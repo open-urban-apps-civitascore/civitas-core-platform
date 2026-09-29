@@ -106,6 +106,48 @@ export const STA_FIXED_TARGET_PATHS: ReadonlySet<string> = new Set(
 )
 
 /**
+ * The vocabulary of the `Observations` port. Its record is the measurement itself, not the Thing
+ * above it, so the same fields sit one root higher: `$.result` rather than
+ * `$.Datastreams[].Observations[].result`. The engine rebases these onto the Thing-rooted catalog
+ * before it validates, and reports them back in this form.
+ */
+export const STA_OBSERVATION_PORT_ENTITIES: readonly StaEntity[] = [
+  {
+    key: 'observation',
+    pathPrefix: '$.',
+    createPaths: ['$.result'],
+    optionalPaths: ['$.phenomenonTime', '$.resultTime', '$.resultQuality', '$.validTime'],
+  },
+  {
+    key: 'featureOfInterest',
+    pathPrefix: '$.FeatureOfInterest',
+    createPaths: [
+      '$.FeatureOfInterest.name',
+      '$.FeatureOfInterest.description',
+      '$.FeatureOfInterest.encodingType',
+      '$.FeatureOfInterest.feature',
+    ],
+    optionalPaths: ['$.FeatureOfInterest.properties'],
+  },
+]
+
+/** The fixed paths of the `Observations` port. */
+export const STA_OBSERVATION_FIXED_TARGET_PATHS: ReadonlySet<string> = new Set(
+  STA_OBSERVATION_PORT_ENTITIES.flatMap(entity => [...entity.createPaths, ...entity.optionalPaths]),
+)
+
+/**
+ * The references the `Observations` port resolves a measurement by. Mirrors the engine's
+ * `SinkPort.OBSERVATIONS.requiredTargets()`: without them the lookup matches nothing and every
+ * measurement would land on whatever the empty filter finds.
+ */
+export const STA_OBSERVATION_REQUIRED_PATHS: readonly string[] = [
+  '$.result',
+  '$.parameters.thingReference',
+  '$.parameters.datastreamReference',
+]
+
+/**
  * A Thing-shaped target structure's FROST vocabulary, snapshotted onto the mapping node at save
  * time (the validation rules cannot re-derive it — they never see the schema tree): the match keys
  * (find-or-create identity, drive the required-key checks) and the full set of mappable
@@ -125,6 +167,13 @@ export interface StaTargetVocabulary {
    */
   readonly thingBag: readonly string[]
   readonly datastreamBag: readonly string[]
+  /**
+   * The measurement's match key, for a structure shaped like the `Observations` port publishes it.
+   * Optional by design: a measurement without one is appended rather than upserted.
+   */
+  readonly observation: readonly string[]
+  /** All record paths the measurement's `parameters` bag declares. */
+  readonly observationBag: readonly string[]
 }
 
 /**
@@ -138,8 +187,12 @@ export const deriveStaMatchKeys = (targetTree: SchemaTree): StaTargetVocabulary 
   const record = recordFields(targetTree)
   const datastreams = record.find(child => child.name === 'Datastreams')?.children ?? []
 
-  const thingProperties = propertiesFields(record)
-  const datastreamProperties = propertiesFields(datastreams)
+  const thingProperties = bagFields(record, 'properties')
+  const datastreamProperties = bagFields(datastreams, 'properties')
+  // SensorThings gives the Observation 'parameters' instead of 'properties'; a structure shaped
+  // like the Observations port publishes it carries that bag at the record root.
+  const observationParameters = bagFields(record, 'parameters')
+  const observationMarked = keyPaths(observationParameters)
 
   const thingMarked = keyPaths(thingProperties)
   const datastreamMarked = keyPaths(datastreamProperties)
@@ -155,12 +208,14 @@ export const deriveStaMatchKeys = (targetTree: SchemaTree): StaTargetVocabulary 
       (thingMarked.length === 0 && thing.length > 0) || (datastreamMarked.length === 0 && datastream.length > 0),
     thingBag: thingProperties.map(node => node.path),
     datastreamBag: datastreamProperties.map(node => node.path),
+    observation: observationMarked.length > 0 ? observationMarked : fallbackReference(observationParameters),
+    observationBag: observationParameters.map(node => node.path),
   }
 }
 
-/** The children of an entity's `properties` bag attribute, or empty if it has none. */
-const propertiesFields = (entityFields: FieldNode[]): FieldNode[] =>
-  entityFields.find(child => child.name === 'properties')?.children ?? []
+/** The children of an entity's bag attribute, or empty if it has none. */
+const bagFields = (entityFields: FieldNode[], bagName: string): FieldNode[] =>
+  entityFields.find(child => child.name === bagName)?.children ?? []
 
 /**
  * The record's direct fields: the tree either roots a single resolved class node (`$`) or exposes

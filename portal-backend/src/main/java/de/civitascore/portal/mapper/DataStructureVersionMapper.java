@@ -4,10 +4,12 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.output.DataStructureVersionOutputDTO;
 import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
+import de.civitascore.portal.model.output.summary.DataStructureVersionUsageSummaryDTO;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
+import org.mapstruct.Named;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.ReportingPolicy;
 
@@ -35,6 +37,10 @@ public interface DataStructureVersionMapper
 
   @Mapping(source = "dataStructure.id", target = "dataStructureId")
   DataStructureVersionSummaryDTO toSummary(DataStructureVersion entity);
+
+  @Named("toUsageSummary")
+  @Mapping(source = "dataStructure.id", target = "dataStructureId")
+  DataStructureVersionUsageSummaryDTO toUsageSummary(DataStructureVersion entity);
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Mapping(target = "dataStructure", ignore = true)

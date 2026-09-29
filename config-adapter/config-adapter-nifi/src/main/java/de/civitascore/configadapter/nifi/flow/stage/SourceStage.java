@@ -48,9 +48,12 @@ public interface SourceStage {
    * Plan-time half: validates the datasource, decrypts credentials, and fills the property maps.
    * Secrets go only into {@link PlanContext#putSensitive}, never into snapshot-bound properties.
    *
+   * @param sourceNodeKey unique per source node across all pipelines and the same on every deploy
+   *     of it, for properties that must be unique per source node rather than per (shared)
+   *     datasource
    * @throws FatalAdapterException if the datasource is invalid or unsafe to deploy
    */
-  void bind(Datasource source, PlanContext out) throws FatalAdapterException;
+  void bind(Datasource source, String sourceNodeKey, PlanContext out) throws FatalAdapterException;
 
   /** Build-time half, phase A: registers source-side controller services (before processors). */
   default void registerControllerServices(BuildContext ctx) throws FatalAdapterException {}

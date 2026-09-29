@@ -10,7 +10,6 @@ const userResponse: User = {
   email: 'maxmustermann@test.de',
   phone: '+49 152 1111111',
   groups: [{ id: 'g1', name: 'Group 1' }],
-  active: true,
 }
 
 describe('mapListUsers', () => {
@@ -20,7 +19,6 @@ describe('mapListUsers', () => {
         id: '12345',
         fullName: 'Max Mustermann',
         email: 'maxmustermann@test.de',
-        active: true,
       },
     ])
   })
@@ -35,7 +33,6 @@ describe('mapUserToFormData', () => {
       lastName: 'Mustermann',
       email: 'maxmustermann@test.de',
       phone: '+49 152 1111111',
-      active: true,
       groupIds: ['g1'],
     }
 

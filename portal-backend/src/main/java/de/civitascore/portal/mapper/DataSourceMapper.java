@@ -3,7 +3,6 @@ package de.civitascore.portal.mapper;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
-import de.civitascore.portal.model.output.summary.DataSourceSummaryDTO;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -40,8 +39,6 @@ public interface DataSourceMapper
   @Mapping(source = "dataStructureVersion.id", target = "dataStructureVersionId")
   @Override
   DataSourceInputDTO toInput(DataSource entity);
-
-  DataSourceSummaryDTO toSummary(DataSource entity);
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Mapping(target = "dataSourceStatus", ignore = true)

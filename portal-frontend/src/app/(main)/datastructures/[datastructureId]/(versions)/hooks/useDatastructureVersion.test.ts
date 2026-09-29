@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { toast } from 'sonner'
 
+import { mockApiError } from '@/__mocks__/errors/apiError.mock'
 import {
   useCreateDatastructureVersion,
   useStatusUpdateDatastructureVersion,
@@ -325,6 +326,30 @@ describe('useDatastructureVersion — status-dependent field validation', () => 
     })
 
     expect(hook.result.current.form.getFieldState('description').error).toBeUndefined()
+  })
+})
+
+describe('useDatastructureVersion — a version still in use', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('names the reason when a data source or data storage still uses the version', async () => {
+    const { hook, updateVersion } = setup(version({ styles: validDiagram() }))
+    updateVersion.mutateAsync.mockRejectedValue(
+      mockApiError(
+        409,
+        'Cannot modify DataStructureVersion because it is referenced by one or more DataSources or DataSinks.',
+        'urn:civitas:error:RESOURCE_IN_USE',
+      ),
+    )
+
+    act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+    await act(async () => {
+      await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(toast.error).toHaveBeenCalledWith('datastructureVersions.errors.inUseError')
   })
 })
 

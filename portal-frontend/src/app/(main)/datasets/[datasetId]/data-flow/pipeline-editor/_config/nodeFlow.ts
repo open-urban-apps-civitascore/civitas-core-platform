@@ -112,10 +112,10 @@ export const NODE_FLOW_DECLARATIONS: Readonly<Record<PipelineNodeType, NodeFlowD
   },
   [PIPELINE_NODE_TYPES.Frost]: {
     role: 'sink',
-    // With a mapping upstream, the engine rebuilds the SensorThings envelope from the mapped
-    // record — any record-convertible input works. Without one, the sink consumes the source's
-    // envelope as-is, so passthrough demands the envelope itself.
-    acceptedInputs: ctx => (ctx.mappedUpstream ? ['RECORDS'] : ['STA_ENVELOPE']),
+    // Records with a mapping and without one: the sink writes every record through its port, and
+    // a record without a mapping must already have the structure of that port. A raw MQTT message
+    // is convertible, so the engine puts a ConvertRecord in front of the sink.
+    acceptedInputs: () => ['RECORDS'],
   },
   [PIPELINE_NODE_TYPES.GeoPersistence]: {
     role: 'sink',

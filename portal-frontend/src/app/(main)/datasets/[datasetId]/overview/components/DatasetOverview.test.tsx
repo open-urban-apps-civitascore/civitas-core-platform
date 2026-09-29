@@ -1,9 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { AxiosError } from 'axios'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { mockApiError } from '@/__mocks__/errors/apiError.mock'
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 import { Dataset } from '@/types/datasets'
@@ -98,6 +98,7 @@ vi.mock('sonner', () => ({
 
 vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
   useGetPipelines: () => ({ data: { data: [] } }),
+  useDeletePipeline: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock('@/app/services/api/datasources/clientRequests', () => ({
@@ -576,18 +577,11 @@ describe('DatasetOverview', () => {
     })
   })
 
-  describe('Save error handling: scope-violation vs. generic', () => {
-    const axios422 = (type?: string) =>
-      new AxiosError('request failed', undefined, undefined, undefined, {
-        status: 422,
-        statusText: '',
-        headers: {},
-        config: {} as never,
-        data: { detail: 'scope violation', type },
-      })
-
+  describe('Save error handling: scope-violation vs. saga vs. generic', () => {
     it('shows the scope-violation toast when the save fails with a DATASOURCE_SCOPE_VIOLATION 422', async () => {
-      mockPatchDataset.mockRejectedValueOnce(axios422('urn:civitas:error:DATASOURCE_SCOPE_VIOLATION'))
+      mockPatchDataset.mockRejectedValueOnce(
+        mockApiError(422, 'scope violation', 'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION'),
+      )
       renderComponent()
       clickEditButton()
 
@@ -598,6 +592,24 @@ describe('DatasetOverview', () => {
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith('messages.datasourceScopeViolation')
+      })
+      expect(toast.error).not.toHaveBeenCalledWith('messages.transitionError')
+    })
+
+    it('shows the saga toast when the save is rejected because a saga is running', async () => {
+      mockPatchDataset.mockRejectedValueOnce(
+        mockApiError(409, 'Cannot release while a saga is in-flight: CREATE', 'urn:civitas:error:SAGA_IN_FLIGHT'),
+      )
+      renderComponent()
+      clickEditButton()
+
+      await act(async () => {
+        fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Updated Name' } })
+      })
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('messages.sagaInFlightError')
       })
       expect(toast.error).not.toHaveBeenCalledWith('messages.transitionError')
     })
@@ -797,6 +809,61 @@ describe('DatasetOverview', () => {
       expect(screen.getByTestId('apiCardMenuView-my-api')).toBeInTheDocument()
       expect(screen.queryByTestId('apiCardMenuEdit-my-api')).not.toBeInTheDocument()
       expect(screen.queryByTestId('apiCardMenuDelete-my-api')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('Release blocked by a draft dependency', () => {
+    const PIPELINE_CLOSURE_INVALID = 'urn:civitas:error:PIPELINE_CLOSURE_INVALID'
+
+    const releaseDraftDataset = async () => {
+      renderComponent({
+        dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
+        groupCount: 1,
+        roleCount: 1,
+      })
+      clickEditButton()
+
+      await openStatusDropdown()
+      await userEvent.click(getStatusOption('AVAILABLE'))
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
+    }
+
+    it('explains the refusal and leaves the Dataset in its previous status', async () => {
+      mockStageDataset.mockRejectedValueOnce(
+        mockApiError(422, 'Pipeline closure validation failed', PIPELINE_CLOSURE_INVALID),
+      )
+
+      await releaseDraftDataset()
+
+      expect(await screen.findByTestId('infoModal')).toBeInTheDocument()
+      expect(screen.getByTestId('statusDropdown')).toHaveTextContent('DRAFT')
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('reports the refusal when the closure only fails at release, after staging succeeded', async () => {
+      mockStageDataset.mockResolvedValueOnce(undefined)
+      mockReleaseDataset.mockRejectedValueOnce(
+        mockApiError(422, 'Pipeline closure validation failed', PIPELINE_CLOSURE_INVALID),
+      )
+
+      await releaseDraftDataset()
+
+      await waitFor(() => {
+        expect(mockStageDataset).toHaveBeenCalledWith('test-id')
+        expect(mockReleaseDataset).toHaveBeenCalledWith('test-id')
+      })
+      expect(await screen.findByTestId('infoModal')).toBeInTheDocument()
+      expect(screen.getByTestId('statusDropdown')).toHaveTextContent('DRAFT')
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('falls back to the transition toast for any other failure', async () => {
+      mockStageDataset.mockRejectedValueOnce(mockApiError(500, 'Boom'))
+
+      await releaseDraftDataset()
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalled())
+      expect(screen.queryByTestId('infoModal')).not.toBeInTheDocument()
     })
   })
 })

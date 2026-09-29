@@ -93,13 +93,7 @@ public class InfraTestDataFactory {
                     .dataSourceStatus(DataSourceStatus.AVAILABLE));
     return portalData.attachSourceConfiguration(
         dataSource,
-        Map.of(
-            "urls",
-            List.of("mqtt://mqtt-broker:1883"),
-            "topics",
-            List.of("sensors/e2e"),
-            "client_id",
-            "civitas-e2e-" + System.nanoTime()));
+        Map.of("urls", List.of("mqtt://mqtt-broker:1883"), "topics", List.of("sensors/e2e")));
   }
 
   public DataSource createSqlDataSource() {

@@ -43,6 +43,15 @@ x-gs-dependencies: &gs_dependencies
   geoserverdb:
     condition: service_healthy
 
+# The probe is the one the images carry; only the start period differs, because the 30s they
+# ship is shorter than a cold start takes on a loaded shared runner.
+x-gs-healthcheck: &gs_healthcheck
+  test: ["CMD-SHELL", "curl -f -s -o /dev/null localhost:8081/actuator/health || exit 1"]
+  start_period: 180s
+  interval: 10s
+  timeout: 5s
+  retries: 5
+
 services:
   # ── Databases ──────────────────────────────────────────────
 
@@ -77,7 +86,7 @@ services:
       retries: 10
 
   postgres-frost:
-    image: postgis/postgis:16-3.5-alpine
+    image: postgis/postgis:16-3.5-alpine@sha256:47e961a569fd52ff31f0fe205ed91eeab17d9f5fff6722e6d7ea6b588748b293
     platform: linux/amd64
     environment:
       POSTGRES_DB: sensorthings
@@ -94,7 +103,7 @@ services:
   # PutDatabaseRecord writes rows into it. The postgis image auto-creates the PostGIS extension in
   # the default database, so geometry columns work out of the box.
   postgres-sink:
-    image: postgis/postgis:16-3.5-alpine
+    image: postgis/postgis:16-3.5-alpine@sha256:47e961a569fd52ff31f0fe205ed91eeab17d9f5fff6722e6d7ea6b588748b293
     platform: linux/amd64
     environment:
       POSTGRES_DB: geosink
@@ -323,8 +332,16 @@ services:
     # into the image instead.
     build:
       context: ../nifi
+      # The FROST NAR the build-frost-nar-api-test job builds. The saga collections deploy FROST
+      # Pipelines, which write through PutFrostRecord. Run `mvn -f nifi-extensions/pom.xml package`
+      # first when starting this stack by hand.
+      additional_contexts:
+        frostnar: ../../nifi-extensions/nifi-frost-nar/target
       dockerfile_inline: |
         FROM apache/nifi:2.9.0
+        # lib/, not the auto-load directory: NiFi loads lib/ before it answers a request, so the
+        # first deployment already finds PutFrostRecord.
+        COPY --from=frostnar --chown=nifi:nifi *.nar /opt/nifi/nifi-current/lib/
         USER root
         RUN mkdir -p /opt/nifi/drivers \
           && curl -fsSL -o /opt/nifi/drivers/postgresql.jar \
@@ -387,7 +404,7 @@ services:
   # ── Email (SMTP sink for Keycloak verification emails) ──
 
   mailpit:
-    image: axllent/mailpit:v1.28
+    image: axllent/mailpit:v1.30@sha256:d5ecbb067db3705fa953d79e1b7f81ef84038df67aba6c52825d8c02a1ea748a
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://localhost:8025/api/v1/messages"]
       interval: 5s
@@ -401,12 +418,12 @@ services:
   # restconfig. Mirrors dev-environment/geoserver/docker-compose.yaml, single-network/ephemeral.
   # The standalone profile removes service discovery and the config server, so every service reads
   # the catalog backend directly. The service name rabbitmq is load-bearing (images resolve it by
-  # bare hostname); each image has a built-in :8081 healthcheck for `up --wait`.
+  # bare hostname); the :8081 probe at x-gs-healthcheck drives `up --wait`.
 
   # pgconfig catalog DB for GeoServer Cloud — separate from postgres-sink (the DATA db the
   # datastore reads). The postgis image auto-creates the PostGIS extension.
   geoserverdb:
-    image: postgis/postgis:16-3.5-alpine
+    image: postgis/postgis:16-3.5-alpine@sha256:47e961a569fd52ff31f0fe205ed91eeab17d9f5fff6722e6d7ea6b588748b293
     platform: linux/amd64
     environment:
       POSTGRES_DB: geoserver
@@ -430,20 +447,22 @@ services:
       retries: 3
 
   gateway:
-    image: geoservercloud/geoserver-cloud-gateway:3.0.1.1
+    image: geoservercloud/geoserver-cloud-gateway:3.0.1.1@sha256:de0b20bd2a4393bac7b9923e63f6e03611648bd749834434f170e9bfc9c0e47d
     environment:
       <<: *gs_common_env
       GEOSERVER_BASE_PATH: /geoserver
     depends_on: *gs_dependencies
+    healthcheck: *gs_healthcheck
     networks:
       default:
         aliases:
           - civitas-geoserver
 
   restconfig:
-    image: geoservercloud/geoserver-cloud-rest:3.0.1.1
+    image: geoservercloud/geoserver-cloud-rest:3.0.1.1@sha256:318254b52f967de74ffbef8efcf1f7d8cf81035e6b8145ea5d42d6e8a65fd301
     environment: *gs_common_env
     depends_on: *gs_dependencies
+    healthcheck: *gs_healthcheck
 
   # ── Application ──────────────────────────────────────────
 
@@ -463,7 +482,6 @@ services:
       KEYCLOAK_ISSUER_URI: http://keycloak:8080
       KEYCLOAK_REALM: civitas-core
       KEYCLOAK_TARGET_REALM: civitas-core
-      APP_URL: http://portal-backend:8089
       SERVER_PORT: 8089
       SPRING_PROFILES_ACTIVE: local,postgres,init
     depends_on:
@@ -589,7 +607,7 @@ services:
   # request traverses APISIX → OIDC → OPA → OWS upstream. Not a real GeoServer (none is provisioned by
   # an OWS named API; workspace provisioning is tied to GeoSinks, not named-API routing).
   geoserver-mock:
-    image: mendhak/http-https-echo:34
+    image: mendhak/http-https-echo:34@sha256:b9b45336763a8ee7f34b78fc77f3b1ecbaae41bb9ab72949d06e7c3cf6928532
     environment:
       HTTP_PORT: "8080"
     healthcheck:
@@ -619,7 +637,7 @@ services:
   # never through the deployed flow, so without this every MQTT-TLS pipeline deploy fails validation.
   nifi-parameter-contexts:
     profiles: [seed]
-    image: curlimages/curl:8.11.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     entrypoint: ["sh", "/provision-parameter-contexts.sh"]
     environment:
       NIFI_SECURITY_USER_OIDC_CLIENT_SECRET: "${NIFI_OIDC_CLIENT_SECRET:-nifi-dev-secret}"

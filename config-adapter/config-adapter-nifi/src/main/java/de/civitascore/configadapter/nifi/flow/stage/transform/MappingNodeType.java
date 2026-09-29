@@ -92,7 +92,7 @@ public final class MappingNodeType implements TransformNodeType {
       }
       FrostMappingCompiler.FrostCompilation compilation =
           frostMappingCompiler.compile(
-              mappingConfigs.get(mappingConfigs.size() - 1), frost.staProperties());
+              mappingConfigs.get(mappingConfigs.size() - 1), frost.staProperties(), frost.port());
       units.add(compilation.mapping());
       return new Compilation(units, compilation.plan());
     }

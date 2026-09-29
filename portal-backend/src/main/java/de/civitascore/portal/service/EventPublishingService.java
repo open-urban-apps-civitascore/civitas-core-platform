@@ -197,14 +197,6 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
       T entity, I input, ConfigValue preSaveConfigValue);
 
   /**
-   * Extracts the entity ID, used for correlation in config adapter events.
-   *
-   * @param entity the entity
-   * @return the entity's UUID
-   */
-  protected abstract UUID getEntityId(T entity);
-
-  /**
    * Hook called after the entity is saved and flushed but before publishing to the external system.
    * Subclasses can override to perform additional setup (e.g., resolving relationships).
    *

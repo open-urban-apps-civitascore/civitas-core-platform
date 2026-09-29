@@ -244,7 +244,6 @@ Defaults are tuned for production. Only adjust for specific throughput/latency r
 
 | Property / Env Var | Default | Description |
 |---|---|---|
-| `APP_URL` | `http://localhost:8089` | Server URL shown in Swagger UI — set to the external-facing URL |
 | `SPRINGDOC_SWAGGER_UI_ENABLED` | `true` | Set to `false` in production to hide API docs |
 | `SPRINGDOC_API_DOCS_PATH` | `/v1/api-docs` | OpenAPI JSON path |
 | `SPRINGDOC_SWAGGER_UI_PATH` | `/swagger-ui.html` | Swagger UI path |
@@ -285,7 +284,7 @@ Enable for a single rollout deploy, then check the completion log — `Group-mem
 
 ### 2.9 Dataset Staging & Release
 
-Before a dataset is staged or released, the backend walks out from each of its pipelines over the references the model registry recorded and refuses the transition while an artifact the flow reaches cannot carry a release. The walk follows a bounded number of hops.
+Before a dataset is released, the backend walks out from each of its pipelines over the references the model registry recorded and refuses the transition while an artifact the flow reaches cannot carry a release. The walk follows a bounded number of hops.
 
 | Property / Env Var | Default | Description |
 |---|---|---|
@@ -393,6 +392,5 @@ environment:
   KAFKA_ENABLED: "true"
 
   # Optional
-  APP_URL: https://api.example.com
   SERVER_PORT: "8089"
 ```

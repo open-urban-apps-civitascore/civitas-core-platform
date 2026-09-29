@@ -46,7 +46,6 @@ class ExternalIdManagementIntegrationTest extends BaseEventPublishingIntegration
     updateInput.setFirstName("Updated");
     updateInput.setLastName(existingUser.getLastName());
     updateInput.setEmail(existingUser.getEmail());
-    updateInput.setActive(true);
 
     User updatedUser = userService.update(existingUser.getId(), updateInput);
 

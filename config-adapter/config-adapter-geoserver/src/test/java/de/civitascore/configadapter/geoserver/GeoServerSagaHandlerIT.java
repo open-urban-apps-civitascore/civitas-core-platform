@@ -18,18 +18,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AppConfig;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import jakarta.ws.rs.client.Invocation;
-import jakarta.ws.rs.core.HttpHeaders;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -61,13 +59,13 @@ class GeoServerSagaHandlerIT extends AbstractGeoServerIT {
   private static final String LAYER_POINT = "sensor_locations";
 
   private GeoServerSagaHandler handler;
-  private Client httpClient;
+  private OkHttpClient httpClient;
   private ObjectMapper objectMapper;
   private String basicAuthHeader;
 
   @BeforeAll
   void prepareClient() {
-    httpClient = ClientBuilder.newClient();
+    httpClient = new OkHttpClient();
     objectMapper = new ObjectMapper();
     basicAuthHeader =
         "Basic "
@@ -79,7 +77,8 @@ class GeoServerSagaHandlerIT extends AbstractGeoServerIT {
   @AfterAll
   void closeClient() {
     if (httpClient != null) {
-      httpClient.close();
+      httpClient.dispatcher().executorService().shutdown();
+      httpClient.connectionPool().evictAll();
     }
   }
 
@@ -250,44 +249,54 @@ class GeoServerSagaHandlerIT extends AbstractGeoServerIT {
   }
 
   private JsonNode getJson(String path) {
-    try (Response response = request(path).get()) {
-      assertEquals(200, response.getStatus(), () -> "GET " + path + " expected 200");
-      try {
-        return objectMapper.readTree(response.readEntity(String.class));
-      } catch (Exception e) {
-        throw new AssertionError("Failed to parse JSON from " + path, e);
-      }
+    Request request = authenticatedRequest(pathUrl(path)).get().build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      assertEquals(200, response.code(), () -> "GET " + path + " expected 200");
+      return objectMapper.readTree(response.body().string());
+    } catch (Exception e) {
+      throw new AssertionError("Failed to parse JSON from " + path, e);
     }
   }
 
   private int statusOf(String path) {
-    try (Response response = request(path).get()) {
-      return response.getStatus();
+    Request request = authenticatedRequest(pathUrl(path)).get().build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      return response.code();
+    } catch (Exception e) {
+      throw new AssertionError("Failed to query " + path, e);
     }
   }
 
-  private Invocation.Builder request(String path) {
-    return httpClient
-        .target(geoServerUrl())
-        .path(path)
-        .request(MediaType.APPLICATION_JSON)
-        .header(HttpHeaders.AUTHORIZATION, basicAuthHeader);
+  private static HttpUrl pathUrl(String path) {
+    return HttpUrl.get(geoServerUrl())
+        .newBuilder()
+        .addPathSegments(path.replaceFirst("^/", ""))
+        .build();
+  }
+
+  private Request.Builder authenticatedRequest(HttpUrl url) {
+    return new Request.Builder()
+        .url(url)
+        .header("Accept", "application/json")
+        .header("Authorization", basicAuthHeader);
   }
 
   private void deleteWorkspaceIfExists() {
-    try (Response response =
-        httpClient
-            .target(geoServerUrl())
-            .path("/rest/workspaces/" + WORKSPACE)
-            .queryParam("recurse", "true")
-            .request(MediaType.APPLICATION_JSON)
-            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader)
-            .delete()) {
-      int status = response.getStatus();
+    HttpUrl url =
+        HttpUrl.get(geoServerUrl())
+            .newBuilder()
+            .addPathSegments("rest/workspaces/" + WORKSPACE)
+            .addQueryParameter("recurse", "true")
+            .build();
+    Request request = authenticatedRequest(url).delete().build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      int status = response.code();
       if (status != 200 && status != 404) {
         throw new AssertionError(
-            "Workspace cleanup failed: HTTP " + status + " — " + response.readEntity(String.class));
+            "Workspace cleanup failed: HTTP " + status + " — " + response.body().string());
       }
+    } catch (Exception e) {
+      throw new AssertionError("Workspace cleanup failed", e);
     }
   }
 }

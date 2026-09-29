@@ -1,12 +1,10 @@
 package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
-import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
@@ -16,7 +14,6 @@ import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
-import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -28,7 +25,6 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
-import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.PipelineRepository;
@@ -36,7 +32,6 @@ import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.StyleRepository;
 import de.civitascore.portal.service.DataSetService;
 import de.civitascore.portal.service.GroupService;
-import de.civitascore.portal.util.ResourceInUseException;
 import jakarta.persistence.EntityManager;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -60,7 +55,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private DataSinkRepository dataSinkRepository;
-  @Autowired private DistributionRepository distributionRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
   @Autowired private DataStructureRepository dataStructureRepository;
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
@@ -83,7 +77,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
     styleRepository.deleteAll();
     dataSinkRepository.deleteAll();
     pipelineRepository.deleteAll();
-    distributionRepository.deleteAll();
     dataSetRepository.deleteAll();
     dataStructureVersionRepository.deleteAll();
     dataStructureRepository.deleteAll();
@@ -112,13 +105,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
     return pipelineRepository.save(p);
   }
 
-  private Distribution createDistribution(DataSet dataSet) {
-    Distribution d = new Distribution();
-    d.setDataSet(dataSet);
-    d.setAccessUrl("http://example.com/" + UUID.randomUUID().toString().substring(0, 8));
-    return distributionRepository.save(d);
-  }
-
   private Group createGroup() {
     Group g = new Group();
     g.setName(uniqueName("group"));
@@ -143,7 +129,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
     dsv.setDataStructure(dataStructure);
     dsv.setVersion(uniqueName("v"));
     dsv.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-    dsv.setDataStructureVersionSource(DataStructureVersionSource.OWN);
     return dataStructureVersionRepository.save(dsv);
   }
 
@@ -222,23 +207,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
       entityManager.flush();
 
       assertThat(pipelineRepository.findById(pipelineId)).isEmpty();
-    }
-
-    @Test
-    @Transactional
-    @DisplayName("Deleting DataSet should cascade-delete its Distributions")
-    void deletingDataSet_shouldCascadeDeleteDistributions() {
-      DataSet dataSet = createDataSet();
-      Distribution distribution = createDistribution(dataSet);
-      UUID distributionId = distribution.getId();
-
-      entityManager.flush();
-      entityManager.clear();
-
-      dataSetRepository.deleteById(dataSet.getId());
-      entityManager.flush();
-
-      assertThat(distributionRepository.findById(distributionId)).isEmpty();
     }
 
     @Test
@@ -330,25 +298,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
   @Nested
   @DisplayName("Group cascades")
   class GroupCascades {
-
-    @Test
-    @Transactional
-    @DisplayName("Deleting Group with children should be prevented")
-    void deletingGroup_withChildren_shouldThrowResourceInUseException() {
-      Group parent = createGroup();
-      Group child = new Group();
-      child.setName(uniqueName("child-group"));
-      child.setParentGroup(parent);
-      groupRepository.save(child);
-
-      entityManager.flush();
-      entityManager.clear();
-
-      UUID parentId = parent.getId();
-      assertThatThrownBy(() -> groupService.deleteById(parentId))
-          .isInstanceOf(ResourceInUseException.class)
-          .hasMessageContaining("child groups");
-    }
 
     @Test
     @Transactional

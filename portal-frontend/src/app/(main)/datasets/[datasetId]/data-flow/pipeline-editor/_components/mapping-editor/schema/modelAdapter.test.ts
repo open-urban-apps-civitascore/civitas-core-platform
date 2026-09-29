@@ -500,6 +500,9 @@ describe('x-core-primaryKey marker', () => {
       // the bag exposes every attribute as a mappable target, including the non-scalar 'tags'
       thingBag: ['$.properties.stationRef', '$.properties.tags'],
       datastreamBag: ['$.Datastreams[].properties.dsRef'],
+      // the model carries no Observation parameters
+      observation: [],
+      observationBag: [],
     })
   })
 })

@@ -26,7 +26,4 @@ public class UserInputDTO extends BaseInputDTO {
 
   @Schema(example = "+49 170 1234567")
   private String phone;
-
-  @Schema(description = "Whether the user account is active", example = "true")
-  private Boolean active;
 }

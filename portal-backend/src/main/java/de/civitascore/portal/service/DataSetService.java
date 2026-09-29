@@ -290,7 +290,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       ModelRegistryGateway.ModelPin pin =
           modelRegistryGateway.createDataSetManifest(entity.getName());
       entity.setManifestLogicalUrn(pin.logicalUrn());
-      entity.setManifestUrn(pin.versionedUrn());
     }
     return super.postConvertToEntity(entity, input);
   }
@@ -434,9 +433,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     if (StringUtils.isBlank(dataSet.getName())) {
       throw new InvalidInputException("name", id, "DataSet name must not be blank");
     }
-    if (StringUtils.isBlank(dataSet.getDescription())) {
-      throw new InvalidInputException("description", id, "DataSet description must not be blank");
-    }
     if (dataSet.getPipelines() == null || dataSet.getPipelines().isEmpty()) {
       throw new InvalidInputException(
           "pipelines", id, "DataSet must contain at least one Pipeline before staging");
@@ -464,7 +460,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     }
 
     revalidatePipelineDataSourcesAgainstPool(dataSet);
-    pipelineClosureValidator.validate(dataSet.getPipelines());
 
     dataSet.setDataSetStatus(DataSetStatus.READY);
     return dataSetRepository.save(dataSet);
@@ -536,9 +531,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
     revalidatePipelineDataSourcesAgainstPool(dataSet);
     verifyPublishedSurfacesAreServable(dataSet);
-    // Re-asserted here and not only at staging: this is the transition that provisions
-    // infrastructure, and registry state can drift through routes that do not pass the in-use
-    // guard refusing to unrelease an artifact a flow still reaches.
     pipelineClosureValidator.validate(dataSet.getPipelines());
 
     dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
@@ -633,36 +625,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     sagaPublisher.publishUnreleaseRequested(saved);
 
     return saved;
-  }
-
-  /**
-   * Explicitly adds a reusable artifact (by CORE URN) to this dataset's manifest — the "Beides"
-   * explicit-assignment path, independent of any Pipeline that uses it. Model Forge maintains the
-   * manifest (a {@code dataset-ref} membership edge).
-   *
-   * <p>No route reaches this: the caller's rights are read off the dataset, never off the artifact,
-   * so a route would let a caller pull in an artifact of a dataset they may not read.
-   */
-  @Transactional
-  public void linkMember(UUID datasetId, String memberUrn) {
-    DataSet dataSet = findByIdOrThrow(datasetId);
-    if (dataSet.getManifestLogicalUrn() == null) {
-      throw new InvalidInputException(
-          "DataSet", datasetId, "DataSet has no manifest to link members into");
-    }
-    if (memberUrn == null || memberUrn.isBlank()) {
-      throw new InvalidInputException("member", datasetId, "member artifact URN is required");
-    }
-    modelRegistryGateway.linkToDataSet(dataSet.getManifestLogicalUrn(), memberUrn);
-  }
-
-  /** Explicitly removes an artifact (by CORE URN) from this dataset's manifest. */
-  @Transactional
-  public void unlinkMember(UUID datasetId, String memberUrn) {
-    DataSet dataSet = findByIdOrThrow(datasetId);
-    if (dataSet.getManifestLogicalUrn() != null && memberUrn != null && !memberUrn.isBlank()) {
-      modelRegistryGateway.unlinkFromDataSet(dataSet.getManifestLogicalUrn(), memberUrn);
-    }
   }
 
   /**
@@ -952,9 +914,16 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * FROST is provisioned only for datasets carrying a FROST sink, so a project id is no longer a
    * reliable proxy. Never resets it: the flag survives an unrelease and is only dropped when the
    * row is removed on DELETE.
+   *
+   * <p>Each sink is marked as well. A completed saga provisioned every sink it was sent, and the
+   * mutation guard keeps the sinks of an AVAILABLE dataset from changing in between.
    */
   private void markProvisioned(DataSet dataSet) {
     dataSet.setProvisioned(true);
+    for (DataSink sink : dataSinkRepository.findByDataSetId(dataSet.getId())) {
+      sink.setProvisioned(true);
+      dataSinkRepository.save(sink);
+    }
   }
 
   /**

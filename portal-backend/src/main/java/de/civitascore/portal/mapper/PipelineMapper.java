@@ -3,7 +3,6 @@ package de.civitascore.portal.mapper;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.PipelineInputDTO;
 import de.civitascore.portal.model.output.PipelineOutputDTO;
-import de.civitascore.portal.model.output.summary.PipelineSummaryDTO;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -37,8 +36,6 @@ public interface PipelineMapper extends DtoMapper<PipelineInputDTO, PipelineOutp
   @Mapping(target = "dataSourceIds", ignore = true)
   @Override
   PipelineInputDTO toInput(Pipeline entity);
-
-  PipelineSummaryDTO toSummary(Pipeline entity);
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Mapping(target = "dataSet", ignore = true)

@@ -36,7 +36,10 @@ export const toBoundingBoxFormData = (bbox: BoundingBox | null) => ({
   crs: bbox?.crs ?? '',
 })
 
-export const mapApiLayerToFormData = (layers: Layer[]): LayerFormData[] =>
+export const mapApiLayerToFormData = (
+  layers: Layer[],
+  resolveNativeCRS: (dataSinkId: string) => string,
+): LayerFormData[] =>
   layers.map(layer => ({
     id: layer.id,
     title: layer.title,
@@ -46,9 +49,8 @@ export const mapApiLayerToFormData = (layers: Layer[]): LayerFormData[] =>
     attribute: layer.attribute,
     cqlFilter: layer.cqlFilter || '',
     geometryColumnRef: layer.geometryColumnRef,
-    nativeCRS: layer.nativeCRS,
-    crs: layer.crs || layer.nativeCRS,
-    bboxAutoCalculate: false,
+    nativeCRS: resolveNativeCRS(layer.dataSinkId),
+    crs: layer.crs,
     nativeBoundingBox: toBoundingBoxFormData(layer.nativeBoundingBox),
     latLonBoundingBox: toBoundingBoxFormData(layer.latLonBoundingBox),
     keywords: layer.keywords,
@@ -78,10 +80,8 @@ export const mapFormLayerToPayload = (layers: LayerFormData[]): LayerApiPayload[
   layers.map(({ id: _id, nativeCRS: _nativeCRS, ...layer }) => ({
     ...layer,
     defaultStyleId: layer.defaultStyleId && layer.defaultStyleId !== 'none' ? layer.defaultStyleId : null,
-    nativeBoundingBox: layer.bboxAutoCalculate ? null : toBoundingBoxPayload(layer.nativeBoundingBox),
-    latLonBoundingBox: layer.bboxAutoCalculate
-      ? null
-      : toBoundingBoxPayload(computeLatLonBoundingBox(layer.nativeBoundingBox, layer.crs)),
+    nativeBoundingBox: toBoundingBoxPayload(layer.nativeBoundingBox),
+    latLonBoundingBox: toBoundingBoxPayload(computeLatLonBoundingBox(layer.nativeBoundingBox, layer.crs)),
   }))
 
 export const buildStaPayloadData = (data: StaApiFormData): NamedApiPayload => ({

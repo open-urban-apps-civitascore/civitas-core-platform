@@ -3,7 +3,7 @@
 import { Copy, Globe, Layers, MoreVertical, Timer } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { ComponentType, useState } from 'react'
+import { ComponentType, MouseEvent, useState } from 'react'
 import { toast } from 'sonner'
 
 import { usePatchDataset } from '@/app/services/api/datasets/clientRequests'
@@ -46,6 +46,11 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, canView, isOpen
 
   const viewUrl = `/datasets/${datasetId}/apis/${api.slug}`
   const editUrl = `/datasets/${datasetId}/apis/${api.slug}?mode=edit`
+
+  const suppressCardNavigation = (e: MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
 
   const handleCopyPath = async () => {
     try {
@@ -118,8 +123,8 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, canView, isOpen
                 size="icon"
                 className="h-8 w-8 shrink-0"
                 data-testid={`apiCardMenu-${api.slug}`}
-                aria-label={api.name}
-                onClick={e => e.stopPropagation()}
+                aria-label={t('menuLabel', { name: api.name })}
+                onClick={suppressCardNavigation}
               >
                 <MoreVertical className="h-4 w-4" />
               </Button>
@@ -167,17 +172,20 @@ export const ApiCard = ({ api, datasetId, existingApis, canEdit, canView, isOpen
             <span className="text-muted-foreground font-normal">{pathPrefix}</span>
             <strong>{api.slug}</strong>
           </span>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={e => {
-              e.stopPropagation()
+              suppressCardNavigation(e)
               handleCopyPath()
             }}
-            className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Copy API path"
+            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+            data-testid={`apiCardCopy-${api.slug}`}
+            aria-label={t('actions.copyPath')}
           >
             <Copy className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       </GuardedLink>
 

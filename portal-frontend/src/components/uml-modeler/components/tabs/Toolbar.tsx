@@ -22,6 +22,35 @@ interface ToolbarProps {
   onImportFromDatastructure?: () => void
 }
 
+/**
+ * The published structures this diagram was built from, each at the version it was loaded at. A
+ * later version of a structure does not change a diagram that took an earlier one, so the version
+ * is what has to be readable here.
+ */
+const ImportedStructures: React.FC = () => {
+  const { diagram } = useActiveDiagram()
+  const t = useTranslations('umlModeler.loadStandard')
+  const imported = diagram.importedStructures ?? []
+  if (imported.length === 0) return null
+
+  return (
+    <span>
+      {t('pinned')}{' '}
+      {imported.map(structure => (
+        <span key={structure.urn} className="ml-1" title={structure.urn}>
+          {structure.name} {versionOf(structure.urn)}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+/** The version segment of a pinned URN, or nothing when the pin carries none. */
+const versionOf = (urn: string): string => {
+  const segments = urn.split(':')
+  return segments.length > 8 ? segments[8] : ''
+}
+
 export const Toolbar: React.FC<ToolbarProps> = ({
   onSave,
   hasUnsavedChanges = false,
@@ -129,7 +158,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       <div className="flex-1" />
 
       {/* Status/Info Area */}
-      <div className="text-xs text-gray-500">{/* Could show current zoom, selection count, etc. */}</div>
+      <div className="text-xs text-gray-500">
+        <ImportedStructures />
+      </div>
     </div>
   )
 }

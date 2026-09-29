@@ -226,7 +226,6 @@
       },
       "department": "1",
       "phone": "+49 75 5576070",
-      "active": true,
       "positionDescription": "Bauingenieur für Kanalisationsbau ",
       "displayName": "Sophia Fischer",
       "groups": ["1", "2", "zQe8zBc"]
@@ -245,7 +244,6 @@
       },
       "department": "2",
       "phone": "+49 164 682294",
-      "active": true,
       "positionDescription": "Biotopschutz-Spezialist",
       "displayName": "Markus Schmidt",
       "groups": ["3", "zQe8zBc"]
@@ -264,7 +262,6 @@
       },
       "department": "1",
       "phone": "+49 78 1583715",
-      "active": false,
       "positionDescription": null,
       "displayName": "Michael Wagner",
       "groups": ["2"]
@@ -285,7 +282,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": false,
       "position": "Luftfahrtprüfer",
       "positionDescription": ""
     },
@@ -304,7 +300,6 @@
       "department": "1",
       "groups": ["1", "2", "3"],
       "phone": "+49 158 3743727",
-      "active": true,
       "position": "Flugsicherheitsbeauftragter",
       "positionDescription": null,
       "roles": ["1"],
@@ -326,7 +321,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["3"],
-      "active": false,
       "position": "Sachbearbeiter Fahrerlaubnisse",
       "positionDescription": ""
     },
@@ -346,7 +340,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": false,
       "position": "Schleusenwärter",
       "positionDescription": ""
     },
@@ -366,7 +359,6 @@
       },
       "groups": ["1", "2", "3", "zQe8zBc"],
       "roles": ["4"],
-      "active": true,
       "position": "Fahrzeugtechniker",
       "positionDescription": ""
     },
@@ -386,7 +378,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["3"],
-      "active": false,
       "position": "Bodenschutzexperte",
       "positionDescription": ""
     },
@@ -404,7 +395,6 @@
       },
       "department": "2",
       "phone": "+49 8919421272",
-      "active": true,
       "positionDescription": null,
       "displayName": "Thomas Schmidt",
       "groups": []
@@ -425,7 +415,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": false,
       "position": "Leiter Recyclinghof",
       "positionDescription": ""
     },
@@ -445,7 +434,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": false,
       "position": "Wasserqualitätsprüfer",
       "positionDescription": ""
     },
@@ -465,7 +453,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": false,
       "position": "Ingenieur Leitungsbau",
       "positionDescription": ""
     },
@@ -485,7 +472,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": false,
       "position": "Ingenieur Leitungsbau",
       "positionDescription": ""
     },
@@ -505,7 +491,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": false,
       "position": "Forstingenieur",
       "positionDescription": ""
     },
@@ -525,7 +510,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["2"],
-      "active": true,
       "position": "Denkmalschutzexperte",
       "positionDescription": ""
     },
@@ -545,7 +529,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": true,
       "position": "Klimaschutzkoordinator",
       "positionDescription": ""
     },
@@ -565,7 +548,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["2"],
-      "active": false,
       "position": "Klimaschutzkoordinator",
       "positionDescription": ""
     },
@@ -585,7 +567,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["3"],
-      "active": true,
       "position": "Kfz-Zulassungsprüfer",
       "positionDescription": ""
     },
@@ -605,7 +586,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": false,
       "position": "Artenschutzbeauftragter",
       "positionDescription": ""
     },
@@ -625,7 +605,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": false,
       "position": "Techniker Straßenbeleuchtung",
       "positionDescription": ""
     },
@@ -645,7 +624,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": true,
       "position": "Mitarbeiter Grundwasserbau",
       "positionDescription": ""
     },
@@ -665,7 +643,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": true,
       "position": "Wasserqualitätsprüfer",
       "positionDescription": ""
     },
@@ -685,7 +662,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["3"],
-      "active": true,
       "position": "Friedhofsgärtner",
       "positionDescription": ""
     },
@@ -705,7 +681,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": false,
       "position": "Mitarbeiter Restmüllentsorgung",
       "positionDescription": ""
     },
@@ -725,7 +700,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": true,
       "position": "Landschaftsgärtner",
       "positionDescription": ""
     },
@@ -745,7 +719,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": true,
       "position": "Biotopschutz-Spezialist",
       "positionDescription": ""
     },
@@ -765,7 +738,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": false,
       "position": "Abfallberater",
       "positionDescription": ""
     },
@@ -785,7 +757,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": false,
       "position": "Techniker Straßenbeleuchtung",
       "positionDescription": ""
     },
@@ -805,7 +776,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["3"],
-      "active": false,
       "position": "Spielplatzwart",
       "positionDescription": ""
     },
@@ -825,7 +795,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": true,
       "position": "Mitarbeiter Grundwasserbau",
       "positionDescription": ""
     },
@@ -845,7 +814,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": true,
       "position": "Baumpfleger",
       "positionDescription": ""
     },
@@ -865,7 +833,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": true,
       "position": "Straßenplaner",
       "positionDescription": ""
     },
@@ -885,7 +852,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": true,
       "position": "Friedhofsgärtner",
       "positionDescription": ""
     },
@@ -905,7 +871,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": false,
       "position": "Landschaftsgärtner",
       "positionDescription": ""
     },
@@ -925,7 +890,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": true,
       "position": "Landschaftsgärtner",
       "positionDescription": ""
     },
@@ -945,7 +909,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["2"],
-      "active": true,
       "position": "Friedhofsgärtner",
       "positionDescription": ""
     },
@@ -965,7 +928,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": true,
       "position": "Hafeninspektor",
       "positionDescription": ""
     },
@@ -985,7 +947,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": true,
       "position": "Biotopschutz-Spezialist",
       "positionDescription": ""
     },
@@ -1005,7 +966,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": false,
       "position": "Friedhofsgärtner",
       "positionDescription": ""
     },
@@ -1025,7 +985,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["2"],
-      "active": false,
       "position": "Luftreinhalteexperte",
       "positionDescription": ""
     },
@@ -1045,7 +1004,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": false,
       "position": "Flughafeninspektor",
       "positionDescription": ""
     },
@@ -1065,7 +1023,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": true,
       "position": "Sachbearbeiter Bußgelder",
       "positionDescription": ""
     },
@@ -1085,7 +1042,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["2"],
-      "active": false,
       "position": "Forstingenieur",
       "positionDescription": ""
     },
@@ -1105,7 +1061,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": true,
       "position": "Experte für Biomüll",
       "positionDescription": ""
     },
@@ -1125,7 +1080,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": true,
       "position": "Ingenieur Leitungsbau",
       "positionDescription": ""
     },
@@ -1145,7 +1099,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["2"],
-      "active": false,
       "position": "Flughafeninspektor",
       "positionDescription": ""
     },
@@ -1165,7 +1118,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": false,
       "position": "Forstingenieur",
       "positionDescription": ""
     },
@@ -1185,7 +1137,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["3"],
-      "active": false,
       "position": "Techniker Straßenbeleuchtung",
       "positionDescription": ""
     },
@@ -1205,7 +1156,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": false,
       "position": "Lärmschutzbeauftragter",
       "positionDescription": ""
     },
@@ -1225,7 +1175,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": false,
       "position": "Brückenbauingenieur",
       "positionDescription": ""
     },
@@ -1245,7 +1194,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["3"],
-      "active": true,
       "position": "Ingenieur Leitungsbau",
       "positionDescription": ""
     },
@@ -1265,7 +1213,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["3"],
-      "active": false,
       "position": "Lärmschutzbeauftragter",
       "positionDescription": ""
     },
@@ -1285,7 +1232,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": false,
       "position": "Biotopschutz-Spezialist",
       "positionDescription": ""
     },
@@ -1305,7 +1251,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": true,
       "position": "Wasserwirtschaftsingenieur",
       "positionDescription": ""
     },
@@ -1325,7 +1270,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["2"],
-      "active": false,
       "position": "Ingenieur Leitungsbau",
       "positionDescription": ""
     },
@@ -1345,7 +1289,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": false,
       "position": "Mitarbeiter Restmüllentsorgung",
       "positionDescription": ""
     },
@@ -1365,7 +1308,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": true,
       "position": "Brückenbauingenieur",
       "positionDescription": ""
     },
@@ -1385,7 +1327,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["3"],
-      "active": false,
       "position": "Verkehrsüberwacher",
       "positionDescription": ""
     },
@@ -1405,7 +1346,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": true,
       "position": "Binnenschifffahrtsinspektor",
       "positionDescription": ""
     },
@@ -1425,7 +1365,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": false,
       "position": "Landschaftsgärtner",
       "positionDescription": ""
     },
@@ -1445,7 +1384,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["3"],
-      "active": true,
       "position": "Friedhofsgärtner",
       "positionDescription": ""
     },
@@ -1465,7 +1403,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": true,
       "position": "Küstenschutztechniker",
       "positionDescription": ""
     },
@@ -1485,7 +1422,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": false,
       "position": "Sachbearbeiter Bußgelder",
       "positionDescription": ""
     },
@@ -1505,7 +1441,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": true,
       "position": "Klimaschutzkoordinator",
       "positionDescription": ""
     },
@@ -1525,7 +1460,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": true,
       "position": "Luftreinhalteexperte",
       "positionDescription": ""
     },
@@ -1545,7 +1479,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": true,
       "position": "Bauprüfer",
       "positionDescription": ""
     },
@@ -1565,7 +1498,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["2"],
-      "active": true,
       "position": "Binnenschifffahrtsinspektor",
       "positionDescription": ""
     },
@@ -1585,7 +1517,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": true,
       "position": "Kfz-Zulassungsprüfer",
       "positionDescription": ""
     },
@@ -1605,7 +1536,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": false,
       "position": "Luftfahrtprüfer",
       "positionDescription": ""
     },
@@ -1625,7 +1555,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": true,
       "position": "Wasserwirtschaftsingenieur",
       "positionDescription": ""
     },
@@ -1645,7 +1574,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["2"],
-      "active": true,
       "position": "Techniker Straßenbeleuchtung",
       "positionDescription": ""
     },
@@ -1665,7 +1593,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["3"],
-      "active": false,
       "position": "Bauprüfer",
       "positionDescription": ""
     },
@@ -1685,7 +1612,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": false,
       "position": "Kfz-Zulassungsprüfer",
       "positionDescription": ""
     },
@@ -1705,7 +1631,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": true,
       "position": "Leiter Recyclinghof",
       "positionDescription": ""
     },
@@ -1725,7 +1650,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["2"],
-      "active": true,
       "position": "Fahrzeugtechniker",
       "positionDescription": ""
     },
@@ -1745,7 +1669,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": false,
       "position": "Straßenplaner",
       "positionDescription": ""
     },
@@ -1765,7 +1688,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": true,
       "position": "Ingenieur Tunnelbau",
       "positionDescription": ""
     },
@@ -1785,7 +1707,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": true,
       "position": "Mitarbeiter Restmüllentsorgung",
       "positionDescription": ""
     },
@@ -1805,7 +1726,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["2"],
-      "active": false,
       "position": "Experte für Sondermüll",
       "positionDescription": ""
     },
@@ -1825,7 +1745,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": true,
       "position": "Brückenbauingenieur",
       "positionDescription": ""
     },
@@ -1845,7 +1764,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": true,
       "position": "Kfz-Zulassungsprüfer",
       "positionDescription": ""
     },
@@ -1865,7 +1783,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": true,
       "position": "Leiter Recyclinghof",
       "positionDescription": ""
     },
@@ -1885,7 +1802,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["3"],
-      "active": true,
       "position": "Straßenunterhaltungsarbeiter",
       "positionDescription": ""
     },
@@ -1905,7 +1821,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": false,
       "position": "Luftreinhalteexperte",
       "positionDescription": ""
     },
@@ -1925,7 +1840,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": false,
       "position": "Techniker Straßenbeleuchtung",
       "positionDescription": ""
     },
@@ -1945,7 +1859,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": false,
       "position": "Sachbearbeiter Bußgelder",
       "positionDescription": ""
     },
@@ -1965,7 +1878,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["2"],
-      "active": true,
       "position": "Ingenieur Tunnelbau",
       "positionDescription": ""
     },
@@ -1985,7 +1897,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": true,
       "position": "Mitarbeiter Restmüllentsorgung",
       "positionDescription": ""
     },
@@ -2005,7 +1916,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["2"],
-      "active": false,
       "position": "Flugraumüberwacher",
       "positionDescription": ""
     },
@@ -2025,7 +1935,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": false,
       "position": "Parkanlagenpfleger",
       "positionDescription": ""
     },
@@ -2045,7 +1954,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": false,
       "position": "Parkanlagenpfleger",
       "positionDescription": ""
     },
@@ -2065,7 +1973,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": false,
       "position": "Umweltpädagoge",
       "positionDescription": ""
     },
@@ -2085,7 +1992,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["4"],
-      "active": true,
       "position": "Landschaftsgärtner",
       "positionDescription": ""
     },
@@ -2105,7 +2011,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": false,
       "position": "Parkanlagenpfleger",
       "positionDescription": ""
     },
@@ -2125,7 +2030,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": false,
       "position": "Luftfahrtprüfer",
       "positionDescription": ""
     },
@@ -2145,7 +2049,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": false,
       "position": "Lärmschutzbeauftragter",
       "positionDescription": ""
     },
@@ -2165,7 +2068,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["5"],
-      "active": false,
       "position": "Luftreinhalteexperte",
       "positionDescription": ""
     },
@@ -2185,7 +2087,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["2"],
-      "active": true,
       "position": "Energieberater",
       "positionDescription": ""
     },
@@ -2205,7 +2106,6 @@
       },
       "groups": ["1", "2", "3"],
       "roles": ["1"],
-      "active": false,
       "position": "Parkanlagenpfleger",
       "positionDescription": ""
     },
@@ -2224,7 +2124,6 @@
       "department": "3",
       "groups": ["1", "2", "3"],
       "phone": "+49 164 6822941",
-      "active": false,
       "position": "",
       "positionDescription": "",
       "roles": ["3"],
@@ -2239,7 +2138,6 @@
       "department": "",
       "group": null,
       "phone": "+49 164 6822941",
-      "active": false,
       "position": null,
       "positionDescription": null,
       "roles": [],
@@ -2259,7 +2157,6 @@
       "department": "",
       "group": null,
       "phone": "+49 164 6822941",
-      "active": false,
       "position": null,
       "positionDescription": null,
       "roles": [],
@@ -3610,14 +3507,7 @@
           "columns": ["*"],
           "where": "",
           "args_mapping": "",
-          "prefix": "",
-          "suffix": "",
-          "init_files": [],
-          "init_statement": "",
-          "conn_max_idle_time": "",
-          "conn_max_life_time": "",
-          "conn_max_idle": 2,
-          "conn_max_open": 0
+          "init_files": []
         }
       },
       "connection": "inactive",
@@ -3630,7 +3520,6 @@
       "id": "ds1",
       "name": "Test Datastructure 1",
       "description": "Description 1",
-      "createdFromDataSource": false,
       "inUse": false,
       "assignments": [],
       "dataStructureStatus": "DRAFT",
@@ -3660,7 +3549,6 @@
       "id": "ds2",
       "name": "Test Datastructure 2",
       "description": "Description 2",
-      "createdFromDataSource": false,
       "inUse": false,
       "assignments": [],
       "dataStructureStatus": "DRAFT",
@@ -3707,7 +3595,6 @@
       "id": "ds3",
       "name": "Test Datastructure 3",
       "description": "Description 3",
-      "createdFromDataSource": false,
       "inUse": false,
       "assignments": [],
       "dataStructureStatus": "DRAFT",
@@ -3771,7 +3658,6 @@
       "id": "ds4",
       "name": "Test Datastructure 4",
       "description": "Description 4",
-      "createdFromDataSource": false,
       "inUse": false,
       "assignments": [],
       "dataStructureStatus": "DRAFT",

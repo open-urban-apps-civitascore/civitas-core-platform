@@ -75,6 +75,48 @@ class CoreSchemaValidatorTest {
             .isNotEmpty();
     }
 
+    @Test
+    @DisplayName("A Mapping with a toUuid field is accepted")
+    void mappingWithToUuidIsAccepted() {
+        assertThat(validate(ArtifactKind.MAPPING, """
+            {
+              "$schema": "https://civitasconnect.digital/core/mapping/v1",
+              "id": "urn:core:platform:civitas:mapping:common:StationToReading:abc1234567:1.0.0",
+              "fields": { "$.id": { "op": "toUuid", "input": { "op": "copy", "sourcePath": "$.stationId" } } }
+            }
+            """)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("A Mapping with a toDateTime nested in another operation is accepted")
+    void mappingWithNestedToDateTimeIsAccepted() {
+        assertThat(validate(ArtifactKind.MAPPING, """
+            {
+              "$schema": "https://civitasconnect.digital/core/mapping/v1",
+              "id": "urn:core:platform:civitas:mapping:common:StationToReading:abc1234567:1.0.0",
+              "fields": {
+                "$.observedAt": {
+                  "op": "format",
+                  "pattern": "yyyy-MM-dd",
+                  "input": { "op": "toDateTime", "input": "$.timestamp", "pattern": "yyyy-MM-dd'T'HH:mm:ssXXX" }
+                }
+              }
+            }
+            """)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("A Mapping with a toDateTime that has no pattern is rejected")
+    void mappingWithToDateTimeWithoutPatternIsRejected() {
+        assertThat(validate(ArtifactKind.MAPPING, """
+            {
+              "$schema": "https://civitasconnect.digital/core/mapping/v1",
+              "id": "urn:core:platform:civitas:mapping:common:StationToReading:abc1234567:1.0.0",
+              "fields": { "$.observedAt": { "op": "toDateTime", "input": "$.timestamp" } }
+            }
+            """)).isNotEmpty();
+    }
+
     // ── Pipeline ────────────────────────────────────────────────────────────────
 
     @Test
@@ -99,6 +141,22 @@ class CoreSchemaValidatorTest {
               "id": "urn:core:platform:civitas:pipeline:common:WeatherIngest:abc1234567:1.0.0"
             }
             """)).isNotEmpty();
+    }
+
+    // ── DataSource ──────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("A conforming MQTT DataSource is accepted")
+    void conformingMqttDataSourceIsAccepted() {
+        assertThat(validate(ArtifactKind.DATA_SOURCE, """
+            {
+              "$schema": "https://civitasconnect.digital/core/datasource/v1",
+              "id": "urn:core:platform:civitas:datasource:common:Broker:abc1234567:1.0.0",
+              "connectionType": "mqtt",
+              "urls": ["mqtt://mosquitto:1883"],
+              "topics": ["sensors/+/temp"]
+            }
+            """)).isEmpty();
     }
 
     // ── DataSet ─────────────────────────────────────────────────────────────────
@@ -172,6 +230,51 @@ class CoreSchemaValidatorTest {
             """));
 
         assertThat(diagnostics).as("the declared mapping contract requires a field map").isNotEmpty();
+    }
+
+    // ── DataSink ────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("A FROST DataSink carrying a port is accepted")
+    void frostDataSinkWithAPortIsAccepted() {
+        // The port is the write logic of the sink. The branch closes over its properties, so a
+        // sink could not carry one before the field was published here.
+        assertThat(validate(ArtifactKind.DATA_SINK, """
+            {
+              "$schema": "https://civitasconnect.digital/core/datasink/v1",
+              "id": "urn:core:platform:civitas:datasink:common:Sensors:abc1234567:1.0.0",
+              "connectionType": "frost",
+              "port": "ThingTree"
+            }
+            """)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("A FROST DataSink with a port outside the closed set is rejected")
+    void frostDataSinkWithAnUnknownPortIsRejected() {
+        // The value reaches a NiFi processor property. Only the published set may be stored.
+        assertThat(validate(ArtifactKind.DATA_SINK, """
+            {
+              "$schema": "https://civitasconnect.digital/core/datasink/v1",
+              "id": "urn:core:platform:civitas:datasink:common:Sensors:abc1234567:1.0.0",
+              "connectionType": "frost",
+              "port": "Everything"
+            }
+            """)).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("A FROST DataSink without a port is accepted")
+    void frostDataSinkWithoutAPortIsAccepted() {
+        // The schema says what may be stored; the deploy engine says what may publish. A sink that
+        // predates the port must still load, or the migration could not read it.
+        assertThat(validate(ArtifactKind.DATA_SINK, """
+            {
+              "$schema": "https://civitasconnect.digital/core/datasink/v1",
+              "id": "urn:core:platform:civitas:datasink:common:Sensors:abc1234567:1.0.0",
+              "connectionType": "frost"
+            }
+            """)).isEmpty();
     }
 
     private List<Diagnostic> validate(ArtifactKind kind, String document) {

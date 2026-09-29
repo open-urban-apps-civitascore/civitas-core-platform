@@ -2,10 +2,7 @@ package de.civitascore.portal.model.input;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
-import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import java.util.List;
-import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -16,13 +13,7 @@ public class DataStructureInputDTO extends BaseDataEntityInputDTO {
 
   @NotBlank(message = "Name is required") private String name;
 
-  private String description;
+  @NotBlank(message = "Description is required") private String description;
 
   @JsonIgnore private DataStructureStatus dataStructureStatus;
-
-  @Schema(description = "Whether this was auto-generated from a data source")
-  private Boolean createdFromDataSource;
-
-  @Schema(description = "IDs of versions to associate")
-  private List<UUID> dataStructureVersionIds;
 }

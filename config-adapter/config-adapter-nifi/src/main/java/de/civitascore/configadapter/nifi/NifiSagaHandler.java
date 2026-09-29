@@ -47,8 +47,6 @@ import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import de.civitascore.configadapter.nifi.rest.NifiRestClient;
 import de.civitascore.configadapter.util.PayloadConverter;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
@@ -63,7 +61,7 @@ import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
-import org.glassfish.jersey.media.multipart.MultiPartFeature;
+import okhttp3.OkHttpClient;
 import org.owasp.encoder.Encode;
 
 /**
@@ -119,7 +117,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   private FlowDeploymentPlanner planner;
   private NifiRestClient nifiClient;
   // Dedicated (cert-validating) client for the Keycloak token endpoint; see oidcTokenProvider().
-  private Client oidcClient;
+  private OkHttpClient oidcClient;
   private NifiRuntimeMonitor runtimeMonitor;
 
   /** No-arg constructor for ServiceLoader discovery. Call {@link #initialize} before use. */
@@ -133,7 +131,6 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   }
 
   @Override
-  @SuppressWarnings("PMD.CloseResource") // the JAX-RS Client is long-lived; closed in close()
   protected void doInitialize(AdapterConfig config) {
     this.tlsInsecure = Boolean.parseBoolean(getProperty("tls.insecure", "true"));
     if (tlsInsecure) {
@@ -170,9 +167,9 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
         new FlowDeploymentPlanner(new GraphParser(), new NifiFlowBuilder(stages), stages);
 
     if (this.nifiClient == null) {
-      Client jaxrs = client() != null ? client() : createClient();
-      setClient(jaxrs);
-      this.nifiClient = new NifiRestClient(url, oidcTokenProvider(), jaxrs, mqttTruststore);
+      OkHttpClient httpClient = client() != null ? client() : createClient();
+      setClient(httpClient);
+      this.nifiClient = new NifiRestClient(url, oidcTokenProvider(), httpClient, mqttTruststore);
     }
     this.runtimeMonitor =
         new NifiRuntimeMonitor(
@@ -228,7 +225,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
    * client-credentials tokens against the configured OpenID Connect provider (Keycloak), replacing
    * the former single-user login.
    *
-   * <p>It gets its OWN JAX-RS client, deliberately NOT the NiFi client: disabling TLS verification
+   * <p>It gets its OWN HTTP client, deliberately NOT the NiFi client: disabling TLS verification
    * for a self-signed dev NiFi ({@code nifi.tls.insecure=true}) must never also disable it for the
    * Keycloak token endpoint, or the client secret could be posted over an unverified connection.
    */
@@ -246,7 +243,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
               + " NIFI_OIDC_CLIENT_SECRET is provided");
     }
     this.oidcClient =
-        ClientBuilder.newBuilder()
+        new OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .build();
@@ -267,14 +264,15 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   }
 
   @Override
-  protected Client createClient() {
-    ClientBuilder builder =
-        ClientBuilder.newBuilder()
+  protected OkHttpClient createClient() {
+    OkHttpClient.Builder builder =
+        new OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .register(MultiPartFeature.class);
+            .readTimeout(60, TimeUnit.SECONDS);
     if (tlsInsecure) {
-      builder.sslContext(trustAllContext()).hostnameVerifier((host, session) -> true);
+      builder
+          .sslSocketFactory(trustAllContext().getSocketFactory(), TRUST_ALL_MANAGER)
+          .hostnameVerifier((host, session) -> true);
     }
     return builder.build();
   }
@@ -747,7 +745,6 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       status.put("message", e.getSafeExternalMessage());
       status.put("stacktrace", PipelineMessageSanitizer.sanitize(e.getInternalMessage()));
       status.put("occurredAt", Instant.now().toString());
-      status.put("correlationId", command.sagaId());
     }
     Map<String, Object> resultData =
         pipelineId == null ? Map.of() : Map.of("pipelineStatus", status);
@@ -766,29 +763,30 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       credentialResolver.close();
     }
     if (oidcClient != null) {
-      oidcClient.close();
+      oidcClient.dispatcher().executorService().shutdown();
+      oidcClient.connectionPool().evictAll();
     }
     super.close();
   }
 
-  private static SSLContext trustAllContext() {
-    try {
-      TrustManager[] trustAll = {
-        new X509TrustManager() {
-          @Override
-          public void checkClientTrusted(X509Certificate[] chain, String type) {}
+  private static final X509TrustManager TRUST_ALL_MANAGER =
+      new X509TrustManager() {
+        @Override
+        public void checkClientTrusted(X509Certificate[] chain, String type) {}
 
-          @Override
-          public void checkServerTrusted(X509Certificate[] chain, String type) {}
+        @Override
+        public void checkServerTrusted(X509Certificate[] chain, String type) {}
 
-          @Override
-          public X509Certificate[] getAcceptedIssuers() {
-            return new X509Certificate[0];
-          }
+        @Override
+        public X509Certificate[] getAcceptedIssuers() {
+          return new X509Certificate[0];
         }
       };
+
+  private static SSLContext trustAllContext() {
+    try {
       SSLContext context = SSLContext.getInstance("TLS");
-      context.init(null, trustAll, new SecureRandom());
+      context.init(null, new TrustManager[] {TRUST_ALL_MANAGER}, new SecureRandom());
       return context;
     } catch (GeneralSecurityException e) {
       throw new IllegalStateException("Failed to build insecure TLS context", e);

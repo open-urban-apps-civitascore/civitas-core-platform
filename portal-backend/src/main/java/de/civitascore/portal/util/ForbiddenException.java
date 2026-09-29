@@ -10,20 +10,11 @@ public class ForbiddenException extends RuntimeException {
 
   private final String resourceType;
   private final UUID resourceId;
-  private final String resourceInfo;
 
   public ForbiddenException(String resourceType, UUID resourceId, String message) {
     super(message);
     this.resourceType = resourceType;
     this.resourceId = resourceId;
-    this.resourceInfo = null;
-  }
-
-  public ForbiddenException(String resourceType, String resourceInfo, String message) {
-    super(message);
-    this.resourceType = resourceType;
-    this.resourceId = null;
-    this.resourceInfo = resourceInfo;
   }
 
   @Override
@@ -33,7 +24,6 @@ public class ForbiddenException extends RuntimeException {
         + resourceType
         + '\''
         + (resourceId != null ? ", resourceId='" + resourceId + '\'' : "")
-        + (resourceInfo != null ? ", resourceInfo='" + resourceInfo + '\'' : "")
         + ", message='"
         + getMessage()
         + '\''

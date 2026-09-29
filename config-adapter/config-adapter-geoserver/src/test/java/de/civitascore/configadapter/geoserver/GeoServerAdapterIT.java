@@ -31,11 +31,7 @@ import de.civitascore.configadapter.model.geoserver.FeatureTypeConfig;
 import de.civitascore.configadapter.model.geoserver.GeoServerConfigValue;
 import de.civitascore.configadapter.model.geoserver.LayerConfig;
 import de.civitascore.configadapter.model.geoserver.WorkspaceConfig;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import jakarta.ws.rs.core.HttpHeaders;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -45,6 +41,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -86,13 +86,13 @@ class GeoServerAdapterIT extends AbstractGeoServerIT {
 
   private GeoServerAdapter adapter;
   private CapturingEventPublisher eventPublisher;
-  private Client httpClient;
+  private OkHttpClient httpClient;
   private ObjectMapper objectMapper;
   private String basicAuthHeader;
 
   @BeforeAll
   void prepareCleanWorkspace() {
-    httpClient = ClientBuilder.newClient();
+    httpClient = new OkHttpClient();
     objectMapper = new ObjectMapper();
     basicAuthHeader =
         "Basic "
@@ -106,7 +106,8 @@ class GeoServerAdapterIT extends AbstractGeoServerIT {
   void cleanupWorkspace() {
     deleteWorkspaceIfExists();
     if (httpClient != null) {
-      httpClient.close();
+      httpClient.dispatcher().executorService().shutdown();
+      httpClient.connectionPool().evictAll();
     }
   }
 
@@ -383,24 +384,31 @@ class GeoServerAdapterIT extends AbstractGeoServerIT {
                 + ".json"));
   }
 
+  private Request.Builder authenticatedRequest(HttpUrl url) {
+    return new Request.Builder()
+        .url(url)
+        .header("Accept", "application/json")
+        .header("Authorization", basicAuthHeader);
+  }
+
   private JsonNode getFeatureType(String workspace, String datastore, String featureType)
       throws Exception {
-    try (Response response =
-        httpClient
-            .target(geoServerUrl())
-            .path(
-                "/rest/workspaces/"
+    HttpUrl url =
+        HttpUrl.get(geoServerUrl())
+            .newBuilder()
+            .addPathSegments(
+                "rest/workspaces/"
                     + workspace
                     + "/datastores/"
                     + datastore
                     + "/featuretypes/"
                     + featureType
                     + ".json")
-            .request(MediaType.APPLICATION_JSON)
-            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader)
-            .get()) {
-      assertEquals(200, response.getStatus());
-      String body = response.readEntity(String.class);
+            .build();
+    Request request = authenticatedRequest(url).get().build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      assertEquals(200, response.code());
+      String body = response.body().string();
       assertNotNull(body);
       return objectMapper.readTree(body);
     }
@@ -411,29 +419,31 @@ class GeoServerAdapterIT extends AbstractGeoServerIT {
   }
 
   private JsonNode getLayer(String workspace, String layer) {
-    try (Response response =
-        httpClient
-            .target(geoServerUrl())
-            .path("/rest/workspaces/" + workspace + "/layers/" + layer + ".json")
-            .request(MediaType.APPLICATION_JSON)
-            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader)
-            .get()) {
-      assertEquals(200, response.getStatus());
-      return objectMapper.readTree(response.readEntity(String.class));
+    HttpUrl url =
+        HttpUrl.get(geoServerUrl())
+            .newBuilder()
+            .addPathSegments("rest/workspaces/" + workspace + "/layers/" + layer + ".json")
+            .build();
+    Request request = authenticatedRequest(url).get().build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      assertEquals(200, response.code());
+      return objectMapper.readTree(response.body().string());
     } catch (Exception e) {
       throw new AssertionError("Failed to read layer " + workspace + ":" + layer, e);
     }
   }
 
   private int statusOf(String path) {
-    try (Response response =
-        httpClient
-            .target(geoServerUrl())
-            .path(path)
-            .request(MediaType.APPLICATION_JSON)
-            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader)
-            .get()) {
-      return response.getStatus();
+    HttpUrl url =
+        HttpUrl.get(geoServerUrl())
+            .newBuilder()
+            .addPathSegments(path.replaceFirst("^/", ""))
+            .build();
+    Request request = authenticatedRequest(url).get().build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      return response.code();
+    } catch (IOException e) {
+      throw new AssertionError("Failed to query " + path, e);
     }
   }
 
@@ -442,22 +452,24 @@ class GeoServerAdapterIT extends AbstractGeoServerIT {
   }
 
   private void deleteWorkspace(String name) {
-    try (Response response =
-        httpClient
-            .target(geoServerUrl())
-            .path("/rest/workspaces/" + name)
-            .queryParam("recurse", "true")
-            .request(MediaType.APPLICATION_JSON)
-            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader)
-            .delete()) {
-      int status = response.getStatus();
-      String body = response.readEntity(String.class);
+    HttpUrl url =
+        HttpUrl.get(geoServerUrl())
+            .newBuilder()
+            .addPathSegments("rest/workspaces/" + name)
+            .addQueryParameter("recurse", "true")
+            .build();
+    Request request = authenticatedRequest(url).delete().build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      int status = response.code();
+      String body = response.body().string();
       // Only "deleted" (200) and "already gone" (404) are acceptable. A 403/500 here means a broken
       // test environment (auth/server failure) and would leave residual state — surface it loudly.
       if (status != 200 && status != 404) {
         throw new AssertionError(
             "Workspace cleanup for '" + name + "' failed: HTTP " + status + " — " + body);
       }
+    } catch (IOException e) {
+      throw new AssertionError("Failed to delete workspace '" + name + "'", e);
     }
   }
 

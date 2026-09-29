@@ -104,7 +104,7 @@ services:
   # Kept out of `up` (profile) because a task container that exits would fail a `--wait` startup.
   nifi-parameter-contexts:
     profiles: [seed]
-    image: curlimages/curl:8.11.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     entrypoint: ["sh", "/provision-parameter-contexts.sh"]
     environment:
       NIFI_SECURITY_USER_OIDC_CLIENT_SECRET: "${NIFI_OIDC_CLIENT_SECRET:-nifi-dev-secret}"

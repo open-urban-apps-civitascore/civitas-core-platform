@@ -1,9 +1,11 @@
 package de.civitascore.portal.service.validation;
 
 import de.civitascore.portal.configuration.PipelineClosureValidationProperties;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.ScopeType;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
@@ -24,19 +26,20 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
 /**
- * Refuses to let a Data Set be staged or released while an artifact its flows depend on cannot
- * carry a release. Provisioning configures NiFi, FROST, PostGIS, GeoServer and APISIX, so an
- * artifact that proves unusable afterwards has to be undone through saga compensation.
+ * Refuses to let a Data Set be released while an artifact its flows depend on cannot carry a
+ * release. Provisioning configures NiFi, FROST, PostGIS, GeoServer and APISIX, so an artifact that
+ * proves unusable afterwards has to be undone through saga compensation.
  *
- * <p>What participates is decided by the flow, not by Data Set membership: the walk starts at each
- * Pipeline's model and follows the references the registry recorded. Pipeline content is never
- * parsed, and a Data Set member no flow reaches does not block it.
+ * <p>A Pipeline with a stored model participates; one without contributes no flow. Its Data sources
+ * are the ones referenced on the Pipeline itself, and the registry walk starts at its model and
+ * follows the recorded references. Pipeline content is never parsed, and a Dataset member that no
+ * flow reaches does not block it.
  *
- * <p>Every artifact reached must resolve. One the platform holds a Data Structure Version for must
- * also be readable by the caller and released — that record, not the URN's kind, is what gives it a
- * lifecycle and a scope. One without a record is held to resolvability alone: elements are
- * deliberately reusable, so inheriting a lifecycle would block a shared element on any unrelated
- * draft.
+ * <p>Every Data source of a participating Pipeline must be AVAILABLE. Every registry artifact must
+ * resolve. An artifact with a Data structure version row must also be readable and released. The
+ * row, not the URN's kind, gives it a lifecycle and a Scope. An artifact without a row is held to
+ * resolvability alone. Elements are reusable, so inheriting a lifecycle would block a shared
+ * element on an unrelated draft.
  *
  * <p>Findings are collected across every flow and reported together.
  */
@@ -62,14 +65,14 @@ public class PipelineClosureValidator {
       return;
     }
     Set<UUID> offending = new LinkedHashSet<>();
-    // One verdict per structure for the whole call: several versions, and several flows, routinely
-    // reach the same structure, and each decision otherwise re-reads the caller's assignments.
-    Map<UUID, Boolean> readability = new HashMap<>();
+    // Keep one verdict per structure for the whole call. Several versions and flows can reach the
+    // same structure, and each decision otherwise reads the caller's Assignments again.
+    Map<UUID, Boolean> structureReadability = new HashMap<>();
     for (Pipeline pipeline : pipelines) {
       if (pipeline.getModelUrn() == null || pipeline.getModelUrn().isBlank()) {
         continue;
       }
-      if (flowBlocks(pipeline, readability)) {
+      if (flowBlocks(pipeline, structureReadability)) {
         offending.add(pipeline.getId());
       }
     }
@@ -79,14 +82,13 @@ public class PipelineClosureValidator {
   }
 
   /**
-   * Whether this flow blocks a release. Every reason is logged rather than returned: the reply
-   * names the pipeline only, so the log is where an operator learns which artifact and why.
+   * Whether this flow blocks a release. The reply names only the Pipeline; the log gives detail.
    */
-  private boolean flowBlocks(Pipeline pipeline, Map<UUID, Boolean> readability) {
+  private boolean flowBlocks(Pipeline pipeline, Map<UUID, Boolean> structureReadability) {
     ModelRegistryGateway.ArtifactClosure closure =
         modelRegistryGateway.closure(pipeline.getModelUrn(), properties.maxDepth());
 
-    boolean blocks = false;
+    boolean blocks = dataSourcesBlock(pipeline);
     if (closure.truncated()) {
       // Passing here would report "nothing found" for a flow nobody walked to its end.
       log.warn(
@@ -110,7 +112,26 @@ public class PipelineClosureValidator {
     Map<String, List<DataStructureVersion>> governed = governingVersions.governingAll(resolved);
     for (String urn : resolved) {
       List<DataStructureVersion> records = governed.get(urn);
-      if (records != null && governedBlocks(pipeline.getId(), urn, records, readability)) {
+      if (records != null && governedBlocks(pipeline.getId(), urn, records, structureReadability)) {
+        blocks = true;
+      }
+    }
+    return blocks;
+  }
+
+  /**
+   * Whether a Data source of this flow blocks a release. No permission on the Data source is
+   * required: saving the Pipeline authorized the reference through the Use relationship, and the
+   * reply discloses nothing about the Data source.
+   */
+  private boolean dataSourcesBlock(Pipeline pipeline) {
+    boolean blocks = false;
+    for (DataSource dataSource : pipeline.getDataSources()) {
+      if (dataSource.getDataSourceStatus() != DataSourceStatus.AVAILABLE) {
+        log.info(
+            "Closure validation: data source {} reached by pipeline {} is still a draft",
+            dataSource.getId(),
+            pipeline.getId());
         blocks = true;
       }
     }
@@ -140,7 +161,7 @@ public class PipelineClosureValidator {
       return true;
     }
     if (readable.stream().noneMatch(PipelineClosureValidator::isReleased)) {
-      log.warn(
+      log.info(
           "Closure validation: {} reached by pipeline {} is still a draft",
           Encode.forJava(urn),
           pipelineId);

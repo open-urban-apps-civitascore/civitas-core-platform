@@ -4,6 +4,7 @@ import { CircleCheckBig, CircleDashed } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
+import { InUseIndicator } from '@/components/in-use-indicator/InUseIndicator'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
@@ -93,6 +94,17 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
       meta: {
         style: {
           width: '15%',
+          minWidth: '100px',
+        },
+      },
+    }),
+    columnHelper.accessor('inUseByReleased', {
+      header: tCommon('inUse.columnHeader'),
+      cell: info => <InUseIndicator isInUseByReleased={info.getValue()} />,
+      enableSorting: false,
+      meta: {
+        style: {
+          width: '10%',
           minWidth: '100px',
         },
       },

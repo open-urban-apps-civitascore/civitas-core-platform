@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
+import de.civitascore.configadapter.nifi.mapping.SinkPort;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -39,7 +40,7 @@ class PipelineDeploymentRequestTest {
 
   @Test
   void frostSinkCarriesItsProjectId() {
-    FrostSinkSpec sink = new FrostSinkSpec("42", null);
+    FrostSinkSpec sink = new FrostSinkSpec("42", SinkPort.THING_TREE, null);
     assertEquals(SinkType.FROST, sink.type());
     assertEquals("42", sink.projectId());
   }
@@ -48,9 +49,13 @@ class PipelineDeploymentRequestTest {
   void frostSinkRequiresANumericProjectId() {
     // The id scopes the flow to the dataset's FROST project and is interpolated into processor
     // URLs/$filters — missing or non-numeric values must be unrepresentable.
-    assertThrows(IllegalArgumentException.class, () -> new FrostSinkSpec(null, null));
-    assertThrows(IllegalArgumentException.class, () -> new FrostSinkSpec(" ", null));
-    assertThrows(IllegalArgumentException.class, () -> new FrostSinkSpec("1) or true", null));
+    assertThrows(
+        IllegalArgumentException.class, () -> new FrostSinkSpec(null, SinkPort.THING_TREE, null));
+    assertThrows(
+        IllegalArgumentException.class, () -> new FrostSinkSpec(" ", SinkPort.THING_TREE, null));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new FrostSinkSpec("1) or true", SinkPort.THING_TREE, null));
   }
 
   @Test
@@ -72,7 +77,10 @@ class PipelineDeploymentRequestTest {
         IllegalArgumentException.class,
         () ->
             new PipelineDeploymentRequest(
-                " ", Map.of(), new Datasource(), new FrostSinkSpec("1", null)));
+                " ",
+                Map.of(),
+                new Datasource(),
+                new FrostSinkSpec("1", SinkPort.THING_TREE, null)));
   }
 
   @Test
@@ -82,7 +90,7 @@ class PipelineDeploymentRequestTest {
 
     PipelineDeploymentRequest request =
         new PipelineDeploymentRequest(
-            "p-1", mutable, new Datasource(), new FrostSinkSpec("1", null));
+            "p-1", mutable, new Datasource(), new FrostSinkSpec("1", SinkPort.THING_TREE, null));
 
     // mutating the caller's map after construction must not leak into the record
     mutable.put("edges", new ArrayList<>());
@@ -94,7 +102,11 @@ class PipelineDeploymentRequestTest {
   void nullGraphDataBecomesEmptyMap() {
     PipelineDeploymentRequest request =
         new PipelineDeploymentRequest(
-            "p-1", null, new Datasource(), new FrostSinkSpec("1", null), Map.of());
+            "p-1",
+            null,
+            new Datasource(),
+            new FrostSinkSpec("1", SinkPort.THING_TREE, null),
+            Map.of());
     assertTrue(request.graphData().isEmpty());
   }
 
@@ -102,7 +114,11 @@ class PipelineDeploymentRequestTest {
   void nullMappingsBecomeEmptyMap() {
     PipelineDeploymentRequest request =
         new PipelineDeploymentRequest(
-            "p-1", Map.of(), new Datasource(), new FrostSinkSpec("1", null), null);
+            "p-1",
+            Map.of(),
+            new Datasource(),
+            new FrostSinkSpec("1", SinkPort.THING_TREE, null),
+            null);
     assertTrue(request.mappings().isEmpty());
   }
 }

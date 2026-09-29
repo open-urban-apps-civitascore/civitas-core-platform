@@ -26,6 +26,7 @@ import {
   StaApiFormData,
 } from '@/types/namedApis'
 import { StyleFormData } from '@/types/styles'
+import { isNotDraftError, isResourceInUseError, isSagaInFlightError } from '@/utils/errors'
 import { getNativeCRSFromDataSink, mapApiLayerToFormData, mapApiStyleToFormData } from '@/utils/namedApis'
 
 import { useApiConfig } from '../../hooks/useApiConfig'
@@ -52,7 +53,6 @@ const defaultLayer: LayerFormData = {
   geometryColumnRef: '',
   nativeCRS: '',
   crs: '',
-  bboxAutoCalculate: false,
   nativeBoundingBox: { minX: '', minY: '', maxX: '', maxY: '', crs: '' },
   latLonBoundingBox: { minX: '', minY: '', maxX: '', maxY: '', crs: 'EPSG:4326' },
   defaultStyleId: '',
@@ -126,15 +126,9 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
 
   const layers = useMemo(
     () =>
-      mapApiLayerToFormData(layersData?.data || []).map(layer => {
-        // setting the nativeLayer here is necessary since in the API response it gets returned as null
-        // TODO: remove this section once this is fixed in the backend
-        if (!layer.nativeCRS && layer.dataSinkId) {
-          const nativeCRS = getNativeCRSFromDataSink(layer.dataSinkId, postgisDataSinks, postgisDatastructures)
-          return { ...layer, nativeCRS }
-        }
-        return layer
-      }),
+      mapApiLayerToFormData(layersData?.data || [], dataSinkId =>
+        getNativeCRSFromDataSink(dataSinkId, postgisDataSinks, postgisDatastructures),
+      ),
     [layersData, postgisDataSinks, postgisDatastructures],
   )
   const apiStyles = useMemo(() => stylesData?.data || [], [stylesData])
@@ -225,6 +219,7 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
   }
 
   const handleAddLayer = () => {
+    if (isReadOnly) return
     const newIndex = layerFields.length
     appendLayer({ ...defaultLayer, id: `new-${crypto.randomUUID()}` })
     setSelectedLayerIndex(newIndex)
@@ -233,15 +228,21 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
   const deleteLayer = useDeleteLayer()
 
   const handleDeleteLayer = async () => {
-    if (selectedLayerIndex === null) return
+    if (isReadOnly || selectedLayerIndex === null) return
     const layer = layerFields[selectedLayerIndex]
     const isNew = layer.id.startsWith('new-')
     if (!isNew) {
       try {
         await deleteLayer.mutateAsync({ datasetId: dataset.id, layerId: layer.id })
         toast.success(t('messages.deleteLayerSuccess'))
-      } catch {
-        toast.error(t('messages.deleteLayerError'))
+      } catch (error) {
+        if (isNotDraftError(error)) {
+          toast.error(t('messages.notDraftError'))
+        } else if (isSagaInFlightError(error)) {
+          toast.error(t('messages.sagaInFlightError'))
+        } else {
+          toast.error(t('messages.deleteLayerError'))
+        }
         throw new Error()
       }
     }
@@ -255,6 +256,7 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
   }
 
   const handleAddStyle = () => {
+    if (isReadOnly) return
     const newIndex = styleFields.length
     appendStyle({ ...defaultStyle, id: `new-${crypto.randomUUID()}` })
     setSelectedStyleIndex(newIndex)
@@ -263,15 +265,23 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
   const deleteStyle = useDeleteStyle()
 
   const handleDeleteStyle = async () => {
-    if (selectedStyleIndex === null) return
+    if (isReadOnly || selectedStyleIndex === null) return
     const style = styleFields[selectedStyleIndex]
     const isNew = style.id.startsWith('new-')
     if (!isNew) {
       try {
         await deleteStyle.mutateAsync({ datasetId: dataset.id, stilId: style.id })
         toast.success(t('messages.deleteStyleSuccess'))
-      } catch {
-        toast.error(t('messages.deleteStyleError'))
+      } catch (error) {
+        if (isNotDraftError(error)) {
+          toast.error(t('messages.notDraftError'))
+        } else if (isSagaInFlightError(error)) {
+          toast.error(t('messages.sagaInFlightError'))
+        } else if (isResourceInUseError(error)) {
+          toast.error(t('messages.styleInUseError'))
+        } else {
+          toast.error(t('messages.deleteStyleError'))
+        }
         throw new Error()
       }
     }

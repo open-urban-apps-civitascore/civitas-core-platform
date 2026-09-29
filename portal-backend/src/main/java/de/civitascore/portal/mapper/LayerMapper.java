@@ -31,8 +31,6 @@ public interface LayerMapper extends DtoMapper<LayerInputDTO, LayerOutputDTO, La
   @Mapping(target = "dataSinkId", source = "dataSink.id")
   @Mapping(target = "defaultStyleId", source = "defaultStyle.id")
   @Mapping(target = "alternativeStyleIds", ignore = true)
-  @Mapping(target = "geometryType", ignore = true)
-  @Mapping(target = "nativeCRS", ignore = true)
   @Override
   LayerOutputDTO toOutput(Layer entity);
 

@@ -38,8 +38,8 @@
         },
         "urls":   { "type": ["array", "null"], "items": { "type": "string" }, "description": "MQTT broker URLs, e.g. 'mqtt://mosquitto:1883'." },
         "topics": { "type": ["array", "null"], "items": { "type": "string" }, "description": "MQTT topic filter(s) to subscribe to. Wildcards (+, #) are supported." },
-        "client_id":       { "type": ["string", "null"], "description": "Optional MQTT client ID. Auto-generated if omitted." },
         "qos":             { "enum": [0, 1, 2, null], "description": "MQTT Quality of Service level: 0, 1 or 2." },
+        "protocol_version": { "enum": ["3", "5", null], "description": "MQTT protocol version: '3' (auto-select 3.1 or 3.1.1) or '5' (5.0)." },
         "connect_timeout": { "type": ["string", "null"], "description": "Connection timeout, e.g. '5s'." },
         "keepalive":       { "type": ["string", "null"], "description": "Keep-alive interval, e.g. '30s'." },
         "tls": {
@@ -85,13 +85,6 @@
         "table":   { "type": ["string", "null"], "description": "Table to poll." },
         "columns": { "type": ["array", "null"], "items": { "type": "string" }, "description": "Columns to select." },
         "where":   { "type": ["string", "null"], "description": "SQL WHERE clause." },
-        "prefix":  { "type": ["string", "null"], "description": "SQL prefix prepended to the query (not honored by the NiFi engine)." },
-        "suffix":  { "type": ["string", "null"], "description": "SQL suffix appended to the query (not honored by the NiFi engine)." },
-        "init_statement":     { "type": ["string", "null"], "description": "SQL executed on connection init (not honored by the NiFi engine)." },
-        "conn_max_idle_time": { "type": ["string", "null"], "description": "Maximum idle time per connection, e.g. '10m'." },
-        "conn_max_life_time": { "type": ["string", "null"], "description": "Maximum lifetime per connection, e.g. '1h'." },
-        "conn_max_idle":      { "type": "integer", "description": "Maximum number of idle connections. Default 2." },
-        "conn_max_open":      { "type": "integer", "description": "Maximum number of open connections. 0 = unlimited. Default 0." },
         "user":     { "type": ["string", "null"], "description": "Database login username." },
         "password": { "type": ["string", "null"], "description": "Database login password. Stored ENCRYPTED by the host; null/absent when unset." }
       }

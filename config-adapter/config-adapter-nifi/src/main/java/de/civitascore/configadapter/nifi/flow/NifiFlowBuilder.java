@@ -17,7 +17,6 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.flow.stage.BuildContext;
 import de.civitascore.configadapter.nifi.flow.stage.Fragment;
-import de.civitascore.configadapter.nifi.flow.stage.MappingSupport;
 import de.civitascore.configadapter.nifi.flow.stage.PayloadForm;
 import de.civitascore.configadapter.nifi.flow.stage.Processor;
 import de.civitascore.configadapter.nifi.flow.stage.SinkStage;
@@ -246,9 +245,7 @@ public class NifiFlowBuilder {
   /**
    * The transforms between source and sink, derived structurally. The record chain (ConvertRecord
    * when the source does not already emit records, then the mapping) runs whenever the sink
-   * consumes {@link PayloadForm#RECORDS} for this flow — which for an {@link
-   * MappingSupport#ENVELOPE} sink is exactly the mapped case, whose sink-owned region consumes the
-   * mapped records through its entity plan.
+   * consumes {@link PayloadForm#RECORDS} for this flow.
    */
   private List<TransformStage> transformsFor(
       SourceStage source, SinkStage<?> sink, FlowBuildSpec spec) throws FatalAdapterException {

@@ -6,7 +6,6 @@ import de.civitascore.portal.model.embedded.DataSinkType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import java.util.Map;
-import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -14,8 +13,6 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class DataSinkInputDTO extends DataSetOwnedInputDTO {
-
-  private UUID id;
 
   @NotNull private DataSinkType dataSinkType;
 
@@ -26,6 +23,6 @@ public class DataSinkInputDTO extends DataSetOwnedInputDTO {
       description =
           "Acknowledges that this update rebuilds the sink's table and discards all stored data."
               + " Required (true) when tableName or the referenced element changes on a"
-              + " provisioned dataset; ignored otherwise.")
+              + " provisioned sink; ignored otherwise.")
   private boolean confirmDataLoss;
 }

@@ -8,6 +8,7 @@ import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { AutoComplete } from '@/components/form/fields/AutoComplete'
 import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
+import { FooterElement } from '@/components/form/FooterElement'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { useContactAutocomplete } from '@/hooks/use-contact-autocomplete'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -60,7 +61,7 @@ export const BasicInfoTab = (props: BasicInfoTabProps) => {
   }))
 
   return (
-    <ContentCard className={cn('h-full overflow-auto')}>
+    <ContentCard className={cn('h-full overflow-auto')} footerElement={<FooterElement areAllFieldsRequired />}>
       <div className="max-w-300 flex flex-col gap-2 pt-2" data-testid="basicInfoTab">
         <DetailsFieldContainer className="pt-0 border-b-0">
           <SubHeader title={t('form.title')} titleClassName="text-2xl leading-none font-bold" />

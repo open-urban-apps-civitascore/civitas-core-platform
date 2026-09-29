@@ -153,7 +153,6 @@ export class ApiClient {
   async createUser(data: { firstName: string; lastName: string; email: string; title?: string; phone?: string }) {
     return this.post<{ id: string; firstName: string; lastName: string; email: string }>('/users', {
       title: 'OTHER',
-      active: true,
       ...data,
     })
   }
@@ -314,8 +313,6 @@ export class ApiClient {
   async createDatastructure(data: { name: string; description?: string }) {
     return this.post<{ id: string; name: string }>('/datastructures', {
       description: '',
-      createdFromDataSource: false,
-      dataStructureVersionIds: [],
       assignments: [],
       ...data,
     })
@@ -333,7 +330,6 @@ export class ApiClient {
     return this.post<{ id: string; version: string; dataStructureVersionStatus: string }>(
       `/datastructures/${datastructureId}/versions`,
       {
-        dataStructureVersionSource: 'OWN',
         description: '',
         styles: {},
         ...data,

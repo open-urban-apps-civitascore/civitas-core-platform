@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 
+import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import { STATUS_TYPES } from '@/types/common'
 import { DataSink, DATASINK_TYPES } from '@/types/datasinks'
 import { DATASTRUCTURE_VERSION_SOURCE, DatastructureVersion } from '@/types/datastructures'
@@ -83,7 +84,6 @@ const makeLayer = (overrides: Partial<LayerFormData> = {}): LayerFormData => ({
   geometryColumnRef: 'geom',
   nativeCRS: 'EPSG:25832',
   crs: 'EPSG:4326',
-  bboxAutoCalculate: false,
   nativeBoundingBox: { minX: '5.8', minY: '47.2', maxX: '15.0', maxY: '55.0', crs: 'EPSG:25832' },
   latLonBoundingBox: { minX: '5.8', minY: '47.2', maxX: '15.0', maxY: '55.0', crs: 'EPSG:25832' },
   defaultStyleId: null,
@@ -93,6 +93,7 @@ const makeLayer = (overrides: Partial<LayerFormData> = {}): LayerFormData => ({
 
 interface WrapperProps {
   layers?: LayerFormData[]
+  datastructures?: DatastructureVersion[]
   selectedLayerIndex?: number | null
   isReadOnly?: boolean
   isDeleteLayerLoading?: boolean
@@ -104,6 +105,7 @@ interface WrapperProps {
 
 const Wrapper = ({
   layers = [],
+  datastructures = [mockDatastructureVersion],
   selectedLayerIndex = null,
   isReadOnly = false,
   isDeleteLayerLoading,
@@ -125,7 +127,7 @@ const Wrapper = ({
         form={form}
         styles={mockStyleList}
         postgisDataSinks={[mockDataSink]}
-        postGisDatastructures={[mockDatastructureVersion]}
+        postGisDatastructures={datastructures}
         selectedLayerIndex={selectedLayerIndex}
         isReadOnly={isReadOnly}
         isDeleteLayerLoading={isDeleteLayerLoading}
@@ -348,6 +350,72 @@ describe('LayerConfig', () => {
       fireEvent.click(screen.getByTestId('layers.0.dataSinkIdSelectTrigger'))
       fireEvent.click(screen.getByTestId('layers.0.dataSinkIdSelectItem0'))
       expect(onTableChange).toHaveBeenCalledWith(mockDataSink.id)
+    })
+  })
+
+  describe('Attribute and geometry options', () => {
+    const classNode = (id: string, name: string, attributes: string[], isRoot?: boolean) => ({
+      id: `node-${id}`,
+      type: 'class',
+      position: { x: 0, y: 0 },
+      data: {
+        element: {
+          id,
+          name,
+          type: 'class',
+          isRoot,
+          attributes: attributes.map(attribute => ({ id: `${id}-${attribute}`, name: attribute, type: 'String' })),
+          operations: [],
+        },
+        label: name,
+      },
+    })
+
+    const enumNode = {
+      id: 'node-e1',
+      type: 'enumeration',
+      position: { x: 0, y: 0 },
+      data: {
+        element: { id: 'e1', name: 'Colour', type: 'enumeration', literals: [{ id: 'e1-l', name: 'RED' }] },
+        label: 'Colour',
+      },
+    }
+
+    const versionWithNodes = (nodes: unknown[]): DatastructureVersion => ({
+      ...mockDatastructureVersion,
+      modelName: 'Struct',
+      styles: { id: 'diagram-1', name: 'Struct', nodes, edges: [] } as unknown as UMLDiagram,
+    })
+
+    it('offers the attributes of the root class when an enumeration comes first in the diagram', () => {
+      const version = versionWithNodes([enumNode, classNode('c1', 'Building', ['name', 'geom'])])
+
+      render(<Wrapper layers={[makeLayer()]} selectedLayerIndex={0} datastructures={[version]} />)
+
+      fireEvent.click(screen.getByTestId('layers.0.geometryColumnRefSelectTrigger'))
+      expect(screen.getByTestId('layers.0.geometryColumnRefSelectItem0')).toHaveTextContent('name')
+      expect(screen.getByTestId('layers.0.geometryColumnRefSelectItem1')).toHaveTextContent('geom')
+    })
+
+    it('offers the attributes of the designated root when several classes exist', () => {
+      const version = versionWithNodes([
+        classNode('c1', 'Address', ['street']),
+        classNode('c2', 'Building', ['name'], true),
+      ])
+
+      render(<Wrapper layers={[makeLayer()]} selectedLayerIndex={0} datastructures={[version]} />)
+
+      fireEvent.click(screen.getByTestId('layers.0.geometryColumnRefSelectTrigger'))
+      expect(screen.getByTestId('layers.0.geometryColumnRefSelectItem0')).toHaveTextContent('name')
+      expect(screen.queryByTestId('layers.0.geometryColumnRefSelectItem1')).not.toBeInTheDocument()
+    })
+
+    it('renders the layer fields without options for a diagram with no nodes', () => {
+      render(<Wrapper layers={[makeLayer()]} selectedLayerIndex={0} datastructures={[versionWithNodes([])]} />)
+
+      fireEvent.click(screen.getByTestId('layers.0.geometryColumnRefSelectTrigger'))
+      expect(screen.queryByTestId('layers.0.geometryColumnRefSelectItem0')).not.toBeInTheDocument()
+      expect(screen.getByText('dataSelection.attributes')).toBeInTheDocument()
     })
   })
 

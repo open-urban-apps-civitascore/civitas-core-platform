@@ -396,11 +396,6 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   }
 
   @Override
-  protected UUID getEntityId(User entity) {
-    return entity.getId();
-  }
-
-  @Override
   protected void updateExternalId(User entity, String externalId) {
     if (externalId != null && !externalId.isBlank()) {
       entity.setExternalId(externalId);
@@ -761,7 +756,6 @@ The following classes are deprecated and scheduled for removal:
 | `SynchronousEventPublisher` | `ConfigEventPublisherService` + `CloudEventPublisher` | New approach provides pluggable backends, CloudEvents support, and better config-adapter integration |
 | `ConfigAdapterResultListener` | `KafkaConfigResultListener` | Works with new CloudEventPublisher architecture |
 | `TopicResolver` | `Topics` enum from config-adapter-api | Standardized topic names across all services |
-| `DomainEvent` (in event publishing context) | `ConfigEvent` from config-adapter-api | Direct use of config-adapter models |
 
 ### Migration Guide
 

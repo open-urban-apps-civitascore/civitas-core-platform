@@ -105,13 +105,13 @@ describe('DatasetCreateForm', () => {
     expect(screen.getByRole('button', { name: 'actions.saveAndContinue' })).toBeDisabled()
   })
 
-  test('calls createDataset mutation with name on form submission', async () => {
+  test('does not submit when description is left blank', async () => {
     setup()
     fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Test Dataset' } })
     fireEvent.click(screen.getByRole('button', { name: 'actions.saveAndContinue' }))
 
     await waitFor(() => {
-      expect(mockMutateAsync).toHaveBeenCalledWith({ name: 'Test Dataset', description: '' })
+      expect(mockMutateAsync).not.toHaveBeenCalled()
     })
   })
 
@@ -134,6 +134,7 @@ describe('DatasetCreateForm', () => {
   test('navigates to dataset overview on successful creation', async () => {
     setup()
     fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Test Dataset' } })
+    fireEvent.change(screen.getByTestId('descriptionTextArea'), { target: { value: 'A description' } })
     fireEvent.click(screen.getByRole('button', { name: 'actions.saveAndContinue' }))
 
     await waitFor(() => {
@@ -193,6 +194,7 @@ describe('DatasetCreateForm', () => {
 
     setup()
     fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Test Dataset' } })
+    fireEvent.change(screen.getByTestId('descriptionTextArea'), { target: { value: 'A description' } })
     fireEvent.click(screen.getByRole('button', { name: 'actions.saveAndContinue' }))
 
     await waitFor(() => {

@@ -35,6 +35,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
 @DisplayName("DataSource Controller Integration Tests")
@@ -234,6 +235,22 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should fail to create data source with blank description")
+    void shouldFailToCreateWithBlankDescription() {
+      DataSourceInputDTO input = createValidInput();
+      input.setDescription("  ");
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpointPath(),
+              HttpMethod.POST,
+              new HttpEntity<>(input, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     @DisplayName("Should fail to create data source without authentication")
     void shouldFailToCreateWithoutAuth() {
       ResponseEntity<String> response = performRequestWithoutAuth("", HttpMethod.POST);
@@ -271,12 +288,12 @@ class DataSourceControllerIntegrationTest
     void shouldNormalizeBlankOptionalStringsOnCreate() {
       DataSourceInputDTO input = new DataSourceInputDTO();
       input.setName("mqtt_blank_test_" + UUID.randomUUID().toString().substring(0, 8));
+      input.setDescription("a description");
       input.setConnectorType(ConnectorType.MQTT);
       Map<String, Object> config = new HashMap<>();
       config.put("urls", List.of("tcp://broker:1883"));
       config.put("topics", List.of("sensor/data"));
       config.put("qos", 1);
-      config.put("client_id", "");
       config.put("connect_timeout", "   ");
       config.put("keepalive", "");
       config.put("user", " ");
@@ -286,7 +303,6 @@ class DataSourceControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       Map<String, Object> resultConfig = response.getBody().getConfiguration();
-      assertThat(resultConfig.get("client_id")).isNull();
       assertThat(resultConfig.get("connect_timeout")).isNull();
       assertThat(resultConfig.get("keepalive")).isNull();
       assertThat(resultConfig.get("user")).isNull();
@@ -297,22 +313,27 @@ class DataSourceControllerIntegrationTest
     void shouldPersistNonBlankOptionalStringsUnchanged() {
       DataSourceInputDTO input = new DataSourceInputDTO();
       input.setName("mqtt_nonblank_test_" + UUID.randomUUID().toString().substring(0, 8));
+      input.setDescription("a description");
       input.setConnectorType(ConnectorType.MQTT);
       input.setConfiguration(
           Map.of(
-              "urls", List.of("tcp://broker:1883"),
-              "topics", List.of("sensor/data"),
-              "qos", 1,
-              "client_id", "my-client",
-              "connect_timeout", "5s",
-              "keepalive", "30s",
-              "user", "mqttuser"));
+              "urls",
+              List.of("tcp://broker:1883"),
+              "topics",
+              List.of("sensor/data"),
+              "qos",
+              1,
+              "connect_timeout",
+              "5s",
+              "keepalive",
+              "30s",
+              "user",
+              "mqttuser"));
 
       ResponseEntity<DataSourceOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       Map<String, Object> resultConfig = response.getBody().getConfiguration();
-      assertThat(resultConfig.get("client_id")).isEqualTo("my-client");
       assertThat(resultConfig.get("connect_timeout")).isEqualTo("5s");
       assertThat(resultConfig.get("keepalive")).isEqualTo("30s");
       assertThat(resultConfig.get("user")).isEqualTo("mqttuser");
@@ -391,6 +412,20 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should reject PATCH that sets description to null")
+    void shouldRejectSettingDescriptionToNullWithPatch() {
+      UUID id = createTestEntity();
+
+      Map<String, Object> patchMap = Collections.singletonMap("description", null);
+
+      ResponseEntity<DataSourceOutputDTO> response = performPatch(id, patchMap);
+
+      assertThat(response.getStatusCode())
+          .as("Description is mandatory and cannot be cleared via PATCH")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     @DisplayName("PUT should update data source")
     void putShouldUpdateDataSource() {
       UUID id = createTestEntity();
@@ -464,6 +499,7 @@ class DataSourceControllerIntegrationTest
     void shouldFailToReleaseWithoutConfiguration() {
       DataSourceInputDTO input = new DataSourceInputDTO();
       input.setName("bare_source_" + UUID.randomUUID().toString().substring(0, 8));
+      input.setDescription("a description");
       input.setConnectorType(ConnectorType.MQTT);
 
       ResponseEntity<DataSourceOutputDTO> createResponse = performCreate(input);
@@ -509,6 +545,24 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<Void> response = performDelete(id);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should refuse to delete a DRAFT data source that a Pipeline references")
+    void shouldRefuseDeletingDraftDataSourceReferencedByPipeline() {
+      UUID id = createTestEntity();
+      linkDataSourceToDataSetViaStatus(
+          dataSourceRepository.findById(id).orElseThrow(), DataSetStatus.DRAFT);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id, HttpMethod.DELETE, createAuthHeaders(), null);
+
+      // The foreign key also answers 409, so only the problem type shows the guard ran before
+      // postDelete dropped the Model Forge artifact.
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
+      assertThat(dataSourceRepository.existsById(id)).isTrue();
     }
 
     @Test
@@ -595,6 +649,7 @@ class DataSourceControllerIntegrationTest
     void patchMqttWithNewPasswordShouldEncrypt() {
       DataSourceInputDTO input = new DataSourceInputDTO();
       input.setName("mqtt_patch_test_" + UUID.randomUUID().toString().substring(0, 8));
+      input.setDescription("a description");
       input.setConnectorType(ConnectorType.MQTT);
       input.setConfiguration(
           Map.of(
@@ -627,6 +682,7 @@ class DataSourceControllerIntegrationTest
     void patchMqttNonSensitiveFieldsShouldPreservePassword() {
       DataSourceInputDTO input = new DataSourceInputDTO();
       input.setName("mqtt_patch_preserve_" + UUID.randomUUID().toString().substring(0, 8));
+      input.setDescription("a description");
       input.setConnectorType(ConnectorType.MQTT);
       input.setConfiguration(
           Map.of(
@@ -746,7 +802,7 @@ class DataSourceControllerIntegrationTest
       UUID secondId = createReleasableTestEntity();
       performRelease(secondId);
 
-      Map<String, Object> metaUpdate = Map.of("name", existingName);
+      Map<String, Object> metaUpdate = Map.of("name", existingName, "description", "a description");
 
       ResponseEntity<DataSourceOutputDTO> response =
           restTemplate.exchange(
@@ -793,37 +849,33 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should reject linking a DRAFT DataStructureVersion")
-    void shouldRejectLinkingDraftDataStructureVersion() {
+    @DisplayName("Should save a DRAFT DataSource with a DRAFT DataStructureVersion")
+    void shouldSaveDraftDataSourceWithDraftDataStructureVersion() {
       UUID dsvId = createDraftDataStructureVersionId();
       DataSourceInputDTO input = createValidInput();
       input.setDataStructureVersionId(dsvId);
 
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath(),
-              HttpMethod.POST,
-              new HttpEntity<>(input, createAuthHeaders()),
-              String.class);
+      ResponseEntity<DataSourceOutputDTO> response = performCreate(input);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody().getDataStructureVersion().getId()).isEqualTo(dsvId);
+      assertThat(performReleaseExpectingError(response.getBody().getId()).getStatusCode())
+          .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
-    @DisplayName("Should reject linking when parent DataStructure is DRAFT")
-    void shouldRejectLinkingWhenParentDataStructureIsDraft() {
+    @DisplayName("Should save a DRAFT DataSource when the parent DataStructure is DRAFT")
+    void shouldSaveDraftDataSourceWithDraftParentDataStructure() {
       UUID dsvId = createDsvWithDraftParentDataStructure();
       DataSourceInputDTO input = createValidInput();
       input.setDataStructureVersionId(dsvId);
 
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath(),
-              HttpMethod.POST,
-              new HttpEntity<>(input, createAuthHeaders()),
-              String.class);
+      ResponseEntity<DataSourceOutputDTO> response = performCreate(input);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody().getDataStructureVersion().getId()).isEqualTo(dsvId);
+      assertThat(performReleaseExpectingError(response.getBody().getId()).getStatusCode())
+          .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
@@ -905,6 +957,7 @@ class DataSourceControllerIntegrationTest
     void shouldMaskSensitiveMqttFieldsInGetResponse() {
       DataSourceInputDTO input = new DataSourceInputDTO();
       input.setName("mqtt_with_password_" + UUID.randomUUID().toString().substring(0, 8));
+      input.setDescription("a description");
       input.setConnectorType(ConnectorType.MQTT);
       input.setConfiguration(
           Map.of(
@@ -946,6 +999,7 @@ class DataSourceControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody().isInUse()).isFalse();
+      assertThat(response.getBody().isInUseByReleased()).isFalse();
     }
 
     @Test
@@ -959,6 +1013,7 @@ class DataSourceControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody().isInUse()).isTrue();
+      assertThat(response.getBody().isInUseByReleased()).isFalse();
     }
 
     @Test
@@ -971,6 +1026,7 @@ class DataSourceControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody().isInUse()).isTrue();
+      assertThat(response.getBody().isInUseByReleased()).isFalse();
     }
 
     @Test
@@ -983,6 +1039,7 @@ class DataSourceControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody().isInUse()).isTrue();
+      assertThat(response.getBody().isInUseByReleased()).isTrue();
     }
   }
 
@@ -1023,7 +1080,9 @@ class DataSourceControllerIntegrationTest
               "urls", List.of("tcp://new-broker:1883"),
               "topics", List.of("new/topic"),
               "qos", 2);
-      Map<String, Object> metaUpdate = Map.of("name", "updated-name", "configuration", newConfig);
+      Map<String, Object> metaUpdate =
+          Map.of(
+              "name", "updated-name", "description", "a description", "configuration", newConfig);
 
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
@@ -1055,7 +1114,8 @@ class DataSourceControllerIntegrationTest
                   "columns", List.of("id", "value", "timestamp"),
                   "user", "admin",
                   "password", ConnectorHandler.MASKED_VALUE));
-      Map<String, Object> metaUpdate = Map.of("name", "updated-sql", "configuration", newConfig);
+      Map<String, Object> metaUpdate =
+          Map.of("name", "updated-sql", "description", "a description", "configuration", newConfig);
 
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
@@ -1086,7 +1146,8 @@ class DataSourceControllerIntegrationTest
               getOutputTypeReference());
       Map<String, Object> originalConfig = before.getBody().getConfiguration();
 
-      Map<String, Object> metaUpdate = Map.of("name", "updated-name");
+      Map<String, Object> metaUpdate =
+          Map.of("name", "updated-name", "description", "a description");
 
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
@@ -1105,7 +1166,8 @@ class DataSourceControllerIntegrationTest
     void shouldRejectUpdateOnDraftDataSource() {
       UUID id = createReleasableTestEntity();
 
-      Map<String, Object> metaUpdate = Map.of("name", "updated-name");
+      Map<String, Object> metaUpdate =
+          Map.of("name", "updated-name", "description", "a description");
 
       ResponseEntity<String> response =
           restTemplate.exchange(
@@ -1150,7 +1212,9 @@ class DataSourceControllerIntegrationTest
               "urls", List.of("tcp://new-broker:1883"),
               "topics", List.of("new/topic"),
               "qos", 2);
-      Map<String, Object> metaUpdate = Map.of("name", "updated-name", "configuration", newConfig);
+      Map<String, Object> metaUpdate =
+          Map.of(
+              "name", "updated-name", "description", "a description", "configuration", newConfig);
 
       ResponseEntity<String> response =
           restTemplate.exchange(
@@ -1163,12 +1227,13 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should reject connector type change when in use")
+    @DisplayName("Should reject connector type change when an AVAILABLE DataSet uses it")
     void shouldRejectConnectorTypeChangeWhenInUse() {
       DataSource dataSource = createAvailableDataSource();
-      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.READY);
+      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.AVAILABLE);
 
-      Map<String, Object> metaUpdate = Map.of("name", "updated-name", "connectorType", "SQL");
+      Map<String, Object> metaUpdate =
+          Map.of("name", "updated-name", "description", "a description", "connectorType", "SQL");
 
       ResponseEntity<String> response =
           restTemplate.exchange(
@@ -1178,6 +1243,37 @@ class DataSourceControllerIntegrationTest
               String.class);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should accept a configuration change when only a DRAFT DataSet uses it")
+    void shouldAcceptConfigurationChangeWhenInUseByDraftDataSetOnly() {
+      DataSource dataSource = createAvailableDataSource();
+      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.DRAFT);
+
+      Map<String, Object> newConfig =
+          Map.of(
+              "urls", List.of("tcp://new-broker:1883"),
+              "topics", List.of("new/topic"),
+              "qos", 2);
+
+      ResponseEntity<DataSourceOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              Map.of(
+                  "name",
+                  dataSource.getName(),
+                  "description",
+                  "a description",
+                  "configuration",
+                  newConfig),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getConfiguration().get("urls"))
+          .isEqualTo(List.of("tcp://new-broker:1883"));
     }
 
     @Test
@@ -1191,7 +1287,9 @@ class DataSourceControllerIntegrationTest
               "urls", List.of("tcp://new-broker:1883"),
               "topics", List.of("new/topic"),
               "qos", 2);
-      Map<String, Object> fullUpdate = Map.of("name", "updated-name", "configuration", newConfig);
+      Map<String, Object> fullUpdate =
+          Map.of(
+              "name", "updated-name", "description", "a description", "configuration", newConfig);
 
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
@@ -1225,14 +1323,14 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should return 409 when unreleasing a DataSource in use by a READY DataSet")
-    void shouldReturn409WhenInUseByReadyDataSet() {
+    @DisplayName("Should unrelease a DataSource a READY DataSet uses")
+    void shouldUnreleaseWhenInUseByReadyDataSet() {
       DataSource dataSource = createAvailableDataSource();
       linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.READY);
 
-      ResponseEntity<String> response = performUnreleaseExpectingError(dataSource.getId());
+      ResponseEntity<DataSourceOutputDTO> response = performUnrelease(dataSource.getId());
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     @Test
@@ -1247,15 +1345,15 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName(
-        "Should return 409 when unreleasing a DataSource referenced by a Pipeline in a DRAFT DataSet")
-    void shouldReturn409WhenInUseByDraftDataSet() {
+    @DisplayName("Should unrelease a DataSource a Pipeline in a DRAFT DataSet references")
+    void shouldUnreleaseWhenInUseByDraftDataSet() {
       DataSource dataSource = createAvailableDataSource();
       linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.DRAFT);
 
-      ResponseEntity<String> response = performUnreleaseExpectingError(dataSource.getId());
+      ResponseEntity<DataSourceOutputDTO> response = performUnrelease(dataSource.getId());
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getDataSourceStatus()).isEqualTo(DataSourceStatus.DRAFT);
     }
   }
 

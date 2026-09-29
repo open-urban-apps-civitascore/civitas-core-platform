@@ -1,0 +1,1 @@
+{"name":"${sta_0_name:escapeJson()}","description":"${sta_1_description:escapeJson()}","properties":{"reference":"${sta_2_reference:escapeJson()}"}}

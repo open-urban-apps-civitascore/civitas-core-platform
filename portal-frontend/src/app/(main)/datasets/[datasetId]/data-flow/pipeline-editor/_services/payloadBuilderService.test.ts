@@ -7,11 +7,14 @@ import {
   buildDataSinkPayloads,
   buildMappingArtifacts,
   buildPipelinePayload,
+  createDataSinkSnapshot,
   createMappingSnapshot,
   type DataSinkSnapshot,
+  getRemovedMappingUrns,
   hasMappingChanged,
   isDestructiveDataSinkChange,
   MappingDocumentValidationError,
+  MissingDataStructureUrnError,
   PipelineModelValidationError,
 } from './payloadBuilderService'
 
@@ -74,6 +77,12 @@ describe('buildDataSinkPayloads — FROST target structure reference', () => {
     expect(frostPayload(p)?.configuration).toEqual({ element: DSV_URN })
   })
 
+  it('sends the selected port with the target structure', () => {
+    const ported: TestNode = { ...frostNode, data: { ...frostNode.data, port: 'Observations' } }
+    const p = pipeline([mappingNode('map-1', DSV_URN), ported], [{ source: 'map-1', target: 'frost-1' }])
+    expect(frostPayload(p)?.configuration).toEqual({ port: 'Observations', element: DSV_URN })
+  })
+
   it('sends an empty configuration for a passthrough pipeline (no mapping)', () => {
     const source: TestNode = {
       id: 'src-1',
@@ -128,14 +137,43 @@ describe('buildDataSinkPayloads — PostGIS configuration', () => {
     },
   }
 
+  const NODE_URN = 'urn:core:platform:civitas:datastructure:common:Roads:aa11bb22cc:1.0.0'
+  const OTHER_NODE_URN = 'urn:core:platform:civitas:datastructure:common:Roads:aa11bb22cc:2.0.0'
+  const MAPPING_TARGET_URN = 'urn:core:platform:civitas:datastructure:common:Target:dd33ee44ff:1.0.0'
+
+  const postgisNodeWithUrn = (dataStructureUrn: string): TestNode => ({
+    ...postgisNode,
+    data: { ...postgisNode.data, dataStructureUrn },
+  })
+
   const postgisPayload = (p: Pipeline) =>
     buildDataSinkPayloads(p).find(entry => entry.payload.dataSinkType === DATASINK_TYPES.POSTGIS)?.payload
 
-  it('omits element for a passthrough pipeline (no upstream mapping)', () => {
-    // A passthrough DataSource → PostGIS pipeline is valid and must be saveable — element is only
-    // present once a mapping feeds the sink (mirrors the FROST passthrough case above).
-    const p = pipeline([postgisNode], [])
-    expect(postgisPayload(p)?.configuration).toEqual({ tableName: 'my_table' })
+  it('sends the node data structure as element when no mapping precedes the sink', () => {
+    const p = pipeline([postgisNodeWithUrn(NODE_URN)], [])
+    expect(postgisPayload(p)?.configuration).toEqual({ tableName: 'my_table', element: NODE_URN })
+  })
+
+  it('sends the node data structure as element when a mapping precedes the sink', () => {
+    const p = pipeline(
+      [mappingNode('map-1', MAPPING_TARGET_URN), postgisNodeWithUrn(NODE_URN)],
+      [{ source: 'map-1', target: 'postgis-1' }],
+    )
+    expect(postgisPayload(p)?.configuration).toEqual({ tableName: 'my_table', element: NODE_URN })
+  })
+
+  it('rejects a node without a stored data structure URN even when a mapping precedes the sink', () => {
+    const p = pipeline(
+      [mappingNode('map-1', MAPPING_TARGET_URN), postgisNode],
+      [{ source: 'map-1', target: 'postgis-1' }],
+    )
+    expect(() => buildDataSinkPayloads(p)).toThrow(MissingDataStructureUrnError)
+  })
+
+  it('flags a version change on a saved sink without mapping as destructive', () => {
+    const snapshot = createDataSinkSnapshot(pipeline([postgisNodeWithUrn(NODE_URN)], []))
+    const [{ payload }] = buildDataSinkPayloads(pipeline([postgisNodeWithUrn(OTHER_NODE_URN)], []))
+    expect(isDestructiveDataSinkChange('postgis-1', payload, snapshot)).toBe(true)
   })
 })
 
@@ -363,18 +401,47 @@ describe('createMappingSnapshot / hasMappingChanged', () => {
     }
     expect(createMappingSnapshot(pipeline([unconfigured], []))).toEqual({})
   })
+
+  it('keeps the logical URN so a removed node can still be deleted', () => {
+    const snapshot = createMappingSnapshot(
+      pipeline([configuredMappingNode({ mappingLogicalUrn: 'urn:core:logical:x' })], []),
+    )
+    expect(snapshot['map-1'].logicalUrn).toBe('urn:core:logical:x')
+  })
+
+  it('records a null URN for a mapping node that was never saved', () => {
+    const snapshot = createMappingSnapshot(pipeline([configuredMappingNode()], []))
+    expect(snapshot['map-1'].logicalUrn).toBeNull()
+  })
+})
+
+describe('getRemovedMappingUrns', () => {
+  const savedMappingNode = () => configuredMappingNode({ mappingLogicalUrn: 'urn:core:logical:x' })
+
+  it('returns the URN of a mapping whose node was removed', () => {
+    const snapshot = createMappingSnapshot(pipeline([savedMappingNode()], []))
+    expect(getRemovedMappingUrns(pipeline([], []), snapshot)).toEqual(['urn:core:logical:x'])
+  })
+
+  it('ignores a mapping whose node is still in the pipeline', () => {
+    const current = pipeline([savedMappingNode()], [])
+    expect(getRemovedMappingUrns(current, createMappingSnapshot(current))).toEqual([])
+  })
+
+  it('ignores a removed node that was never saved (no artifact to delete)', () => {
+    const snapshot = createMappingSnapshot(pipeline([configuredMappingNode()], []))
+    expect(getRemovedMappingUrns(pipeline([], []), snapshot)).toEqual([])
+  })
 })
 
 describe('isDestructiveDataSinkChange', () => {
   const postgisPayload = (tableName: string, element: string): DataSinkPayload => ({
-    id: 'sink-1',
     dataSinkType: DATASINK_TYPES.POSTGIS,
     configuration: { tableName, element },
   })
 
   const snapshotFor = (payload: DataSinkPayload, entityId: string | null): DataSinkSnapshot => {
-    const { id: _id, ...comparable } = payload
-    return { 'node-1': { entityId, configJson: JSON.stringify(comparable) } }
+    return { 'node-1': { entityId, configJson: JSON.stringify(payload) } }
   }
 
   it('flags a tableName change on an existing sink', () => {

@@ -964,18 +964,12 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     }
   }
 
-  /**
-   * An MQTT datasource for one flow. Every flow needs its OWN client id: the fragment ships a fixed
-   * one, and a broker evicts the existing connection whenever a second client presents the same id
-   * — so shared ids make concurrently deployed flows knock each other offline.
-   */
   private static Datasource mqttSource(String sourceId, String topic) {
     Datasource source = new Datasource();
     source.setId(sourceId);
     source.setType("MQTT");
     source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
     source.handleUnknownProperty("topics", List.of(topic));
-    source.handleUnknownProperty("client_id", sourceId);
     return source;
   }
 
