@@ -33,7 +33,7 @@ export const ElementPalette: React.FC<ElementPaletteProps> = props => {
   )
 
   useEffect(() => {
-    togglePalette(isReadOnly)
+    togglePalette(false)
   }, [isReadOnly, togglePalette])
 
   if (isReadOnly) return null
