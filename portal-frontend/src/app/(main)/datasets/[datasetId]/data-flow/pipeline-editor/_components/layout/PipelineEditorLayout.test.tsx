@@ -203,12 +203,12 @@ describe('saving from the Pipeline editor', () => {
     [
       'FROST',
       frostNode({ data: { entityId: undefined, configurationUrn: undefined } }),
-      { id: null, dataSinkType: 'FROST', configuration: { port: 'Things', element: TARGET_STRUCTURE_URN } },
+      { dataSinkType: 'FROST', configuration: { port: 'Things', element: TARGET_STRUCTURE_URN } },
     ],
     [
       'PostGIS',
       geoPersistenceNode({ data: { entityId: undefined, configurationUrn: undefined } }),
-      { id: null, dataSinkType: 'POSTGIS', configuration: { tableName: 'my_table', element: TARGET_STRUCTURE_URN } },
+      { dataSinkType: 'POSTGIS', configuration: { tableName: 'my_table', element: TARGET_STRUCTURE_URN } },
     ],
   ] as const
 
