@@ -239,7 +239,32 @@ class RoleInitializerTest {
             "DATASOURCE_RELEASE",
             "DATASTRUCTURE_READ",
             "DATASTRUCTURE_RELEASE",
-            "DATAPOOL_READ");
+            "DATAPOOL_READ",
+            "INSTALLATION_READ");
+  }
+
+  @Test
+  @DisplayName("Should give the permission to uninstall to Data Owner only")
+  void shouldGiveInstallationDeleteToDataOwnerOnly() {
+    // given
+    when(permissionRepository.findAll()).thenReturn(allPermissions);
+    when(roleRepository.findAll()).thenReturn(List.of());
+
+    // when
+    roleInitializer.initialize();
+
+    // then
+    verify(roleRepository).saveAll(rolesCaptor.capture());
+    List<String> rolesWithPermission =
+        rolesCaptor.getValue().stream()
+            .filter(
+                role ->
+                    role.getPermissions().stream()
+                        .anyMatch(permission -> "INSTALLATION_DELETE".equals(permission.getName())))
+            .map(Role::getName)
+            .toList();
+
+    assertThat(rolesWithPermission).containsExactly("Data Owner");
   }
 
   @Test

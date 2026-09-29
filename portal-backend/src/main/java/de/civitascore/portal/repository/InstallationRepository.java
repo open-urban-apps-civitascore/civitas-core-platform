@@ -6,14 +6,18 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-/** The install journal. Append-only: entries are written once and never edited. */
+/**
+ * The install journal. An entry is written by the install and never removed. An uninstall only sets
+ * the time of the uninstall on it.
+ */
 public interface InstallationRepository extends JpaRepository<Installation, UUID> {
 
   /**
-   * Whether this package is already installed here. A package fixes the URNs of its artifacts, so
-   * installing it twice on one instance would collide with itself.
+   * Whether this package has an active installation here. A package fixes the URNs of its
+   * artifacts, so installing it twice on one instance would collide with itself. An installation
+   * that was uninstalled does not count.
    */
-  boolean existsByPackageId(String packageId);
+  boolean existsByPackageIdAndUninstalledAtIsNull(String packageId);
 
   Page<Installation> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }

@@ -133,6 +133,8 @@ docs {
 
   The pipeline also carries editor styles from the instance that made the package. They name a
   data source by an id that does not exist here. Case 15 proves that the install does not keep them.
+
+  Cases 16 to 21 uninstall this installation.
 }
 
 script:pre-request {
@@ -159,9 +161,12 @@ script:pre-request {
 script:post-response {
   if (res.status === 201) {
     const byType = Object.fromEntries(res.body.artifacts.map(line => [line.artifactType, line]));
+    bru.setVar('flowInstallationId', res.body.id);
     bru.setVar('flowDataSetId', res.body.dataSetId);
     bru.setVar('flowPipelineId', byType.PIPELINE && byType.PIPELINE.shellId);
     bru.setVar('flowSinkId', byType.DATA_SINK && byType.DATA_SINK.shellId);
+    bru.setVar('flowSourceId', byType.DATA_SOURCE && byType.DATA_SOURCE.shellId);
+    bru.setVar('flowStructureId', byType.DATA_STRUCTURE && byType.DATA_STRUCTURE.shellId);
   }
 }
 

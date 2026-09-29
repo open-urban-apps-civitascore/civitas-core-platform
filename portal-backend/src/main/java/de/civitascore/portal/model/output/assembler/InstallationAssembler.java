@@ -19,6 +19,7 @@ public class InstallationAssembler {
     output.setDataSetName(installation.getDataSetName());
     output.setCreatedAt(installation.getCreatedAt());
     output.setCreatedBy(installation.getCreatedBy());
+    output.setUninstalledAt(installation.getUninstalledAt());
     installation.getArtifacts().forEach(line -> output.getArtifacts().add(toOutput(line)));
     return output;
   }

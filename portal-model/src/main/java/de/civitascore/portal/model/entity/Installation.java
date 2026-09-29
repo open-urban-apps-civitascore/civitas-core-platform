@@ -8,6 +8,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -22,9 +23,9 @@ import org.hibernate.annotations.BatchSize;
  * the install itself, so the record exists exactly iff the install committed. Who and when come
  * from the audit columns.
  *
- * <p>Append-only history: referenced artifacts are stored as plain ids and URNs, not foreign keys,
- * so the record survives their deletion — which is what makes it usable for uninstall and reference
- * counting later.
+ * <p>History: referenced artifacts are stored as plain ids and URNs, not foreign keys, so the
+ * record survives their deletion. An uninstall removes the artifacts and sets {@link
+ * #uninstalledAt}. The record and its lines stay.
  */
 @Getter
 @Setter
@@ -55,6 +56,13 @@ public class Installation extends BaseEntity {
   private String dataSetName;
 
   /**
+   * The time of the uninstall. Null while the installation is active. A package can be installed
+   * again when it has no active installation.
+   */
+  @Column(name = "uninstalled_at")
+  private LocalDateTime uninstalledAt;
+
+  /**
    * Ordered list, not a set: lines are append-only with no dedup semantics, and the explicit
    * position keeps the response order stable across loads. {@code @BatchSize} instead of a fetch
    * join keeps the collection compatible with paged queries on the parent.
@@ -74,5 +82,10 @@ public class Installation extends BaseEntity {
     artifact.setPosition(artifacts.size());
     artifacts.add(artifact);
     artifact.setInstallation(this);
+  }
+
+  /** Whether an uninstall removed the artifacts of this installation. */
+  public boolean isUninstalled() {
+    return uninstalledAt != null;
   }
 }

@@ -26,5 +26,11 @@ public class InstallationOutputDTO {
   private LocalDateTime createdAt;
   private UUID createdBy;
 
+  /**
+   * The time of the uninstall. Null while the installation is active. The artifact lines of an
+   * uninstalled installation say what it created, not what exists.
+   */
+  private LocalDateTime uninstalledAt;
+
   private List<InstalledArtifactOutputDTO> artifacts = new ArrayList<>();
 }

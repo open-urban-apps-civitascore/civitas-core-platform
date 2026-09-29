@@ -1,0 +1,38 @@
+meta {
+  name: Uninstall the installation
+  type: http
+  seq: 17
+}
+
+delete {
+  url: {{baseUrl}}/installations/{{flowInstallationId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  The data source of case 16 is deleted first, so nothing outside the installation uses its
+  artifacts. The dataset of the installation is READY, because case 11 staged it. A dataset that
+  was not released has no infrastructure, thus the uninstall removes it in the same request.
+
+  The uninstall removes the dataset with its mapping, data sink and pipeline, then the data source,
+  then the data structure. Cases 18 and 19 prove the result.
+}
+
+script:pre-request {
+  const axios = require('axios');
+  await axios.delete(
+    `${bru.getEnvVar('baseUrl')}/datasources/${bru.getVar('blockingSourceId')}`,
+    { headers: { Authorization: `Bearer ${bru.getVar('accessToken')}` } }
+  );
+}
+
+tests {
+  test("should uninstall", function() {
+    expect(res.status).to.equal(204);
+  });
+}

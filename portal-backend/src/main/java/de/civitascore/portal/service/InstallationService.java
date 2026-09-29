@@ -2,6 +2,7 @@ package de.civitascore.portal.service;
 
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSinkType;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.InstalledArtifactAction;
@@ -31,8 +32,10 @@ import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.InstallationRepository;
 import de.civitascore.portal.repository.PublishedStructureRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -40,9 +43,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.owasp.encoder.Encode;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -63,7 +69,10 @@ import org.springframework.transaction.annotation.Transactional;
  * journal line as its origin. Identities inside the package only serve to let members refer to one
  * another; every such reference is rewritten to the minted copy before the referring member is
  * stored.
+ *
+ * <p>An uninstall removes what the install created, in the reverse order, and keeps the record.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class InstallationService {
@@ -97,6 +106,7 @@ public class InstallationService {
   private final PipelineService pipelineService;
   private final PublishedStructureRepository publishedStructureRepository;
   private final ModelRegistryGateway modelRegistryGateway;
+  private final UninstallGuard uninstallGuard;
 
   /**
    * What one package member became on this instance. Sources reference structures by version id,
@@ -132,7 +142,7 @@ public class InstallationService {
     PackageManifestInputDTO manifest = input.getPackageManifest();
     // A policy, not a technical limit: two copies of the same package on one instance serve
     // nobody. Updating means installing the new version and uninstalling the old one.
-    if (installationRepository.existsByPackageId(manifest.getId())) {
+    if (installationRepository.existsByPackageIdAndUninstalledAtIsNull(manifest.getId())) {
       throw new UniqueConstraintViolationException(
           ("Package '%s' is already installed on this instance; updating an installation is not"
                   + " supported yet.")
@@ -174,6 +184,109 @@ public class InstallationService {
     return installationRepository
         .findById(id)
         .orElseThrow(() -> new ResourceNotFoundException("Installation", id.toString()));
+  }
+
+  /**
+   * Removes what an installation created and keeps its record.
+   *
+   * <p>The uninstall first makes sure that each artifact can be removed, and changes nothing if one
+   * cannot: a Dataset that is released or has infrastructure, and an artifact that something
+   * outside the installation uses, stop the uninstall. Then the artifacts are removed in the
+   * reverse order of the install: first the Dataset, then the Data sources, then the Data
+   * structures. Each removal goes through the service of its artifact, so the rules of the platform
+   * apply. All changes are in one transaction.
+   *
+   * <p>The Dataset is removed with all that it contains. This includes Pipelines, Data sinks and
+   * Mappings that were added after the install.
+   *
+   * <p>An artifact that no longer exists is skipped, because an operator can delete it by hand. An
+   * artifact that the install reused is not removed, because it does not belong to the
+   * installation. An installation that is already uninstalled stays as it is.
+   *
+   * @param id the id of the installation
+   * @throws ResourceNotFoundException if the installation does not exist
+   * @throws ResourceInUseException if a Dataset of the installation is released or has
+   *     infrastructure on the platform, or if an artifact is still in use
+   * @throws de.civitascore.portal.util.SagaInFlightException if an operation on a Dataset of the
+   *     installation is in progress
+   */
+  @Transactional
+  public void uninstall(UUID id) {
+    Installation installation = findByIdOrThrow(id);
+    if (installation.isUninstalled()) {
+      return;
+    }
+    List<InstalledArtifact> created =
+        installation.getArtifacts().stream()
+            .filter(line -> line.getAction() == InstalledArtifactAction.CREATED)
+            .toList();
+    uninstallGuard.requireRemovable(id, created);
+
+    created.reversed().forEach(this::remove);
+
+    installation.setUninstalledAt(LocalDateTime.now());
+    installationRepository.save(installation);
+    log.info(
+        "Uninstalled installation {} of package {}",
+        id,
+        Encode.forJava(installation.getPackageId()));
+  }
+
+  /**
+   * Removes the artifact of one journal line. The guard refused the known cases before the first
+   * removal, thus a refusal here is not usual. It names the artifact, because the message of the
+   * artifact service does not, and a package can contain more than one of a kind.
+   */
+  private void remove(InstalledArtifact line) {
+    try {
+      switch (line.getArtifactType()) {
+        case DATA_SET -> removeDataSet(line.getShellId());
+        case DATA_SOURCE -> removeDataSource(line.getShellId());
+        case DATA_STRUCTURE -> removeDataStructure(line.getShellId());
+        case MAPPING, DATA_SINK, PIPELINE -> {
+          // The Dataset removes its Mappings, Data sinks and Pipelines.
+        }
+      }
+    } catch (ResourceInUseException e) {
+      throw new ResourceInUseException(
+          e.getResourceType(),
+          e.getResourceId(),
+          "Cannot uninstall because '%s' is in use. %s".formatted(line.getName(), e.getMessage()),
+          e.getBlockedBy());
+    }
+  }
+
+  private void removeDataSet(UUID dataSetId) {
+    if (!dataSetService.existsById(dataSetId)) {
+      logSkipped(InstalledArtifactType.DATA_SET, dataSetId);
+      return;
+    }
+    dataSetService.deleteById(dataSetId);
+  }
+
+  /** The install released the Data source, and a released Data source cannot be deleted. */
+  private void removeDataSource(UUID dataSourceId) {
+    Optional<DataSource> dataSource = dataSourceService.findById(dataSourceId);
+    if (dataSource.isEmpty()) {
+      logSkipped(InstalledArtifactType.DATA_SOURCE, dataSourceId);
+      return;
+    }
+    if (dataSource.get().getDataSourceStatus() == DataSourceStatus.AVAILABLE) {
+      dataSourceService.unrelease(dataSourceId);
+    }
+    dataSourceService.deleteById(dataSourceId);
+  }
+
+  private void removeDataStructure(UUID dataStructureId) {
+    if (!dataStructureService.existsById(dataStructureId)) {
+      logSkipped(InstalledArtifactType.DATA_STRUCTURE, dataStructureId);
+      return;
+    }
+    dataStructureService.deleteById(dataStructureId);
+  }
+
+  private static void logSkipped(InstalledArtifactType type, UUID shellId) {
+    log.info("Uninstall skips {} {} because it no longer exists", type, shellId);
   }
 
   /**

@@ -1,0 +1,61 @@
+meta {
+  name: The artifacts of the uninstalled installation are gone
+  type: http
+  seq: 19
+}
+
+get {
+  url: {{baseUrl}}/datasets/{{flowDataSetId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  The request reads the dataset. The script reads the data source and the data structure, which
+  the dataset does not contain and which the uninstall thus removes itself.
+}
+
+script:post-response {
+  const axios = require('axios');
+  const headers = { Authorization: `Bearer ${bru.getVar('accessToken')}` };
+  const baseUrl = bru.getEnvVar('baseUrl');
+
+  // The sandbox of the runner does not pass a function to axios, thus validateStatus has no
+  // effect and an error status arrives as an exception. In the default sandbox the exception has
+  // only a message. The status is read from the response if there is one, and from the message
+  // if there is none. It is kept as text, so that a test compares the same type in each version
+  // of the runner.
+  const statusOf = async (url) => {
+    try {
+      const response = await axios.get(url, { headers });
+      return String(response.status);
+    } catch (error) {
+      if (error.response && error.response.status) {
+        return String(error.response.status);
+      }
+      const found = /status code (\d{3})/.exec(String(error.message));
+      return found ? found[1] : 'unknown';
+    }
+  };
+
+  bru.setVar('uninstalledSourceStatus', await statusOf(`${baseUrl}/datasources/${bru.getVar('flowSourceId')}`));
+  bru.setVar('uninstalledStructureStatus', await statusOf(`${baseUrl}/datastructures/${bru.getVar('flowStructureId')}`));
+}
+
+tests {
+  test("should not find the dataset", function() {
+    expect(res.status).to.equal(404);
+  });
+
+  test("should not find the data source", function() {
+    expect(bru.getVar('uninstalledSourceStatus')).to.equal('404');
+  });
+
+  test("should not find the data structure", function() {
+    expect(bru.getVar('uninstalledStructureStatus')).to.equal('404');
+  });
+}

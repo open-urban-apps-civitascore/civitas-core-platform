@@ -109,7 +109,8 @@ public enum RoleDefault {
       PermissionName.DATAPOOL_READ,
       PermissionName.DATAPOOL_UPDATE,
       PermissionName.INSTALLATION_CREATE,
-      PermissionName.INSTALLATION_READ),
+      PermissionName.INSTALLATION_READ,
+      PermissionName.INSTALLATION_DELETE),
 
   DATA_GATEKEEPER(
       "Data Gatekeeper",

@@ -151,3 +151,55 @@ test_ready_meta_denied_unauthenticated if {
 	result := authz.decision with input as portal_request_no_auth("PATCH", "/v1/datasets/dataset-abc/ready/meta")
 	result.allow == false
 }
+
+# =============================================================================
+# INSTALLATIONS
+# =============================================================================
+# An installation is a tenant-level resource. It has no scope of its own, and an
+# install or an uninstall changes artifacts of more than one scope. Only a
+# tenant-wide grant of an INSTALLATION_* permission gives access.
+
+mock_send_installation_reader(_) := {"status_code": 200, "body": mock_http.user_with_permissions(["INSTALLATION_READ"])}
+mock_send_installation_remover(_) := {"status_code": 200, "body": mock_http.user_with_permissions(["INSTALLATION_DELETE"])}
+mock_send_pool_installation_remover(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["INSTALLATION_DELETE"], "DATAPOOL", "pool-1")}
+
+test_installation_read_allowed_with_tenant_grant if {
+	result := authz.decision with http.send as mock_send_installation_reader
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/installations/installation-1")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.required_permissions == {"INSTALLATION_READ"}
+}
+
+test_installation_uninstall_allowed_with_tenant_grant if {
+	result := authz.decision with http.send as mock_send_installation_remover
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/installations/installation-1")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.required_permissions == {"INSTALLATION_DELETE"}
+}
+
+# The permission to read an installation does not include the permission to uninstall it.
+test_installation_uninstall_denied_with_read_only if {
+	result := authz.decision with http.send as mock_send_installation_reader
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/installations/installation-1")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# A grant on one data pool is not tenant-wide, thus it does not reach an installation.
+test_installation_uninstall_denied_with_pool_grant if {
+	result := authz.decision with http.send as mock_send_pool_installation_remover
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/installations/installation-1")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+test_installation_uninstall_denied_unauthenticated if {
+	result := authz.decision with input as portal_request_no_auth("DELETE", "/v1/installations/installation-1")
+	result.allow == false
+}

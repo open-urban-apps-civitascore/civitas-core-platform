@@ -236,7 +236,8 @@
       "POST": "INSTALLATION_CREATE"
     },
     "/v1/installations/{id}": {
-      "GET": "INSTALLATION_READ"
+      "GET": "INSTALLATION_READ",
+      "DELETE": "INSTALLATION_DELETE"
     },
     "_removed_for_v2": "catalogs and dataspaces removed — not implemented in v2.0 (see #989). OPA denies as unknown_endpoint."
   }
