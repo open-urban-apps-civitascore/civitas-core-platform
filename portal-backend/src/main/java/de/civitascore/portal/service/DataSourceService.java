@@ -18,7 +18,6 @@ import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataPoolRepository;
-import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
@@ -60,7 +59,6 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   private final ConnectorHandlerRegistry connectorHandlerRegistry;
   private final AssignmentFactory assignmentFactory;
   private final DataStructureVersionService dataStructureVersionService;
-  private final DataSetRepository dataSetRepository;
   private final PipelineRepository pipelineRepository;
   private final DataPoolRepository dataPoolRepository;
   private final ModelRegistryGateway modelRegistryGateway;
@@ -625,24 +623,6 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       throw new InvalidInputException(
           getEntityName(), entity.getId(), "Invalid configuration: " + String.join("; ", errors));
     }
-  }
-
-  /**
-   * Returns the data structure version linked to the given data source, or {@code null} if none is
-   * linked.
-   *
-   * @param dataSourceId the data source ID
-   * @return the linked {@link DataStructureVersion}, or {@code null}
-   * @throws de.civitascore.portal.util.ResourceNotFoundException if the data source does not exist
-   */
-  @Transactional(readOnly = true)
-  public DataStructureVersion findLinkedDataStructureVersion(UUID dataSourceId) {
-    DataSource dataSource = findByIdOrThrow(dataSourceId);
-    if (dataSource.getDataStructureVersion() == null) {
-      return null;
-    }
-    return dataStructureVersionService.findByIdOrThrow(
-        dataSource.getDataStructureVersion().getId());
   }
 
   /**

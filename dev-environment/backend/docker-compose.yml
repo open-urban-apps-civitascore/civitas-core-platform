@@ -38,7 +38,6 @@ services:
       KEYCLOAK_ISSUER_URI: http://civitas-keycloak:8080
       KEYCLOAK_REALM: civitas-core
       KEYCLOAK_TARGET_REALM: civitas-core
-      APP_URL: http://localhost:8089
       SERVER_PORT: 8089
       SPRING_PROFILES_ACTIVE: local,postgres,init
     depends_on:

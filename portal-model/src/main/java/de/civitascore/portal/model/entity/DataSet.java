@@ -9,7 +9,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -32,12 +31,7 @@ import lombok.experimental.SuperBuilder;
  * @see DataSetStatus
  */
 @Entity
-@Table(
-    name = "datasets",
-    indexes = {
-      @Index(name = "idx_dataset_owner", columnList = "owner_user_id"),
-      @Index(name = "idx_dataset_external_id", columnList = "external_id")
-    })
+@Table(name = "datasets")
 @Getter
 @Setter
 @SuperBuilder
@@ -66,23 +60,9 @@ public class DataSet extends BaseDataEntity {
   @Column(name = "manifest_logical_urn")
   private String manifestLogicalUrn;
 
-  /** Versioned CORE URN pin of the DataSet manifest's current version. */
-  @Column(name = "manifest_urn")
-  private String manifestUrn;
-
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "owner_user_id")
-  private User owner;
-
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "datapool_id")
   private DataPool dataPool;
-
-  @Column(name = "external_id")
-  private String externalId;
-
-  @Column(name = "format")
-  private String format;
 
   @Column(name = "open_data_access", nullable = false)
   @Builder.Default

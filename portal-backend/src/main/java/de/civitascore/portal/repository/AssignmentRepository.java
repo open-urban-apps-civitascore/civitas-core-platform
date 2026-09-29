@@ -41,17 +41,6 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
   List<Assignment> findAllByRoleId(@Param("roleId") UUID roleId);
 
   /**
-   * Find all assignments for the given group ID with groups eagerly fetched. This prevents N+1
-   * query problems when loading assignments with their groups.
-   *
-   * @param groupId the group ID
-   * @return the assignments with eagerly fetched roles
-   */
-  @EntityGraph(attributePaths = {"role"})
-  @Query("SELECT a FROM Assignment a WHERE a.group.id = :groupId")
-  List<Assignment> findAllByGroupId(@Param("groupId") UUID groupId);
-
-  /**
    * Find all assignments for a data source with the given scope type.
    *
    * @param scopeType the scope type to filter by

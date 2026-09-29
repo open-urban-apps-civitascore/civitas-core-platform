@@ -15,7 +15,5 @@ public enum PayloadKind {
   /**
    * Declarative field-to-field mapping between two DataStructures, extracted from a pipeline node.
    */
-  MAPPING,
-  /** Dataset manifest (currently unused — datasets own no opaque JSON payload). */
-  DATA_SET
+  MAPPING
 }

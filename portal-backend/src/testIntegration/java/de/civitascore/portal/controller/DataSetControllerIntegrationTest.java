@@ -164,22 +164,11 @@ class DataSetControllerIntegrationTest
    * @return UUID of the created DataSet
    */
   private DataSet createDataSetWithRelationships() {
-    // Create a User to be the owner of the dataset
-    User owner = new User();
-    owner.setFirstName("Test");
-    owner.setLastName("Owner");
-    owner.setEmail("test.owner." + System.currentTimeMillis() + "@example.com");
-    owner.setExternalId("ext-user-" + System.currentTimeMillis());
-    owner = userRepository.save(owner);
-
     DataSet dataSet = new DataSet();
     dataSet.setName("test_dataset_with_relationships_" + System.currentTimeMillis());
     dataSet.setDescription("Test dataset with pipelines");
     dataSet.setDataSetStatus(DataSetStatus.DRAFT);
-    dataSet.setExternalId("ext-dataset-" + System.currentTimeMillis());
-    dataSet.setFormat("JSON");
     dataSet.setOpenDataAccess(false);
-    dataSet.setOwner(owner);
     dataSet = dataSetRepository.save(dataSet);
 
     // Create data sources for the pipelines
@@ -1811,8 +1800,6 @@ class DataSetControllerIntegrationTest
       dataSet.setName("test_dataset_stage_" + System.currentTimeMillis());
       dataSet.setDescription("Test dataset with pipelines");
       dataSet.setDataSetStatus(DataSetStatus.DRAFT);
-      dataSet.setExternalId("ext-dataset-stage-" + System.currentTimeMillis());
-      dataSet.setFormat("JSON");
       dataSet.setOpenDataAccess(false);
       dataSet = dataSetRepository.save(dataSet);
 
@@ -1860,7 +1847,6 @@ class DataSetControllerIntegrationTest
       dataSet.setName("test_dataset_no_pipelines_" + System.currentTimeMillis());
       dataSet.setDescription("Test dataset without pipelines");
       dataSet.setDataSetStatus(DataSetStatus.DRAFT);
-      dataSet.setFormat("JSON");
       dataSet.setOpenDataAccess(false);
       dataSet = dataSetRepository.save(dataSet);
 

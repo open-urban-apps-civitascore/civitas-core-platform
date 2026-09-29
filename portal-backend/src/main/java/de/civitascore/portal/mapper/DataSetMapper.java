@@ -27,7 +27,6 @@ import org.mapstruct.ReportingPolicy;
     },
     unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputDTO, DataSet> {
-  @Mapping(target = "owner", ignore = true)
   @Mapping(target = "pipelines", ignore = true)
   @Mapping(target = "projectId", ignore = true)
   @Mapping(target = "frostBaseUrl", ignore = true)
@@ -63,7 +62,6 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   DataSetSummaryDTO toSummary(DataSet entity);
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
-  @Mapping(target = "owner", ignore = true)
   @Mapping(target = "pipelines", ignore = true)
   @Mapping(target = "assignments", ignore = true)
   @Mapping(target = "projectId", ignore = true)
@@ -86,8 +84,6 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Mapping(target = "dataSet", ignore = true)
   @Mapping(target = "routeId", ignore = true)
   NamedApi toNamedApiEntity(NamedApiInputDTO dto);
-
-  NamedApiInputDTO toNamedApiInputDto(NamedApi entity);
 
   // previewUrl is built by DataSetAssembler since it depends on configuration.
   @Mapping(target = "previewUrl", ignore = true)

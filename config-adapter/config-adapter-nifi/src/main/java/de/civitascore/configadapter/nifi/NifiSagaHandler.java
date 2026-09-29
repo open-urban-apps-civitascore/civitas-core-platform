@@ -745,7 +745,6 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       status.put("message", e.getSafeExternalMessage());
       status.put("stacktrace", PipelineMessageSanitizer.sanitize(e.getInternalMessage()));
       status.put("occurredAt", Instant.now().toString());
-      status.put("correlationId", command.sagaId());
     }
     Map<String, Object> resultData =
         pipelineId == null ? Map.of() : Map.of("pipelineStatus", status);
