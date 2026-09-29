@@ -1432,10 +1432,11 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
               statusOf(
                   pathUnderForeignDataStructure("/released/meta"),
                   HttpMethod.PATCH,
-                  Map.of("modelName", "Changed")))
+                  Map.of("description", "Changed")))
           .isEqualTo(HttpStatus.NOT_FOUND);
 
-      assertThat(getUnderOwnDataStructure().getModelName()).isEqualTo("TestModel1");
+      assertThat(getUnderOwnDataStructure().getDescription())
+          .isEqualTo("First version of the test data structure");
     }
   }
 }

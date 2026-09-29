@@ -951,6 +951,50 @@ class DataStructureControllerIntegrationTest
       assertThat(assignmentsResponse.getBody()).hasSize(1);
       assertThat(assignmentsResponse.getBody().getFirst().getGroup().getId()).isEqualTo(groupId2);
     }
+
+    @Test
+    @DisplayName("Should replace assignments of released data structure via released meta patch")
+    void shouldReplaceAssignmentsViaReleasedMeta() {
+      UUID groupId1 = createTestGroup();
+      UUID groupId2 = createTestGroup();
+      UUID roleId = createTestRole();
+
+      AssignmentScopedInputDTO assignment1 = new AssignmentScopedInputDTO();
+      assignment1.setGroupId(groupId1);
+      assignment1.setRoleId(roleId);
+
+      DataStructureInputDTO createInput = createValidInput();
+      createInput.setAssignments(Set.of(assignment1));
+      UUID id = performCreate(createInput).getBody().getId();
+
+      DataStructure dataStructure = dataStructureRepository.findById(id).orElseThrow();
+      dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      dataStructureRepository.save(dataStructure);
+
+      AssignmentScopedInputDTO assignment2 = new AssignmentScopedInputDTO();
+      assignment2.setGroupId(groupId2);
+      assignment2.setRoleId(roleId);
+
+      ResponseEntity<DataStructureOutputDTO> response =
+          exchange(
+              ENDPOINT + "/" + id + "/released/meta",
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("assignments", Set.of(assignment2)),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+      ResponseEntity<List<AssignmentOutputDTO>> assignmentsResponse =
+          restTemplate.exchange(
+              ENDPOINT + "/" + id + "/assignments",
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<>() {});
+
+      assertThat(assignmentsResponse.getBody()).hasSize(1);
+      assertThat(assignmentsResponse.getBody().getFirst().getGroup().getId()).isEqualTo(groupId2);
+    }
   }
 
   @Nested

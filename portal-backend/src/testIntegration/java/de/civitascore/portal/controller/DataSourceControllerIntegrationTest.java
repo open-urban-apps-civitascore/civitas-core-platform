@@ -15,6 +15,8 @@ import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
+import de.civitascore.portal.model.input.assignment.AssignmentScopedInputDTO;
+import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
@@ -1156,6 +1158,48 @@ class DataSourceControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody().getName()).isEqualTo("updated-name");
       assertThat(response.getBody().getDescription()).isEqualTo("updated-desc");
+    }
+
+    @Test
+    @DisplayName("Should replace assignments of AVAILABLE data source via released/meta")
+    void shouldReplaceAssignmentsViaReleasedMeta() {
+      UUID groupId1 = portalData.group().getId();
+      UUID groupId2 = portalData.group().getId();
+      UUID roleId = portalData.role().getId();
+
+      AssignmentScopedInputDTO initialAssignment = new AssignmentScopedInputDTO();
+      initialAssignment.setGroupId(groupId1);
+      initialAssignment.setRoleId(roleId);
+
+      DataSourceInputDTO input = createValidInput();
+      input.setDataStructureVersionId(createAvailableDataStructureVersionId());
+      input.setAssignments(Set.of(initialAssignment));
+      UUID id = performCreate(input).getBody().getId();
+      performRelease(id);
+
+      AssignmentScopedInputDTO replacementAssignment = new AssignmentScopedInputDTO();
+      replacementAssignment.setGroupId(groupId2);
+      replacementAssignment.setRoleId(roleId);
+
+      ResponseEntity<DataSourceOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + id + "/released/meta",
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("assignments", Set.of(replacementAssignment)),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+      ResponseEntity<List<AssignmentOutputDTO>> assignmentsResponse =
+          restTemplate.exchange(
+              getEndpointPath() + "/" + id + "/assignments",
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<>() {});
+
+      assertThat(assignmentsResponse.getBody()).hasSize(1);
+      assertThat(assignmentsResponse.getBody().getFirst().getGroup().getId()).isEqualTo(groupId2);
     }
 
     @Test
