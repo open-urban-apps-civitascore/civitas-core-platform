@@ -13,8 +13,8 @@ export const MappingOperationSchema: z.ZodType = z.lazy(() =>
     ToIntFieldOperationSchema,
     ToFloatFieldOperationSchema,
     ToUuidFieldOperationSchema,
-    ToDateFieldOperationSchema,
     ToDateTimeFieldOperationSchema,
+    ToDateFieldOperationSchema,
     FormatFieldOperationSchema,
     GeoPointFieldOperationSchema,
   ]),
@@ -80,7 +80,7 @@ export const ToFloatFieldOperationSchema = z
   })
   .strict()
 
-/** Converts the input value to a UUID. No pattern: the value is passed through as-is. */
+/** Converts the input string to a UUID. */
 export const ToUuidFieldOperationSchema = z
   .object({
     op: z.literal('toUuid'),
@@ -89,31 +89,25 @@ export const ToUuidFieldOperationSchema = z
   })
   .strict()
 
-/**
- * Parses the input string into a date/time value using a date pattern.
- * `pattern` is optional: the editor node has a default pattern but the user can clear it.
- */
+/** Parses the input string into a date-time value using a date pattern. */
+export const ToDateTimeFieldOperationSchema = z
+  .object({
+    op: z.literal('toDateTime'),
+    /** String value to parse — a JSONPath string or a nested operation. */
+    input: MappingFieldSchema,
+    /** Date pattern used to parse the input, e.g. "yyyy-MM-dd'T'HH:mm:ssXXX". */
+    pattern: z.string(),
+  })
+  .strict()
+
+/** Parses the input string into a date/time value using a date pattern. */
 export const ToDateFieldOperationSchema = z
   .object({
     op: z.literal('toDate'),
     /** String value to parse — a JSONPath string or a nested operation. */
     input: MappingFieldSchema,
     /** Date pattern used to parse the input, e.g. 'yyyy-MM-dd'. */
-    pattern: z.string().optional(),
-  })
-  .strict()
-
-/**
- * Parses the input string into a date-time value using a date-time pattern.
- * `pattern` is optional: the editor node has a default pattern but the user can clear it.
- */
-export const ToDateTimeFieldOperationSchema = z
-  .object({
-    op: z.literal('toDateTime'),
-    /** String value to parse — a JSONPath string or a nested operation. */
-    input: MappingFieldSchema,
-    /** Date-time pattern used to parse the input, e.g. 'yyyy-MM-dd\'T\'HH:mm:ssXXX'. */
-    pattern: z.string().optional(),
+    pattern: z.string(),
   })
   .strict()
 
@@ -139,16 +133,12 @@ export const GeoPointFieldOperationSchema = z
   })
   .strict()
 
-/**
- * Concatenates multiple input field values with an optional separator.
- * `inputs` may legitimately be empty: the editor's concat node is variadic and drops unconnected
- * ports rather than padding them, so a node with nothing connected yet emits `inputs: []`.
- */
+/** Concatenates multiple input field values with an optional separator. */
 export const ConcatFieldOperationSchema = z
   .object({
     op: z.literal('concat'),
     /** Inputs concatenated in order — each a JSONPath string or a nested operation. */
-    inputs: z.array(MappingFieldSchema),
+    inputs: z.array(MappingFieldSchema).min(1),
     separator: z.string().optional(),
   })
   .strict()
@@ -193,8 +183,8 @@ export type ToStringFieldOperation = z.infer<typeof ToStringFieldOperationSchema
 export type ToIntFieldOperation = z.infer<typeof ToIntFieldOperationSchema>
 export type ToFloatFieldOperation = z.infer<typeof ToFloatFieldOperationSchema>
 export type ToUuidFieldOperation = z.infer<typeof ToUuidFieldOperationSchema>
-export type ToDateFieldOperation = z.infer<typeof ToDateFieldOperationSchema>
 export type ToDateTimeFieldOperation = z.infer<typeof ToDateTimeFieldOperationSchema>
+export type ToDateFieldOperation = z.infer<typeof ToDateFieldOperationSchema>
 export type FormatFieldOperation = z.infer<typeof FormatFieldOperationSchema>
 export type GeoPointFieldOperation = z.infer<typeof GeoPointFieldOperationSchema>
 export type ConcatFieldOperation = z.infer<typeof ConcatFieldOperationSchema>
