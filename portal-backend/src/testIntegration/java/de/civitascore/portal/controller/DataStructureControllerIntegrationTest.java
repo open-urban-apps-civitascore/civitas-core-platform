@@ -64,7 +64,6 @@ class DataStructureControllerIntegrationTest
     DataStructureInputDTO input = new DataStructureInputDTO();
     input.setName("test_datastructure_" + System.currentTimeMillis());
     input.setDescription("A test data structure for integration testing");
-    input.setCreatedFromDataSource(false);
     return input;
   }
 
@@ -80,7 +79,6 @@ class DataStructureControllerIntegrationTest
     DataStructureInputDTO input = new DataStructureInputDTO();
     input.setName("Updated Data Structure");
     input.setDescription("Updated description");
-    input.setCreatedFromDataSource(false);
     return input;
   }
 
@@ -109,7 +107,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("New Data Structure");
       input.setDescription("A new test data structure");
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response = performCreate(input);
 
@@ -127,9 +124,6 @@ class DataStructureControllerIntegrationTest
       assertThat(output.getDataStructureStatus())
           .as("Status should be set to DRAFT by preCreate hook")
           .isEqualTo(DataStructureStatus.DRAFT);
-      assertThat(output.getCreatedFromDataSource())
-          .as("CreatedFromDataSource should match input")
-          .isFalse();
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
 
       assertThat(response.getHeaders().getLocation())
@@ -143,7 +137,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setDescription("Missing name");
       input.setDataStructureStatus(DataStructureStatus.DRAFT);
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response = performCreate(input);
 
@@ -158,7 +151,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Missing description");
       input.setDescription("  ");
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response = performCreate(input);
 
@@ -187,7 +179,6 @@ class DataStructureControllerIntegrationTest
       input.setName("Shared Data Structure Name");
       input.setDescription("First one");
       input.setDataStructureStatus(DataStructureStatus.DRAFT);
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> firstResponse = performCreate(input);
       assertThat(firstResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -259,9 +250,6 @@ class DataStructureControllerIntegrationTest
       assertThat(version1.getDataStructureVersionStatus())
           .as("Version should have a status")
           .isNotNull();
-      assertThat(version1.getDataStructureVersionSource())
-          .as("Version should have a source")
-          .isNotNull();
     }
 
     @Test
@@ -322,7 +310,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Updated Data Structure");
       input.setDescription("Updated description");
-      input.setCreatedFromDataSource(true);
 
       ResponseEntity<DataStructureOutputDTO> response = performUpdate(dataStructureId, input);
 
@@ -334,7 +321,6 @@ class DataStructureControllerIntegrationTest
       assertThat(output.getName()).isEqualTo("Updated Data Structure");
       assertThat(output.getDescription()).isEqualTo("Updated description");
       assertThat(output.getDataStructureStatus()).isEqualTo(DataStructureStatus.DRAFT);
-      assertThat(output.getCreatedFromDataSource()).isTrue();
     }
 
     @Test
@@ -344,7 +330,6 @@ class DataStructureControllerIntegrationTest
       input.setName("Non-existent");
       input.setDescription("a description");
       input.setDataStructureStatus(DataStructureStatus.DRAFT);
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response = performUpdate(UUID.randomUUID(), input);
 
@@ -361,7 +346,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("");
       input.setDescription("Empty name");
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response = performUpdate(dataStructureId, input);
 
@@ -378,7 +362,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Still has a name");
       input.setDescription("  ");
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response = performUpdate(dataStructureId, input);
 
@@ -410,7 +393,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Trying to update released with regular PUT");
       input.setDescription("This should fail");
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response = performUpdate(dataStructure.getId(), input);
 
@@ -717,7 +699,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Updated Released Data Structure");
       input.setDescription("Updated description for released data structure");
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
@@ -756,7 +737,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Trying to update draft");
       input.setDescription("This should fail");
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
@@ -777,7 +757,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Non-existent");
       input.setDescription("Does not exist");
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
@@ -810,7 +789,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("");
       input.setDescription("Blank name should fail");
-      input.setCreatedFromDataSource(false);
 
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
@@ -895,7 +873,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Data Structure With Assignments");
       input.setDescription("Test");
-      input.setCreatedFromDataSource(false);
       input.setAssignments(Set.of(assignment));
 
       ResponseEntity<DataStructureOutputDTO> createResponse = performCreate(input);
@@ -930,7 +907,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO createInput = new DataStructureInputDTO();
       createInput.setName("Data Structure For Update " + System.currentTimeMillis());
       createInput.setDescription("Test");
-      createInput.setCreatedFromDataSource(false);
       createInput.setAssignments(Set.of(assignment1));
 
       ResponseEntity<DataStructureOutputDTO> createResponse = performCreate(createInput);
@@ -943,7 +919,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO updateInput = new DataStructureInputDTO();
       updateInput.setName(createInput.getName());
       updateInput.setDescription("Updated");
-      updateInput.setCreatedFromDataSource(false);
       updateInput.setAssignments(Set.of(assignment2));
 
       performUpdate(id, updateInput);

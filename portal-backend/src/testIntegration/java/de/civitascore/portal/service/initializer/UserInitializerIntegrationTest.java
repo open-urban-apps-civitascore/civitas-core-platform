@@ -101,7 +101,6 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
     assertThat(user).isPresent();
     assertThat(user.get().getFirstName()).isEqualTo("Init");
     assertThat(user.get().getLastName()).isEqualTo("TestUser");
-    assertThat(user.get().getActive()).isTrue();
     assertThat(user.get().getExternalId()).isNotBlank();
 
     UserRepresentation keycloakUser = findKeycloakUserByEmail(TEST_EMAIL);
@@ -123,7 +122,6 @@ class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest 
     assertThat(user).isPresent();
     assertThat(user.get().getFirstName()).isEqualTo("Init");
     assertThat(user.get().getLastName()).isEqualTo("SyncUser");
-    assertThat(user.get().getActive()).isTrue();
     assertThat(user.get().getExternalId()).isNotBlank();
 
     UserRepresentation keycloakUser = findKeycloakUserByEmail(TEST_SYNC_EMAIL);

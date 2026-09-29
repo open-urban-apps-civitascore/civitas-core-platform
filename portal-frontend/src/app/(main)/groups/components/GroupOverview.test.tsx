@@ -74,7 +74,6 @@ const mockGroupData: Group = {
   id: '1',
   name: 'Test',
   description: '',
-  roles: null,
   contactUser: null,
   members: [],
   assignments: [],

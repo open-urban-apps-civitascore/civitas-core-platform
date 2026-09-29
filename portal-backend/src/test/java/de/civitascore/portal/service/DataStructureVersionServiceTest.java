@@ -13,7 +13,6 @@ import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
-import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
@@ -254,7 +253,6 @@ class DataStructureVersionServiceTest {
       version.setDataStructure(ds);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
       input.setModel(new HashMap<>(Map.of("title", "New")));
       input.setStyles(new HashMap<>(Map.of("color", "red")));
@@ -297,7 +295,6 @@ class DataStructureVersionServiceTest {
       version.setDataStructure(ds);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
       input.setModel(new HashMap<>(Map.of("title", "SHOULD_NOT_CHANGE")));
       input.setStyles(new HashMap<>(Map.of("color", "red")));
@@ -341,7 +338,6 @@ class DataStructureVersionServiceTest {
       version.setDataStructure(ds);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
       input.setModel(new HashMap<>(Map.of("title", "New")));
 
@@ -390,7 +386,6 @@ class DataStructureVersionServiceTest {
       version.setDataStructure(ds);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
       input.setModel(null);
 
@@ -474,13 +469,11 @@ class DataStructureVersionServiceTest {
       dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
       input.setModel(new HashMap<>(Map.of("title", "Observation")));
       input.setStyles(new HashMap<>(Map.of("color", "blue")));
 
       DataStructureVersion newEntity = new DataStructureVersion();
-      newEntity.setDataStructureVersionSource(DataStructureVersionSource.OWN);
 
       when(dataStructureVersionMapper.toEntity(any())).thenReturn(newEntity);
       when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
@@ -516,12 +509,10 @@ class DataStructureVersionServiceTest {
       dataStructure.setModelLogicalUrn("urn:core:platform:civitas:element:common:test");
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
       input.setModel(new HashMap<>(Map.of("title", "Observation")));
 
       DataStructureVersion newEntity = new DataStructureVersion();
-      newEntity.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       newEntity.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
 
       when(dataStructureVersionMapper.toEntity(any())).thenReturn(newEntity);
@@ -557,7 +548,6 @@ class DataStructureVersionServiceTest {
       version.setDataStructure(dataStructure);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
       input.setModel(new HashMap<>(Map.of("title", "Arrived late")));
 
@@ -589,7 +579,6 @@ class DataStructureVersionServiceTest {
       version.setDataStructure(dataStructure);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
       input.setModel(new HashMap<>(Map.of("title", "Replaced")));
 
@@ -612,11 +601,9 @@ class DataStructureVersionServiceTest {
       dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setDataStructureId(dataStructureId);
 
       DataStructureVersion newEntity = new DataStructureVersion();
-      newEntity.setDataStructureVersionSource(DataStructureVersionSource.OWN);
 
       when(dataStructureVersionMapper.toEntity(any())).thenReturn(newEntity);
       when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);

@@ -37,7 +37,6 @@ const createDatastructure = (versions: string[], datastructureId = 'ds1'): Datas
   id: datastructureId,
   name: `Datastructure ${datastructureId}`,
   description: 'Datastructure Description',
-  createdFromDataSource: false,
   dataStructureStatus: 'DRAFT',
   inUse: false,
   dataStructureVersions: versions.map(version => createVersion(version, datastructureId)),
@@ -296,7 +295,6 @@ describe('mapDatastructureVersionFormToApiData', () => {
     expect(result).toEqual({
       id: formData.id,
       description: formData.description,
-      dataStructureVersionSource: formData.dataStructureVersionSource,
       dataStructureVersionStatus: formData.dataStructureVersionStatus,
       modelName: formData.modelName,
       model,

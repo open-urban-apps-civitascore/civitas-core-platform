@@ -46,8 +46,6 @@ tests {
     expect(res.body.configuration).to.not.have.property('dsn');
     expect(res.body.configuration).to.not.have.property('table');
     expect(res.body.configuration).to.not.have.property('columns');
-    expect(res.body.configuration).to.not.have.property('conn_max_open');
-    expect(res.body.configuration).to.not.have.property('conn_max_idle');
   });
 }
 

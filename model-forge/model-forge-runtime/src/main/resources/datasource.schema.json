@@ -85,13 +85,6 @@
         "table":   { "type": ["string", "null"], "description": "Table to poll." },
         "columns": { "type": ["array", "null"], "items": { "type": "string" }, "description": "Columns to select." },
         "where":   { "type": ["string", "null"], "description": "SQL WHERE clause." },
-        "prefix":  { "type": ["string", "null"], "description": "SQL prefix prepended to the query (not honored by the NiFi engine)." },
-        "suffix":  { "type": ["string", "null"], "description": "SQL suffix appended to the query (not honored by the NiFi engine)." },
-        "init_statement":     { "type": ["string", "null"], "description": "SQL executed on connection init (not honored by the NiFi engine)." },
-        "conn_max_idle_time": { "type": ["string", "null"], "description": "Maximum idle time per connection, e.g. '10m'." },
-        "conn_max_life_time": { "type": ["string", "null"], "description": "Maximum lifetime per connection, e.g. '1h'." },
-        "conn_max_idle":      { "type": "integer", "description": "Maximum number of idle connections. Default 2." },
-        "conn_max_open":      { "type": "integer", "description": "Maximum number of open connections. 0 = unlimited. Default 0." },
         "user":     { "type": ["string", "null"], "description": "Database login username." },
         "password": { "type": ["string", "null"], "description": "Database login password. Stored ENCRYPTED by the host; null/absent when unset." }
       }

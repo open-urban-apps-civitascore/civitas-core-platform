@@ -6,7 +6,6 @@ import de.civitascore.portal.model.embedded.DataSinkType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import java.util.Map;
-import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -14,8 +13,6 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class DataSinkInputDTO extends DataSetOwnedInputDTO {
-
-  private UUID id;
 
   @NotNull private DataSinkType dataSinkType;
 

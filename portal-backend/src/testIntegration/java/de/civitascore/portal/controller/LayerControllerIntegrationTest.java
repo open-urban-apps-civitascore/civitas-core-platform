@@ -274,24 +274,9 @@ class LayerControllerIntegrationTest
         Map.of("minx", -180, "miny", -90, "maxx", 180, "maxy", 90);
 
     @Test
-    @DisplayName("Should return 400 when nativeBoundingBox is set but bboxAutoCalculate is true")
-    void shouldReturn400WhenNativeBboxSetWithAutoCalculateTrue() {
+    @DisplayName("Should return 400 when only latLonBoundingBox is set")
+    void shouldReturn400WhenOnlyLatLonBboxSet() {
       LayerInputDTO input = createValidInput();
-      input.setBboxAutoCalculate(true);
-      input.setNativeBoundingBox(BBOX);
-
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName(
-        "Should return 400 when bboxAutoCalculate is false but nativeBoundingBox is missing")
-    void shouldReturn400WhenNativeBboxMissingWithAutoCalculateFalse() {
-      LayerInputDTO input = createValidInput();
-      input.setBboxAutoCalculate(false);
       input.setLatLonBoundingBox(BBOX);
 
       ResponseEntity<ProblemDetail> response =
@@ -301,25 +286,10 @@ class LayerControllerIntegrationTest
     }
 
     @Test
-    @DisplayName(
-        "Should return 400 when bboxAutoCalculate is false but latLonBoundingBox is missing")
-    void shouldReturn400WhenLatLonBboxMissingWithAutoCalculateFalse() {
+    @DisplayName("Should return 400 when only nativeBoundingBox is set")
+    void shouldReturn400WhenOnlyNativeBboxSet() {
       LayerInputDTO input = createValidInput();
-      input.setBboxAutoCalculate(false);
       input.setNativeBoundingBox(BBOX);
-
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName(
-        "Should return 400 when bboxAutoCalculate is false but both bbox fields are missing")
-    void shouldReturn400WhenBothBboxFieldsMissingWithAutoCalculateFalse() {
-      LayerInputDTO input = createValidInput();
-      input.setBboxAutoCalculate(false);
 
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);

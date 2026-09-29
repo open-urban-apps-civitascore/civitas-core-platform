@@ -71,12 +71,12 @@ if [ -z "$TOKEN" ]; then echo "    token fetch failed (Keycloak up? creds correc
 echo "==> 3/4  Creating a DataStructure + schema version via portal-backend ..."
 DS_ID=$(curl -fsS -X POST "$BACKEND_URL/v1/datastructures" \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"name":"Vertical Slice DataStructure","description":"vertical-slice smoke test: portal-backend -> Model Forge","createdFromDataSource":false,"assignments":[]}' | json id)
+  -d '{"name":"Vertical Slice DataStructure","description":"vertical-slice smoke test: portal-backend -> Model Forge","assignments":[]}' | json id)
 echo "    DataStructure id = $DS_ID"
 
 curl -fsS -X POST "$BACKEND_URL/v1/datastructures/$DS_ID/versions" \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"dataStructureVersionSource":"OWN","version":"1.0.0","description":"Vertical-slice schema version","modelName":"VerticalSliceModel","model":{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"VerticalSliceModel","type":"object","properties":{"name":{"type":"string"},"count":{"type":"integer"}}},"styles":{}}' >/dev/null
+  -d '{"version":"1.0.0","description":"Vertical-slice schema version","modelName":"VerticalSliceModel","model":{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"VerticalSliceModel","type":"object","properties":{"name":{"type":"string"},"count":{"type":"integer"}}},"styles":{}}' >/dev/null
 echo "    DataStructure version 1.0.0 stored as a portal-backend entity"
 echo "    NOTE: nothing lands in the model_forge schema — portal-backend has no Model Forge"
 echo "          integration yet, so the registry stays empty until that step exists."

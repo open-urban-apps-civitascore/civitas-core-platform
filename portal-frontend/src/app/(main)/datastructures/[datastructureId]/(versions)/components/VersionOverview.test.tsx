@@ -71,7 +71,6 @@ const mockDatastructure: Datastructure = {
   dataStructureVersions: [],
   createdAt: '2024-01-01',
   modifiedAt: '2024-01-01',
-  createdFromDataSource: false,
 }
 
 const mockVersion: DatastructureVersion = {

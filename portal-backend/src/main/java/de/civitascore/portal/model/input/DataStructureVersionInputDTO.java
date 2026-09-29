@@ -1,10 +1,8 @@
 package de.civitascore.portal.model.input;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -22,9 +20,6 @@ import lombok.EqualsAndHashCode;
 public class DataStructureVersionInputDTO extends BaseInputDTO {
 
   @JsonIgnore private DataStructureVersionStatus dataStructureVersionStatus;
-
-  @Schema(description = "How this version was created (required)")
-  @NotNull(message = "DataStructureVersionSource is required") private DataStructureVersionSource dataStructureVersionSource;
 
   private String description;
 

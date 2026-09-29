@@ -101,8 +101,8 @@ for entry in "${USERS[@]}"; do
   fi
 
   run_psql "
-    INSERT INTO users (id, first_name, last_name, email, title, active, phone, created_at)
-    VALUES ('${uuid}', '${first}', '${last}', '${email}', '${title}', ${active}, ${phone_val}, NOW())
+    INSERT INTO users (id, first_name, last_name, email, title, phone, created_at)
+    VALUES ('${uuid}', '${first}', '${last}', '${email}', '${title}', ${phone_val}, NOW())
     ON CONFLICT (email) DO NOTHING;
   " && ok "PG: ${first} ${last} (${email})" \
     || err "PG: failed to insert ${email}"

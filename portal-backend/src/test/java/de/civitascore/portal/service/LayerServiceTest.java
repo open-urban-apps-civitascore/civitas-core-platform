@@ -365,28 +365,18 @@ class LayerServiceTest {
     static Stream<Arguments> bboxConsistencyCases() {
       Map<String, Object> bbox = Map.of("minx", -180, "miny", -90, "maxx", 180, "maxy", 90);
       return Stream.of(
-          // autoCalculate=true: bbox fields must be absent
-          Arguments.of(true, null, null, false),
-          Arguments.of(true, bbox, null, true),
-          Arguments.of(true, null, bbox, true),
-          Arguments.of(true, bbox, bbox, true),
-          // autoCalculate=false: both bbox fields are required
-          Arguments.of(false, bbox, bbox, false),
-          Arguments.of(false, null, null, true),
-          Arguments.of(false, bbox, null, true),
-          Arguments.of(false, null, bbox, true));
+          Arguments.of(null, null, false),
+          Arguments.of(bbox, bbox, false),
+          Arguments.of(bbox, null, true),
+          Arguments.of(null, bbox, true));
     }
 
-    @ParameterizedTest(name = "autoCalculate={0}, nativeBbox={1}, latLonBbox={2} → shouldThrow={3}")
+    @ParameterizedTest(name = "nativeBbox={0}, latLonBbox={1} → shouldThrow={2}")
     @MethodSource("bboxConsistencyCases")
-    @DisplayName("Should validate bbox field combinations against bboxAutoCalculate")
+    @DisplayName("Should require both bounding boxes or neither")
     void shouldValidateBboxConsistency(
-        boolean autoCalculate,
-        Map<String, Object> nativeBbox,
-        Map<String, Object> latLonBbox,
-        boolean shouldThrow) {
+        Map<String, Object> nativeBbox, Map<String, Object> latLonBbox, boolean shouldThrow) {
       LayerInputDTO input = new LayerInputDTO();
-      input.setBboxAutoCalculate(autoCalculate);
       input.setNativeBoundingBox(nativeBbox);
       input.setLatLonBoundingBox(latLonBbox);
       input.setDataSinkId(UUID.randomUUID());
@@ -395,7 +385,7 @@ class LayerServiceTest {
       if (shouldThrow) {
         assertThatThrownBy(() -> layerService.preProcessCreateInput(input))
             .isInstanceOf(InvalidInputException.class)
-            .hasMessageContaining("bboxAutoCalculate");
+            .hasMessageContaining("latLonBoundingBox");
       } else {
         assertThatCode(() -> layerService.preProcessCreateInput(input)).doesNotThrowAnyException();
       }

@@ -170,15 +170,12 @@ class DataSetControllerIntegrationTest
     owner.setLastName("Owner");
     owner.setEmail("test.owner." + System.currentTimeMillis() + "@example.com");
     owner.setExternalId("ext-user-" + System.currentTimeMillis());
-    owner.setActive(true);
     owner = userRepository.save(owner);
 
     DataSet dataSet = new DataSet();
     dataSet.setName("test_dataset_with_relationships_" + System.currentTimeMillis());
     dataSet.setDescription("Test dataset with pipelines");
     dataSet.setDataSetStatus(DataSetStatus.DRAFT);
-    dataSet.setIdentifier("test-identifier-001");
-    dataSet.setVersion("1.0.0");
     dataSet.setExternalId("ext-dataset-" + System.currentTimeMillis());
     dataSet.setFormat("JSON");
     dataSet.setOpenDataAccess(false);
@@ -863,7 +860,6 @@ class DataSetControllerIntegrationTest
       creator.setLastName("User");
       creator.setEmail("testuser.creator." + System.currentTimeMillis() + "@example.com");
       creator.setExternalId(keycloakId);
-      creator.setActive(true);
       userRepository.save(creator);
 
       ResponseEntity<DataSetOutputDTO> response = performCreate(createValidInput());
@@ -1815,8 +1811,6 @@ class DataSetControllerIntegrationTest
       dataSet.setName("test_dataset_stage_" + System.currentTimeMillis());
       dataSet.setDescription("Test dataset with pipelines");
       dataSet.setDataSetStatus(DataSetStatus.DRAFT);
-      dataSet.setIdentifier("test-identifier-stage");
-      dataSet.setVersion("1.0.0");
       dataSet.setExternalId("ext-dataset-stage-" + System.currentTimeMillis());
       dataSet.setFormat("JSON");
       dataSet.setOpenDataAccess(false);

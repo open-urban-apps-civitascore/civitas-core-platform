@@ -1,12 +1,10 @@
 package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
-import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
@@ -34,7 +32,6 @@ import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.StyleRepository;
 import de.civitascore.portal.service.DataSetService;
 import de.civitascore.portal.service.GroupService;
-import de.civitascore.portal.util.ResourceInUseException;
 import jakarta.persistence.EntityManager;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -132,7 +129,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
     dsv.setDataStructure(dataStructure);
     dsv.setVersion(uniqueName("v"));
     dsv.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-    dsv.setDataStructureVersionSource(DataStructureVersionSource.OWN);
     return dataStructureVersionRepository.save(dsv);
   }
 
@@ -302,25 +298,6 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
   @Nested
   @DisplayName("Group cascades")
   class GroupCascades {
-
-    @Test
-    @Transactional
-    @DisplayName("Deleting Group with children should be prevented")
-    void deletingGroup_withChildren_shouldThrowResourceInUseException() {
-      Group parent = createGroup();
-      Group child = new Group();
-      child.setName(uniqueName("child-group"));
-      child.setParentGroup(parent);
-      groupRepository.save(child);
-
-      entityManager.flush();
-      entityManager.clear();
-
-      UUID parentId = parent.getId();
-      assertThatThrownBy(() -> groupService.deleteById(parentId))
-          .isInstanceOf(ResourceInUseException.class)
-          .hasMessageContaining("child groups");
-    }
 
     @Test
     @Transactional

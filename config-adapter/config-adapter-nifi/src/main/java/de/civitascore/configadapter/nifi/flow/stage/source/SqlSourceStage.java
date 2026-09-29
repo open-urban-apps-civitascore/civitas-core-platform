@@ -142,8 +142,6 @@ public final class SqlSourceStage implements SourceStage {
     putIfPresent(pool::put, "Database User", decrypted.get("user"));
     pool.put("Database Driver Class Name", "org.postgresql.Driver");
     pool.put("Database Driver Locations", "/opt/nifi/drivers/postgresql.jar");
-    // The Redpanda conn_max_* fields (idle/lifetime/open) are intentionally NOT mapped: the
-    // connection pool is platform-managed (NiFi DBCPConnectionPool defaults), not tenant-tunable.
     pool.forEach((key, value) -> out.putControllerServiceProperty(SOURCE_DBCP, key, value));
 
     // A password, if present, must be encrypted: a plaintext secret must never be written into the
@@ -209,22 +207,13 @@ public final class SqlSourceStage implements SourceStage {
   }
 
   /**
-   * Fails loud on SQL connector fields the NiFi mapping cannot honor — rather than silently
-   * dropping them. {@code prefix}/{@code suffix}/{@code init_statement} are Redpanda Connect (the
-   * former engine) query concepts with no QueryDatabaseTableRecord equivalent; a {@code where}
-   * carrying a bind placeholder ({@code :name} or {@code ?}) would reach NiFi as unbound, invalid
-   * SQL; and the {@code dsn} query string is restricted to an allowlist of safe parameters (see
-   * {@link #rejectUnknownDsnParams}).
+   * Fails loud on SQL connector values the NiFi mapping cannot honor — rather than silently
+   * dropping them. A {@code where} carrying a bind placeholder ({@code :name} or {@code ?}) would
+   * reach NiFi as unbound, invalid SQL, and the {@code dsn} query string is restricted to an
+   * allowlist of safe parameters (see {@link #rejectUnknownDsnParams}).
    */
   private static void rejectUnsupportedSqlFields(Map<String, Object> config)
       throws FatalAdapterException {
-    for (String field : List.of("prefix", "suffix", "init_statement")) {
-      if (!trimmedString(config.get(field)).isEmpty()) {
-        throw new FatalAdapterException(
-            AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-            "SQL source field not supported by the pipeline engine: " + field);
-      }
-    }
     if (containsBindPlaceholder(trimmedString(config.get("where")))) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,

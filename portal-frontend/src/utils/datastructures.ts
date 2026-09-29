@@ -92,7 +92,6 @@ export const mapDatastructureVersionFormToApiData = (
   return {
     id: version.id,
     description: version.description,
-    dataStructureVersionSource: version.dataStructureVersionSource,
     dataStructureVersionStatus: version.dataStructureVersionStatus,
     modelName: version.modelName,
     model,

@@ -26,7 +26,6 @@ const makeLayer = (overrides: Partial<LayerFormData> = {}): LayerFormData => ({
   geometryColumnRef: 'geom',
   nativeCRS: 'EPSG:25832',
   crs: 'EPSG:4326',
-  bboxAutoCalculate: false,
   nativeBoundingBox: { minX: '5.8', minY: '47.2', maxX: '15.0', maxY: '55.0', crs: 'EPSG:25832' },
   latLonBoundingBox: { minX: '5.8', minY: '47.2', maxX: '15.0', maxY: '55.0', crs: 'EPSG:25832' },
   defaultStyleId: null,
