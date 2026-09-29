@@ -66,7 +66,7 @@ describe('buildDataSinkPayloads — FROST target structure reference', () => {
   })
 
   it('sends the selected port with the target structure', () => {
-    const ported: TestNode = { ...frostNode, data: { ...frostNode.data, port: 'Observations' } }
+    const ported: FixtureNode = { ...frostNode, data: { ...frostNode.data, port: 'Observations' } }
     const p = pipeline([mappingNode('map-1', DSV_URN), ported], [{ source: 'map-1', target: 'frost-1' }])
     expect(frostPayload(p)?.configuration).toEqual({ port: 'Observations', element: DSV_URN })
   })
@@ -129,7 +129,7 @@ describe('buildDataSinkPayloads — PostGIS configuration', () => {
   const OTHER_NODE_URN = 'urn:core:platform:civitas:datastructure:common:Roads:aa11bb22cc:2.0.0'
   const MAPPING_TARGET_URN = 'urn:core:platform:civitas:datastructure:common:Target:dd33ee44ff:1.0.0'
 
-  const postgisNodeWithUrn = (dataStructureUrn: string): TestNode => ({
+  const postgisNodeWithUrn = (dataStructureUrn: string): FixtureNode => ({
     ...postgisNode,
     data: { ...postgisNode.data, dataStructureUrn },
   })
@@ -511,6 +511,7 @@ describe('CORE-IR conformance of the artifacts sent to Model Forge', () => {
       entityId: 'sink-guid-1',
       configurationUrn: SINK_URN,
       dataStructureVersionId: 'dsv-1',
+      dataStructureUrn: TGT_STRUCT_URN,
       tableName: 'my_table',
     },
   }

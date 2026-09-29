@@ -648,6 +648,9 @@ describe('getDatastructureFieldOptions', () => {
     expect(getDatastructureFieldOptions(versionOf({ styles: diagramOf([]) }))).toEqual([])
     expect(getDatastructureFieldOptions(versionOf({}))).toEqual([])
     expect(getDatastructureFieldOptions(undefined)).toEqual([])
+  })
+})
+
 /**
  * The editor rehydrates from `styles`, never from the stored CORE model,
  * so the provable statement is that a rehydrated diagram exports the same model again.

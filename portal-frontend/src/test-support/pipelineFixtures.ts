@@ -136,6 +136,7 @@ export const frostNode = (overrides: NodeOverrides = {}): FixtureNode =>
       serverName: 'Sensor Data Storage',
       serverUrl: '',
       version: '1.1',
+      port: 'Things',
     },
     overrides,
   )
@@ -152,6 +153,7 @@ export const geoPersistenceNode = (overrides: NodeOverrides = {}): FixtureNode =
       entityId: 'sink-guid-1',
       configurationUrn: POSTGIS_SINK_URN,
       dataStructureVersionId: 'dsv-1',
+      dataStructureUrn: TARGET_STRUCTURE_URN,
       tableName: 'my_table',
     },
     overrides,

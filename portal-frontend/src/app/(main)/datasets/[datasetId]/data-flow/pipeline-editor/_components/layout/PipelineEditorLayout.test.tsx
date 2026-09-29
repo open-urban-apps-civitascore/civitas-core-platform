@@ -1,17 +1,18 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NextIntlClientProvider } from 'next-intl'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 
 import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import {
   useCreateDataSink,
   useDeleteDataSink,
+  useGetDataSinks,
   useUpdateDataSink,
 } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { useGetDatasources } from '@/app/services/api/datasources/clientRequests'
 import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
-import { useCreateMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
+import { useCreateMapping, useDeleteMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
 import {
   useCreatePipeline,
   useDeletePipeline,
@@ -59,10 +60,12 @@ vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
   useCreateDataSink: vi.fn(),
   useUpdateDataSink: vi.fn(),
   useDeleteDataSink: vi.fn(),
+  useGetDataSinks: vi.fn(),
 }))
 vi.mock('@/app/services/api/mappings/clientRequests', () => ({
   useCreateMapping: vi.fn(),
   useUpdateMapping: vi.fn(),
+  useDeleteMapping: vi.fn(),
 }))
 
 const CREATED_SINK_URN = 'urn:core:platform:civitas:datasink:common:Created:zyxw987654:1.0.0'
@@ -70,8 +73,8 @@ const CREATED_SINK_URN = 'urn:core:platform:civitas:datasink:common:Created:zyxw
 const mutation = (mutateAsync = vi.fn().mockResolvedValue({ data: {} })) =>
   ({ mutate: vi.fn(), mutateAsync, isPending: false }) as never
 
-let updatePipeline: ReturnType<typeof vi.fn>
-let createDataSink: ReturnType<typeof vi.fn>
+let updatePipeline: Mock
+let createDataSink: Mock
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -125,6 +128,10 @@ beforeEach(() => {
   vi.mocked(useDeleteDataSink).mockReturnValue(mutation())
   vi.mocked(useCreateMapping).mockReturnValue(mutation())
   vi.mocked(useUpdateMapping).mockReturnValue(mutation())
+  vi.mocked(useDeleteMapping).mockReturnValue(mutation())
+  vi.mocked(useGetDataSinks).mockReturnValue({ data: { data: [] }, isLoading: false } as unknown as ReturnType<
+    typeof useGetDataSinks
+  >)
 })
 
 const sinks = [
@@ -186,7 +193,7 @@ describe('saving from the Pipeline editor', () => {
     [
       'FROST',
       frostNode({ data: { entityId: undefined, configurationUrn: undefined } }),
-      { id: null, dataSinkType: 'FROST', configuration: { element: TARGET_STRUCTURE_URN } },
+      { id: null, dataSinkType: 'FROST', configuration: { port: 'Things', element: TARGET_STRUCTURE_URN } },
     ],
     [
       'PostGIS',
