@@ -733,6 +733,17 @@ if [ ! -f "$SCRIPT_DIR/nifi/drivers/postgresql.jar" ]; then
     fi
 fi
 
+echo "  Building the NiFi FROST NAR..."
+if ! mvn_build "$SCRIPT_DIR/../nifi-extensions" $MVN_CLEAN package -DskipTests -q; then
+    echo "ERROR: NiFi extensions build failed"
+    exit 1
+fi
+if [ "$SKIP_BUILD" != "true" ]; then
+    rm -f "$SCRIPT_DIR/nifi/extensions"/nifi-frost-nar-*.nar
+    cp "$SCRIPT_DIR/../nifi-extensions/nifi-frost-nar/target"/nifi-frost-nar-*.nar "$SCRIPT_DIR/nifi/extensions/"
+    echo "  NiFi FROST NAR copied to nifi/extensions"
+fi
+
 if $DOCKER_COMPOSE up -d 2>&1; then
     echo "  Apache NiFi started"
     # The MQTT-TLS flows resolve their truststore password from a parameter context that the

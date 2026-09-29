@@ -17,6 +17,7 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.service.initializer.FrostSinkPortMigration;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +42,11 @@ class FrostSinkPortMigrationIntegrationTest extends BaseKeycloakIntegrationTest 
   @Autowired private DataSinkRepository dataSinkRepository;
   @Autowired private ModelRegistryGateway modelRegistryGateway;
   @Autowired private FrostSinkPortMigration migration;
+
+  @AfterEach
+  void cleanup() {
+    factory.cleanAll();
+  }
 
   @Test
   @DisplayName("Gives a sink that predates the port the ThingTree port, and the schema accepts it")

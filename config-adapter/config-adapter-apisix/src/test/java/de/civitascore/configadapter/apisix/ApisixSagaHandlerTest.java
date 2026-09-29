@@ -500,6 +500,53 @@ class ApisixSagaHandlerTest {
     }
 
     @Test
+    @DisplayName("rewrites FROST's @iot.* links onto the slug route's external endpoint")
+    void shouldRewriteStaLinksToExternalEndpoint() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        server.enqueue(created()); // shared upstream
+        server.enqueue(created()); // traffic route
+
+        handler.handle(
+            createPerApiCommand(true, List.of(Map.of("slug", "traffic", "standard", "STA"))));
+
+        // PUT order: shared upstream first, then the slug route.
+        takeRequest(); // upstream
+        Map<String, Object> routeBody = requestBodyAsMap(takeRequest());
+
+        // Without the rewrite, a client following one of FROST's @iot.* links leaves the
+        // gateway entirely (issue #336).
+        @SuppressWarnings("unchecked")
+        Map<String, Object> responseRewrite =
+            (Map<String, Object>) pluginsOf(routeBody).get("response-rewrite");
+        assertNotNull(responseRewrite, "STA route rewrites FROST's self-referential links");
+        @SuppressWarnings("unchecked")
+        List<Object> filters = (List<Object>) responseRewrite.get("filters");
+        assertEquals(2, filters.size());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> projectScoped = (Map<String, Object>) filters.get(0);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> canonical = (Map<String, Object>) filters.get(1);
+        // The nextLink form repeats the project segment the regex_uri adds back, so it is
+        // dropped here — before the canonical filter, which would otherwise double it.
+        assertEquals("https?://[^/]+/v1\\.1/Projects\\(1\\)", projectScoped.get("regex"));
+        assertEquals(
+            "https://api.example.test/v1/datasets/ds-001/traffic", projectScoped.get("replace"));
+        assertEquals("https?://[^/]+/v1\\.1/", canonical.get("regex"));
+        assertEquals(
+            "https://api.example.test/v1/datasets/ds-001/traffic/", canonical.get("replace"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> headers =
+            (Map<String, Object>) proxyRewriteOf(routeBody).get("headers");
+        @SuppressWarnings("unchecked")
+        List<String> remove = (List<String>) headers.get("remove");
+        assertTrue(
+            remove.contains("Accept-Encoding"),
+            "STA route strips Accept-Encoding so the response-rewrite filters see a plain body");
+      }
+    }
+
+    @Test
     @DisplayName(
         "compensation data carries the slug-keyed routeIds and shared upstream for rollback")
     void shouldReturnSlugKeyedCompensationData() {
@@ -1671,10 +1718,11 @@ class ApisixSagaHandlerTest {
         Map<String, Object> headers = (Map<String, Object>) proxyRewrite.get("headers");
         Object remove = headers.get("remove");
         assertEquals(
-            List.of("X-Allowed-Scope-Ids", "X-Allowed-Pool-Ids", "X-Some-Other"),
+            List.of("X-Allowed-Scope-Ids", "X-Allowed-Pool-Ids", "X-Some-Other", "Accept-Encoding"),
             remove,
             "route-level proxy-rewrite must strip the configured headers (Finding P1 — plugin"
-                + " config's proxy-rewrite is overridden by route precedence)");
+                + " config's proxy-rewrite is overridden by route precedence), plus the"
+                + " Accept-Encoding the SensorThings link rewrite needs to see a plain body");
       }
     }
 

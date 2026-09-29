@@ -160,10 +160,12 @@ final class RouteAuthConfigurer {
     // STA routes inject the FROST upstream credential; OWS map-service routes carry none.
     mergeProxyRewriteHeaders(proxyRewrite, managedHeader, sta);
 
-    // OWS routes additionally rewrite GeoServer's self-referential capabilities URLs to this
-    // route's external endpoint so map clients can follow them back through the gateway.
+    // Both standards rewrite the upstream's self-referential URLs onto this route's external
+    // endpoint: GeoServer's capabilities URLs, FROST's SensorThings @iot.* links.
     if (kind == RouteUpstreamKind.OWS) {
       OwsCapabilitiesRewrite.apply(route, plugins, proxyRewrite, settings.apiHost());
+    } else {
+      StaLinkRewrite.apply(route, plugins, proxyRewrite, settings.apiHost());
     }
   }
 
