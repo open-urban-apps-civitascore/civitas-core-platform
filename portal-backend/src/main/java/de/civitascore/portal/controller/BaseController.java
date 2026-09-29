@@ -198,8 +198,8 @@ public abstract class BaseController<
    * @param updates the JSON node containing the fields to update
    * @return the patched and validated state
    * @throws InvalidInputException if the patch contains a field that {@code current} does not have,
-   *     even with a {@code null} value, sets a field to {@code null} that rejects it, or the
-   *     patched state violates a Bean Validation constraint
+   *     even with a {@code null} value, sets a field to {@code null} that rejects it, sets a field
+   *     to a value of the wrong type, or the patched state violates a Bean Validation constraint
    */
   protected <T> T mergePatch(UUID id, T current, JsonNode updates) {
     UnknownFieldCollector unknownFields = new UnknownFieldCollector();
@@ -209,6 +209,8 @@ public abstract class BaseController<
           objectMapper.readerForUpdating(current).withHandler(unknownFields).readValue(updates);
     } catch (InvalidNullException e) {
       throw nullNotAllowed(id, current, e);
+    } catch (JacksonException e) {
+      throw invalidValue(id, current, e);
     }
     if (!unknownFields.pointers.isEmpty()) {
       throw new InvalidInputException(
@@ -223,6 +225,11 @@ public abstract class BaseController<
       UUID id, Object current, InvalidNullException e) {
     return new InvalidInputException(
         current.getClass().getSimpleName(), id, "Must not be null: " + jsonPointer(e));
+  }
+
+  private static InvalidInputException invalidValue(UUID id, Object current, JacksonException e) {
+    return new InvalidInputException(
+        current.getClass().getSimpleName(), id, "Invalid value: " + jsonPointer(e));
   }
 
   private static String jsonPointer(JacksonException e) {

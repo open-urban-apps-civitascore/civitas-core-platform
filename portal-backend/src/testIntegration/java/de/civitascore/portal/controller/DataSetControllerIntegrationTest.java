@@ -1758,6 +1758,26 @@ class DataSetControllerIntegrationTest
 
     @ParameterizedTest
     @CsvSource({"ready/meta, READY", "released/meta, AVAILABLE"})
+    @DisplayName("Should reject a metadata patch with a malformed datapoolId and keep the pool")
+    void patchMeta_whenDatapoolIdMalformed_shouldRejectAndKeepPool(
+        String endpoint, DataSetStatus status) {
+      DataSet dataSet = dataSetInPool(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSet.getId() + "/" + endpoint,
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("datapoolId", "abc"));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail()).contains("/datapoolId");
+      assertThat(storedPoolId(dataSet.getId())).isEqualTo(pool.getId());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ready/meta, READY", "released/meta, AVAILABLE"})
     @DisplayName("Should reject a move to a data pool the caller may not use and keep the pool")
     void patchMeta_whenTargetPoolNotAllowed_shouldRejectAndKeepPool(
         String endpoint, DataSetStatus status) {
