@@ -1,7 +1,6 @@
 package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -17,6 +16,7 @@ import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
+import de.civitascore.portal.model.input.DataStructureVersionMetaInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.VersionBump;
 import de.civitascore.portal.repository.DataSourceRepository;
@@ -231,125 +231,36 @@ class DataStructureVersionServiceTest {
   }
 
   @Nested
-  @DisplayName("UpdateReleasedMeta inUse guard")
-  class UpdateReleasedMetaInUseTests {
+  @DisplayName("updateReleasedMeta()")
+  class UpdateReleasedMetaTests {
 
     @Test
-    @DisplayName("Should allow full update via updateReleasedMeta when version is not in use")
-    void shouldAllowFullUpdateWhenNotInUse() {
+    @DisplayName("Should change description and keep the model pin")
+    void updateReleasedMeta_whenNotInUse_keepsModelPin() {
+      // A released version that no released entity uses is the case that could replace its model;
+      // without this test a meta path routed through the full update would replace it.
       UUID versionId = UUID.randomUUID();
-      UUID dataStructureId = UUID.randomUUID();
-      DataStructure ds = new DataStructure();
-      ds.setId(dataStructureId);
-      ds.setModelLogicalUrn("urn:core:platform:civitas:element:common:test");
-      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
-
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
       version.setVersion("1.0.0");
       version.setModelName("OldModel");
       version.setModelUrn("urn:core:platform:civitas:element:common:test:1.0.0");
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-      version.setDataStructure(ds);
 
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureId(dataStructureId);
-      input.setModel(new HashMap<>(Map.of("title", "New")));
-      input.setStyles(new HashMap<>(Map.of("color", "red")));
+      DataStructureVersionMetaInputDTO meta = new DataStructureVersionMetaInputDTO();
+      meta.setDescription("New description");
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(dataStructureVersionRepository.save(any())).thenReturn(version);
-      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(ds);
+      when(dataStructureVersionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      assertThatNoException()
-          .isThrownBy(() -> dataStructureVersionService.updateReleasedMeta(versionId, input));
+      DataStructureVersion result = dataStructureVersionService.updateReleasedMeta(versionId, meta);
 
-      // The replaced model is stored as a new registry version under the parent's logical URN.
-      verify(modelRegistryGateway)
-          .storeModel(
-              eq(Optional.of("urn:core:platform:civitas:element:common:test")),
-              any(),
-              eq(Map.of("title", "New")),
-              eq(Map.of("color", "red")),
-              any(),
-              any());
-    }
-
-    @Test
-    @DisplayName(
-        "Should block model and structural changes via updateReleasedMeta when a released entity"
-            + " references the version")
-    void shouldBlockStructuralChangesWhenInUseByReleased() {
-      UUID versionId = UUID.randomUUID();
-      UUID dataStructureId = UUID.randomUUID();
-      DataStructure ds = new DataStructure();
-      ds.setId(dataStructureId);
-      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
-
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-      version.setVersion("1.0.0");
-      version.setModelName("OldModel");
-      version.setModelUrn("urn:core:platform:civitas:element:common:original:1.0.0");
-      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-      version.setDataStructure(ds);
-
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureId(dataStructureId);
-      input.setModel(new HashMap<>(Map.of("title", "SHOULD_NOT_CHANGE")));
-      input.setStyles(new HashMap<>(Map.of("color", "red")));
-      input.setModelName("UpdatedModelName");
-
-      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(artifactUsageLookup.of(version)).thenReturn(IN_USE_BY_RELEASED);
-      when(dataStructureVersionRepository.save(any())).thenReturn(version);
-      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(ds);
-
-      dataStructureVersionService.updateReleasedMeta(versionId, input);
-
-      // In-use: the structural payload is neutralized — no registry write, the pin is preserved.
-      verify(modelRegistryGateway, org.mockito.Mockito.never())
-          .storeModel(any(), any(), any(), any(), any(), any());
-      assertThat(input.getModel()).as("In-use model change must be dropped").isNull();
-      assertThat(input.getStyles()).as("In-use styles change must be dropped").isNull();
-      assertThat(version.getModelUrn())
-          .as("The stored content pin stays untouched")
-          .isEqualTo("urn:core:platform:civitas:element:common:original:1.0.0");
-      assertThat(input.getModelName())
-          .as("ModelName is editable while in use")
-          .isEqualTo("UpdatedModelName");
-    }
-
-    @Test
-    @DisplayName("Should store a model change via updateReleasedMeta when only drafts reference it")
-    void shouldAllowStructuralChangesWhenInUseByDraftsOnly() {
-      UUID versionId = UUID.randomUUID();
-      UUID dataStructureId = UUID.randomUUID();
-      DataStructure ds = new DataStructure();
-      ds.setId(dataStructureId);
-      ds.setModelLogicalUrn("urn:core:platform:civitas:element:common:test");
-      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
-
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-      version.setVersion("1.0.0");
-      version.setModelUrn("urn:core:platform:civitas:element:common:test:1.0.0");
-      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-      version.setDataStructure(ds);
-
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureId(dataStructureId);
-      input.setModel(new HashMap<>(Map.of("title", "New")));
-
-      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(artifactUsageLookup.of(version)).thenReturn(IN_USE_BY_DRAFTS);
-      when(dataStructureVersionRepository.save(any())).thenReturn(version);
-      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(ds);
-
-      dataStructureVersionService.updateReleasedMeta(versionId, input);
-
-      verify(modelRegistryGateway)
-          .storeModel(any(), any(), eq(Map.of("title", "New")), any(), any(), any());
+      assertThat(result.getDescription()).isEqualTo("New description");
+      assertThat(result.getModelName()).isEqualTo("OldModel");
+      assertThat(result.getModelUrn())
+          .isEqualTo("urn:core:platform:civitas:element:common:test:1.0.0");
+      assertThat(result.getVersion()).isEqualTo("1.0.0");
+      verifyNoInteractions(modelRegistryGateway);
     }
 
     @Test
@@ -362,38 +273,11 @@ class DataStructureVersionServiceTest {
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
 
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      DataStructureVersionMetaInputDTO meta = new DataStructureVersionMetaInputDTO();
 
-      assertThatThrownBy(() -> dataStructureVersionService.updateReleasedMeta(versionId, input))
+      assertThatThrownBy(() -> dataStructureVersionService.updateReleasedMeta(versionId, meta))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("DRAFT");
-    }
-
-    @Test
-    @DisplayName("Should reject clearing the model of a released version that is not in use")
-    void shouldRejectClearingModelWhenReleasedAndNotInUse() {
-      UUID versionId = UUID.randomUUID();
-      UUID dataStructureId = UUID.randomUUID();
-      DataStructure ds = new DataStructure();
-      ds.setId(dataStructureId);
-      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
-
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-      version.setVersion("1.0.0");
-      version.setModelUrn("urn:core:platform:civitas:element:common:existing:1.0.0");
-      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-      version.setDataStructure(ds);
-
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureId(dataStructureId);
-      input.setModel(null);
-
-      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-
-      assertThatThrownBy(() -> dataStructureVersionService.updateReleasedMeta(versionId, input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("model");
     }
   }
 
@@ -568,14 +452,14 @@ class DataStructureVersionServiceTest {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
-      dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
       dataStructure.setModelLogicalUrn("urn:core:platform:civitas:element:common:test");
 
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
       version.setVersion("2.4.0");
       version.setModelUrn("urn:core:platform:civitas:element:common:test:2.4.0");
-      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       version.setDataStructure(dataStructure);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
@@ -586,7 +470,7 @@ class DataStructureVersionServiceTest {
       when(dataStructureVersionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
       when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
 
-      dataStructureVersionService.updateReleasedMeta(versionId, input);
+      dataStructureVersionService.update(versionId, input);
 
       verify(modelRegistryGateway)
           .storeModel(any(), any(), any(), any(), eq(VersionBump.MINOR), eq("2.4.0"));

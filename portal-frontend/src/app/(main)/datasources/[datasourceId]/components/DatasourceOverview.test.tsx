@@ -109,8 +109,8 @@ vi.mock('./basic-info/BasicInfoTab', () => ({
 }))
 
 vi.mock('./connector-tab/ConnectorTab', () => ({
-  ConnectorTab: ({ isReadOnly }: { isReadOnly: boolean }) => (
-    <div data-testid="connectorTab" data-readonly={isReadOnly} />
+  ConnectorTab: ({ isReadOnly, isDatasourceReleased }: { isReadOnly: boolean; isDatasourceReleased: boolean }) => (
+    <div data-testid="connectorTab" data-readonly={isReadOnly} data-released={isDatasourceReleased} />
   ),
 }))
 
@@ -121,8 +121,8 @@ vi.mock('./access-management/AccessManagementTab', () => ({
 }))
 
 vi.mock('./datastructure-tab/DatastructureTab', () => ({
-  DatastructureTab: ({ isReadOnly }: { isReadOnly: boolean }) => (
-    <div data-testid="datastructureTab" data-readonly={isReadOnly} />
+  DatastructureTab: ({ isReadOnly, isDatasourceReleased }: { isReadOnly: boolean; isDatasourceReleased: boolean }) => (
+    <div data-testid="datastructureTab" data-readonly={isReadOnly} data-released={isDatasourceReleased} />
   ),
 }))
 
@@ -488,6 +488,44 @@ describe('DatasourceOverview', () => {
 
       expect(screen.queryByTestId('infoModal')).not.toBeInTheDocument()
       expect(mockHandleStatusChange).toHaveBeenCalledWith('DRAFT')
+    })
+  })
+
+  describe('Released data source', () => {
+    const availableProps = { ...defaultProps, datasource: { ...datasource, dataSourceStatus: 'AVAILABLE' as const } }
+
+    beforeEach(() => {
+      mockSearchParams = new URLSearchParams('mode=edit')
+      mockCurrentUser([
+        PERMISSION_NAMES.DATASOURCE_UPDATE,
+        PERMISSION_NAMES.DATASOURCE_RELEASE,
+        PERMISSION_NAMES.DATASTRUCTURE_READ,
+      ])
+    })
+
+    it('locks the connector and data structure tabs when AVAILABLE', () => {
+      render(<DatasourceOverview {...availableProps} />)
+
+      fireEvent.click(screen.getByTestId('tab-connector'))
+      expect(screen.getByTestId('connectorTab')).toHaveAttribute('data-released', 'true')
+
+      fireEvent.click(screen.getByTestId('tab-dataStructure'))
+      expect(screen.getByTestId('datastructureTab')).toHaveAttribute('data-released', 'true')
+    })
+
+    it('keeps the basic info editable when AVAILABLE', () => {
+      render(<DatasourceOverview {...availableProps} />)
+      expect(screen.getByTestId('basicInfoTab')).toHaveAttribute('data-readonly', 'false')
+    })
+
+    it('leaves the connector and data structure tabs unlocked when DRAFT', () => {
+      render(<DatasourceOverview {...defaultProps} />)
+
+      fireEvent.click(screen.getByTestId('tab-connector'))
+      expect(screen.getByTestId('connectorTab')).toHaveAttribute('data-released', 'false')
+
+      fireEvent.click(screen.getByTestId('tab-dataStructure'))
+      expect(screen.getByTestId('datastructureTab')).toHaveAttribute('data-released', 'false')
     })
   })
 })

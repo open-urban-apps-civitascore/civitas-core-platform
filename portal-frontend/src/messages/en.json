@@ -1043,6 +1043,7 @@
       "typePlaceholder": "Select connector type",
       "connection": "Connection",
       "establishConnection": "Establish Connection",
+      "availableInfo": "This Data source has the status \"Available\". To change the connector, set it to \"Draft\" first.",
       "mqtt": {
         "urls": {
           "label": "Brokers",
@@ -1116,7 +1117,8 @@
       "importModal": {
         "title": "Import Data Model",
         "to": "into {name}"
-      }
+      },
+      "availableInfo": "This Data source has the status \"Available\". To change the Data structure, set it to \"Draft\" first."
     },
     "accessManagementTab": {
       "infoBoxes": {

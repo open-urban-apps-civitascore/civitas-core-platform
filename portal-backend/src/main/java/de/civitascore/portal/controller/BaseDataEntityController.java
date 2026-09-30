@@ -17,7 +17,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
@@ -29,10 +28,11 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Abstract base controller for data-entity resources that support scope-based access control.
@@ -42,12 +42,14 @@ import org.springframework.web.bind.annotation.RequestBody;
  * {@link #getScopeType()} to declare their scope category.
  *
  * @param <I> the input DTO type
+ * @param <M> the metadata input DTO type: the part of {@code I} that stays changeable after release
  * @param <O> the output DTO type
  * @param <E> the JPA data-entity type
  * @param <S> the specification type used for filtering
  */
 public abstract class BaseDataEntityController<
-        I extends BaseDataEntityInputDTO,
+        I extends M,
+        M extends BaseDataEntityInputDTO,
         O extends BaseOutputDTO,
         E extends BaseDataEntity,
         S extends BaseSpec<E>>
@@ -132,7 +134,7 @@ public abstract class BaseDataEntityController<
   }
 
   @Override
-  protected abstract BaseDataEntityService<E, I> getService();
+  protected abstract BaseDataEntityService<E, I, M> getService();
 
   @PostMapping("/{id}/release")
   @Operation(
@@ -156,16 +158,31 @@ public abstract class BaseDataEntityController<
     return ResponseEntity.ok(output);
   }
 
-  @PutMapping("/{id}/released/meta")
+  @PatchMapping("/{id}/released/meta")
   @Operation(
       operationId = "updateReleased{Entity}Meta",
       summary = "Update released metadata",
       description =
-          "Updates metadata of a released entity. Only works on entities that are not in DRAFT status.")
-  public ResponseEntity<O> updateReleasedMeta(@PathVariable UUID id, @Valid @RequestBody I input) {
-    I preProcessedInput = preProcessInput(input);
-    E updated = getService().updateReleasedMeta(id, preProcessedInput);
+          "Applies a JSON merge patch to the metadata of a released entity. An omitted field keeps"
+              + " its value. A field that is not metadata answers 400, and so does null for"
+              + " assignments or datapoolScope. Only works on entities that are not in DRAFT"
+              + " status.")
+  public ResponseEntity<O> updateReleasedMeta(
+      @PathVariable UUID id, @RequestBody JsonNode updates) {
+    E updated = getService().updateReleasedMeta(id, patchMeta(id, updates));
     O output = getAssembler().toOutput(updated);
     return ResponseEntity.ok(output);
+  }
+
+  /**
+   * Applies a metadata patch to the current metadata of the entity.
+   *
+   * @param id the UUID of the entity
+   * @param updates the JSON node containing the metadata fields to update
+   * @return the patched and validated metadata
+   */
+  protected M patchMeta(UUID id, JsonNode updates) {
+    M current = getService().toMetaInput(getService().findByIdOrThrow(id));
+    return mergePatch(id, current, updates);
   }
 }

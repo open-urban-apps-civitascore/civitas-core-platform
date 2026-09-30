@@ -18,7 +18,7 @@ export const ElementPalette: React.FC<ElementPaletteProps> = props => {
   const { className = '' } = props
   const { isReadOnly } = useReadOnly()
   const { fitView } = useReactFlow()
-  const [isCollapsed, setIsCollapsed] = useState(isReadOnly)
+  const [isCollapsed, setIsCollapsed] = useState(false)
   const [areClassesExpanded, setAreClassesExpanded] = useState(true)
   const [areRelationshipsExpanded, setAreRelationshipsExpanded] = useState(true)
 
@@ -33,8 +33,10 @@ export const ElementPalette: React.FC<ElementPaletteProps> = props => {
   )
 
   useEffect(() => {
-    togglePalette(isReadOnly)
+    togglePalette(false)
   }, [isReadOnly, togglePalette])
+
+  if (isReadOnly) return null
 
   if (isCollapsed) {
     return (

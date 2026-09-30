@@ -13,6 +13,8 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -26,7 +28,13 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ValueDeserializer;
+import tools.jackson.databind.deser.DeserializationProblemHandler;
+import tools.jackson.databind.exc.InvalidNullException;
 
 /**
  * Abstract base controller providing standard CRUD operations for all entity types. For read-only
@@ -139,17 +147,13 @@ public abstract class BaseController<
       throws IOException {
     E current = getService().findByIdOrThrow(id);
     I currentDto = getAssembler().toInput(current);
-    I patchedDto = patchInput(currentDto, current, updates);
-
-    Set<ConstraintViolation<I>> violations = validator.validate(patchedDto);
-    if (!violations.isEmpty()) {
-      String message =
-          violations.stream()
-              .map(ConstraintViolation::getMessage)
-              .reduce((a, b) -> a + ";\n" + b)
-              .orElse("");
-      throw new InvalidInputException(patchedDto.getClass().getSimpleName(), id, message);
+    I patchedDto;
+    try {
+      patchedDto = patchInput(currentDto, current, updates);
+    } catch (InvalidNullException e) {
+      throw nullNotAllowed(id, currentDto, e);
     }
+    patchedDto = validated(id, patchedDto);
 
     patchedDto = preProcessInput(patchedDto);
     E updated = getService().update(id, patchedDto);
@@ -182,5 +186,91 @@ public abstract class BaseController<
 
   protected I patchInput(I currentDto, E current, JsonNode updates) throws IOException {
     return objectMapper.readerForUpdating(currentDto).readValue(updates);
+  }
+
+  /**
+   * Applies a JSON merge patch to the current state and validates the result. A field that the
+   * patch omits keeps its current value. The type of {@code current} defines which fields a patch
+   * may contain.
+   *
+   * @param id the UUID of the patched entity, used in the error
+   * @param current the current state, updated in place
+   * @param updates the JSON node containing the fields to update
+   * @return the patched and validated state
+   * @throws InvalidInputException if the patch contains a field that {@code current} does not have,
+   *     even with a {@code null} value, sets a field to {@code null} that rejects it, sets a field
+   *     to a value of the wrong type, or the patched state violates a Bean Validation constraint
+   */
+  protected <T> T mergePatch(UUID id, T current, JsonNode updates) {
+    UnknownFieldCollector unknownFields = new UnknownFieldCollector();
+    T patched;
+    try {
+      patched =
+          objectMapper.readerForUpdating(current).withHandler(unknownFields).readValue(updates);
+    } catch (InvalidNullException e) {
+      throw nullNotAllowed(id, current, e);
+    } catch (JacksonException e) {
+      throw invalidValue(id, current, e);
+    }
+    if (!unknownFields.pointers.isEmpty()) {
+      throw new InvalidInputException(
+          current.getClass().getSimpleName(),
+          id,
+          "Cannot change after release: " + String.join(", ", unknownFields.pointers));
+    }
+    return validated(id, patched);
+  }
+
+  private static InvalidInputException nullNotAllowed(
+      UUID id, Object current, InvalidNullException e) {
+    return new InvalidInputException(
+        current.getClass().getSimpleName(), id, "Must not be null: " + jsonPointer(e));
+  }
+
+  private static InvalidInputException invalidValue(UUID id, Object current, JacksonException e) {
+    return new InvalidInputException(
+        current.getClass().getSimpleName(), id, "Invalid value: " + jsonPointer(e));
+  }
+
+  private static String jsonPointer(JacksonException e) {
+    StringBuilder pointer = new StringBuilder();
+    for (JacksonException.Reference reference : e.getPath()) {
+      pointer.append('/');
+      if (reference.getPropertyName() != null) {
+        pointer.append(reference.getPropertyName());
+      } else {
+        pointer.append(reference.getIndex());
+      }
+    }
+    return pointer.toString();
+  }
+
+  private static final class UnknownFieldCollector extends DeserializationProblemHandler {
+    private final List<String> pointers = new ArrayList<>();
+
+    @Override
+    public boolean handleUnknownProperty(
+        DeserializationContext context,
+        JsonParser parser,
+        ValueDeserializer<?> deserializer,
+        Object beanOrClass,
+        String propertyName) {
+      pointers.add(parser.streamReadContext().pathAsPointer().toString());
+      parser.skipChildren();
+      return true;
+    }
+  }
+
+  private <T> T validated(UUID id, T dto) {
+    Set<ConstraintViolation<T>> violations = validator.validate(dto);
+    if (!violations.isEmpty()) {
+      String message =
+          violations.stream()
+              .map(ConstraintViolation::getMessage)
+              .reduce((a, b) -> a + ";\n" + b)
+              .orElse("");
+      throw new InvalidInputException(dto.getClass().getSimpleName(), id, message);
+    }
+    return dto;
   }
 }

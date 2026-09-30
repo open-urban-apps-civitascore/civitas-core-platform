@@ -68,8 +68,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     datasource.id,
   )
   const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
-  const canEdit =
-    datasource.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE ? canUpdate && canRelease : canUpdate
+  const isReleased = datasource.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
+  const canEdit = isReleased ? canUpdate && canRelease : canUpdate
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -236,7 +236,14 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       case 'basicInfo':
         return <BasicInfoTab form={datasourceForm} isReadOnly={isReadOnly} />
       case 'connector':
-        return <ConnectorTab form={datasourceForm} connectorType={selectedConnectorType} isReadOnly={isReadOnly} />
+        return (
+          <ConnectorTab
+            form={datasourceForm}
+            connectorType={selectedConnectorType}
+            isReadOnly={isReadOnly}
+            isDatasourceReleased={isReleased}
+          />
+        )
       case 'dataStructure':
         return (
           <DatastructureTab
@@ -249,6 +256,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             onSelectDatastructureVersion={handleSelectDatastructureVersion}
             isReadOnly={isReadOnly}
             isDatasourceInUseByReleased={datasource.inUseByReleased}
+            isDatasourceReleased={isReleased}
           />
         )
       case 'datapools':

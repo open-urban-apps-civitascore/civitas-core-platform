@@ -1,5 +1,7 @@
 package de.civitascore.portal.model.input;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import de.civitascore.portal.model.input.assignment.AssignmentScopedInputDTO;
 import jakarta.validation.Valid;
 import java.util.Set;
@@ -10,5 +12,6 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public abstract class BaseDataEntityInputDTO extends BaseInputDTO {
+  @JsonSetter(nulls = Nulls.FAIL)
   @Valid private Set<AssignmentScopedInputDTO> assignments;
 }

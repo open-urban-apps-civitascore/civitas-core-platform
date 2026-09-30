@@ -1030,6 +1030,7 @@
       "typePlaceholder": "Konnektortyp auswählen",
       "connection": "Verbindung",
       "establishConnection": "Verbindung herstellen",
+      "availableInfo": "Diese Datenquelle hat den Status \"Verfügbar\". Um den Konnektor zu ändern, setzen Sie den Status zuerst auf \"Entwurf\".",
       "mqtt": {
         "urls": {
           "label": "Broker",
@@ -1103,7 +1104,8 @@
       "importModal": {
         "title": "Datenmodell importieren",
         "to": "in {name}"
-      }
+      },
+      "availableInfo": "Diese Datenquelle hat den Status \"Verfügbar\". Um die Datenstruktur zu ändern, setzen Sie den Status zuerst auf \"Entwurf\"."
     },
     "accessManagementTab": {
       "infoBoxes": {

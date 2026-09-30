@@ -14,6 +14,9 @@ import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
+import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
+import de.civitascore.portal.model.input.assignment.AssignmentScopedInputDTO;
+import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
@@ -30,6 +33,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
@@ -454,6 +459,22 @@ class DataSourceControllerIntegrationTest
       assertThat(response.getBody().getName()).isEqualTo(originalName);
       assertThat(response.getBody().getDescription()).isEqualTo("New description");
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"assignments", "datapoolScope"})
+    @DisplayName("Should reject an explicit null for a field that cannot hold null with PATCH")
+    void shouldRejectExplicitNullWithPatch(String field) {
+      UUID id = createTestEntity();
+      Map<String, Object> patch = new HashMap<>();
+      patch.put(field, null);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id, HttpMethod.PATCH, createAuthHeaders(), patch);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getDetail()).contains(field);
+    }
   }
 
   @Nested
@@ -807,7 +828,7 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<DataSourceOutputDTO> response =
           restTemplate.exchange(
               getEndpointPath() + "/" + secondId + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               new HttpEntity<>(metaUpdate, createAuthHeaders()),
               DataSourceOutputDTO.class);
 
@@ -1059,7 +1080,7 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + id + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               metaUpdate,
               getOutputTypeReference());
@@ -1067,68 +1088,6 @@ class DataSourceControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody().getName()).isEqualTo("updated-name");
       assertThat(response.getBody().getDescription()).isEqualTo("updated-desc");
-    }
-
-    @Test
-    @DisplayName("Should update configuration of AVAILABLE data source via released/meta")
-    void shouldUpdateConfiguration() {
-      UUID id = createReleasableTestEntity();
-      performRelease(id);
-
-      Map<String, Object> newConfig =
-          Map.of(
-              "urls", List.of("tcp://new-broker:1883"),
-              "topics", List.of("new/topic"),
-              "qos", 2);
-      Map<String, Object> metaUpdate =
-          Map.of(
-              "name", "updated-name", "description", "a description", "configuration", newConfig);
-
-      ResponseEntity<DataSourceOutputDTO> response =
-          exchange(
-              getEndpointPath() + "/" + id + "/released/meta",
-              HttpMethod.PUT,
-              createAuthHeaders(),
-              metaUpdate,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      Map<String, Object> config = response.getBody().getConfiguration();
-      assertThat(config.get("urls")).isEqualTo(List.of("tcp://new-broker:1883"));
-      assertThat(config.get("topics")).isEqualTo(List.of("new/topic"));
-      assertThat(config.get("qos")).isEqualTo(2);
-    }
-
-    @Test
-    @DisplayName("Should preserve masked password when updating configuration via released/meta")
-    void shouldPreserveMaskedPassword() {
-      UUID id = createReleasableSqlTestEntity();
-      performRelease(id);
-
-      Map<String, Object> newConfig =
-          new HashMap<>(
-              Map.of(
-                  "driver", "postgres",
-                  "dsn", "postgres://new-host:5432/db",
-                  "table", "measurements",
-                  "columns", List.of("id", "value", "timestamp"),
-                  "user", "admin",
-                  "password", ConnectorHandler.MASKED_VALUE));
-      Map<String, Object> metaUpdate =
-          Map.of("name", "updated-sql", "description", "a description", "configuration", newConfig);
-
-      ResponseEntity<DataSourceOutputDTO> response =
-          exchange(
-              getEndpointPath() + "/" + id + "/released/meta",
-              HttpMethod.PUT,
-              createAuthHeaders(),
-              metaUpdate,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      Map<String, Object> config = response.getBody().getConfiguration();
-      assertThat(config.get("dsn")).isEqualTo("postgres://new-host:5432/db");
-      assertThat(config.get("password")).isEqualTo(ConnectorHandler.MASKED_VALUE);
     }
 
     @Test
@@ -1152,7 +1111,7 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + id + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               metaUpdate,
               getOutputTypeReference());
@@ -1172,7 +1131,7 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<String> response =
           restTemplate.exchange(
               getEndpointPath() + "/" + id + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               new HttpEntity<>(metaUpdate, createAuthHeaders()),
               String.class);
 
@@ -1191,7 +1150,7 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               metaUpdate,
               getOutputTypeReference());
@@ -1202,107 +1161,151 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should reject configuration change when in use")
-    void shouldRejectConfigurationChangeWhenInUse() {
-      DataSource dataSource = createAvailableDataSource();
-      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.AVAILABLE);
+    @DisplayName("Should replace assignments of AVAILABLE data source via released/meta")
+    void shouldReplaceAssignmentsViaReleasedMeta() {
+      UUID groupId1 = portalData.group().getId();
+      UUID groupId2 = portalData.group().getId();
+      UUID roleId = portalData.role().getId();
 
-      Map<String, Object> newConfig =
-          Map.of(
-              "urls", List.of("tcp://new-broker:1883"),
-              "topics", List.of("new/topic"),
-              "qos", 2);
-      Map<String, Object> metaUpdate =
-          Map.of(
-              "name", "updated-name", "description", "a description", "configuration", newConfig);
+      AssignmentScopedInputDTO initialAssignment = new AssignmentScopedInputDTO();
+      initialAssignment.setGroupId(groupId1);
+      initialAssignment.setRoleId(roleId);
 
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
-              HttpMethod.PUT,
-              new HttpEntity<>(metaUpdate, createAuthHeaders()),
-              String.class);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName("Should reject connector type change when an AVAILABLE DataSet uses it")
-    void shouldRejectConnectorTypeChangeWhenInUse() {
-      DataSource dataSource = createAvailableDataSource();
-      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.AVAILABLE);
-
-      Map<String, Object> metaUpdate =
-          Map.of("name", "updated-name", "description", "a description", "connectorType", "SQL");
-
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
-              HttpMethod.PUT,
-              new HttpEntity<>(metaUpdate, createAuthHeaders()),
-              String.class);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName("Should accept a configuration change when only a DRAFT DataSet uses it")
-    void shouldAcceptConfigurationChangeWhenInUseByDraftDataSetOnly() {
-      DataSource dataSource = createAvailableDataSource();
-      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.DRAFT);
-
-      Map<String, Object> newConfig =
-          Map.of(
-              "urls", List.of("tcp://new-broker:1883"),
-              "topics", List.of("new/topic"),
-              "qos", 2);
-
-      ResponseEntity<DataSourceOutputDTO> response =
-          exchange(
-              getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
-              HttpMethod.PUT,
-              createAuthHeaders(),
-              Map.of(
-                  "name",
-                  dataSource.getName(),
-                  "description",
-                  "a description",
-                  "configuration",
-                  newConfig),
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody().getConfiguration().get("urls"))
-          .isEqualTo(List.of("tcp://new-broker:1883"));
-    }
-
-    @Test
-    @DisplayName("Should allow full update when not in use")
-    void shouldAllowFullUpdateWhenNotInUse() {
-      UUID id = createReleasableTestEntity();
+      DataSourceInputDTO input = createValidInput();
+      input.setDataStructureVersionId(createAvailableDataStructureVersionId());
+      input.setAssignments(Set.of(initialAssignment));
+      UUID id = performCreate(input).getBody().getId();
       performRelease(id);
 
-      Map<String, Object> newConfig =
-          Map.of(
-              "urls", List.of("tcp://new-broker:1883"),
-              "topics", List.of("new/topic"),
-              "qos", 2);
-      Map<String, Object> fullUpdate =
-          Map.of(
-              "name", "updated-name", "description", "a description", "configuration", newConfig);
+      AssignmentScopedInputDTO replacementAssignment = new AssignmentScopedInputDTO();
+      replacementAssignment.setGroupId(groupId2);
+      replacementAssignment.setRoleId(roleId);
 
       ResponseEntity<DataSourceOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + id + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
-              fullUpdate,
+              Map.of("assignments", Set.of(replacementAssignment)),
               getOutputTypeReference());
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody().getName()).isEqualTo("updated-name");
-      Map<String, Object> config = response.getBody().getConfiguration();
-      assertThat(config.get("urls")).isEqualTo(List.of("tcp://new-broker:1883"));
+
+      ResponseEntity<List<AssignmentOutputDTO>> assignmentsResponse =
+          restTemplate.exchange(
+              getEndpointPath() + "/" + id + "/assignments",
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<>() {});
+
+      assertThat(assignmentsResponse.getBody()).hasSize(1);
+      assertThat(assignmentsResponse.getBody().getFirst().getGroup().getId()).isEqualTo(groupId2);
+    }
+
+    @Test
+    @DisplayName(
+        "Should reject clearing the description of AVAILABLE data source with an explicit null")
+    void shouldRejectClearingDescriptionWithNull() {
+      UUID id = createReleasableTestEntity();
+      performRelease(id);
+
+      Map<String, Object> metaUpdate = new HashMap<>();
+      metaUpdate.put("description", null);
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpointPath() + "/" + id + "/released/meta",
+              HttpMethod.PATCH,
+              new HttpEntity<>(metaUpdate, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"assignments", "datapoolScope"})
+    @DisplayName("Should reject an explicit null for a field that cannot hold null")
+    void shouldRejectExplicitNullInMetaPatch(String field) {
+      UUID id = createReleasableTestEntity();
+      performRelease(id);
+      Map<String, Object> metaUpdate = new HashMap<>();
+      metaUpdate.put(field, null);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id + "/released/meta",
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              metaUpdate);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getDetail()).contains(field);
+    }
+
+    @Test
+    @DisplayName("Should reject a field that the data source input does not have")
+    void shouldRejectUnknownFieldInMetaPatch() {
+      UUID id = createReleasableTestEntity();
+      performRelease(id);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id + "/released/meta",
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("name", "updated-name", "dataSourceStatus", "DRAFT"));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getDetail()).contains("dataSourceStatus");
+      assertThat(performGetById(id).getBody().getName()).isNotEqualTo("updated-name");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"connectorType", "configuration", "dataStructureVersionId"})
+    @DisplayName("Should reject a field fixed after release when no dataset uses the data source")
+    void shouldRejectFieldFixedAfterReleaseWhenNotInUse(String field) {
+      UUID id = createReleasableTestEntity();
+      performRelease(id);
+
+      assertRejectedAndUnchanged(id, field);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"connectorType", "configuration", "dataStructureVersionId"})
+    @DisplayName("Should reject a field fixed after release when an AVAILABLE dataset uses it")
+    void shouldRejectFieldFixedAfterReleaseWhenInUse(String field) {
+      DataSource dataSource = createAvailableDataSource();
+      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.AVAILABLE);
+
+      assertRejectedAndUnchanged(dataSource.getId(), field);
+    }
+
+    private void assertRejectedAndUnchanged(UUID id, String field) {
+      DataSourceOutputDTO before = performGetById(id).getBody();
+      Map<String, Object> newValues =
+          Map.of(
+              "connectorType",
+              "SQL",
+              "configuration",
+              Map.of("urls", List.of("tcp://new-broker:1883"), "topics", List.of("new/topic")),
+              "dataStructureVersionId",
+              createAvailableDataStructureVersionId());
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id + "/released/meta",
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("name", "updated-name", field, newValues.get(field)));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getDetail()).contains(field);
+      DataSourceOutputDTO after = performGetById(id).getBody();
+      assertThat(after.getName()).isEqualTo(before.getName());
+      assertThat(after.getConnectorType()).isEqualTo(before.getConnectorType());
+      assertThat(after.getConfiguration()).isEqualTo(before.getConfiguration());
+      assertThat(after.getDataStructureVersion().getId())
+          .isEqualTo(before.getDataStructureVersion().getId());
     }
   }
 
@@ -1462,6 +1465,134 @@ class DataSourceControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
       return response.getBody();
+    }
+  }
+
+  @Nested
+  @DisplayName("DataPool Scope Change Tests")
+  class DatapoolScopeChangeTests {
+
+    private DataPool usedPool;
+    private DataPool otherPool;
+
+    private void createPools() {
+      usedPool = portalData.dataPool();
+      otherPool = portalData.dataPool();
+    }
+
+    private void useInDataSetOfPool(DataSource dataSource, DataPool pool) {
+      DataSet dataSet = portalData.dataSet(b -> b.dataPool(pool));
+      portalData.pipeline(dataSet, b -> b.dataSources(Set.of(dataSource)));
+    }
+
+    private DataSource draftDataSourceUsedInPool() {
+      createPools();
+      DataSource dataSource =
+          portalData.dataSource(b -> b.datapoolScopeType(DatapoolScopeType.ALL));
+      useInDataSetOfPool(dataSource, usedPool);
+      return dataSource;
+    }
+
+    private DatapoolScopeInputDTO specificScope(DataPool pool) {
+      DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+      scope.setType(DatapoolScopeType.SPECIFIC);
+      scope.setDatapoolIds(List.of(pool.getId()));
+      return scope;
+    }
+
+    private Map<String, Object> specificScopePatch(DataPool pool) {
+      return Map.of(
+          "datapoolScope",
+          Map.of("type", "SPECIFIC", "datapoolIds", List.of(pool.getId().toString())));
+    }
+
+    private void assertScopeViolationAndScopeUnchanged(
+        ResponseEntity<ProblemDetail> response, UUID id) {
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getProperties()).containsKey("offendingDataSourceIds");
+      assertThat(performGetById(id).getBody().getDatapoolScope().getType())
+          .isEqualTo(DatapoolScopeType.ALL);
+    }
+
+    @Test
+    @DisplayName("PUT on a DRAFT data source should reject a scope that excludes a using dataset")
+    void putDraft_whenScopeExcludesUsingDataSetPool_shouldRejectAndKeepScope() {
+      DataSource dataSource = draftDataSourceUsedInPool();
+      DataSourceInputDTO input = createUpdateInput();
+      input.setDatapoolScope(specificScope(otherPool));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSource.getId(),
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              input);
+
+      assertScopeViolationAndScopeUnchanged(response, dataSource.getId());
+    }
+
+    @Test
+    @DisplayName("PATCH on a DRAFT data source should reject a scope that excludes a using dataset")
+    void patchDraft_whenScopeExcludesUsingDataSetPool_shouldRejectAndKeepScope() {
+      DataSource dataSource = draftDataSourceUsedInPool();
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSource.getId(),
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              specificScopePatch(otherPool));
+
+      assertScopeViolationAndScopeUnchanged(response, dataSource.getId());
+    }
+
+    @Test
+    @DisplayName("PUT on a DRAFT data source should accept a narrowed scope that keeps the pool")
+    void putDraft_whenScopeKeepsUsingDataSetPool_shouldUpdateScope() {
+      DataSource dataSource = draftDataSourceUsedInPool();
+      DataSourceInputDTO input = createUpdateInput();
+      input.setDatapoolScope(specificScope(usedPool));
+
+      ResponseEntity<DataSourceOutputDTO> response = performUpdate(dataSource.getId(), input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getDatapoolScope().getType())
+          .isEqualTo(DatapoolScopeType.SPECIFIC);
+      assertThat(response.getBody().getDatapoolScope().getDatapoolIds())
+          .containsExactly(usedPool.getId());
+    }
+
+    @Test
+    @DisplayName("PATCH on a DRAFT data source should accept a narrowed scope that keeps the pool")
+    void patchDraft_whenScopeKeepsUsingDataSetPool_shouldUpdateScope() {
+      DataSource dataSource = draftDataSourceUsedInPool();
+
+      ResponseEntity<DataSourceOutputDTO> response =
+          performPatch(dataSource.getId(), specificScopePatch(usedPool));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getDatapoolScope().getType())
+          .isEqualTo(DatapoolScopeType.SPECIFIC);
+      assertThat(response.getBody().getDatapoolScope().getDatapoolIds())
+          .containsExactly(usedPool.getId());
+    }
+
+    @Test
+    @DisplayName("Released meta PATCH should reject a scope that excludes a using dataset")
+    void patchReleasedMeta_whenScopeExcludesUsingDataSetPool_shouldRejectAndKeepScope() {
+      createPools();
+      DataSource dataSource = createAvailableDataSource();
+      useInDataSetOfPool(dataSource, usedPool);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSource.getId() + "/released/meta",
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              specificScopePatch(otherPool));
+
+      assertScopeViolationAndScopeUnchanged(response, dataSource.getId());
     }
   }
 }

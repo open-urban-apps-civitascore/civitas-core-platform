@@ -4,6 +4,7 @@ import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.DataSetMetaInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.model.output.NamedApiOutputDTO;
 import de.civitascore.portal.model.output.assembler.DataSetAssembler;
@@ -35,12 +36,14 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
 
 /** REST controller for managing dataset resources, including release lifecycle operations. */
 @RestController
@@ -48,7 +51,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(name = "DataSets", description = "Dataset management endpoints")
 public class DataSetController
-    extends BaseDataEntityController<DataSetInputDTO, DataSetOutputDTO, DataSet, DataSetSpec> {
+    extends BaseDataEntityController<
+        DataSetInputDTO, DataSetMetaInputDTO, DataSetOutputDTO, DataSet, DataSetSpec> {
 
   private final DataSetService dataSetService;
   private final DataSetAssembler dataSetAssembler;
@@ -188,7 +192,7 @@ public class DataSetController
   @Operation(
       summary = "Update a DRAFT dataset",
       description =
-          "Updates a dataset in DRAFT status. For released datasets (READY or AVAILABLE), use PUT /datasets/{id}/released/meta instead.")
+          "Updates a dataset in DRAFT status. For released datasets (READY or AVAILABLE), use PATCH /datasets/{id}/released/meta instead.")
   public ResponseEntity<DataSetOutputDTO> update(
       @PathVariable UUID id, @Valid @RequestBody DataSetInputDTO input) {
     return super.update(id, input);
@@ -281,27 +285,29 @@ public class DataSetController
       responseCode = "409",
       description = "Conflict (saga is in-flight for this dataset)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content = @Content(schema = @Schema(implementation = DataSetMetaInputDTO.class)))
   public ResponseEntity<DataSetOutputDTO> updateReleasedMeta(
-      @PathVariable UUID id, @Valid @RequestBody DataSetInputDTO input) {
-    DataSetInputDTO preProcessedInput = preProcessInput(input);
-    DataSet updated = dataSetService.updateReleasedMeta(id, preProcessedInput);
-    DataSetOutputDTO output = dataSetAssembler.toOutput(updated);
-    return ResponseEntity.ok(output);
+      @PathVariable UUID id, @RequestBody JsonNode updates) {
+    return super.updateReleasedMeta(id, updates);
   }
 
-  @PutMapping("/{id}/ready/meta")
+  @PatchMapping("/{id}/ready/meta")
   @Operation(
       operationId = "updateReadyDataSetMeta",
       summary = "Update READY dataset metadata",
       description =
-          "Updates the metadata of a dataset in READY status, requiring only DATASET_UPDATE — unlike"
-              + " PUT /datasets/{id}/released/meta, which also requires DATASET_RELEASE. Rejects"
-              + " DRAFT and AVAILABLE datasets. namedApis are immutable — unrelease the dataset and"
-              + " edit it in DRAFT.")
+          "Applies a JSON merge patch to the metadata of a dataset in READY status, requiring only"
+              + " DATASET_UPDATE — unlike PATCH /datasets/{id}/released/meta, which also requires"
+              + " DATASET_RELEASE. An omitted field keeps its value. Rejects DRAFT and AVAILABLE"
+              + " datasets. A field that is not metadata, such as namedApis, answers 400 — unrelease"
+              + " the dataset and edit it in DRAFT.")
   @ApiResponse(responseCode = "200", description = "Dataset metadata updated successfully")
   @ApiResponse(
       responseCode = "400",
-      description = "Dataset is not READY, or the input carries namedApis",
+      description =
+          "Dataset is not READY, the request contains a field that is not metadata, or the"
+              + " patched metadata is invalid",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @ApiResponse(
       responseCode = "409",
@@ -311,10 +317,11 @@ public class DataSetController
       responseCode = "422",
       description = "A datapool switch leaves a pipeline DataSource out of scope",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content = @Content(schema = @Schema(implementation = DataSetMetaInputDTO.class)))
   public ResponseEntity<DataSetOutputDTO> updateReadyMeta(
-      @PathVariable UUID id, @Valid @RequestBody DataSetInputDTO input) {
-    DataSetInputDTO preProcessedInput = preProcessInput(input);
-    DataSet updated = dataSetService.updateReadyMeta(id, preProcessedInput);
+      @PathVariable UUID id, @RequestBody JsonNode updates) {
+    DataSet updated = dataSetService.updateReadyMeta(id, patchMeta(id, updates));
     DataSetOutputDTO output = dataSetAssembler.toOutput(updated);
     return ResponseEntity.ok(output);
   }

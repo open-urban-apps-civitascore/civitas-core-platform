@@ -20,10 +20,10 @@ mock_endpoints := {
 	"/v1/datasets/{id}/stage": {"POST": "DATASET_UPDATE"},
 	"/v1/datasets/{id}/assignments": {"GET": "DATASET_READ"},
 	"/v1/datasets/{id}/pipelines/{id}": {"GET": "DATASET_READ", "PUT": "DATASET_UPDATE"},
-	"/v1/datasets/{id}/released/meta": {"PUT": ["DATASET_UPDATE", "DATASET_RELEASE"]},
+	"/v1/datasets/{id}/released/meta": {"PATCH": ["DATASET_UPDATE", "DATASET_RELEASE"]},
 	"/v1/datastructures/{id}/versions/{id}/release": {"POST": "DATASTRUCTURE_RELEASE"},
 	"/v1/datastructures/{id}/versions/{id}/unrelease": {"POST": "DATASTRUCTURE_UPDATE"},
-	"/v1/datastructures/{id}/versions/{id}/released/meta": {"PUT": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]},
+	"/v1/datastructures/{id}/versions/{id}/released/meta": {"PATCH": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]},
 }
 
 # =============================================================================

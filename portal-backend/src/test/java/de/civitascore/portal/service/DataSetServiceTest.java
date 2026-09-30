@@ -18,6 +18,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.civitascore.portal.mapper.DataSetMapper;
+import de.civitascore.portal.mapper.DataSetMapperImpl;
 import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.ApiStandard;
@@ -32,6 +33,7 @@ import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.DataSetMetaInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataPoolRepository;
@@ -88,6 +90,9 @@ class DataSetServiceTest {
     // tests;
     // F4-specific tests override allowedScopesProvider.getObject() after calling createService().
     lenient().when(allowedScopesProvider.getObject()).thenReturn(wildcardScopes());
+    lenient()
+        .when(dataSetMapper.toUpdateInput(any()))
+        .thenAnswer(inv -> new DataSetMapperImpl().toUpdateInput(inv.getArgument(0)));
     // Persisting a dataset creates its Model Forge manifest; return a dummy pin so tests exercising
     // create/update do not NPE (lenient — not every test triggers a persist).
     lenient()
@@ -639,7 +644,7 @@ class DataSetServiceTest {
       ds.setPendingSagaType(pendingSagaType);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
 
-      DataSetInputDTO input = new DataSetInputDTO();
+      DataSetMetaInputDTO input = new DataSetMetaInputDTO();
       input.setName("updated name");
 
       assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
@@ -665,7 +670,7 @@ class DataSetServiceTest {
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
       when(dataPoolRepository.findById(poolId)).thenReturn(Optional.of(pool));
 
-      DataSetInputDTO input = new DataSetInputDTO();
+      DataSetMetaInputDTO input = new DataSetMetaInputDTO();
       input.setName("updated name");
       input.setDatapoolId(poolId);
 
@@ -688,7 +693,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      DataSetInputDTO input = new DataSetInputDTO();
+      DataSetMetaInputDTO input = new DataSetMetaInputDTO();
       input.setName("updated name");
 
       DataSet result = createService().updateReleasedMeta(id, input);
@@ -723,7 +728,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataPoolRepository.findById(poolBId)).thenReturn(Optional.of(poolB));
 
-      DataSetInputDTO input = new DataSetInputDTO();
+      DataSetMetaInputDTO input = new DataSetMetaInputDTO();
       input.setDatapoolId(poolBId);
 
       assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
@@ -732,35 +737,6 @@ class DataSetServiceTest {
               ex ->
                   assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
                       .containsExactly(offendingId));
-      verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
-    }
-
-    @Test
-    @DisplayName(
-        "rejects any non-null namedApis on /released/meta (concept #1379/#1384 immutability)")
-    void rejectsAnyNamedApisOnReleased() {
-      // The contract is that namedApis cannot appear at all on this endpoint — even a no-op
-      // round-trip of the existing list is rejected, not just diffs.
-      UUID id = UUID.randomUUID();
-      DataSet ds = availableDataSet(id);
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
-
-      DataSetInputDTO input = new DataSetInputDTO();
-      input.setName("updated name");
-      NamedApiInputDTO roundTripped = new NamedApiInputDTO();
-      roundTripped.setName("Traffic Sensor Readings");
-      roundTripped.setSlug("traffic");
-      roundTripped.setStandard(ApiStandard.STA);
-      input.setNamedApis(List.of(roundTripped));
-
-      assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("cannot be changed")
-          .hasMessageContaining("AVAILABLE");
-
-      // Pins the ordering contract: the namedApis guard fires BEFORE the saga trigger. Without
-      // this, a regression that placed the check after publishUpdateRequested would leak an
-      // UPDATE event for invalid input.
       verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
     }
 
@@ -837,25 +813,6 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("rejects an empty namedApis list too (the field is forbidden, not just changes)")
-    void rejectsEmptyNamedApisListOnReleased() {
-      UUID id = UUID.randomUUID();
-      DataSet ds = readyDataSet(id);
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
-
-      DataSetInputDTO input = new DataSetInputDTO();
-      input.setName("updated name");
-      input.setNamedApis(List.of());
-
-      assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("cannot be changed")
-          .hasMessageContaining("READY");
-
-      verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
-    }
-
-    @Test
     @DisplayName("allows updateReleasedMeta with namedApis omitted (PATCH semantics)")
     void allowsOmittedNamedApis() {
       UUID id = UUID.randomUUID();
@@ -865,7 +822,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      DataSetInputDTO input = new DataSetInputDTO();
+      DataSetMetaInputDTO input = new DataSetMetaInputDTO();
       input.setName("updated name");
       // input.getNamedApis() stays null
 
@@ -888,7 +845,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      DataSetInputDTO input = new DataSetInputDTO();
+      DataSetMetaInputDTO input = new DataSetMetaInputDTO();
       input.setName("updated name");
 
       DataSet result = createService().updateReleasedMeta(id, input);
@@ -910,7 +867,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      DataSetInputDTO input = new DataSetInputDTO();
+      DataSetMetaInputDTO input = new DataSetMetaInputDTO();
       input.setName("updated name");
 
       DataSet result = createService().updateReleasedMeta(id, input);
@@ -932,13 +889,18 @@ class DataSetServiceTest {
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      DataSetInputDTO input = new DataSetInputDTO();
+      DataSetMetaInputDTO input = new DataSetMetaInputDTO();
       input.setName("updated name");
       input.setDescription("updated description");
 
       DataSet result = createService().updateReadyMeta(id, input);
 
-      verify(dataSetMapper).updateEntity(ds, input);
+      ArgumentCaptor<DataSetInputDTO> applied = ArgumentCaptor.forClass(DataSetInputDTO.class);
+      verify(dataSetMapper).updateEntity(eq(ds), applied.capture());
+      assertThat(applied.getValue())
+          .usingRecursiveComparison()
+          .ignoringFields("namedApis")
+          .isEqualTo(input);
       assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
       assertThat(result.getPendingSagaType()).isNull();
       verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
@@ -950,7 +912,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(draftDataSet(id)));
 
-      DataSetInputDTO input = new DataSetInputDTO();
+      DataSetMetaInputDTO input = new DataSetMetaInputDTO();
       input.setName("updated name");
 
       assertThatThrownBy(() -> createService().updateReadyMeta(id, input))
@@ -965,7 +927,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(availableDataSet(id)));
 
-      DataSetInputDTO input = new DataSetInputDTO();
+      DataSetMetaInputDTO input = new DataSetMetaInputDTO();
       input.setName("updated name");
 
       assertThatThrownBy(() -> createService().updateReadyMeta(id, input))
@@ -980,7 +942,7 @@ class DataSetServiceTest {
     READY,
     RELEASED;
 
-    DataSet update(DataSetService service, UUID id, DataSetInputDTO input) {
+    DataSet update(DataSetService service, UUID id, DataSetMetaInputDTO input) {
       return this == READY
           ? service.updateReadyMeta(id, input)
           : service.updateReleasedMeta(id, input);
@@ -996,8 +958,8 @@ class DataSetServiceTest {
   @DisplayName("shared metadata-update behaviour of /ready/meta and /released/meta")
   class SharedMetaUpdateTests {
 
-    private DataSetInputDTO renameInput() {
-      DataSetInputDTO input = new DataSetInputDTO();
+    private DataSetMetaInputDTO renameInput() {
+      DataSetMetaInputDTO input = new DataSetMetaInputDTO();
       input.setName("updated name");
       return input;
     }
@@ -1015,7 +977,7 @@ class DataSetServiceTest {
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
       when(dataPoolRepository.findById(poolId)).thenReturn(Optional.of(pool));
 
-      DataSetInputDTO input = new DataSetInputDTO();
+      DataSetMetaInputDTO input = new DataSetMetaInputDTO();
       input.setName("updated name");
       input.setDescription("updated description");
       input.setOpenDataAccess(true);
@@ -1023,25 +985,13 @@ class DataSetServiceTest {
 
       DataSet result = endpoint.update(createService(), id, input);
 
-      verify(dataSetMapper).updateEntity(ds, input);
+      ArgumentCaptor<DataSetInputDTO> applied = ArgumentCaptor.forClass(DataSetInputDTO.class);
+      verify(dataSetMapper).updateEntity(eq(ds), applied.capture());
+      assertThat(applied.getValue())
+          .usingRecursiveComparison()
+          .ignoringFields("namedApis")
+          .isEqualTo(input);
       assertThat(result.getDataPool()).isEqualTo(pool);
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @EnumSource(MetaEndpoint.class)
-    @DisplayName("rejects any non-null namedApis")
-    void rejectsNamedApis(MetaEndpoint endpoint) {
-      UUID id = UUID.randomUUID();
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(readyDataSet(id)));
-
-      DataSetInputDTO input = renameInput();
-      input.setNamedApis(List.of());
-
-      assertThatThrownBy(() -> endpoint.update(createService(), id, input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("cannot be changed")
-          .hasMessageContaining("READY");
-      verify(dataSetMapper, never()).updateEntity(any(), any());
     }
 
     @ParameterizedTest(name = "{0}")
@@ -1085,7 +1035,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataPoolRepository.findById(poolBId)).thenReturn(Optional.of(poolB));
 
-      DataSetInputDTO input = new DataSetInputDTO();
+      DataSetMetaInputDTO input = new DataSetMetaInputDTO();
       input.setDatapoolId(poolBId);
 
       assertThatThrownBy(() -> endpoint.update(createService(), id, input))

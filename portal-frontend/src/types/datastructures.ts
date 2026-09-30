@@ -208,7 +208,7 @@ export const DatastructureCreateDataSchema = z.object({
 export type DatastructureCreateFormData = z.infer<typeof DatastructureCreateFormSchema>
 export type DatastructureCreateData = z.infer<typeof DatastructureCreateDataSchema>
 
-export type DatastructurePutData = DatastructureFormDraft & {
+export type DatastructureMetaPatchData = Pick<DatastructureFormDraft, 'id' | 'name' | 'description'> & {
   assignments?: AssignmentScopedInput[]
 }
 export type DatastructurePatchData = Partial<DatastructureCreateData> & WithId
