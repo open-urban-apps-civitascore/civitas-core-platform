@@ -2,9 +2,9 @@
 -- touched.
 --
 -- The lines reference artifacts by plain id and URN rather than by foreign key. That is deliberate:
--- the journal is append-only history and has to stay readable after the artifacts it names are
--- gone, which is exactly what uninstall needs later. A foreign key would either block those
--- deletions or cascade the history away with them.
+-- the journal is history and has to stay readable after the artifacts it names are gone, which is
+-- what the uninstall relies on. A foreign key would either block those deletions or cascade the
+-- history away with them.
 
 CREATE TABLE installations
 (
@@ -17,6 +17,10 @@ CREATE TABLE installations
     package_version VARCHAR(255),
     data_set_id     UUID,
     data_set_name   VARCHAR(255),
+    -- An uninstall removes the artifacts and keeps the entry. The time of the uninstall marks the
+    -- entry as history; an entry without it is an active installation, and a package can be
+    -- installed again when it has no active installation.
+    uninstalled_at  TIMESTAMP WITHOUT TIME ZONE,
     CONSTRAINT pk_installations PRIMARY KEY (id)
 );
 

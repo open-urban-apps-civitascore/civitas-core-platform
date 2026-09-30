@@ -53,7 +53,8 @@ public class InstalledArtifact extends BaseEntity {
    * The versioned URN of the resolved artifact, where one exists — which concrete version this
    * install created or reused. The {@code urn} column above stays the stable logical identity that
    * reference counting keys on; this column answers the update flow's question. Null for artifact
-   * types without a registry identity.
+   * types without a registry identity, and for a dataset, whose manifest the platform does not pin
+   * to a version.
    */
   @Column(name = "versioned_urn", length = 1024)
   private String versionedUrn;

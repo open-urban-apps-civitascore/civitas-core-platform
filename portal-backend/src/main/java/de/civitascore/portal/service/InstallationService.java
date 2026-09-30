@@ -3,7 +3,6 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.InstalledArtifactAction;
 import de.civitascore.portal.model.embedded.InstalledArtifactType;
@@ -127,8 +126,6 @@ public class InstallationService {
     final Installation installation;
     final UUID datapoolId;
     final Map<String, Minted> minted = new LinkedHashMap<>();
-    final List<String> structureUrns = new ArrayList<>();
-    final List<DataSource> sources = new ArrayList<>();
     final Map<String, DataSet> datasets = new LinkedHashMap<>();
 
     Run(Installation installation, UUID datapoolId) {
@@ -170,7 +167,6 @@ public class InstallationService {
             case PIPELINE -> installPipeline(member, run);
           });
     }
-    linkMembersIntoDatasets(run);
     return installationRepository.save(installation);
   }
 
@@ -324,7 +320,6 @@ public class InstallationService {
     DataStructureInputDTO structureInput = new DataStructureInputDTO();
     structureInput.setName(name);
     structureInput.setDescription(description);
-    structureInput.setCreatedFromDataSource(false);
     DataStructure shell = dataStructureService.create(structureInput);
 
     String localUrn = DataStructureUrns.dataStructure(name, shell.getId());
@@ -332,7 +327,6 @@ public class InstallationService {
 
     DataStructureVersionInputDTO versionInput = new DataStructureVersionInputDTO();
     versionInput.setDataStructureId(shell.getId());
-    versionInput.setDataStructureVersionSource(DataStructureVersionSource.OWN);
     versionInput.setDescription(description);
     versionInput.setModelName(name);
     versionInput.setModel(model);
@@ -355,7 +349,6 @@ public class InstallationService {
             version.getModelUrn(),
             shell.getId(),
             version.getId()));
-    run.structureUrns.add(logicalUrn);
     return line(
         InstalledArtifactType.DATA_STRUCTURE,
         name,
@@ -419,7 +412,6 @@ public class InstallationService {
             source.getConfigurationUrn(),
             source.getId(),
             null));
-    run.sources.add(source);
     return line(
         InstalledArtifactType.DATA_SOURCE,
         name,
@@ -433,7 +425,9 @@ public class InstallationService {
    * The dataset is the container the package's mappings, sinks and pipelines belong to. It stays
    * DRAFT: releasing a dataset rolls out infrastructure, and that remains the operator's explicit
    * decision. The first dataset of a package is also named on the installation header, so the
-   * install list can show it without reading the lines.
+   * install list can show it without reading the lines. The structures and sources of the package
+   * become members of the dataset's manifest the way they do in the editor: through the pipeline
+   * that reaches them, which links its whole flow when it is stored.
    */
   private InstalledArtifact installDataSet(PackageMemberInputDTO member, Run run) {
     String name = displayName(member);
@@ -447,12 +441,14 @@ public class InstallationService {
     DataSet dataSet = dataSetService.create(input);
 
     run.datasets.put(key(member.getUrn()), dataSet);
+    // The platform does not pin the manifest of a dataset to a version, so the copy and its
+    // journal line carry the logical URN only.
     run.minted.put(
         key(member.getUrn()),
         new Minted(
             PackageMemberKind.DATASET,
             dataSet.getManifestLogicalUrn(),
-            dataSet.getManifestUrn(),
+            null,
             dataSet.getId(),
             null));
     if (run.installation.getDataSetId() == null) {
@@ -464,7 +460,7 @@ public class InstallationService {
         name,
         dataSet.getId(),
         dataSet.getManifestLogicalUrn(),
-        dataSet.getManifestUrn(),
+        null,
         member.getUrn());
   }
 
@@ -646,22 +642,6 @@ public class InstallationService {
     node.put(field, target.versionedUrn());
     if (shells != null) {
       shells.add(target.shellId());
-    }
-  }
-
-  /**
-   * A dataset's manifest is the bracket around a use case; a member the manifest does not name
-   * shows up as an orphan although it belongs here. Mappings link themselves when stored, a
-   * pipeline links everything its flow reaches; the structures and sources are linked into every
-   * dataset the package ships, so they are members even where no flow reaches them yet.
-   */
-  private void linkMembersIntoDatasets(Run run) {
-    for (DataSet dataSet : run.datasets.values()) {
-      run.structureUrns.forEach(urn -> dataSetService.linkMember(dataSet.getId(), urn));
-      run.sources.stream()
-          .map(DataSource::getConfigurationLogicalUrn)
-          .filter(urn -> urn != null && !urn.isBlank())
-          .forEach(urn -> dataSetService.linkMember(dataSet.getId(), urn));
     }
   }
 
