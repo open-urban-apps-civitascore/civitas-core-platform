@@ -13,6 +13,9 @@ import { GeoPersistencePanel } from './GeoPersistencePanel'
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ datasetId: 'dataset-1' }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/',
 }))
 
 vi.mock('next-intl', () => ({
@@ -224,6 +227,32 @@ describe('GeoPersistencePanel data structure selection', () => {
       dataStructureVersionId: `${DATASTRUCTURE_ID}/${SECOND_VERSION_ID}`,
       dataStructureUrn: buildDataStructureUrn('Test Structure', DATASTRUCTURE_ID, '2.0.0'),
       configured: true,
+    })
+  })
+
+  it('configures the node once a data structure version is chosen for a valid table name', async () => {
+    const onUpdate = vi.fn()
+    renderPanel(() => null, { configured: false }, onUpdate)
+
+    await selectVersion('geoPersistencePanel.importDataStructure', 'Version 1.0.0')
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      dataStructureVersionId: `${DATASTRUCTURE_ID}/${FIRST_VERSION_ID}`,
+      dataStructureUrn: buildDataStructureUrn('Test Structure', DATASTRUCTURE_ID, '1.0.0'),
+      configured: true,
+    })
+  })
+
+  it('leaves the node unconfigured when a version is chosen for an invalid table name', async () => {
+    const onUpdate = vi.fn()
+    renderPanel(() => null, { configured: false, tableName: 'roads-2024' }, onUpdate)
+
+    await selectVersion('geoPersistencePanel.importDataStructure', 'Version 1.0.0')
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      dataStructureVersionId: `${DATASTRUCTURE_ID}/${FIRST_VERSION_ID}`,
+      dataStructureUrn: buildDataStructureUrn('Test Structure', DATASTRUCTURE_ID, '1.0.0'),
+      configured: false,
     })
   })
 })

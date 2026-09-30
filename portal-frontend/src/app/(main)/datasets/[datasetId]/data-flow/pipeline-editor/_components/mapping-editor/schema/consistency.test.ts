@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { exportToJsonSchema, SchemaExportError } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
+import { cls, datastructureFixtures, diagram } from '@/test-support/datastructureFixtures'
 
 import type { FieldNode } from '../_types'
 import { umlDiagramToSchemaTree } from './adapter'
@@ -9,115 +10,7 @@ import { modelToSchemaTree } from './modelAdapter'
 
 const treeOf = (diagram: UMLDiagram, fallbackName: string) => umlDiagramToSchemaTree(diagram, fallbackName).tree
 
-const cls = (id: string, name: string, attrs: { id: string; name: string; type?: string }[]) => ({
-  id: `node-${id}`,
-  type: 'class' as const,
-  position: { x: 0, y: 0 },
-  data: {
-    element: {
-      id,
-      name,
-      type: 'class' as const,
-      attributes: attrs.map(a => ({ visibility: 'public' as const, type: 'String', ...a })),
-      operations: [],
-    },
-    label: name,
-  },
-})
-
-const rel = (id: string, type: string, source: string, target: string, extra: Record<string, unknown> = {}) => ({
-  id: `edge-${id}`,
-  type,
-  source: `node-${source}`,
-  target: `node-${target}`,
-  data: {
-    relationship: { id: `rel-${id}`, type, source, target, ...extra },
-    label: '',
-    isSelected: false,
-    isDirty: false,
-  },
-})
-
-const diagram = (name: string, nodes: unknown[], edges: unknown[]): UMLDiagram =>
-  ({ id: 'd', name, nodes, edges, lastModified: new Date('2026-01-01'), isDirty: false }) as unknown as UMLDiagram
-
-const fixtures: { label: string; diagram: UMLDiagram }[] = [
-  {
-    label: 'pure inheritance (diagram name = parent)',
-    diagram: diagram(
-      'Animal',
-      [cls('animal', 'Animal', [{ id: 'a1', name: 'name' }]), cls('dog', 'Dog', [{ id: 'a2', name: 'breed' }])],
-      [rel('1', 'inheritance', 'dog', 'animal')],
-    ),
-  },
-  {
-    label: 'multi-level inheritance',
-    diagram: diagram(
-      'Base',
-      [
-        cls('base', 'Base', [{ id: 'a1', name: 'a' }]),
-        cls('mid', 'Mid', [{ id: 'a2', name: 'b' }]),
-        cls('leaf', 'Leaf', [{ id: 'a3', name: 'c' }]),
-      ],
-      [rel('1', 'inheritance', 'mid', 'base'), rel('2', 'inheritance', 'leaf', 'mid')],
-    ),
-  },
-  {
-    label: 'multiple inheritance',
-    diagram: diagram(
-      'P1',
-      [
-        cls('p1', 'P1', [{ id: 'a1', name: 'x' }]),
-        cls('p2', 'P2', [{ id: 'a2', name: 'y' }]),
-        cls('leaf', 'Leaf', [{ id: 'a3', name: 'own' }]),
-      ],
-      [rel('1', 'inheritance', 'leaf', 'p1'), rel('2', 'inheritance', 'leaf', 'p2')],
-    ),
-  },
-  {
-    label: 'composition',
-    diagram: diagram(
-      'Thing',
-      [cls('thing', 'Thing', [{ id: 'a1', name: 'id' }]), cls('reading', 'Reading', [{ id: 'a2', name: 'value' }])],
-      [rel('1', 'composition', 'reading', 'thing', { sourceRole: 'readings', sourceMultiplicity: '*' })],
-    ),
-  },
-  {
-    label: 'composition without role but with relationship name',
-    diagram: diagram(
-      'Sensor',
-      [cls('sensor', 'Sensor', [{ id: 'a1', name: 'id' }]), cls('reading', 'Reading', [{ id: 'a2', name: 'value' }])],
-      [rel('1', 'composition', 'reading', 'sensor', { name: 'measurements', sourceMultiplicity: '*' })],
-    ),
-  },
-  {
-    label: 'inheritance + composition on the subclass',
-    diagram: diagram(
-      'Vehicle',
-      [
-        cls('vehicle', 'Vehicle', [{ id: 'a1', name: 'vin' }]),
-        cls('car', 'Car', [{ id: 'a2', name: 'doors' }]),
-        cls('engine', 'Engine', [{ id: 'a3', name: 'power' }]),
-      ],
-      [rel('1', 'inheritance', 'car', 'vehicle'), rel('2', 'composition', 'engine', 'car', { sourceRole: 'engine' })],
-    ),
-  },
-  {
-    label: 'inheritance + composition on the parent',
-    diagram: diagram(
-      'Vehicle',
-      [
-        cls('vehicle', 'Vehicle', [{ id: 'a1', name: 'vin' }]),
-        cls('car', 'Car', [{ id: 'a2', name: 'doors' }]),
-        cls('engine', 'Engine', [{ id: 'a3', name: 'power' }]),
-      ],
-      [
-        rel('1', 'inheritance', 'car', 'vehicle'),
-        rel('2', 'composition', 'engine', 'vehicle', { sourceRole: 'engine' }),
-      ],
-    ),
-  },
-]
+const fixtures = datastructureFixtures
 
 type JsonSchema = {
   title?: string

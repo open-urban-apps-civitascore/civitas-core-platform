@@ -18,6 +18,7 @@ import {
   useUpdatePipeline,
 } from '@/app/services/api/pipelines/clientRequests'
 
+import { getNodeDef } from '../../_config/nodeRegistry'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
 import { usePipelineSession } from '../../_hooks/use-pipeline-session'
 import {
@@ -453,6 +454,22 @@ describe('PipelineEditorProviderComponent', () => {
 
       expect(contextRef.current?.isDirty).toBe(true)
     })
+
+    it.each(Object.values(PIPELINE_NODE_TYPES))(
+      'adds a %s node at the drop position with the registry default data',
+      nodeType => {
+        renderProvider()
+
+        act(() => {
+          contextRef.current?.addNode({ nodeType, position: { x: 100, y: 200 } })
+        })
+
+        const added = contextRef.current?.pipeline?.nodes[0]
+        expect(added?.type).toBe(nodeType)
+        expect(added?.position).toEqual({ x: 100, y: 200 })
+        expect(added?.data).toEqual(getNodeDef(nodeType)?.createDefaultData())
+      },
+    )
   })
 
   describe('updateNode', () => {

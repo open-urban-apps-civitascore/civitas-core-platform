@@ -27,7 +27,9 @@ const eslintConfig = [
   {
     ignores: [
       'src/components/ui/**',
-      'src/generated/**', // machine-generated CORE types: snake_case schema keys + generator-controlled ordering
+      // machine-generated CORE types: snake_case schema keys + generator-controlled ordering.
+      // Tests next to them stay linted.
+      'src/generated/**/!(*.test).ts',
       'scripts/**',
       'eslint.config.mjs',
       'next-env.d.ts',
@@ -258,7 +260,7 @@ const eslintConfig = [
       'import/no-extraneous-dependencies': [
         'error',
         {
-          devDependencies: ['**/*.test.ts', '**/*.test.tsx', '**/*.config.js', '**/*.config.ts', '**/*.stories.*', 'e2e/**', 'playwright/**'],
+          devDependencies: ['**/*.test.ts', '**/*.test.tsx', '**/*.config.js', '**/*.config.ts', '**/*.stories.*', 'e2e/**', 'playwright/**', 'src/test-support/**'],
         },
       ],
     },

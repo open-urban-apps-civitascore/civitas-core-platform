@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import { DataStructureSchema } from '@/generated/core'
-import { elementModelUrnForMember } from '@/utils/urn'
+import { contractErrors } from '@/test-support/coreContracts'
+import { cls as sharedCls, datastructureFixtures, diagram, DS_URN, rel } from '@/test-support/datastructureFixtures'
+import { buildDataStructureLogicalUrn, elementModelUrnForMember } from '@/utils/urn'
 
 import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality, UML_PRIMITIVE_TYPES } from '../constants/umlTypes'
 import type { UMLDiagram, UMLNode } from '../types/diagram'
@@ -13,6 +15,7 @@ import {
   sanitizeName,
   SchemaExportError,
 } from './jsonSchemaExportService'
+import { buildUMLModelPayload } from './modelUploadService'
 
 const baseDiagram = (overrides?: Partial<UMLDiagram>): UMLDiagram => ({
   id: 'diagram-1',
@@ -1254,5 +1257,64 @@ describe('canMultiplicityBePrimaryKey', () => {
     expect(canMultiplicityBePrimaryKey('1..*')).toBe(false)
     expect(canMultiplicityBePrimaryKey('2')).toBe(false)
     expect(canMultiplicityBePrimaryKey('1..5')).toBe(false)
+  })
+})
+
+/**
+ * The artifacts the editor stores must satisfy the published CORE-IR contract,
+ * not just the generated Zod copy of it.
+ */
+describe('CORE-IR conformance of the exported DataStructure', () => {
+  it.each(datastructureFixtures)('$label satisfies the published datastructure contract', ({ diagram }) => {
+    expect(contractErrors('datastructure', buildUMLModelPayload(diagram, DS_URN).model)).toEqual([])
+  })
+
+  it('carries the DataStructure URN as $id and an Element URN as the root $ref', () => {
+    const { model } = buildUMLModelPayload(datastructureFixtures[0].diagram, DS_URN)
+    expect(model.$id).toBe(DS_URN)
+    expect(model.$ref).toBe(elementModelUrnForMember(DS_URN, 'TrafficSensor'))
+  })
+
+  // The app saves under the logical URN, which has no version segment.
+  it('leaves the Element URNs unversioned when saved under the logical DataStructure URN', () => {
+    const logicalUrn = buildDataStructureLogicalUrn('TrafficSensor', '11111111-1111-1111-1111-111111111111')
+    const { model } = buildUMLModelPayload(datastructureFixtures[0].diagram, logicalUrn)
+    const defs = model.$defs as Record<string, { $id?: string }>
+
+    expect(logicalUrn).not.toMatch(/:1\.0\.0$/)
+    expect(defs.TrafficSensor.$id).toBe(elementModelUrnForMember(logicalUrn, 'TrafficSensor'))
+    expect(defs.TrafficSensor.$id).toMatch(/:element:common:TrafficSensor:[^:]+$/)
+    expect(contractErrors('datastructure', model)).toEqual([])
+  })
+})
+
+// Two classes each composing the other: drawable on the canvas, never exportable.
+describe('composition cycles', () => {
+  const failureOf = (diagram: UMLDiagram) => {
+    try {
+      exportToJsonSchema(diagram)
+    } catch (error) {
+      expect(error).toBeInstanceOf(SchemaExportError)
+      return (error as SchemaExportError).failure.code
+    }
+    return 'exported'
+  }
+
+  const composed = (isRootOnAlpha = false) =>
+    diagram(
+      'Loop',
+      [
+        sharedCls('a', 'Alpha', [{ id: 'a1', name: 'x' }], { isRoot: isRootOnAlpha }),
+        sharedCls('b', 'Beta', [{ id: 'a2', name: 'y' }]),
+      ],
+      [rel('1', 'composition', 'a', 'b'), rel('2', 'composition', 'b', 'a')],
+    )
+
+  it('refuses one: every class is a part, so no root is left', () => {
+    expect(failureOf(composed())).toBe('noRoot')
+  })
+
+  it('refuses one even with a designated root, which is itself a part', () => {
+    expect(failureOf(composed(true))).toBe('misdirected')
   })
 })
