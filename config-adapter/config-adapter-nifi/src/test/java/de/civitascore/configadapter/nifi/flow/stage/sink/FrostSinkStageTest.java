@@ -176,7 +176,7 @@ class FrostSinkStageTest {
             """
             { "configuration": { "port": "ThingTree" },
               "dataStructure": {
-                "$id": "urn:core:platform:civitas:datastructure:common:ALittleThing:91zjftfn1i:1.0.0",
+                "$id": "urn:core:platform:civitas:datastructure:common:0830d1e3-2c72-80b1-b2ff-5138756fad56:1.0.0",
                 "type": "object",
                 "$defs": {
                   "Thing": {

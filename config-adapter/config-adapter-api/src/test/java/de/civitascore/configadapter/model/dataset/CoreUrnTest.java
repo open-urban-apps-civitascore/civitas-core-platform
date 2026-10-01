@@ -17,18 +17,21 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 @DisplayName("CoreUrn")
 class CoreUrnTest {
 
+  private static final UUID ID = UUID.fromString("a1b2c3d4-e5f6-4890-abcd-ef1234567890");
+  private static final String STRUCTURE =
+      "urn:core:platform:civitas:datastructure:common:" + ID + ":1.0.0";
+
   @ParameterizedTest
   @ValueSource(
       strings = {
-        "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w40:1.0.0",
-        "urn:core:tenant:stadt-muenster:mapping:mobility.parking:ParkingSensor:0000000001:2.1.0",
-        "urn:core:standard:xoev:element:environment.air.quality:GeoPoint:abcdefghij:10.20.30",
+        "urn:core:platform:civitas:datastructure:common:a1b2c3d4-e5f6-4890-abcd-ef1234567890:1.0.0",
+        "urn:core:tenant:stadt-muenster:mapping:mobility.parking:00000000-0000-0000-0000-000000000001:2.1.0",
+        "urn:core:standard:xoev:element:environment.air.quality:8cc31216-5417-4d0a-abea-dde0659ce00d:10.20.30",
       })
   @DisplayName("accepts well-formed URNs across the scope/artifact-type vocabularies")
   void accepts(String urn) {
@@ -41,21 +44,21 @@ class CoreUrnTest {
         // an HTTP URL, not a URN
         "https://civitasconnect.digital/core/WeatherModel",
         // missing version segment
-        "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w40",
+        "urn:core:platform:civitas:datastructure:common:a1b2c3d4-e5f6-4890-abcd-ef1234567890",
         // scope not in vocabulary
-        "urn:core:galaxy:civitas:datastructure:common:WeatherModel:2dmtus8w40:1.0.0",
+        "urn:core:galaxy:civitas:datastructure:common:a1b2c3d4-e5f6-4890-abcd-ef1234567890:1.0.0",
         // artifact-type not in vocabulary
-        "urn:core:platform:civitas:widget:common:WeatherModel:2dmtus8w40:1.0.0",
+        "urn:core:platform:civitas:widget:common:a1b2c3d4-e5f6-4890-abcd-ef1234567890:1.0.0",
         // owner not lowercase
-        "urn:core:platform:Civitas:datastructure:common:WeatherModel:2dmtus8w40:1.0.0",
-        // space in name
-        "urn:core:platform:civitas:datastructure:common:Weather Model:2dmtus8w40:1.0.0",
-        // disambiguator too short
-        "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w4:1.0.0",
-        // disambiguator uppercase
-        "urn:core:platform:civitas:datastructure:common:WeatherModel:2DMTUS8W40:1.0.0",
+        "urn:core:platform:Civitas:datastructure:common:a1b2c3d4-e5f6-4890-abcd-ef1234567890:1.0.0",
+        // UUID uppercase
+        "urn:core:platform:civitas:datastructure:common:A1B2C3D4-E5F6-4890-ABCD-EF1234567890:1.0.0",
+        // UUID without hyphens
+        "urn:core:platform:civitas:datastructure:common:a1b2c3d4e5f64890abcdef1234567890:1.0.0",
+        // a name segment and a short token where the UUID belongs
+        "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w40:1.0.0",
         // version not semver
-        "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w40:1.0",
+        "urn:core:platform:civitas:datastructure:common:a1b2c3d4-e5f6-4890-abcd-ef1234567890:1.0",
       })
   @DisplayName("rejects malformed URNs and out-of-vocabulary segments")
   void rejects(String urn) {
@@ -68,77 +71,48 @@ class CoreUrnTest {
     assertFalse(CoreUrn.isValid(null));
   }
 
-  @ParameterizedTest
-  @CsvSource({
-    "a1b2c3d4-e5f6-7890-abcd-ef1234567890, 2dmtus8w40",
-    "00000000-0000-0000-0000-000000000001, 0000000001",
-    "8cc31216-5417-4d0a-abea-dde0659ce00d, ggb6odzea5",
-  })
-  @DisplayName("derives the same base36 disambiguator as the frontend")
-  void disambiguatorFor(String id, String expected) {
-    assertEquals(expected, CoreUrn.disambiguatorFor(UUID.fromString(id)));
-  }
-
   @Test
-  @DisplayName("keeps the disambiguator short enough for a 23-character MQTT client id")
-  void disambiguatorFitsMqttClientId() {
-    // MQTT client ids are "civitascore" plus this disambiguator, and brokers need accept only 23
-    // characters [MQTT-3.1.3-5].
-    assertTrue(CoreUrn.DISAMBIGUATOR_LENGTH <= 23 - "civitascore".length());
-  }
-
-  @Test
-  @DisplayName("matchesId accepts a URN whose disambiguator was derived from the id")
+  @DisplayName("matchesId accepts the DataStructure URN carrying the id")
   void matchesId_accepts() {
-    UUID id = UUID.fromString("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
-    assertTrue(
-        CoreUrn.matchesId(
-            "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w40:1.0.0", id));
+    assertTrue(CoreUrn.matchesId(STRUCTURE, ID));
   }
 
   @Test
-  @DisplayName("matchesId rejects a well-formed URN whose disambiguator belongs to another id")
-  void matchesId_rejectsForeignDisambiguator() {
-    UUID id = UUID.fromString("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+  @DisplayName("matchesId rejects a well-formed URN carrying another id")
+  void matchesId_rejectsForeignId() {
     assertFalse(
         CoreUrn.matchesId(
-            "urn:core:platform:civitas:datastructure:common:WeatherModel:0000000001:1.0.0", id));
+            "urn:core:platform:civitas:datastructure:common:00000000-0000-0000-0000-000000000001:1.0.0",
+            ID));
   }
 
   @Test
   @DisplayName("matchesId rejects a malformed URN")
   void matchesId_rejectsMalformed() {
-    UUID id = UUID.fromString("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
-    assertFalse(CoreUrn.matchesId("not-a-core-urn", id));
+    assertFalse(CoreUrn.matchesId("not-a-core-urn", ID));
   }
 
   @Test
-  @DisplayName("matchesId rejects a non-datastructure URN reusing the correct disambiguator")
+  @DisplayName("matchesId rejects a non-datastructure URN carrying the id")
   void matchesId_rejectsForeignArtifactType() {
-    UUID id = UUID.fromString("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
-    assertFalse(
-        CoreUrn.matchesId(
-            "urn:core:platform:civitas:mapping:common:WeatherModel:2dmtus8w40:1.0.0", id));
+    assertFalse(CoreUrn.matchesId("urn:core:platform:civitas:mapping:common:" + ID + ":1.0.0", ID));
   }
 
   @Test
-  @DisplayName("matchesId rejects a non-platform-scoped URN reusing the correct disambiguator")
+  @DisplayName("matchesId rejects a non-platform-scoped URN carrying the id")
   void matchesId_rejectsForeignScope() {
-    UUID id = UUID.fromString("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
     assertFalse(
-        CoreUrn.matchesId(
-            "urn:core:tenant:civitas:datastructure:common:WeatherModel:2dmtus8w40:1.0.0", id));
+        CoreUrn.matchesId("urn:core:tenant:civitas:datastructure:common:" + ID + ":1.0.0", ID));
   }
 
   @Test
-  @DisplayName("sameStructureVersion ignores a renamed display-name segment")
-  void sameStructureVersion_ignoresTheName() {
-    // A rename leaves both the structure and its shape untouched, so a caller comparing identity
-    // must not see a difference — otherwise a rename fails deploys that were correct.
+  @DisplayName("sameStructureVersion matches a DataStructure and its root Element")
+  void sameStructureVersion_matchesTheRootElement() {
+    // A mapping chain may name one side by the grouping and the other by its root Element; both
+    // carry the same UUID and version, so the handover is the same shape.
     assertTrue(
         CoreUrn.sameStructureVersion(
-            "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w40:1.0.0",
-            "urn:core:platform:civitas:datastructure:common:Renamed:2dmtus8w40:1.0.0"));
+            STRUCTURE, "urn:core:platform:civitas:element:common:" + ID + ":1.0.0"));
   }
 
   @Test
@@ -146,25 +120,23 @@ class CoreUrnTest {
   void sameStructureVersion_separatesVersions() {
     assertFalse(
         CoreUrn.sameStructureVersion(
-            "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w40:1.0.0",
-            "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w40:2.0.0"));
+            STRUCTURE, "urn:core:platform:civitas:datastructure:common:" + ID + ":2.0.0"));
   }
 
   @Test
-  @DisplayName("sameStructureVersion separates two structures sharing a name and version")
+  @DisplayName("sameStructureVersion separates two structures at the same version")
   void sameStructureVersion_separatesStructures() {
     assertFalse(
         CoreUrn.sameStructureVersion(
-            "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w40:1.0.0",
-            "urn:core:platform:civitas:datastructure:common:WeatherModel:0000000001:1.0.0"));
+            STRUCTURE,
+            "urn:core:platform:civitas:datastructure:common:00000000-0000-0000-0000-000000000001:1.0.0"));
   }
 
   @Test
   @DisplayName("sameStructureVersion rejects a malformed or absent URN")
   void sameStructureVersion_rejectsUnverifiable() {
-    String valid = "urn:core:platform:civitas:datastructure:common:WeatherModel:2dmtus8w40:1.0.0";
-    assertFalse(CoreUrn.sameStructureVersion(valid, "not-a-core-urn"));
-    assertFalse(CoreUrn.sameStructureVersion(valid, null));
+    assertFalse(CoreUrn.sameStructureVersion(STRUCTURE, "not-a-core-urn"));
+    assertFalse(CoreUrn.sameStructureVersion(STRUCTURE, null));
     assertFalse(CoreUrn.sameStructureVersion(null, null));
   }
 
@@ -172,17 +144,15 @@ class CoreUrnTest {
   @DisplayName("logicalUrn strips the trailing SemVer version segment")
   void logicalUrn_stripsVersion() {
     assertEquals(
-        "urn:core:tenant:stadt:mapping:mobility:Parking:0000000001",
-        CoreUrn.logicalUrn("urn:core:tenant:stadt:mapping:mobility:Parking:0000000001:2.1.0"));
+        "urn:core:platform:civitas:datastructure:common:" + ID, CoreUrn.logicalUrn(STRUCTURE));
   }
 
   @Test
   @DisplayName(
       "logicalUrn returns an already-logical URN (no version tail) unchanged, and null for null")
   void logicalUrn_passthroughAndNull() {
-    assertEquals(
-        "urn:core:tenant:stadt:mapping:mobility:Parking:0000000001",
-        CoreUrn.logicalUrn("urn:core:tenant:stadt:mapping:mobility:Parking:0000000001"));
+    String logical = "urn:core:platform:civitas:datastructure:common:" + ID;
+    assertEquals(logical, CoreUrn.logicalUrn(logical));
     assertEquals("ds-1", CoreUrn.logicalUrn("ds-1"));
     assertEquals(null, CoreUrn.logicalUrn(null));
   }
@@ -190,37 +160,15 @@ class CoreUrnTest {
   @Test
   @DisplayName("sameArtifact matches verbatim and across a version drift, but not across artifacts")
   void sameArtifact() {
-    String v1 = "urn:core:tenant:stadt:mapping:mobility:Parking:0000000001:1.0.0";
-    String v2 = "urn:core:tenant:stadt:mapping:mobility:Parking:0000000001:2.3.4";
-    String other = "urn:core:tenant:stadt:mapping:mobility:Parking:0000000002:1.0.0";
+    String v1 = "urn:core:tenant:stadt:mapping:mobility:" + ID + ":1.0.0";
+    String v2 = "urn:core:tenant:stadt:mapping:mobility:" + ID + ":2.3.4";
+    String other =
+        "urn:core:tenant:stadt:mapping:mobility:00000000-0000-0000-0000-000000000002:1.0.0";
     assertTrue(CoreUrn.sameArtifact(v1, v1));
     assertTrue(CoreUrn.sameArtifact(v1, v2));
     assertTrue(CoreUrn.sameArtifact("ds-1", "ds-1"));
     assertFalse(CoreUrn.sameArtifact(v1, other));
     assertFalse(CoreUrn.sameArtifact(v1, null));
     assertFalse(CoreUrn.sameArtifact(null, v1));
-  }
-
-  @Test
-  @DisplayName("accepts the dotted and underscored names the registry derives from schema titles")
-  void acceptsRegistryDerivedNames() {
-    // XOEV identifiers keep dots and underscores, and the registry preserves them in the name
-    // segment; rejecting them here would fail every mapping onto such a structure at deploy time.
-    assertTrue(
-        CoreUrn.isValid(
-            "urn:core:platform:civitas:element:common:Klaeranlage.0001:2dmtus8w40:1.0.0"));
-    assertTrue(
-        CoreUrn.isValid(
-            "urn:core:platform:civitas:element:common:Lokation.0002_Bundesland:2dmtus8w40:1.0.0"));
-    assertTrue(
-        CoreUrn.isValid("urn:core:platform:civitas:element:common:Reading-Set:2dmtus8w40:1.0.0"));
-  }
-
-  @Test
-  @DisplayName("still rejects a name segment carrying a separator or whitespace")
-  void rejectsNameWithSeparatorOrSpace() {
-    assertFalse(
-        CoreUrn.isValid("urn:core:platform:civitas:element:common:Bad Name:2dmtus8w40:1.0.0"));
-    assertFalse(CoreUrn.isValid("urn:core:platform:civitas:element:common::2dmtus8w40:1.0.0"));
   }
 }

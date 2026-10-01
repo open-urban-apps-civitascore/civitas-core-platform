@@ -55,7 +55,7 @@ class DatasetSerializationTest {
   void shouldDeserializePostgresqlDatasource() {
     Datasource pg = dataset.datasources().getFirst();
     assertEquals(
-        "urn:core:platform:civitas:datasource:common:NeustadtMobilityDB:0a7b8c9d1e:1.0.0",
+        "urn:core:platform:civitas:datasource:common:c712b9ae-3e8d-8fc7-9a12-f0d5ba1c83b1:1.0.0",
         pg.getId());
     assertEquals("postgresql", pg.getType());
     assertEquals("Neustadt Mobility DB", pg.getName());
@@ -82,7 +82,7 @@ class DatasetSerializationTest {
   void shouldDeserializeMqttDatasource() {
     Datasource mqtt = dataset.datasources().get(1);
     assertEquals(
-        "urn:core:platform:civitas:datasource:common:NeustadtTrafficSensors:5f2a1c3e7b:1.0.0",
+        "urn:core:platform:civitas:datasource:common:1a5b119c-46af-85a3-920f-d68bb70a4b07:1.0.0",
         mqtt.getId());
     assertEquals("mqtt", mqtt.getType());
     assertEquals("Neustadt IoT MQTT Broker", mqtt.getName());
@@ -153,17 +153,18 @@ class DatasetSerializationTest {
         objectMapper.readValue(
             """
             {"id":"p1","version":"1","action":"ADD","data":{},
-             "dataSourceIds":["urn:core:dataset:d:datasource:c:Src:0000000001:1.0.0"],
-             "dataSinkIds":["urn:core:dataset:d:datasink:c:A:0000000002:1.0.0",
-                            "urn:core:dataset:d:datasink:c:B:0000000003:1.0.0"]}
+             "dataSourceIds":["urn:core:dataset:d:datasource:c:9787c3df-5325-8a02-8722-d44c626bed38:1.0.0"],
+             "dataSinkIds":["urn:core:dataset:d:datasink:c:344d8798-87fe-8ff7-97ac-74c216a4b4e4:1.0.0",
+                            "urn:core:dataset:d:datasink:c:dbcd8f42-2446-8c5b-9686-da1e0e6b2b46:1.0.0"]}
             """,
             DataPipeline.class);
     assertEquals(
-        List.of("urn:core:dataset:d:datasource:c:Src:0000000001:1.0.0"), pipeline.dataSourceIds());
+        List.of("urn:core:dataset:d:datasource:c:9787c3df-5325-8a02-8722-d44c626bed38:1.0.0"),
+        pipeline.dataSourceIds());
     assertEquals(
         List.of(
-            "urn:core:dataset:d:datasink:c:A:0000000002:1.0.0",
-            "urn:core:dataset:d:datasink:c:B:0000000003:1.0.0"),
+            "urn:core:dataset:d:datasink:c:344d8798-87fe-8ff7-97ac-74c216a4b4e4:1.0.0",
+            "urn:core:dataset:d:datasink:c:dbcd8f42-2446-8c5b-9686-da1e0e6b2b46:1.0.0"),
         pipeline.dataSinkIds());
   }
 
@@ -178,7 +179,8 @@ class DatasetSerializationTest {
     @SuppressWarnings("unchecked")
     Map<String, Object> mapping =
         (Map<String, Object>)
-            mappings.get("urn:core:dataset:neustadt:mapping:traffic:TreeToThing:0a1b2c3d4e:1.0.0");
+            mappings.get(
+                "urn:core:dataset:neustadt:mapping:traffic:4af71165-ea38-8247-bc44-481a078a9b5e:1.0.0");
     assertNotNull(mapping);
     assertTrue(((Map<?, ?>) mapping.get("fields")).containsKey("$.name"));
   }

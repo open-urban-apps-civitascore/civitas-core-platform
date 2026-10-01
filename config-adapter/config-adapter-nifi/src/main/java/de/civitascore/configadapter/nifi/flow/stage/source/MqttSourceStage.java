@@ -15,7 +15,6 @@ import static de.civitascore.configadapter.nifi.flow.stage.BindingSupport.trimme
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
-import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.SourceType;
@@ -26,6 +25,8 @@ import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
 import de.civitascore.configadapter.nifi.flow.stage.Processor;
 import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageResult;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -55,6 +56,9 @@ public final class MqttSourceStage implements SourceStage {
 
   /** Alphanumeric only, to stay within the client ids every broker must accept [MQTT-3.1.3-5]. */
   private static final String CLIENT_ID_PREFIX = "civitascore";
+
+  /** Keeps prefix plus id within the 23 characters MQTT 3.1 allows a client id. */
+  private static final int SHORT_ID_LENGTH = 10;
 
   private static final Set<String> PLAINTEXT_SCHEMES = Set.of("tcp", "ws", "mqtt");
   private static final Set<String> TLS_SCHEMES = Set.of("ssl", "mqtts", "wss");
@@ -199,7 +203,24 @@ public final class MqttSourceStage implements SourceStage {
   /** Hashed, because the key has neither the length nor the characters a client id allows. */
   private static String clientId(String sourceNodeKey) {
     UUID name = UUID.nameUUIDFromBytes(sourceNodeKey.getBytes(StandardCharsets.UTF_8));
-    return CLIENT_ID_PREFIX + CoreUrn.disambiguatorFor(name);
+    return CLIENT_ID_PREFIX + shortId(name);
+  }
+
+  /**
+   * Must reproduce the client ids deployed flows already carry; another derivation renames every
+   * flow's broker client on its next deploy.
+   */
+  private static String shortId(UUID id) {
+    ByteBuffer bytes =
+        ByteBuffer.allocate(16)
+            .putLong(id.getMostSignificantBits())
+            .putLong(id.getLeastSignificantBits());
+    String base36 = new BigInteger(1, bytes.array()).toString(36);
+    String tail =
+        base36.length() > SHORT_ID_LENGTH
+            ? base36.substring(base36.length() - SHORT_ID_LENGTH)
+            : base36;
+    return "0".repeat(SHORT_ID_LENGTH - tail.length()) + tail;
   }
 
   @Override

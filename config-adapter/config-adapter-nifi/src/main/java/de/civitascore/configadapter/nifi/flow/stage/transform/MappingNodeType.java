@@ -154,8 +154,7 @@ public final class MappingNodeType implements TransformNodeType {
    * so a stale declaration is not recoverable at runtime: paths resolve against nothing, and an
    * array selector makes the fan-out target an array the record no longer has.
    *
-   * <p>Compared on structure identity and version, not on the URN string: the name segment is a
-   * display name, so a rename leaves the shape untouched and must not fail a deploy. A version bump
+   * <p>Compared through {@link CoreUrn#sameStructureVersion}, not on the URN string. A version bump
    * is a different shape and does fail — the downstream node's paths were authored against the old
    * one.
    *

@@ -36,18 +36,21 @@ class MappingNodeTypeTest {
   private final FrostSinkStage envelopeSink =
       new FrostSinkStage("https://frost.example/FROST", FrostSinkAuth.basicAuth("frost", "secret"));
 
-  private static final String REF_1 = "urn:core:dataset:d:mapping:c:M1:0000000001:1.0.0";
-  private static final String REF_2 = "urn:core:dataset:d:mapping:c:M2:0000000002:1.0.0";
-  private static final String REF_3 = "urn:core:dataset:d:mapping:c:M3:0000000003:1.0.0";
+  private static final String REF_1 =
+      "urn:core:dataset:d:mapping:c:a71c28f9-da26-8f55-a930-a2872ecb24fa:1.0.0";
+  private static final String REF_2 =
+      "urn:core:dataset:d:mapping:c:007c13d1-2e63-8a72-baac-d2720256dc0b:1.0.0";
+  private static final String REF_3 =
+      "urn:core:dataset:d:mapping:c:0ce752c2-bbc2-8895-9d5d-1a9c3d6a7876:1.0.0";
 
   private static final String STRUCTURE_A =
-      "urn:core:platform:civitas:datastructure:common:StructureA:0000000001:1.0.0";
+      "urn:core:platform:civitas:datastructure:common:f7c1d4fd-2c6e-8b7b-985a-5f13c16b432c:1.0.0";
   private static final String STRUCTURE_B =
-      "urn:core:platform:civitas:datastructure:common:StructureB:0000000002:1.0.0";
+      "urn:core:platform:civitas:datastructure:common:de96c47e-bb88-87c7-becf-ee40109662ce:1.0.0";
   private static final String STRUCTURE_B_V2 =
-      "urn:core:platform:civitas:datastructure:common:StructureB:0000000002:2.0.0";
-  private static final String STRUCTURE_B_RENAMED =
-      "urn:core:platform:civitas:datastructure:common:StructureBRenamed:0000000002:1.0.0";
+      "urn:core:platform:civitas:datastructure:common:de96c47e-bb88-87c7-becf-ee40109662ce:2.0.0";
+  private static final String STRUCTURE_B_ROOT_ELEMENT =
+      "urn:core:platform:civitas:element:common:de96c47e-bb88-87c7-becf-ee40109662ce:1.0.0";
 
   private static GraphNode mappingNode(String id, String mappingRef) {
     return new GraphNode(id, "mapping", null, null, mappingRef, null);
@@ -149,15 +152,14 @@ class MappingNodeTypeTest {
   }
 
   @Test
-  void renamingTheStructureBetweenTwoNodesDeploysUnchanged() throws Exception {
-    // The name segment is a display name; renaming a structure changes neither its identity nor its
-    // shape. Comparing the URNs verbatim would fail a deploy that was correct before the rename,
-    // and the remedy would be re-authoring both mappings for nothing.
+  void handoverNamingTheRootElementOfTheStructureDeploysUnchanged() throws Exception {
+    // A grouping and its root Element share UUID and version, so they describe one shape. Comparing
+    // the URNs verbatim would fail a correct deploy whose mappings name the two sides differently.
     GraphNode first = mappingNode("m1", REF_1);
     GraphNode last = mappingNode("m2", REF_2);
     Map<String, Object> mappings =
         Map.of(
-            REF_1, mappingDoc(STRUCTURE_A, STRUCTURE_B_RENAMED, Map.of("$.name", "$.raw")),
+            REF_1, mappingDoc(STRUCTURE_A, STRUCTURE_B_ROOT_ELEMENT, Map.of("$.name", "$.raw")),
             REF_2,
                 mappingDoc(STRUCTURE_B, STRUCTURE_A, Map.of("$.properties.reference", "$.name")));
 

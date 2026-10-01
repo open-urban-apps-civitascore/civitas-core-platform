@@ -52,18 +52,26 @@ public final class NifiTestFixtures {
   // Configuration CORE URNs the graph fixtures' source/sink nodes reference. The planner resolves
   // source/sink from the request, not the graph, so their exact values are inert here — they exist
   // only to make the graphs shaped like a real clean CORE Pipeline document.
-  static final String SRC_REF = "urn:core:dataset:acme:datasource:sensors:Src:0000000001:1.0.0";
-  static final String SINK_REF = "urn:core:dataset:acme:datasink:sensors:Sink:0000000002:1.0.0";
+  static final String SRC_REF =
+      "urn:core:dataset:acme:datasource:sensors:cf6397e4-7b2e-855b-9b65-162d59762bb2:1.0.0";
+  static final String SINK_REF =
+      "urn:core:dataset:acme:datasink:sensors:a851ddf5-92e4-82ef-9941-9006a4238893:1.0.0";
 
   // Mapping CORE URNs the graph fixtures' mapping nodes reference; resolved against MAPPINGS.
-  static final String MAP_BASIC = "urn:core:dataset:acme:mapping:sensors:Basic:0000000010:1.0.0";
-  static final String MAP_GEO = "urn:core:dataset:acme:mapping:sensors:Geo:0000000011:1.0.0";
-  static final String MAP_FROST = "urn:core:dataset:acme:mapping:sensors:Frost:0000000012:1.0.0";
+  static final String MAP_BASIC =
+      "urn:core:dataset:acme:mapping:sensors:9fb9b546-2f6c-8444-9a4f-fece132d8f72:1.0.0";
+  static final String MAP_GEO =
+      "urn:core:dataset:acme:mapping:sensors:72e1fd6f-10d1-869a-9e2c-b9e938550f10:1.0.0";
+  static final String MAP_FROST =
+      "urn:core:dataset:acme:mapping:sensors:685e1060-77d7-87b9-861f-d460a6289898:1.0.0";
   static final String MAP_FROST_INCOMPLETE =
-      "urn:core:dataset:acme:mapping:sensors:FrostInc:0000000013:1.0.0";
-  static final String MAP_CRON = "urn:core:dataset:acme:mapping:sensors:Cron:0000000014:1.0.0";
-  static final String MAP_TOINT = "urn:core:dataset:acme:mapping:sensors:ToInt:0000000015:1.0.0";
-  static final String MAP_MIXED = "urn:core:dataset:acme:mapping:sensors:Mixed:0000000016:1.0.0";
+      "urn:core:dataset:acme:mapping:sensors:e918ac0f-dd1d-815d-b853-c0a9ea3da7cf:1.0.0";
+  static final String MAP_CRON =
+      "urn:core:dataset:acme:mapping:sensors:80b70441-0b85-89dd-b66b-0f7f01d5a4aa:1.0.0";
+  static final String MAP_TOINT =
+      "urn:core:dataset:acme:mapping:sensors:e9db03b4-32b2-8942-b2b8-7abb4db0d473:1.0.0";
+  static final String MAP_MIXED =
+      "urn:core:dataset:acme:mapping:sensors:e519292a-7dc6-85c6-bbc6-9d2bf792cd44:1.0.0";
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
