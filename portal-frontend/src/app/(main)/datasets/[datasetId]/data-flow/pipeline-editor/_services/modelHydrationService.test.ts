@@ -1,15 +1,28 @@
 import { describe, expect, it } from 'vitest'
 
+import { buildDataStructureUrn } from '@/utils/urn'
+
 import type { PipelineNodeData } from '../_types/nodes'
 import type { Pipeline, PipelineNode, PipelineNodeType, PipelineOutputDTO } from '../_types/pipeline'
 import {
   hydrateFromCoreModel,
   type HydrationDataSink,
   type HydrationDataSource,
+  type HydrationDataStructure,
+  type HydrationMappingDocument,
+  mappingRefsToHydrate,
   type ModelHydrationContext,
   needsModelHydration,
 } from './modelHydrationService'
-import { buildDataSinkPayloads, buildPipelineModel, buildPipelinePayload } from './payloadBuilderService'
+import {
+  buildDataSinkPayloads,
+  buildMappingArtifacts,
+  buildPipelineModel,
+  buildPipelinePayload,
+  createMappingSnapshot,
+  hasMappingChanged,
+  updateNodeData,
+} from './payloadBuilderService'
 import { createSessionFromBackendDTO } from './sessionService'
 
 /**
@@ -77,6 +90,45 @@ const contextWith = (overrides: Partial<ModelHydrationContext> = {}): ModelHydra
   createDefaultData,
   ...overrides,
 })
+
+/** The two data structures the mapping of the model maps between, as the structure list returns them. */
+const COUNT_STRUCTURE: HydrationDataStructure = {
+  id: '0b3c5e8a-1f2d-4c6b-9a7e-3d5f8c1b2a40',
+  name: 'Counter reading',
+  dataStructureVersions: [{ id: 'count-version-1', version: '1.0.0' }],
+}
+
+const TRAFFIC_STRUCTURE: HydrationDataStructure = {
+  id: '7e9f1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b',
+  name: 'Traffic',
+  dataStructureVersions: [
+    { id: 'traffic-version-1', version: '1.0.0' },
+    { id: 'traffic-version-2', version: '2.0.0' },
+  ],
+}
+
+const COUNT_URN = buildDataStructureUrn(COUNT_STRUCTURE.name, COUNT_STRUCTURE.id, '1.0.0')
+const TRAFFIC_URN = buildDataStructureUrn(TRAFFIC_STRUCTURE.name, TRAFFIC_STRUCTURE.id, '2.0.0')
+
+/** The mapping of the model as the backend returns it: the registry stamps `$schema` and `id`. */
+const STORED_MAPPING: HydrationMappingDocument = {
+  $schema: 'https://civitasconnect.digital/core/mapping/v1',
+  id: versioned(MAPPING_URN),
+  title: 'Count to traffic',
+  source: COUNT_URN,
+  target: TRAFFIC_URN,
+  fields: { '$.vehicles': { op: 'copy', sourcePath: '$.count' } },
+}
+
+const withStoredMapping = (
+  document: HydrationMappingDocument = STORED_MAPPING,
+  overrides: Partial<ModelHydrationContext> = {},
+): ModelHydrationContext =>
+  contextWith({
+    mappings: new Map([[versioned(MAPPING_URN), document]]),
+    dataStructures: [COUNT_STRUCTURE, TRAFFIC_STRUCTURE],
+    ...overrides,
+  })
 
 /** The flow of an installed package: start, source, mapping, sink, end. */
 const MODEL = {
@@ -168,6 +220,20 @@ describe('needsModelHydration', () => {
   it('is false when the model has no nodes', () => {
     expect(needsModelHydration(dtoWith({ nodes: [], edges: [] }))).toBe(false)
     expect(needsModelHydration(dtoWith(structuredClone(MODEL), { model: null }))).toBe(false)
+  })
+})
+
+describe('mappingRefsToHydrate', () => {
+  it('collects the mapping references of the pipelines without a stored graph, each one time', () => {
+    const second = dtoWith(structuredClone(MODEL), { id: 'pipeline-2' })
+    expect(mappingRefsToHydrate([installedPipeline(), second])).toEqual([versioned(MAPPING_URN)])
+  })
+
+  it('collects nothing for a pipeline the editor stored a graph for', () => {
+    const stored = dtoWith(structuredClone(MODEL), {
+      styles: { nodes: [{ id: 'n-start' }], edges: [], nodePositions: {} },
+    })
+    expect(mappingRefsToHydrate([stored])).toEqual([])
   })
 })
 
@@ -326,6 +392,72 @@ describe('hydrateFromCoreModel', () => {
       expect(nodeOf(nodes, 'n-mapping').data).toMatchObject({ mappingConfig: { fields: {}, positions: {} } })
       expect(nodeOf(nodes, 'n-mapping').data.mappingConfig).not.toHaveProperty('target')
     })
+
+    it('marks the node as stored outside the mapping editor', () => {
+      const { nodes } = hydrateFromCoreModel(installedPipeline(), contextWith())
+      expect(nodeOf(nodes, 'n-mapping').data).toMatchObject({ isStoredOutsideEditor: true })
+    })
+
+    describe('with its stored document', () => {
+      it('takes over the rules and the title of the stored mapping', () => {
+        const { nodes } = hydrateFromCoreModel(installedPipeline(), withStoredMapping())
+        expect(nodeOf(nodes, 'n-mapping').data).toMatchObject({
+          mappingTitle: 'Count to traffic',
+          mappingConfig: { source: COUNT_URN, target: TRAFFIC_URN, fields: STORED_MAPPING.fields, positions: {} },
+          configured: true,
+        })
+      })
+
+      it('binds the source and the target to the versions the mapping names, so the mapping editor opens', () => {
+        const { nodes } = hydrateFromCoreModel(installedPipeline(), withStoredMapping())
+        expect(nodeOf(nodes, 'n-mapping').data).toMatchObject({
+          sourceDatastructureId: COUNT_STRUCTURE.id,
+          sourceVersionId: 'count-version-1',
+          targetDatastructureId: TRAFFIC_STRUCTURE.id,
+          targetVersionId: 'traffic-version-2',
+        })
+      })
+
+      it('keeps the layout of the mapping editor', () => {
+        const positions = { 'concat-0': { x: 10, y: 20 } }
+        const { nodes } = hydrateFromCoreModel(installedPipeline(), withStoredMapping({ ...STORED_MAPPING, positions }))
+        expect(nodeOf(nodes, 'n-mapping').data).toMatchObject({ mappingConfig: { positions } })
+      })
+
+      it('leaves a structure unbound that the user cannot read, and keeps the rules', () => {
+        const context = withStoredMapping(STORED_MAPPING, { dataStructures: [TRAFFIC_STRUCTURE] })
+        const { data } = nodeOf(hydrateFromCoreModel(installedPipeline(), context).nodes, 'n-mapping')
+
+        expect(data).toMatchObject({
+          targetDatastructureId: TRAFFIC_STRUCTURE.id,
+          mappingConfig: { source: COUNT_URN },
+        })
+        expect(data).not.toHaveProperty('sourceDatastructureId')
+      })
+
+      it('leaves a structure unbound when it has no version the mapping names', () => {
+        const source = buildDataStructureUrn(COUNT_STRUCTURE.name, COUNT_STRUCTURE.id, '3.0.0')
+        const context = withStoredMapping({ ...STORED_MAPPING, source })
+        const { data } = nodeOf(hydrateFromCoreModel(installedPipeline(), context).nodes, 'n-mapping')
+
+        expect(data).not.toHaveProperty('sourceDatastructureId')
+        expect(data).toMatchObject({ targetVersionId: 'traffic-version-2' })
+      })
+
+      it('does not take over a document the mapping editor could not send back', () => {
+        const context = withStoredMapping({ ...STORED_MAPPING, fields: { '$.vehicles': { op: 'unknown' } } })
+        const { data } = nodeOf(hydrateFromCoreModel(installedPipeline(), context).nodes, 'n-mapping')
+
+        expect(data).toMatchObject({ mappingRef: versioned(MAPPING_URN), mappingConfig: { fields: {}, positions: {} } })
+        expect(data).not.toHaveProperty('targetDatastructureId')
+      })
+
+      it('keeps the target of the stored mapping in front of a FROST sink', () => {
+        const context = withStoredMapping(STORED_MAPPING, { dataSinks: [frostSink] })
+        const { nodes } = hydrateFromCoreModel(installedPipeline(), context)
+        expect(nodeOf(nodes, 'n-mapping').data).toMatchObject({ mappingConfig: { target: TRAFFIC_URN } })
+      })
+    })
   })
 
   describe('scheduled trigger', () => {
@@ -404,6 +536,31 @@ describe('hydrateFromCoreModel', () => {
 
       expect(payloads[0].entityId).toBe('sink-1')
       expect(payloads[0].payload.configuration).toEqual({ port: 'ThingTree', element: STRUCTURE_URN })
+    })
+
+    it('does not version a stored mapping that was not changed', () => {
+      const pipeline = asPipeline(installedPipeline(), withStoredMapping())
+      const snapshot = createMappingSnapshot(pipeline)
+      const [artifact] = buildMappingArtifacts(pipeline)
+
+      expect(artifact.logicalUrn).toBe(MAPPING_URN)
+      expect(hasMappingChanged(artifact.nodeId, artifact.body, snapshot)).toBe(false)
+    })
+
+    it('versions a changed stored mapping under its logical URN and its title', () => {
+      const pipeline = asPipeline(installedPipeline(), withStoredMapping())
+      const snapshot = createMappingSnapshot(pipeline)
+      const mappingConfig = {
+        source: COUNT_URN,
+        target: TRAFFIC_URN,
+        fields: { '$.vehicles': '$.total' },
+        positions: {},
+      }
+      const [artifact] = buildMappingArtifacts(updateNodeData(pipeline, 'n-mapping', { mappingConfig }))
+
+      expect(hasMappingChanged(artifact.nodeId, artifact.body, snapshot)).toBe(true)
+      expect(artifact.logicalUrn).toBe(MAPPING_URN)
+      expect(artifact.body.title).toBe('Count to traffic')
     })
   })
 })

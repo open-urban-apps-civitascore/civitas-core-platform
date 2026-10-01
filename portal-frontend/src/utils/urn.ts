@@ -129,6 +129,15 @@ export const toLogicalUrn = (urn: string): string => {
 }
 
 /**
+ * Returns the version of a versioned CORE URN (`1.0.0` of `urn:core:…:<disambiguator>:1.0.0`). A
+ * logical URN has no version and gives `undefined`.
+ */
+export const versionOf = (urn: string): string | undefined => {
+  const versionSegments = urn.split(':').slice(LOGICAL_URN_SEGMENT_COUNT)
+  return versionSegments.length > 0 ? versionSegments.join(':') : undefined
+}
+
+/**
  * Builds the versioned CORE URN for an Element that shares a DataStructure's disambiguator + version
  * and differs only in the artifact-type segment (`element` instead of `datastructure`) and, via
  * {@param name}, the name segment. Kept as the canonical Element-URN builder; a DataStructure's own

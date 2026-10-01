@@ -1037,14 +1037,16 @@ const isNonEmptyMappingValue = (value: unknown): boolean =>
 
 /**
  * True for a mapping that was stored through the API and not through the mapping editor, as an
- * installed package does it. The node then holds the reference, but no field assignments and no
- * snapshot of the required fields. The content is in the registry and was checked when it was
- * stored. The editor cannot reach this state on its own: a save in the mapping editor always writes
- * the snapshot.
+ * installed package does it. The node holds the reference and no snapshot of the required fields.
+ * The content is in the registry and was checked when it was stored. Either the node holds no
+ * field assignments, or it holds the assignments the editor read from the registry when it drew
+ * the pipeline from its model ({@code isStoredOutsideEditor}). The editor cannot reach this state on
+ * its own: a save in the mapping editor always writes the snapshot.
  */
 const isMappingStoredOutsideEditor = (data: MappingNodeData): boolean => {
+  if (!data.mappingRef) return false
   const assignedFields = Object.keys(data.mappingConfig?.fields ?? {})
-  return Boolean(data.mappingRef) && assignedFields.length === 0
+  return data.isStoredOutsideEditor === true || assignedFields.length === 0
 }
 
 /**

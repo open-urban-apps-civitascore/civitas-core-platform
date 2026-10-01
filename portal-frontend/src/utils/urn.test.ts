@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildDataStructureUrn, buildElementModelUrn, toLogicalUrn, toPascalCaseName } from './urn'
+import { buildDataStructureUrn, buildElementModelUrn, toLogicalUrn, toPascalCaseName, versionOf } from './urn'
 
 describe('toPascalCaseName', () => {
   it('joins words into PascalCase', () => {
@@ -80,6 +80,18 @@ describe('toLogicalUrn', () => {
 
   it('gives the same result for two versions of one artifact', () => {
     expect(toLogicalUrn(`${logical}:1.0.0`)).toBe(toLogicalUrn(`${logical}:2.3.0`))
+  })
+})
+
+describe('versionOf', () => {
+  const logical = 'urn:core:platform:civitas:datastructure:common:Traffic:2dmtus8w40'
+
+  it('returns the version of a versioned URN', () => {
+    expect(versionOf(`${logical}:2.1.0`)).toBe('2.1.0')
+  })
+
+  it('returns undefined for a logical URN', () => {
+    expect(versionOf(logical)).toBeUndefined()
   })
 })
 

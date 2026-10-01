@@ -44,6 +44,7 @@ import {
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
 import { useDataSinkLocks } from '../../_hooks/use-datasink-locks'
+import { useMappingLookups } from '../../_hooks/use-mapping-lookups'
 import { usePipelineDatasources } from '../../_hooks/use-pipeline-datasources'
 import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
 import { tableNameOwnerOutsideNode, tableNameOwnersOutsideSession } from '../../_services/dataSinkNameService'
@@ -152,15 +153,17 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Lookups for pipelines that have a model but no stored graph =====
   // Such a pipeline is drawn from its model. The model holds references only, so the data sinks
-  // and data sources of the dataset are necessary to find the ids and the types behind them.
+  // and data sources of the dataset are necessary to find the ids and the types behind them. A
+  // mapping node also needs its stored document and the data structures it maps between.
   const dataSinksQuery = useGetDataSinks(datasetId, { isEnabled: !!datasetId })
   const { entities: dataSources, isLoading: isLoadingDataSources } = usePipelineDatasources()
+  const mappingLookups = useMappingLookups(datasetId, pipelinesQuery.data?.data)
 
   const isHydrationPending = useMemo(() => {
     const pipelineDTOs = pipelinesQuery.data?.data ?? []
     const isHydrationNecessary = pipelineDTOs.some(needsModelHydration)
-    return isHydrationNecessary && (dataSinksQuery.isLoading || isLoadingDataSources)
-  }, [pipelinesQuery.data, dataSinksQuery.isLoading, isLoadingDataSources])
+    return isHydrationNecessary && (dataSinksQuery.isLoading || isLoadingDataSources || mappingLookups.isLoading)
+  }, [pipelinesQuery.data, dataSinksQuery.isLoading, isLoadingDataSources, mappingLookups.isLoading])
 
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
@@ -207,6 +210,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     const hydration: ModelHydrationContext = {
       dataSinks: dataSinksQuery.data?.data ?? [],
       dataSources,
+      mappings: mappingLookups.mappings,
+      dataStructures: mappingLookups.dataStructures,
       createDefaultData: type => getNodeDef(type)?.createDefaultData(),
     }
 
@@ -238,7 +243,16 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         mappingSnapshotsRef.current[session.id] = {}
       }
     }
-  }, [pipelinesQuery.data, sessionManager, requestedPipelineId, isHydrationPending, dataSinksQuery.data, dataSources])
+  }, [
+    pipelinesQuery.data,
+    sessionManager,
+    requestedPipelineId,
+    isHydrationPending,
+    dataSinksQuery.data,
+    dataSources,
+    mappingLookups.mappings,
+    mappingLookups.dataStructures,
+  ])
 
   // ===== Validation State =====
   const [validationResult, setValidationResult] = useState<ValidationResultWithNodeStatus | null>(null)

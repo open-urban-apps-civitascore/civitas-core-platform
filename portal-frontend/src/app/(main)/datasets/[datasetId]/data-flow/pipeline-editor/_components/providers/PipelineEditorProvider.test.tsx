@@ -17,6 +17,7 @@ import {
   useGetPipelines,
   useUpdatePipeline,
 } from '@/app/services/api/pipelines/clientRequests'
+import { buildDataStructureUrn } from '@/utils/urn'
 
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
@@ -104,6 +105,16 @@ const mockPipelineDatasources = vi.hoisted(() => ({
 
 vi.mock('../../_hooks/use-pipeline-datasources', () => ({
   usePipelineDatasources: () => mockPipelineDatasources,
+}))
+
+const mockMappingLookups = vi.hoisted(() => ({
+  mappings: new Map<string, Record<string, unknown>>(),
+  dataStructures: [] as { id: string; name: string; dataStructureVersions: { id: string; version: string | null }[] }[],
+  isLoading: false,
+}))
+
+vi.mock('../../_hooks/use-mapping-lookups', () => ({
+  useMappingLookups: () => mockMappingLookups,
 }))
 
 // Capture the latest WarningModal props so tests can drive the data-loss dialog (confirm/discard).
@@ -237,6 +248,9 @@ beforeEach(() => {
   mockDatasetPermissions.canDeletePipeline = true
   mockPipelineDatasources.entities = []
   mockPipelineDatasources.isLoading = false
+  mockMappingLookups.mappings = new Map()
+  mockMappingLookups.dataStructures = []
+  mockMappingLookups.isLoading = false
 
   vi.mocked(buildDataSinkPayloads).mockReturnValue([])
   vi.mocked(buildMappingArtifacts).mockReturnValue([])
@@ -493,6 +507,85 @@ describe('PipelineEditorProviderComponent', () => {
 
       expect(contextRef.current?.isLoadingEditor).toBe(true)
       expect(contextRef.current?.pipeline?.id).toBeUndefined()
+    })
+
+    it('waits for the stored mappings before it loads the pipeline', () => {
+      vi.mocked(useGetDataSinks).mockReturnValue(dataSinksLoaded)
+      mockMappingLookups.isLoading = true
+
+      renderProvider()
+
+      expect(contextRef.current?.isLoadingEditor).toBe(true)
+      expect(contextRef.current?.pipeline?.id).toBeUndefined()
+    })
+
+    describe('with a mapping', () => {
+      const MAPPING_REF = 'urn:core:platform:civitas:mapping:common:CountToTraffic:5566778899:1.0.0'
+      const COUNT = { id: '0b3c5e8a-1f2d-4c6b-9a7e-3d5f8c1b2a40', name: 'Count' }
+      const TRAFFIC = { id: '7e9f1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b', name: 'Traffic' }
+      const COUNT_URN = buildDataStructureUrn(COUNT.name, COUNT.id, '1.0.0')
+      const TRAFFIC_URN = buildDataStructureUrn(TRAFFIC.name, TRAFFIC.id, '1.0.0')
+
+      const pipelineWithMapping = {
+        ...installedPipeline,
+        model: {
+          nodes: [
+            { id: 'n-start', kind: 'start', label: 'Start' },
+            { id: 'n-source', kind: 'source', label: 'Counter feed', sourceRef: SOURCE_URN },
+            { id: 'n-mapping', kind: 'mapping', label: 'Count to traffic', mappingRef: MAPPING_REF },
+            { id: 'n-sink', kind: 'sink', label: 'Traffic table', sinkRef: SINK_URN },
+            { id: 'n-end', kind: 'end', label: 'End' },
+          ],
+          edges: [
+            { id: 'e1', source: 'n-start', target: 'n-source' },
+            { id: 'e2', source: 'n-source', target: 'n-mapping' },
+            { id: 'e3', source: 'n-mapping', target: 'n-sink' },
+            { id: 'e4', source: 'n-sink', target: 'n-end' },
+          ],
+        },
+      } as unknown as PipelineOutputDTO
+
+      beforeEach(() => {
+        vi.mocked(useGetDataSinks).mockReturnValue(dataSinksLoaded)
+        vi.mocked(useGetPipelines).mockReturnValue({
+          data: { data: [pipelineWithMapping] },
+          isLoading: false,
+        } as unknown as ReturnType<typeof useGetPipelines>)
+      })
+
+      it('opens the mapping node with its stored rules and the structures it maps between', () => {
+        mockMappingLookups.mappings = new Map([
+          [
+            MAPPING_REF,
+            { title: 'Count to traffic', source: COUNT_URN, target: TRAFFIC_URN, fields: { '$.n': '$.c' } },
+          ],
+        ])
+        mockMappingLookups.dataStructures = [
+          { ...COUNT, dataStructureVersions: [{ id: 'count-version-1', version: '1.0.0' }] },
+          { ...TRAFFIC, dataStructureVersions: [{ id: 'traffic-version-1', version: '1.0.0' }] },
+        ]
+
+        renderProvider()
+
+        const mapping = contextRef.current?.pipeline?.nodes.find(node => node.id === 'n-mapping')
+        expect(mapping?.data).toMatchObject({
+          mappingRef: MAPPING_REF,
+          mappingConfig: { source: COUNT_URN, target: TRAFFIC_URN, fields: { '$.n': '$.c' } },
+          sourceDatastructureId: COUNT.id,
+          sourceVersionId: 'count-version-1',
+          targetDatastructureId: TRAFFIC.id,
+          targetVersionId: 'traffic-version-1',
+        })
+        expect(contextRef.current?.isDirty).toBe(false)
+      })
+
+      it('opens the mapping node with its reference only when the document cannot be read', () => {
+        renderProvider()
+
+        const mapping = contextRef.current?.pipeline?.nodes.find(node => node.id === 'n-mapping')
+        expect(mapping?.data).toMatchObject({ mappingRef: MAPPING_REF, configured: true })
+        expect(mapping?.data).not.toHaveProperty('sourceDatastructureId')
+      })
     })
   })
 

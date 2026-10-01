@@ -12,16 +12,22 @@
  * source and the data sinks, because a save sends them. The caller supplies the data sources and
  * data sinks of the dataset, and this service resolves each reference against them.
  *
+ * A mapping node also needs the stored mapping document, and the ids of the data structures it maps
+ * between, because the mapping editor opens only with both. The caller supplies the documents and
+ * the data structures the user can read.
+ *
  * Nothing is written on load. The derived graph becomes `styles` when the user saves the pipeline.
  *
  * Kept React-free: the default data of a node comes from the caller, because the node registry
  * imports the inspector panels.
  */
 
+import { MappingDraftSchema } from '@/generated/core'
 import { DATASINK_TYPES, type DataSinkType } from '@/types/datasinks'
 import type { Datasource } from '@/types/datasources'
-import { toLogicalUrn } from '@/utils/urn'
+import { buildDataStructureLogicalUrn, toLogicalUrn, versionOf } from '@/utils/urn'
 
+import type { MappingConfig } from '../_components/mapping-editor/_types'
 import { isFrostSinkPort } from '../_constants/frostPorts'
 import { isFrostNodeData, isMappingNodeData, type PipelineNodeData } from '../_types/nodes'
 import {
@@ -53,9 +59,23 @@ export interface HydrationDataSink {
 /** What the hydration reads from a data source that the dataset can use. */
 export type HydrationDataSource = Pick<Datasource, 'id' | 'name' | 'connectorType' | 'configurationUrn'>
 
+/** What the hydration reads from a data structure that the user can read. */
+export interface HydrationDataStructure {
+  id: string
+  name: string
+  dataStructureVersions: readonly { id: string; version: string | null }[]
+}
+
+/** A stored mapping document as the backend returns it: its rules, and the editor's node layout. */
+export type HydrationMappingDocument = Record<string, unknown>
+
 export interface ModelHydrationContext {
   dataSinks: readonly HydrationDataSink[]
   dataSources: readonly HydrationDataSource[]
+  /** The stored mapping documents, by the reference that a pipeline node holds (`mappingRef`). */
+  mappings?: ReadonlyMap<string, HydrationMappingDocument>
+  /** The data structures that the user can read, to find the ids behind the URNs of a mapping. */
+  dataStructures?: readonly HydrationDataStructure[]
   /** The data a new node of this type starts with. The node registry is the source. */
   createDefaultData: (type: PipelineNodeType) => PipelineNodeData | undefined
 }
@@ -67,10 +87,18 @@ interface NodeDraft {
   data: Record<string, unknown>
 }
 
+/** The ids that the mapping editor needs to load one data structure version. */
+interface StructureVersionIds {
+  datastructureId: string
+  versionId: string
+}
+
 interface Lookups {
   sourcesByUrn: Map<string, HydrationDataSource>
   sinksByUrn: Map<string, HydrationDataSink>
   sinksById: Map<string, HydrationDataSink>
+  mappingsByRef: ReadonlyMap<string, HydrationMappingDocument>
+  structuresByUrn: Map<string, HydrationDataStructure>
   /** The id of the linked data source, when the pipeline has one source node and one linked source. */
   soleSourceId: string | undefined
   /** The linked data sink, when the pipeline has one sink node and one linked sink. */
@@ -137,6 +165,22 @@ export const hasStoredGraph = (dto: Pick<PipelineOutputDTO, 'styles'>): boolean 
 export const needsModelHydration = (dto: Pick<PipelineOutputDTO, 'styles' | 'model'>): boolean =>
   !hasStoredGraph(dto) && modelNodesOf(dto).length > 0
 
+/**
+ * The mapping references of the pipelines that are drawn from their model, each one time. The
+ * caller reads these mapping documents before it draws the pipelines.
+ */
+export const mappingRefsToHydrate = (dtos: readonly Pick<PipelineOutputDTO, 'styles' | 'model'>[]): string[] => {
+  const references = new Set<string>()
+  for (const dto of dtos) {
+    if (!needsModelHydration(dto)) continue
+    for (const node of modelNodesOf(dto)) {
+      const reference = node.kind === MODEL_KINDS.mapping ? textOf(node.mappingRef) : undefined
+      if (reference) references.add(reference)
+    }
+  }
+  return [...references]
+}
+
 // ============================================================================
 // Lookups
 // ============================================================================
@@ -145,6 +189,24 @@ const byLogicalUrn = <T extends { configurationUrn?: string | null }>(entities: 
   const lookup = new Map<string, T>()
   for (const entity of entities) {
     if (entity.configurationUrn) lookup.set(toLogicalUrn(entity.configurationUrn), entity)
+  }
+  return lookup
+}
+
+/**
+ * The data structures by their logical CORE URN. The list does not carry the URN, so it is made
+ * from the name and the id, with the rule the editor uses when it saves a mapping
+ * (`buildDataStructureUrn` in `MappingEditorModal`). A renamed structure thus does not match, as it
+ * does not match there.
+ */
+const byStructureUrn = (structures: readonly HydrationDataStructure[]): Map<string, HydrationDataStructure> => {
+  const lookup = new Map<string, HydrationDataStructure>()
+  for (const structure of structures) {
+    try {
+      lookup.set(buildDataStructureLogicalUrn(structure.name, structure.id), structure)
+    } catch {
+      // A name without a URN segment, or an id that is not a UUID, gives no URN to compare.
+    }
   }
   return lookup
 }
@@ -163,6 +225,8 @@ const buildLookups = (dto: PipelineOutputDTO, modelNodes: ModelRecord[], context
     sourcesByUrn: byLogicalUrn(context.dataSources),
     sinksByUrn: byLogicalUrn(context.dataSinks),
     sinksById,
+    mappingsByRef: context.mappings ?? new Map(),
+    structuresByUrn: byStructureUrn(context.dataStructures ?? []),
     soleSourceId,
     soleSink: soleSinkId ? sinksById.get(soleSinkId) : undefined,
   }
@@ -241,8 +305,60 @@ const sinkDraft = (node: ModelRecord, lookups: Lookups): NodeDraft | undefined =
   return geoPersistenceDraft(reference, sink)
 }
 
-const mappingDraft = (node: ModelRecord): NodeDraft => {
+/**
+ * The rules of a stored mapping in the form the mapping editor holds them, or `undefined`. A save
+ * sends them back unchanged, so a document that the editor's own schema refuses is not taken over:
+ * it would block each save of the pipeline. The node then keeps only its reference.
+ */
+const mappingConfigOf = (document: HydrationMappingDocument): MappingConfig | undefined => {
+  const source = textOf(document.source)
+  const target = textOf(document.target)
+  const fields = isRecord(document.fields) ? document.fields : {}
+  const positions = isRecord(document.positions) ? document.positions : {}
+  if (!source || !target) return undefined
+  if (!MappingDraftSchema.safeParse({ source, target, fields, positions }).success) return undefined
+
+  return {
+    source,
+    target,
+    fields: fields as MappingConfig['fields'],
+    positions: positions as MappingConfig['positions'],
+  }
+}
+
+/** The ids of the data structure version that a versioned structure URN names, when the user can read it. */
+const structureVersionOf = (urn: string, lookups: Lookups): StructureVersionIds | undefined => {
+  const structure = lookups.structuresByUrn.get(toLogicalUrn(urn))
+  const version = versionOf(urn)
+  const match = structure?.dataStructureVersions.find(candidate => candidate.version === version)
+  return structure && match ? { datastructureId: structure.id, versionId: match.id } : undefined
+}
+
+/**
+ * What a stored mapping document adds to the node: its rules, its title, and the data structures
+ * that the mapping editor opens with. A structure that the list does not contain (deleted, a
+ * structure the platform publishes, no permission to read it) stays unbound. The node then shows
+ * the rules, but the mapping editor stays closed, as it is for a node without a document.
+ */
+const storedMappingData = (document: HydrationMappingDocument, lookups: Lookups): Record<string, unknown> => {
+  const mappingConfig = mappingConfigOf(document)
+  if (!mappingConfig?.source || !mappingConfig.target) return {}
+
+  const source = structureVersionOf(mappingConfig.source, lookups)
+  const target = structureVersionOf(mappingConfig.target, lookups)
+  return {
+    mappingConfig,
+    mappingTitle: textOf(document.title),
+    sourceDatastructureId: source?.datastructureId,
+    sourceVersionId: source?.versionId,
+    targetDatastructureId: target?.datastructureId,
+    targetVersionId: target?.versionId,
+  }
+}
+
+const mappingDraft = (node: ModelRecord, lookups: Lookups): NodeDraft => {
   const reference = textOf(node.mappingRef)
+  const document = reference ? lookups.mappingsByRef.get(reference) : undefined
 
   return {
     type: PIPELINE_NODE_TYPES.Mapping,
@@ -250,6 +366,9 @@ const mappingDraft = (node: ModelRecord): NodeDraft => {
       mappingRef: reference,
       mappingLogicalUrn: reference ? toLogicalUrn(reference) : undefined,
       configured: reference !== undefined,
+      // The registry checked the rules when they were stored. The mapping editor did not.
+      isStoredOutsideEditor: reference !== undefined ? true : undefined,
+      ...(document ? storedMappingData(document, lookups) : {}),
     },
   }
 }
@@ -274,7 +393,7 @@ const draftOf = (node: ModelRecord, lookups: Lookups): NodeDraft | undefined => 
     case MODEL_KINDS.source:
       return sourceDraft(node, lookups)
     case MODEL_KINDS.mapping:
-      return mappingDraft(node)
+      return mappingDraft(node, lookups)
     case MODEL_KINDS.sink:
       return sinkDraft(node, lookups)
     default:
@@ -350,7 +469,8 @@ const nearestUpstreamMappingId = (
 /**
  * A FROST sink stores the target structure of the mapping in front of it, and the editor sends
  * that value again on each change of the sink. The mapping node thus gets its target from the
- * stored sink. Without it, a change of the port would remove the structure from the sink.
+ * stored sink. Without it, a change of the port would remove the structure from the sink. A mapping
+ * whose stored document names a target keeps that target.
  */
 const withFrostMappingTargets = (
   nodes: PipelineNode[],
@@ -369,7 +489,7 @@ const withFrostMappingTargets = (
 
   return nodes.map(node => {
     const target = targetByMappingId.get(node.id)
-    if (!target || !isMappingNodeData(node.data)) return node
+    if (!target || !isMappingNodeData(node.data) || node.data.mappingConfig?.target) return node
     const data: PipelineNodeData = { ...node.data, mappingConfig: { ...node.data.mappingConfig, target } }
     return { ...node, data }
   })

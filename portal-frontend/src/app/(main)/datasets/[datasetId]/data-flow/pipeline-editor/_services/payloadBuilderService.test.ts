@@ -329,6 +329,11 @@ describe('buildMappingArtifacts', () => {
     })
   })
 
+  it('keeps the title of a stored mapping', () => {
+    const artifacts = buildMappingArtifacts(pipeline([configuredMappingNode({ mappingTitle: 'Count to traffic' })], []))
+    expect(artifacts[0].body.title).toBe('Count to traffic')
+  })
+
   it('carries the prior logical URN so an existing mapping is PUT-versioned', () => {
     const artifacts = buildMappingArtifacts(
       pipeline([configuredMappingNode({ mappingLogicalUrn: 'urn:core:logical:x' })], []),
