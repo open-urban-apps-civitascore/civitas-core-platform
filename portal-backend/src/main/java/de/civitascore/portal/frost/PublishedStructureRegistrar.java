@@ -37,7 +37,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Order(PublishedStructureRegistrar.ORDER)
 public class PublishedStructureRegistrar implements ApplicationRunner {
 
-  /** After the permission and role initializers, beside the other FROST start-up work. */
   static final int ORDER = 110;
 
   private final ModelRegistryGateway modelRegistryGateway;

@@ -389,8 +389,8 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
    * deploy engine.
    *
    * <p>An empty configuration stays valid: the editor creates the node before the modeller picks a
-   * port, and a Data sink that predates the port has none either. What a missing port costs is
-   * decided at publish time — a Dataset does not release without one.
+   * port. What a missing port costs is decided at publish time — a Dataset does not release without
+   * one.
    */
   private void validateFrostConfiguration(Map<String, Object> config) {
     if (config == null || config.isEmpty()) {
