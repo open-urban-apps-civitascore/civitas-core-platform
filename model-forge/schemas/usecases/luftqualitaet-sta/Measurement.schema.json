@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id":     "urn:core:platform:civitas:element:luftqualitaet:Measurement:1.0.0",
+  "$id":     "urn:core:platform:civitas:element:luftqualitaet:30263101-599c-84cb-9e13-2aa2767afab1:1.0.0",
   "title":   "Measurement",
   "description": "A single pollutant measurement with quality indicator and optional raw (uncalibrated) value.",
   "type": "object",

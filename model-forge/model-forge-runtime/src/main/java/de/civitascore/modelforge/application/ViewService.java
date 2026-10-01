@@ -227,7 +227,8 @@ public class ViewService {
             // that exact URN, otherwise the $ref dangles. For an XSD-authored Element the
             // converted $id is type-/bundle-level (one segment longer than the artifact URN) and
             // would never match — so we stamp the concrete dep URN as the embedded $id.
-            String key = uniqueDefKey(defsNode, UrnParser.nameFromUrn(depUrn), depUrn);
+            String key = uniqueDefKey(defsNode,
+                depSchema.get().path("title").asText(UrnParser.logicalUrn(depUrn)), depUrn);
             defsNode.set(key, ensureEmbeddedId(depSchema.get(), concreteDepUrn));
         }
 

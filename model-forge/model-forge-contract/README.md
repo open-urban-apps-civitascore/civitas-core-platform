@@ -78,7 +78,7 @@ ObjectMapper objectMapper = new ObjectMapper();
 JsonNode schema = objectMapper.readTree("""
     {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "$id": "urn:core:platform:civitas:element:common:GeoPoint:k3f9a2b7qx:1.0.0",
+      "$id": "urn:core:platform:civitas:element:common:0b6f5c1e-8a4d-4f7b-9c2e-3d1a5b7c9e20:1.0.0",
       "title": "GeoPoint",
       "type": "object"
     }
@@ -87,14 +87,15 @@ JsonNode schema = objectMapper.readTree("""
 var command = new ImportSchemaCommand(schema);
 ```
 
-Create a new artifact — the caller supplies only a display name; Model Forge mints the URN
-and the version and returns the versioned pin in `ArtifactWriteResult.artifactId()`:
+Create a new artifact — the caller supplies a display name and, optionally, the UUID of the
+host entity the artifact backs; Model Forge builds the URN from that UUID (or mints one), assigns
+the version and returns the versioned pin in `ArtifactWriteResult.artifactId()`:
 
 ```java
 import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 
-var command = new CreateArtifactCommand(ArtifactKind.DATA_SET, "Air Quality", content);
+var command = new CreateArtifactCommand(ArtifactKind.DATA_SET, "Air Quality", content, null, dataSetId);
 ```
 
 Take an `ArtifactId` apart, or parse CORE URNs directly, without Spring:
@@ -103,18 +104,19 @@ Take an `ArtifactId` apart, or parse CORE URNs directly, without Spring:
 import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.urn.UrnParser;
 
-var id = new ArtifactId("urn:core:platform:civitas:element:common:GeoPoint:k3f9a2b7qx:1.0.0");
+var id = new ArtifactId("urn:core:platform:civitas:element:common:0b6f5c1e-8a4d-4f7b-9c2e-3d1a5b7c9e20:1.0.0");
 
-id.name();       // "GeoPoint"
+id.id();         // UUID 0b6f5c1e-8a4d-4f7b-9c2e-3d1a5b7c9e20
 id.version();    // "1.0.0"
-id.logicalUrn(); // "urn:core:platform:civitas:element:common:GeoPoint:k3f9a2b7qx"
+id.logicalUrn(); // "urn:core:platform:civitas:element:common:0b6f5c1e-8a4d-4f7b-9c2e-3d1a5b7c9e20"
 
 String version = UrnParser.versionFromUrn(id.logicalUrn()); // null — logical URNs carry no version
 ```
 
-A CORE URN has eight colon-separated segments in its logical form
-(`urn:core:<scope>:<owner>:<type>:<domain>:<name>:<disambiguator>`) and nine when a version is
-pinned. `versionFromUrn` returns `null` for the logical form.
+A CORE URN has seven colon-separated segments in its logical form
+(`urn:core:<scope>:<owner>:<type>:<domain>:<uuid>`) and eight when a version is pinned.
+`versionFromUrn` returns `null` for the logical form. The URN carries no display name, so a rename
+leaves every reference to the artifact intact.
 
 ## Versioning
 

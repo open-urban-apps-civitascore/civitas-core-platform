@@ -2,6 +2,7 @@ package de.civitascore.modelforge.contract;
 
 import tools.jackson.databind.JsonNode;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Command to import one JSON Schema document into Model Forge. The import stores the Elements
@@ -26,10 +27,16 @@ import java.util.Objects;
  *     caller that revises one particular version rather than the newest. Applies to the
  *     DataStructure grouping only: a member Element records a content history, so its bump always
  *     counts from its own newest version. {@code null} counts from the grouping's newest version.
+ * @param dataStructureId when non-null, the document is imported under this UUID, typically the
+ *     id of the host entity it backs, and its grouping is the DataStructure with this UUID. A pure
+ *     {@code $defs} library becomes that DataStructure; a document with a shape of its own becomes
+ *     the root Element with this UUID. Either way its {@code $id} is replaced, and every
+ *     {@code $defs} member gets an Element URN derived from the UUID and the member key, whatever
+ *     {@code $id} the document carried. {@code null} keeps the document's own identities.
  */
 public record ImportSchemaCommand(
     JsonNode schema, VersionBump bump, String version, boolean preserveVersion,
-    String bumpFromVersion) {
+    String bumpFromVersion, UUID dataStructureId) {
 
     public ImportSchemaCommand {
         Objects.requireNonNull(schema, "schema");
@@ -39,16 +46,23 @@ public record ImportSchemaCommand(
     }
 
     public ImportSchemaCommand(JsonNode schema) {
-        this(schema, VersionBump.PATCH, null, false, null);
+        this(schema, VersionBump.PATCH, null, false, null, null);
     }
 
     public ImportSchemaCommand(JsonNode schema, VersionBump bump) {
-        this(schema, bump, null, false, null);
+        this(schema, bump, null, false, null, null);
     }
 
     /** Numbering from the artifact's newest version. */
     public ImportSchemaCommand(
         JsonNode schema, VersionBump bump, String version, boolean preserveVersion) {
-        this(schema, bump, version, preserveVersion, null);
+        this(schema, bump, version, preserveVersion, null, null);
+    }
+
+    /** Keeping the document's own identities. */
+    public ImportSchemaCommand(
+        JsonNode schema, VersionBump bump, String version, boolean preserveVersion,
+        String bumpFromVersion) {
+        this(schema, bump, version, preserveVersion, bumpFromVersion, null);
     }
 }

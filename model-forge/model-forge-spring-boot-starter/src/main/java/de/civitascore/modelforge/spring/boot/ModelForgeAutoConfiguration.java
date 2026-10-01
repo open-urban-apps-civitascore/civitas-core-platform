@@ -226,10 +226,9 @@ public class ModelForgeAutoConfiguration {
         XRepositoryCatalog catalog,
         XsdSchemaConverter xsdConverter,
         SchemaImportService schemaImportService,
-        UrnService urns,
         ObjectMapper mapper
     ) {
-        return new XRepositoryService(catalog, xsdConverter, schemaImportService, urns, mapper);
+        return new XRepositoryService(catalog, xsdConverter, schemaImportService, mapper);
     }
 
     @Bean

@@ -21,8 +21,8 @@ class NonConformingElementAuditDatabaseTest extends AbstractRegistryDatabaseTest
 
     private final ModelValidator validator = new ModelValidator();
 
-    private static final String BAD = "urn:core:platform:civitas:element:common:Legacy:aa11bb22";
-    private static final String GOOD = "urn:core:platform:civitas:element:common:Fine:cc33dd44";
+    private static final String BAD = "urn:core:platform:civitas:element:common:923ad52f-2c2f-8f96-aa94-de5ef74b9a3b";
+    private static final String GOOD = "urn:core:platform:civitas:element:common:df67bb2c-3891-8e78-a84c-4f9787127f46";
 
     /**
      * Reads of a non-conforming Element must keep working — the audit exists precisely because such
@@ -30,11 +30,11 @@ class NonConformingElementAuditDatabaseTest extends AbstractRegistryDatabaseTest
      */
     @Test
     void aStoredNonConformingElementIsFoundAndStaysReadable() {
-        registry.storeElement(BAD, mapper.readTree("""
+        registry.storeElement(mapper.readTree("""
             {"$schema":"https://json-schema.org/draft/2020-12/schema",
              "$id":"%s","title":"Legacy","type":42}""".formatted(BAD)),
             Set.of(), Set.of(), null, VersionBump.PATCH);
-        registry.storeElement(GOOD, mapper.readTree("""
+        registry.storeElement(mapper.readTree("""
             {"$schema":"https://json-schema.org/draft/2020-12/schema",
              "$id":"%s","title":"Fine","type":"object"}""".formatted(GOOD)),
             Set.of(), Set.of(), null, VersionBump.PATCH);

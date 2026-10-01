@@ -14,7 +14,7 @@
     "id": {
       "type": "string",
       "description": "CORE URN of this DataSet (logical, or with a trailing :version).",
-      "pattern": "^urn:core:[^:]+:[^:]+:dataset:[^:]+:[^:]+:[^:]+(:[^:]+)?$"
+      "pattern": "^urn:core:[^:]+:[^:]+:dataset:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$"
     },
     "title": { "type": "string" },
     "description": { "type": "string" },
@@ -24,7 +24,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^urn:core:[^:]+:[^:]+:datastructure:[^:]+:[^:]+:[^:]+(:[^:]+)?$",
+        "pattern": "^urn:core:[^:]+:[^:]+:datastructure:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$",
         "x-core-ref": { "type": "urn:core:type:DataStructure" }
       }
     },
@@ -33,7 +33,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^urn:core:[^:]+:[^:]+:mapping:[^:]+:[^:]+:[^:]+(:[^:]+)?$",
+        "pattern": "^urn:core:[^:]+:[^:]+:mapping:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$",
         "x-core-ref": { "type": "urn:core:type:Mapping" }
       }
     },
@@ -42,7 +42,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^urn:core:[^:]+:[^:]+:pipeline:[^:]+:[^:]+:[^:]+(:[^:]+)?$",
+        "pattern": "^urn:core:[^:]+:[^:]+:pipeline:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$",
         "x-core-ref": { "type": "urn:core:type:Pipeline" }
       }
     },
@@ -51,7 +51,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^urn:core:[^:]+:[^:]+:datasource:[^:]+:[^:]+:[^:]+(:[^:]+)?$",
+        "pattern": "^urn:core:[^:]+:[^:]+:datasource:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$",
         "x-core-ref": { "type": "urn:core:type:DataSource" }
       }
     },
@@ -60,7 +60,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^urn:core:[^:]+:[^:]+:datasink:[^:]+:[^:]+:[^:]+(:[^:]+)?$",
+        "pattern": "^urn:core:[^:]+:[^:]+:datasink:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$",
         "x-core-ref": { "type": "urn:core:type:DataSink" }
       }
     }

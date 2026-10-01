@@ -45,7 +45,7 @@ class XRepositoryImportPageTest extends AbstractWicketPageTest {
 
     @Test
     void importProducingAnArtifactNavigatesToItsViewPage() {
-        ArtifactId rootId = new ArtifactId("urn:core:platform:civitas:element:xoev:XMeld:1.0.0");
+        ArtifactId rootId = new ArtifactId("urn:core:platform:civitas:element:xoev:c9985a4d-ff8e-8076-8b0e-75520ca78b2d:1.0.0");
         when(modelForge.searchXRepository(any(XRepositorySearchQuery.class))).thenReturn(List.of(HIT));
         when(modelForge.importFromXRepository(any(ImportXRepositoryCommand.class)))
             .thenReturn(new ImportResult(rootId, List.of(rootId), Map.of()));

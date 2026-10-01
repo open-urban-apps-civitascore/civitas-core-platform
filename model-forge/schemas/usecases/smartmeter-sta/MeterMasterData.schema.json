@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id":     "urn:core:platform:civitas:element:smartmeter:MeterMasterData:1.0.0",
+  "$id":     "urn:core:platform:civitas:element:smartmeter:eb20917f-cbd4-8a66-9f65-bfaa2b08c0a3:1.0.0",
   "title":   "MeterMasterData",
   "description": "Reference data for a smart electricity meter from the utility's master database. Looked up at runtime via LookupRecord (DatabaseRecordLookup) using meterId as key. Mirrors the role of StationMasterData in the Luftqualität use case.",
   "type": "object",
@@ -28,7 +28,7 @@
       "format": "date"
     },
     "location": {
-      "$ref": "urn:core:platform:civitas:element:common:GeoPoint:1.0.0"
+      "$ref": "urn:core:platform:civitas:element:common:f1ebc343-33a2-8681-8e4a-aecfaeaa8e1e:1.0.0"
     },
     "frostThingId": {
       "type": "integer",

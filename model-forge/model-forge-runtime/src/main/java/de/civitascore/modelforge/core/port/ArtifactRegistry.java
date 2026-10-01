@@ -49,31 +49,31 @@ public interface ArtifactRegistry {
         return Map.of();
     }
 
-    default String storeElement(String name, JsonNode schema, Set<String> refs) {
-        return storeElement(name, schema, refs, Set.of(), null, VersionBump.PATCH);
+    default String storeElement(JsonNode schema, Set<String> refs) {
+        return storeElement(schema, refs, Set.of(), null, VersionBump.PATCH);
     }
 
-    default String storeElement(String name, JsonNode schema, Set<String> refs, VersionBump bump) {
-        return storeElement(name, schema, refs, Set.of(), null, bump);
+    default String storeElement(JsonNode schema, Set<String> refs, VersionBump bump) {
+        return storeElement(schema, refs, Set.of(), null, bump);
     }
 
-    default String storeElement(String name, JsonNode schema, Set<String> refs, Set<String> associationTargets) {
-        return storeElement(name, schema, refs, associationTargets, null, VersionBump.PATCH);
+    default String storeElement(JsonNode schema, Set<String> refs, Set<String> associationTargets) {
+        return storeElement(schema, refs, associationTargets, null, VersionBump.PATCH);
     }
 
-    default String storeElement(String name, JsonNode schema, Set<String> refs, Set<String> associationTargets,
+    default String storeElement(JsonNode schema, Set<String> refs, Set<String> associationTargets,
                                  VersionBump bump) {
-        return storeElement(name, schema, refs, associationTargets, null, bump);
+        return storeElement(schema, refs, associationTargets, null, bump);
     }
 
-    default String storeElement(String name, JsonNode schema, Set<String> refs, Set<String> associationTargets,
+    default String storeElement(JsonNode schema, Set<String> refs, Set<String> associationTargets,
                                  String explicitVersion) {
-        return storeElement(name, schema, refs, associationTargets, explicitVersion, VersionBump.PATCH);
+        return storeElement(schema, refs, associationTargets, explicitVersion, VersionBump.PATCH);
     }
 
-    default String storeElement(String name, JsonNode schema, Set<String> refs, Set<String> associationTargets,
+    default String storeElement(JsonNode schema, Set<String> refs, Set<String> associationTargets,
                                  String explicitVersion, VersionBump bump) {
-        return storeElement(name, schema, refs, associationTargets, explicitVersion, bump, null);
+        return storeElement(schema, refs, associationTargets, explicitVersion, bump, null);
     }
 
     /**
@@ -88,7 +88,7 @@ public interface ArtifactRegistry {
      *     independent lines names the version it revises here, so the bump stays inside that line.
      * @return the concrete versioned URN (pin) the write resolved to
      */
-    String storeElement(String name, JsonNode schema, Set<String> refs, Set<String> associationTargets,
+    String storeElement(JsonNode schema, Set<String> refs, Set<String> associationTargets,
                          String explicitVersion, VersionBump bump, String bumpFromVersion);
 
     /** @return the concrete versioned URN (pin) the write resolved to */
@@ -255,4 +255,16 @@ public interface ArtifactRegistry {
     }
 
     List<ArtifactSearchResult> searchArtifacts(ArtifactSearchCriteria criteria);
+
+    /**
+     * Records {@code name} as the display name of the artifact {@code urn} names, for a document that
+     * carries no {@code title} of its own. A no-op when the registry does not hold the artifact.
+     */
+    void nameArtifact(String urn, String name);
+
+    /**
+     * The display name of each held artifact among {@code logicalUrns}, keyed by logical URN. An
+     * artifact the registry does not hold has no entry; an empty input touches no store.
+     */
+    Map<String, String> displayNames(Collection<String> logicalUrns);
 }

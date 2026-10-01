@@ -1,10 +1,10 @@
 {
   "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
-  "id": "urn:core:platform:civitas:mapping:taf10-grid:taf10-to-voltage-notify-action:1.0.0",
+  "id": "urn:core:platform:civitas:mapping:taf10-grid:68e281ff-b760-8a92-8d30-a1806817fbcb:1.0.0",
   "title": "TAF10 Voltage-Band Violation -> SwitchingAction (notify operator)",
   "description": "Emitted only for a voltage-band violation — the measured voltage is outside the grid node's voltageMinV/voltageMaxV band. Under- and overvoltage need an operator decision rather than an automatic curtailment or load shift.",
-  "source": "urn:core:platform:civitas:element:taf10-grid:TAF10GridReading:1.0.0",
-  "target": "urn:core:platform:civitas:element:taf10-grid:SwitchingAction:1.0.0",
+  "source": "urn:core:platform:civitas:element:taf10-grid:fb8586b6-92ea-8bca-a3a7-a8e99a377b83:1.0.0",
+  "target": "urn:core:platform:civitas:element:taf10-grid:3fd993e2-e14c-8eb4-9cf7-c83ced426d7a:1.0.0",
   "fields": {
     "gridNodeId": { "op": "copy", "input": "$.gridNodeId" },
     "requestedAt": { "op": "copy", "input": "$.timestamp" },

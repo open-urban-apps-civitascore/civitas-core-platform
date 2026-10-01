@@ -35,7 +35,7 @@ class GeometrySchemaResolutionTest {
     private JsonNode model(String properties) {
         return mapper.readTree("""
             { "$schema": "https://json-schema.org/draft/2020-12/schema",
-              "$id": "urn:core:global:core:datastructure:mobility:sensor:abcd1234",
+              "$id": "urn:core:global:core:datastructure:mobility:24d96f92-ee7f-8581-97a0-81a379437a83",
               "type": "object",
               "properties": %s }
             """.formatted(properties));

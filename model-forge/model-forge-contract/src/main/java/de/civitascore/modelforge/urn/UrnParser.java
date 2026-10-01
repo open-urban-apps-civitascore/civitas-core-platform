@@ -1,6 +1,12 @@
 package de.civitascore.modelforge.urn;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * Stateless utility class for parsing CORE URNs.
@@ -10,8 +16,11 @@ import java.util.Arrays;
  * on any string that follows the CORE URN format:
  *
  * <pre>{@code
- *   urn:core:<scope>:<owner>:<artifact-type>:<domain>:<name>:<disambiguator>[:<version>]
+ *   urn:core:<scope>:<owner>:<artifact-type>:<domain>:<uuid>[:<version>]
  * }</pre>
+ *
+ * <p>The {@code uuid} is the artifact's identity. The URN carries no display name, so renaming an
+ * artifact never changes the identifier other artifacts reference it by.
  *
  * <p>For generating new URNs use {@code UrnService}, which reads the
  * scope/owner/domain configuration from application properties when provided by
@@ -26,40 +35,37 @@ public final class UrnParser {
      */
     public static final String LATEST = "latest";
 
+    /** The namespace {@link #deriveId(String)} derives external identities under. */
+    static final UUID CORE_NAMESPACE = UUID.fromString("5a0d5e1c-7b7e-4c43-9a8e-1f3f6c2b9d40");
+
+    /** Segment count of a logical CORE URN: {@code urn:core:<scope>:<owner>:<type>:<domain>:<uuid>}. */
+    private static final int LOGICAL_SEGMENTS = 7;
+
+    private static final int TYPE_INDEX = 4;
+    private static final int ID_INDEX = 6;
+    private static final int VERSION_INDEX = 7;
+
+    private static final Pattern ID =
+        Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+
+    /** XÖV standards use two-segment versions (6.0, 5.5), so the minor and patch are optional. */
+    private static final Pattern VERSION = Pattern.compile("\\d+(\\.\\d+){0,2}([-+][0-9A-Za-z.-]+)?");
+
     private UrnParser() {}
 
     /**
-     * Segment count of a logical CORE URN:
-     * {@code urn:core:<scope>:<owner>:<type>:<domain>:<name>:<disambiguator>}.
-     */
-    private static final int LOGICAL_SEGMENTS = 8;
-
-    /** Segment count of a versioned CORE URN: logical + {@code :<version>}. */
-    private static final int VERSIONED_SEGMENTS = 9;
-
-    /**
-     * Returns {@code true} if the string is a well-formed CORE URN: the {@code urn:core:} prefix
-     * plus exactly the 8 (logical) or 9 (versioned) colon-separated segments the format requires.
+     * Returns {@code true} if the string is a well-formed CORE URN: the {@code urn:core:} prefix,
+     * four non-empty segments, a lowercase canonical UUID and, optionally, a version or
+     * {@link #LATEST}.
      *
-     * <p>A prefix match alone is not enough — callers throughout Model Forge use {@code isUrn} to
-     * decide whether a caller-supplied {@code $id}/{@code artifactId} is an authoritative identity
-     * to keep as-is, or a plain candidate to sanitize and mint a real URN from. A string that only
-     * happens to start with {@code urn:core:} (too few or too many segments) must fall through to
-     * minting instead of being trusted verbatim — otherwise it silently corrupts every URN
-     * operation downstream (segment-index extraction, version parsing, logical/versioned
-     * round-tripping).
-     *
-     * <p>Every segment must be non-empty, including the last: the {@code -1} limit keeps trailing
-     * empty segments, which the default {@code split(":")} discards.
+     * <p>Callers throughout Model Forge use {@code isUrn} to decide whether a caller-supplied
+     * {@code $id}/{@code artifactId} is an authoritative identity to keep as-is, or has to be
+     * replaced by a minted one. A string that only starts with {@code urn:core:} must not be
+     * trusted verbatim: segment extraction, version parsing and logical/versioned round-tripping
+     * all rely on the shape.
      */
     public static boolean isUrn(String id) {
-        if (id == null || !id.startsWith("urn:core:")) return false;
-        String[] parts = id.split(":", -1);
-        if (parts.length != LOGICAL_SEGMENTS && parts.length != VERSIONED_SEGMENTS) return false;
-        for (String part : parts) {
-            if (part.isEmpty()) return false;
-        }
-        return true;
+        return segments(id) != null;
     }
 
     /**
@@ -68,8 +74,8 @@ public final class UrnParser {
      *
      * <p>A write is the last point where a malformed identity can still be refused cheaply. Past it
      * the value becomes the artifact's {@code logical_urn}, and {@link #logicalUrn} returns a non-URN
-     * unchanged — so a display name persists as an identity that no URN navigation resolves, and the
-     * mistake surfaces far from where it was made.
+     * unchanged — so a malformed value persists as an identity that no URN navigation resolves, and
+     * the mistake surfaces far from where it was made.
      *
      * @return {@code urn}, so a caller can guard and assign in one expression
      */
@@ -77,7 +83,7 @@ public final class UrnParser {
         if (!isUrn(urn)) {
             throw new IllegalArgumentException(
                 what + " '" + urn + "' is not a CORE URN (expected "
-                    + "urn:core:<scope>:<owner>:<type>:<domain>:<name>:<disambiguator>"
+                    + "urn:core:<scope>:<owner>:<type>:<domain>:<uuid>"
                     + " with an optional :<version>).");
         }
         return urn;
@@ -101,41 +107,24 @@ public final class UrnParser {
         }
     }
 
-    /**
-     * Extracts the name segment (index 6) from a versioned or logical CORE URN — the readable
-     * display slug, without the disambiguator. Returns the input string unchanged if it is not a
-     * CORE URN.
-     */
-    public static String nameFromUrn(String urn) {
-        if (!isUrn(urn)) return urn;
-        String[] parts = urn.split(":");
-        return parts.length >= 7 ? parts[6] : urn;
+    /** The artifact's UUID, or {@code null} if the input is not a CORE URN. */
+    public static UUID idFromUrn(String urn) {
+        String[] parts = segments(urn);
+        return parts == null ? null : UUID.fromString(parts[ID_INDEX]);
     }
 
     /**
-     * Extracts the disambiguator segment (index 7) — the short token that keeps artifacts with an
-     * equal display name from colliding onto the same logical URN. Returns {@code null} if the
-     * input is not a CORE URN.
-     */
-    public static String disambiguatorFromUrn(String urn) {
-        if (!isUrn(urn)) return null;
-        String[] parts = urn.split(":");
-        return parts.length >= 8 ? parts[7] : null;
-    }
-
-    /**
-     * Extracts the version segment (index 8) from a versioned CORE URN.
-     * Returns {@code null} if the URN has no version segment.
+     * The version segment of a versioned CORE URN, a SemVer or {@link #LATEST}.
+     * Returns {@code null} if the URN has no version segment or is not a CORE URN.
      */
     public static String versionFromUrn(String urn) {
-        if (!isUrn(urn)) return null;
-        String[] parts = urn.split(":");
-        return parts.length >= 9 ? parts[8] : null;
+        String[] parts = segments(urn);
+        return parts == null || parts.length == LOGICAL_SEGMENTS ? null : parts[VERSION_INDEX];
     }
 
     /**
      * Whether the URN's version segment is the {@code latest} reference token
-     * ({@code urn:core:…:Foo:latest}). {@code latest} tracks the target's current
+     * ({@code urn:core:…:<uuid>:latest}). {@code latest} tracks the target's current
      * (highest-SemVer) version and is resolved at read time.
      */
     public static boolean isLatest(String urn) {
@@ -143,38 +132,36 @@ public final class UrnParser {
     }
 
     /**
-     * Extracts the artifact-type segment (index 4) from a CORE URN.
+     * Extracts the artifact-type segment from a CORE URN.
      * Returns {@code null} if the input is not a well-formed CORE URN.
      */
     public static String artifactTypeFromUrn(String urn) {
-        if (!isUrn(urn)) return null;
-        String[] parts = urn.split(":");
-        return parts.length >= 5 ? parts[4] : null;
+        String[] parts = segments(urn);
+        return parts == null ? null : parts[TYPE_INDEX];
     }
 
     /**
      * Returns the logical (version-free) form of a URN used as Registry ArtifactId.
      *
      * <pre>{@code
-     *   urn:core:platform:civitas:element:common:GeoPoint:k3f9a2b7qx:1.0.0
-     *     → urn:core:platform:civitas:element:common:GeoPoint:k3f9a2b7qx
+     *   urn:core:platform:civitas:element:common:0b6f…e2:1.0.0
+     *     → urn:core:platform:civitas:element:common:0b6f…e2
      * }</pre>
      *
-     * If the URN has no version segment it is returned unchanged.
+     * A URN without a version segment, and a string that is not a CORE URN, is returned unchanged.
      */
     public static String logicalUrn(String urn) {
-        if (!isUrn(urn)) return urn;
-        String[] parts = urn.split(":");
-        return parts.length >= 9
-            ? String.join(":", Arrays.copyOf(parts, parts.length - 1))
-            : urn;
+        String[] parts = segments(urn);
+        return parts == null || parts.length == LOGICAL_SEGMENTS
+            ? urn
+            : String.join(":", Arrays.copyOf(parts, LOGICAL_SEGMENTS));
     }
 
     /**
      * Appends a version to a logical URN.
      *
      * <pre>{@code
-     *   urn:core:...:GeoPoint:k3f9a2b7qx  +  "2.0.0"  →  ...:GeoPoint:k3f9a2b7qx:2.0.0
+     *   urn:core:…:0b6f…e2  +  "2.0.0"  →  urn:core:…:0b6f…e2:2.0.0
      * }</pre>
      *
      * If the URN already carries a version it is returned unchanged.
@@ -185,7 +172,62 @@ public final class UrnParser {
     }
 
     /**
-     * Canonical slug-sanitiser for CORE URN name segments.
+     * The same CORE URN with another artifact type, or {@code null} when {@code urn} is not a CORE
+     * URN. A DataStructure grouping and the root Element it was built from share their UUID, so
+     * this navigates between the two.
+     */
+    public static String withArtifactType(String urn, String artifactType) {
+        String[] parts = segments(urn);
+        if (parts == null) return null;
+        parts[TYPE_INDEX] = artifactType;
+        return String.join(":", parts);
+    }
+
+    /**
+     * The identity of an externally-identified artifact (e.g. an XÖV standard): the same stable
+     * {@code key} always yields the same UUID, so re-importing the standard hits the same URN
+     * instead of minting a duplicate.
+     */
+    public static UUID deriveId(String key) {
+        return nameBasedId(CORE_NAMESPACE, key == null ? "" : key);
+    }
+
+    /**
+     * The identity of the member {@code key} of the artifact {@code parent}, e.g. a DataStructure's
+     * {@code $defs} entry. Stable per pair, so a re-imported member versions the existing Element,
+     * and distinct for distinct keys of one parent.
+     */
+    public static UUID memberId(UUID parent, String key) {
+        return nameBasedId(parent, key);
+    }
+
+    /**
+     * A name-based UUIDv8 with SHA-256, as in RFC 9562 Appendix B.2. UUIDv5 would need SHA-1, which
+     * BSI TR-02102-1 no longer permits.
+     */
+    private static UUID nameBasedId(UUID namespace, String name) {
+        byte[] input = ByteBuffer.allocate(16 + name.getBytes(StandardCharsets.UTF_8).length)
+            .putLong(namespace.getMostSignificantBits())
+            .putLong(namespace.getLeastSignificantBits())
+            .put(name.getBytes(StandardCharsets.UTF_8))
+            .array();
+        ByteBuffer hash = ByteBuffer.wrap(sha256(input));
+        long msb = (hash.getLong() & ~0xF000L) | 0x8000L;
+        long lsb = (hash.getLong() & 0x3FFFFFFFFFFFFFFFL) | 0x8000000000000000L;
+        return new UUID(msb, lsb);
+    }
+
+    private static byte[] sha256(byte[] input) {
+        try {
+            return MessageDigest.getInstance("SHA-256").digest(input);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
+    }
+
+    /**
+     * Canonical slug-sanitiser for identifiers that end up in a CORE URN segment, such as an
+     * XRepository domain identifier.
      *
      * <p>Rules applied in order:
      * <ol>
@@ -195,13 +237,8 @@ public final class UrnParser {
      *   <li>Collapse consecutive hyphens to one
      * </ol>
      *
-     * Dots are preserved so that names like {@code xinneres.xmeld} remain intact
-     * as URN name segments.
-     *
-     * <p>Case is intentionally preserved so that URN name segments derived from
-     * schema titles (e.g. {@code "GeoPoint"}) remain stable across invocations.
-     * Callers that require lowercase (e.g. domain identifiers from XRepository)
-     * should call {@code .toLowerCase()} on the result themselves.
+     * Dots are preserved so that names like {@code xinneres.xmeld} remain intact. Case is
+     * preserved; callers that require lowercase call {@code .toLowerCase()} on the result.
      *
      * @param name raw candidate string (e.g. schema title, domain identifier)
      * @return safe URN slug, never null or blank
@@ -213,29 +250,21 @@ public final class UrnParser {
                    .replaceAll("-{2,}", "-");
     }
 
-    /** base36 alphabet for disambiguator tokens — URN-segment-safe, readable in logs. */
-    static final char[] DISAMBIGUATOR_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz".toCharArray();
-
-    /** Disambiguator length; 10 base36 chars ≈ 51 bits — collision-free within a name bucket. */
-    static final int DISAMBIGUATOR_LENGTH = 10;
-
-    /**
-     * A deterministic disambiguator token for an externally-identified artifact: the same
-     * {@code key} always yields the same token, so re-importing the same external standard
-     * resolves to the same URN instead of minting a duplicate. Model-Forge-derived identities
-     * use a fresh random token instead (see {@code UrnService#mintDisambiguator}).
-     */
-    public static String deriveDisambiguator(String key) {
-        try {
-            byte[] hash = java.security.MessageDigest.getInstance("SHA-256")
-                .digest((key == null ? "" : key).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            char[] out = new char[DISAMBIGUATOR_LENGTH];
-            for (int i = 0; i < out.length; i++) {
-                out[i] = DISAMBIGUATOR_ALPHABET[(hash[i] & 0xFF) % DISAMBIGUATOR_ALPHABET.length];
-            }
-            return new String(out);
-        } catch (java.security.NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 unavailable", e);
+    /** The URN's segments when it is a well-formed CORE URN, otherwise {@code null}. */
+    private static String[] segments(String urn) {
+        if (urn == null || !urn.startsWith("urn:core:")) return null;
+        // The -1 limit keeps trailing empty segments, which the default split discards.
+        String[] parts = urn.split(":", -1);
+        if (parts.length != LOGICAL_SEGMENTS && parts.length != LOGICAL_SEGMENTS + 1) return null;
+        for (String part : parts) {
+            if (part.isEmpty()) return null;
         }
+        if (!ID.matcher(parts[ID_INDEX]).matches()) return null;
+        if (parts.length > LOGICAL_SEGMENTS
+                && !LATEST.equals(parts[VERSION_INDEX])
+                && !VERSION.matcher(parts[VERSION_INDEX]).matches()) {
+            return null;
+        }
+        return parts;
     }
 }

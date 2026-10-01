@@ -1,6 +1,6 @@
 {
   "$schema": "https://civitasconnect.digital/core/artifact-envelope/v1",
-  "artifactId": "urn:core:platform:civitas:element:common:AirQualityEnvelope:uxqttdplsw",
+  "artifactId": "urn:core:platform:civitas:element:common:3f70fe36-2a8e-861b-a0f1-ebdf67a7657f",
   "artifactType": "XSD",
   "groupId": "elements",
   "title": "AirQualityEnvelope",

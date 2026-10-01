@@ -1,8 +1,8 @@
 {
   "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSink",
-  "id": "urn:core:platform:civitas:datasink:taf10-grid:grid-control-actions:1.0.0",
+  "id": "urn:core:platform:civitas:datasink:taf10-grid:5a6d451f-a9f4-89d0-8c8b-1af2e11b0336:1.0.0",
   "title": "Grid Control Switching Actions",
   "connectionType": "postgis",
   "tableName": "grid_switching_actions",
-  "element": "urn:core:platform:civitas:element:taf10-grid:SwitchingAction:1.0.0"
+  "element": "urn:core:platform:civitas:element:taf10-grid:3fd993e2-e14c-8eb4-9cf7-c83ced426d7a:1.0.0"
 }

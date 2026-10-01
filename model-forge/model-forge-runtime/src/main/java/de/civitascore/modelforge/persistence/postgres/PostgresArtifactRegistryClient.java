@@ -94,9 +94,9 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
     // ── Write ─────────────────────────────────────────────────────────────────
 
     @Override
-    public String storeElement(String name, JsonNode schema, Set<String> refs, Set<String> associationTargets,
+    public String storeElement(JsonNode schema, Set<String> refs, Set<String> associationTargets,
                                 String explicitVersion, VersionBump bump, String bumpFromVersion) {
-        String urn = schemaUrn(name, schema);
+        String urn = schemaUrn(schema);
         List<ReferenceRow> rows = new ArrayList<>(ReferenceExtraction.schemaRefs(refs));
         rows.addAll(ReferenceExtraction.associationRefs(associationTargets));
         return writeArtifact(urn, RegistryMapping.TYPE_ELEMENT, RegistryMapping.FORMAT_JSONSCHEMA,
@@ -107,7 +107,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
     @Override
     public String storeMapping(String id, JsonNode m, VersionBump bump) {
         JsonNode payload = m;
-        return writeArtifact(urns.mappingUrn(id), RegistryMapping.TYPE_MAPPING, RegistryMapping.FORMAT_CORE_JSON,
+        return writeArtifact(UrnParser.requireUrn(id, "Mapping id"), RegistryMapping.TYPE_MAPPING, RegistryMapping.FORMAT_CORE_JSON,
             RegistryMapping.CONTENT_TYPE_JSON,
             writeJson(payload), null, ReferenceExtraction.mappingRefs(payload), bump, null, null, null, null, false);
     }
@@ -115,7 +115,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
     @Override
     public String storePipeline(String id, JsonNode p, VersionBump bump) {
         JsonNode payload = p;
-        return writeArtifact(urns.pipelineUrn(id), RegistryMapping.TYPE_PIPELINE, RegistryMapping.FORMAT_CORE_JSON,
+        return writeArtifact(UrnParser.requireUrn(id, "Pipeline id"), RegistryMapping.TYPE_PIPELINE, RegistryMapping.FORMAT_CORE_JSON,
             RegistryMapping.CONTENT_TYPE_JSON,
             writeJson(payload), null, ReferenceExtraction.pipelineRefs(payload), bump, null, null, null, null, false);
     }
@@ -123,14 +123,14 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
     @Override
     public String storeDataSource(String id, JsonNode s, VersionBump bump) {
         JsonNode payload = s;
-        return writeArtifact(urns.dataSourceUrn(id), RegistryMapping.TYPE_DATASOURCE, RegistryMapping.FORMAT_CORE_JSON,
+        return writeArtifact(UrnParser.requireUrn(id, "DataSource id"), RegistryMapping.TYPE_DATASOURCE, RegistryMapping.FORMAT_CORE_JSON,
             RegistryMapping.CONTENT_TYPE_JSON, writeJson(payload), null, ReferenceExtraction.dataSourceRefs(payload), bump, null, null, null, null, false);
     }
 
     @Override
     public String storeDataSink(String id, JsonNode s, VersionBump bump) {
         JsonNode payload = s;
-        return writeArtifact(urns.dataSinkUrn(id), RegistryMapping.TYPE_DATASINK, RegistryMapping.FORMAT_CORE_JSON,
+        return writeArtifact(UrnParser.requireUrn(id, "DataSink id"), RegistryMapping.TYPE_DATASINK, RegistryMapping.FORMAT_CORE_JSON,
             RegistryMapping.CONTENT_TYPE_JSON, writeJson(payload), null, ReferenceExtraction.dataSinkRefs(payload), bump, null, null, null, null, false);
     }
 
@@ -399,7 +399,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         // The caller owns the [1, MAX] clamp; guard only against negatives.
         int limit = Math.max(0, criteria.limit());
         int offset = Math.max(0, criteria.offset());
-        // a.name is the URN name segment and is NOT unique (only logical_urn is); append the
+        // a.name is the display name and is NOT unique (only logical_urn is); append the
         // unique key as a tiebreak so offset/limit paging is stable (no skipped/duplicated rows).
         if (!scored) {
             // No free-text term: order and page in SQL.
@@ -433,13 +433,11 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
             log.warn("Search q hit the {}-row scan cap; relevance ranking is over a truncated candidate set",
                 SEARCH_SCAN_CAP);
         }
-        // Relevance-score the structural matches against q (URN name segment + title), keep the
-        // matches, rank by score (ties by title) and page in memory.
+        // Relevance-score the structural matches against q (title, which falls back to the display
+        // name), keep the matches, rank by score (ties by title) and page in memory.
         String q = criteria.q().trim();
         return rows.stream()
-            .map(r -> withScore(r, Math.max(
-                NameMatch.score(UrnParser.nameFromUrn(r.logicalId()), q, criteria.fuzzy()),
-                NameMatch.score(r.title(), q, criteria.fuzzy()))))
+            .map(r -> withScore(r, NameMatch.score(r.title(), q, criteria.fuzzy())))
             .filter(r -> r.score() > 0)
             .sorted(Comparator.comparingInt(ArtifactSearchResult::score).reversed()
                 .thenComparing(ArtifactSearchResult::title))
@@ -498,7 +496,9 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
             // logical/:latest request URN) so a multi-version XSD never returns another version.
             if (xsdText.isPresent()) {
                 String versioned = UrnParser.withVersion(UrnParser.logicalUrn(urn), v.version());
-                return xsd.toJsonSchema(versioned, () -> xsdText);
+                String title = artifacts.findByLogicalUrn(UrnParser.logicalUrn(urn))
+                    .map(ArtifactRow::name).orElse(null);
+                return xsd.toJsonSchema(versioned, title, () -> xsdText);
             }
             // core-json artifacts (mappings, pipelines, …): return their authored JSON as-is.
             return authoredRepresentation(v)
@@ -676,8 +676,9 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                 "':latest' is a reference token, not a writable version. "
                 + "Author a concrete version (e.g. ':1.0.0').");
         }
+        UrnParser.requireUrn(urn, "Artifact id");
         String logical   = UrnParser.logicalUrn(urn);
-        String name      = UrnParser.nameFromUrn(logical);
+        String title     = titleOf(contentJson, titleOverride);
         String canonical = contentText != null ? contentText : contentJson;
         String hash      = sha256(canonical);
         try {
@@ -695,6 +696,9 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                 if (existing.isEmpty()) {
                     artifactId = UUID.randomUUID();
                     newVersion = hasExplicitVersion ? explicitVersion : SemVer.INITIAL;
+                    // The URN carries no name; until a title or nameArtifact supplies one, the
+                    // UUID stands in, because the column is the sort key of every listing.
+                    String name = title != null ? title : UrnParser.idFromUrn(logical).toString();
                     artifacts.insert(new ArtifactRow(artifactId, logical, artifactType, name,
                         null, null, newVersion, now, now));
                     // A reference to this URN may already have been recorded before the
@@ -703,6 +707,9 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                 } else {
                     ArtifactRow row = existing.get();
                     artifactId = row.id();
+                    if (title != null && !title.equals(row.name())) {
+                        artifacts.updateName(logical, title);
+                    }
                     Optional<ArtifactVersionRow> current = row.currentVersion() == null
                         ? Optional.empty() : versions.find(artifactId, row.currentVersion());
                     // Idempotent only when the authored content of the current version, in the
@@ -793,11 +800,39 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                 .map(text -> new ResolvedXsd(v.artifactId(), v.id(), text)));
     }
 
+    @Override
+    public void nameArtifact(String urn, String name) {
+        UrnParser.requireNoControlChars(urn);
+        if (name == null || name.isBlank()) return;
+        try {
+            inTxResult(() -> {
+                artifacts.updateName(UrnParser.logicalUrn(urn), name);
+                return null;
+            });
+        } catch (DataAccessException e) {
+            throw translate(e, "Could not name model_forge.artifact " + UrnParser.logicalUrn(urn));
+        }
+    }
+
+    @Override
+    public Map<String, String> displayNames(Collection<String> logicalUrns) {
+        if (logicalUrns == null || logicalUrns.isEmpty()) return Map.of();
+        return read(() -> artifacts.namesByLogicalUrn(Set.copyOf(logicalUrns)));
+    }
+
     // ── URN / content helpers ───────────────────────────────────────────────────
 
-    private String schemaUrn(String name, JsonNode schema) {
+    private String schemaUrn(JsonNode schema) {
         String id = schema.path("$id").asText(null);
-        return UrnParser.isUrn(id) ? id : urns.mintElement(name);
+        return UrnParser.isUrn(id) ? id : urns.mintElement();
+    }
+
+    /** The display name a write carries: the explicit title, else the JSON document's title. */
+    private String titleOf(String contentJson, String titleOverride) {
+        if (titleOverride != null && !titleOverride.isBlank()) return titleOverride;
+        if (contentJson == null) return null;
+        JsonNode title = readJson(contentJson).path("title");
+        return title.isTextual() && !title.asText().isBlank() ? title.asText() : null;
     }
 
     private String writeJson(JsonNode node) {

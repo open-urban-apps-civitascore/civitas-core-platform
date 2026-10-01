@@ -1,5 +1,6 @@
 package de.civitascore.modelforge.urn;
 
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -9,16 +10,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * Unit tests for the stateless {@link UrnParser}.
  *
- * CORE URN format: urn:core:&lt;scope&gt;:&lt;owner&gt;:&lt;model_forge.artifact-type&gt;:&lt;domain&gt;:&lt;name&gt;[:&lt;version&gt;]
+ * CORE URN format: urn:core:&lt;scope&gt;:&lt;owner&gt;:&lt;artifact-type&gt;:&lt;domain&gt;:&lt;uuid&gt;[:&lt;version&gt;]
  */
 class UrnParserTest {
 
+    private static final UUID ID = UUID.fromString("b75dba9f-a9f2-8b7d-a9e1-f800ff5378f1");
     private static final String VERSIONED =
-            "urn:core:platform:civitas:element:common:GeoPoint:k3f9a2b7qx:1.0.0";
+            "urn:core:platform:civitas:element:common:b75dba9f-a9f2-8b7d-a9e1-f800ff5378f1:1.0.0";
     private static final String LOGICAL =
-            "urn:core:platform:civitas:element:common:GeoPoint:k3f9a2b7qx";
+            "urn:core:platform:civitas:element:common:b75dba9f-a9f2-8b7d-a9e1-f800ff5378f1";
     private static final String LATEST_REF =
-            "urn:core:platform:civitas:element:common:GeoPoint:k3f9a2b7qx:latest";
+            "urn:core:platform:civitas:element:common:b75dba9f-a9f2-8b7d-a9e1-f800ff5378f1:latest";
 
     // ── requireNoControlChars ─────────────────────────────────────────────────
 
@@ -54,22 +56,24 @@ class UrnParserTest {
     void requireNoControlChars_acceptsSpace_onlyControlCharsAreRejected() {
         // Pins current behaviour: space (0x20) is not a control character and passes.
         assertThatCode(() -> UrnParser.requireNoControlChars(
-                "urn:core:platform:civitas:element:common:Geo Point"))
+                LOGICAL + " trailing"))
             .doesNotThrowAnyException();
     }
 
-    // ── nameFromUrn / versionFromUrn ──────────────────────────────────────────
+    // ── idFromUrn / versionFromUrn ────────────────────────────────────────────
 
     @Test
-    void nameFromUrn_extractsNameSegment() {
-        assertThat(UrnParser.nameFromUrn(VERSIONED)).isEqualTo("GeoPoint");
-        assertThat(UrnParser.nameFromUrn(LOGICAL)).isEqualTo("GeoPoint");
+    void idFromUrn_extractsUuidSegment() {
+        assertThat(UrnParser.idFromUrn(VERSIONED)).isEqualTo(ID);
+        assertThat(UrnParser.idFromUrn(LOGICAL)).isEqualTo(ID);
+        assertThat(UrnParser.idFromUrn(LATEST_REF)).isEqualTo(ID);
     }
 
     @Test
-    void nameFromUrn_nonUrnOrTooShort_returnsInputUnchanged() {
-        assertThat(UrnParser.nameFromUrn("plain-id")).isEqualTo("plain-id");
-        assertThat(UrnParser.nameFromUrn("urn:core:too:short")).isEqualTo("urn:core:too:short");
+    void idFromUrn_nonUrnOrTooShort_returnsNull() {
+        assertThat(UrnParser.idFromUrn("plain-id")).isNull();
+        assertThat(UrnParser.idFromUrn("urn:core:too:short")).isNull();
+        assertThat(UrnParser.idFromUrn(null)).isNull();
     }
 
     @Test
@@ -101,7 +105,6 @@ class UrnParserTest {
         assertThat(UrnParser.LATEST).isEqualTo("latest");
         assertThat(UrnParser.versionFromUrn(LATEST_REF)).isEqualTo("latest");
         assertThat(UrnParser.logicalUrn(LATEST_REF)).isEqualTo(LOGICAL);
-        assertThat(UrnParser.nameFromUrn(LATEST_REF)).isEqualTo("GeoPoint");
     }
 
     // ── logicalUrn / withVersion round-trips ──────────────────────────────────
@@ -133,7 +136,14 @@ class UrnParserTest {
         String version = UrnParser.versionFromUrn(VERSIONED);
 
         assertThat(UrnParser.withVersion(logical, version)).isEqualTo(VERSIONED);
-        assertThat(UrnParser.nameFromUrn(logical)).isEqualTo(UrnParser.nameFromUrn(VERSIONED));
+        assertThat(UrnParser.idFromUrn(logical)).isEqualTo(UrnParser.idFromUrn(VERSIONED));
+    }
+
+    @Test
+    void withArtifactType_swapsOnlyTheTypeSegment() {
+        assertThat(UrnParser.withArtifactType(VERSIONED, "datastructure"))
+            .isEqualTo("urn:core:platform:civitas:datastructure:common:" + ID + ":1.0.0");
+        assertThat(UrnParser.withArtifactType("plain-id", "datastructure")).isNull();
     }
 
     // ── isUrn ─────────────────────────────────────────────────────────────────
@@ -158,7 +168,7 @@ class UrnParserTest {
         assertThat(UrnParser.isUrn("urn:core:too:short")).isFalse();
         assertThat(UrnParser.isUrn("urn:core:datastructure:Model1")).isFalse();
 
-        // Too many segments: e.g. a full URN accidentally embedded in a name segment.
+        // Too many segments: e.g. a full URN accidentally embedded in another segment.
         assertThat(UrnParser.isUrn(VERSIONED + ":extra")).isFalse();
     }
 
@@ -170,25 +180,68 @@ class UrnParserTest {
         assertThat(UrnParser.withVersion(LOGICAL, "2.0.0")).doesNotContain("::");
 
         // An empty interior segment carries no identity either.
-        assertThat(UrnParser.isUrn("urn:core:platform:civitas:element::GeoPoint:k3f9a2b7qx")).isFalse();
-        assertThat(UrnParser.isUrn("urn:core::civitas:element:common:GeoPoint:k3f9a2b7qx")).isFalse();
-    }
-
-    // ── Disambiguator segment ─────────────────────────────────────────────────
-
-    @Test
-    void disambiguator_extractedFromItsOwnSegment() {
-        assertThat(UrnParser.disambiguatorFromUrn(VERSIONED)).isEqualTo("k3f9a2b7qx");
-        assertThat(UrnParser.disambiguatorFromUrn(LOGICAL)).isEqualTo("k3f9a2b7qx");
-        assertThat(UrnParser.nameFromUrn(VERSIONED)).isEqualTo("GeoPoint");   // name stays clean
-        assertThat(UrnParser.disambiguatorFromUrn("plain-id")).isNull();
+        assertThat(UrnParser.isUrn("urn:core:platform:civitas:element::" + ID)).isFalse();
+        assertThat(UrnParser.isUrn("urn:core::civitas:element:common:" + ID)).isFalse();
     }
 
     @Test
-    void deriveDisambiguator_isDeterministicAndUrnSafe() {
-        String a = UrnParser.deriveDisambiguator("urn:xoev-de:xmeld:Meldeanschrift");
-        assertThat(a).isEqualTo(UrnParser.deriveDisambiguator("urn:xoev-de:xmeld:Meldeanschrift"));
-        assertThat(a).hasSize(10).matches("[0-9a-z]{10}");
-        assertThat(UrnParser.deriveDisambiguator("something-else")).isNotEqualTo(a);
+    void isUrn_rejectsANameSegmentInPlaceOfTheUuid() {
+        // A name in the identity would break every reference to an artifact on its first rename.
+        String nameBased = "urn:core:platform:civitas:element:common:GeoPoint:k3f9a2b7qx";
+        assertThat(UrnParser.isUrn(nameBased)).isFalse();
+        assertThat(UrnParser.isUrn(nameBased + ":1.0.0")).isFalse();
+    }
+
+    @Test
+    void isUrn_requiresALowercaseCanonicalUuid() {
+        assertThat(UrnParser.isUrn("urn:core:platform:civitas:element:common:" + ID.toString().toUpperCase()))
+            .isFalse();
+        assertThat(UrnParser.isUrn("urn:core:platform:civitas:element:common:b75dba9fa9f28b7da9e1f800ff5378f1"))
+            .isFalse();
+    }
+
+    @Test
+    void isUrn_acceptsSemVerTwoSegmentAndLatestVersions_rejectsOthers() {
+        assertThat(UrnParser.isUrn(LOGICAL + ":6.0")).isTrue();
+        assertThat(UrnParser.isUrn(LOGICAL + ":1.0.0-rc.1")).isTrue();
+        assertThat(UrnParser.isUrn(LATEST_REF)).isTrue();
+        assertThat(UrnParser.isUrn(LOGICAL + ":GeoPoint")).isFalse();
+        assertThat(UrnParser.isUrn(LOGICAL + ":newest")).isFalse();
+    }
+
+    @Test
+    void requireUrn_rejectsANonUrnNamingTheExpectedFormat() {
+        assertThatThrownBy(() -> UrnParser.requireUrn("plain-id", "Element id"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Element id 'plain-id'")
+            .hasMessageContaining("<uuid>");
+        assertThat(UrnParser.requireUrn(VERSIONED, "Element id")).isEqualTo(VERSIONED);
+    }
+
+    // ── Derived identities ────────────────────────────────────────────────────
+
+    @Test
+    void deriveId_isDeterministicAndKeySensitive() {
+        UUID a = UrnParser.deriveId("urn:xoev-de:xmeld:Meldeanschrift");
+        assertThat(a).isEqualTo(UrnParser.deriveId("urn:xoev-de:xmeld:Meldeanschrift"));
+        assertThat(UrnParser.deriveId("something-else")).isNotEqualTo(a);
+    }
+
+    @Test
+    void deriveId_isANameBasedUuidV8() {
+        UUID id = UrnParser.deriveId("urn:xoev-de:xmeld:Meldeanschrift");
+        assertThat(id.version()).isEqualTo(8);
+        assertThat(id.variant()).isEqualTo(2);
+    }
+
+    @Test
+    void memberId_isStablePerParentAndKey_andDistinctOtherwise() {
+        UUID parent = UUID.fromString("0b6f5c1e-8a4d-4f7b-9c2e-3d1a5b7c9e20");
+        UUID other = UUID.fromString("1c7a6d2f-9b5e-4a8c-8d3f-4e2b6c8d0f31");
+
+        assertThat(UrnParser.memberId(parent, "Sensor")).isEqualTo(UrnParser.memberId(parent, "Sensor"));
+        assertThat(UrnParser.memberId(parent, "Sensor")).isNotEqualTo(UrnParser.memberId(parent, "Reading"));
+        assertThat(UrnParser.memberId(parent, "Sensor")).isNotEqualTo(UrnParser.memberId(other, "Sensor"));
+        assertThat(UrnParser.memberId(parent, "Sensor")).isNotEqualTo(parent);
     }
 }

@@ -1,6 +1,6 @@
 {
   "$schema": "https://civitasconnect.digital/core/pipeline/v1",
-  "id": "urn:core:platform:civitas:pipeline:common:Temperatur-Import:1.0.0",
+  "id": "urn:core:platform:civitas:pipeline:common:f6cfb736-21f3-86e6-9e2d-0c969c3330d5:1.0.0",
   "title": "Temperatur-Import",
   "debug": false,
   "nodes": [
@@ -17,7 +17,7 @@
       "id": "n-source",
       "kind": "source",
       "label": "MQTT Sensor",
-      "sourceRef": "urn:core:platform:civitas:datasource:common:mqtt-temperature:1.0.0",
+      "sourceRef": "urn:core:platform:civitas:datasource:common:bfb49da0-c83b-87ca-ab8e-bf09528e3f38:1.0.0",
       "x-ui-position": {
         "x": 260,
         "y": 220
@@ -27,7 +27,7 @@
       "id": "n-mapping",
       "kind": "mapping",
       "label": "Normalisieren",
-      "mappingRef": "urn:core:platform:civitas:mapping:common:sensor-to-observation:1.0.0",
+      "mappingRef": "urn:core:platform:civitas:mapping:common:9b38e37c-0c12-8c9a-8b48-ffeea1269358:1.0.0",
       "x-ui-position": {
         "x": 480,
         "y": 220
@@ -37,7 +37,7 @@
       "id": "n-sink",
       "kind": "sink",
       "label": "PostgreSQL",
-      "sinkRef": "urn:core:platform:civitas:datasink:common:postgres-observations:1.0.0",
+      "sinkRef": "urn:core:platform:civitas:datasink:common:6354723d-a213-8769-b518-a03c417dc1a8:1.0.0",
       "x-ui-position": {
         "x": 700,
         "y": 220

@@ -110,7 +110,7 @@ class ModelValidatorTest {
               "$schema": "https://json-schema.org/draft/2020-12/schema",
               "type": "object",
               "properties": {
-                "geo": { "$ref": "urn:core:platform:civitas:element:common:GeoPoint:3ak90vqrog:1.0.0" }
+                "geo": { "$ref": "urn:core:platform:civitas:element:common:da736e5f-bb91-88a6-abaa-761d911af81a:1.0.0" }
               }
             }
             """);
@@ -130,7 +130,7 @@ class ModelValidatorTest {
               "type": "object",
               "properties": {
                 "ref": {
-                  "$ref": "urn:core:platform:civitas:element:common:GeoPoint:3ak90vqrog:1.0.0",
+                  "$ref": "urn:core:platform:civitas:element:common:da736e5f-bb91-88a6-abaa-761d911af81a:1.0.0",
                   "type": "integer"
                 }
               }
@@ -214,7 +214,7 @@ class ModelValidatorTest {
               "$schema": "https://json-schema.org/draft/2020-12/schema",
               "type": "object",
               "properties": {
-                "geo": { "$ref": "urn:core:platform:civitas:element:common:GeoPoint:3ak90vqrog:1.0.0" }
+                "geo": { "$ref": "urn:core:platform:civitas:element:common:da736e5f-bb91-88a6-abaa-761d911af81a:1.0.0" }
               }
             }
             """);

@@ -31,11 +31,10 @@ class BulkExistenceDatabaseTest extends AbstractRegistryDatabaseTest {
 
     @BeforeEach
     void storeTwoArtifactsOneOfThemVersioned() {
-        stationV1 = registry.storeElement("Station", schema("stationId"), Set.of());
-        stationV2 = registry.storeElement(
-            "Station", schema("stationId2"), Set.of(), Set.of(), null, VersionBump.MINOR);
+        stationV1 = registry.storeElement(schema("stationId"), Set.of());
+        stationV2 = registry.storeElement(schema("stationId2"), Set.of(), Set.of(), null, VersionBump.MINOR);
         stationLogical = UrnParser.logicalUrn(stationV1);
-        readingPin = registry.storeElement("Reading", schema("temperature"), Set.of());
+        readingPin = registry.storeElement(schema("temperature"), Set.of());
     }
 
     /** Both answers for one URN, so a disagreement is the assertion failure. */
@@ -55,8 +54,8 @@ class BulkExistenceDatabaseTest extends AbstractRegistryDatabaseTest {
             stationLogical + ":latest",
             stationLogical + ":9.9.9",
             readingPin,
-            "urn:core:platform:civitas:element:common:Ghost:zzzzzzzzzz",
-            "urn:core:platform:civitas:element:common:Ghost:zzzzzzzzzz:1.0.0",
+            "urn:core:platform:civitas:element:common:71ed2279-6ded-8ac5-9d4f-b1c26fdf5db5",
+            "urn:core:platform:civitas:element:common:71ed2279-6ded-8ac5-9d4f-b1c26fdf5db5:1.0.0",
             "not-a-urn-at-all");
 
         Set<String> held = registry.heldUrns(probes);
@@ -114,7 +113,7 @@ class BulkExistenceDatabaseTest extends AbstractRegistryDatabaseTest {
     @DisplayName("an input larger than one statement is answered in full")
     void aBatchWiderThanOneStatementIsAnsweredInFull() {
         List<String> probes = new ArrayList<>(IntStream.range(0, 1200)
-            .mapToObj(i -> "urn:core:platform:civitas:element:common:Absent%d:zzzzzzzzzz:1.0.0".formatted(i))
+            .mapToObj(i -> "urn:core:platform:civitas:element:common:00000000-0000-4000-8000-%012d:1.0.0".formatted(i))
             .toList());
         probes.add(stationV1);
         probes.add(readingPin);
@@ -128,7 +127,7 @@ class BulkExistenceDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("an artifact holding no version is not held")
     void anArtifactWithoutAVersionIsNotHeld() {
-        String urn = "urn:core:platform:civitas:element:common:Empty:yyyyyyyyyy";
+        String urn = "urn:core:platform:civitas:element:common:5f832b18-4b7d-8c26-85c0-37820e628b72";
         // The write path cannot produce a version-less artifact, so insert one directly: it is the
         // state a caller sees if a version write is ever rolled back on its own.
         jdbc.sql("""

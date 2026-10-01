@@ -1,6 +1,7 @@
 package de.civitascore.modelforge.application;
 
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 import de.civitascore.modelforge.facade.ModelForge;
 import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.contract.ArtifactSearchQuery;
@@ -46,6 +47,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class EmbeddedModelForgeOperations implements ModelForge {
@@ -96,10 +98,59 @@ public class EmbeddedModelForgeOperations implements ModelForge {
 
     @Override
     public ImportResult importSchema(ImportSchemaCommand command) {
+        JsonNode schema = command.dataStructureId() == null
+            ? command.schema()
+            : underHostId(command.schema(), command.dataStructureId());
         var response = schemaImportService.importSchema(new SchemaImportRequest(
-            command.schema(), command.version(), command.preserveVersion(), command.bump(),
+            schema, command.version(), command.preserveVersion(), command.bump(),
             command.bumpFromVersion()));
         return toImportResult(response, "Schema import validation failed");
+    }
+
+    /**
+     * The document with a URN of {@code id} as its {@code $id} and no {@code $id} on its members, so
+     * the import derives every member's URN from {@code id}. A member keeping an authored {@code $id}
+     * could name an Element of another DataStructure and overwrite it.
+     *
+     * <p>Only a pure {@code $defs} library is folded into the DataStructure; the fold keeps no root
+     * shape.
+     */
+    private JsonNode underHostId(JsonNode schema, UUID id) {
+        if (!(schema instanceof ObjectNode object)) {
+            return schema;
+        }
+        ObjectNode copy = object.deepCopy();
+        String urn = SchemaImportService.isDefsLibrary(object) ? urns.dataStructure(id) : urns.element(id);
+        copy.put("$id", UrnParser.logicalUrn(urn));
+        if (copy.get("$defs") instanceof ObjectNode defs) {
+            dropEmbeddedCopies(defs);
+            defs.properties().forEach(member -> {
+                if (member.getValue() instanceof ObjectNode def) {
+                    def.remove("$id");
+                }
+            });
+        }
+        return copy;
+    }
+
+    /**
+     * Removes the members that are copies of an Element another member references, as a bundled view
+     * embeds them. Without its {@code $id}, such a copy would become a member of its own.
+     */
+    private static void dropEmbeddedCopies(ObjectNode defs) {
+        Set<String> referenced = new LinkedHashSet<>();
+        defs.properties().forEach(member -> {
+            JsonNode ref = member.getValue().path("$ref");
+            if (member.getValue().size() == 1 && UrnParser.isUrn(ref.asText(null))) {
+                referenced.add(UrnParser.logicalUrn(ref.asText()));
+            }
+        });
+        List<String> copies = defs.properties().stream()
+            .filter(member -> member.getValue().size() > 1
+                && referenced.contains(UrnParser.logicalUrn(member.getValue().path("$id").asText(""))))
+            .map(Map.Entry::getKey)
+            .toList();
+        copies.forEach(defs::remove);
     }
 
     @Override
@@ -193,11 +244,10 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             ? dependencyGraph.getTransitiveDependencies(source.value(), query.maxDepth())
             : dependencyGraph.getDependencies(source.value());
         var targets = targetUrns.stream().map(ArtifactId::new).toList();
-        var nodes = new java.util.ArrayList<DependencyGraphView.Node>();
-        nodes.add(new DependencyGraphView.Node(source, UrnParser.nameFromUrn(source.value())));
-        targets.stream()
-            .map(target -> new DependencyGraphView.Node(target, UrnParser.nameFromUrn(target.value())))
-            .forEach(nodes::add);
+        var ids = new ArrayList<ArtifactId>();
+        ids.add(source);
+        ids.addAll(targets);
+        var nodes = labelled(ids);
         var edges = targets.stream()
             .map(target -> new DependencyGraphView.Edge(source, target, "depends-on"))
             .toList();
@@ -211,11 +261,10 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             ? dependencyGraph.getTransitiveDependents(source.value(), query.maxDepth())
             : dependencyGraph.getDependents(source.value());
         var origins = originUrns.stream().map(ArtifactId::new).toList();
-        var nodes = new ArrayList<DependencyGraphView.Node>();
-        nodes.add(new DependencyGraphView.Node(source, UrnParser.nameFromUrn(source.value())));
-        origins.stream()
-            .map(origin -> new DependencyGraphView.Node(origin, UrnParser.nameFromUrn(origin.value())))
-            .forEach(nodes::add);
+        var ids = new ArrayList<ArtifactId>();
+        ids.add(source);
+        ids.addAll(origins);
+        var nodes = labelled(ids);
         var edges = origins.stream()
             .map(origin -> new DependencyGraphView.Edge(origin, source, "depends-on"))
             .toList();
@@ -284,27 +333,40 @@ public class EmbeddedModelForgeOperations implements ModelForge {
      */
     private DependencyGraphView mappingEdges(ArtifactId artifactId, String role, String otherKey, String mappingRelation) {
         List<Map<String, String>> rows = registry.mappingsForElement(artifactId.value(), role);
-        var nodes = new ArrayList<DependencyGraphView.Node>();
+        var ids = new ArrayList<ArtifactId>();
         var edges = new ArrayList<DependencyGraphView.Edge>();
-        nodes.add(new DependencyGraphView.Node(artifactId, UrnParser.nameFromUrn(artifactId.value())));
+        ids.add(artifactId);
         for (Map<String, String> row : rows) {
             String mappingUrn = row.get("mapping");
             if (mappingUrn == null) continue;
             var mappingId = new ArtifactId(mappingUrn);
-            nodes.add(new DependencyGraphView.Node(mappingId, UrnParser.nameFromUrn(mappingUrn)));
+            ids.add(mappingId);
             edges.add("source".equals(role)
                 ? new DependencyGraphView.Edge(artifactId, mappingId, "source-of")
                 : new DependencyGraphView.Edge(mappingId, artifactId, "target-of"));
             String otherUrn = row.get(otherKey);
             if (otherUrn != null) {
                 var otherId = new ArtifactId(otherUrn);
-                nodes.add(new DependencyGraphView.Node(otherId, UrnParser.nameFromUrn(otherUrn)));
+                ids.add(otherId);
                 edges.add("source".equals(role)
                     ? new DependencyGraphView.Edge(mappingId, otherId, mappingRelation)
                     : new DependencyGraphView.Edge(otherId, mappingId, mappingRelation));
             }
         }
-        return new DependencyGraphView(nodes, edges);
+        return new DependencyGraphView(labelled(ids), edges);
+    }
+
+    /**
+     * Graph nodes labelled with each artifact's display name. The URN carries none, so the names are
+     * read from the registry in one lookup; an artifact it does not hold is labelled with its URN.
+     */
+    private List<DependencyGraphView.Node> labelled(List<ArtifactId> ids) {
+        Map<String, String> names = registry.displayNames(
+            ids.stream().map(id -> UrnParser.logicalUrn(id.value())).toList());
+        return ids.stream()
+            .map(id -> new DependencyGraphView.Node(id,
+                names.getOrDefault(UrnParser.logicalUrn(id.value()), id.value())))
+            .toList();
     }
 
     @Override
@@ -332,19 +394,15 @@ public class EmbeddedModelForgeOperations implements ModelForge {
 
     @Override
     public ArtifactWriteResult createArtifact(CreateArtifactCommand command) {
-        String urn = switch (command.kind()) {
-            case MAPPING -> urns.mintMapping(command.name());
-            case PIPELINE -> urns.mintPipeline(command.name());
-            case DATA_SOURCE -> urns.mintDataSource(command.name());
-            case DATA_SINK -> urns.mintDataSink(command.name());
-            case DATA_SET -> urns.mintDataSet(command.name());
-            case DATA_STRUCTURE -> urns.mintDataStructure(command.name());
-            case ELEMENT -> throw new IllegalArgumentException(
+        if (command.kind() == ArtifactKind.ELEMENT) {
+            throw new IllegalArgumentException(
                 "Elements are created through importSchema, which mints the URN and splits $defs "
                 + "into their own Elements.");
-        };
-        // Model Forge owns a created artifact's identity: the document's id always carries the
-        // minted URN, regardless of any id the caller left in the content.
+        }
+        String urn = urns.urn(artifactTypeOf(command.kind()),
+            command.id() != null ? command.id() : UUID.randomUUID());
+        // The document's id always carries the URN built here, regardless of any id the caller left
+        // in the content.
         var content = command.content();
         if (content.isObject()) {
             tools.jackson.databind.node.ObjectNode stamped =
@@ -352,9 +410,18 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             stamped.put("id", urn);
             content = stamped;
         }
-        return saveArtifact(
-            new SaveArtifactCommand(
-                new ArtifactId(urn), command.kind(), content, VersionBump.PATCH, command.dataSet()));
+        JsonNode created = content;
+        return registry.inTransaction(() -> {
+            ArtifactWriteResult result = saveArtifact(
+                new SaveArtifactCommand(
+                    new ArtifactId(urn), command.kind(), created, VersionBump.PATCH, command.dataSet()));
+            // The URN carries no name, so the display name a search and the graph show is recorded
+            // beside it; a document title, once there, takes precedence.
+            if (!created.hasNonNull("title")) {
+                registry.nameArtifact(urn, command.name());
+            }
+            return result;
+        });
     }
 
     @Override
@@ -456,6 +523,19 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             out.put(dep, kind);
             collectMemberDeps(dep, out);
         }
+    }
+
+    /** The CORE artifact-type segment for a kind. */
+    private static String artifactTypeOf(ArtifactKind kind) {
+        return switch (kind) {
+            case ELEMENT -> "element";
+            case DATA_SET -> "dataset";
+            case DATA_STRUCTURE -> "datastructure";
+            case MAPPING -> "mapping";
+            case PIPELINE -> "pipeline";
+            case DATA_SOURCE -> "datasource";
+            case DATA_SINK -> "datasink";
+        };
     }
 
     /** The DataSet-member ArtifactKind for a CORE URN, or {@code null} for a non-member kind. */

@@ -1,9 +1,9 @@
 {
   "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
-  "id":     "urn:core:platform:civitas:mapping:luftqualitaet:station-to-sta-thing:1.0.0",
+  "id":     "urn:core:platform:civitas:mapping:luftqualitaet:48eef3de-1c17-862c-ac3e-c5b80682eee9:1.0.0",
   "title":  "StationMasterData → STAThing",
-  "source": "urn:core:platform:civitas:element:luftqualitaet:StationMasterData:1.0.0",
-  "target": "urn:core:platform:civitas:element:sta:STAThing:1.0.0",
+  "source": "urn:core:platform:civitas:element:luftqualitaet:57efd321-5e4e-89fc-8cbd-dc3443bf2317:1.0.0",
+  "target": "urn:core:platform:civitas:element:sta:513c5444-b723-8341-b283-ea96fea99b16:1.0.0",
   "fields": {
     "name":                    { "op": "copy",   "input": "$.stationName" },
     "description": {

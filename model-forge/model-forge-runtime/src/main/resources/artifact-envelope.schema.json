@@ -11,9 +11,9 @@
       "const": "https://civitasconnect.digital/core/artifact-envelope/v1"
     },
     "artifactId": {
-      "description": "Logical artifact id — the version-free CORE URN; combine it with firstVersion.version for the versioned artifact URN. Exactly 8 non-empty colon-separated segments, matching UrnParser's logical form: urn:core:<scope>:<owner>:<type>:<domain>:<name>:<disambiguator>.",
+      "description": "Logical artifact id — the version-free CORE URN; combine it with firstVersion.version for the versioned artifact URN. Matches UrnParser's logical form: urn:core:<scope>:<owner>:<type>:<domain>:<uuid>.",
       "type": "string",
-      "pattern": "^urn:core(:[^:]+){6}$"
+      "pattern": "^urn:core(:[^:]+){4}:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
     },
     "artifactType": {
       "description": "Artifact content type as used by the global artifact store.",

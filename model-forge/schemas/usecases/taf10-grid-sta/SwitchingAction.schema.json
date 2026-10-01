@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:core:platform:civitas:element:taf10-grid:SwitchingAction:1.0.0",
+  "$id": "urn:core:platform:civitas:element:taf10-grid:3fd993e2-e14c-8eb4-9cf7-c83ced426d7a:1.0.0",
   "title": "SwitchingAction",
   "description": "Command request sent to a grid-control service when TAF10 telemetry indicates a load peak, a feed-in peak, or a voltage-band violation.",
   "type": "object",

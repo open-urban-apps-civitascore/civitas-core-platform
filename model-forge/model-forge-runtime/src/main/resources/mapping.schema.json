@@ -16,7 +16,7 @@
     "id": {
       "type": "string",
       "description": "Versioned CORE URN of this Mapping.",
-      "pattern": "^urn:core:[^:]+:[^:]+:mapping:[^:]+:[^:]+:[^:]+(:[^:]+)?$"
+      "pattern": "^urn:core:[^:]+:[^:]+:mapping:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$"
     },
     "title":       { "type": "string", "description": "Human-readable display name." },
     "description": { "type": "string" },
@@ -40,7 +40,7 @@
     "StructureUrn": {
       "description": "Versioned CORE URN of a DataStructure that a Mapping binds (an Element URN is also accepted for backward compatibility).",
       "type": "string",
-      "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$"
+      "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$"
     },
     "CopyFieldOperation": {
       "description": "Copies a value from an input field path. The path is given as 'sourcePath' (the mapping editor's field name) or 'input' (legacy alias); at least one must be present.",

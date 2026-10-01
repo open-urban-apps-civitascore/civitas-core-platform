@@ -9,6 +9,7 @@ import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.contract.ArtifactSearchQuery;
 import de.civitascore.modelforge.contract.ArtifactSummary;
 import java.util.List;
+import java.util.UUID;
 import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.util.tester.FormTester;
 import org.junit.jupiter.api.Test;
@@ -58,13 +59,13 @@ class ArtifactListPageTest extends AbstractWicketPageTest {
 
     private static ArtifactSummary summary(String name, String type) {
         return new ArtifactSummary(
-            new ArtifactId("urn:core:platform:civitas:element:common:" + name + ":1.0.0"),
+            new ArtifactId("urn:core:platform:civitas:element:common:" + UUID.randomUUID() + ":1.0.0"),
             type, name, "1.0.0", "json-schema");
     }
 
     @Test
     void searchingRendersMatchingRows() {
-        ArtifactId id = new ArtifactId("urn:core:platform:civitas:element:common:Thing:1.0.0");
+        ArtifactId id = new ArtifactId("urn:core:platform:civitas:element:common:d9e5d4ce-e872-8435-beb7-2038c6a6866a:1.0.0");
         when(modelForge.search(any(ArtifactSearchQuery.class)))
             .thenReturn(List.of(new ArtifactSummary(id, "element", "Thing", "1.0.0", "json-schema")));
 

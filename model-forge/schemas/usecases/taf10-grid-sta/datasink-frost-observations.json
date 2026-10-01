@@ -1,7 +1,7 @@
 {
   "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSink",
-  "id": "urn:core:platform:civitas:datasink:taf10-grid:frost-observations:1.0.0",
+  "id": "urn:core:platform:civitas:datasink:taf10-grid:b38277e4-52bd-85bc-9403-f96224e25ce1:1.0.0",
   "title": "FROST-Server Grid Observations",
   "connectionType": "frost",
-  "element": "urn:core:platform:civitas:element:sta:STAObservation:1.0.0"
+  "element": "urn:core:platform:civitas:element:sta:61296fa8-8cca-8d83-af42-51e12c991cd8:1.0.0"
 }

@@ -24,9 +24,9 @@ import org.junit.jupiter.api.Test;
  */
 class ArtifactTreeProviderTest {
 
-    private static final String A = "urn:core:platform:civitas:element:common:A:1.0.0";
-    private static final String B = "urn:core:platform:civitas:element:common:B:1.0.0";
-    private static final String C = "urn:core:platform:civitas:element:common:C:1.0.0";
+    private static final String A = "urn:core:platform:civitas:element:common:944024b5-0cdc-8eb8-aff4-639c626807b7:1.0.0";
+    private static final String B = "urn:core:platform:civitas:element:common:d71f1d4e-a35d-80c0-b35e-34ab2465db8f:1.0.0";
+    private static final String C = "urn:core:platform:civitas:element:common:eaa5da6b-1a17-8982-8ef7-c0889b0d8ee2:1.0.0";
 
     private ModelForge modelForge;
     private ArtifactTreeProvider provider;

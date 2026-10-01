@@ -28,11 +28,11 @@ import static org.mockito.Mockito.when;
 class ReferenceExistenceValidatorTest {
 
     private static final String STRASSE =
-        "urn:core:platform:civitas:element:common:Strasse:u8pwgr2zzg:1.0.0";
+        "urn:core:platform:civitas:element:common:4efe004c-2dcb-8c11-b006-ca19ac540baf:1.0.0";
     private static final String STRASSE_LOGICAL =
-        "urn:core:platform:civitas:element:common:Strasse:u8pwgr2zzg";
+        "urn:core:platform:civitas:element:common:4efe004c-2dcb-8c11-b006-ca19ac540baf";
     private static final String PLATZ =
-        "urn:core:platform:civitas:element:common:Platz:dutffafv67:1.0.0";
+        "urn:core:platform:civitas:element:common:fdb4291f-1a99-897d-b962-0612dec2a3e5:1.0.0";
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final SchemaRefExtractor extractor = new SchemaRefExtractor();
@@ -119,7 +119,7 @@ class ReferenceExistenceValidatorTest {
     void concreteUrnWhoseScopeIsType_isExistenceChecked_notTreatedAsCategory() {
         // A real model_forge.artifact URN (>= 7 segments) whose scope segment happens to be "type" must NOT
         // be mistaken for the 4-segment urn:core:type:<Kind> category marker.
-        String scopeTypeUrn = "urn:core:type:civitas:element:common:Foo:sajjwrc28m:1.0.0";
+        String scopeTypeUrn = "urn:core:type:civitas:element:common:ce3b2b9e-1ac1-89ba-9089-d902c55ec976:1.0.0";
         when(registry.resolveReference(scopeTypeUrn)).thenReturn(Optional.empty());
 
         List<Diagnostic> diags = validator.checkForeignKeys(schemaWithFk(scopeTypeUrn), Set.of());

@@ -32,7 +32,7 @@ class CoreSchemaValidatorTest {
         assertThat(validate(ArtifactKind.MAPPING, """
             {
               "$schema": "https://civitasconnect.digital/core/mapping/v1",
-              "id": "urn:core:platform:civitas:mapping:common:StationToReading:abc1234567:1.0.0",
+              "id": "urn:core:platform:civitas:mapping:common:29d58c4c-50a7-8477-b001-ba6abdcc0164:1.0.0",
               "fields": { "temperature": "temp" }
             }
             """)).isEmpty();
@@ -44,7 +44,7 @@ class CoreSchemaValidatorTest {
         assertThat(validate(ArtifactKind.MAPPING, """
             {
               "$schema": "https://civitasconnect.digital/core/mapping/v1",
-              "id": "urn:core:platform:civitas:mapping:common:StationToReading:abc1234567:1.0.0"
+              "id": "urn:core:platform:civitas:mapping:common:29d58c4c-50a7-8477-b001-ba6abdcc0164:1.0.0"
             }
             """)).isNotEmpty();
     }
@@ -56,7 +56,7 @@ class CoreSchemaValidatorTest {
         assertThat(validate(ArtifactKind.MAPPING, """
             {
               "$schema": "https://civitasconnect.digital/core/mapping/v1",
-              "id": "urn:core:platform:civitas:element:common:Station:abc1234567:1.0.0",
+              "id": "urn:core:platform:civitas:element:common:b4b1eaaf-8766-827e-b89a-95bf592cc9b2:1.0.0",
               "fields": {}
             }
             """)).isNotEmpty();
@@ -81,7 +81,7 @@ class CoreSchemaValidatorTest {
         assertThat(validate(ArtifactKind.MAPPING, """
             {
               "$schema": "https://civitasconnect.digital/core/mapping/v1",
-              "id": "urn:core:platform:civitas:mapping:common:StationToReading:abc1234567:1.0.0",
+              "id": "urn:core:platform:civitas:mapping:common:29d58c4c-50a7-8477-b001-ba6abdcc0164:1.0.0",
               "fields": { "$.id": { "op": "toUuid", "input": { "op": "copy", "sourcePath": "$.stationId" } } }
             }
             """)).isEmpty();
@@ -93,7 +93,7 @@ class CoreSchemaValidatorTest {
         assertThat(validate(ArtifactKind.MAPPING, """
             {
               "$schema": "https://civitasconnect.digital/core/mapping/v1",
-              "id": "urn:core:platform:civitas:mapping:common:StationToReading:abc1234567:1.0.0",
+              "id": "urn:core:platform:civitas:mapping:common:29d58c4c-50a7-8477-b001-ba6abdcc0164:1.0.0",
               "fields": {
                 "$.observedAt": {
                   "op": "format",
@@ -111,7 +111,7 @@ class CoreSchemaValidatorTest {
         assertThat(validate(ArtifactKind.MAPPING, """
             {
               "$schema": "https://civitasconnect.digital/core/mapping/v1",
-              "id": "urn:core:platform:civitas:mapping:common:StationToReading:abc1234567:1.0.0",
+              "id": "urn:core:platform:civitas:mapping:common:29d58c4c-50a7-8477-b001-ba6abdcc0164:1.0.0",
               "fields": { "$.observedAt": { "op": "toDateTime", "input": "$.timestamp" } }
             }
             """)).isNotEmpty();
@@ -125,7 +125,7 @@ class CoreSchemaValidatorTest {
         assertThat(validate(ArtifactKind.PIPELINE, """
             {
               "$schema": "https://civitasconnect.digital/core/pipeline/v1",
-              "id": "urn:core:platform:civitas:pipeline:common:WeatherIngest:abc1234567:1.0.0",
+              "id": "urn:core:platform:civitas:pipeline:common:8c521919-2300-846f-b710-bbbbb212b47a:1.0.0",
               "nodes": [],
               "edges": []
             }
@@ -138,7 +138,7 @@ class CoreSchemaValidatorTest {
         assertThat(validate(ArtifactKind.PIPELINE, """
             {
               "$schema": "https://civitasconnect.digital/core/pipeline/v1",
-              "id": "urn:core:platform:civitas:pipeline:common:WeatherIngest:abc1234567:1.0.0"
+              "id": "urn:core:platform:civitas:pipeline:common:8c521919-2300-846f-b710-bbbbb212b47a:1.0.0"
             }
             """)).isNotEmpty();
     }
@@ -151,7 +151,7 @@ class CoreSchemaValidatorTest {
         assertThat(validate(ArtifactKind.DATA_SOURCE, """
             {
               "$schema": "https://civitasconnect.digital/core/datasource/v1",
-              "id": "urn:core:platform:civitas:datasource:common:Broker:abc1234567:1.0.0",
+              "id": "urn:core:platform:civitas:datasource:common:a01d5b29-c93e-8dd4-a525-1cf551ce908a:1.0.0",
               "connectionType": "mqtt",
               "urls": ["mqtt://mosquitto:1883"],
               "topics": ["sensors/+/temp"]
@@ -167,7 +167,7 @@ class CoreSchemaValidatorTest {
         assertThat(validate(ArtifactKind.DATA_SET, """
             {
               "$schema": "https://civitasconnect.digital/core-dataset/v1",
-              "id": "urn:core:platform:civitas:dataset:common:WeatherSet:abc1234567:1.0.0"
+              "id": "urn:core:platform:civitas:dataset:common:b365d0f3-0500-89b2-959e-4446fe69850f:1.0.0"
             }
             """)).isEmpty();
     }
@@ -188,7 +188,7 @@ class CoreSchemaValidatorTest {
         assertThat(validate(ArtifactKind.DATA_STRUCTURE, """
             {
               "$schema": "https://json-schema.org/draft/2020-12/schema",
-              "$id": "urn:core:platform:civitas:datastructure:common:WeatherStructure:abc1234567:1.0.0",
+              "$id": "urn:core:platform:civitas:datastructure:common:7de7b7a9-189c-80bd-8994-ccdf52b34d72:1.0.0",
               "type": "object"
             }
             """)).isEmpty();
@@ -225,7 +225,7 @@ class CoreSchemaValidatorTest {
         List<Diagnostic> diagnostics = validator.validate(json("""
             {
               "$schema": "https://civitasconnect.digital/core/mapping/v1",
-              "id": "urn:core:platform:civitas:mapping:common:StationToReading:abc1234567:1.0.0"
+              "id": "urn:core:platform:civitas:mapping:common:29d58c4c-50a7-8477-b001-ba6abdcc0164:1.0.0"
             }
             """));
 
@@ -242,7 +242,7 @@ class CoreSchemaValidatorTest {
         assertThat(validate(ArtifactKind.DATA_SINK, """
             {
               "$schema": "https://civitasconnect.digital/core/datasink/v1",
-              "id": "urn:core:platform:civitas:datasink:common:Sensors:abc1234567:1.0.0",
+              "id": "urn:core:platform:civitas:datasink:common:dcb6179e-f5c7-87f6-8fd4-3590dd906e8c:1.0.0",
               "connectionType": "frost",
               "port": "ThingTree"
             }
@@ -256,7 +256,7 @@ class CoreSchemaValidatorTest {
         assertThat(validate(ArtifactKind.DATA_SINK, """
             {
               "$schema": "https://civitasconnect.digital/core/datasink/v1",
-              "id": "urn:core:platform:civitas:datasink:common:Sensors:abc1234567:1.0.0",
+              "id": "urn:core:platform:civitas:datasink:common:dcb6179e-f5c7-87f6-8fd4-3590dd906e8c:1.0.0",
               "connectionType": "frost",
               "port": "Everything"
             }
@@ -271,7 +271,7 @@ class CoreSchemaValidatorTest {
         assertThat(validate(ArtifactKind.DATA_SINK, """
             {
               "$schema": "https://civitasconnect.digital/core/datasink/v1",
-              "id": "urn:core:platform:civitas:datasink:common:Sensors:abc1234567:1.0.0",
+              "id": "urn:core:platform:civitas:datasink:common:dcb6179e-f5c7-87f6-8fd4-3590dd906e8c:1.0.0",
               "connectionType": "frost"
             }
             """)).isEmpty();

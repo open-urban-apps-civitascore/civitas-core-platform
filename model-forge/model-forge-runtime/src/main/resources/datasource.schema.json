@@ -25,7 +25,7 @@
         "id": {
           "type": "string",
           "description": "Versioned CORE URN of this DataSource.",
-          "pattern": "^urn:core:[^:]+:[^:]+:datasource:[^:]+:[^:]+:[^:]+(:[^:]+)?$"
+          "pattern": "^urn:core:[^:]+:[^:]+:datasource:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$"
         },
         "title":       { "type": "string", "description": "Human-readable display name." },
         "description": { "type": "string" },
@@ -33,7 +33,7 @@
         "element": {
           "type": "string",
           "description": "Versioned CORE URN of the DataStructure that describes the payload format.",
-          "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$",
+          "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$",
           "x-core-ref": { "type": "urn:core:type:DataStructure" }
         },
         "urls":   { "type": ["array", "null"], "items": { "type": "string" }, "description": "MQTT broker URLs, e.g. 'mqtt://mosquitto:1883'." },
@@ -69,7 +69,7 @@
         "id": {
           "type": "string",
           "description": "Versioned CORE URN of this DataSource.",
-          "pattern": "^urn:core:[^:]+:[^:]+:datasource:[^:]+:[^:]+:[^:]+(:[^:]+)?$"
+          "pattern": "^urn:core:[^:]+:[^:]+:datasource:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$"
         },
         "title":       { "type": "string", "description": "Human-readable display name." },
         "description": { "type": "string" },
@@ -77,7 +77,7 @@
         "element": {
           "type": "string",
           "description": "Versioned CORE URN of the DataStructure that describes the row format.",
-          "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$",
+          "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$",
           "x-core-ref": { "type": "urn:core:type:DataStructure" }
         },
         "driver":  { "type": ["string", "null"], "description": "Database driver, e.g. 'postgres'. Only 'postgres' is wired in the NiFi engine." },

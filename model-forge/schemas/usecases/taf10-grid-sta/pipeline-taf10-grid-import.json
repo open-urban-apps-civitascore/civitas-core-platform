@@ -1,6 +1,6 @@
 {
   "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Pipeline",
-  "id": "urn:core:platform:civitas:pipeline:taf10-grid:TAF10-Grid-Protection:1.0.0",
+  "id": "urn:core:platform:civitas:pipeline:taf10-grid:34c4876a-1b30-8d13-bbf1-3a19e3a9cedd:1.0.0",
   "title": "TAF10 Low-Voltage Grid Protection",
   "debug": false,
   "nodes": [
@@ -14,7 +14,7 @@
       "id": "n-source",
       "kind": "source",
       "label": "TAF10 MQTT",
-      "sourceRef": "urn:core:platform:civitas:datasource:taf10-grid:taf10-mqtt:1.0.0",
+      "sourceRef": "urn:core:platform:civitas:datasource:taf10-grid:46d209ee-11ca-8116-a5c3-5a5c190f0d1c:1.0.0",
       "x-ui-position": { "x": 220, "y": 320 }
     },
     {
@@ -28,7 +28,7 @@
       "id": "n-enrich",
       "kind": "enrich",
       "label": "Grid-Node Stammdaten",
-      "lookupSourceRef": "urn:core:platform:civitas:datasource:taf10-grid:gridnode-db:1.0.0",
+      "lookupSourceRef": "urn:core:platform:civitas:datasource:taf10-grid:23f1f4f4-4b01-8748-b800-42d4490c614c:1.0.0",
       "lookupKey": "$.gridNodeId",
       "x-ui-position": { "x": 600, "y": 320 }
     },
@@ -36,21 +36,21 @@
       "id": "n-map-p-plus",
       "kind": "mapping",
       "label": "Wirkleistung Bezug",
-      "mappingRef": "urn:core:platform:civitas:mapping:taf10-grid:taf10-to-activepowerplus:1.0.0",
+      "mappingRef": "urn:core:platform:civitas:mapping:taf10-grid:02804ecb-8c72-8564-99b2-6650a6241bb5:1.0.0",
       "x-ui-position": { "x": 830, "y": 100 }
     },
     {
       "id": "n-map-p-minus",
       "kind": "mapping",
       "label": "Wirkleistung Einspeisung",
-      "mappingRef": "urn:core:platform:civitas:mapping:taf10-grid:taf10-to-activepowerminus:1.0.0",
+      "mappingRef": "urn:core:platform:civitas:mapping:taf10-grid:b1c986af-3704-8713-b36d-95bda5ff5766:1.0.0",
       "x-ui-position": { "x": 830, "y": 260 }
     },
     {
       "id": "n-map-voltage",
       "kind": "mapping",
       "label": "Spannung",
-      "mappingRef": "urn:core:platform:civitas:mapping:taf10-grid:taf10-to-voltage:1.0.0",
+      "mappingRef": "urn:core:platform:civitas:mapping:taf10-grid:3d3265c8-024e-8efa-b048-5ed624611591:1.0.0",
       "x-ui-position": { "x": 830, "y": 420 }
     },
     {
@@ -64,14 +64,14 @@
       "id": "n-map-load-shift",
       "kind": "mapping",
       "label": "Lastverschiebung",
-      "mappingRef": "urn:core:platform:civitas:mapping:taf10-grid:taf10-to-load-shift-action:1.0.0",
+      "mappingRef": "urn:core:platform:civitas:mapping:taf10-grid:7913259f-ace7-88aa-b5ab-41acfbc3fe29:1.0.0",
       "x-ui-position": { "x": 1060, "y": 580 }
     },
     {
       "id": "n-sink-load-shift",
       "kind": "sink",
       "label": "Grid Control Lastverschiebung",
-      "sinkRef": "urn:core:platform:civitas:datasink:taf10-grid:grid-control-actions:1.0.0",
+      "sinkRef": "urn:core:platform:civitas:datasink:taf10-grid:5a6d451f-a9f4-89d0-8c8b-1af2e11b0336:1.0.0",
       "x-ui-position": { "x": 1280, "y": 580 }
     },
     {
@@ -85,14 +85,14 @@
       "id": "n-map-feedin-curtail",
       "kind": "mapping",
       "label": "PV-Abregelung",
-      "mappingRef": "urn:core:platform:civitas:mapping:taf10-grid:taf10-to-feedin-curtail-action:1.0.0",
+      "mappingRef": "urn:core:platform:civitas:mapping:taf10-grid:90b66538-f167-8d3c-97ad-c8bad8be5087:1.0.0",
       "x-ui-position": { "x": 1060, "y": 740 }
     },
     {
       "id": "n-sink-feedin-curtail",
       "kind": "sink",
       "label": "Grid Control PV-Abregelung",
-      "sinkRef": "urn:core:platform:civitas:datasink:taf10-grid:grid-control-actions:1.0.0",
+      "sinkRef": "urn:core:platform:civitas:datasink:taf10-grid:5a6d451f-a9f4-89d0-8c8b-1af2e11b0336:1.0.0",
       "x-ui-position": { "x": 1280, "y": 740 }
     },
     {
@@ -106,35 +106,35 @@
       "id": "n-map-voltage-notify",
       "kind": "mapping",
       "label": "Betreiberbenachrichtigung",
-      "mappingRef": "urn:core:platform:civitas:mapping:taf10-grid:taf10-to-voltage-notify-action:1.0.0",
+      "mappingRef": "urn:core:platform:civitas:mapping:taf10-grid:68e281ff-b760-8a92-8d30-a1806817fbcb:1.0.0",
       "x-ui-position": { "x": 1060, "y": 900 }
     },
     {
       "id": "n-sink-voltage-notify",
       "kind": "sink",
       "label": "Grid Control Benachrichtigung",
-      "sinkRef": "urn:core:platform:civitas:datasink:taf10-grid:grid-control-actions:1.0.0",
+      "sinkRef": "urn:core:platform:civitas:datasink:taf10-grid:5a6d451f-a9f4-89d0-8c8b-1af2e11b0336:1.0.0",
       "x-ui-position": { "x": 1280, "y": 900 }
     },
     {
       "id": "n-sink-p-plus",
       "kind": "sink",
       "label": "FROST Bezug",
-      "sinkRef": "urn:core:platform:civitas:datasink:taf10-grid:frost-observations:1.0.0",
+      "sinkRef": "urn:core:platform:civitas:datasink:taf10-grid:b38277e4-52bd-85bc-9403-f96224e25ce1:1.0.0",
       "x-ui-position": { "x": 1060, "y": 100 }
     },
     {
       "id": "n-sink-p-minus",
       "kind": "sink",
       "label": "FROST Einspeisung",
-      "sinkRef": "urn:core:platform:civitas:datasink:taf10-grid:frost-observations:1.0.0",
+      "sinkRef": "urn:core:platform:civitas:datasink:taf10-grid:b38277e4-52bd-85bc-9403-f96224e25ce1:1.0.0",
       "x-ui-position": { "x": 1060, "y": 260 }
     },
     {
       "id": "n-sink-voltage",
       "kind": "sink",
       "label": "FROST Spannung",
-      "sinkRef": "urn:core:platform:civitas:datasink:taf10-grid:frost-observations:1.0.0",
+      "sinkRef": "urn:core:platform:civitas:datasink:taf10-grid:b38277e4-52bd-85bc-9403-f96224e25ce1:1.0.0",
       "x-ui-position": { "x": 1060, "y": 420 }
     },
     {

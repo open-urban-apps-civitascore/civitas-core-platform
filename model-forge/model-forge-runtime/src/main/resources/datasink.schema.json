@@ -33,7 +33,7 @@
         "id": {
           "type": "string",
           "description": "Versioned CORE URN of this DataSink.",
-          "pattern": "^urn:core:[^:]+:[^:]+:datasink:[^:]+:[^:]+:[^:]+(:[^:]+)?$"
+          "pattern": "^urn:core:[^:]+:[^:]+:datasink:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$"
         },
         "title": {
           "type": "string",
@@ -58,7 +58,7 @@
         "element": {
           "type": "string",
           "description": "Versioned CORE URN of the DataStructure describing the Thing-shaped target structure.",
-          "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$",
+          "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$",
           "x-core-ref": {
             "type": "urn:core:type:DataStructure"
           }
@@ -88,7 +88,7 @@
         "id": {
           "type": "string",
           "description": "Versioned CORE URN of this DataSink.",
-          "pattern": "^urn:core:[^:]+:[^:]+:datasink:[^:]+:[^:]+:[^:]+(:[^:]+)?$"
+          "pattern": "^urn:core:[^:]+:[^:]+:datasink:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$"
         },
         "title": {
           "type": "string",
@@ -108,7 +108,7 @@
         "element": {
           "type": "string",
           "description": "Versioned CORE URN of the DataStructure describing the row format written to the table.",
-          "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$",
+          "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$",
           "x-core-ref": {
             "type": "urn:core:type:DataStructure"
           }

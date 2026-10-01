@@ -1,9 +1,9 @@
 {
   "$schema": "https://civitasconnect.digital/core/mapping/v1",
-  "id": "urn:core:platform:civitas:mapping:common:sensor-to-observation:1.0.0",
+  "id": "urn:core:platform:civitas:mapping:common:9b38e37c-0c12-8c9a-8b48-ffeea1269358:1.0.0",
   "title": "Sensor → Beobachtung",
-  "source": "urn:core:platform:civitas:element:common:SensorReading:1.0.0",
-  "target": "urn:core:platform:civitas:element:common:Observation:1.0.0",
+  "source": "urn:core:platform:civitas:element:common:bb784821-3369-8795-8731-904750c5b1e1:1.0.0",
+  "target": "urn:core:platform:civitas:element:common:1722a13b-2b05-8d3a-b0cf-4d0dbf215aa0:1.0.0",
   "fields": {
     "id": {
       "op": "copy",

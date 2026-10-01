@@ -97,7 +97,7 @@ public class SchemaImportService {
         }
 
         String schemaTitle = schema.path("title").asText(null);
-        String safeTitle   = sanitizeId(schemaTitle, UUID.randomUUID().toString());
+        String safeTitle   = elementKeyOf(schemaTitle, UUID.randomUUID().toString());
 
         // When the root's $id is a :datastructure: URN, the caller intends the document to BE a
         // DataStructure — one artifact that holds its own shape + styles and *contains* its $defs
@@ -157,7 +157,7 @@ public class SchemaImportService {
         // (→ version.model_urn); otherwise the root Element's pin (first entry) is the root, as before.
         String rootPin = (dsRootUrn != null && dataStructurePin != null)
             ? dataStructurePin
-            : (pins.isEmpty() ? primaryResourceId(elements, safeTitle) : pins.getFirst());
+            : (pins.isEmpty() ? primaryResourceId(elements) : pins.getFirst());
         return new SchemaImportResult(rootPin, pins, List.of());
     }
 
@@ -193,18 +193,17 @@ public class SchemaImportService {
         if (artifactId != null && !artifactId.isBlank() && !UrnParser.isUrn(artifactId)) {
             return importError("invalid-artifact-id",
                 "Artifact id '" + artifactId + "' is not a CORE URN (expected "
-                    + "urn:core:<scope>:<owner>:<type>:<domain>:<name>:<disambiguator>"
+                    + "urn:core:<scope>:<owner>:<type>:<domain>:<uuid>"
                     + " with an optional :<version>).");
         }
-        String safeName = sanitizeId(name, UUID.randomUUID().toString());
         // XSD shares the Element identity — the format is a stored representation, not in the URN.
-        // A name-derived identity is minted (UUID invariant); an explicit artifactId (e.g. the
-        // XRepository kennung-based URN) is caller-owned and respected as-is.
+        // A fresh identity is minted; an explicit artifactId (e.g. the XRepository kennung-based
+        // URN) is caller-owned and respected as-is.
         String urn = artifactId != null && !artifactId.isBlank()
             ? artifactId
             : version != null && !version.isBlank()
-            ? urns.mintElement(safeName, version)
-            : urns.mintElement(safeName);
+            ? urns.mintElement(version)
+            : urns.mintElement();
 
         Set<String> importRefs =
             Optional.ofNullable(registry.extractImportRefs(xsdContent)).orElse(Set.of());
@@ -216,6 +215,7 @@ public class SchemaImportService {
         // node once a rebuild re-syncs from the durable registry.
         String explicitVersion = command.preserveVersion() && version != null && !version.isBlank() ? version : null;
         String pin = registry.storeXsdElement(urn, xsdContent, importRefs, explicitVersion);
+        registry.nameArtifact(pin != null ? pin : urn, name);
         graph.register(pin != null ? pin : urn, importRefs);
 
         // The write itself assigned the version; return its pin (fall back to the import URN
@@ -236,14 +236,13 @@ public class SchemaImportService {
      */
     /**
      * As {@link #importFromUrl(String)}, but derives the imported artifact's identity from
-     * {@code stableKey} — the upstream's own identifier — instead of minting a random
-     * disambiguator. Re-importing the same upstream artifact therefore resolves to the same logical
-     * URN, so the registry either recognises it as unchanged or versions it, rather than creating a
-     * duplicate. Same reasoning as the xRepository import, which derives from the standard's
-     * identifier.
+     * {@code stableKey} — the upstream's own identifier — instead of minting a random UUID.
+     * Re-importing the same upstream artifact therefore resolves to the same logical URN, so the
+     * registry either recognises it as unchanged or versions it, rather than creating a duplicate.
+     * Same reasoning as the xRepository import, which derives from the standard's identifier.
      *
-     * <p>Only the document's own identity is derived. A {@code $defs} member still mints randomly,
-     * so a document with members is idempotent at the root and the grouping but not per member.
+     * <p>The members' identities derive from the document's, so a re-import is idempotent per
+     * member as well.
      *
      * @param stableKey an identifier that names the same upstream artifact across imports and is
      *     unique across upstreams — include the source, e.g. {@code smart-data-models:Weather/…}
@@ -261,9 +260,8 @@ public class SchemaImportService {
     private JsonNode stampDerivedId(JsonNode schema, String stableKey) {
         if (schema == null || !schema.isObject()) return schema;
         if (UrnParser.isUrn(schema.path("$id").asText(null))) return schema;
-        String name = sanitizeId(schema.path("title").asText(null), sanitizeId(stableKey, "element"));
         ObjectNode copy = (ObjectNode) schema.deepCopy();
-        copy.put("$id", urns.element(name, urns.disambiguatorFor(stableKey)));
+        copy.put("$id", urns.element(UrnParser.deriveId(stableKey)));
         return copy;
     }
 
@@ -307,18 +305,26 @@ public class SchemaImportService {
                 return new ImportModel(elements, buildDataStructureContent(schema, Map.of(), dsRootUrn, schemaTitle));
             }
             // Flat schema (no $defs): the whole schema is one Element.
-            ObjectNode flat = buildFlatElement(schema, safeTitle, schemaTitle);
-            elements.set(schemaKey(flat, safeTitle), flat);
+            ObjectNode flat = buildFlatElement(schema, schemaTitle);
+            elements.set(safeTitle, flat);
             return new ImportModel(elements, buildDataStructureManifest(elements, schemaTitle, safeTitle));
         }
 
-        // The root's URN is resolved up front (used to seed de-dup / re-import-matching for the
-        // defs below) so a $defs entry named like the schema title can never be assigned it.
+        // The root's URN is resolved first: every def's URN derives from its UUID, and the de-dup
+        // reserves it.
         boolean rootIsExplicit = UrnParser.isUrn(schema.path("$id").asText(null));
         String rootUrn = UrnParser.logicalUrn(rootIsExplicit
             ? schema.path("$id").asText()
-            : urns.mintElement(safeTitle));
-        Map<String, String> defUrns = mapDefUrns(defs, rootUrn, rootIsExplicit);
+            : urns.mintElement());
+        // A DataStructure member that is a bare reference names an Element already stored, the
+        // form the DataStructure itself is stored in. Splitting it out would store a new version
+        // of that Element whose content is a reference to its own previous version.
+        Map<String, String> referencedMembers = dsRootUrn != null ? bareReferences(defs) : Map.of();
+        ObjectNode ownDefs = ((ObjectNode) defs).deepCopy();
+        referencedMembers.keySet().forEach(ownDefs::remove);
+        Map<String, String> defUrns = new LinkedHashMap<>(mapDefUrns(ownDefs, rootUrn));
+        defUrns.putAll(referencedMembers);
+        defs = ownDefs;
 
         // A document with no shape of its own (no type/properties/$ref/composition keyword — just
         // metadata and $defs) is a pure container: the DataStructure grouping its defs, not an
@@ -327,15 +333,14 @@ public class SchemaImportService {
         // buildDataStructureContent). Only a plain Element root with its own shape becomes an Element.
         if (hasOwnShape(schema) && dsRootUrn == null) {
             ObjectNode root = buildRootElement(schema, defUrns, rootUrn, schemaTitle);
-            elements.set(schemaKey(root, safeTitle), root);
+            elements.set(safeTitle, root);
         }
 
         defs.properties().forEach(e -> {
             ObjectNode def = buildDefElement(e.getKey(), e.getValue(), defUrns);
             // Map keys are display names — disambiguate instead of dropping, so every
-            // def survives even when its name segment collides with the root's.
-            elements.set(uniqueElementKey(elements,
-                UrnParser.nameFromUrn(defUrns.get(e.getKey()))), def);
+            // def survives even when its key collides with the root's.
+            elements.set(uniqueElementKey(elements, e.getKey()), def);
         });
 
         ObjectNode dataStructure = dsRootUrn != null
@@ -375,6 +380,18 @@ public class SchemaImportService {
         return content;
     }
 
+    /** The {@code $defs} entries that are only a {@code $ref} to a CORE URN, keyed by entry. */
+    private static Map<String, String> bareReferences(JsonNode defs) {
+        Map<String, String> references = new LinkedHashMap<>();
+        defs.properties().forEach(e -> {
+            JsonNode ref = e.getValue().path("$ref");
+            if (e.getValue().size() == 1 && ref.isTextual() && UrnParser.isUrn(ref.asText())) {
+                references.put(e.getKey(), ref.asText());
+            }
+        });
+        return references;
+    }
+
     /** Resolve a {@code "#/$defs/<Name>"} pointer to the member Element's CORE URN; a value that is
      *  already a URN (or an unknown pointer) is returned verbatim. */
     private static String localDefTarget(String ref, Map<String, String> defUrns) {
@@ -385,6 +402,23 @@ public class SchemaImportService {
         return ref;
     }
 
+    /**
+     * Whether the document is a {@code $defs} library: one that names itself a DataStructure, or one
+     * with no shape of its own beyond a top-level {@code $ref} — a {@code "#/$defs/<key>"} pointer or
+     * a member's CORE URN, either of which only designates the root member.
+     */
+    static boolean isDefsLibrary(JsonNode schema) {
+        if (!(schema instanceof ObjectNode object)) return false;
+        if (dataStructureRootUrn(object) != null) return true;
+        String rootRef = object.path("$ref").asText("");
+        if (rootRef.startsWith("#/$defs/") || UrnParser.isUrn(rootRef)) {
+            ObjectNode withoutRootPointer = object.deepCopy();
+            withoutRootPointer.remove("$ref");
+            return !hasOwnShape(withoutRootPointer);
+        }
+        return !hasOwnShape(object);
+    }
+
     private static boolean hasOwnShape(JsonNode schema) {
         for (String keyword : OWN_SHAPE_KEYWORDS) {
             if (schema.has(keyword)) return true;
@@ -393,11 +427,11 @@ public class SchemaImportService {
     }
 
     /** Flat schema → a single Element, with $id/title backfilled when absent. */
-    private ObjectNode buildFlatElement(JsonNode schema, String safeTitle, String schemaTitle) {
+    private ObjectNode buildFlatElement(JsonNode schema, String schemaTitle) {
         ObjectNode s = (ObjectNode) schema.deepCopy();
         String authored = s.path("$id").asText(null);
         s.put("$id", UrnParser.logicalUrn(
-            UrnParser.isUrn(authored) ? authored : urns.mintElement(safeTitle)));
+            UrnParser.isUrn(authored) ? authored : urns.mintElement()));
         if (!s.has("title") && schemaTitle != null)
             s.put("title", schemaTitle);
         return s;
@@ -431,22 +465,21 @@ public class SchemaImportService {
     /**
      * Map each top-level {@code $defs} key to the URN its extracted Element will carry.
      * A definition that already declares its own CORE-URN {@code $id} keeps it. Otherwise the
-     * def is matched against the sub-elements minted for this root in an earlier import (so a
-     * re-imported def keeps its identity and is versioned, not duplicated); a def with no such
-     * predecessor gets a freshly minted, UUID-bearing URN. Generated URNs are de-duplicated
-     * against each other <em>and</em> against the root schema's URN — comparison is on the
-     * logical (version-free) form because the logical URN is the registry artifact ID, so two
-     * URNs differing only in version would still collapse onto the same artifact.
+     * def's URN derives from the root's UUID and the def key, so a re-imported def keeps its
+     * identity and is versioned, not duplicated. URNs are de-duplicated against each other
+     * <em>and</em> against the root schema's URN — comparison is on the logical (version-free)
+     * form because the logical URN is the registry artifact ID, so two URNs differing only in
+     * version would still collapse onto the same artifact.
      */
-    private Map<String, String> mapDefUrns(JsonNode defs, String reservedRootUrn, boolean rootIsExplicit) {
+    private Map<String, String> mapDefUrns(JsonNode defs, String reservedRootUrn) {
         Map<String, String> defUrns = new LinkedHashMap<>();
         Set<String> usedLogical = new HashSet<>();
         usedLogical.add(UrnParser.logicalUrn(reservedRootUrn));
         // Pass 1: reserve URNs of defs that bring their own CORE-URN $id — but only when the
         // logical URN is still free. A def whose explicit $id collides with the reserved root URN
-        // (or an earlier def's $id) is left for pass 2, which derives a distinct URN from the def
-        // key; this mirrors pass 2's de-dup so a def can never silently mint another version of an
-        // already-claimed artifact (URN-collision / identity-confusion hardening).
+        // (or an earlier def's $id) is left for pass 2; this mirrors pass 2's de-dup so a def can
+        // never silently mint another version of an already-claimed artifact (URN-collision /
+        // identity-confusion hardening).
         defs.properties().forEach(e -> {
             String ownId = e.getValue().path("$id").asText(null);
             if (UrnParser.isUrn(ownId) && !usedLogical.contains(UrnParser.logicalUrn(ownId))) {
@@ -454,47 +487,20 @@ public class SchemaImportService {
                 usedLogical.add(UrnParser.logicalUrn(ownId));
             }
         });
-        // Pass 2: reuse the sub-element minted for the same def name in an earlier import of this
-        // root, or mint a fresh UUID-bearing URN. Minted UUIDs cannot collide; the usedLogical
-        // guard stays as identity-confusion hardening. Only an explicitly supplied root URN can
-        // be a re-import — a root minted in this very call cannot have predecessors.
-        Map<String, String> mintedPredecessors = rootIsExplicit
-            ? mintedSubElementsOf(reservedRootUrn)
-            : Map.of();
+        // Pass 2: derive the remaining defs from the root. A def whose derived URN an explicit $id
+        // from pass 1 already holds gets a minted one.
+        UUID rootId = UrnParser.idFromUrn(reservedRootUrn);
         defs.properties().forEach(e -> {
             if (!defUrns.containsKey(e.getKey())) {
-                String predecessor = mintedPredecessors.get(UrnParser.sanitize(e.getKey()));
-                String urn = predecessor != null && !usedLogical.contains(UrnParser.logicalUrn(predecessor))
-                    ? predecessor
-                    : mintedElementUrn(usedLogical, e.getKey());
-                defUrns.put(e.getKey(), UrnParser.logicalUrn(urn));
-                usedLogical.add(UrnParser.logicalUrn(urn));
+                String derived = urns.member(rootId, e.getKey());
+                String urn = usedLogical.contains(derived)
+                    ? UrnParser.logicalUrn(urns.mintElement())
+                    : derived;
+                defUrns.put(e.getKey(), urn);
+                usedLogical.add(urn);
             }
         });
         return defUrns;
-    }
-
-    /**
-     * The minted sub-elements a previous import of {@code rootUrn} produced, keyed by the base
-     * of their name segment (the sanitised def key without the UUID suffix). Re-importing a root
-     * therefore versions its existing sub-elements instead of minting a parallel set — the
-     * def-name-within-parent matching that keeps sub-element identity stable across imports.
-     */
-    private Map<String, String> mintedSubElementsOf(String rootUrn) {
-        Map<String, String> byBaseName = new LinkedHashMap<>();
-        for (String dependency : graph.getDependencies(rootUrn)) {
-            String base = UrnParser.nameFromUrn(dependency);
-            if (base != null) byBaseName.putIfAbsent(base, dependency);
-        }
-        return byBaseName;
-    }
-
-    /** Mint a UUID-bearing Element URN for {@code name}; the guard loop is belt-and-braces. */
-    private String mintedElementUrn(Set<String> usedLogical, String name) {
-        String urn = urns.mintElement(name);
-        while (usedLogical.contains(UrnParser.logicalUrn(urn)))
-            urn = urns.mintElement(name);
-        return urn;
     }
 
     /** Pick an elements-map key that is not taken yet, appending a numeric suffix on collision. */
@@ -564,12 +570,6 @@ public class SchemaImportService {
         return false;
     }
 
-    /** Returns the short name used as the map key (name segment of $id, or fallback). */
-    private static String schemaKey(ObjectNode schema, String fallback) {
-        String id = schema.path("$id").asText(null);
-        return UrnParser.isUrn(id) ? UrnParser.nameFromUrn(id) : fallback;
-    }
-
     /**
      * Stores every imported Element and returns each one's registry-assigned pin (the versioned
      * URN returned by the write itself), in {@code elements}' order — the first entry is the root,
@@ -591,7 +591,7 @@ public class SchemaImportService {
             Set<String> refs         = refExtractor.extractRefs(schema);
             Set<String> associations = refExtractor.extractCoreRefTargets(schema);
             String schemaId = schema.path("$id").asText(null);
-            String urn = UrnParser.isUrn(schemaId) ? schemaId : urns.mintElement(e.getKey());
+            String urn = UrnParser.isUrn(schemaId) ? schemaId : urns.mintElement();
             // Persist first, then register the graph node, so a failed store never leaves a phantom
             // node/edge. Persist the full (possibly cyclic) edge set — compositions ($ref) and
             // associations (x-core-ref) alike, so both are navigable as dependencies/dependents.
@@ -600,7 +600,7 @@ public class SchemaImportService {
             // mints 1.0.0 for a brand-new artifact regardless of the incoming URN's version segment,
             // unless explicitVersion opts into adopting it verbatim), which would otherwise orphan
             // the graph node once a rebuild re-syncs from the registry.
-            String pin = registry.storeElement(e.getKey(), schema, refs, associations, explicitVersion, bump);
+            String pin = registry.storeElement(schema, refs, associations, explicitVersion, bump);
             String resolvedPin = pin != null ? pin : urn;
             pins.add(resolvedPin);
             pinByLogical.put(UrnParser.logicalUrn(urn), resolvedPin);
@@ -715,16 +715,13 @@ public class SchemaImportService {
     }
 
     /**
-     * The grouping DataStructure's URN: the root Element's identity (first member) — its name AND
-     * disambiguator segments — reused with the {@code datastructure} type, so a re-imported document
-     * versions its existing DataStructure instead of minting a new one. Used by
-     * {@link #buildDataStructureManifest} so the URN a grouping is validated and stored under is one
-     * and the same.
+     * The grouping DataStructure's URN: the root Element's UUID (first member) with the
+     * {@code datastructure} type, so a re-imported document versions its existing DataStructure
+     * instead of minting a new one. Used by {@link #buildDataStructureManifest} so the URN a
+     * grouping is validated and stored under is one and the same.
      */
     private String dataStructureUrnForMembers(List<String> members) {
-        String firstMember = members.getFirst();
-        return urns.dataStructure(
-            UrnParser.nameFromUrn(firstMember), UrnParser.disambiguatorFromUrn(firstMember));
+        return urns.dataStructure(UrnParser.idFromUrn(members.getFirst()));
     }
 
     /** The member Element URNs of an import, in order: each element's $id (or generated URN). */
@@ -732,13 +729,13 @@ public class SchemaImportService {
         List<String> urnList = new ArrayList<>();
         elements.properties().forEach(e -> {
             String id = e.getValue().path("$id").asText(null);
-            urnList.add(UrnParser.isUrn(id) ? id : urns.mintElement(e.getKey()));
+            urnList.add(UrnParser.isUrn(id) ? id : urns.mintElement());
         });
         return urnList;
     }
 
-    /** A URN-safe slug of {@code candidate}, or {@code fallback} when nothing usable remains. */
-    private static String sanitizeId(String candidate, String fallback) {
+    /** A slug of {@code candidate} for the elements-map key, or {@code fallback} if none remains. */
+    private static String elementKeyOf(String candidate, String fallback) {
         if (candidate == null || candidate.isBlank()) return fallback;
         String safe = UrnParser.sanitize(candidate);
         return safe.equals("unknown") ? fallback : safe;
@@ -754,11 +751,11 @@ public class SchemaImportService {
         return logical;
     }
 
-    private String primaryResourceId(ObjectNode elements, String fallbackName) {
+    private String primaryResourceId(ObjectNode elements) {
         for (Map.Entry<String, JsonNode> first : elements.properties()) {
-            return first.getValue().path("$id").asText(urns.mintElement(first.getKey()));
+            return first.getValue().path("$id").asText(urns.mintElement());
         }
-        return urns.mintElement(fallbackName);
+        return urns.mintElement();
     }
 
     private SchemaImportResult importError(String code, String message) {

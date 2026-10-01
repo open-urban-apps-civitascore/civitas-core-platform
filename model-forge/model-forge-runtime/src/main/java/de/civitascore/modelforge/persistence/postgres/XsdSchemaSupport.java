@@ -58,9 +58,10 @@ class XsdSchemaSupport {
      * so a multi-version XSD never returns another version's conversion.
      *
      * @param urn         the (versioned or logical) XSD URN
+     * @param title       the artifact's display name, the title of a multi-type bundle; may be null
      * @param rawXsd      supplier of the raw XSD text for {@code urn}
      */
-    Optional<JsonNode> toJsonSchema(String urn, Supplier<Optional<String>> rawXsd) {
+    Optional<JsonNode> toJsonSchema(String urn, String title, Supplier<Optional<String>> rawXsd) {
         if (converter == null) return Optional.empty();
         String reqVersion = UrnParser.versionFromUrn(urn);
         // A concrete version pins the cache key; a logical/:latest URN (no resolvable version)
@@ -97,7 +98,7 @@ class XsdSchemaSupport {
             ObjectNode bundle = mapper.createObjectNode();
             bundle.put("$schema", JsonSchema.DRAFT_2020_12);
             bundle.put("$id",     jsonPrefix + ":bundle:" + ver);
-            bundle.put("title",   UrnParser.nameFromUrn(urn));
+            if (title != null) bundle.put("title", title);
             bundle.put("x-xsd-source", urn);
             bundle.put("type",    "object");
             var defs  = mapper.createObjectNode();

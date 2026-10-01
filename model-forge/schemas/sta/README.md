@@ -12,15 +12,15 @@ Schema document) from the Elements it defines.
 
 | Entity | CORE URN |
 |---|---|
-| Thing | `urn:core:platform:civitas:element:sta:Thing:h2s9s5nlvw:1.0.0` |
-| Location | `urn:core:platform:civitas:element:sta:Location:l2p8y4efpu:1.0.0` |
-| HistoricalLocation | `urn:core:platform:civitas:element:sta:HistoricalLocation:kpu3mldt72:1.0.0` |
-| Datastream | `urn:core:platform:civitas:element:sta:Datastream:s04brbdcz9:1.0.0` |
-| Sensor | `urn:core:platform:civitas:element:sta:Sensor:m8i4hc3h56:1.0.0` |
-| ObservedProperty | `urn:core:platform:civitas:element:sta:ObservedProperty:yduda2m190:1.0.0` |
-| Observation | `urn:core:platform:civitas:element:sta:Observation:ulhry9fjx6:1.0.0` |
-| FeatureOfInterest | `urn:core:platform:civitas:element:sta:FeatureOfInterest:an2vwx133n:1.0.0` |
-| UnitOfMeasurement | `urn:core:platform:civitas:element:sta:UnitOfMeasurement:fy7igxkv4b:1.0.0` |
+| Thing | `urn:core:platform:civitas:element:sta:574343b4-3c80-852d-a313-5fc2a01b4174:1.0.0` |
+| Location | `urn:core:platform:civitas:element:sta:d8a52fda-326d-8b95-8244-c1ff8975dab2:1.0.0` |
+| HistoricalLocation | `urn:core:platform:civitas:element:sta:326f69aa-528b-88ca-b8bf-25a675f66a53:1.0.0` |
+| Datastream | `urn:core:platform:civitas:element:sta:b75539ef-605c-8818-b49e-879284ed3a26:1.0.0` |
+| Sensor | `urn:core:platform:civitas:element:sta:7149a588-7403-8b26-a560-a83163b063b4:1.0.0` |
+| ObservedProperty | `urn:core:platform:civitas:element:sta:2137eae2-ced7-85ab-a30b-5ed341b4aecf:1.0.0` |
+| Observation | `urn:core:platform:civitas:element:sta:04f87117-b59e-8309-b8f6-0af3c9913679:1.0.0` |
+| FeatureOfInterest | `urn:core:platform:civitas:element:sta:324be979-f61b-83f9-aaac-bbc33ef50c7b:1.0.0` |
+| UnitOfMeasurement | `urn:core:platform:civitas:element:sta:56eb7cd3-773a-8133-a52b-740c98380c1d:1.0.0` |
 
 Each `$defs` entry keeps the same explicit CORE-URN `$id` it always had, so every entity is
 still individually addressable and re-imports still land on the same identities; only the
@@ -45,7 +45,7 @@ than embedded:
 "Thing": {
   "type": "string",
   "pattern": "^urn:",
-  "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:Thing:h2s9s5nlvw:1.0.0" }
+  "x-core-ref": { "type": "urn:core:platform:civitas:element:sta:574343b4-3c80-852d-a313-5fc2a01b4174:1.0.0" }
 }
 ```
 

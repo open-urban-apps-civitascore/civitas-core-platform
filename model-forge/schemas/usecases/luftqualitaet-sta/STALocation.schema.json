@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id":     "urn:core:platform:civitas:element:sta:STALocation:1.0.0",
+  "$id":     "urn:core:platform:civitas:element:sta:136301c2-0217-8147-aff0-12d08e3724b3:1.0.0",
   "title":   "STALocation",
   "description": "OGC SensorThings API v1.1 Location entity. Describes a geographic position of a Thing using GeoJSON Point encoding, as required by the STA specification. Used inline in STAThing.Locations array when creating a new station in FROST-Server.",
   "type": "object",

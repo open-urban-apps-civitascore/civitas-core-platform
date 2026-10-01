@@ -1,9 +1,9 @@
 {
   "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
-  "id": "urn:core:platform:civitas:mapping:luftqualitaet:airquality-co-to-observation:1.0.0",
+  "id": "urn:core:platform:civitas:mapping:luftqualitaet:9d3e2518-756b-8426-a6f0-a7926ae24b3e:1.0.0",
   "title": "Air Quality CO -> STA Observation",
-  "source": "urn:core:platform:civitas:element:luftqualitaet:AirQualityRawReading:1.0.0",
-  "target": "urn:core:platform:civitas:element:sta:STAObservation:1.0.0",
+  "source": "urn:core:platform:civitas:element:luftqualitaet:be49ab6e-d247-880e-95cd-4dadeedd7e25:1.0.0",
+  "target": "urn:core:platform:civitas:element:sta:61296fa8-8cca-8d83-af42-51e12c991cd8:1.0.0",
   "fields": {
     "phenomenonTime": {
       "op": "copy",

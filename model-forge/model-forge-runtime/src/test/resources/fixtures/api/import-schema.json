@@ -1,7 +1,7 @@
 {
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "urn:core:platform:civitas:element:common:Observation:ulhry9fjx6:1.0.0",
+    "$id": "urn:core:platform:civitas:element:common:4560fbf9-5824-85f9-b58f-5e1049048f42:1.0.0",
     "title": "Observation",
     "type": "object",
     "required": ["id", "observedAt", "value"],

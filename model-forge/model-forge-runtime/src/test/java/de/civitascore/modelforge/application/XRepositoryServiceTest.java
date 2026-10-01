@@ -2,9 +2,10 @@ package de.civitascore.modelforge.application;
 
 import de.civitascore.modelforge.core.port.XRepositoryCatalog;
 import de.civitascore.modelforge.core.port.XsdSchemaConverter;
-import de.civitascore.modelforge.urn.UrnService;
+import de.civitascore.modelforge.urn.UrnParser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -41,13 +42,12 @@ class XRepositoryServiceTest {
         client = mock(XRepositoryCatalog.class);
         converter = mock(XsdSchemaConverter.class);
         importService = mock(SchemaImportService.class);
-        UrnService urns = new UrnService("platform", "civitas", "common", "1.0.0");
-        svc = new XRepositoryService(client, converter, importService, urns, MAPPER);
+        svc = new XRepositoryService(client, converter, importService, MAPPER);
         when(client.downloadXsd(anyString())).thenReturn(XSD);
         when(importService.importXsd(org.mockito.ArgumentMatchers.any(XsdImportRequest.class)))
-            .thenReturn(new SchemaImportResult("urn:core:test:owner:element:domain:name:disc:1.0.0", java.util.List.of()));
+            .thenReturn(new SchemaImportResult("urn:core:test:owner:element:domain:00000000-0000-4000-8000-000000000051:1.0.0", java.util.List.of()));
         when(importService.importSchema(org.mockito.ArgumentMatchers.any(SchemaImportRequest.class)))
-            .thenReturn(new SchemaImportResult("urn:core:test:owner:element:domain:name:disc:1.0.0", java.util.List.of()));
+            .thenReturn(new SchemaImportResult("urn:core:test:owner:element:domain:00000000-0000-4000-8000-000000000051:1.0.0", java.util.List.of()));
     }
 
     private static XRepositoryImportCommand req(boolean importAsXsd, boolean preserveUpstreamVersion) {
@@ -73,7 +73,22 @@ class XRepositoryServiceTest {
     void rawXsdImport_returnsTheServiceResultDirectly() {
         var result = svc.importArtifact(req(true, false));
 
-        assertThat(result.resourceId()).isEqualTo("urn:core:test:owner:element:domain:name:disc:1.0.0");
+        assertThat(result.resourceId()).isEqualTo("urn:core:test:owner:element:domain:00000000-0000-4000-8000-000000000051:1.0.0");
+    }
+
+    /** Without this, every version of a standard would start an unrelated version history. */
+    @Test
+    void rawXsdImport_keepsOneIdentityAcrossVersionsOfAStandard() {
+        svc.importArtifact(new XRepositoryImportCommand("urn:xoev-de:xmeld:standard:xmeld_5.5", "5.5",
+            "standard", "xoev", true, false));
+        svc.importArtifact(new XRepositoryImportCommand("urn:xoev-de:xmeld:standard:xmeld_5.6", "5.6",
+            "standard", "xoev", true, false));
+
+        ArgumentCaptor<XsdImportRequest> imports = ArgumentCaptor.forClass(XsdImportRequest.class);
+        verify(importService, times(2)).importXsd(imports.capture());
+        assertThat(UrnParser.logicalUrn(imports.getAllValues().get(1).artifactId()))
+            .isEqualTo(UrnParser.logicalUrn(imports.getAllValues().get(0).artifactId()));
+        assertThat(UrnParser.isUrn(imports.getAllValues().get(0).artifactId())).isTrue();
     }
 
     /** Matches an {@link XsdImportRequest} carrying the given version, xsdContent and preserveVersion flag. */

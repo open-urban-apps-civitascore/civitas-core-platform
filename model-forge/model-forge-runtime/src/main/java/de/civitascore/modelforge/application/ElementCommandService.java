@@ -76,7 +76,7 @@ public class ElementCommandService {
         Set<String> refs         = refExtractor.extractRefs(updated);
         Set<String> associations = refExtractor.extractCoreRefTargets(updated);
         String pin = registry.storeElement(
-            UrnParser.nameFromUrn(urn), updated, refs, associations, null, bump, bumpFromVersion);
+            updated, refs, associations, null, bump, bumpFromVersion);
         // Register the graph node under the pin the write itself assigned (the current version),
         // so the node key matches what read-time lookups resolve a logical/:latest URN to.
         Set<String> allEdges = new LinkedHashSet<>(refs);

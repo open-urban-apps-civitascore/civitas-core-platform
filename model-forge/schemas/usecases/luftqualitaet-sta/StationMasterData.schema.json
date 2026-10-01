@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:core:platform:civitas:element:luftqualitaet:StationMasterData:1.0.0",
+  "$id": "urn:core:platform:civitas:element:luftqualitaet:57efd321-5e4e-89fc-8cbd-dc3443bf2317:1.0.0",
   "title": "StationMasterData",
   "description": "Master record for an air-quality monitoring station. Stored in a PostgreSQL database and looked up by stationId at runtime to enrich incoming AirQualityRawReading messages.",
   "type": "object",
@@ -29,11 +29,11 @@
       "description": "Station classification according to EU Directive 2008/50/EC."
     },
     "location": {
-      "$ref": "urn:core:platform:civitas:element:common:GeoPoint:1.0.0",
+      "$ref": "urn:core:platform:civitas:element:common:f1ebc343-33a2-8681-8e4a-aecfaeaa8e1e:1.0.0",
       "description": "Fixed installation coordinates of the station."
     },
     "calibration": {
-      "$ref": "urn:core:platform:civitas:element:luftqualitaet:StationCalibration:1.0.0",
+      "$ref": "urn:core:platform:civitas:element:luftqualitaet:cd7a3fa1-bb58-87bd-bd98-2f7bb21807a9:1.0.0",
       "description": "Currently active calibration parameters."
     },
     "frostThingId": {

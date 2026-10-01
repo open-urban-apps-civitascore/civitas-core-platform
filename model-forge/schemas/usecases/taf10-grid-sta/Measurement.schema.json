@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:core:platform:civitas:element:taf10-grid:Measurement:1.0.0",
+  "$id": "urn:core:platform:civitas:element:taf10-grid:066f1d7d-e0b0-8445-b78d-cd70a3f326e2:1.0.0",
   "title": "Measurement",
   "description": "A single electrical measurement with quality indicator and optional raw meter value.",
   "type": "object",

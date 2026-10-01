@@ -17,10 +17,10 @@ class XsdToJsonSchemaConverterTest {
 
     private static final String URN_PREFIX = "urn:core:standard:xoev:element:xadvanced";
 
-    /** Expected converter URN: prefix + name + derived disambiguator (logical, version-less). */
+    /** Expected converter URN: prefix + UUID derived from prefix and name (logical, version-less). */
     private static String urn(String name) {
-        return URN_PREFIX + ":" + name + ":"
-            + de.civitascore.modelforge.urn.UrnParser.deriveDisambiguator(name);
+        return URN_PREFIX + ":"
+            + de.civitascore.modelforge.urn.UrnParser.deriveId(URN_PREFIX + ":" + name);
     }
 
     private final ObjectMapper mapper = new ObjectMapper();

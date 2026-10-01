@@ -32,13 +32,13 @@ class DependencyGraphRebuildDatabaseTest extends AbstractRegistryDatabaseTest {
 
     @BeforeEach
     void storeAStationPinningASupersededReading() {
-        leafPin = registry.storeElement("Leaf", objectSchema(), Set.of());
-        readingV1 = registry.storeElement("Reading", composing(leafPin), Set.of(leafPin));
+        leafPin = registry.storeElement(objectSchema(), Set.of());
+        readingV1 = registry.storeElement(composing(leafPin), Set.of(leafPin));
         readingLogical = UrnParser.logicalUrn(readingV1);
         // Written under the same $id, so this is a second version and not a second artifact — the
         // registry mints a fresh URN for a schema that carries none.
-        readingV2 = registry.storeElement("Reading", identified(readingLogical), Set.of());
-        stationPin = registry.storeElement("Station", composing(readingV1), Set.of(readingV1));
+        readingV2 = registry.storeElement(identified(readingLogical), Set.of());
+        stationPin = registry.storeElement(composing(readingV1), Set.of(readingV1));
     }
 
     @Test
@@ -107,13 +107,12 @@ class DependencyGraphRebuildDatabaseTest extends AbstractRegistryDatabaseTest {
     void writeOntoAnOlderLineRegistersTheVersionItWrote() {
         // What editing the model of an older DataStructureVersion does: the bump counts from that
         // version's own number, so it stays inside its major and never becomes current.
-        String v1 = registry.storeElement("Holder", composing(leafPin), Set.of(leafPin));
+        String v1 = registry.storeElement(composing(leafPin), Set.of(leafPin));
         String logical = UrnParser.logicalUrn(v1);
-        registry.storeElement("Holder", identified(logical), Set.of(), VersionBump.MAJOR);
+        registry.storeElement(identified(logical), Set.of(), VersionBump.MAJOR);
         // Every write carries the same $id, or the registry mints a separate artifact instead of
         // adding a version — and a separate artifact is current on its own and proves nothing.
-        String revised = registry.storeElement(
-            "Holder", identifiedComposing(logical, leafPin), Set.of(leafPin), Set.of(),
+        String revised = registry.storeElement(identifiedComposing(logical, leafPin), Set.of(leafPin), Set.of(),
             null, VersionBump.MINOR, UrnParser.versionFromUrn(v1));
 
         assertThat(UrnParser.logicalUrn(revised)).isEqualTo(logical);
@@ -133,13 +132,12 @@ class DependencyGraphRebuildDatabaseTest extends AbstractRegistryDatabaseTest {
     @DisplayName("A version's edges come back in sort_order, not in row or URN order")
     void edgesOfAVersionComeBackInSortOrder() {
         List<String> alphabetical = Stream.of(
-                registry.storeElement("PartA", objectSchema(), Set.of()),
-                registry.storeElement("PartB", objectSchema(), Set.of()),
-                registry.storeElement("PartC", objectSchema(), Set.of()))
+                registry.storeElement(objectSchema(), Set.of()),
+                registry.storeElement(objectSchema(), Set.of()),
+                registry.storeElement(objectSchema(), Set.of()))
             .sorted()
             .toList();
-        String holder = registry.storeElement(
-            "Holder", objectSchema(), new LinkedHashSet<>(alphabetical));
+        String holder = registry.storeElement(objectSchema(), new LinkedHashSet<>(alphabetical));
 
         // The write path numbers sort_order by insertion, so stored order, row order and URN order
         // all agree. Renumber to a rotation to tell them apart. The renumber runs in URN order,

@@ -20,7 +20,7 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("Reusing the returned logical URN updates that artifact instead of creating a second one")
     void reusingLogicalUrnUpdatesTheSameArtifact() {
-        String firstPin = registry.storeElement("Sensor", schema(null, "temperature"), Set.of());
+        String firstPin = registry.storeElement(schema(null, "temperature"), Set.of());
         String logical = UrnParser.logicalUrn(firstPin);
 
         String secondPin = storeUnder(logical, "humidity", VersionBump.MINOR);
@@ -35,7 +35,7 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("A content change adds a version and leaves the earlier version's stored bytes untouched")
     void contentChangeDoesNotOverwriteTheEarlierVersion() {
-        String firstPin = registry.storeElement("Sensor", schema(null, "temperature"), Set.of());
+        String firstPin = registry.storeElement(schema(null, "temperature"), Set.of());
         String logical = UrnParser.logicalUrn(firstPin);
         String originalBytes = storedContent(logical, "1.0.0");
 
@@ -50,7 +50,7 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("An earlier version stays readable by its pin after a later version is written")
     void earlierVersionRemainsReadableAfterALaterWrite() {
-        String firstPin = registry.storeElement("Sensor", schema(null, "temperature"), Set.of());
+        String firstPin = registry.storeElement(schema(null, "temperature"), Set.of());
         String logical = UrnParser.logicalUrn(firstPin);
 
         storeUnder(logical, "humidity", VersionBump.MAJOR);
@@ -63,10 +63,10 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("Re-storing byte-identical content returns the existing pin and adds no version")
     void identicalContentIsAbsorbed() {
-        String firstPin = registry.storeElement("Sensor", schema(null, "temperature"), Set.of());
+        String firstPin = registry.storeElement(schema(null, "temperature"), Set.of());
         String logical = UrnParser.logicalUrn(firstPin);
         // Idempotence is keyed on the stored bytes, so the identity has to be carried for the
-        // rewrite to be identical: a name-only store mints a fresh disambiguator instead.
+        // rewrite to be identical: a store without an $id mints a fresh UUID instead.
         String carriedPin = storeUnder(logical, "temperature", VersionBump.MINOR);
 
         String rewritePin = storeUnder(logical, "temperature", VersionBump.MINOR);
@@ -79,8 +79,8 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("A store that carries no identity mints a new logical artifact rather than revising one")
     void nameOnlyStoreMintsAFreshIdentity() {
-        String firstPin = registry.storeElement("Sensor", schema(null, "temperature"), Set.of());
-        String secondPin = registry.storeElement("Sensor", schema(null, "temperature"), Set.of());
+        String firstPin = registry.storeElement(schema(null, "temperature"), Set.of());
+        String secondPin = registry.storeElement(schema(null, "temperature"), Set.of());
 
         assertThat(UrnParser.logicalUrn(secondPin)).isNotEqualTo(UrnParser.logicalUrn(firstPin));
         assertThat(rows("artifact")).hasSize(2);
@@ -89,7 +89,7 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("The stored representation is the authored document, with no identity stamped into it")
     void storedRepresentationKeepsTheAuthoredDocument() {
-        String pin = registry.storeElement("Sensor", schema(null, "temperature"), Set.of());
+        String pin = registry.storeElement(schema(null, "temperature"), Set.of());
         String logical = UrnParser.logicalUrn(pin);
 
         // The logical URN lives in the artifact row, not in the document, which is what leaves the
@@ -101,8 +101,7 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
 
     /** Writes under an existing logical URN by carrying it as the schema's {@code $id}. */
     private String storeUnder(String logicalUrn, String property, VersionBump bump) {
-        return registry.storeElement(
-            "Sensor", schema(logicalUrn, property), Set.of(), Set.of(), null, bump, null);
+        return registry.storeElement(schema(logicalUrn, property), Set.of(), Set.of(), null, bump, null);
     }
 
     /** A minimal JSON Schema, optionally claiming an existing logical identity via {@code $id}. */

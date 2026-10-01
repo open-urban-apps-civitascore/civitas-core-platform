@@ -16,7 +16,7 @@
     "id": {
       "type": "string",
       "description": "Versioned CORE URN of this Pipeline.",
-      "pattern": "^urn:core:[^:]+:[^:]+:pipeline:[^:]+:[^:]+:[^:]+(:[^:]+)?$"
+      "pattern": "^urn:core:[^:]+:[^:]+:pipeline:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$"
     },
     "title":       { "type": "string", "description": "Human-readable display name." },
     "description": { "type": "string" },

@@ -99,7 +99,7 @@ class SmokePagesTest extends AbstractWicketPageTest {
 
     @Test
     void artifactEditPageRendersExistingContentWhenEditing() {
-        String urn = "urn:core:platform:civitas:element:common:Thing:1.0.0";
+        String urn = "urn:core:platform:civitas:element:common:d9e5d4ce-e872-8435-beb7-2038c6a6866a:1.0.0";
         ArtifactId id = new ArtifactId(urn);
         when(modelForge.getArtifact(eq(id)))
             .thenReturn(Optional.of(new ArtifactView(id, JSON.readTree("{\"type\":\"object\"}"))));

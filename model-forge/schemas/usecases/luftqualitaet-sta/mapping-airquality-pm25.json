@@ -1,9 +1,9 @@
 {
   "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
-  "id": "urn:core:platform:civitas:mapping:luftqualitaet:airquality-pm25-to-observation:1.0.0",
+  "id": "urn:core:platform:civitas:mapping:luftqualitaet:c48b90e0-4047-8f86-bbf6-4fed6dd06b56:1.0.0",
   "title": "Air Quality PM2.5 -> STA Observation",
-  "source": "urn:core:platform:civitas:element:luftqualitaet:AirQualityRawReading:1.0.0",
-  "target": "urn:core:platform:civitas:element:sta:STAObservation:1.0.0",
+  "source": "urn:core:platform:civitas:element:luftqualitaet:be49ab6e-d247-880e-95cd-4dadeedd7e25:1.0.0",
+  "target": "urn:core:platform:civitas:element:sta:61296fa8-8cca-8d83-af42-51e12c991cd8:1.0.0",
   "fields": {
     "phenomenonTime": {
       "op": "copy",

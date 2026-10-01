@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:core:platform:civitas:element:luftqualitaet:AirQualityRawReading:1.0.0",
+  "$id": "urn:core:platform:civitas:element:luftqualitaet:be49ab6e-d247-880e-95cd-4dadeedd7e25:1.0.0",
   "title": "AirQualityRawReading",
   "description": "Raw measurement payload from an urban air-quality monitoring station published to MQTT (topic: luftqualitaet/readings/{stationId}). Contains pollutant measurements plus meteorological context.",
   "type": "object",
@@ -16,15 +16,15 @@
       "description": "ISO-8601 UTC timestamp of the measurement cycle."
     },
     "no2": {
-      "$ref": "urn:core:platform:civitas:element:luftqualitaet:Measurement:1.0.0",
+      "$ref": "urn:core:platform:civitas:element:luftqualitaet:30263101-599c-84cb-9e13-2aa2767afab1:1.0.0",
       "description": "Nitrogen dioxide (NO2) measurement."
     },
     "pm25": {
-      "$ref": "urn:core:platform:civitas:element:luftqualitaet:Measurement:1.0.0",
+      "$ref": "urn:core:platform:civitas:element:luftqualitaet:30263101-599c-84cb-9e13-2aa2767afab1:1.0.0",
       "description": "Particulate matter PM2.5 measurement."
     },
     "co": {
-      "$ref": "urn:core:platform:civitas:element:luftqualitaet:Measurement:1.0.0",
+      "$ref": "urn:core:platform:civitas:element:luftqualitaet:30263101-599c-84cb-9e13-2aa2767afab1:1.0.0",
       "description": "Carbon monoxide (CO) measurement."
     },
     "temperature": {
@@ -38,7 +38,7 @@
       "description": "Relative humidity in percent."
     },
     "location": {
-      "$ref": "urn:core:platform:civitas:element:common:GeoPoint:1.0.0",
+      "$ref": "urn:core:platform:civitas:element:common:f1ebc343-33a2-8681-8e4a-aecfaeaa8e1e:1.0.0",
       "description": "Current GPS position, if the sensor has a GPS module. Overrides the station default location."
     }
   }

@@ -14,6 +14,7 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import org.apache.wicket.AttributeModifier;
 import org.apache.wicket.markup.head.IHeaderResponse;
 import org.apache.wicket.markup.head.OnDomReadyHeaderItem;
@@ -65,14 +66,20 @@ public class ArtifactViewPage extends BasePage {
 
     public ArtifactViewPage(PageParameters parameters) {
         this.urn = parameters.get("urn").toString("");
-        ArtifactId artifactId = new ArtifactId(urn.isBlank() ? "urn:core:x:x:x:x:x:x" : urn);
+        ArtifactId artifactId =
+            new ArtifactId(urn.isBlank() ? "urn:core:x:x:x:x:" + new UUID(0, 0) : urn);
+        Optional<ArtifactView> view = urn.isBlank() ? Optional.empty() : safeGet(artifactId);
+        boolean exists = view.isPresent();
 
         String type = UrnParser.artifactTypeFromUrn(urn);
         // KIND_LABELS is an immutable Map.of(...) — getOrDefault(null, ...) throws NPE on a null
         // key regardless of the fallback value, so a blank/unparseable urn (type == null, e.g. a
         // missing "urn" page parameter) must short-circuit before ever calling it.
         String typeLabel = type == null ? "Artifact" : KIND_LABELS.getOrDefault(type, type);
-        String name = UrnParser.nameFromUrn(urn);
+        String name = view.map(ArtifactView::content)
+            .map(content -> content.path("title").asText(null))
+            .filter(title -> !title.isBlank())
+            .orElse(urn);
         String version = UrnParser.versionFromUrn(urn);
 
         // Breadcrumbs + header
@@ -86,9 +93,6 @@ public class ArtifactViewPage extends BasePage {
         add(new Label("urn", urn));
         Label versionLabel = new Label("version", version == null ? "current" : version);
         add(versionLabel);
-
-        Optional<ArtifactView> view = urn.isBlank() ? Optional.empty() : safeGet(artifactId);
-        boolean exists = view.isPresent();
 
         WebMarkupContainer copyUrnButton = new WebMarkupContainer("copyUrnButton");
         copyUrnButton.add(new AttributeModifier("data-urn", urn));
@@ -189,8 +193,7 @@ public class ArtifactViewPage extends BasePage {
                 .map(node -> {
                     String relUrn = node.artifactId().value();
                     String kind = UrnParser.artifactTypeFromUrn(relUrn);
-                    String label = node.label() != null && !node.label().isBlank()
-                        ? node.label() : UrnParser.nameFromUrn(relUrn);
+                    String label = node.label();
                     // The null guard has to be on the KEY: KIND_LABELS is an immutable Map.of(...),
                     // which throws on a null key however harmless the fallback looks. A relation
                     // target whose URN is not a CORE URN yields kind == null (see the constructor).

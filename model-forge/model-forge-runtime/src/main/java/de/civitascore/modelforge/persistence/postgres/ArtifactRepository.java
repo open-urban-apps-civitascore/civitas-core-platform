@@ -3,7 +3,10 @@ package de.civitascore.modelforge.persistence.postgres;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -108,6 +111,24 @@ class ArtifactRepository {
             .param("u", RegistryTime.toOffset(updatedAt))
             .param("id", id)
             .update();
+    }
+
+    void updateName(String logicalUrn, String name) {
+        jdbc.sql("update model_forge.artifact set name = :name where logical_urn = :urn")
+            .param("name", name)
+            .param("urn", logicalUrn)
+            .update();
+    }
+
+    /** {@code logical_urn -> name} of the held artifacts among {@code logicalUrns}. */
+    Map<String, String> namesByLogicalUrn(Collection<String> logicalUrns) {
+        Map<String, String> names = new LinkedHashMap<>();
+        jdbc.sql("select logical_urn, name from model_forge.artifact where logical_urn in (:urns)")
+            .param("urns", logicalUrns)
+            .query(rs -> {
+                names.put(rs.getString("logical_urn"), rs.getString("name"));
+            });
+        return names;
     }
 
     /** Deletes the model_forge.artifact (versions, representations, references and namespace rows cascade). */
