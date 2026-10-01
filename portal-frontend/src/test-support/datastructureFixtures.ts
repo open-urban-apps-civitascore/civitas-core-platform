@@ -65,9 +65,6 @@ export const rel = (id: string, type: string, source: string, target: string, ex
 export const diagram = (name: string, nodes: unknown[], edges: unknown[]): UMLDiagram =>
   ({ id: 'd', name, nodes, edges, lastModified: new Date('2026-01-01'), isDirty: false }) as unknown as UMLDiagram
 
-/** A versioned DataStructure CORE URN; passing one switches the export to the canonical saved form. */
-export const DS_URN = 'urn:core:platform:civitas:datastructure:common:TrafficSensor:abc1234567:1.0.0'
-
 export interface DatastructureFixture {
   label: string
   diagram: UMLDiagram

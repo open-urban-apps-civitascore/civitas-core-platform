@@ -19,10 +19,10 @@ import { modelToSchemaTree } from './modelAdapter'
  * silent fixture drift between the two copies into a red test on whichever side lags behind.
  */
 const FIXTURE_HASHES: Record<string, string> = {
-  'broken-missing-parent.json': '4b8aa70c36ee85b86db5adf34cb9214f4a7d6c14254c8be5217437199f69fa82',
+  'broken-missing-parent.json': '4807e3efacb308fc10d6161554f77900fcddef1e4e3c74a41f447756fb7977b6',
   'legacy-definitions.json': 'dff36ea7e76be8fb31a69b848654a73a844fcefe7b3704f11531287aff14fb85',
   'legacy-flat-root.json': '2503d11def93c1ee4a189cb66d9bd2309cfad9645f009be2badfea910ceb6fbe',
-  'wrapper-root.json': '95b6b74650a5a01350f251240ec003e215cfda30c2378aabef7c11a679a3d84d',
+  'wrapper-root.json': 'f596dae7b93246f7f7e6e6ec92d932bdfeaa0cdb3ee6750a68c38abdffdc82b1',
 }
 
 describe('datastructure-model contract fixtures', () => {

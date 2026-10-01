@@ -27,7 +27,7 @@ export const MappingFieldSchema: z.ZodType = z.lazy(() => z.union([z.string(), M
 export const StructureUrnSchema = z
   .string()
   .regex(
-    /^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$/,
+    /^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$/,
     'Must be a versioned CORE DataStructure URN',
   )
 
@@ -154,7 +154,10 @@ export const MappingSchema = z.object({
   /** Versioned CORE URN of this Mapping. */
   id: z
     .string()
-    .regex(/^urn:core:[^:]+:[^:]+:mapping:[^:]+:[^:]+:[^:]+(:[^:]+)?$/, 'Must be a versioned CORE Mapping URN'),
+    .regex(
+      /^urn:core:[^:]+:[^:]+:mapping:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$/,
+      'Must be a versioned CORE Mapping URN',
+    ),
   /** Human-readable display name. */
   title: z.string().optional(),
   description: z.string().optional(),

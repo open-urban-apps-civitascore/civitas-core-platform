@@ -32,6 +32,8 @@ export interface SelectedDatastructureVersion {
   datastructureId: string
   name: string
   version: string
+  /** The registry's pin of the version's model, the URN a reference to it carries. */
+  modelUrn: string
 }
 
 interface DataModelImportModalProps extends DialogProps {
@@ -84,8 +86,13 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
   const findSelectedVersion = (rowId: string | undefined): SelectedDatastructureVersion | undefined => {
     for (const datastructure of datastructures) {
       const version = datastructure.versions.find(item => `${datastructure.id}/${item.id}` === rowId)
-      if (version?.versionNumber) {
-        return { datastructureId: datastructure.id, name: datastructure.name, version: version.versionNumber }
+      if (version?.versionNumber && version.modelUrn) {
+        return {
+          datastructureId: datastructure.id,
+          name: datastructure.name,
+          version: version.versionNumber,
+          modelUrn: version.modelUrn,
+        }
       }
     }
     return undefined

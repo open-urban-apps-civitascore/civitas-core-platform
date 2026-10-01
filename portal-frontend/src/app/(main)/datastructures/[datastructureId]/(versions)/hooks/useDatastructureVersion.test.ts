@@ -43,7 +43,6 @@ vi.mock('@/components/uml-modeler/hooks/use-multi-session-manager', () => ({
   useMultiSessionManager: vi.fn(),
 }))
 
-// A real UUID: buildDataStructureUrn derives the disambiguator by reading the id's hex as a BigInt.
 const DS_ID = '11111111-1111-1111-1111-111111111111'
 
 const classNode = (id: string, name: string) => ({
@@ -188,7 +187,6 @@ const setup = (versionData: DatastructureVersion) => {
   const hook = renderHook(() =>
     useDatastructureVersion({
       datastructureId: DS_ID,
-      dataStructureName: 'Struct',
       version: versionData,
       isCreateMode: false,
     }),
@@ -277,7 +275,7 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     const payload = updateVersion.mutateAsync.mock.calls[0][0] as {
       data: { model: { $ref?: string; $defs?: Record<string, { $id?: string }> } }
     }
-    expect(payload.data.model.$ref).toBe(payload.data.model.$defs?.Alpha?.$id)
+    expect(payload.data.model.$ref).toBe('#/$defs/Alpha')
     expect(payload.data.model.$defs).toHaveProperty('Beta')
   })
 
@@ -293,10 +291,10 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     expect(saved).toBe(true)
     expect(toast.warning).not.toHaveBeenCalled()
     const payload = updateVersion.mutateAsync.mock.calls[0][0] as { data: { model: Record<string, unknown> } }
-    // The root class sits in $defs, a top-level $ref points at its $id
+    // The root class sits in $defs, a top-level $ref points at it
     const model = payload.data.model as { $ref?: string; $defs?: Record<string, { $id?: string }> }
     expect(model.$defs?.Alpha).toBeDefined()
-    expect(model.$ref).toBe(model.$defs?.Alpha?.$id)
+    expect(model.$ref).toBe('#/$defs/Alpha')
   })
 
   it('marking the only class as root does not change the saved model', async () => {
@@ -317,7 +315,7 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     const derived = await modelOf(validDiagram())
 
     expect(Object.keys(designated.$defs ?? {})).toEqual(['Alpha'])
-    expect(designated.$ref).toBe(designated.$defs?.Alpha?.$id)
+    expect(designated.$ref).toBe('#/$defs/Alpha')
     expect(designated).toEqual(derived)
   })
 
@@ -340,7 +338,7 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
 
     expect(Object.keys(model.$defs ?? {})).toEqual(['Status'])
     expect(model.$defs?.Status.enum).toEqual(['ACTIVE', 'INACTIVE'])
-    expect(model.$ref).toBe(model.$defs?.Status.$id)
+    expect(model.$ref).toBe('#/$defs/Status')
     expect(model.type).toBeUndefined()
   })
 })

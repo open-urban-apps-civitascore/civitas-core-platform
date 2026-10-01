@@ -51,7 +51,7 @@ const SOURCE = {
   name: 'Sensor Reading',
   versionNumber: '1.0.0',
   field: 'reading',
-  urn: 'urn:core:platform:civitas:datastructure:common:SensorReading:vhoo8w924h:1.0.0',
+  urn: 'urn:core:platform:civitas:datastructure:common:3f2504e0-4f89-11d3-9a0c-0305e82c3301:1.0.0',
 }
 
 const TARGET = {
@@ -60,13 +60,14 @@ const TARGET = {
   name: 'Observation',
   versionNumber: '2.1.0',
   field: 'result',
-  urn: 'urn:core:platform:civitas:datastructure:common:Observation:waqwrg1ntz:2.1.0',
+  urn: 'urn:core:platform:civitas:datastructure:common:7c9e6679-7425-40de-944b-e07fc1f90ae7:2.1.0',
 }
 
 const versionOf = (structure: typeof SOURCE) =>
   ({
     id: structure.versionId,
     version: structure.versionNumber,
+    modelUrn: structure.urn,
     dataStructure: { id: structure.datastructureId, name: structure.name },
     model: {
       $id: 'urn:example',

@@ -69,7 +69,7 @@ vi.mock('@/app/services/api/mappings/clientRequests', () => ({
   useDeleteMapping: vi.fn(),
 }))
 
-const CREATED_SINK_URN = 'urn:core:platform:civitas:datasink:common:Created:zyxw987654:1.0.0'
+const CREATED_SINK_URN = 'urn:core:platform:civitas:datasink:common:67bd068f-4fda-81dc-ba34-7fc85bf1b7f6:1.0.0'
 
 const mutation = (mutateAsync = vi.fn().mockResolvedValue({ data: {} })) =>
   ({ mutate: vi.fn(), mutateAsync, isPending: false }) as never

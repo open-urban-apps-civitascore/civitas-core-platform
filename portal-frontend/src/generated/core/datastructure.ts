@@ -3,14 +3,14 @@ import { z } from 'zod'
 
 // ── Root schema ────────────────────────────────────────────────────────────
 
-/** A CORE DataStructure is a JSON-Schema '$defs' library of member Elements, identified by its ':datastructure:' '$id' URN. Each '$defs' entry is EITHER an inline member Element schema carrying its own Element CORE URN as '$id' (the canonical, split-ready form the editor emits — Model Forge splits it into a separate Element artifact under that identity, without minting a new one; any version segment is advisory, because Model Forge assigns the version inside the write) OR a bare '$ref' to an already-stored member Element URN (the form Model Forge persists after splitting, pinned to the version the member write assigned, and the form used to reference existing Elements). A raw imported JSON Schema whose members carry no '$id' is also accepted (Model Forge then mints the URNs). An optional top-level '$ref' designates one member Element as the root shape. The UML diagram travels under 'x-ui-styles'. */
+/** A CORE DataStructure is a JSON-Schema '$defs' library of member Elements, identified by its ':datastructure:' '$id' URN. Each '$defs' entry is EITHER an inline member Element schema, optionally carrying its own Element CORE URN as '$id' (Model Forge splits it into a separate Element artifact under that identity; any version segment is advisory, because Model Forge assigns the version inside the write) OR a bare '$ref' to an already-stored member Element URN (the form Model Forge persists after splitting, pinned to the version the member write assigned, and the form used to reference existing Elements). A member without '$id' gets an Element URN whose UUID derives from the DataStructure's UUID and the member key. An optional top-level '$ref' designates one member Element as the root shape. The UML diagram travels under 'x-ui-styles'. */
 export const DataStructureSchema = z.object({
   $schema: z.string(),
   /** CORE URN of this DataStructure (logical, or with a trailing :version). */
   $id: z
     .string()
     .regex(
-      /^urn:core:[^:]+:[^:]+:datastructure:[^:]+:[^:]+:[^:]+(:[^:]+)?$/,
+      /^urn:core:[^:]+:[^:]+:datastructure:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$/,
       'Must be a versioned CORE DataStructure URN',
     ),
   title: z.string().optional(),
@@ -29,7 +29,7 @@ export const DataStructureSchema = z.object({
             $ref: z
               .string()
               .regex(
-                /^urn:core:[^:]+:[^:]+:element:[^:]+:[^:]+:[^:]+(:[^:]+)?$/,
+                /^urn:core:[^:]+:[^:]+:element:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$/,
                 'Must be a versioned CORE Element URN',
               ),
           })
@@ -41,7 +41,10 @@ export const DataStructureSchema = z.object({
            */
           $id: z
             .string()
-            .regex(/^urn:core:[^:]+:[^:]+:element:[^:]+:[^:]+:[^:]+(:[^:]+)?$/, 'Must be a versioned CORE Element URN')
+            .regex(
+              /^urn:core:[^:]+:[^:]+:element:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$/,
+              'Must be a versioned CORE Element URN',
+            )
             .optional(),
         }),
       ]),
@@ -53,7 +56,10 @@ export const DataStructureSchema = z.object({
    */
   $ref: z
     .string()
-    .regex(/^urn:core:[^:]+:[^:]+:element:[^:]+:[^:]+:[^:]+(:[^:]+)?$/, 'Must be a versioned CORE Element URN')
+    .regex(
+      /^urn:core:[^:]+:[^:]+:element:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$/,
+      'Must be a versioned CORE Element URN',
+    )
     .optional(),
 })
 

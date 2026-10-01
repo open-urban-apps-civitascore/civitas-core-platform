@@ -20,7 +20,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useDatasetPermissionsById } from '@/hooks/use-dataset-permissions'
-import { buildDataStructureUrn } from '@/utils/urn'
 
 import { useActivePipeline } from '../../../_hooks/use-active-pipeline'
 import { parseCompositeKey, useDatastructureVersionInfo } from '../../../_hooks/use-datastructure-version-info'
@@ -67,10 +66,9 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
     (selection: Record<string, boolean>, selectedVersion?: SelectedDatastructureVersion) => {
       const selectedKey = Object.keys(selection).find(key => selection[key])
       if (selectedKey && parseCompositeKey(selectedKey) && selectedVersion) {
-        const { datastructureId, name, version } = selectedVersion
         onUpdate({
           dataStructureVersionId: selectedKey,
-          dataStructureUrn: buildDataStructureUrn(name, datastructureId, version),
+          dataStructureUrn: selectedVersion.modelUrn,
           configured: isValidTableName(data.tableName),
         })
       }

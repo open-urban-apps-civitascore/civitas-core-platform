@@ -6,8 +6,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
+import { DataStructureDraftSchema } from '@/generated/core'
 import messages from '@/messages/de.json'
-import { contractErrors } from '@/test-support/coreContracts'
 import { cls, datastructureFixtures, type FixtureAttribute } from '@/test-support/datastructureFixtures'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 import {
@@ -866,6 +866,10 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
     type ClassDef = { properties?: Record<string, unknown>; required?: string[] }
 
+    /** The draft contract the backend accepts: it stamps the URNs the stored form carries. */
+    const draftErrors = (model: unknown): string[] =>
+      DataStructureDraftSchema.safeParse(model).error?.issues.map(issue => issue.message) ?? []
+
     const savedDefs = () => {
       const { data } = mockUpdateMutateAsync.mock.calls[0][0] as { data: DatastructureVersionPutData }
       return { data, defs: (data.model as { $defs: Record<string, ClassDef> }).$defs }
@@ -907,7 +911,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       expect(Object.keys(defs)).toEqual(['TestClassX'])
       expect(defs.TestClassX.properties).toEqual({ serial: { type: 'string', format: 'uuid' } })
       expect(data.styles?.nodes[0].data.element.name).toBe('TestClassX')
-      expect(contractErrors('datastructure', data.model)).toEqual([])
+      expect(draftErrors(data.model)).toEqual([])
     })
 
     it('saves an attribute added in the inspector into the CORE model', async () => {
@@ -925,7 +929,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
         serial: { type: 'string', format: 'uuid' },
         neuesAttribut: { type: 'string' },
       })
-      expect(contractErrors('datastructure', data.model)).toEqual([])
+      expect(draftErrors(data.model)).toEqual([])
     })
 
     it('saves a geometry attribute turned primitive without its CRS', async () => {
@@ -949,7 +953,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       // A leftover crs would still satisfy the contract, which does not know the keyword at all.
       const { data, defs } = savedDefs()
       expect(defs.TestClass.properties).toEqual({ location: { type: 'string' } })
-      expect(contractErrors('datastructure', data.model)).toEqual([])
+      expect(draftErrors(data.model)).toEqual([])
     })
 
     it('saves a primitive attribute turned geometry with the default CRS', async () => {
@@ -968,7 +972,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       expect(defs.TestClass.properties).toEqual({
         location: { $ref: 'https://geojson.org/schema/Point.json', crs: 'EPSG:4326' },
       })
-      expect(contractErrors('datastructure', data.model)).toEqual([])
+      expect(draftErrors(data.model)).toEqual([])
     })
 
     it('saves a cardinality change into the CORE model', async () => {
@@ -988,7 +992,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       expect(defs.TestClass.properties?.serial).toEqual({ type: 'array', items: { type: 'string', format: 'uuid' } })
       // A lower bound of 0 also drops the property from required.
       expect(defs.TestClass.required).toBeUndefined()
-      expect(contractErrors('datastructure', data.model)).toEqual([])
+      expect(draftErrors(data.model)).toEqual([])
     })
 
     it('saves and publishes a one-class structure whose root was designated in the inspector', async () => {
@@ -1012,10 +1016,9 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       expect(data.styles?.nodes[0].data.element.isRoot).toBe(true)
       expect(Object.keys(defs)).toEqual(['TestClass'])
 
-      const rootId = (defs.TestClass as { $id?: string }).$id
-      expect(rootId).toMatch(/^urn:core:.*:element:.*:TestClass:/)
-      expect((data.model as { $ref?: string }).$ref).toBe(rootId)
-      expect(contractErrors('datastructure', data.model)).toEqual([])
+      expect(defs.TestClass).not.toHaveProperty('$id')
+      expect((data.model as { $ref?: string }).$ref).toBe('#/$defs/TestClass')
+      expect(draftErrors(data.model)).toEqual([])
     })
 
     it('saves and publishes four cross-referencing Elements under one root', async () => {
@@ -1043,7 +1046,6 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       await waitFor(() => expect(mockStatusUpdateMutateAsync).toHaveBeenCalled())
 
       const { data, defs } = savedDefs()
-      const idOf = (name: string) => (defs[name] as { $id?: string }).$id
 
       expect(mockUpdateMutateAsync.mock.invocationCallOrder[0]).toBeLessThan(
         mockStatusUpdateMutateAsync.mock.invocationCallOrder[0],
@@ -1055,12 +1057,11 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       )
 
       expect(Object.keys(defs)).toEqual(members)
-      expect((data.model as { $ref?: string }).$ref).toBe(idOf('Station'))
-      // The saved URNs carry no version segment.
+      expect((data.model as { $ref?: string }).$ref).toBe('#/$defs/Station')
       for (const name of members) {
-        expect(idOf(name)).toMatch(new RegExp(`:element:common:${name}:[^:]+$`))
+        expect(defs[name]).not.toHaveProperty('$id')
       }
-      expect(contractErrors('datastructure', data.model)).toEqual([])
+      expect(draftErrors(data.model)).toEqual([])
     })
 
     it('saves a class added on the canvas into the CORE model', async () => {
@@ -1090,7 +1091,7 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       expect(Object.keys(defs)).toEqual(['TestClass', addedClass])
       // The class template seeds one attribute, so the new class is not empty.
       expect(defs[addedClass!].properties).toEqual({ attribut: { type: 'string' } })
-      expect(contractErrors('datastructure', data.model)).toEqual([])
+      expect(draftErrors(data.model)).toEqual([])
     })
   })
 })

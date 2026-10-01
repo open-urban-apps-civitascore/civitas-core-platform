@@ -134,15 +134,9 @@ export type TransformOp = Exclude<OpNode['op'], 'copy'>
 export interface MappingConfig {
   /** JSON Schema URI — always "https://civitasconnect.digital/core/mapping/v1" */
   $schema?: string
-  /**
-   * Versioned CORE URN of the source DataStructure, built via
-   * `buildDataStructureUrn` from `@/utils/urn`.
-   */
+  /** Versioned CORE URN of the source DataStructure, as the registry pinned the version. */
   source?: string
-  /**
-   * Versioned CORE URN of the target DataStructure, built via
-   * `buildDataStructureUrn` from `@/utils/urn`.
-   */
+  /** Versioned CORE URN of the target DataStructure, as the registry pinned the version. */
   target?: string
   fields: Record<string, ValueNode>
   positions: Record<string, { x: number; y: number }>

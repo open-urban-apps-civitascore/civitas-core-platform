@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { DataStructureSchema } from '@/generated/core'
+import { DataStructureDraftSchema } from '@/generated/core'
 import { contractErrors } from '@/test-support/coreContracts'
-import { cls as sharedCls, datastructureFixtures, diagram, DS_URN, rel } from '@/test-support/datastructureFixtures'
-import { buildDataStructureLogicalUrn, elementModelUrnForMember } from '@/utils/urn'
+import { cls as sharedCls, datastructureFixtures, diagram, rel } from '@/test-support/datastructureFixtures'
 
 import { PROPERTY_CARDINALITY_VALUES, type PropertyCardinality, UML_PRIMITIVE_TYPES } from '../constants/umlTypes'
 import type { UMLDiagram, UMLNode } from '../types/diagram'
@@ -102,25 +101,6 @@ describe('exportToJsonSchema', () => {
     expect(schema.$ref).toBe('#/$defs/TrafficSensor')
     expect(schema.title).toBe('TrafficSensor')
     expect(schema.$id).toBe('http://civitas.org/model/trafficsensor')
-  })
-
-  it('uses the provided model URI as $id', () => {
-    const schema = exportToJsonSchema(baseDiagram(), 'http://civitas.org/model/traffic-sensor/1.0.0')
-    expect(schema.$id).toBe('http://civitas.org/model/traffic-sensor/1.0.0')
-  })
-
-  it('emits the canonical split-ready form under a DataStructure CORE URN', () => {
-    const dsUrn = 'urn:core:platform:civitas:datastructure:common:TrafficSensor:abc1234567:1.0.0'
-    const schema = exportToJsonSchema(baseDiagram(), dsUrn)
-    const memberUrn = elementModelUrnForMember(dsUrn, 'TrafficSensor')
-
-    // Each $defs member carries its Element CORE URN as $id (Model Forge splits by it, no minting),
-    expect((schema.$defs as Record<string, Record<string, unknown>>).TrafficSensor.$id).toBe(memberUrn)
-    // the root shape is designated by the member Element URN (not a local #/$defs pointer),
-    expect(schema.$ref).toBe(memberUrn)
-    expect(schema.$id).toBe(dsUrn)
-    // and the whole document validates against the generated CORE DataStructure schema.
-    expect(DataStructureSchema.safeParse(schema).success).toBe(true)
   })
 
   it('maps attributes to properties with correct types', () => {
@@ -1180,10 +1160,8 @@ describe('exportToJsonSchema', () => {
     expect((schema.$defs as Record<string, unknown>)['Road-Segment-Part']).toBeDefined()
   })
 
-  it('disambiguates member names that collide only after PascalCase normalization', () => {
-    // 'Road-Segment' and 'Road Segment' are distinct $defs keys, but both normalize to 'RoadSegment'
-    // — elementModelUrnForMember would stamp the same canonical Element URN on both members unless
-    // assignDefKeys itself treats the normalized collision as a collision.
+  it('keeps member keys that differ only in spelling', () => {
+    // Each key derives its own Element URN in Model Forge, so a suffix would only rename a class.
     const first = cls('a', 'Road-Segment', [{ id: 'a1', name: 'a1' }])
     ;(first.data.element as { isRoot?: boolean }).isRoot = true
     const diagram = baseDiagram({
@@ -1192,13 +1170,10 @@ describe('exportToJsonSchema', () => {
       edges: [],
     } as Partial<UMLDiagram>)
 
-    const dsUrn = 'urn:core:platform:civitas:datastructure:common:S:abc1234567:1.0.0'
-    const schema = exportToJsonSchema(diagram, dsUrn)
-    const defs = schema.$defs as Record<string, Record<string, unknown>>
+    const schema = exportToJsonSchema(diagram)
 
-    const ids = new Set(Object.values(defs).map(member => member.$id))
-    expect(ids.size).toBe(2)
-    expect(DataStructureSchema.safeParse(schema).success).toBe(true)
+    expect(Object.keys(schema.$defs as Record<string, unknown>)).toEqual(['Road-Segment', 'Road Segment'])
+    expect(DataStructureDraftSchema.safeParse(schema).success).toBe(true)
   })
 
   it('exports the designated root (isRoot) when the derivation alone would be ambiguous', () => {
@@ -1261,31 +1236,20 @@ describe('canMultiplicityBePrimaryKey', () => {
 })
 
 /**
- * The artifacts the editor stores must satisfy the published CORE-IR contract,
- * not just the generated Zod copy of it.
+ * The artifacts the editor stores must satisfy the published CORE-IR contract, not just the
+ * generated Zod copy of it. The backend stamps the identity and Model Forge resolves the root
+ * pointer, so the members are what the editor answers for.
  */
 describe('CORE-IR conformance of the exported DataStructure', () => {
-  it.each(datastructureFixtures)('$label satisfies the published datastructure contract', ({ diagram }) => {
-    expect(contractErrors('datastructure', buildUMLModelPayload(diagram, DS_URN).model)).toEqual([])
-  })
+  const STAMPED_ID = 'urn:core:platform:civitas:datastructure:common:09f2f67a-482e-867f-86dd-b23b27b75865'
 
-  it('carries the DataStructure URN as $id and an Element URN as the root $ref', () => {
-    const { model } = buildUMLModelPayload(datastructureFixtures[0].diagram, DS_URN)
-    expect(model.$id).toBe(DS_URN)
-    expect(model.$ref).toBe(elementModelUrnForMember(DS_URN, 'TrafficSensor'))
-  })
-
-  // The app saves under the logical URN, which has no version segment.
-  it('leaves the Element URNs unversioned when saved under the logical DataStructure URN', () => {
-    const logicalUrn = buildDataStructureLogicalUrn('TrafficSensor', '11111111-1111-1111-1111-111111111111')
-    const { model } = buildUMLModelPayload(datastructureFixtures[0].diagram, logicalUrn)
-    const defs = model.$defs as Record<string, { $id?: string }>
-
-    expect(logicalUrn).not.toMatch(/:1\.0\.0$/)
-    expect(defs.TrafficSensor.$id).toBe(elementModelUrnForMember(logicalUrn, 'TrafficSensor'))
-    expect(defs.TrafficSensor.$id).toMatch(/:element:common:TrafficSensor:[^:]+$/)
-    expect(contractErrors('datastructure', model)).toEqual([])
-  })
+  it.each(datastructureFixtures)(
+    '$label satisfies the published datastructure contract once stamped',
+    ({ diagram }) => {
+      const { $ref: _rootPointer, ...members } = buildUMLModelPayload(diagram).model
+      expect(contractErrors('datastructure', { ...members, $id: STAMPED_ID })).toEqual([])
+    },
+  )
 })
 
 // Two classes each composing the other: drawable on the canvas, never exportable.

@@ -50,7 +50,10 @@ describe('diagramSchema', () => {
 
   it('keeps a Json attribute and the pins of the structures the diagram was built from', () => {
     const pins = [
-      { urn: 'urn:core:platform:civitas:datastructure:frost:ThingTree:0123456789:1.0.0', name: 'ThingTree' },
+      {
+        urn: 'urn:core:platform:civitas:datastructure:frost:9cc6ed95-0f8b-8ace-ab6e-83cdee87b3dd:1.0.0',
+        name: 'ThingTree',
+      },
     ]
     const diagram = {
       id: 'diagram-1',

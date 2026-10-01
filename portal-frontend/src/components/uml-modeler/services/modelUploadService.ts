@@ -27,10 +27,9 @@ export interface UMLModelPayload {
  * Builds the complete UMLModelPayload for backend API submission.
  *
  * @param diagram - The UML diagram with nodes, edges, and viewport
- * @param modelUri - Optional URI used as the JSON Schema `$id`
  * @returns The payload ready to be sent to the backend
  */
-export const buildUMLModelPayload = (diagram: UMLDiagram, modelUri?: string): UMLModelPayload => {
+export const buildUMLModelPayload = (diagram: UMLDiagram): UMLModelPayload => {
   // 1. Extract styles (viewport + node positions for reload)
   const styles: UMLModelStylesPayload = {
     viewport: diagram.viewport,
@@ -38,7 +37,7 @@ export const buildUMLModelPayload = (diagram: UMLDiagram, modelUri?: string): UM
   }
 
   // 2. Build the JSON Schema model (without layout info - styles are stored separately)
-  const model = exportToJsonSchema(diagram, modelUri)
+  const model = exportToJsonSchema(diagram)
 
   // 3. Assemble payload
   return {

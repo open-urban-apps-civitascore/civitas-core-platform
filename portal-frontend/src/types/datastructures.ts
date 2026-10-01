@@ -75,6 +75,8 @@ export const DatastructureVersionSummaryApiResponseSchema = z.object({
   createdAt: z.string(),
   modifiedAt: z.string(),
   dataStructureId: z.string(),
+  // Versioned CORE URN of this version's model in Model Forge; absent while the version has none.
+  modelUrn: z.string().nullable().optional(),
   inUse: z.boolean().optional(),
   inUseByReleased: z.boolean().optional(),
 })
@@ -222,6 +224,7 @@ export type DatastructuresListData = {
   status: DatastructureStatusType
   source: DatastructureVersionSource | null
   versionNumber: string | null
+  modelUrn?: string | null
   versions: DatastructuresListData[]
   inUse?: boolean
   inUseByReleased?: boolean

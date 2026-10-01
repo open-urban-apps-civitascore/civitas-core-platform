@@ -238,7 +238,7 @@ describe('isResourceInUseError', () => {
   it('returns true when a mapping is still referenced by a pipeline', () => {
     const error = mockApiError(
       409,
-      'Cannot delete urn:core:mapping:x — still referenced by: urn:core:pipeline:y',
+      'Cannot delete urn:core:platform:civitas:mapping:common:00000000-0000-4000-8000-000000000043 — still referenced by: urn:core:platform:civitas:pipeline:common:00000000-0000-4000-8000-000000000044',
       RESOURCE_IN_USE,
     )
     expect(isResourceInUseError(error)).toBe(true)

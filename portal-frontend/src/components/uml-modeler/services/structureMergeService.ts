@@ -14,8 +14,6 @@
  * - **An empty diagram takes the loaded root as its own.**
  */
 
-import { toPascalCaseName } from '@/utils/urn'
-
 import type { ImportedStructureRef, UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
 import type { UMLElement, UMLRelationship } from '../types/uml'
 import { importFromJsonSchema } from './jsonSchemaImportService'
@@ -109,7 +107,7 @@ const renameTakenNames = (
 ): { from: string; to: string }[] => {
   const taken = new Set<string>()
   for (const node of diagram.nodes ?? []) {
-    taken.add(toPascalCaseName(node.data.element.name))
+    taken.add(node.data.element.name)
   }
 
   const renamed: { from: string; to: string }[] = []
@@ -118,10 +116,10 @@ const renameTakenNames = (
     const original = element.name
     let candidate = original
     let suffix = 1
-    while (taken.has(toPascalCaseName(candidate))) {
+    while (taken.has(candidate)) {
       candidate = `${original}_${suffix++}`
     }
-    taken.add(toPascalCaseName(candidate))
+    taken.add(candidate)
     if (candidate !== original) {
       element.name = candidate
       node.data.label = candidate

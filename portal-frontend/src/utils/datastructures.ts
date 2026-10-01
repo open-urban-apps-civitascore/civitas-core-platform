@@ -48,6 +48,7 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
       versions: datastructure.dataStructureVersions.map(version => ({
         id: version.id,
         versionNumber: version.version,
+        modelUrn: version.modelUrn,
         name: version.version ? `Version ${version.version}` : '-',
         description: version.description || '-',
         status: version.dataStructureVersionStatus,

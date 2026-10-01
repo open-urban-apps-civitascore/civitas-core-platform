@@ -21,7 +21,7 @@ import { buildRegistry } from '@/components/node-editor/types'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { rootFailureMessage } from '@/components/uml-modeler/services/rootFailureMessage'
-import { buildDataStructureUrn } from '@/utils/urn'
+import type { DatastructureVersion } from '@/types/datastructures'
 
 import type { StaTargetVocabulary } from '../../_constants/staTargetCatalog'
 import { deriveStaMatchKeys } from '../../_constants/staTargetCatalog'
@@ -62,6 +62,16 @@ interface MappingEditorModalProps {
 
 const FULLSCREEN =
   'flex h-screen w-screen max-w-none flex-col overflow-hidden rounded-none border-0 p-0 gap-0 top-0 left-0 translate-x-0 translate-y-0 sm:max-w-none'
+
+/**
+ * The pin the registry assigned the version's model. A selectable source/target is always a
+ * released version, which carries one; a missing pin is an unexpected platform state, surfaced
+ * rather than saved as a mapping that names no structure.
+ */
+const modelUrnOf = (version: DatastructureVersion | undefined): string => {
+  if (!version?.modelUrn) throw new Error('A mapping endpoint has no stored model to reference')
+  return version.modelUrn
+}
 
 export const MappingEditorModal = ({
   open,
@@ -383,15 +393,11 @@ export const MappingEditorModal = ({
 
   const doSave = () => {
     const { fields, positions } = compileCanvas(nodes, edges)
-    // A selectable source/target is always a released version, so name and
-    // version are present. If buildDataStructureUrn throws here, the platform is
-    // in an unexpected state (a released DataStructure without name/version) —
-    // let it surface rather than silently emitting a malformed URN.
     onSave(
       {
         $schema: 'https://civitasconnect.digital/core/mapping/v1',
-        source: buildDataStructureUrn(source.name ?? '', source.datastructureId, sourceQuery.data?.data?.version ?? ''),
-        target: buildDataStructureUrn(target.name ?? '', target.datastructureId, targetQuery.data?.data?.version ?? ''),
+        source: modelUrnOf(sourceQuery.data?.data),
+        target: modelUrnOf(targetQuery.data?.data),
         fields,
         positions,
       },

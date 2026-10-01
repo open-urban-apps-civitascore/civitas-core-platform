@@ -1,5 +1,4 @@
-import { DataStructureSchema } from '@/generated/core'
-import { buildDataStructureLogicalUrn } from '@/utils/urn'
+import { DataStructureDraftSchema, DataStructureSchema } from '@/generated/core'
 
 import type { UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
 import type { UMLElement } from '../types/uml'
@@ -26,25 +25,6 @@ export class DiagramImportError extends Error {
     this.code = code
     this.details = details
   }
-}
-
-export type DiagramExportErrorCode = 'INVALID_URN'
-
-export class DiagramExportError extends Error {
-  readonly code: DiagramExportErrorCode
-  readonly details?: unknown
-
-  constructor(code: DiagramExportErrorCode, message: string, details?: unknown) {
-    super(message)
-    this.name = 'DiagramExportError'
-    this.code = code
-    this.details = details
-  }
-}
-
-export interface DiagramExportOptions {
-  dataStructureName?: string
-  datastructureId?: string
 }
 
 /**
@@ -134,28 +114,9 @@ export const cleanDiagramForExport = (diagram: UMLDiagram): Record<string, unkno
  * under 'x-ui-styles', matching the format persisted by Model Forge.
  *
  * @throws SchemaExportError if root resolution fails (e.g. cycles or ambiguous roots).
- * @throws DiagramExportError if no valid CORE URN can be built for the data structure.
  */
-export const buildDiagramExport = (diagram: UMLDiagram, options?: DiagramExportOptions): Record<string, unknown> => {
-  const dataStructureName = options?.dataStructureName?.trim() || diagram.name?.trim() || 'DataStructure'
-  const datastructureId = options?.datastructureId || crypto.randomUUID()
-
-  // The URN is the document's identity: import validates '$id' against the CORE URN pattern, and
-  // only a real DataStructure URN makes the exporter stamp each $defs member with its Element URN.
-  // Continuing without one would write a file that can never be imported again, so this fails here
-  // - exactly as saving the model does, which calls the same builder without catching.
-  let modelUri: string
-  try {
-    modelUri = buildDataStructureLogicalUrn(dataStructureName, datastructureId)
-  } catch (error) {
-    throw new DiagramExportError(
-      'INVALID_URN',
-      `Cannot build a CORE URN for data structure ${JSON.stringify(dataStructureName)}.`,
-      error,
-    )
-  }
-
-  const { model } = buildUMLModelPayload(diagram, modelUri)
+export const buildDiagramExport = (diagram: UMLDiagram): Record<string, unknown> => {
+  const { model } = buildUMLModelPayload(diagram)
   const cleanedDiagram = cleanDiagramForExport(diagram)
 
   return {
@@ -199,7 +160,8 @@ export const readDiagramFile = async (file: File): Promise<UMLDiagram> => (await
  * Reads, parses, and validates an uploaded CORE DataStructure file.
  *
  * Performs a two-stage validation:
- * 1. Stage 1: Validates the root CORE JSON document envelope via DataStructureSchema.
+ * 1. Stage 1: Validates the root CORE JSON document envelope: a document read from the platform
+ *    satisfies DataStructureSchema, one the editor exported satisfies DataStructureDraftSchema.
  * 2. Stage 2: Validates the embedded UML diagram in 'x-ui-styles' via UMLDiagramSchema.
  *
  * A document without 'x-ui-styles' was not drawn: it came from the API, from a Data source, or it is
@@ -247,7 +209,7 @@ export const readImportFile = async (file: File): Promise<DiagramImportFile> => 
 
   // Stage 1: Validate CORE DataStructure schema
   const coreValidation = DataStructureSchema.safeParse(parsed)
-  if (!coreValidation.success) {
+  if (!coreValidation.success && !DataStructureDraftSchema.safeParse(parsed).success) {
     throw new DiagramImportError(
       'INVALID_DATASTRUCTURE_DOCUMENT',
       'Document does not conform to the CORE DataStructure schema.',

@@ -11,7 +11,6 @@ import { useMultiSessionManager } from '../../hooks/use-multi-session-manager'
 import {
   buildDiagramExport,
   buildDiagramFileName,
-  DiagramExportError,
   DiagramImportError,
   type DiagramImportFile,
   downloadDiagramFile,
@@ -241,10 +240,7 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
 
     try {
       const fileName = buildDiagramFileName(dataStructureName || currentActiveSession.name, versionName)
-      const exportDoc = buildDiagramExport(currentActiveSession.diagram, {
-        dataStructureName,
-        datastructureId,
-      })
+      const exportDoc = buildDiagramExport(currentActiveSession.diagram)
       downloadDiagramFile(exportDoc, fileName)
       toast.success(t('export.success'))
     } catch (error) {
@@ -252,16 +248,10 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
         toast.error(rootFailureMessage(t, error.failure))
         return
       }
-      // Named separately from the generic failure: retrying cannot help, the data structure needs a
-      // name the URN can carry.
-      if (error instanceof DiagramExportError) {
-        toast.error(t(`export.errors.${error.code}`))
-        return
-      }
       console.error('Diagram export failed', error)
       toast.error(t('export.error'))
     }
-  }, [sessionManager, dataStructureName, versionName, datastructureId, t])
+  }, [sessionManager, dataStructureName, versionName, t])
 
   return (
     <ActiveDiagramProviderComponent sessionManager={sessionManager}>
