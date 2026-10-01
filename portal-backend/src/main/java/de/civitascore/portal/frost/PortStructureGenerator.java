@@ -84,7 +84,10 @@ public final class PortStructureGenerator {
     return ID_TEMPLATE.formatted(nameBasedId("frost-port:" + port));
   }
 
-  /** A name-based UUIDv8 with SHA-256 (RFC 9562, Appendix B.2). */
+  /**
+   * A UUIDv8 from the SHA-256 of the name alone, without the namespace RFC 9562 Appendix B.2
+   * prefixes; adding one would change every id in the generated port structures.
+   */
   private static UUID nameBasedId(String name) {
     byte[] digest;
     try {
