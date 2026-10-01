@@ -207,13 +207,16 @@ class DataStructureControllerIntegrationTest
                       .description("First test data structure")
                       .dataStructureStatus(DataStructureStatus.DRAFT));
 
-      portalData.dataStructureVersion(
-          dataStructure,
-          b ->
-              b.version("1.0.0")
-                  .description("Version 1 Description")
-                  .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
-                  .modelName("Test Model v1"));
+      DataStructureVersion modelledVersion =
+          portalData.attachModel(
+              portalData.dataStructureVersion(
+                  dataStructure,
+                  b ->
+                      b.version("1.0.0")
+                          .description("Version 1 Description")
+                          .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
+                          .modelName("Test Model v1")),
+              portalData.dataStructureVersionModel("Test Model v1"));
 
       portalData.dataStructureVersion(
           dataStructure,
@@ -250,6 +253,12 @@ class DataStructureControllerIntegrationTest
       assertThat(version1.getDataStructureVersionStatus())
           .as("Version should have a status")
           .isNotNull();
+      assertThat(output.getDataStructureVersions())
+          .filteredOn(version -> version.getId().equals(modelledVersion.getId()))
+          .singleElement()
+          .extracting(DataStructureVersionSummaryDTO::getModelUrn)
+          .isNotNull()
+          .isEqualTo(modelledVersion.getModelUrn());
     }
 
     @Test

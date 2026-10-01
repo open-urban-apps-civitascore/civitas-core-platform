@@ -21,6 +21,7 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -333,6 +334,7 @@ class DataSinkControllerIntegrationTest
       first.setDataSinkType(DataSinkType.POSTGIS);
       first.setConfiguration(Map.of("tableName", "shared_table", "element", dsv.getModelUrn()));
       assertThat(performCreate(first).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      List<String> registryReferencesBefore = modelRegistryGateway.referencesTo(dsv.getModelUrn());
 
       DataSinkInputDTO duplicate = new DataSinkInputDTO();
       duplicate.setDataSinkType(DataSinkType.POSTGIS);
@@ -344,6 +346,9 @@ class DataSinkControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDetail()).contains("tableName").contains("shared_table");
+      assertThat(dataSinkRepository.findByDataSetId(testDataSetId)).hasSize(1);
+      assertThat(modelRegistryGateway.referencesTo(dsv.getModelUrn()))
+          .isEqualTo(registryReferencesBefore);
     }
 
     @Test
@@ -360,6 +365,7 @@ class DataSinkControllerIntegrationTest
       first.setDataSinkType(DataSinkType.POSTGIS);
       first.setConfiguration(Map.of("tableName", "case_table", "element", dsv.getModelUrn()));
       assertThat(performCreate(first).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      List<String> registryReferencesBefore = modelRegistryGateway.referencesTo(dsv.getModelUrn());
 
       DataSinkInputDTO duplicate = new DataSinkInputDTO();
       duplicate.setDataSinkType(DataSinkType.POSTGIS);
@@ -371,6 +377,9 @@ class DataSinkControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDetail()).contains("tableName").contains("CASE_TABLE");
+      assertThat(dataSinkRepository.findByDataSetId(testDataSetId)).hasSize(1);
+      assertThat(modelRegistryGateway.referencesTo(dsv.getModelUrn()))
+          .isEqualTo(registryReferencesBefore);
     }
 
     @Test
