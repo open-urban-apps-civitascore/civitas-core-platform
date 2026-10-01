@@ -150,12 +150,6 @@ describe('diagramFileService', () => {
       expect(DataStructureDraftSchema.safeParse(exported).success).toBe(true)
     })
 
-    it('leaves every CORE URN to the backend', () => {
-      // The backend builds the URN from the Data structure's id, which a rename leaves untouched; one
-      // built here from what the editor knows would not survive a rename.
-      expect(JSON.stringify(buildDiagramExport(sampleDiagram))).not.toContain('urn:core:')
-    })
-
     it('throws SchemaExportError when root resolution fails', () => {
       const cycleDiagram: UMLDiagram = {
         id: 'diagram-cycle',

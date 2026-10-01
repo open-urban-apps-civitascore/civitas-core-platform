@@ -25,7 +25,8 @@
  * Elements with NO inline root shape. Every class is emitted under `$defs`. The
  * single root class — the `isRoot`-designated element or, absent a designation,
  * the one class not embedded by any structural or inheritance edge — is
- * designated by a top-level `$ref`; every other element must be reachable from
+ * designated by a top-level `$ref`, so clients that need a root-shaped schema
+ * can still derive one; every other element must be reachable from
  * the root, otherwise (or when no unique root exists) the export throws
  * {@link SchemaExportError} instead of guessing. An empty diagram exports a
  * library with no members and no root.
@@ -303,10 +304,6 @@ export const exportToJsonSchema = (diagram: UMLDiagram): JsonSchemaObject => {
   const resolution = resolveRootElement(diagram)
   if (resolution.kind === 'invalid') throw new SchemaExportError(resolution.failure)
 
-  // A DataStructure is a JSON-Schema $defs library of member Elements — no inline root shape. Every
-  // class is a $defs member. The root class, when the diagram has one, is designated by a top-level
-  // $ref, so a root-shaped schema can still be derived by clients that need one. An empty diagram
-  // yields a library with no members and no root.
   const schema: JsonSchemaObject = {
     $id: id,
     $schema: JSON_SCHEMA_DIALECT,
