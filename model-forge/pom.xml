@@ -45,8 +45,10 @@
     <java.version>25</java.version>
     <!-- Spring Boot 4.1.1 pins the legacy Jackson 2 line (jackson-2-bom) to 2.21.5,
          which is vulnerable to CVE-2026-68497. Override until a Spring Boot patch
-         ships a fixed jackson-2-bom. Kept in sync with portal-backend/pom.xml. -->
-    <jackson-2-bom.version>2.21.6</jackson-2-bom.version>
+         ships a fixed jackson-2-bom. Raised to 2.22.3 (from 2.21.6) for
+         CVE-2026-91776 and CVE-2026-91777, which also affect 2.21.6.
+         Kept in sync with portal-backend/pom.xml. -->
+    <jackson-2-bom.version>2.22.3</jackson-2-bom.version>
     <!-- Same CVE also affects Spring Boot 4.1.1's default Jackson 3 line
          (jackson-bom, pinned to 3.1.5). Override until a Spring Boot patch
          ships a fixed jackson-bom. Kept in sync with portal-backend/pom.xml. -->
@@ -72,10 +74,10 @@
   <dependencyManagement>
     <dependencies>
       <!-- jackson-annotations doesn't follow jackson-databind's patch versioning (only
-           coarse 2.21/2.22 releases exist). jackson-databind 2.21.6 (jackson-2-bom.version
+           coarse 2.21/2.22 releases exist). jackson-databind 2.22.3 (jackson-2-bom.version
            above) needs a class (JsonApplyView) that isn't in jackson-annotations 2.21 —
-           the version both jackson-2-bom and jackson-databind 3.2.3's own transitive
-           dependency otherwise resolve to. Force 2.22 so both Jackson lines load cleanly. -->
+           the version jackson-databind 3.2.3's own transitive dependency resolves to.
+           Force 2.22 so both Jackson lines load cleanly. -->
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-annotations</artifactId>
