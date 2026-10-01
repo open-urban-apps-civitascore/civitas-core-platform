@@ -227,6 +227,14 @@ class UrnParserTest {
         assertThat(UrnParser.deriveId("something-else")).isNotEqualTo(a);
     }
 
+    // Without a pinned value, a change to the derivation gives every re-imported external schema a
+    // new identity on upgrade.
+    @Test
+    void deriveId_isStableAcrossReleases() {
+        assertThat(UrnParser.deriveId("urn:xoev-de:xmeld:Meldeanschrift"))
+            .isEqualTo(UUID.fromString("a1426c5c-bfff-8662-8ebb-3493f6676ed6"));
+    }
+
     @Test
     void deriveId_isANameBasedUuidV8() {
         UUID id = UrnParser.deriveId("urn:xoev-de:xmeld:Meldeanschrift");
@@ -243,5 +251,15 @@ class UrnParserTest {
         assertThat(UrnParser.memberId(parent, "Sensor")).isNotEqualTo(UrnParser.memberId(parent, "Reading"));
         assertThat(UrnParser.memberId(parent, "Sensor")).isNotEqualTo(UrnParser.memberId(other, "Sensor"));
         assertThat(UrnParser.memberId(parent, "Sensor")).isNotEqualTo(parent);
+    }
+
+    // Without a pinned value, a change to the derivation gives every member Element a new identity on
+    // re-import after an upgrade.
+    @Test
+    void memberId_isStableAcrossReleases() {
+        UUID parent = UUID.fromString("0b6f5c1e-8a4d-4f7b-9c2e-3d1a5b7c9e20");
+
+        assertThat(UrnParser.memberId(parent, "Sensor"))
+            .isEqualTo(UUID.fromString("13c88f2a-8896-8aef-bbc8-f3bc8fe4d4a2"));
     }
 }
