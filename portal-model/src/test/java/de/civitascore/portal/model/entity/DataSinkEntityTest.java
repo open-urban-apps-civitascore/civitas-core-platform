@@ -35,20 +35,22 @@ class DataSinkEntityTest {
       DataSet dataSet = dataSet(UUID.randomUUID());
       Pipeline pipeline = pipeline(UUID.randomUUID());
 
+      String logicalUrn =
+          "urn:core:platform:civitas:datasink:common:3f2b8c1e-7a4d-4e9b-9c6f-1d2e3f4a5b6c";
+      String urn = logicalUrn + ":1.0.0";
+
       DataSink sink = new DataSink();
       sink.setDataSet(dataSet);
       sink.setPipeline(pipeline);
       sink.setDataSinkType(DataSinkType.POSTGIS);
-      sink.setConfigurationLogicalUrn("urn:core:platform:civitas:data-sink:common:traffic-data");
-      sink.setConfigurationUrn("urn:core:platform:civitas:data-sink:common:traffic-data:1.0.0");
+      sink.setConfigurationLogicalUrn(logicalUrn);
+      sink.setConfigurationUrn(urn);
 
       assertThat(sink.getDataSet()).isSameAs(dataSet);
       assertThat(sink.getPipeline()).isSameAs(pipeline);
       assertThat(sink.getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
-      assertThat(sink.getConfigurationLogicalUrn())
-          .isEqualTo("urn:core:platform:civitas:data-sink:common:traffic-data");
-      assertThat(sink.getConfigurationUrn())
-          .isEqualTo("urn:core:platform:civitas:data-sink:common:traffic-data:1.0.0");
+      assertThat(sink.getConfigurationLogicalUrn()).isEqualTo(logicalUrn);
+      assertThat(sink.getConfigurationUrn()).isEqualTo(urn);
     }
 
     @Test
