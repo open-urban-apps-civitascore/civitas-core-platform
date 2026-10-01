@@ -29,6 +29,14 @@
     <!--  mvn versions:display-property-updates -->
     <properties>
         <java.version>25</java.version>
+        <!-- Spring Boot 4.1.1 pins the legacy Jackson 2 line (jackson-2-bom) to 2.21.5,
+             which is vulnerable to CVE-2026-68497. Override until a Spring Boot patch
+             ships a fixed jackson-2-bom. -->
+        <jackson-2-bom.version>2.21.6</jackson-2-bom.version>
+        <!-- Same CVE also affects Spring Boot 4.1.1's default Jackson 3 line
+             (jackson-bom, pinned to 3.1.5). Override until a Spring Boot patch
+             ships a fixed jackson-bom. -->
+        <jackson-bom.version>3.2.3</jackson-bom.version>
         <springdoc-openapi.version>3.0.3</springdoc-openapi.version>
         <commons-io.version>2.21.0</commons-io.version>
         <testcontainers.version>2.0.4</testcontainers.version>
@@ -60,6 +68,16 @@
 
     <dependencyManagement>
         <dependencies>
+            <!-- jackson-annotations doesn't follow jackson-databind's patch versioning (only
+                 coarse 2.21/2.22 releases exist). jackson-databind 2.21.6 (jackson-2-bom.version
+                 above) needs a class (JsonApplyView) that isn't in jackson-annotations 2.21 —
+                 the version both jackson-2-bom and jackson-databind 3.2.3's own transitive
+                 dependency otherwise resolve to. Force 2.22 so both Jackson lines load cleanly. -->
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>2.22</version>
+            </dependency>
             <!--
                 Drop once the Spring Boot parent's kafka-clients ships lz4-java >= 1.11.2
                 itself: Boot 4.1.1 resolves kafka-clients 4.2.1, which pins 1.10.1 —
