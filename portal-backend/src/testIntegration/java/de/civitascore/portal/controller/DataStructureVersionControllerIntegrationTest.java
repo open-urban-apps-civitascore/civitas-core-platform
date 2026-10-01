@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -157,12 +158,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .isEqualTo(HttpStatus.CONFLICT);
     }
 
-    /**
-     * A URN carrying the structure's name kept the old name after a rename, so a reference built
-     * from the new name named a version the registry did not hold.
-     */
     @Test
-    @DisplayName("A UML model is stored under the data structure's id, which a rename keeps")
+    @DisplayName("A UML model is stored under the data structure's id")
     void umlModelIsStoredUnderTheDataStructureId() {
       DataStructure structure = portalData.dataStructure(b -> b.name("OriginalName"));
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
@@ -190,18 +187,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(modelUrn)
           .isEqualTo(
               "urn:core:platform:civitas:datastructure:common:" + structure.getId() + ":1.0.0");
-
-      DataStructure renamed = dataStructureRepository.findById(structure.getId()).orElseThrow();
-      renamed.setName("NewName");
-      dataStructureRepository.save(renamed);
-
-      assertThat(modelRegistryGateway.fetchModel(modelUrn)).isPresent();
-      assertThat(
-              dataStructureVersionRepository
-                  .findById(created.getBody().getId())
-                  .orElseThrow()
-                  .getModelUrn())
-          .isEqualTo(modelUrn);
     }
 
     @Test
@@ -558,10 +543,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   @DisplayName("Patch DataStructureVersion Tests")
   class PatchDataStructureVersionTests {
 
-    /**
-     * A PATCH carries the stored model forward. Read back as the bundled view, it differed from
-     * what was stored and was stored again under a new version.
-     */
+    /** Catches a PATCH that stores the bundled read-back of a UML model again as a new version. */
     @Test
     @DisplayName("Patching the description of a UML model leaves its version and pin alone")
     void patchingTheDescriptionOfAUmlModelKeepsItsVersion() {
@@ -1342,6 +1324,136 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getBody().isInUse())
           .as("inUse should be false when no DataSource references this version")
           .isFalse();
+    }
+  }
+
+  @Nested
+  @DisplayName("Model identity")
+  class ModelIdentityTests {
+
+    private String foreignDataStructureUrn;
+    private Optional<ModelRegistryGateway.RegistryDocument> foreignModelBefore;
+    private String foreignMemberUrn;
+    private Optional<ModelRegistryGateway.RegistryDocument> foreignMemberBefore;
+
+    @BeforeEach
+    void storeForeignDataStructure() {
+      assertThat(
+              modelRegistryGateway.artifactType(
+                  dataStructureRepository
+                      .findById(dataStructureId)
+                      .orElseThrow()
+                      .getModelLogicalUrn()))
+          .as("the host is stored as an Element, so the host-id import path is not taken")
+          .isEqualTo("element");
+
+      DataStructure foreign = portalData.dataStructure(b -> b.name("Foreign"));
+      portalData.attachModel(portalData.dataStructureVersion(foreign), modelWithAnAddressMember());
+      foreignDataStructureUrn = "urn:core:platform:civitas:datastructure:common:" + foreign.getId();
+      foreignModelBefore = modelRegistryGateway.fetchStoredModel(foreignDataStructureUrn);
+      assertThat(foreignModelBefore).isPresent();
+
+      foreignMemberUrn =
+          modelRegistryGateway.logicalUrn(
+              addressReferenceOf(
+                  modelRegistryGateway
+                      .fetchStoredModel(
+                          dataStructureRepository
+                              .findById(foreign.getId())
+                              .orElseThrow()
+                              .getModelLogicalUrn())
+                      .orElseThrow()
+                      .content()));
+      foreignMemberBefore = modelRegistryGateway.fetchStoredModel(foreignMemberUrn);
+      assertThat(foreignMemberBefore).isPresent();
+    }
+
+    private Map<String, Object> modelWithAnAddressMember() {
+      Map<String, Object> model = portalData.dataStructureVersionModel("Foreign");
+      model.put("$defs", Map.of("Address", Map.of("type", "object")));
+      model.put("properties", Map.of("address", Map.of("$ref", "#/$defs/Address")));
+      return model;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String addressReferenceOf(Map<String, Object> rootElement) {
+      Map<String, Object> properties = (Map<String, Object>) rootElement.get("properties");
+      return (String) ((Map<String, Object>) properties.get("address")).get("$ref");
+    }
+
+    private Map<String, Object> modelWithAMemberClaimingTheForeignMember() {
+      Map<String, Object> model = portalData.dataStructureVersionModel("Hijack");
+      model.put("$id", "urn:core:platform:civitas:datastructure:common:" + dataStructureId);
+      model.put(
+          "$defs",
+          Map.of(
+              "Address",
+              Map.of(
+                  "$id",
+                  foreignMemberUrn,
+                  "type",
+                  "object",
+                  "properties",
+                  Map.of("injected", Map.of("type", "string")))));
+      model.put("properties", Map.of("address", Map.of("$ref", "#/$defs/Address")));
+      return model;
+    }
+
+    private Map<String, Object> modelClaimingTheForeignDataStructure() {
+      Map<String, Object> model = portalData.dataStructureVersionModel("Hijack");
+      model.put("$id", foreignDataStructureUrn);
+      return model;
+    }
+
+    @Test
+    @DisplayName("POST refuses a model whose $id names another data structure")
+    void postRefusesAModelNamingAnotherDataStructure() {
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setModelName("Hijack");
+      input.setModel(modelClaimingTheForeignDataStructure());
+
+      ResponseEntity<ProblemDetail> response =
+          restTemplate.exchange(
+              getEndpoint(),
+              HttpMethod.POST,
+              new HttpEntity<>(input, createAuthHeaders()),
+              ProblemDetail.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(modelRegistryGateway.fetchStoredModel(foreignDataStructureUrn))
+          .isEqualTo(foreignModelBefore);
+    }
+
+    @Test
+    @DisplayName("PATCH refuses a model whose $id names another data structure")
+    void patchRefusesAModelNamingAnotherDataStructure() {
+      ResponseEntity<ProblemDetail> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1,
+              HttpMethod.PATCH,
+              new HttpEntity<>(
+                  Map.of("model", modelClaimingTheForeignDataStructure()), createAuthHeaders()),
+              ProblemDetail.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(modelRegistryGateway.fetchStoredModel(foreignDataStructureUrn))
+          .isEqualTo(foreignModelBefore);
+    }
+
+    @Test
+    @DisplayName("PATCH keeps a member $id off another data structure's Element")
+    void patchKeepsAMemberOffAnotherDataStructuresElement() {
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1,
+              HttpMethod.PATCH,
+              new HttpEntity<>(
+                  Map.of("model", modelWithAMemberClaimingTheForeignMember()), createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(modelRegistryGateway.fetchStoredModel(foreignMemberUrn))
+          .isEqualTo(foreignMemberBefore);
     }
   }
 

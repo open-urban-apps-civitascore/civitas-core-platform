@@ -4,16 +4,24 @@
 package de.civitascore.portal.modelregistry;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyQuery;
+import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.facade.ModelForge;
+import de.civitascore.portal.util.InvalidInputException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -103,6 +111,58 @@ class ModelRegistryGatewayTest {
       assertThat(gateway.closure("  ", 10).artifacts()).isEmpty();
       assertThat(gateway.closure(PIPELINE_URN, 0).artifacts()).isEmpty();
       verify(modelForge, never()).closure(any());
+    }
+  }
+
+  @Nested
+  @DisplayName("storing a model under a host id")
+  class StoringUnderAHostId {
+
+    private static final UUID HOST_ID = UUID.fromString("0b6f1c2d-3e4f-4a5b-8c6d-7e8f9a0b1c2d");
+    private static final String HOST_ELEMENT_URN =
+        "urn:core:platform:civitas:element:common:" + HOST_ID;
+    private static final String HOST_DATA_STRUCTURE_URN =
+        "urn:core:platform:civitas:datastructure:common:" + HOST_ID;
+    private static final String FOREIGN_DATA_STRUCTURE_URN =
+        "urn:core:platform:civitas:datastructure:common:6ddf8001-3ba6-83db-8d23-b547419c1ff2";
+
+    private ModelRegistryGateway.ModelPin store(String id) {
+      return store(Optional.of(HOST_ELEMENT_URN), id);
+    }
+
+    private ModelRegistryGateway.ModelPin store(Optional<String> existingLogicalUrn, String id) {
+      Map<String, Object> model = new HashMap<>();
+      model.put("$id", id);
+      model.put("type", "object");
+      return gateway.storeModel(
+          existingLogicalUrn, HOST_ID, "Host", model, null, VersionBump.MINOR, "1.0.0");
+    }
+
+    @Test
+    @DisplayName("refuses a $id naming another data structure and writes nothing")
+    void refusesAForeignDataStructureId() {
+      assertThatThrownBy(() -> store(FOREIGN_DATA_STRUCTURE_URN))
+          .isInstanceOf(InvalidInputException.class);
+      verifyNoInteractions(modelForge);
+    }
+
+    @Test
+    @DisplayName("refuses a $id naming another data structure on a first store")
+    void refusesAForeignDataStructureIdOnAFirstStore() {
+      assertThatThrownBy(() -> store(Optional.empty(), FOREIGN_DATA_STRUCTURE_URN))
+          .isInstanceOf(InvalidInputException.class);
+      verifyNoInteractions(modelForge);
+    }
+
+    @Test
+    @DisplayName("folds a $id naming the host's own data structure into it")
+    void foldsTheHostsOwnDataStructureId() {
+      when(modelForge.importSchema(any()))
+          .thenReturn(
+              new ImportResult(
+                  new ArtifactId(HOST_DATA_STRUCTURE_URN + ":1.1.0"), List.of(), Map.of()));
+
+      assertThat(store(HOST_DATA_STRUCTURE_URN).logicalUrn()).isEqualTo(HOST_DATA_STRUCTURE_URN);
     }
   }
 }

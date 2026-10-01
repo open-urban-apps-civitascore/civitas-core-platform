@@ -13,6 +13,7 @@ import de.civitascore.modelforge.contract.SaveArtifactCommand;
 import de.civitascore.modelforge.contract.SchemaViewQuery;
 import de.civitascore.modelforge.facade.ModelForge;
 import de.civitascore.modelforge.urn.UrnParser;
+import de.civitascore.portal.util.InvalidInputException;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -84,15 +85,18 @@ public class ModelRegistryGateway {
    * the version pin. Model Forge assigns the version.
    *
    * <ul>
-   *   <li>A model stored before as an Element is stored as a new version of {@code
-   *       existingLogicalUrn}. The Element versions the whole document, so a changed member always
-   *       yields a new version.
-   *   <li>Otherwise, with a {@code dataStructureId}, the model is imported under that UUID,
-   *       whatever {@code $id} the document carried: a {@code $defs} library as the DataStructure,
-   *       a schema with a shape of its own as the root Element grouped by the DataStructure of the
-   *       same UUID. Each {@code $defs} member's Element URN derives from the UUID.
-   *   <li>Without one, the document's own {@code $id} decides. A {@code :datastructure:} URN folds
-   *       the document into that DataStructure; anything else is imported as an Element.
+   *   <li>With a {@code dataStructureId}, the model is imported under that UUID: as the
+   *       DataStructure when it is a {@code $defs} library or its {@code $id} is a {@code
+   *       :datastructure:} URN, otherwise as the root Element grouped by the DataStructure of the
+   *       same UUID. Member Element URNs derive from the UUID; the members' own {@code $id}s are
+   *       dropped.
+   *   <li>Except: a model stored before as an Element whose {@code $id} is no {@code
+   *       :datastructure:} URN is stored as a new version of {@code existingLogicalUrn}. The
+   *       Element versions the whole document, so a changed member always yields a new version.
+   *   <li>Without a {@code dataStructureId}, the document's own {@code $id} decides. A {@code
+   *       :datastructure:} URN, or a {@code :datastructure:} {@code existingLogicalUrn}, folds the
+   *       document into that DataStructure; any other model stored before becomes a new version of
+   *       {@code existingLogicalUrn}; a first store is imported as an Element.
    * </ul>
    *
    * @param existingLogicalUrn the stored logical URN of a previous version, empty on first store
@@ -108,6 +112,8 @@ public class ModelRegistryGateway {
    *     than one history, so a revision must name its own version or the bump would jump to the
    *     newest line.
    * @return the pin (logical URN, versioned URN, version) the caller persists on the shell
+   * @throws InvalidInputException if {@code dataStructureId} is given and the model's {@code $id}
+   *     is a {@code :datastructure:} URN of another data structure
    */
   public ModelPin storeModel(
       Optional<String> existingLogicalUrn,
@@ -118,18 +124,17 @@ public class ModelRegistryGateway {
       VersionBump bump,
       String bumpFromVersion) {
     JsonNode content = mergeStyles(model, styles);
+    if (dataStructureId != null) {
+      requireNoForeignDataStructureId(content, dataStructureId);
+    }
     boolean storedAsElement =
         existingLogicalUrn.map(this::artifactType).filter("element"::equals).isPresent();
     ArtifactId root;
     if (dataStructureId != null && !storedAsElement) {
       root = importRoot(withTitle(content, name), bump, bumpFromVersion, dataStructureId);
     } else if (isDataStructureModel(content, existingLogicalUrn)) {
-      // A datastructure model is folded into a single DataStructure artifact by importSchema (which
-      // also splits + versions its member Elements), whether new OR re-versioned. It must NOT go
-      // through saveArtifact(ELEMENT) — that would store an Element under a :datastructure: URN.
-      // importSchema versions the existing logical URN idempotently, applying the change class to
-      // the grouping and to every member whose content changed.
-      root = importRoot(withTitle(content, name), bump, bumpFromVersion, null);
+      // Not saveVersion(ELEMENT): that would store an Element under a :datastructure: URN.
+      root = importRoot(withTitle(content, name), bump, bumpFromVersion, dataStructureId);
     } else if (existingLogicalUrn.isPresent()) {
       root =
           saveVersion(
@@ -138,6 +143,14 @@ public class ModelRegistryGateway {
       root = importRoot(withTitle(content, name), bump, bumpFromVersion, null);
     }
     return toPin(root);
+  }
+
+  private static void requireNoForeignDataStructureId(JsonNode content, UUID dataStructureId) {
+    String id = content.path("$id").asText(null);
+    if (isDataStructureUrn(id) && !dataStructureId.equals(UrnParser.idFromUrn(id))) {
+      throw new InvalidInputException(
+          "model", dataStructureId, "The model's $id names another data structure.");
+    }
   }
 
   /**
@@ -149,13 +162,17 @@ public class ModelRegistryGateway {
   private static boolean isDataStructureModel(
       JsonNode content, Optional<String> existingLogicalUrn) {
     String id = content.path("$id").asText(null);
-    if (UrnParser.isUrn(id) && "datastructure".equals(UrnParser.artifactTypeFromUrn(id))) {
+    if (isDataStructureUrn(id)) {
       return true;
     }
     return existingLogicalUrn
         .filter(UrnParser::isUrn)
         .map(u -> "datastructure".equals(UrnParser.artifactTypeFromUrn(u)))
         .orElse(false);
+  }
+
+  private static boolean isDataStructureUrn(String urn) {
+    return UrnParser.isUrn(urn) && "datastructure".equals(UrnParser.artifactTypeFromUrn(urn));
   }
 
   /**
