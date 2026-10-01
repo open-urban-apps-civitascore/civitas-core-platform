@@ -25,10 +25,23 @@
         <!-- Drop once the Spring Boot parent manages Tomcat >= 11.0.25: Boot 4.1.1 pins 11.0.24,
              affected by GHSA-9xv2-5v5q-p794, GHSA-gcx9-497g-6cp6 and GHSA-h3x4-894j-xpx5. -->
         <tomcat.version>11.0.26</tomcat.version>
+        <!-- Spring Boot 4.1.1 pins jackson-bom to 3.1.5, vulnerable to CVE-2026-68497
+             (jackson-databind DoS via unbounded number parsing). Override until a
+             Spring Boot patch ships a fixed jackson-bom. -->
+        <jackson-bom.version>3.2.3</jackson-bom.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <!-- jackson-annotations doesn't follow jackson-databind's patch versioning (only
+                 coarse 2.21/2.22 releases exist). jackson-databind 3.2.3 (jackson-bom.version
+                 above) transitively depends on jackson-annotations 2.21, which is missing a
+                 class (JsonApplyView) jackson-databind expects. Force 2.22 to fix that. -->
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>2.22</version>
+            </dependency>
             <dependency>
                 <groupId>org.testcontainers</groupId>
                 <artifactId>testcontainers-bom</artifactId>
