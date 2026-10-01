@@ -20,6 +20,8 @@ import de.civitascore.portal.model.entity.Installation;
 import de.civitascore.portal.model.entity.InstalledArtifact;
 import de.civitascore.portal.model.input.InstallationInputDTO;
 import de.civitascore.portal.model.input.PackageManifestInputDTO;
+import de.civitascore.portal.model.input.PackageMemberInputDTO;
+import de.civitascore.portal.model.input.PackageMemberKind;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.InstallationRepository;
 import de.civitascore.portal.repository.PublishedStructureRepository;
@@ -28,6 +30,7 @@ import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +42,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 /**
  * Unit tests for the uninstall of {@link InstallationService}: the order of the removals, what is
@@ -277,5 +281,32 @@ class InstallationServiceTest {
         .hasMessageContaining("is already installed");
 
     verify(installationRepository, never()).save(any());
+    verify(installationRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void install_whenAnInstallOfTheSamePackageCommitsFirst_refusesBeforeItCreatesAnything() {
+    PackageMemberInputDTO member = new PackageMemberInputDTO();
+    member.setKind(PackageMemberKind.DATASTRUCTURE);
+    member.setUrn("urn:core:standard:openurbanapps:datastructure:environment:soil_moisture:demo");
+    member.setName("Soil moisture");
+    member.setDescription("Installed by the test");
+    member.setContent(Map.of("title", "Soil moisture"));
+    PackageManifestInputDTO manifest = new PackageManifestInputDTO();
+    manifest.setId(PACKAGE_ID);
+    manifest.setMembers(List.of(member));
+    InstallationInputDTO input = new InstallationInputDTO();
+    input.setPackageManifest(manifest);
+    // The check passes: the other install has not committed yet. The unique index refuses the row.
+    when(installationRepository.existsByPackageIdAndUninstalledAtIsNull(PACKAGE_ID))
+        .thenReturn(false);
+    when(installationRepository.saveAndFlush(any()))
+        .thenThrow(new DataIntegrityViolationException("uq_installations_active_package"));
+
+    assertThatThrownBy(() -> installationService.install(input))
+        .isInstanceOf(UniqueConstraintViolationException.class)
+        .hasMessageContaining("is already installed");
+
+    verifyNoInteractions(dataStructureService, dataStructureVersionService, modelRegistryGateway);
   }
 }

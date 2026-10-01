@@ -15,7 +15,8 @@ public interface InstallationRepository extends JpaRepository<Installation, UUID
   /**
    * Whether this package has an active installation here. A package fixes the URNs of its
    * artifacts, so installing it twice on one instance would collide with itself. An installation
-   * that was uninstalled does not count.
+   * that was uninstalled does not count. The database enforces the same rule with a partial unique
+   * index, for two installs that run at the same time.
    */
   boolean existsByPackageIdAndUninstalledAtIsNull(String packageId);
 

@@ -53,5 +53,8 @@ CREATE INDEX idx_installed_artifacts_urn ON installed_artifacts (urn);
 -- origin. Prerequisites ("is standard X installed?") and updates resolve against this column.
 CREATE INDEX idx_installed_artifacts_origin ON installed_artifacts (origin);
 
--- "Is this package already installed here?" is the question every install answers first.
-CREATE INDEX idx_installations_package ON installations (package_id);
+-- A package has at most one active installation per instance. The install checks this first, but
+-- two installs of one package at the same time both pass that check; this index lets the second
+-- one fail. An uninstalled installation is history and does not count. The index also serves the
+-- check itself.
+CREATE UNIQUE INDEX uq_installations_active_package ON installations (package_id) WHERE uninstalled_at IS NULL;

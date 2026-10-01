@@ -48,6 +48,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -140,10 +141,7 @@ public class InstallationService {
     // A policy, not a technical limit: two copies of the same package on one instance serve
     // nobody. Updating means installing the new version and uninstalling the old one.
     if (installationRepository.existsByPackageIdAndUninstalledAtIsNull(manifest.getId())) {
-      throw new UniqueConstraintViolationException(
-          ("Package '%s' is already installed on this instance; updating an installation is not"
-                  + " supported yet.")
-              .formatted(manifest.getId()));
+      throw alreadyInstalled(manifest.getId());
     }
     List<PackageMemberInputDTO> members =
         manifest.getMembers().stream()
@@ -154,6 +152,7 @@ public class InstallationService {
     Installation installation = new Installation();
     installation.setPackageId(manifest.getId());
     installation.setPackageVersion(manifest.getVersion());
+    claim(installation);
     Run run = new Run(installation, input.getDatapoolId());
 
     for (PackageMemberInputDTO member : members) {
@@ -168,6 +167,27 @@ public class InstallationService {
           });
     }
     return installationRepository.save(installation);
+  }
+
+  /**
+   * Writes the installation before the first artifact. The database allows one active installation
+   * per package, so a second install of the same package that runs at the same time waits here
+   * until the first one commits, and then fails before it creates anything. The check before the
+   * install gives the same answer in the usual case, where the first install is complete.
+   */
+  private void claim(Installation installation) {
+    try {
+      installationRepository.saveAndFlush(installation);
+    } catch (DataIntegrityViolationException e) {
+      throw alreadyInstalled(installation.getPackageId());
+    }
+  }
+
+  private static UniqueConstraintViolationException alreadyInstalled(String packageId) {
+    return new UniqueConstraintViolationException(
+        ("Package '%s' is already installed on this instance; updating an installation is not"
+                + " supported yet.")
+            .formatted(packageId));
   }
 
   @Transactional(readOnly = true)

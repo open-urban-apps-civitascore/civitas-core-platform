@@ -1,15 +1,18 @@
 package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
+import de.civitascore.portal.model.entity.Installation;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.InstallationRepository;
 import de.civitascore.portal.security.AllowedScopesFilter;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -99,6 +103,18 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
   }
 
   @Test
+  @DisplayName("lets the database refuse a second active installation of a package")
+  void letsTheDatabaseRefuseASecondActiveInstallation() {
+    installationRepository.saveAndFlush(installationOf(null));
+    // An uninstalled installation is history and does not count.
+    installationRepository.saveAndFlush(installationOf(LocalDateTime.now()));
+
+    // What two installs that run at the same time come down to: both passed the check.
+    assertThatThrownBy(() -> installationRepository.saveAndFlush(installationOf(null)))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
   @DisplayName("refuses a second install of the same package")
   void refusesASecondInstallOfTheSamePackage() {
     long before = installationRepository.count();
@@ -163,6 +179,14 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
     assertThat(post("/installations", request(STRUCTURE_URN)).getStatusCode())
         .isEqualTo(HttpStatus.CREATED);
     assertThat(delete("/installations/" + id).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+  }
+
+  private static Installation installationOf(LocalDateTime uninstalledAt) {
+    Installation installation = new Installation();
+    installation.setPackageId(PACKAGE_ID);
+    installation.setPackageVersion("1.0.0");
+    installation.setUninstalledAt(uninstalledAt);
+    return installation;
   }
 
   private HttpHeaders authHeaders() {
