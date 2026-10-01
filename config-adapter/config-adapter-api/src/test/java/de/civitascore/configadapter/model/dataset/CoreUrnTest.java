@@ -72,44 +72,8 @@ class CoreUrnTest {
   }
 
   @Test
-  @DisplayName("matchesId accepts the DataStructure URN carrying the id")
-  void matchesId_accepts() {
-    assertTrue(CoreUrn.matchesId(STRUCTURE, ID));
-  }
-
-  @Test
-  @DisplayName("matchesId rejects a well-formed URN carrying another id")
-  void matchesId_rejectsForeignId() {
-    assertFalse(
-        CoreUrn.matchesId(
-            "urn:core:platform:civitas:datastructure:common:00000000-0000-0000-0000-000000000001:1.0.0",
-            ID));
-  }
-
-  @Test
-  @DisplayName("matchesId rejects a malformed URN")
-  void matchesId_rejectsMalformed() {
-    assertFalse(CoreUrn.matchesId("not-a-core-urn", ID));
-  }
-
-  @Test
-  @DisplayName("matchesId rejects a non-datastructure URN carrying the id")
-  void matchesId_rejectsForeignArtifactType() {
-    assertFalse(CoreUrn.matchesId("urn:core:platform:civitas:mapping:common:" + ID + ":1.0.0", ID));
-  }
-
-  @Test
-  @DisplayName("matchesId rejects a non-platform-scoped URN carrying the id")
-  void matchesId_rejectsForeignScope() {
-    assertFalse(
-        CoreUrn.matchesId("urn:core:tenant:civitas:datastructure:common:" + ID + ":1.0.0", ID));
-  }
-
-  @Test
   @DisplayName("sameStructureVersion matches a DataStructure and its root Element")
   void sameStructureVersion_matchesTheRootElement() {
-    // A mapping chain may name one side by the grouping and the other by its root Element; both
-    // carry the same UUID and version, so the handover is the same shape.
     assertTrue(
         CoreUrn.sameStructureVersion(
             STRUCTURE, "urn:core:platform:civitas:element:common:" + ID + ":1.0.0"));

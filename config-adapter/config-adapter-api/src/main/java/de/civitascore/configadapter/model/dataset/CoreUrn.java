@@ -10,7 +10,6 @@
 package de.civitascore.configadapter.model.dataset;
 
 import java.util.List;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -20,11 +19,9 @@ import java.util.regex.Pattern;
  * <p>Layout: {@code urn:core:<scope>:<owner>:<artifact-type>:<domain>:<uuid>:<version>}. The UUID
  * is the artifact's identity; the URN carries no display name, so a rename never changes it.
  *
- * <p>Lives in {@code config-adapter-api} as the single source of truth so both trust boundaries
- * validate the same shape: the portal-backend guards the DataStructure model {@code $id} it
- * persists, and the config-adapter guards the {@code source}/{@code target} URNs a tenant ships on
- * a mapping. Producers reference {@link #PATTERN} on {@code @Pattern}; consumers call {@link
- * #isValid(String)} as the runtime guard.
+ * <p>Lives in {@code config-adapter-api} so every module validates the same shape. The
+ * config-adapter calls {@link #isValid(String)} on the {@code source}/{@code target} URNs a tenant
+ * ships on a mapping.
  *
  * <p>Unlike a generic {@code urn:core:} parser that only enforces the prefix and positional layout,
  * these are the CORE platform's own conventions: {@code scope} and {@code artifact-type} are drawn
@@ -114,23 +111,6 @@ public final class CoreUrn {
       return false;
     }
     return a.equals(b) || logicalUrn(a).equals(logicalUrn(b));
-  }
-
-  /**
-   * Whether {@code urn} is a well-formed platform-scoped {@code datastructure} URN of the
-   * DataStructure {@code id}. Scope and artifact-type are pinned because the UUID alone does not
-   * say what it identifies: a {@code mapping} or tenant-scoped URN carrying the same UUID would
-   * otherwise pass as this DataStructure's identity.
-   */
-  public static boolean matchesId(String urn, UUID id) {
-    if (urn == null || id == null) {
-      return false;
-    }
-    Matcher matcher = COMPILED_PATTERN.matcher(urn);
-    return matcher.matches()
-        && "platform".equals(matcher.group("scope"))
-        && "datastructure".equals(matcher.group("artifactType"))
-        && matcher.group("id").equals(id.toString());
   }
 
   /**
