@@ -66,8 +66,8 @@ body:json {
             "source": "{{flowStructureUrn}}",
             "target": "{{flowStructureUrn}}",
             "fields": {
-              "tensionKpa": { "op": "copy", "sourcePath": "$.tensionKpa" },
-              "measuredAt": { "op": "copy", "sourcePath": "$.measuredAt" }
+              "$.tensionKpa": { "op": "copy", "sourcePath": "$.tensionKpa" },
+              "$.measuredAt": { "op": "copy", "sourcePath": "$.measuredAt" }
             }
           }
         },

@@ -273,9 +273,9 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
                         STRUCTURE_URN,
                         "fields",
                         Map.of(
-                            "tensionKpa",
+                            "$.tensionKpa",
                             Map.of("op", "copy", "sourcePath", "$.tensionKpa"),
-                            "measuredAt",
+                            "$.measuredAt",
                             Map.of("op", "copy", "sourcePath", "$.measuredAt")))),
                 member(
                     "datasource",
