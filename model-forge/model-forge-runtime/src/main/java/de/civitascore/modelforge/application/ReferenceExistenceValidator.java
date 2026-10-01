@@ -14,9 +14,9 @@ import java.util.Set;
 /**
  * Registry-aware existence check for strongly-typed {@code x-core-ref} foreign keys.
  *
- * <p>When an Element declares a property as a foreign key with a <em>concrete</em> target
- * (e.g. {@code "x-core-ref": { "type": "urn:core:...:Strasse:1.0.0" }}), the referenced
- * Element must exist in the registry. This is something pure JSON Schema validation cannot
+ * <p>When an Element declares a property as a foreign key with a <em>concrete</em> target (e.g.
+ * {@code "x-core-ref": { "type": "urn:core:platform:civitas:element:common:<uuid>:1.0.0" }}), the
+ * referenced Element must exist in the registry. This is something pure JSON Schema validation cannot
  * express, so it is verified here against the {@link ArtifactRegistry}.
  *
  * <p>Category targets ({@code urn:core:type:<Kind>}, used by the generic CORE-IR meta-schemas)

@@ -32,6 +32,7 @@ import de.civitascore.modelforge.contract.XRepositoryHit;
 import de.civitascore.modelforge.contract.XRepositorySearchQuery;
 import de.civitascore.modelforge.graph.DependencyGraphService;
 import de.civitascore.modelforge.core.port.ArtifactRegistry;
+import de.civitascore.modelforge.util.JsonSchema;
 import de.civitascore.modelforge.core.port.ArtifactSearchCriteria;
 import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.modelforge.urn.UrnService;
@@ -140,9 +141,9 @@ public class EmbeddedModelForgeOperations implements ModelForge {
     private static void dropEmbeddedCopies(ObjectNode defs) {
         Set<String> referenced = new LinkedHashSet<>();
         defs.properties().forEach(member -> {
-            JsonNode ref = member.getValue().path("$ref");
-            if (member.getValue().size() == 1 && UrnParser.isUrn(ref.asText(null))) {
-                referenced.add(UrnParser.logicalUrn(ref.asText()));
+            String ref = SchemaImportService.bareReference(member.getValue());
+            if (ref != null) {
+                referenced.add(UrnParser.logicalUrn(ref));
             }
         });
         List<String> copies = defs.properties().stream()
@@ -399,10 +400,8 @@ public class EmbeddedModelForgeOperations implements ModelForge {
                 "Elements are created through importSchema, which mints the URN and splits $defs "
                 + "into their own Elements.");
         }
-        String urn = urns.urn(artifactTypeOf(command.kind()),
+        String urn = urns.urn(typeSegmentFor(command.kind()),
             command.id() != null ? command.id() : UUID.randomUUID());
-        // The document's id always carries the URN built here, regardless of any id the caller left
-        // in the content.
         var content = command.content();
         if (content.isObject()) {
             tools.jackson.databind.node.ObjectNode stamped =
@@ -417,7 +416,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
                     new ArtifactId(urn), command.kind(), created, VersionBump.PATCH, command.dataSet()));
             // The URN carries no name, so the display name a search and the graph show is recorded
             // beside it; a document title, once there, takes precedence.
-            if (!created.hasNonNull("title")) {
+            if (JsonSchema.usableTitle(created) == null) {
                 registry.nameArtifact(urn, command.name());
             }
             return result;
@@ -523,19 +522,6 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             out.put(dep, kind);
             collectMemberDeps(dep, out);
         }
-    }
-
-    /** The CORE artifact-type segment for a kind. */
-    private static String artifactTypeOf(ArtifactKind kind) {
-        return switch (kind) {
-            case ELEMENT -> "element";
-            case DATA_SET -> "dataset";
-            case DATA_STRUCTURE -> "datastructure";
-            case MAPPING -> "mapping";
-            case PIPELINE -> "pipeline";
-            case DATA_SOURCE -> "datasource";
-            case DATA_SINK -> "datasink";
-        };
     }
 
     /** The DataSet-member ArtifactKind for a CORE URN, or {@code null} for a non-member kind. */

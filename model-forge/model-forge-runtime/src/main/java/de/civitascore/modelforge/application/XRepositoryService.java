@@ -179,9 +179,9 @@ public class XRepositoryService {
     }
 
     /**
-     * A per-artifact display name from the XRepository identifier (its last meaningful segment with
-     * any trailing version suffix stripped), so the <em>same</em> schema keeps a stable name across
-     * versions. Falls back to the domain. Example: {@code urn:xoev-de:xmeld:profil:nachricht_5.5} →
+     * A per-artifact name from the XRepository identifier (its last meaningful segment with any
+     * trailing version suffix stripped). It is the display name and also the key the artifact's UUID
+     * derives from; changing it re-keys the artifact. Falls back to the domain. Example: {@code urn:xoev-de:xmeld:profil:nachricht_5.5} →
      * {@code nachricht}.
      */
     private String nameFromIdentifier(String identifier, String domain) {

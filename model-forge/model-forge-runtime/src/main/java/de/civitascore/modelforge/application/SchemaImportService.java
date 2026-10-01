@@ -380,16 +380,25 @@ public class SchemaImportService {
         return content;
     }
 
-    /** The {@code $defs} entries that are only a {@code $ref} to a CORE URN, keyed by entry. */
+    /** The bare member references among the {@code $defs} entries, keyed by entry. */
     private static Map<String, String> bareReferences(JsonNode defs) {
         Map<String, String> references = new LinkedHashMap<>();
         defs.properties().forEach(e -> {
-            JsonNode ref = e.getValue().path("$ref");
-            if (e.getValue().size() == 1 && ref.isTextual() && UrnParser.isUrn(ref.asText())) {
-                references.put(e.getKey(), ref.asText());
+            String ref = bareReference(e.getValue());
+            if (ref != null) {
+                references.put(e.getKey(), ref);
             }
         });
         return references;
+    }
+
+    /**
+     * The CORE URN a {@code $defs} entry refers to when the entry is only a {@code $ref} to it, else
+     * {@code null}.
+     */
+    static String bareReference(JsonNode member) {
+        JsonNode ref = member.path("$ref");
+        return member.size() == 1 && ref.isTextual() && UrnParser.isUrn(ref.asText()) ? ref.asText() : null;
     }
 
     /** Resolve a {@code "#/$defs/<Name>"} pointer to the member Element's CORE URN; a value that is

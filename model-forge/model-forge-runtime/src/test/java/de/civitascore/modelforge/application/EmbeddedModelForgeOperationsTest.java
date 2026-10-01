@@ -534,6 +534,18 @@ class EmbeddedModelForgeOperationsTest {
         verify(registry, never()).nameArtifact(anyString(), eq("Ignored"));
     }
 
+    /** Without this, an artifact created from a document with an empty title is listed by its UUID. */
+    @Test
+    void createArtifactRecordsTheDisplayNameWhenTheDocumentTitleIsBlank() {
+        when(registry.storeMapping(anyString(), any(), any()))
+            .thenAnswer(inv -> UrnParser.withVersion(UrnParser.logicalUrn(inv.getArgument(0)), "1.0.0"));
+
+        var blankTitled = operations.createArtifact(new CreateArtifactCommand(
+            ArtifactKind.MAPPING, "Sensor to Obs", mapper.createObjectNode().put("title", " "))).artifactId();
+
+        verify(registry).nameArtifact(blankTitled.value(), "Sensor to Obs");
+    }
+
     @Test
     void writeResultsCarryTheDependencyListsGroupedByReferenceType() {
         when(registry.storeMapping(anyString(), any(), any()))

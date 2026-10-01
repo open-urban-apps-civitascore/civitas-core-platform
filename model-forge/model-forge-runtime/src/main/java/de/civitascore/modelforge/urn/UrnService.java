@@ -68,10 +68,6 @@ public class UrnService {
         return urn("element", id, defaultVersion);
     }
 
-    public String element(UUID id, String version) {
-        return urn("element", id, version);
-    }
-
     public String dataStructure(UUID id) {
         return urn("datastructure", id, defaultVersion);
     }

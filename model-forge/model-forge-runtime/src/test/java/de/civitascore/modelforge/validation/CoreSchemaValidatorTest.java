@@ -266,8 +266,8 @@ class CoreSchemaValidatorTest {
     @Test
     @DisplayName("A FROST DataSink without a port is accepted")
     void frostDataSinkWithoutAPortIsAccepted() {
-        // The schema says what may be stored; the deploy engine says what may publish. A sink that
-        // predates the port must still load, or the migration could not read it.
+        // The editor stores a FROST sink before the modeller picks a port; rejecting it here would
+        // break that save.
         assertThat(validate(ArtifactKind.DATA_SINK, """
             {
               "$schema": "https://civitasconnect.digital/core/datasink/v1",
