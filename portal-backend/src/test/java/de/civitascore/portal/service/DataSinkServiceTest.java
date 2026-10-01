@@ -67,17 +67,17 @@ class DataSinkServiceTest {
   @InjectMocks private DataSinkService dataSinkService;
 
   private static final String STORED_LOGICAL_URN =
-      "urn:core:platform:civitas:data-sink:common:test";
+      "urn:core:platform:civitas:datasink:common:00000000-0000-4000-8000-000000000013";
   private static final String STORED_VERSIONED_URN = STORED_LOGICAL_URN + ":1.0.0";
   private static final String ELEMENT_URN =
-      "urn:core:platform:civitas:element:common:observation:1.0.0";
+      "urn:core:platform:civitas:element:common:5cf6e9e7-fa0d-877a-bda7-df0cc339e439:1.0.0";
 
   @BeforeEach
   void stubPayloadStore() {
     // Storing a configuration returns the registry-assigned pin. Lenient so tests that never
     // store one (validation-failure paths, FROST) don't trip strict stubbing.
     lenient()
-        .when(modelRegistryGateway.storePayload(any(), any(), any(), any(), any()))
+        .when(modelRegistryGateway.storePayload(any(), any(), any(), any(), any(), any()))
         .thenReturn(
             new ModelRegistryGateway.ModelPin(STORED_LOGICAL_URN, STORED_VERSIONED_URN, "1.0.0"));
     // The element soft reference resolves to an existing model by default; individual "not
@@ -164,9 +164,10 @@ class DataSinkServiceTest {
   class ConfigurationStorage {
 
     @Test
-    @DisplayName("POSTGIS create stores the configuration and mirrors the assigned pin")
+    @DisplayName("POSTGIS create stores the configuration under the sink's id and mirrors the pin")
     void postgisCreateStoresConfigurationAndMirrorsPin() {
       UUID dataSetId = UUID.randomUUID();
+      UUID sinkId = UUID.randomUUID();
       Map<String, Object> configuration =
           Map.of("tableName", "sensor_readings", "element", ELEMENT_URN);
 
@@ -178,7 +179,13 @@ class DataSinkServiceTest {
       DataSink entity = new DataSink();
       when(dataSinkMapper.toEntity(any())).thenReturn(entity);
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
-      when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataSinkRepository.save(any()))
+          .thenAnswer(
+              inv -> {
+                DataSink saved = inv.getArgument(0);
+                saved.setId(sinkId);
+                return saved;
+              });
 
       DataSink result = dataSinkService.create(input);
 
@@ -193,6 +200,7 @@ class DataSinkServiceTest {
           .storePayload(
               eq(PayloadKind.DATA_SINK),
               eq(Optional.empty()),
+              eq(sinkId),
               eq("sensor_readings"),
               eq(
                   Map.of(
@@ -228,6 +236,7 @@ class DataSinkServiceTest {
           .storePayload(
               eq(PayloadKind.DATA_SINK),
               eq(Optional.empty()),
+              any(),
               any(),
               eq(Map.of("connectionType", "frost")),
               isNull());
@@ -567,7 +576,7 @@ class DataSinkServiceTest {
       sink.setId(id);
       sink.setDataSet(dataSet(dataSetId));
       sink.setDataSinkType(type);
-      String urn = STORED_LOGICAL_URN + ":sibling-" + id + ":1.0.0";
+      String urn = "urn:core:platform:civitas:datasink:common:" + id + ":1.0.0";
       sink.setConfigurationUrn(urn);
       storedDocuments.put(urn, Map.of("tableName", tableName));
       return sink;
@@ -595,6 +604,13 @@ class DataSinkServiceTest {
       entity.setDataSinkType(DataSinkType.POSTGIS);
       when(dataSinkMapper.toEntity(any())).thenReturn(entity);
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      lenient()
+          .when(dataSinkRepository.save(entity))
+          .thenAnswer(
+              call -> {
+                entity.setId(UUID.randomUUID());
+                return entity;
+              });
       stubStoredConfiguration(input.getConfiguration());
     }
 

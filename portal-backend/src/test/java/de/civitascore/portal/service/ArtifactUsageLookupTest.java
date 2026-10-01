@@ -47,21 +47,21 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class ArtifactUsageLookupTest {
 
   private static final String MODEL_URN =
-      "urn:core:platform:civitas:element:common:Reading:8kq2n4p1vd:1.0.0";
+      "urn:core:platform:civitas:element:common:e5eaeb37-4c14-8bb9-903b-4f86897bfcea:1.0.0";
   private static final String PIPELINE_URN =
-      "urn:core:platform:civitas:pipeline:common:Flow:1aa2bb3cc4";
+      "urn:core:platform:civitas:pipeline:common:d49e7eb0-f7c4-81d0-bf09-3a2197886614";
   private static final String OTHER_PIPELINE_URN =
-      "urn:core:platform:civitas:pipeline:common:Other:5dd6ee7ff8";
+      "urn:core:platform:civitas:pipeline:common:f94c417e-54f2-8eec-83d3-5ca534e71438";
   private static final String SINK_URN =
-      "urn:core:platform:civitas:datasink:common:Store:4rrb1hifsm";
+      "urn:core:platform:civitas:datasink:common:762a05c3-4783-8446-b3cb-8240eee1227a";
   private static final String DATA_SET_URN =
-      "urn:core:platform:civitas:dataset:common:Readings:7pp2kd9sle";
+      "urn:core:platform:civitas:dataset:common:4d4ccbcb-dd32-8b43-ac2d-162aeefb3ef9";
   private static final String MAPPING_URN =
-      "urn:core:platform:civitas:mapping:common:Map:5tt3mnq2wa";
+      "urn:core:platform:civitas:mapping:common:b2ecab01-2f5a-8963-ac6a-2f86b3c8205a";
   private static final String ELEMENT_URN =
-      "urn:core:platform:civitas:element:common:Station:9zz8yy7xx6";
+      "urn:core:platform:civitas:element:common:f97a1a6e-b512-8210-b734-315d0c6a75cd";
   private static final String STRUCTURE_URN =
-      "urn:core:platform:civitas:datastructure:common:Station:9zz8yy7xx6";
+      "urn:core:platform:civitas:datastructure:common:f97a1a6e-b512-8210-b734-315d0c6a75cd";
 
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private PipelineRepository pipelineRepository;
@@ -400,7 +400,8 @@ class ArtifactUsageLookupTest {
       released.setDataStructure(structure);
       DataStructureVersion draft = new DataStructureVersion();
       draft.setId(UUID.randomUUID());
-      draft.setModelUrn("urn:core:platform:civitas:element:common:Reading:8kq2n4p1vd:2.0.0");
+      draft.setModelUrn(
+          "urn:core:platform:civitas:element:common:e5eaeb37-4c14-8bb9-903b-4f86897bfcea:2.0.0");
       draft.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       draft.setDataStructure(structure);
       structure.setDataStructureVersions(Set.of(released, draft));
@@ -427,12 +428,14 @@ class ArtifactUsageLookupTest {
       released.setDataStructure(structure);
       DataStructureVersion draft = new DataStructureVersion();
       draft.setId(UUID.randomUUID());
-      draft.setModelUrn("urn:core:platform:civitas:element:common:Reading:8kq2n4p1vd:2.0.0");
+      draft.setModelUrn(
+          "urn:core:platform:civitas:element:common:e5eaeb37-4c14-8bb9-903b-4f86897bfcea:2.0.0");
       draft.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       draft.setDataStructure(structure);
       DataStructureVersion unused = new DataStructureVersion();
       unused.setId(UUID.randomUUID());
-      unused.setModelUrn("urn:core:platform:civitas:element:common:Reading:8kq2n4p1vd:3.0.0");
+      unused.setModelUrn(
+          "urn:core:platform:civitas:element:common:e5eaeb37-4c14-8bb9-903b-4f86897bfcea:3.0.0");
       unused.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       unused.setDataStructure(structure);
       structure.setDataStructureVersions(Set.of(released, draft, unused));

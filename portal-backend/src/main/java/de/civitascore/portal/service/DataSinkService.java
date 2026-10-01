@@ -184,21 +184,34 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
     entity.setDataSet(dataSet);
 
     validateConfiguration(input.getDataSinkType(), input.getConfiguration());
-    storeConfigurationInRegistry(entity, input);
+    if (entity.getId() != null) {
+      storeConfigurationInRegistry(entity, input);
+    }
 
     return super.postConvertToEntity(entity, input);
   }
 
   @Override
   protected DataSink preSave(DataSink entity) {
-    validateUniquePostgisTableName(entity);
+    validateUniquePostgisTableName(entity, false);
     return super.preSave(entity);
+  }
+
+  /**
+   * Stores the configuration of a new sink and checks its table name, which {@link #preSave} could
+   * not: the name lives in the stored configuration.
+   */
+  @Override
+  protected DataSink postCreate(DataSink saved, DataSinkInputDTO input) {
+    storeConfigurationInRegistry(saved, input);
+    validateUniquePostgisTableName(saved, true);
+    return super.postCreate(saved, input);
   }
 
   /**
    * The dataset's POSTGIS sinks share one schema, so one {@code tableName} is one physical table.
    */
-  private void validateUniquePostgisTableName(DataSink entity) {
+  private void validateUniquePostgisTableName(DataSink entity, boolean created) {
     if (entity.getDataSinkType() != DataSinkType.POSTGIS) {
       return;
     }
@@ -215,7 +228,7 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
         .ifPresent(
             _ -> {
               throw new UniqueConstraintViolationException(
-                  duplicateTableNameMessage(entity, tableName));
+                  duplicateTableNameMessage(created, tableName));
             });
   }
 
@@ -224,8 +237,8 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
    * a sink that already collides is rejected by a request that changed nothing about its name. That
    * reads as a bug in the request unless the message points at the stored value.
    */
-  private static String duplicateTableNameMessage(DataSink entity, String tableName) {
-    if (entity.getId() == null) {
+  private static String duplicateTableNameMessage(boolean created, String tableName) {
+    if (created) {
       return "Another POSTGIS DataSink of this dataset already uses tableName '%s';"
               .formatted(tableName)
           + " they would share one physical table";
@@ -296,6 +309,7 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
         modelRegistryGateway.storePayload(
             PayloadKind.DATA_SINK,
             Optional.ofNullable(entity.getConfigurationLogicalUrn()),
+            entity.getId(),
             deriveArtifactName(input, configuration),
             payload,
             null);
@@ -306,9 +320,8 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
   }
 
   /**
-   * Derives a readable registry artifact name for the sink configuration: the POSTGIS table name
-   * when present, otherwise the sink type. Model Forge appends a UUID, so equal names never
-   * collide.
+   * Derives a readable registry display name for the sink configuration: the POSTGIS table name
+   * when present, otherwise the sink type.
    */
   private static String deriveArtifactName(DataSinkInputDTO input, Map<String, Object> config) {
     if (config.get("tableName") instanceof String tableName && !tableName.isBlank()) {

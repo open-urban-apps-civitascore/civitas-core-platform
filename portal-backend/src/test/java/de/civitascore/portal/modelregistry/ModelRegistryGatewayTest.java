@@ -44,11 +44,11 @@ class ModelRegistryGatewayTest {
   class ParticipatingClosure {
 
     private static final String PIPELINE_URN =
-        "urn:core:platform:civitas:pipeline:common:Ingest:aaaaaaaaaa:1.0.0";
+        "urn:core:platform:civitas:pipeline:common:a8ff27eb-c6c3-8136-9fac-596b9b92356a:1.0.0";
     private static final String STRUCTURE_URN =
-        "urn:core:platform:civitas:datastructure:common:Sensor:bbbbbbbbbb:1.0.0";
+        "urn:core:platform:civitas:datastructure:common:6ddf8001-3ba6-83db-8d23-b547419c1ff2:1.0.0";
     private static final String GHOST_URN =
-        "urn:core:platform:civitas:element:common:Ghost:cccccccccc:1.0.0";
+        "urn:core:platform:civitas:element:common:158a41e4-f47b-8e87-bc6f-d6573a02ab99:1.0.0";
 
     @Test
     @DisplayName("asks the registry for a bounded walk and passes the depth through")

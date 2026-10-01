@@ -275,6 +275,17 @@ class DataSinkControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("POST stores the sink's configuration under the sink's id")
+    void postStoresTheConfigurationUnderTheSinkId() {
+      ResponseEntity<DataSinkOutputDTO> response = performCreate(createValidInput());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      UUID sinkId = response.getBody().getId();
+      assertThat(dataSinkRepository.findById(sinkId).orElseThrow().getConfigurationLogicalUrn())
+          .isEqualTo("urn:core:platform:civitas:datasink:common:" + sinkId);
+    }
+
+    @Test
     @DisplayName("POST creates a POSTGIS DataSink with a resolved DSV summary")
     void postCreatesPostgisDataSink() {
       ensureTestData();
@@ -429,7 +440,9 @@ class DataSinkControllerIntegrationTest
       DataSinkInputDTO input = new DataSinkInputDTO();
       input.setDataSinkType(DataSinkType.FROST);
       input.setConfiguration(
-          Map.of("element", "urn:core:platform:civitas:element:common:missing:1.0.0"));
+          Map.of(
+              "element",
+              "urn:core:platform:civitas:element:common:a299bfdf-06c5-8ff3-8104-36f5db48311d:1.0.0"));
 
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
@@ -443,7 +456,9 @@ class DataSinkControllerIntegrationTest
       DataSinkInputDTO input = new DataSinkInputDTO();
       input.setDataSinkType(DataSinkType.POSTGIS);
       input.setConfiguration(
-          Map.of("element", "urn:core:platform:civitas:element:common:missing:1.0.0"));
+          Map.of(
+              "element",
+              "urn:core:platform:civitas:element:common:a299bfdf-06c5-8ff3-8104-36f5db48311d:1.0.0"));
 
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
@@ -465,7 +480,7 @@ class DataSinkControllerIntegrationTest
               "tableName",
               "sensor_data",
               "element",
-              "urn:core:platform:civitas:element:common:missing:1.0.0"));
+              "urn:core:platform:civitas:element:common:a299bfdf-06c5-8ff3-8104-36f5db48311d:1.0.0"));
 
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);

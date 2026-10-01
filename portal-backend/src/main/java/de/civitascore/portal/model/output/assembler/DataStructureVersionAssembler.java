@@ -70,7 +70,7 @@ public class DataStructureVersionAssembler
     DataStructureVersionInputDTO input = dataStructureVersionMapper.toInput(entity);
     if (entity.getModelUrn() != null) {
       modelRegistryGateway
-          .fetchModel(entity.getModelUrn())
+          .fetchStoredModel(entity.getModelUrn())
           .ifPresent(
               document -> {
                 input.setModel(document.content());

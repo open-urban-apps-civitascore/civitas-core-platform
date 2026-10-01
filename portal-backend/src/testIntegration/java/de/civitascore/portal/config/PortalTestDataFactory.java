@@ -101,6 +101,7 @@ public class PortalTestDataFactory {
     ModelRegistryGateway.ModelPin pin =
         modelRegistryGateway.storeModel(
             Optional.ofNullable(parent.getModelLogicalUrn()),
+            parent.getId(),
             parent.getName(),
             model,
             styles,
@@ -128,6 +129,7 @@ public class PortalTestDataFactory {
         modelRegistryGateway.storePayload(
             PayloadKind.PIPELINE,
             Optional.ofNullable(pipeline.getModelLogicalUrn()),
+            pipeline.getId(),
             pipeline.getName(),
             model,
             styles);
@@ -153,6 +155,7 @@ public class PortalTestDataFactory {
         modelRegistryGateway.storePayload(
             PayloadKind.DATA_SINK,
             Optional.ofNullable(sink.getConfigurationLogicalUrn()),
+            sink.getId(),
             payload.get("tableName") instanceof String tableName ? tableName : "datasink",
             payload,
             null);
@@ -180,6 +183,7 @@ public class PortalTestDataFactory {
         modelRegistryGateway.storePayload(
             PayloadKind.DATA_SOURCE,
             Optional.ofNullable(dataSource.getConfigurationLogicalUrn()),
+            dataSource.getId(),
             dataSource.getName() != null ? dataSource.getName() : "datasource",
             payload,
             null);

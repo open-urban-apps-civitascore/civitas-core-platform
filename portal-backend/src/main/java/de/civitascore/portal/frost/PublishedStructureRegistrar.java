@@ -69,6 +69,8 @@ public class PublishedStructureRegistrar implements ApplicationRunner {
     ModelRegistryGateway.ModelPin pin =
         modelRegistryGateway.storeModel(
             stored.map(PublishedStructure::getLogicalUrn),
+            // The document carries its own identity, derived from the port label.
+            null,
             structure.port(),
             PortStructureGenerator.model(structure),
             // A published structure carries no diagram. Nobody draws it, and a version without one

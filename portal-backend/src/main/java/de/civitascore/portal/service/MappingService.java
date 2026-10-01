@@ -86,6 +86,8 @@ public class MappingService {
     return registry.storePayload(
         PayloadKind.MAPPING,
         Optional.ofNullable(logicalUrn),
+        // A Mapping has no portal row, so Model Forge mints its UUID.
+        null,
         deriveName(content),
         content,
         styles,

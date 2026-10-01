@@ -42,7 +42,7 @@ class FrostSinkPortMigrationTest {
             Optional.of(
                 new ModelRegistryGateway.RegistryDocument(
                     Map.of("connectionType", "frost", "element", "urn:element:9"), Map.of())));
-    when(modelRegistryGateway.storePayload(any(), any(), any(), any(), any()))
+    when(modelRegistryGateway.storePayload(any(), any(), any(), any(), any(), any()))
         .thenReturn(new ModelRegistryGateway.ModelPin("urn:sink:1", "urn:sink:1:3", "3"));
 
     migration.run(null);
@@ -52,6 +52,7 @@ class FrostSinkPortMigrationTest {
         .storePayload(
             eq(PayloadKind.DATA_SINK),
             eq(Optional.of("urn:sink:1")),
+            any(),
             any(),
             payload.capture(),
             any());
@@ -75,7 +76,7 @@ class FrostSinkPortMigrationTest {
     migration.run(null);
 
     // The migration runs on every start. Overwriting here would undo the modeller's own choice.
-    verify(modelRegistryGateway, never()).storePayload(any(), any(), any(), any(), any());
+    verify(modelRegistryGateway, never()).storePayload(any(), any(), any(), any(), any(), any());
     assertEquals("urn:sink:1:2", sink.getConfigurationUrn());
   }
 
@@ -88,7 +89,7 @@ class FrostSinkPortMigrationTest {
 
     migration.run(null);
 
-    verify(modelRegistryGateway, never()).storePayload(any(), any(), any(), any(), any());
+    verify(modelRegistryGateway, never()).storePayload(any(), any(), any(), any(), any(), any());
   }
 
   @Test
@@ -96,7 +97,7 @@ class FrostSinkPortMigrationTest {
   void shouldMigrateAFrostSinkThatCarriesNoConfigurationArtifactYet() {
     DataSink sink = frostSink(null, null);
     when(dataSinkRepository.findAll()).thenReturn(List.of(sink));
-    when(modelRegistryGateway.storePayload(any(), any(), any(), any(), any()))
+    when(modelRegistryGateway.storePayload(any(), any(), any(), any(), any(), any()))
         .thenReturn(new ModelRegistryGateway.ModelPin("urn:sink:7", "urn:sink:7:1", "1"));
 
     migration.run(null);
@@ -104,7 +105,12 @@ class FrostSinkPortMigrationTest {
     ArgumentCaptor<Map<String, Object>> payload = ArgumentCaptor.captor();
     verify(modelRegistryGateway)
         .storePayload(
-            eq(PayloadKind.DATA_SINK), eq(Optional.empty()), any(), payload.capture(), any());
+            eq(PayloadKind.DATA_SINK),
+            eq(Optional.empty()),
+            any(),
+            any(),
+            payload.capture(),
+            any());
     assertEquals("ThingTree", payload.getValue().get("port"));
     // The host supplies the connection type; a payload without it does not satisfy the schema.
     assertEquals("frost", payload.getValue().get("connectionType"));

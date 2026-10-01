@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -80,17 +81,24 @@ public class ModelRegistryGateway {
 
   /**
    * Stores a model (with its styles merged in as {@value #X_UI_STYLES}) in the registry and returns
-   * the version pin. Model Forge assigns the version and the (uuid-bearing) URN.
+   * the version pin. Model Forge assigns the version.
    *
    * <ul>
-   *   <li>First store ({@code existingLogicalUrn} empty): the model is imported as a new Element —
-   *       Model Forge mints the logical URN from {@code name} and decomposes any {@code $defs}.
-   *   <li>Follow-up version ({@code existingLogicalUrn} present): a new version of that same
-   *       artifact is stored, bumping the SemVer version.
+   *   <li>A model stored before as an Element is stored as a new version of {@code
+   *       existingLogicalUrn}. The Element versions the whole document, so a changed member always
+   *       yields a new version.
+   *   <li>Otherwise, with a {@code dataStructureId}, the model is imported under that UUID,
+   *       whatever {@code $id} the document carried: a {@code $defs} library as the DataStructure,
+   *       a schema with a shape of its own as the root Element grouped by the DataStructure of the
+   *       same UUID. Each {@code $defs} member's Element URN derives from the UUID.
+   *   <li>Without one, the document's own {@code $id} decides. A {@code :datastructure:} URN folds
+   *       the document into that DataStructure; anything else is imported as an Element.
    * </ul>
    *
    * @param existingLogicalUrn the stored logical URN of a previous version, empty on first store
-   * @param name the data structure's display name, used to derive a readable URN on first store
+   * @param dataStructureId the id of the Data structure the model belongs to; null for a model that
+   *     carries its own identity
+   * @param name the data structure's display name, the model's title when it carries none
    * @param model the JSON Schema document to store (must be non-empty)
    * @param styles the host's UI styles, merged into the document as {@value #X_UI_STYLES}; null or
    *     empty means the stored document carries no styles
@@ -103,36 +111,40 @@ public class ModelRegistryGateway {
    */
   public ModelPin storeModel(
       Optional<String> existingLogicalUrn,
+      UUID dataStructureId,
       String name,
       Map<String, Object> model,
       Map<String, Object> styles,
       VersionBump bump,
       String bumpFromVersion) {
     JsonNode content = mergeStyles(model, styles);
+    boolean storedAsElement =
+        existingLogicalUrn.map(this::artifactType).filter("element"::equals).isPresent();
     ArtifactId root;
-    if (isDataStructureModel(content, existingLogicalUrn)) {
+    if (dataStructureId != null && !storedAsElement) {
+      root = importRoot(withTitle(content, name), bump, bumpFromVersion, dataStructureId);
+    } else if (isDataStructureModel(content, existingLogicalUrn)) {
       // A datastructure model is folded into a single DataStructure artifact by importSchema (which
       // also splits + versions its member Elements), whether new OR re-versioned. It must NOT go
       // through saveArtifact(ELEMENT) — that would store an Element under a :datastructure: URN.
       // importSchema versions the existing logical URN idempotently, applying the change class to
       // the grouping and to every member whose content changed.
-      root = importRoot(withTitle(content, name), bump, bumpFromVersion);
+      root = importRoot(withTitle(content, name), bump, bumpFromVersion, null);
     } else if (existingLogicalUrn.isPresent()) {
       root =
           saveVersion(
               existingLogicalUrn.get(), ArtifactKind.ELEMENT, content, bump, null, bumpFromVersion);
     } else {
-      root = importRoot(withTitle(content, name), bump, bumpFromVersion);
+      root = importRoot(withTitle(content, name), bump, bumpFromVersion, null);
     }
     return toPin(root);
   }
 
   /**
-   * Whether the model being stored is a DataStructure (as opposed to a plain Element). True when
+   * Whether a model without a host id is a DataStructure (as opposed to a plain Element). True when
    * the content's {@code $id} — or the existing logical URN it re-versions — is a {@code
-   * :datastructure:} URN. The portal stamps a datastructure URN on a UML model's {@code $id};
-   * model-forge then folds the wrapper into one DataStructure artifact holding its shape + member
-   * Elements.
+   * :datastructure:} URN; model-forge then folds the wrapper into one DataStructure artifact
+   * holding its shape + member Elements.
    */
   private static boolean isDataStructureModel(
       JsonNode content, Optional<String> existingLogicalUrn) {
@@ -144,6 +156,18 @@ public class ModelRegistryGateway {
         .filter(UrnParser::isUrn)
         .map(u -> "datastructure".equals(UrnParser.artifactTypeFromUrn(u)))
         .orElse(false);
+  }
+
+  /**
+   * Reads a model back as it was stored, split into content and styles. A PATCH starts from this
+   * document: the bundled view adds embedded copies of the members, which would compare as a change
+   * and be stored as one.
+   *
+   * @param urn logical (current version) or versioned (exact version) CORE URN
+   * @return the split document, or empty when the artifact does not exist
+   */
+  public Optional<RegistryDocument> fetchStoredModel(String urn) {
+    return modelForge.getArtifact(new ArtifactId(urn)).map(ArtifactView::content).map(this::split);
   }
 
   /**
@@ -191,7 +215,9 @@ public class ModelRegistryGateway {
    * grouping as a reference.
    */
   private static String groupingUrnOf(String urn) {
-    return urn.replace(":element:", ":datastructure:");
+    return "element".equals(UrnParser.artifactTypeFromUrn(urn))
+        ? UrnParser.withArtifactType(urn, "datastructure")
+        : urn;
   }
 
   /**
@@ -225,7 +251,7 @@ public class ModelRegistryGateway {
    * anti-corruption layer (enforced by {@code ModelForgeBoundaryTest}).
    *
    * @param urn a versioned, logical or {@code :latest} CORE URN
-   * @return the logical URN (the first 8 segments, no trailing version)
+   * @return the logical URN (no trailing version)
    */
   public String logicalUrn(String urn) {
     return UrnParser.logicalUrn(urn);
@@ -261,14 +287,14 @@ public class ModelRegistryGateway {
   }
 
   /**
-   * An imported model's grouping takes its name and disambiguator from its root Element, which is
-   * what a Data structure row stores for a model that is not a UML Data structure.
+   * An imported model's grouping takes its UUID from its root Element, which is what a Data
+   * structure row stores for a model that is not a UML Data structure.
    */
   private static Set<String> hostModelUrnsOfGrouping(String logicalUrn) {
-    if (!logicalUrn.contains(":datastructure:")) {
+    if (!"datastructure".equals(UrnParser.artifactTypeFromUrn(logicalUrn))) {
       return Set.of();
     }
-    return Set.of(logicalUrn, logicalUrn.replace(":datastructure:", ":element:"));
+    return Set.of(logicalUrn, UrnParser.withArtifactType(logicalUrn, "element"));
   }
 
   /**
@@ -328,14 +354,15 @@ public class ModelRegistryGateway {
    *
    * <ul>
    *   <li>First store ({@code existingLogicalUrn} empty): {@code createArtifact} — Model Forge
-   *       mints the URN from {@code name} and stamps it into the document's {@code id}.
+   *       builds the URN from {@code id} and stamps it into the document's {@code id}.
    *   <li>Follow-up version ({@code existingLogicalUrn} present): {@code saveArtifact} with a MINOR
    *       bump (payload versions are not user-classified).
    * </ul>
    *
    * @param kind the host payload kind, mapped onto the Model Forge artifact kind
    * @param existingLogicalUrn the stored logical URN of a previous version, empty on first store
-   * @param name display name the URN is derived from on first store (must not be blank)
+   * @param id the id of the host entity the payload belongs to, the UUID of its URN; null mints one
+   * @param name display name of the artifact on first store (must not be blank)
    * @param payload the payload document; null is stored as an empty object when styles exist
    * @param styles optional UI styles, merged into the document as {@value #X_UI_STYLES}
    * @return the pin (logical URN, versioned URN, version) the caller persists on the shell
@@ -343,21 +370,23 @@ public class ModelRegistryGateway {
   public ModelPin storePayload(
       PayloadKind kind,
       Optional<String> existingLogicalUrn,
+      UUID id,
       String name,
       Map<String, Object> payload,
       Map<String, Object> styles) {
-    return storePayload(kind, existingLogicalUrn, name, payload, styles, null);
+    return storePayload(kind, existingLogicalUrn, id, name, payload, styles, null);
   }
 
   /**
-   * As {@link #storePayload(PayloadKind, Optional, String, Map, Map)}, but additionally links the
-   * stored artifact into a DataSet: {@code dataSet} is the CORE URN of the DataSet manifest to add
-   * it to. Model Forge maintains the manifest (for a Pipeline it links the whole reference closure
-   * too). {@code null} stores without DataSet membership.
+   * As {@link #storePayload(PayloadKind, Optional, UUID, String, Map, Map)}, but additionally links
+   * the stored artifact into a DataSet: {@code dataSet} is the CORE URN of the DataSet manifest to
+   * add it to. Model Forge maintains the manifest (for a Pipeline it links the whole reference
+   * closure too). {@code null} stores without DataSet membership.
    */
   public ModelPin storePayload(
       PayloadKind kind,
       Optional<String> existingLogicalUrn,
+      UUID id,
       String name,
       Map<String, Object> payload,
       Map<String, Object> styles,
@@ -374,7 +403,7 @@ public class ModelRegistryGateway {
                 () -> {
                   ArtifactWriteResult result =
                       modelForge.createArtifact(
-                          new CreateArtifactCommand(artifactKind, name, content, dataSet));
+                          new CreateArtifactCommand(artifactKind, name, content, dataSet, id));
                   logDependencies(result.artifactId(), result.dependencies());
                   return result.artifactId();
                 });
@@ -382,17 +411,17 @@ public class ModelRegistryGateway {
   }
 
   /**
-   * Creates an (initially empty) DataSet manifest artifact and returns its pin. Members are linked
-   * in later by storing them with this DataSet's URN (see the {@code dataSet} parameter of {@link
-   * #storePayload}); Model Forge maintains the manifest and validates it against {@code
-   * dataset.schema.json}.
+   * Creates an (initially empty) DataSet manifest artifact under the Data set's id and returns its
+   * pin. Members are linked in later by storing them with this DataSet's URN (see the {@code
+   * dataSet} parameter of {@link #storePayload}); Model Forge maintains the manifest and validates
+   * it against {@code dataset.schema.json}.
    */
-  public ModelPin createDataSetManifest(String name) {
+  public ModelPin createDataSetManifest(UUID dataSetId, String name) {
     String safeName = name == null || name.isBlank() ? "dataset" : name;
     JsonNode content = mergeStyles(Map.of("title", safeName), null);
     ArtifactWriteResult result =
         modelForge.createArtifact(
-            new CreateArtifactCommand(ArtifactKind.DATA_SET, safeName, content));
+            new CreateArtifactCommand(ArtifactKind.DATA_SET, safeName, content, null, dataSetId));
     return toPin(result.artifactId());
   }
 
@@ -454,10 +483,12 @@ public class ModelRegistryGateway {
    * @param bump the change class to apply; it reaches the grouping and every member whose content
    *     changed, and a member that is byte-identical still mints nothing
    */
-  private ArtifactId importRoot(JsonNode content, VersionBump bump, String bumpFromVersion) {
+  private ArtifactId importRoot(
+      JsonNode content, VersionBump bump, String bumpFromVersion, UUID dataStructureId) {
     ImportResult result =
         modelForge.importSchema(
-            new ImportSchemaCommand(content, toModelForgeBump(bump), null, false, bumpFromVersion));
+            new ImportSchemaCommand(
+                content, toModelForgeBump(bump), null, false, bumpFromVersion, dataStructureId));
     logDependencies(result.rootArtifactId(), result.dependencies());
     return result.rootArtifactId();
   }
@@ -571,9 +602,7 @@ public class ModelRegistryGateway {
     return copy;
   }
 
-  /**
-   * Backfills the schema {@code title} from the data structure name so the minted URN is readable.
-   */
+  /** Backfills the schema {@code title} from the data structure name, its registry display name. */
   private static JsonNode withTitle(JsonNode content, String name) {
     if (content instanceof ObjectNode object
         && name != null

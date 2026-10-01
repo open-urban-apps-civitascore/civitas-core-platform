@@ -43,9 +43,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class DataStructureVersionServiceTest {
 
   private static final String MODEL_URN =
-      "urn:core:platform:civitas:element:common:Sensor:m8i4hc3h56:1.0.0";
+      "urn:core:platform:civitas:element:common:36b5df47-c3f5-86fd-9428-4597d8cd4d36:1.0.0";
   private static final String BLOCKER_URN =
-      "urn:core:platform:civitas:datasink:common:Store:4rrb1hifsm";
+      "urn:core:platform:civitas:datasink:common:762a05c3-4783-8446-b3cb-8240eee1227a";
 
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @Mock private DataStructureVersionMapper dataStructureVersionMapper;
@@ -60,7 +60,7 @@ class DataStructureVersionServiceTest {
           List.of(
               new ArtifactUsageLookup.ReleasedReferrer(
                   ArtifactUsageLookup.ReferrerKind.MAPPING,
-                  "urn:core:platform:civitas:mapping:common:Map:5tt3mnq2wa")));
+                  "urn:core:platform:civitas:mapping:common:b2ecab01-2f5a-8963-ac6a-2f86b3c8205a")));
   private static final ArtifactUsageLookup.ArtifactUsage IN_USE_BY_DRAFTS =
       new ArtifactUsageLookup.ArtifactUsage(true, List.of());
 
@@ -71,11 +71,11 @@ class DataStructureVersionServiceTest {
     // Model Forge is the version authority: storing a model returns the assigned pin. Lenient so
     // tests that never store a model (early-throw / no-model paths) don't trip strict stubbing.
     lenient()
-        .when(modelRegistryGateway.storeModel(any(), any(), any(), any(), any(), any()))
+        .when(modelRegistryGateway.storeModel(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(
             new ModelRegistryGateway.ModelPin(
-                "urn:core:platform:civitas:element:common:test",
-                "urn:core:platform:civitas:element:common:test:1.0.0",
+                "urn:core:platform:civitas:element:common:00000000-0000-4000-8000-000000000016",
+                "urn:core:platform:civitas:element:common:7c96ac2d-1fad-817a-a9b0-c7374bba1952:1.0.0",
                 "1.0.0"));
     lenient()
         .when(artifactUsageLookup.of(any(DataStructureVersion.class)))
@@ -244,7 +244,8 @@ class DataStructureVersionServiceTest {
       version.setId(versionId);
       version.setVersion("1.0.0");
       version.setModelName("OldModel");
-      version.setModelUrn("urn:core:platform:civitas:element:common:test:1.0.0");
+      version.setModelUrn(
+          "urn:core:platform:civitas:element:common:7c96ac2d-1fad-817a-a9b0-c7374bba1952:1.0.0");
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
 
       DataStructureVersionMetaInputDTO meta = new DataStructureVersionMetaInputDTO();
@@ -258,7 +259,8 @@ class DataStructureVersionServiceTest {
       assertThat(result.getDescription()).isEqualTo("New description");
       assertThat(result.getModelName()).isEqualTo("OldModel");
       assertThat(result.getModelUrn())
-          .isEqualTo("urn:core:platform:civitas:element:common:test:1.0.0");
+          .isEqualTo(
+              "urn:core:platform:civitas:element:common:7c96ac2d-1fad-817a-a9b0-c7374bba1952:1.0.0");
       assertThat(result.getVersion()).isEqualTo("1.0.0");
       verifyNoInteractions(modelRegistryGateway);
     }
@@ -307,7 +309,8 @@ class DataStructureVersionServiceTest {
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setModelUrn("urn:core:platform:civitas:element:common:observation:1.0.0");
+      version.setModelUrn(
+          "urn:core:platform:civitas:element:common:5cf6e9e7-fa0d-877a-bda7-df0cc339e439:1.0.0");
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.save(version)).thenReturn(version);
@@ -371,16 +374,19 @@ class DataStructureVersionServiceTest {
           .storeModel(
               eq(Optional.empty()),
               any(),
+              any(),
               eq(Map.of("title", "Observation")),
               eq(Map.of("color", "blue")),
               any(),
               any());
       assertThat(result.getVersion()).isEqualTo("1.0.0");
       assertThat(result.getModelUrn())
-          .isEqualTo("urn:core:platform:civitas:element:common:test:1.0.0");
+          .isEqualTo(
+              "urn:core:platform:civitas:element:common:7c96ac2d-1fad-817a-a9b0-c7374bba1952:1.0.0");
       assertThat(dataStructure.getModelLogicalUrn())
           .as("The parent's stable logical URN is minted on the first store")
-          .isEqualTo("urn:core:platform:civitas:element:common:test");
+          .isEqualTo(
+              "urn:core:platform:civitas:element:common:00000000-0000-4000-8000-000000000016");
     }
 
     @Test
@@ -390,7 +396,8 @@ class DataStructureVersionServiceTest {
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
       dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
-      dataStructure.setModelLogicalUrn("urn:core:platform:civitas:element:common:test");
+      dataStructure.setModelLogicalUrn(
+          "urn:core:platform:civitas:element:common:00000000-0000-4000-8000-000000000016");
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureId(dataStructureId);
@@ -407,7 +414,10 @@ class DataStructureVersionServiceTest {
 
       verify(modelRegistryGateway)
           .storeModel(
-              eq(Optional.of("urn:core:platform:civitas:element:common:test")),
+              eq(
+                  Optional.of(
+                      "urn:core:platform:civitas:element:common:00000000-0000-4000-8000-000000000016")),
+              any(),
               any(),
               any(),
               any(),
@@ -423,7 +433,8 @@ class DataStructureVersionServiceTest {
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
       dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
-      dataStructure.setModelLogicalUrn("urn:core:platform:civitas:element:common:test");
+      dataStructure.setModelLogicalUrn(
+          "urn:core:platform:civitas:element:common:00000000-0000-4000-8000-000000000016");
 
       // Created without a diagram, so it holds no model yet — the save below is its first.
       DataStructureVersion version = new DataStructureVersion();
@@ -442,7 +453,7 @@ class DataStructureVersionServiceTest {
       dataStructureVersionService.update(versionId, input);
 
       verify(modelRegistryGateway)
-          .storeModel(any(), any(), any(), any(), eq(VersionBump.MAJOR), isNull());
+          .storeModel(any(), any(), any(), any(), any(), eq(VersionBump.MAJOR), isNull());
     }
 
     @Test
@@ -453,12 +464,14 @@ class DataStructureVersionServiceTest {
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
       dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
-      dataStructure.setModelLogicalUrn("urn:core:platform:civitas:element:common:test");
+      dataStructure.setModelLogicalUrn(
+          "urn:core:platform:civitas:element:common:00000000-0000-4000-8000-000000000016");
 
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
       version.setVersion("2.4.0");
-      version.setModelUrn("urn:core:platform:civitas:element:common:test:2.4.0");
+      version.setModelUrn(
+          "urn:core:platform:civitas:element:common:7c96ac2d-1fad-817a-a9b0-c7374bba1952:2.4.0");
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       version.setDataStructure(dataStructure);
 
@@ -473,7 +486,7 @@ class DataStructureVersionServiceTest {
       dataStructureVersionService.update(versionId, input);
 
       verify(modelRegistryGateway)
-          .storeModel(any(), any(), any(), any(), eq(VersionBump.MINOR), eq("2.4.0"));
+          .storeModel(any(), any(), any(), any(), any(), eq(VersionBump.MINOR), eq("2.4.0"));
     }
 
     @Test
@@ -496,7 +509,7 @@ class DataStructureVersionServiceTest {
       DataStructureVersion result = dataStructureVersionService.create(input);
 
       verify(modelRegistryGateway, org.mockito.Mockito.never())
-          .storeModel(any(), any(), any(), any(), any(), any());
+          .storeModel(any(), any(), any(), any(), any(), any(), any());
       assertThat(result.getVersion()).isNull();
       assertThat(result.getModelUrn()).isNull();
     }

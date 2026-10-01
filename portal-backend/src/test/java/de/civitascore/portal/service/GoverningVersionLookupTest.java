@@ -26,7 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class GoverningVersionLookupTest {
 
   private static final String LOGICAL =
-      "urn:core:platform:civitas:element:common:Sensor:bbbbbbbbbb";
+      "urn:core:platform:civitas:element:common:6ddf8001-3ba6-83db-8d23-b547419c1ff2";
 
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;

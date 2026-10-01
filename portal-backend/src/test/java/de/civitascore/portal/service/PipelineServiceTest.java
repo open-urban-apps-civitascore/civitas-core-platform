@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,6 +20,8 @@ import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.PipelineInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
@@ -29,6 +32,7 @@ import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -59,6 +63,7 @@ class PipelineServiceTest {
   @Spy private DataSourceDatapoolScopeValidator datapoolScopeValidator;
 
   @Mock private DataSetMutationGuard dataSetMutationGuard;
+  @Mock private ModelRegistryGateway modelRegistryGateway;
 
   @InjectMocks private PipelineService pipelineService;
 
@@ -84,6 +89,56 @@ class PipelineServiceTest {
     p.setDataSet(dataSet);
     p.setVersion(1L);
     return p;
+  }
+
+  @Nested
+  @DisplayName("Registry identity")
+  class RegistryIdentity {
+
+    @Test
+    @DisplayName("Stores a created pipeline's definition under the id the save assigned")
+    void create_storesTheDefinitionUnderTheSavedId() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID pipelineId = UUID.randomUUID();
+      DataSet dataSet = draftDataSet(dataSetId);
+      String logicalUrn = "urn:core:platform:civitas:pipeline:common:" + pipelineId;
+
+      PipelineInputDTO input = new PipelineInputDTO();
+      input.setName("test-pipeline");
+      input.setDataSetId(dataSetId);
+      input.setModel(Map.of("nodes", List.of(), "edges", List.of()));
+
+      Pipeline entity = new Pipeline();
+      entity.setName("test-pipeline");
+      when(pipelineMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
+      when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
+      when(pipelineRepository.save(any()))
+          .thenAnswer(
+              invocation -> {
+                Pipeline saved = invocation.getArgument(0);
+                saved.setId(pipelineId);
+                return saved;
+              });
+      when(dataSinkRepository.findByPipelineId(any())).thenReturn(List.of());
+      when(modelRegistryGateway.storePayload(any(), any(), any(), any(), any(), any(), any()))
+          .thenReturn(
+              new ModelRegistryGateway.ModelPin(logicalUrn, logicalUrn + ":1.0.0", "1.0.0"));
+
+      Pipeline result = pipelineService.create(input);
+
+      verify(modelRegistryGateway)
+          .storePayload(
+              eq(PayloadKind.PIPELINE),
+              eq(Optional.empty()),
+              eq(pipelineId),
+              any(),
+              any(),
+              any(),
+              any());
+      assertThat(result.getModelLogicalUrn()).isEqualTo(logicalUrn);
+      assertThat(result.getModelUrn()).isEqualTo(logicalUrn + ":1.0.0");
+    }
   }
 
   @Nested

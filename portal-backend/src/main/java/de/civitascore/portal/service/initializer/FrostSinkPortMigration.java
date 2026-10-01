@@ -87,6 +87,7 @@ public class FrostSinkPortMigration implements ApplicationRunner {
         modelRegistryGateway.storePayload(
             PayloadKind.DATA_SINK,
             Optional.ofNullable(sink.getConfigurationLogicalUrn()),
+            sink.getId(),
             DataSinkType.FROST.name(),
             payload,
             null);

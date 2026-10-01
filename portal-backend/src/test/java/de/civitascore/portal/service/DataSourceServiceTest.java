@@ -81,7 +81,7 @@ class DataSourceServiceTest {
   @InjectMocks private DataSourceService dataSourceService;
 
   private static final String STORED_LOGICAL_URN =
-      "urn:core:platform:civitas:data-source:common:test";
+      "urn:core:platform:civitas:datasource:common:00000000-0000-4000-8000-000000000014";
   private static final String STORED_VERSIONED_URN = STORED_LOGICAL_URN + ":1.0.0";
 
   private static final ArtifactUsageLookup.ArtifactUsage NOT_IN_USE =
@@ -100,7 +100,7 @@ class DataSourceServiceTest {
     // Storing a configuration returns the registry-assigned pin. Lenient so tests that never
     // store a configuration don't trip strict stubbing.
     lenient()
-        .when(modelRegistryGateway.storePayload(any(), any(), any(), any(), any()))
+        .when(modelRegistryGateway.storePayload(any(), any(), any(), any(), any(), any()))
         .thenReturn(
             new ModelRegistryGateway.ModelPin(STORED_LOGICAL_URN, STORED_VERSIONED_URN, "1.0.0"));
     lenient().when(artifactUsageLookup.of(any(DataSource.class))).thenReturn(NOT_IN_USE);
@@ -112,7 +112,7 @@ class DataSourceServiceTest {
    */
   private void stubStoredConfiguration(DataSource entity, Map<String, Object> config) {
     String urn =
-        "urn:core:platform:civitas:data-source:common:src-"
+        "urn:core:platform:civitas:datasource:common:"
             + (entity.getId() != null ? entity.getId() : UUID.randomUUID())
             + ":1.0.0";
     entity.setConfigurationLogicalUrn(urn.substring(0, urn.lastIndexOf(':')));
@@ -522,7 +522,7 @@ class DataSourceServiceTest {
 
       DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
-      verify(modelRegistryGateway, never()).storePayload(any(), any(), any(), any(), any());
+      verify(modelRegistryGateway, never()).storePayload(any(), any(), any(), any(), any(), any());
       assertThat(result.getConfigurationUrn())
           .as("the stored content pin stays untouched")
           .isEqualTo(originalPin);
@@ -990,7 +990,8 @@ class DataSourceServiceTest {
       entity.setId(id);
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(ConnectorType.SQL);
-      entity.setConfigurationUrn("urn:core:platform:civitas:datasource:common:gone:kx1:1.0.0");
+      entity.setConfigurationUrn(
+          "urn:core:platform:civitas:datasource:common:00000000-0000-4000-8000-000000000015:1.0.0");
 
       DataSourceInputDTO input = new DataSourceInputDTO();
       input.setName("updated");

@@ -58,6 +58,9 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
     entity = preSave(entity);
 
     entity = getRepository().saveAndFlush(entity);
+    if ("create".equals(operation)) {
+      entity = postCreate(entity, preProcessedInput);
+    }
 
     entity = prePublish(entity, preProcessedInput);
 

@@ -15,6 +15,7 @@ import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionMetaInputDTO;
 import de.civitascore.portal.model.output.DataStructureVersionOutputDTO;
 import de.civitascore.portal.model.output.summary.DataStructureSummaryDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
@@ -46,6 +47,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   @Autowired protected PortalTestDataFactory portalData;
 
   @Autowired private DataStructureRepository dataStructureRepository;
+
+  @Autowired private ModelRegistryGateway modelRegistryGateway;
 
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
 
@@ -152,6 +155,53 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(secondResponse.getStatusCode())
           .as("The number is already taken by the version holding this content")
           .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    /**
+     * A URN carrying the structure's name kept the old name after a rename, so a reference built
+     * from the new name named a version the registry did not hold.
+     */
+    @Test
+    @DisplayName("A UML model is stored under the data structure's id, which a rename keeps")
+    void umlModelIsStoredUnderTheDataStructureId() {
+      DataStructure structure = portalData.dataStructure(b -> b.name("OriginalName"));
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDescription("UML model");
+      input.setModelName("Uml");
+      input.setModel(
+          Map.of(
+              "$schema", "https://json-schema.org/draft/2020-12/schema",
+              "title", "OriginalName",
+              "$defs",
+                  Map.of(
+                      "Sensor",
+                      Map.of(
+                          "type", "object", "properties", Map.of("id", Map.of("type", "string")))),
+              "$ref", "#/$defs/Sensor"));
+
+      ResponseEntity<DataStructureVersionOutputDTO> created =
+          restTemplate.exchange(
+              "/datastructures/" + structure.getId() + "/versions",
+              HttpMethod.POST,
+              new HttpEntity<>(input, createAuthHeaders()),
+              getOutputTypeReference());
+      assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      String modelUrn = created.getBody().getModelUrn();
+      assertThat(modelUrn)
+          .isEqualTo(
+              "urn:core:platform:civitas:datastructure:common:" + structure.getId() + ":1.0.0");
+
+      DataStructure renamed = dataStructureRepository.findById(structure.getId()).orElseThrow();
+      renamed.setName("NewName");
+      dataStructureRepository.save(renamed);
+
+      assertThat(modelRegistryGateway.fetchModel(modelUrn)).isPresent();
+      assertThat(
+              dataStructureVersionRepository
+                  .findById(created.getBody().getId())
+                  .orElseThrow()
+                  .getModelUrn())
+          .isEqualTo(modelUrn);
     }
 
     @Test
@@ -507,6 +557,49 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   @Nested
   @DisplayName("Patch DataStructureVersion Tests")
   class PatchDataStructureVersionTests {
+
+    /**
+     * A PATCH carries the stored model forward. Read back as the bundled view, it differed from
+     * what was stored and was stored again under a new version.
+     */
+    @Test
+    @DisplayName("Patching the description of a UML model leaves its version and pin alone")
+    void patchingTheDescriptionOfAUmlModelKeepsItsVersion() {
+      DataStructure structure = portalData.dataStructure(b -> b.name("Uml"));
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDescription("UML model");
+      input.setModelName("Uml");
+      input.setModel(
+          Map.of(
+              "$schema", "https://json-schema.org/draft/2020-12/schema",
+              "title", "Uml",
+              "$defs",
+                  Map.of(
+                      "Sensor",
+                      Map.of(
+                          "type", "object", "properties", Map.of("id", Map.of("type", "string")))),
+              "$ref", "#/$defs/Sensor"));
+      String endpoint = "/datastructures/" + structure.getId() + "/versions";
+      DataStructureVersionOutputDTO created =
+          restTemplate
+              .exchange(
+                  endpoint,
+                  HttpMethod.POST,
+                  new HttpEntity<>(input, createAuthHeaders()),
+                  getOutputTypeReference())
+              .getBody();
+
+      ResponseEntity<DataStructureVersionOutputDTO> patched =
+          restTemplate.exchange(
+              endpoint + "/" + created.getId(),
+              HttpMethod.PATCH,
+              new HttpEntity<>(Map.of("description", "Patched"), createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(patched.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patched.getBody().getVersion()).isEqualTo(created.getVersion());
+      assertThat(patched.getBody().getModelUrn()).isEqualTo(created.getModelUrn());
+    }
 
     @Test
     @DisplayName("Should patch description without affecting the model")

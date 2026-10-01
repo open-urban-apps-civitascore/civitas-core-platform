@@ -135,7 +135,10 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("Should keep the blocking artifacts out of the response body")
     void shouldNotReturnBlockersForResourceInUse() {
-      List<String> blockers = List.of("urn:core:datasink:Readings", "urn:core:mapping:Join");
+      List<String> blockers =
+          List.of(
+              "urn:core:platform:civitas:datasink:common:00000000-0000-4000-8000-000000000031",
+              "urn:core:platform:civitas:mapping:common:00000000-0000-4000-8000-000000000032");
       ResourceInUseException ex =
           new ResourceInUseException(
               "DataStructure", UUID.randomUUID(), "Still referenced", blockers);

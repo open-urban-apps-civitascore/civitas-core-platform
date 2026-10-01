@@ -105,26 +105,34 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
     @DisplayName("each kind reports its row's release state by logical URN")
     void eachKindReportsItsReleaseState() {
       DataSet released = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.AVAILABLE));
-      released.setManifestLogicalUrn("urn:core:platform:civitas:dataset:common:A:1aaaaaaaaa");
+      released.setManifestLogicalUrn(
+          "urn:core:platform:civitas:dataset:common:85b23d00-fd3b-8af5-9dcc-69445cda1b26");
       released = dataSetRepository.save(released);
       Pipeline pipeline =
           portalData.pipeline(
-              released, b -> b.modelLogicalUrn("urn:core:platform:civitas:pipeline:common:P:1a"));
+              released,
+              b ->
+                  b.modelLogicalUrn(
+                      "urn:core:platform:civitas:pipeline:common:00000000-0000-4000-8000-000000000021"));
       DataSink sink =
           portalData.dataSink(
               released,
               pipeline,
-              s -> s.setConfigurationLogicalUrn("urn:core:platform:civitas:datasink:common:S:1a"));
+              s ->
+                  s.setConfigurationLogicalUrn(
+                      "urn:core:platform:civitas:datasink:common:00000000-0000-4000-8000-000000000022"));
       DataSource source =
           portalData.dataSource(
               b ->
                   b.dataSourceStatus(DataSourceStatus.AVAILABLE)
-                      .configurationLogicalUrn("urn:core:platform:civitas:datasource:common:D:1a"));
+                      .configurationLogicalUrn(
+                          "urn:core:platform:civitas:datasource:common:00000000-0000-4000-8000-000000000023"));
       DataStructure structure =
           portalData.dataStructure(
               b ->
                   b.dataStructureStatus(DataStructureStatus.DRAFT)
-                      .modelLogicalUrn("urn:core:platform:civitas:datastructure:common:T:1a"));
+                      .modelLogicalUrn(
+                          "urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000024"));
 
       assertThat(
               dataSetRepository.findReleaseStatesByManifestLogicalUrnIn(
@@ -311,9 +319,15 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
     @Test
     @DisplayName("a dataset counts as released while AVAILABLE or being unreleased, not when READY")
     void dataSetReleaseState_includesUnreleaseInFlight() {
-      DataSet available = dataSetWithManifestUrn("urn:core:platform:civitas:dataset:common:A:1a");
-      DataSet ready = dataSetWithManifestUrn("urn:core:platform:civitas:dataset:common:R:1a");
-      DataSet unreleasing = dataSetWithManifestUrn("urn:core:platform:civitas:dataset:common:U:1a");
+      DataSet available =
+          dataSetWithManifestUrn(
+              "urn:core:platform:civitas:dataset:common:00000000-0000-4000-8000-000000000025");
+      DataSet ready =
+          dataSetWithManifestUrn(
+              "urn:core:platform:civitas:dataset:common:00000000-0000-4000-8000-000000000026");
+      DataSet unreleasing =
+          dataSetWithManifestUrn(
+              "urn:core:platform:civitas:dataset:common:00000000-0000-4000-8000-000000000027");
       withStatus(available, DataSetStatus.AVAILABLE);
       withStatus(ready, DataSetStatus.READY);
       unreleasing(unreleasing);

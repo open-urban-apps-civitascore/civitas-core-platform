@@ -67,13 +67,15 @@ class ModelRegistryExceptionHandlerTest {
     ProblemDetail problem =
         handler.handleArtifactInUse(
             new ArtifactInUseException(
-                "urn:core:platform:civitas:mapping:common:M:abcdefghij",
-                List.of("urn:core:platform:civitas:pipeline:common:P:abcdefghij")),
+                "urn:core:platform:civitas:mapping:common:3bb4d91a-a4c3-8696-bbb3-ee3c4ef17c6d",
+                List.of(
+                    "urn:core:platform:civitas:pipeline:common:c71d3077-985f-85f7-b699-88738d3e0dd6")),
             request());
 
     assertThat(problem.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
     assertThat(problem.getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
-    assertThat(problem.getDetail()).contains("pipeline:common:P");
+    assertThat(problem.getDetail())
+        .contains("urn:core:platform:civitas:pipeline:common:c71d3077-985f-85f7-b699-88738d3e0dd6");
   }
 
   @Test

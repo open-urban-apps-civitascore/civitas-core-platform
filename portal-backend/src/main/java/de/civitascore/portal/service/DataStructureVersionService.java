@@ -129,6 +129,7 @@ public class DataStructureVersionService
     ModelRegistryGateway.ModelPin pin =
         modelRegistryGateway.storeModel(
             Optional.ofNullable(parent.getModelLogicalUrn()),
+            parent.getId(),
             parent.getName(),
             input.getModel(),
             input.getStyles(),
