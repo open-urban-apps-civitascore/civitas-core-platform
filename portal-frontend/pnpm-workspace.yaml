@@ -4,8 +4,18 @@ packages:
 # next@15.5.25 hard-pins postcss@8.4.31 (exact, no range) even in its latest
 # 15.x patch, which carries CVE-2026-45623 and CVE-2026-73646 (fixed in
 # 8.5.18). Override until Next.js bumps its own pin upstream.
+#
+# brace-expansion: three separate major lines (1.x, 2.x, 5.x) are pulled in
+# transitively by different dependents. CVE-2026-102276 and CVE-2026-102278
+# (stack exhaustion via recursion) and CVE-2026-102277 (quadratic-time
+# expansion) affect all three lines; bump each to its latest patch rather
+# than collapsing them to one line, which would break dependents expecting
+# an older major.
 overrides:
   next>postcss: '8.5.23'
+  brace-expansion@1: '1.1.21'
+  brace-expansion@2: '2.1.7'
+  brace-expansion@5: '5.0.12'
 
 allowBuilds:
   '@parcel/watcher': true
