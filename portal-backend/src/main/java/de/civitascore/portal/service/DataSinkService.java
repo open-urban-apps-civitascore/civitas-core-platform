@@ -337,10 +337,19 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
   }
 
   /**
-   * @throws ResourceInUseException (409) if a Layer references this DataSink
+   * A provisioned sink's storage outlives its row, and the dataset teardown only finds storage of
+   * the sinks still present, so such a sink goes only with its dataset.
+   *
+   * @throws ResourceInUseException (409) if this DataSink is provisioned or a Layer references it
    */
   @Override
   protected void onDelete(DataSink sink) {
+    if (sink.isProvisioned()) {
+      throw new ResourceInUseException(
+          getEntityName(),
+          sink.getId(),
+          "DataSink is provisioned; its storage is removed only together with its DataSet");
+    }
     if (layerRepository.existsByDataSinkId(sink.getId())) {
       throw new ResourceInUseException(
           getEntityName(), sink.getId(), "DataSink is referenced by one or more Layers");

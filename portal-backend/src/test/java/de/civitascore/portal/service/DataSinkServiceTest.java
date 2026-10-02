@@ -255,6 +255,28 @@ class DataSinkServiceTest {
       verify(dataSinkRepository).deleteById(sinkId);
       verify(modelRegistryGateway).deletePayload(STORED_LOGICAL_URN);
     }
+
+    @Test
+    @DisplayName("Delete refuses a provisioned sink and keeps its configuration artifact")
+    void deleteRefusesProvisionedSink() {
+      UUID sinkId = UUID.randomUUID();
+      DataSink sink = new DataSink();
+      sink.setId(sinkId);
+      sink.setDataSet(dataSet(UUID.randomUUID()));
+      sink.setDataSinkType(DataSinkType.POSTGIS);
+      sink.setProvisioned(true);
+      sink.setConfigurationLogicalUrn(STORED_LOGICAL_URN);
+
+      when(dataSinkRepository.existsById(sinkId)).thenReturn(true);
+      when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(sink));
+
+      assertThatThrownBy(() -> dataSinkService.deleteById(sinkId))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("provisioned");
+
+      verify(dataSinkRepository, never()).deleteById(sinkId);
+      verify(modelRegistryGateway, never()).deletePayload(any());
+    }
   }
 
   @Nested

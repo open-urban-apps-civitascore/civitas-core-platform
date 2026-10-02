@@ -16,24 +16,28 @@ params:path {
 }
 
 tests {
-  test("DataSink deleted or already gone", function() {
+  test("Provisioned FROST DataSink refused", function() {
     const status = res.getStatus();
-    // 204=deleted, 404=already gone, 400=sagaDataSinkId never set (aborted run)
-    expect(status === 204 || status === 404 || status === 400).to.be.true;
+    // 409=provisioned by the release in step 8, 204=never provisioned (release saga failed),
+    // 404=already gone, 400=sagaDataSinkId never set (aborted run)
+    expect(status === 409 || status === 204 || status === 404 || status === 400).to.be.true;
+    if (status === 409) {
+      expect(res.getBody().type).to.equal("urn:civitas:error:RESOURCE_IN_USE");
+    }
   });
 }
 
 docs {
-  **Saga step 12b** — Delete the FROST DataSink (cleanup).
+  **Saga step 12b** — Delete the FROST DataSink (refused).
 
-  Removes the DataSink created in step 4c. Ordering is constrained from both sides: it must run **after** the pipeline is deleted, because a pipeline references its sink's configuration by CORE URN and the registry refuses to delete a referenced artifact (409); and **before** the dataset is deleted, because `data_sinks.dataset_id` is `NOT NULL` with no `ON DELETE CASCADE`.
+  The release in step 8 provisioned the DataSink created in step 4c. A provisioned DataSink keeps its storage after an unrelease, and only the DataSet teardown removes that storage, so a standalone delete is refused with `409` even though the DataSet is a draft again. The DataSink goes together with the DataSet in step 13.
 
-  **Expected Response:** 204 No Content. 404 if already deleted. 400 if `sagaDataSinkId` is not set (first run / aborted earlier).
+  **Expected Response:** 409 Conflict (`RESOURCE_IN_USE`). 204 if the release saga failed and nothing was provisioned. 404 if already deleted. 400 if `sagaDataSinkId` is not set (first run / aborted earlier).
 
   **System Impact:**
 
   | Layer | Effect |
   |---|---|
-  | Backend | DataSink record removed from `portal_backend` DB |
-  | Config Adapter | — (FROST project cleanup happens via the DELETE saga on unrelease) |
+  | Backend | — (DataSink record kept) |
+  | Config Adapter | — |
 }

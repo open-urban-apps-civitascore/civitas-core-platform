@@ -24,9 +24,9 @@ tests {
 }
 
 docs {
-  **Precondition:** `dataSetId` and `dataSinkId` are set. The DataSink must not be in use by a Layer (delete dependent Layers first).
+  **Precondition:** `dataSetId` and `dataSinkId` are set. The DataSink must not be in use by a Layer (delete dependent Layers first) and must not be provisioned: a provisioned DataSink is refused with `409` and goes only together with its DataSet, whose teardown removes its storage.
 
-  **Expected Response:** 204 No Content.
+  **Expected Response:** 204 No Content. 409 if the DataSink is provisioned or a Layer references it.
 
   **Verification:** Issue `get-datasink-by-id` for the same `dataSinkId` and confirm 404.
 

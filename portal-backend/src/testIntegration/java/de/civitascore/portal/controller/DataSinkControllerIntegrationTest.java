@@ -856,6 +856,25 @@ class DataSinkControllerIntegrationTest
       assertRejected(response, HttpStatus.CONFLICT, "urn:civitas:error:RESOURCE_IN_USE");
       assertThat(dataSinkRepository.findById(sink.getId())).isPresent();
     }
+
+    /** A draft dataset holds a provisioned sink after an unrelease. */
+    @Test
+    @DisplayName("DELETE returns 409 for a provisioned DataSink and keeps its configuration")
+    void deleteReturns409WhenDataSinkIsProvisioned() {
+      UUID id = createTestEntity();
+      DataSink sink = dataSinkRepository.findById(id).orElseThrow();
+      sink.setProvisioned(true);
+      dataSinkRepository.save(sink);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id, HttpMethod.DELETE, createAuthHeaders(), null);
+
+      assertRejected(response, HttpStatus.CONFLICT, "urn:civitas:error:RESOURCE_IN_USE");
+      assertThat(response.getBody().getDetail()).doesNotContain("confirmDataLoss");
+      assertThat(dataSinkRepository.findById(id)).isPresent();
+      assertThat(modelRegistryGateway.fetchPayload(sink.getConfigurationUrn())).isPresent();
+    }
   }
 
   @Nested
