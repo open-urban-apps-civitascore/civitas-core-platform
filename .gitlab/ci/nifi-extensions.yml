@@ -11,8 +11,9 @@
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
-    # Always run on main and develop branch
+    # Always run on main, staging and develop branch
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
     - if: $CI_COMMIT_BRANCH == "develop"
     # Run on MR only when the extensions change
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -68,6 +69,7 @@ generate-graph-nifi-extensions:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
     - if: $CI_COMMIT_BRANCH == "develop"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   script:
@@ -266,7 +268,7 @@ deploy-nifi-extensions-image:
     - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/nifi-extensions:$NIFI_EXTENSIONS_VERSION
     - docker buildx imagetools rm $SCAN_IMAGE_TAG || true
     - |
-      if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
+      if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "staging" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
         docker buildx imagetools create $CI_REGISTRY_IMAGE/nifi-extensions:$NIFI_EXTENSIONS_VERSION --tag $CI_REGISTRY_IMAGE/nifi-extensions:$CI_COMMIT_BRANCH
       fi
 
