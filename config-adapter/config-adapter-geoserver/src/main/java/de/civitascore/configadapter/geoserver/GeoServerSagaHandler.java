@@ -757,8 +757,9 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Title (else the layer name), abstract, CQL filter and the selected attributes plus the geometry
-   * column; always sent, empty when cleared, because a feature-type PUT keeps omitted fields.
+   * Title (else the layer name), abstract, CQL filter and the geometry column followed by the
+   * selected attributes; always sent, empty when cleared, because a feature-type PUT keeps omitted
+   * fields.
    */
   private static Map<String, Object> publishedFields(
       Map<String, Object> layer, String layerName, Map<String, String> geometryCrs) {
@@ -770,10 +771,10 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       }
     }
     if (!attributes.isEmpty()) {
+      // GeoServer draws the first geometry attribute, so the layer's geometry column leads.
       String geometryColumn = resolveGeometryColumn(layer, layerName, geometryCrs);
-      if (!attributes.contains(geometryColumn)) {
-        attributes.add(geometryColumn);
-      }
+      attributes.remove(geometryColumn);
+      attributes.add(0, geometryColumn);
     }
     Map<String, Object> fields = new LinkedHashMap<>();
     fields.put(TITLE, title != null && !title.isBlank() ? title : layerName);

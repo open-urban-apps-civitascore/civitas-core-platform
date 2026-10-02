@@ -203,7 +203,7 @@ class GeoServerSagaHandlerIT extends AbstractGeoServerIT {
     assertEquals("Sensoren", featureType.path("title").asText());
     assertEquals("Messstationen", featureType.path("abstract").asText());
     assertEquals("pm25 > 10", featureType.path("cqlFilter").asText());
-    assertEquals(List.of("sensor_id", "pm25", "geom"), attributeNames(featureType));
+    assertEquals(List.of("geom", "sensor_id", "pm25"), attributeNames(featureType));
     JsonNode wms = getJson(wmsSettingsPath()).get("wms");
     assertEquals("Luftqualität", wms.path("title").asText());
     assertEquals("Stationsdaten", wms.path("abstrct").asText());
@@ -245,7 +245,21 @@ class GeoServerSagaHandlerIT extends AbstractGeoServerIT {
     assertStepCompleted(provision(List.of(layer), owsApi("Luft", null)));
 
     JsonNode featureType = getJson(featureTypePath(LAYER_POINT)).get("featureType");
-    assertEquals(List.of("name", "geom"), attributeNames(featureType));
+    assertEquals(List.of("geom", "name"), attributeNames(featureType));
+  }
+
+  /** GeoServer draws the first geometry attribute, so the layer's geometry column must lead. */
+  @Test
+  void theLayersGeometryColumnLeadsASelectionWithAnotherGeometry() {
+    Map<String, Object> layer = new HashMap<>(layerWithBoundingBox());
+    layer.put("layerName", "sites");
+    layer.put("geometryColumnRef", "area");
+    layer.put("attribute", List.of("name", "location"));
+
+    assertStepCompleted(provision(List.of(layer), owsApi("Luft", null)));
+
+    JsonNode featureType = getJson(featureTypePath("sites")).get("featureType");
+    assertEquals(List.of("area", "name", "location"), attributeNames(featureType));
   }
 
   /** GeoServer validates the filter only while computing the native bounding box itself. */

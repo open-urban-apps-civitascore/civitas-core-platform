@@ -41,7 +41,7 @@ import java.util.Map;
  *       layer in addition to the default. {@code null} when none are set.
  *   <li>{@code title} — optional; the layer title, else {@code layerName}.
  *   <li>{@code description} — optional; the layer abstract.
- *   <li>{@code attribute} — optional; the published columns, plus the geometry column. Empty
+ *   <li>{@code attribute} — optional; the published columns, after the geometry column. Empty
  *       publishes every column.
  *   <li>{@code cqlFilter} — optional; the ECQL filter applied to every request on the layer.
  * </ul>

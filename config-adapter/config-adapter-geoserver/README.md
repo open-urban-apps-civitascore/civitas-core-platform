@@ -83,8 +83,9 @@ publication and pruning; `datasinks` only resolves native table names and the na
   through to a `PUT` on every path, so stale connection parameters and definitions converge instead of a re-POST
   reporting an unapplied success.
 - **Layer fields are always sent**, empty when cleared, because a feature-type `PUT` keeps omitted fields: `title`
-  (blank → `layerName`), `abstract` (from `description`), `cqlFilter`, and `attributes` = the `attribute` selection
-  plus the geometry column (no selection publishes every column). An unknown geometry column with a selection, or
+  (blank → `layerName`), `abstract` (from `description`), `cqlFilter`, and `attributes` = the geometry column, then
+  the `attribute` selection. GeoServer draws the first geometry attribute; no selection publishes every column and
+  draws the table's first geometry. An unknown geometry column with a selection, or
   an attribute the table lacks, fails the step. GeoServer validates `cqlFilter` only when it computes the native
   bounding box: with a supplied `nativeBoundingBox` an invalid filter is stored, and WFS `GetFeature` on the layer
   answers an exception report. `RESTORE_WORKSPACE` restores which feature types exist, not their definitions or the

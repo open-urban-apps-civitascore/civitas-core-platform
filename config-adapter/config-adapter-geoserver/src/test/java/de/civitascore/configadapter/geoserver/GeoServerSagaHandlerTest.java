@@ -1723,7 +1723,7 @@ class GeoServerSagaHandlerTest {
   class PublishedMetadata {
 
     @Test
-    void sendsTheLayerFieldsWithTheGeometryColumnAddedToTheAttributes()
+    void sendsTheLayerFieldsWithTheGeometryColumnLeadingTheAttributes()
         throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
         server.enqueue(created());
@@ -1741,7 +1741,7 @@ class GeoServerSagaHandlerTest {
         assertEquals("Stationen", featureType.get("title"));
         assertEquals("Messstationen", featureType.get("abstract"));
         assertEquals("id > 3", featureType.get("cqlFilter"));
-        assertEquals(List.of("id", "geom"), attributeNames(featureType));
+        assertEquals(List.of("geom", "id"), attributeNames(featureType));
       }
     }
 
@@ -1767,7 +1767,7 @@ class GeoServerSagaHandlerTest {
 
         provisionLayers(
             handler,
-            Map.of("layerName", "stations", "attribute", List.of("geom", "id")),
+            Map.of("layerName", "stations", "attribute", List.of("id", "geom")),
             Map.of("geom", "EPSG:4326"));
 
         assertEquals(
@@ -1776,7 +1776,7 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
-    void addsTheGeometryColumnTheLayerPicksAmongSeveral() throws InterruptedException {
+    void leadsWithTheGeometryColumnTheLayerPicksAmongSeveral() throws InterruptedException {
       try (GeoServerSagaHandler handler = createHandler()) {
         server.enqueue(created());
         Map<String, String> geometries = new LinkedHashMap<>();
@@ -1786,11 +1786,17 @@ class GeoServerSagaHandlerTest {
         provisionLayers(
             handler,
             Map.of(
-                "layerName", "stations", "attribute", List.of("id"), "geometryColumnRef", "area"),
+                "layerName",
+                "stations",
+                "attribute",
+                List.of("id", "location"),
+                "geometryColumnRef",
+                "area"),
             geometries);
 
         assertEquals(
-            List.of("id", "area"), attributeNames(postedFeatureType(server.takeRequest())));
+            List.of("area", "id", "location"),
+            attributeNames(postedFeatureType(server.takeRequest())));
       }
     }
 
@@ -1806,7 +1812,7 @@ class GeoServerSagaHandlerTest {
             null);
 
         assertEquals(
-            List.of("id", "geom"), attributeNames(postedFeatureType(server.takeRequest())));
+            List.of("geom", "id"), attributeNames(postedFeatureType(server.takeRequest())));
       }
     }
 
