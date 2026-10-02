@@ -248,7 +248,6 @@ class GeoServerSagaHandlerIT extends AbstractGeoServerIT {
     assertEquals(List.of("geom", "name"), attributeNames(featureType));
   }
 
-  /** GeoServer draws the first geometry attribute, so the layer's geometry column must lead. */
   @Test
   void theLayersGeometryColumnLeadsASelectionWithAnotherGeometry() {
     Map<String, Object> layer = new HashMap<>(layerWithBoundingBox());

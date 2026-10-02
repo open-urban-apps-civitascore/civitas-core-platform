@@ -46,8 +46,8 @@ import java.util.Map;
  *   <li>{@code cqlFilter} — optional; the ECQL filter applied to every request on the layer.
  * </ul>
  *
- * <p>Each provisioning converges the feature type to this payload: an absent optional field clears
- * its value in GeoServer.
+ * <p>Each provisioning converges the feature type to this payload: an absent {@code description},
+ * {@code attribute} or {@code cqlFilter} clears its value in GeoServer.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record LayerPayload(

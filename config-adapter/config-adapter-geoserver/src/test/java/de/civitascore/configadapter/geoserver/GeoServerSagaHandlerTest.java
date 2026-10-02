@@ -1750,7 +1750,10 @@ class GeoServerSagaHandlerTest {
       try (GeoServerSagaHandler handler = createHandler()) {
         server.enqueue(created());
 
-        provisionLayers(handler, Map.of("layerName", "stations"), Map.of("geom", "EPSG:4326"));
+        provisionLayers(
+            handler,
+            Map.of("layerName", "stations", "title", " ", "description", " ", "cqlFilter", " "),
+            Map.of("geom", "EPSG:4326"));
 
         Map<String, Object> featureType = postedFeatureType(server.takeRequest());
         assertEquals("stations", featureType.get("title"), "a blank title falls back to the name");
@@ -1824,6 +1827,7 @@ class GeoServerSagaHandlerTest {
                 handler, Map.of("layerName", "stations", "attribute", List.of("id")), null);
 
         assertEquals("STEP_FAILED", result.type());
+        assertTrue(result.error().contains("geometry column cannot be determined"), result.error());
         assertEquals(0, server.getRequestCount());
       }
     }
@@ -1900,6 +1904,20 @@ class GeoServerSagaHandlerTest {
         Map<String, Object> wms = takeWmsSettings();
         assertEquals("Luftkarte", wms.get("title"));
         assertEquals("Stationsdaten", wms.get("abstrct"));
+      }
+    }
+
+    @Test
+    void completesTheWorkspaceStepWhenTheWmsSettingsWriteFails() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        server.enqueue(created()); // workspace
+        server.enqueue(new MockResponse.Builder().code(500).body("settings rejected").build());
+
+        SagaCommandResult result =
+            createWorkspace(handler, List.of(Map.of("slug", "karte", "standard", "OWS")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals(2, server.getRequestCount());
       }
     }
 

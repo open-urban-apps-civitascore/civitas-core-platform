@@ -352,7 +352,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       }
     }
 
-    // Restore the previous state of feature types that existed before the update.
+    // Put back the snapshot entries; they carry names only, not definitions.
     for (Map<String, Object> ft : previousFeatureTypes) {
       String ftName = (String) ft.get("name");
       if (ftName == null) {
