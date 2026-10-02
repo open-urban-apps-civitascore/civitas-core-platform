@@ -142,30 +142,6 @@ Content-Type: application/json
 
 ---
 
-## TC-DSTV-06 – Delete DataStructure Version
-
-**Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is not in released state.
-
-**Request**
-```
-DELETE {{baseUrl}}/datastructures/:dataStructureId/versions/:id
-```
-
-**Expected Response**
-- Status: `204 No Content`
-
-**Verification:** Issue TC-DSTV-02 for the same `dataStructureVersionId` and confirm a `404` response.
-
-**System Impact**
-
-| System | Expected Change | Verified |
-|---|---|---|
-| Backend | Version record removed from `portal_backend` DB | ☐ |
-| Config Adapter | — | ☐ |
-| External System | — | ☐ |
-
----
-
 ## TC-DSTV-07 – Release DataStructure Version
 
 **Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in draft state.

@@ -293,6 +293,17 @@ test_delete_on_readonly_endpoint_denied if {
 	result.reason == "unknown_endpoint"
 }
 
+mock_send_datastructure_delete(_) := {"status_code": 200, "body": mock_http.user_with_permissions(["DATASTRUCTURE_DELETE"])}
+
+# Test: A single data structure version cannot be deleted, even with DATASTRUCTURE_DELETE
+test_delete_on_datastructure_version_denied if {
+	result := authz.decision with http.send as mock_send_datastructure_delete
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/datastructures/ds-123/versions/v-123")
+	result.allow == false
+	result.reason == "unknown_endpoint"
+}
+
 # Test: Unknown endpoint path results in denial
 test_unknown_endpoint_denied if {
 	result := authz.decision with http.send as mock_send_all_read

@@ -194,8 +194,7 @@
     "/v1/datastructures/{id}/versions/{id}": {
       "GET": "DATASTRUCTURE_READ",
       "PUT": "DATASTRUCTURE_UPDATE",
-      "PATCH": "DATASTRUCTURE_UPDATE",
-      "DELETE": "DATASTRUCTURE_DELETE"
+      "PATCH": "DATASTRUCTURE_UPDATE"
     },
     "/v1/datastructures/{id}/versions/{id}/release": {
       "POST": "DATASTRUCTURE_RELEASE"

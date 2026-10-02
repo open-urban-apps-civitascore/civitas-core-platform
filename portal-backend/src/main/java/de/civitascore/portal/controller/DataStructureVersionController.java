@@ -132,17 +132,15 @@ public class DataStructureVersionController
   }
 
   /**
-   * Deletes a data structure version by its unique identifier.
+   * Deleting a single version is not supported on this endpoint; throws MethodNotAllowedException.
    *
-   * @param id the UUID of the version to delete
+   * @param id the UUID of the version (unused)
+   * @throws org.springframework.web.server.MethodNotAllowedException always
    */
   @Override
-  @Operation(
-      operationId = "deleteDataStructureVersion",
-      summary = "Delete a data structure version")
+  @Operation(hidden = true)
   public void delete(@PathVariable UUID id) {
-    requireOwnedByPathDataStructure(id);
-    super.delete(id);
+    throw new MethodNotAllowedException(HttpMethod.DELETE, Collections.emptySet());
   }
 
   /**

@@ -577,44 +577,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   class DeleteDataStructureVersionTests {
 
     @Test
-    @DisplayName("Should delete data structure version successfully")
-    void shouldDeleteDataStructureVersionSuccessfully() {
-      ResponseEntity<Void> response =
-          restTemplate.exchange(
-              getEndpoint() + "/" + versionId1,
-              HttpMethod.DELETE,
-              new HttpEntity<>(createAuthHeaders()),
-              Void.class);
-
-      assertThat(response.getStatusCode())
-          .as("Should return NO_CONTENT status")
-          .isEqualTo(HttpStatus.NO_CONTENT);
-
-      ResponseEntity<String> getResponse =
-          restTemplate.exchange(
-              getEndpoint() + "/" + versionId1,
-              HttpMethod.GET,
-              new HttpEntity<>(createAuthHeaders()),
-              String.class);
-
-      assertThat(getResponse.getStatusCode())
-          .as("Should return NOT_FOUND after deletion")
-          .isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("Should fail to delete last released version of a released data structure")
-    void shouldFailToDeleteLastReleasedVersionOfReleasedDataStructure() {
-      DataStructureVersion version1 =
-          dataStructureVersionRepository.findById(versionId1).orElseThrow();
-      version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-      dataStructureVersionRepository.save(version1);
-
-      DataStructure dataStructure = dataStructureRepository.findById(dataStructureId).orElseThrow();
-      dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
-      dataStructureRepository.save(dataStructure);
-
-      // Try to delete the only released version - should fail
+    @DisplayName("Should return 405 for delete (endpoint disabled) and keep the version")
+    void shouldRejectDelete() {
       ResponseEntity<String> response =
           restTemplate.exchange(
               getEndpoint() + "/" + versionId1,
@@ -623,27 +587,9 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
               String.class);
 
       assertThat(response.getStatusCode())
-          .as("Should return BAD_REQUEST status")
-          .isEqualTo(HttpStatus.BAD_REQUEST);
-
-      // Verify dataStructure and version still exist
-      assertThat(dataStructureRepository.existsById(dataStructureId)).isTrue();
+          .as("Should return METHOD_NOT_ALLOWED status")
+          .isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
       assertThat(dataStructureVersionRepository.existsById(versionId1)).isTrue();
-    }
-
-    @Test
-    @DisplayName("Should return 404 when deleting non-existent version")
-    void shouldReturn404WhenDeletingNonExistent() {
-      ResponseEntity<Void> response =
-          restTemplate.exchange(
-              getEndpoint() + "/" + UUID.randomUUID(),
-              HttpMethod.DELETE,
-              new HttpEntity<>(createAuthHeaders()),
-              Void.class);
-
-      assertThat(response.getStatusCode())
-          .as("Should return NOT_FOUND status")
-          .isEqualTo(HttpStatus.NOT_FOUND);
     }
   }
 
@@ -1223,21 +1169,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should return 409 when deleting in-use version")
-    void shouldReturn409WhenDeletingInUseVersion() {
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              "/datastructures/" + inUseDataStructureId + "/versions" + "/" + inUseVersionId,
-              HttpMethod.DELETE,
-              new HttpEntity<>(createAuthHeaders()),
-              String.class);
-
-      assertThat(response.getStatusCode())
-          .as("Should return CONFLICT status")
-          .isEqualTo(HttpStatus.CONFLICT);
-    }
-
-    @Test
     @DisplayName("Should return inUse=true in version output DTO")
     void shouldReturnInUseTrueInVersionOutputDTO() {
       ResponseEntity<DataStructureVersionOutputDTO> response =
@@ -1390,15 +1321,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       DataStructureVersionOutputDTO output = getUnderOwnDataStructure();
       assertThat(output.getDataStructure().getId()).isEqualTo(dataStructureId);
       assertThat(output.getDescription()).isEqualTo("First version of the test data structure");
-    }
-
-    @Test
-    @DisplayName("DELETE answers 404 and leaves the version in place")
-    void deleteAnswers404ForForeignVersion() {
-      assertThat(statusOf(pathUnderForeignDataStructure(""), HttpMethod.DELETE, null))
-          .isEqualTo(HttpStatus.NOT_FOUND);
-
-      getUnderOwnDataStructure();
     }
 
     @Test
