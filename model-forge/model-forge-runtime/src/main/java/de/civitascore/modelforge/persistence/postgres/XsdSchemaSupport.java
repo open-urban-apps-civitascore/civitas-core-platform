@@ -75,12 +75,12 @@ class XsdSchemaSupport {
         return rawXsd.get().map(xsd -> {
             String logical    = UrnParser.logicalUrn(urn);
             String version    = UrnParser.versionFromUrn(urn);
-            // The logical URN is already the canonical ':element:' identity (the format is no
-            // longer part of the URN), so it is the prefix for the converted schema's $id verbatim.
             String jsonPrefix = logical;
             String ver        = version != null ? version : "1.0.0";
 
-            var schemas = converter.convert(xsd, jsonPrefix);
+            // A type id must never parse as a CORE URN: a view resolves URN-shaped $refs against the
+            // registry, and these types are not artifacts of their own.
+            var schemas = converter.convert(xsd, jsonPrefix + ":type");
             if (schemas.isEmpty()) {
                 ObjectNode placeholder = mapper.createObjectNode();
                 placeholder.put("$schema", JsonSchema.DRAFT_2020_12);

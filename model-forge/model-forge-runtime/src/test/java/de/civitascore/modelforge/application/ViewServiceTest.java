@@ -737,15 +737,9 @@ class ViewServiceTest {
 
         @Test
         void xsdConvertedDep_withTypeLevelId_isSelfContained() {
-            // DSVIEW-1 guard: an XSD-authored Element converts to a JSON Schema whose
-            // $id is TYPE-LEVEL — one segment longer than the model_forge.artifact URN (the XÖV/XMeld
-            // case, e.g. ...:Person:Personentyp:1.0.0). The root pins the *model_forge.artifact* URN in
-            // its $ref, so the embedded resource's $id must be stamped to the model_forge.artifact URN;
-            // otherwise the $ref dangles and the bundle is not self-contained.
+            // Without the restamp, an XSD-converted dependency keeps its type-level $id and the root's
+            // $ref dangles.
             String xsdDepUrn   = "urn:core:platform:civitas:element:xmeld:d002c1b7-0339-8820-9671-6bf33eeceaa3:1.0.0";
-            // Converted schema's $id is type-level (model_forge.artifact URN + ":Personentyp:1.0.0"-style
-            // extra segment) — deliberately NOT equal to the model_forge.artifact URN, so the old guard
-            // (existing == null || !isUrn(existing)) would have kept it and dangled the $ref.
             String typeLevelId = "urn:core:platform:civitas:element:xmeld:d002c1b7-0339-8820-9671-6bf33eeceaa3:Personentyp:1.0.0";
 
             ObjectNode convertedXsd = MAPPER.createObjectNode();
