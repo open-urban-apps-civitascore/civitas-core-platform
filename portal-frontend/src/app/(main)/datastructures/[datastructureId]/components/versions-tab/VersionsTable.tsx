@@ -13,7 +13,6 @@ import { resolveUpdater } from '@/utils/table'
 interface VersionsTableProps extends TableProps<DatastructureVersionsListData> {
   datastructureId: string
   versions: DatastructureVersionsListData[]
-  onDelete?: (id: string) => void
 }
 
 export const VersionsTable = (props: VersionsTableProps) => {
