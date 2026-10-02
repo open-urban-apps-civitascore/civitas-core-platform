@@ -86,17 +86,14 @@ public class ModelRegistryGateway {
    *
    * <ul>
    *   <li>With a {@code dataStructureId}, the model is imported under that UUID: as the
-   *       DataStructure when it is a {@code $defs} library or its {@code $id} is a {@code
-   *       :datastructure:} URN, otherwise as the root Element grouped by the DataStructure of the
-   *       same UUID. Member Element URNs derive from the UUID; the members' own {@code $id}s are
-   *       dropped.
+   *       DataStructure when it is a {@code $defs} library, otherwise as the root Element grouped
+   *       by the DataStructure of the same UUID. The document's {@code $id} and its members' {@code
+   *       $id}s are replaced; member Element URNs derive from the UUID.
+   *   <li>Without one, the document's own {@code $id} decides: a {@code :datastructure:} URN folds
+   *       the document into that DataStructure.
    *   <li>Except: a model stored before as an Element whose {@code $id} is no {@code
    *       :datastructure:} URN is stored as a new version of {@code existingLogicalUrn}. The
    *       Element versions the whole document, so a changed member always yields a new version.
-   *   <li>Without a {@code dataStructureId}, the document's own {@code $id} decides. A {@code
-   *       :datastructure:} URN, or a {@code :datastructure:} {@code existingLogicalUrn}, folds the
-   *       document into that DataStructure; any other model stored before becomes a new version of
-   *       {@code existingLogicalUrn}; a first store is imported as an Element.
    * </ul>
    *
    * @param existingLogicalUrn the stored logical URN of a previous version, empty on first store
@@ -129,19 +126,18 @@ public class ModelRegistryGateway {
     }
     boolean storedAsElement =
         existingLogicalUrn.map(this::artifactType).filter("element"::equals).isPresent();
-    ArtifactId root;
-    if (dataStructureId != null && !storedAsElement) {
-      root = importRoot(withTitle(content, name), bump, bumpFromVersion, dataStructureId);
-    } else if (isDataStructureModel(content, existingLogicalUrn)) {
-      // Not saveVersion(ELEMENT): that would store an Element under a :datastructure: URN.
-      root = importRoot(withTitle(content, name), bump, bumpFromVersion, dataStructureId);
-    } else if (existingLogicalUrn.isPresent()) {
-      root =
-          saveVersion(
-              existingLogicalUrn.get(), ArtifactKind.ELEMENT, content, bump, null, bumpFromVersion);
-    } else {
-      root = importRoot(withTitle(content, name), bump, bumpFromVersion, null);
-    }
+    // A :datastructure: $id goes through the import: saveVersion(ELEMENT) would store an Element
+    // under that URN.
+    ArtifactId root =
+        storedAsElement && !isDataStructureUrn(content.path("$id").asText(null))
+            ? saveVersion(
+                existingLogicalUrn.get(),
+                ArtifactKind.ELEMENT,
+                content,
+                bump,
+                null,
+                bumpFromVersion)
+            : importRoot(withTitle(content, name), bump, bumpFromVersion, dataStructureId);
     return toPin(root);
   }
 
@@ -151,24 +147,6 @@ public class ModelRegistryGateway {
       throw new InvalidInputException(
           "model", dataStructureId, "The model's $id names another data structure.");
     }
-  }
-
-  /**
-   * Whether a model without a host id is a DataStructure (as opposed to a plain Element). True when
-   * the content's {@code $id} — or the existing logical URN it re-versions — is a {@code
-   * :datastructure:} URN; model-forge then folds the wrapper into one DataStructure artifact
-   * holding its shape + member Elements.
-   */
-  private static boolean isDataStructureModel(
-      JsonNode content, Optional<String> existingLogicalUrn) {
-    String id = content.path("$id").asText(null);
-    if (isDataStructureUrn(id)) {
-      return true;
-    }
-    return existingLogicalUrn
-        .filter(UrnParser::isUrn)
-        .map(u -> "datastructure".equals(UrnParser.artifactTypeFromUrn(u)))
-        .orElse(false);
   }
 
   private static boolean isDataStructureUrn(String urn) {
@@ -281,6 +259,24 @@ public class ModelRegistryGateway {
    */
   public String artifactType(String urn) {
     return UrnParser.artifactTypeFromUrn(urn);
+  }
+
+  /**
+   * The UUID of an Element or Data structure URN. The model of a Data structure carries the Data
+   * structure's id there, so this is the id to look the structure up by.
+   *
+   * @param urn logical or versioned CORE URN
+   * @return the UUID, or empty when {@code urn} is no CORE URN or names another artifact type
+   */
+  public Optional<UUID> modelIdOf(String urn) {
+    String type = UrnParser.artifactTypeFromUrn(urn);
+    return "element".equals(type) || "datastructure".equals(type)
+        ? Optional.of(UrnParser.idFromUrn(urn))
+        : Optional.empty();
+  }
+
+  public static UUID deriveId(String key) {
+    return UrnParser.deriveId(key);
   }
 
   /**

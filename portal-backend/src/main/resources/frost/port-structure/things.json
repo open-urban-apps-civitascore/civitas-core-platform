@@ -1,5 +1,5 @@
 {
-  "$id": "urn:core:platform:civitas:datastructure:frost:85b92300-4bb6-8c2f-afc6-1b616a86349e",
+  "$id": "urn:core:platform:civitas:datastructure:frost:09846bf2-00d1-8ef2-bede-0e5936586b89",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Things",
   "type": "object",

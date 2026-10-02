@@ -15,13 +15,9 @@ import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.model.embedded.DataSinkType;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
-import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
-import de.civitascore.portal.model.entity.DataStructure;
-import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.PayloadKind;
@@ -38,6 +34,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -69,8 +66,9 @@ class DataSinkServiceTest {
   private static final String STORED_LOGICAL_URN =
       "urn:core:platform:civitas:datasink:common:00000000-0000-4000-8000-000000000013";
   private static final String STORED_VERSIONED_URN = STORED_LOGICAL_URN + ":1.0.0";
+  private static final UUID STRUCTURE_ID = UUID.fromString("5cf6e9e7-fa0d-877a-bda7-df0cc339e439");
   private static final String ELEMENT_URN =
-      "urn:core:platform:civitas:element:common:5cf6e9e7-fa0d-877a-bda7-df0cc339e439:1.0.0";
+      "urn:core:platform:civitas:element:common:" + STRUCTURE_ID + ":1.0.0";
 
   @BeforeEach
   void stubPayloadStore() {
@@ -91,8 +89,11 @@ class DataSinkServiceTest {
     // validation failures) don't trip strict stubbing. authorizeReferences is a void no-op on the
     // mock, which is the authorized outcome.
     lenient()
-        .when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(any()))
-        .thenReturn(Optional.of(dataStructureVersion(UUID.randomUUID())));
+        .when(modelRegistryGateway.modelIdOf(ELEMENT_URN))
+        .thenReturn(Optional.of(STRUCTURE_ID));
+    lenient()
+        .when(dataStructureVersionRepository.existsByDataStructure_Id(STRUCTURE_ID))
+        .thenReturn(true);
   }
 
   private DataSet dataSet(UUID id) {
@@ -100,17 +101,6 @@ class DataSinkServiceTest {
     ds.setId(id);
     ds.setName("ds");
     return ds;
-  }
-
-  private DataStructureVersion dataStructureVersion(UUID id) {
-    DataStructure structure = new DataStructure();
-    structure.setId(UUID.randomUUID());
-    structure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
-    DataStructureVersion dsv = new DataStructureVersion();
-    dsv.setId(id);
-    dsv.setDataStructure(structure);
-    dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-    return dsv;
   }
 
   @Nested
@@ -279,6 +269,20 @@ class DataSinkServiceTest {
     }
 
     @Test
+    @DisplayName("POSTGIS create authorizes the structure whose id the element URN carries")
+    void postgisCreateAuthorizesTheStructureTheElementNames() {
+      UUID dataSetId = UUID.randomUUID();
+      when(dataSinkMapper.toEntity(any())).thenReturn(new DataSink());
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+      when(dataSinkRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      dataSinkService.create(postgisInput(dataSetId));
+
+      verify(scopeAccessAuthorizer)
+          .authorizeReferences(ScopeType.DATASTRUCTURE, Set.of(STRUCTURE_ID));
+    }
+
+    @Test
     @DisplayName("POSTGIS create is denied when the caller is not authorized for the structure")
     void postgisCreateDeniedWhenUnauthorized() {
       UUID dataSetId = UUID.randomUUID();
@@ -306,8 +310,7 @@ class DataSinkServiceTest {
 
       when(dataSinkMapper.toEntity(any())).thenReturn(new DataSink());
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
-      when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(any()))
-          .thenReturn(Optional.empty());
+      when(dataStructureVersionRepository.existsByDataStructure_Id(STRUCTURE_ID)).thenReturn(false);
 
       assertThatThrownBy(() -> dataSinkService.create(input))
           .isInstanceOf(InvalidInputException.class)
@@ -331,8 +334,8 @@ class DataSinkServiceTest {
       InvalidInputException whenUnknown =
           captureFailure(
               () ->
-                  when(dataStructureVersionRepository.findFirstByModelUrnStartingWith(any()))
-                      .thenReturn(Optional.empty()));
+                  when(dataStructureVersionRepository.existsByDataStructure_Id(STRUCTURE_ID))
+                      .thenReturn(false));
 
       assertThat(whenUnauthorized.getClass()).isEqualTo(whenUnknown.getClass());
       assertThat(whenUnauthorized.getMessage()).isEqualTo(whenUnknown.getMessage());

@@ -27,6 +27,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -163,6 +165,37 @@ class ModelRegistryGatewayTest {
                   new ArtifactId(HOST_DATA_STRUCTURE_URN + ":1.1.0"), List.of(), Map.of()));
 
       assertThat(store(HOST_DATA_STRUCTURE_URN).logicalUrn()).isEqualTo(HOST_DATA_STRUCTURE_URN);
+    }
+  }
+
+  @Nested
+  @DisplayName("the model id of a URN")
+  class ModelIdOf {
+
+    private static final UUID ID = UUID.fromString("6ddf8001-3ba6-83db-8d23-b547419c1ff2");
+
+    @ParameterizedTest
+    @ValueSource(strings = {"element", "datastructure"})
+    @DisplayName("is the UUID of an Element or Data structure URN")
+    void isTheUuidOfAModelUrn(String type) {
+      assertThat(
+              gateway.modelIdOf("urn:core:platform:civitas:" + type + ":common:" + ID + ":1.0.0"))
+          .contains(ID);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"pipeline", "datasink", "datasource", "mapping", "dataset"})
+    @DisplayName("is empty for an artifact that carries its own entity id")
+    void isEmptyForAnotherArtifactType(String type) {
+      assertThat(
+              gateway.modelIdOf("urn:core:platform:civitas:" + type + ":common:" + ID + ":1.0.0"))
+          .isEmpty();
+    }
+
+    @Test
+    @DisplayName("is empty for a value that is no CORE URN")
+    void isEmptyForANonUrn() {
+      assertThat(gateway.modelIdOf("ds-1")).isEmpty();
     }
   }
 }

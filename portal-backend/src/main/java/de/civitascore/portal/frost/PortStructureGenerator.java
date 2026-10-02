@@ -5,16 +5,12 @@ import de.civitascore.portal.frost.PortStructureModel.Field;
 import de.civitascore.portal.frost.PortStructureModel.Member;
 import de.civitascore.portal.frost.PortStructureModel.PortStructure;
 import de.civitascore.portal.frost.PortStructureModel.StaClass;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
 import tools.jackson.core.util.DefaultIndenter;
 import tools.jackson.core.util.DefaultPrettyPrinter;
 import tools.jackson.core.util.Separators;
@@ -81,24 +77,7 @@ public final class PortStructureGenerator {
    * which is what makes the identity survive a reinstallation.
    */
   public static String logicalUrn(String port) {
-    return ID_TEMPLATE.formatted(nameBasedId("frost-port:" + port));
-  }
-
-  /**
-   * A UUIDv8 from the SHA-256 of the name alone, without the namespace RFC 9562 Appendix B.2
-   * prefixes; adding one would change every id in the generated port structures.
-   */
-  private static UUID nameBasedId(String name) {
-    byte[] digest;
-    try {
-      digest = MessageDigest.getInstance("SHA-256").digest(name.getBytes(StandardCharsets.UTF_8));
-    } catch (NoSuchAlgorithmException e) {
-      throw new IllegalStateException("SHA-256 unavailable", e);
-    }
-    ByteBuffer hash = ByteBuffer.wrap(digest);
-    long msb = (hash.getLong() & ~0xF000L) | 0x8000L;
-    long lsb = (hash.getLong() & 0x3FFFFFFFFFFFFFFFL) | 0x8000000000000000L;
-    return new UUID(msb, lsb);
+    return ID_TEMPLATE.formatted(ModelRegistryGateway.deriveId("frost-port:" + port));
   }
 
   /** The model document of one port, printed the one way this generator prints. */
