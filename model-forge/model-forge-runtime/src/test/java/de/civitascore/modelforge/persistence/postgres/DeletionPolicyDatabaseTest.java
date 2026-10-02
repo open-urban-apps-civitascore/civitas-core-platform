@@ -316,19 +316,52 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("A member two Data Sets hold is refused until it is removed from one")
     void aMemberTwoDataSetsHoldIsRefused() {
+        String sinkPin = registry.storeDataSink(urns.urn("datasink", UUID.randomUUID()), dataSink(), VersionBump.PATCH);
+        registry.storeDataSet(urns.urn("dataset", UUID.randomUUID()), dataSetOfSinks(sinkPin), VersionBump.PATCH);
+        String secondSet = registry.storeDataSet(
+            urns.urn("dataset", UUID.randomUUID()), dataSetOfSinks(sinkPin), VersionBump.PATCH);
+
+        assertThatThrownBy(() -> deletes.delete(sinkPin)).isInstanceOf(ArtifactInUseException.class);
+        assertThat(registry.fetch(sinkPin)).isPresent();
+
+        deletes.unlinkFromDataSet(logical(secondSet), logical(sinkPin));
+        deletes.delete(sinkPin);
+
+        assertThat(registry.fetch(sinkPin)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("A Data Structure two Data Sets list is deleted and unlinked from both")
+    void aDataStructureTwoDataSetsListIsDeletedAndUnlinkedFromBoth() {
         String structurePin = registry.storeDataStructure(
             urns.urn("datastructure", UUID.randomUUID()), dataStructureOf(readingPin), VersionBump.PATCH, null);
-        registry.storeDataSet(urns.urn("dataset", UUID.randomUUID()), dataSetOf(structurePin), VersionBump.PATCH);
+        String firstSet = registry.storeDataSet(
+            urns.urn("dataset", UUID.randomUUID()), dataSetOf(structurePin), VersionBump.PATCH);
         String secondSet = registry.storeDataSet(
             urns.urn("dataset", UUID.randomUUID()), dataSetOf(structurePin), VersionBump.PATCH);
 
-        assertThatThrownBy(() -> deletes.delete(structurePin)).isInstanceOf(ArtifactInUseException.class);
-        assertThat(registry.fetch(structurePin)).isPresent();
-
-        deletes.unlinkFromDataSet(logical(secondSet), logical(structurePin));
         deletes.delete(structurePin);
 
         assertThat(registry.fetch(structurePin)).isEmpty();
+        for (String set : List.of(firstSet, secondSet)) {
+            assertThat(registry.fetch(logical(set)).orElseThrow().toString())
+                .as("the manifest must not list a member that is gone")
+                .doesNotContain(logical(structurePin));
+        }
+    }
+
+    @Test
+    @DisplayName("The members of every version belong to the Data Structure")
+    void theMembersOfEveryVersionBelongToTheDataStructure() {
+        String structureUrn = urns.urn("datastructure", UUID.randomUUID());
+        String v1 = registry.storeDataStructure(structureUrn, dataStructureOf(stationPin), VersionBump.PATCH, null);
+        registry.storeDataStructure(structureUrn, dataStructureOf(stationPin, readingPin), VersionBump.MAJOR, null);
+
+        assertThat(registry.dataStructureMembersOfAnyVersion(v1))
+            .containsExactlyInAnyOrder(logical(stationPin), logical(readingPin));
+        assertThat(registry.ownedMemberUrns(v1, "1.0.0"))
+            .as("what one version owns is unchanged")
+            .containsExactly(stationPin);
     }
 
     @Test
@@ -427,6 +460,13 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
         String refs = "\"" + String.join("\",\"", mappingPins) + "\"";
         return mapper.readTree("""
             { "title": "Weather set", "mappingRefs": [%s] }
+            """.formatted(refs));
+    }
+
+    private JsonNode dataSetOfSinks(String... sinkPins) {
+        String refs = "\"" + String.join("\",\"", sinkPins) + "\"";
+        return mapper.readTree("""
+            { "title": "Weather set", "dataSinkRefs": [%s] }
             """.formatted(refs));
     }
 

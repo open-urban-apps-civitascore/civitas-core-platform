@@ -15,6 +15,8 @@ import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
@@ -25,8 +27,10 @@ import de.civitascore.portal.repository.ReferrerReleaseState;
 import de.civitascore.portal.security.AllowedScopesFilter;
 import de.civitascore.portal.service.ArtifactUsageLookup.ArtifactUsage;
 import de.civitascore.portal.service.ArtifactUsageLookup.ReferrerKind;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -57,6 +61,7 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private DataStructureRepository dataStructureRepository;
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
   @Autowired private PipelineRepository pipelineRepository;
+  @Autowired private ModelRegistryGateway modelRegistryGateway;
 
   @AfterEach
   void cleanup() {
@@ -64,12 +69,27 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
   }
 
   private DataStructureVersion releasedVersion(String title) {
-    DataStructure structure =
-        portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+    return releasedVersionOf(
+        portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE)),
+        portalData.dataStructureVersionModel(title));
+  }
+
+  private DataStructureVersion releasedVersionOf(
+      DataStructure structure, Map<String, Object> model) {
     DataStructureVersion version =
         portalData.dataStructureVersion(
             structure, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
-    return portalData.attachModel(version, portalData.dataStructureVersionModel(title));
+    return portalData.attachModel(version, model);
+  }
+
+  private static Map<String, Object> pipelineDefinition(String mappingUrn) {
+    return Map.of(
+        "title",
+        "Ingest",
+        "nodes",
+        List.of(Map.of("id", "map", "kind", "mapping", "mappingRef", mappingUrn)),
+        "edges",
+        List.of());
   }
 
   private ArtifactUsage usageOf(DataStructureVersion version) {
@@ -228,16 +248,7 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
       DataSet dataSet = dataSetWithManifest();
       Pipeline pipeline = portalData.pipeline(dataSet);
       String mappingUrn = createMapping(dataSet, source, target);
-      portalData.attachPipelineDefinition(
-          pipeline,
-          Map.of(
-              "title",
-              "Ingest",
-              "nodes",
-              List.of(Map.of("id", "map", "kind", "mapping", "mappingRef", mappingUrn)),
-              "edges",
-              List.of()),
-          null);
+      portalData.attachPipelineDefinition(pipeline, pipelineDefinition(mappingUrn), null);
 
       assertThat(usageOf(source).inUse()).isTrue();
       assertThat(usageOf(source).inUseByReleased()).isFalse();
@@ -308,6 +319,122 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
     DataStructure reloaded = dataStructureRepository.findById(structure.getId()).orElseThrow();
     reloaded.setDataStructureStatus(status);
     return dataStructureRepository.save(reloaded);
+  }
+
+  @Nested
+  @DisplayName("Versions of one structure")
+  class VersionsOfOneStructure {
+
+    @Test
+    @DisplayName("a class another version adds does not use the version it references")
+    void classOfAnotherVersion_doesNotUseTheVersion() {
+      DataStructure structure =
+          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion first = releasedVersionOf(structure, modeledAs("NeueKlasse"));
+      DataStructureVersion second =
+          releasedVersionOf(structure, modeledAs("NeueKlasse", "NeueKlasse2"));
+
+      assertThat(usageOf(first).inUse()).isFalse();
+      assertThat(modelRegistryGateway.referencesTo(first.getModelUrn())).isEmpty();
+      assertThat(usageOf(second).inUse()).isFalse();
+    }
+
+    @Test
+    @DisplayName("a class of another structure still uses the version it references")
+    void classOfAnotherStructure_usesTheVersion() {
+      DataStructure structure =
+          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion version = releasedVersionOf(structure, modeledAs("NeueKlasse"));
+      Map<String, Object> other = modeledAs("Fremd");
+      defOf(other, "Fremd")
+          .put(
+              "properties", Map.of("neueKlasse", Map.of("$ref", memberUrn(version, "NeueKlasse"))));
+      structureWithModel(DataStructureStatus.DRAFT, other);
+
+      assertThat(usageOf(version).inUse()).isTrue();
+    }
+
+    @Test
+    @DisplayName("a structure that two datasets list is not used by the listing")
+    void structureListedByTwoDataSets_isNotUsedByTheListing() {
+      DataStructure sourceStructure =
+          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion source = releasedVersionOf(sourceStructure, modeledAs("Quelle"));
+      DataStructureVersion unused = releasedVersionOf(sourceStructure, modeledAs("Andere"));
+      DataStructureVersion target =
+          releasedVersionOf(
+              portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE)),
+              modeledAs("Ziel"));
+      List<String> pipelines =
+          List.of(
+              pipelineMapping(dataSetWithManifest(), source, target),
+              pipelineMapping(dataSetWithManifest(), source, target));
+
+      assertThat(usageOf(source).inUse()).as("the mappings use it").isTrue();
+      assertThat(usageOf(unused).inUse()).as("nothing uses this version").isFalse();
+
+      pipelines.forEach(pipeline -> modelRegistryGateway.deleteArtifact(pipeline, true));
+
+      assertThat(usageOf(source).inUse()).isFalse();
+      assertThat(modelRegistryGateway.referencesTo(source.getModelUrn())).isEmpty();
+    }
+
+    /**
+     * A pipeline whose mapping joins the two versions, stored into the dataset as the editor does.
+     */
+    private String pipelineMapping(
+        DataSet dataSet, DataStructureVersion source, DataStructureVersion target) {
+      String mappingUrn = createMapping(dataSet, source, target);
+      return modelRegistryGateway
+          .storePayload(
+              PayloadKind.PIPELINE,
+              Optional.empty(),
+              UUID.randomUUID(),
+              "pipeline",
+              pipelineDefinition(mappingUrn),
+              null,
+              dataSet.getManifestLogicalUrn())
+          .logicalUrn();
+    }
+
+    /**
+     * The document the frontend builds for one diagram: each class a member, each class after the
+     * first composing the first through a local reference.
+     */
+    private Map<String, Object> modeledAs(String... classes) {
+      Map<String, Object> defs = new LinkedHashMap<>();
+      for (int i = 0; i < classes.length; i++) {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("attribut", Map.of("type", "string"));
+        if (i > 0) {
+          properties.put("neueKlasse", Map.of("$ref", "#/$defs/" + classes[0]));
+        }
+        Map<String, Object> def = new LinkedHashMap<>();
+        def.put("type", "object");
+        def.put("title", classes[i]);
+        def.put("properties", properties);
+        defs.put(classes[i], def);
+      }
+      Map<String, Object> model = new LinkedHashMap<>();
+      model.put("$id", "http://civitas.org/model/modell");
+      model.put("$schema", "https://json-schema.org/draft/2020-12/schema");
+      model.put("title", "Modell");
+      model.put("$defs", defs);
+      model.put("$ref", "#/$defs/" + classes[classes.length - 1]);
+      return model;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> defOf(Map<String, Object> model, String name) {
+      return (Map<String, Object>) ((Map<String, Object>) model.get("$defs")).get(name);
+    }
+
+    /** The Element the registry stored the version's class as, by the URN it carries. */
+    private String memberUrn(DataStructureVersion version, String name) {
+      Map<String, Object> stored =
+          modelRegistryGateway.fetchStoredModel(version.getModelUrn()).orElseThrow().content();
+      return modelRegistryGateway.logicalUrn((String) defOf(stored, name).get("$ref"));
+    }
   }
 
   @Nested

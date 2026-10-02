@@ -139,8 +139,9 @@ public class ElementCommandService {
      * deletion policy, optionally cascading into the artifacts it owns.
      *
      * <p>Non-DataSet references block unconditionally; DataSet membership is counted: none or one
-     * lets the artifact go (that one manifest is unlinked with it), two or more block. {@code force}
-     * overrides both and unlinks from every DataSet, which may dangle references.
+     * lets the artifact go (that one manifest is unlinked with it), two or more block — except for a
+     * Data Structure, which is unlinked from all of them. {@code force} overrides both and unlinks
+     * from every DataSet, which may dangle references.
      *
      * <p>Each delete re-checks the live registry, so a cascade never dangles a reference, and joins
      * the caller's transaction where there is one, so several removals commit or roll back together.
@@ -155,7 +156,7 @@ public class ElementCommandService {
                 throw new ArtifactInUseException(logical, blockers);
             }
             // A member shared across several DataSets must be removed from all but one first.
-            if (memberships.size() >= 2) {
+            if (memberships.size() >= 2 && !isDataStructure(urn)) {
                 throw new ArtifactInUseException(logical, memberships);
             }
         }
@@ -180,6 +181,15 @@ public class ElementCommandService {
                 delete(member, true, force);
             }
         }
+    }
+
+    /**
+     * Whether the artifact is a Data Structure, whose Data Set memberships are not counted: a
+     * Pipeline lists it there, and the Mapping or Data Sink that reaches it already holds the version
+     * it uses.
+     */
+    static boolean isDataStructure(String urn) {
+        return "datastructure".equals(UrnParser.artifactTypeFromUrn(urn));
     }
 
     /**
