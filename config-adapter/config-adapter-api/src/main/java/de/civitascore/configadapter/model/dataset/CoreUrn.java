@@ -48,19 +48,15 @@ public final class CoreUrn {
   private static final String ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   private static final String VERSION = "\\d+\\.\\d+\\.\\d+";
 
-  /**
-   * Regex matching a full CORE URN, with named {@code scope}, {@code artifactType}, {@code id} and
-   * {@code version} groups. Anchored so {@code @Pattern} and {@link #COMPILED_PATTERN} agree —
-   * {@code @Pattern} matches the whole value, {@code Matcher#matches} likewise.
-   */
+  /** Regex matching a full CORE URN, with named {@code id} and {@code version} groups. */
   public static final String PATTERN =
-      "urn:core:(?<scope>"
+      "urn:core:"
           + SCOPE
-          + "):"
+          + ":"
           + SLUG
-          + ":(?<artifactType>"
+          + ":"
           + ARTIFACT_TYPE
-          + "):"
+          + ":"
           + DOMAIN
           + ":(?<id>"
           + ID
@@ -110,7 +106,7 @@ public final class CoreUrn {
     if (a == null || b == null) {
       return false;
     }
-    return a.equals(b) || logicalUrn(a).equals(logicalUrn(b));
+    return logicalUrn(a).equals(logicalUrn(b));
   }
 
   /**
