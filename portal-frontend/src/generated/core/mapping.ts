@@ -23,7 +23,7 @@ export const MappingOperationSchema: z.ZodType = z.lazy(() =>
 /** A field mapping — either a shorthand input path string or a full operation object. */
 export const MappingFieldSchema: z.ZodType = z.lazy(() => z.union([z.string(), MappingOperationSchema]))
 
-/** Versioned CORE URN of a DataStructure that a Mapping binds (an Element URN is also accepted for backward compatibility). */
+/** Versioned CORE URN of a DataStructure that a Mapping binds, or the root Element URN of an imported model. */
 export const StructureUrnSchema = z
   .string()
   .regex(
@@ -162,12 +162,12 @@ export const MappingSchema = z.object({
   title: z.string().optional(),
   description: z.string().optional(),
   /**
-   * Versioned CORE URN of the source DataStructure (the structure being read from). An Element URN is also accepted for backward compatibility.
+   * Versioned CORE URN of the source DataStructure (the structure being read from).
    * @coreRef { type: "urn:core:type:DataStructure" }
    */
   source: StructureUrnSchema.optional(),
   /**
-   * Versioned CORE URN of the target DataStructure (the structure being written to). An Element URN is also accepted for backward compatibility.
+   * Versioned CORE URN of the target DataStructure (the structure being written to).
    * @coreRef { type: "urn:core:type:DataStructure" }
    */
   target: StructureUrnSchema.optional(),

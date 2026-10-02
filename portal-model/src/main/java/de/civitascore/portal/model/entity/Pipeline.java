@@ -43,8 +43,8 @@ public class Pipeline extends DataSetOwnedEntity {
   private String description;
 
   /**
-   * Stable logical CORE URN of this pipeline's definition artifact in Model Forge, minted once on
-   * the first store and reused for every following version. Null until a definition is stored.
+   * Logical CORE URN of this pipeline's definition artifact in Model Forge. Null until a definition
+   * is stored.
    */
   @Column(name = "model_logical_urn")
   private String modelLogicalUrn;

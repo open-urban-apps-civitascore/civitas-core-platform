@@ -114,8 +114,7 @@ public class DataStructureVersionService
    * Stores the input's model (styles merged in as {@code x-ui-styles} by the gateway) in Model
    * Forge (the version authority) and mirrors the assigned versioned URN and version string onto
    * the shell. Skipped when the input carries no model — a draft without a model stays unpinned, an
-   * update without a model keeps the version's current content pin. The parent's stable logical URN
-   * is minted on the first store and reused for every later version.
+   * update without a model keeps the version's current content pin.
    *
    * @param entity the data structure version entity
    * @param input the input DTO carrying the model and its styles

@@ -62,8 +62,8 @@ public class DataStructure extends BaseDataEntity {
   private DataStructureStatus dataStructureStatus = DataStructureStatus.DRAFT;
 
   /**
-   * Stable logical CORE URN of this data structure's model artifact in Model Forge, minted once on
-   * first store and reused for every following version. Null until the first model is stored.
+   * Logical CORE URN of this data structure's model artifact in Model Forge. Null until the first
+   * model is stored.
    */
   @Column(name = "model_logical_urn")
   private String modelLogicalUrn;

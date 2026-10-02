@@ -357,12 +357,7 @@ public class PortalTestDataFactory {
     return dataStructureVersionRepository.save(builder.build());
   }
 
-  /**
-   * A minimal, well-formed JSON Schema document suitable for a data structure version's model. No
-   * {@code $id} is set — Model Forge is the sole version authority and mints the CORE URN itself; a
-   * caller-supplied {@code $id} that isn't a full, well-formed CORE URN gets stored verbatim and
-   * breaks version extraction downstream.
-   */
+  /** A minimal, well-formed JSON Schema document suitable for a data structure version's model. */
   public Map<String, Object> dataStructureVersionModel(String title) {
     Map<String, Object> schema = new HashMap<>();
     schema.put("title", title);

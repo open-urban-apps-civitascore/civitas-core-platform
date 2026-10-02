@@ -286,7 +286,6 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
         // The sink writes into Station, then is repointed at Reading; its first version keeps the
         // Station edge as history.
         String first = registry.storeDataSink(urns.urn("datasink", UUID.randomUUID()), dataSinkFor(stationPin), VersionBump.PATCH);
-        // Writing under the existing identity versions that sink; a bare name mints a new one.
         String repointed = registry.storeDataSink(logical(first), dataSinkFor(readingPin), VersionBump.MINOR);
         assertThat(versionsOf(logical(repointed))).containsExactly("1.0.0", "1.1.0");
 

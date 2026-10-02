@@ -106,7 +106,7 @@ import de.civitascore.modelforge.urn.UrnParser;
 
 var id = new ArtifactId("urn:core:platform:civitas:element:common:0b6f5c1e-8a4d-4f7b-9c2e-3d1a5b7c9e20:1.0.0");
 
-id.id();         // UUID 0b6f5c1e-8a4d-4f7b-9c2e-3d1a5b7c9e20
+UrnParser.idFromUrn(id.value()); // UUID 0b6f5c1e-8a4d-4f7b-9c2e-3d1a5b7c9e20
 id.version();    // "1.0.0"
 id.logicalUrn(); // "urn:core:platform:civitas:element:common:0b6f5c1e-8a4d-4f7b-9c2e-3d1a5b7c9e20"
 

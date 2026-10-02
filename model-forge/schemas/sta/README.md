@@ -22,9 +22,8 @@ Schema document) from the Elements it defines.
 | FeatureOfInterest | `urn:core:platform:civitas:element:sta:324be979-f61b-83f9-aaac-bbc33ef50c7b:1.0.0` |
 | UnitOfMeasurement | `urn:core:platform:civitas:element:sta:56eb7cd3-773a-8133-a52b-740c98380c1d:1.0.0` |
 
-Each `$defs` entry keeps the same explicit CORE-URN `$id` it always had, so every entity is
-still individually addressable and re-imports still land on the same identities; only the
-file layout and the relation encoding (below) changed.
+Each `$defs` entry carries an explicit CORE-URN `$id`, so every entity is individually
+addressable and re-imports land on the same identities.
 
 ## Composition vs. association: `$ref` vs. `x-core-ref`
 

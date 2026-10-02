@@ -21,8 +21,7 @@ import org.springframework.stereotype.Component;
  * <p>Found by structure and major, not by the pinned string: editing a draft version's model
  * advances its pin inside its own major, so the string a flow recorded stops naming any record
  * while the record that owns it is still there. A later major is a record of its own and stays out
- * of reach. A model the platform keeps no record of — an element, a mapping, a sink configuration —
- * is governed by nothing.
+ * of reach.
  */
 @Component
 @RequiredArgsConstructor

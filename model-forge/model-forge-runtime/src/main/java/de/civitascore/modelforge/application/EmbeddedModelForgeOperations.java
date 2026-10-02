@@ -415,7 +415,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
                 new SaveArtifactCommand(
                     new ArtifactId(urn), command.kind(), created, VersionBump.PATCH, command.dataSet()));
             // The URN carries no name, so the display name a search and the graph show is recorded
-            // beside it; a document title, once there, takes precedence.
+            // beside it.
             if (JsonSchema.usableTitle(created) == null) {
                 registry.nameArtifact(urn, command.name());
             }

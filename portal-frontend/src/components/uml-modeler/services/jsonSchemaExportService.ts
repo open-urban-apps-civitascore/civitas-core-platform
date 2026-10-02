@@ -327,8 +327,7 @@ const buildDefs = (
 ): JsonSchemaObject => {
   const defs: JsonSchemaObject = {}
   // Members are emitted WITHOUT a $id: a $id would re-base the subschema so a sibling's local
-  // "#/$defs/<Name>" cross-reference no longer resolves during validation. Model Forge splits each
-  // member into its own Element (minting the URN) and rewrites the local refs to those URNs.
+  // "#/$defs/<Name>" cross-reference no longer resolves during validation.
   for (const element of elements) {
     const defKey = classDefKeyById.get(element.id)
     if (!defKey) continue
