@@ -36,7 +36,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * @param slug URL slug used in the public route (e.g. "traffic")
  * @param standard API standard string (e.g. "STA"); any value accepted for forward compatibility
  * @param version optional standard version (e.g. "1.1" for STA); nullable
- * @param name display name of the API
+ * @param name display name of the API; nullable, absent from an older producer
  * @param description optional description of the API; nullable
  */
 @JsonIgnoreProperties(ignoreUnknown = true)

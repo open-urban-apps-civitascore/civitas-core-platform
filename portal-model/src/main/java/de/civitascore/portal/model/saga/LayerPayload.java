@@ -45,6 +45,9 @@ import java.util.Map;
  *       publishes every column.
  *   <li>{@code cqlFilter} — optional; the ECQL filter applied to every request on the layer.
  * </ul>
+ *
+ * <p>Each provisioning converges the feature type to this payload: an absent optional field clears
+ * its value in GeoServer.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record LayerPayload(

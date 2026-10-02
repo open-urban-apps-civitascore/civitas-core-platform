@@ -74,9 +74,9 @@ publication and pruning; `datasinks` only resolves native table names and the na
   MUST NOT start with a digit). Datastore name appends `_postgis`; its schema *is* the workspace name, so GeoServer
   reads exactly the schema the PostGIS sink created. The mapping is lossy, so dataset ids MUST be unique under it.
 - **Workspaces are isolated**, each with its own namespace, otherwise the WMS layer-by-name lookup fails and
-  same-named layers across datasets collide. On every workspace step the workspace-local WMS service is enabled,
-  titled with the OWS API name (else `datasetName`) and described with its description (field `abstrct`); failure
-  is logged, not fatal. WFS stays global — a workspace-local WFS created over REST has no service level, breaking
+  same-named layers across datasets collide. `CREATE_WORKSPACE`, `PROVISION_WORKSPACE` and `UPDATE_WORKSPACE` enable
+  the workspace-local WMS service, titled with the OWS API name (else `datasetName`) and described with its
+  description (field `abstrct`); failure is logged, not fatal. WFS stays global — a workspace-local WFS created over REST has no service level, breaking
   its `GetCapabilities`.
 - **"Already exists" converges.** GeoServer signals it on POST as HTTP 409, or as HTTP 500 whose body contains
   `already exists`; both are absorbed. Workspace creation treats it as success; datastores and feature types fall
@@ -86,8 +86,9 @@ publication and pruning; `datasinks` only resolves native table names and the na
   (blank → `layerName`), `abstract` (from `description`), `cqlFilter`, and `attributes` = the `attribute` selection
   plus the geometry column (no selection publishes every column). An unknown geometry column with a selection, or
   an attribute the table lacks, fails the step. GeoServer validates `cqlFilter` only when it computes the native
-  bounding box: with a supplied `nativeBoundingBox` an invalid filter is stored, and the layer answers every
-  request with an exception report. `RESTORE_WORKSPACE` does not revert these fields.
+  bounding box: with a supplied `nativeBoundingBox` an invalid filter is stored, and WFS `GetFeature` on the layer
+  answers an exception report. `RESTORE_WORKSPACE` restores which feature types exist, not their definitions or the
+  WMS service settings.
 - **Styles.** A style POST for an existing name answers HTTP 403, not 409; the upsert branches on 403 and refreshes
   the SLD by `PUT`, and a genuine authorization 403 surfaces on that same `PUT`. Assignment to a layer is verified
   by read-back: a `PUT` with an unresolvable style reference answers HTTP 200 while keeping the previous style, so

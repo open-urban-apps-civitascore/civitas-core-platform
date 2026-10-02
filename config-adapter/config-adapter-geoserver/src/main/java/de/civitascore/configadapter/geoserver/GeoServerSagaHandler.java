@@ -58,10 +58,10 @@ import org.owasp.encoder.Encode;
  *       a deleted feature type, so this must run after the last failable step
  *   <li>{@code DELETE_WORKSPACE} — deletes the workspace recursively (compensation for the create
  *       steps and the teardown step in the delete saga)
- *   <li>{@code RESTORE_WORKSPACE} — restores the previous feature type state (compensation for
- *       {@code UPDATE_WORKSPACE}). Styles are not snapshotted: a failed update that uploaded or
- *       overwrote styles leaves them in place — only a full {@code DELETE_WORKSPACE} (recursive)
- *       removes them.
+ *   <li>{@code RESTORE_WORKSPACE} — restores which feature types exist, not their definitions or
+ *       the WMS service settings (compensation for {@code UPDATE_WORKSPACE}). Styles are not
+ *       snapshotted: a failed update that uploaded or overwrote styles leaves them in place — only
+ *       a full {@code DELETE_WORKSPACE} (recursive) removes them.
  * </ul>
  *
  * <p>Input contract (process variables forwarded from the saga trigger): {@code datasetId} (the
@@ -407,6 +407,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       }
     }
     enableWorkspaceWmsService(
+        command.sagaId(),
         workspaceName,
         resolveServiceTitle(command, workspaceName),
         resolveServiceAbstract(command));
@@ -415,8 +416,8 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   /**
    * Enables the per-workspace WMS virtual service, titled and described from the dataset's OWS API,
    * so a map client shows the dataset as the named service above the layers. Best-effort: a failure
-   * is logged but does not fail workspace provisioning — the layer stays reachable, only the
-   * service title would be unset.
+   * is logged but does not fail the step; the layer stays reachable with the previous service title
+   * and abstract.
    *
    * <p>WFS is deliberately NOT enabled per-workspace: a WFS capabilities document has a flat
    * feature type list (no root-layer node to title, unlike WMS), so it gains nothing in a client;
@@ -424,7 +425,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
    * makes WFS GetCapabilities fail with a 500/400. WFS keeps using the global service defaults.
    */
   private void enableWorkspaceWmsService(
-      String workspaceName, String serviceTitle, String serviceAbstract) {
+      String sagaId, String workspaceName, String serviceTitle, String serviceAbstract) {
     Map<String, Object> settings = new LinkedHashMap<>();
     settings.put(WORKSPACE, Map.of(NAME, workspaceName));
     settings.put(ENABLED, true);
@@ -442,10 +443,12 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       if (response.code() != HttpURLConnection.HTTP_OK
           && response.code() != HttpURLConnection.HTTP_CREATED) {
         log.warn(
-            "Could not enable WMS service for workspace {} (status {}); the layer stays reachable,"
-                + " only the workspace service title is unset",
+            "Could not write the WMS service settings of workspace {} (status {}, saga {}): {};"
+                + " the previous title and abstract stay",
             Encode.forJava(workspaceName),
-            response.code());
+            response.code(),
+            Encode.forJava(sagaId),
+            Encode.forJava(truncateBody(readBody(response))));
       }
     }
   }
@@ -510,7 +513,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   /**
    * Iterates the command's {@code layers}, provisioning a GeoServer feature type for each. The
-   * native PostGIS table is taken from the layer's {@code nativeName}, falling back to the first
+   * native PostGIS table is taken from the layer's {@code nativeName}, falling back to the single
    * {@code POSTGIS} data sink's {@code tableName}, then to the layer name. An existing feature type
    * is converged to the command's definition.
    */

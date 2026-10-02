@@ -234,6 +234,20 @@ class GeoServerSagaHandlerIT extends AbstractGeoServerIT {
     assertEquals("", wms.path("abstrct").asText(""));
   }
 
+  @Test
+  void narrowingTheAttributeSelectionUnpublishesTheDeselectedColumns() {
+    Map<String, Object> layer = layerWithBoundingBox();
+    layer.put("geometryColumnRef", "geom");
+    layer.put("attribute", List.of("name", "pm25"));
+    assertStepCompleted(provision(List.of(layer), owsApi("Luft", null)));
+
+    layer.put("attribute", List.of("name"));
+    assertStepCompleted(provision(List.of(layer), owsApi("Luft", null)));
+
+    JsonNode featureType = getJson(featureTypePath(LAYER_POINT)).get("featureType");
+    assertEquals(List.of("name", "geom"), attributeNames(featureType));
+  }
+
   /** GeoServer validates the filter only while computing the native bounding box itself. */
   @Test
   void anInvalidCqlFilterFailsTheStepWhenGeoServerComputesTheBoundingBox() {
