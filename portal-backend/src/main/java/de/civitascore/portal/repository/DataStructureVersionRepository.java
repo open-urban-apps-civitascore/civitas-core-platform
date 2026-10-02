@@ -26,6 +26,8 @@ public interface DataStructureVersionRepository extends BaseRepository<DataStruc
 
   boolean existsByDataStructure_Id(UUID dataStructureId);
 
+  boolean existsByDataStructureIdAndModelUrn(UUID dataStructureId, String modelUrn);
+
   /**
    * Every version record of these structures.
    *

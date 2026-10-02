@@ -13,6 +13,7 @@ import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
+import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -139,11 +140,26 @@ public class DataStructureVersionService
             // version was saved, so a model arriving on a later save still starts a major.
             entity.getModelUrn() == null ? VersionBump.MAJOR : VersionBump.MINOR,
             entity.getModelUrn() == null ? null : entity.getVersion());
+    if (entity.getModelUrn() == null) {
+      requireNewModelVersion(parent.getId(), pin);
+    }
     if (parent.getModelLogicalUrn() == null) {
       parent.setModelLogicalUrn(pin.logicalUrn());
     }
     entity.setModelUrn(pin.versionedUrn());
     entity.setVersion(pin.version());
+  }
+
+  /**
+   * Model Forge stores no new version for content identical to its newest one and returns that
+   * version's pin, which another version of this structure already holds.
+   */
+  private void requireNewModelVersion(UUID dataStructureId, ModelRegistryGateway.ModelPin pin) {
+    if (dataStructureVersionRepository.existsByDataStructureIdAndModelUrn(
+        dataStructureId, pin.versionedUrn())) {
+      throw new UniqueConstraintViolationException(
+          "The model is unchanged from version " + pin.version() + ", so it starts no new version");
+    }
   }
 
   /**

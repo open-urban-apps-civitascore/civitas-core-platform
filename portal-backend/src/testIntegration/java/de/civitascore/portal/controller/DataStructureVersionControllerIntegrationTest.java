@@ -156,6 +156,9 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(secondResponse.getStatusCode())
           .as("The number is already taken by the version holding this content")
           .isEqualTo(HttpStatus.CONFLICT);
+      assertThat(secondResponse.getBody().getDetail())
+          .startsWith("The model is unchanged from version ")
+          .doesNotContain("data_structure_id");
     }
 
     @Test

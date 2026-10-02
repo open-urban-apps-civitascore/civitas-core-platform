@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -23,6 +24,7 @@ import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
+import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -512,6 +514,32 @@ class DataStructureVersionServiceTest {
           .storeModel(any(), any(), any(), any(), any(), any(), any());
       assertThat(result.getVersion()).isNull();
       assertThat(result.getModelUrn()).isNull();
+    }
+
+    // Without the check the insert hits the unique constraint, and the 409 quotes the database.
+    @Test
+    @DisplayName("A new version whose model is unchanged from an existing version is refused")
+    void createWithUnchangedModelIsRefused() {
+      UUID dataStructureId = UUID.randomUUID();
+      DataStructure dataStructure = new DataStructure();
+      dataStructure.setId(dataStructureId);
+      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureId(dataStructureId);
+      input.setModel(new HashMap<>(Map.of("title", "Observation")));
+
+      when(dataStructureVersionMapper.toEntity(any())).thenReturn(new DataStructureVersion());
+      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
+      when(dataStructureVersionRepository.existsByDataStructureIdAndModelUrn(
+              dataStructureId,
+              "urn:core:platform:civitas:element:common:7c96ac2d-1fad-817a-a9b0-c7374bba1952:1.0.0"))
+          .thenReturn(true);
+
+      assertThatThrownBy(() -> dataStructureVersionService.create(input))
+          .isInstanceOf(UniqueConstraintViolationException.class)
+          .hasMessageContaining("unchanged from version 1.0.0");
+      verify(dataStructureVersionRepository, never()).save(any());
     }
   }
 }
