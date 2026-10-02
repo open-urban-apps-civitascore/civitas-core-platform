@@ -346,6 +346,47 @@ class DataSinkServiceTest {
       assertThat(whenUnauthorized.getMessage()).doesNotContain(ELEMENT_URN);
     }
 
+    @Test
+    @DisplayName("An element missing from the registry fails like an unauthorized structure")
+    void missingElementIsIndistinguishableFromUnauthorizedStructure() {
+      InvalidInputException whenUnauthorized =
+          captureFailure(
+              () ->
+                  doThrow(new AccessDeniedException("denied"))
+                      .when(scopeAccessAuthorizer)
+                      .authorizeReferences(eq(ScopeType.DATASTRUCTURE), any()));
+
+      InvalidInputException whenMissing =
+          captureFailure(
+              () ->
+                  when(modelRegistryGateway.fetchModel(ELEMENT_URN)).thenReturn(Optional.empty()));
+
+      assertThat(whenMissing.getMessage()).isEqualTo(whenUnauthorized.getMessage());
+      assertThat(whenMissing.getResourceId()).isEqualTo(whenUnauthorized.getResourceId());
+      assertThat(whenMissing.getMessage()).doesNotContain(ELEMENT_URN);
+    }
+
+    // The config-adapter refuses an unpinned element only at deploy time, after the release.
+    @ParameterizedTest
+    @ValueSource(
+        strings = {
+          "urn:core:platform:civitas:element:common:5cf6e9e7-fa0d-877a-bda7-df0cc339e439",
+          "urn:core:platform:civitas:element:common:5cf6e9e7-fa0d-877a-bda7-df0cc339e439:latest"
+        })
+    @DisplayName("POSTGIS create is refused when the element is not pinned to a SemVer version")
+    void postgisCreateRefusedWhenElementNotPinned(String unpinned) {
+      UUID dataSetId = UUID.randomUUID();
+      DataSinkInputDTO input = postgisInput(dataSetId);
+      input.setConfiguration(Map.of("tableName", "sensor_readings", "element", unpinned));
+      when(dataSinkMapper.toEntity(any())).thenReturn(new DataSink());
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet(dataSetId)));
+
+      assertThatThrownBy(() -> dataSinkService.create(input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("pinned to a version");
+      verify(modelRegistryGateway, never()).fetchModel(any());
+    }
+
     /** Runs a create whose only difference is {@code arrangeFailure}, and returns what it threw. */
     private InvalidInputException captureFailure(Runnable arrangeFailure) {
       reset(

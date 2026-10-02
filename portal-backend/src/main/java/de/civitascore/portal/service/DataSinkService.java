@@ -1,5 +1,6 @@
 package de.civitascore.portal.service;
 
+import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.model.datasink.FrostSinkPort;
 import de.civitascore.portal.model.embedded.DataSinkType;
@@ -463,21 +464,19 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
   }
 
   /**
-   * Validates the {@code element} soft reference: it must be a non-blank CORE URN that resolves to
-   * an existing model (Element) in the registry. Model Forge tracks this URN as a {@code
-   * datasink-element} dependency edge when the configuration is stored, which is what the in-use
-   * guard on {@code DataStructureVersion} queries.
+   * Validates the {@code element} soft reference: it must be a CORE URN pinned to a SemVer version,
+   * the form the deployment accepts ({@link CoreUrn}), and resolve to an existing model (Element)
+   * in the registry. Model Forge tracks this URN as a {@code datasink-element} dependency edge when
+   * the configuration is stored, which is what the in-use guard on {@code DataStructureVersion}
+   * queries.
    */
   private void requireExistingElement(Object elementRaw) {
-    if (!(elementRaw instanceof String urn) || urn.isBlank()) {
+    if (!(elementRaw instanceof String urn) || !CoreUrn.isValid(urn)) {
       throw new InvalidInputException(
-          "DataSink", "configuration.element", "element must be a CORE URN");
+          "DataSink", "configuration.element", "element must be a CORE URN pinned to a version");
     }
     if (modelRegistryGateway.fetchModel(urn).isEmpty()) {
-      throw new InvalidInputException(
-          "DataSink",
-          "configuration.element",
-          "Referenced Element not found in the model registry: " + urn);
+      throw referencedStructureNotAvailable();
     }
     authorizeReferencedStructure(urn);
   }

@@ -28,6 +28,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
@@ -355,6 +357,27 @@ class MappingServiceTest {
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("not available");
 
+    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
+  }
+
+  // The config-adapter refuses an unpinned endpoint only at deploy time, after the release.
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "urn:core:platform:civitas:element:common:07ee560b-697b-87ca-a0ac-aa2a0e481164",
+        "urn:core:platform:civitas:element:common:07ee560b-697b-87ca-a0ac-aa2a0e481164:latest",
+        "urn:core:platform:civitas:element:common:07ee560b-697b-87ca-a0ac-aa2a0e481164:1.0"
+      })
+  @DisplayName("an endpoint not pinned to a SemVer version is refused before anything is stored")
+  void store_whenEndpointNotPinned_isRefused(String unpinned) {
+    assertThatThrownBy(
+            () ->
+                mappingService.store(
+                    DATA_SET_ID, null, Map.of("source", unpinned, "fields", Map.of())))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("pinned to a version");
+
+    verify(registry, never()).fetchModel(any());
     verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
   }
 
