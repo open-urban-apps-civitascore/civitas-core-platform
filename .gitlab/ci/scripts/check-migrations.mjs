@@ -11,8 +11,9 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 
 const MIGRATIONS = 'portal-backend/src/main/resources/db/migration'
+const JAVA_MIGRATIONS = 'portal-backend/src/main/java/db/migration'
 const LATEST_FILE = `${MIGRATIONS}/LATEST`
-const NAME_PATTERN = /^V([0-9]+(?:_[0-9]+)*)__[A-Za-z0-9_]+\.sql$/
+const NAME_PATTERN = /^V([0-9]+(?:_[0-9]+)*)__[A-Za-z0-9_]+\.(?:sql|java)$/
 
 const root = git('.', 'rev-parse', '--show-toplevel').trim()
 let errors = 0
@@ -20,7 +21,7 @@ let errors = 0
 main(process.argv[2] ?? '')
 
 function main(target) {
-  const files = migrationFileNames()
+  const files = migrationPaths()
   checkFileNames(files)
 
   const branch = branchMigrations(files)
@@ -48,8 +49,8 @@ function main(target) {
 }
 
 function checkFileNames(files) {
-  for (const file of files.filter(file => !NAME_PATTERN.test(file))) {
-    fail(`${file}: name a migration V<major>_<minor>_<patch>__<description>.sql`)
+  for (const path of files.filter(path => !NAME_PATTERN.test(basename(path)))) {
+    fail(`${path}: name a migration V<major>_<minor>_<patch>__<description>.sql or .java`)
   }
 }
 
@@ -128,26 +129,27 @@ function checkNewVersionsFollowDirectly(merged, branch) {
   }
 }
 
-function migrationFileNames() {
-  const directory = join(root, MIGRATIONS)
-  if (!existsSync(directory) || !statSync(directory).isDirectory()) return []
-  return readdirSync(directory)
-    .filter(file => file.startsWith('V'))
-    .sort()
+function migrationPaths() {
+  return [MIGRATIONS, JAVA_MIGRATIONS].flatMap(relative => {
+    const directory = join(root, relative)
+    if (!existsSync(directory) || !statSync(directory).isDirectory()) return []
+    return readdirSync(directory)
+      .filter(file => file.startsWith('V'))
+      .sort()
+      .map(file => `${relative}/${file}`)
+  })
 }
 
 function branchMigrations(files) {
-  const names = files.filter(file => NAME_PATTERN.test(file))
-  if (names.length === 0) return []
-  const blobs = git(root, 'hash-object', '--', ...names.map(file => `${MIGRATIONS}/${file}`))
-    .trim()
-    .split('\n')
-  return names.map((file, i) => migration(file, blobs[i])).sort(compareMigrations)
+  const paths = files.filter(path => NAME_PATTERN.test(basename(path)))
+  if (paths.length === 0) return []
+  const blobs = git(root, 'hash-object', '--', ...paths).trim().split('\n')
+  return paths.map((path, i) => migration(basename(path), blobs[i])).sort(compareMigrations)
 }
 
 function targetMigrations(ref) {
-  return git(root, 'ls-tree', ref, `${MIGRATIONS}/`)
-    .split('\n')
+  return [MIGRATIONS, JAVA_MIGRATIONS]
+    .flatMap(relative => git(root, 'ls-tree', ref, `${relative}/`).split('\n'))
     .filter(Boolean)
     .map(parseTreeEntry)
     .filter(({ file }) => NAME_PATTERN.test(file))
