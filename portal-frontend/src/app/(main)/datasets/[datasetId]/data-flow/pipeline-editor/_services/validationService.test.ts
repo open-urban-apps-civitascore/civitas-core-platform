@@ -838,6 +838,39 @@ describe('validateEdgeCompatibility', () => {
   })
 })
 
+describe('a pipeline without a mapping', () => {
+  const sinks = { FROST: frostAt('sink-1'), PostGIS: geoAt('sink-1') }
+
+  const withoutMapping = (connector: 'MQTT' | 'SQL', sink: TestNode) =>
+    connector === 'SQL'
+      ? graph(
+          [startNode, cronAt('cron-1'), sourceAt('src-1', connector), sink, endNode],
+          [
+            { source: 'start-1', target: 'cron-1' },
+            { source: 'cron-1', target: 'src-1' },
+            { source: 'src-1', target: 'sink-1' },
+            { source: 'sink-1', target: 'end-1' },
+          ],
+        )
+      : graph(
+          [startNode, sourceAt('src-1', connector), sink, endNode],
+          [
+            { source: 'start-1', target: 'src-1' },
+            { source: 'src-1', target: 'sink-1' },
+            { source: 'sink-1', target: 'end-1' },
+          ],
+        )
+
+  it.each([
+    ['MQTT', 'FROST'],
+    ['MQTT', 'PostGIS'],
+    ['SQL', 'FROST'],
+    ['SQL', 'PostGIS'],
+  ] as const)('accepts a %s source connected directly to a %s sink', (connector, sink) => {
+    expect(validatePipeline(withoutMapping(connector, sinks[sink])).errors).toEqual([])
+  })
+})
+
 describe('validateMappingChainStructure', () => {
   const CHAIN_KEY = 'mappingChainStructureMismatch'
 

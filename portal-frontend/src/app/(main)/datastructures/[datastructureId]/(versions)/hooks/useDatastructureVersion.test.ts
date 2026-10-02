@@ -9,6 +9,7 @@ import {
 } from '@/app/services/api/datastructures/versions/clientRequests'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
+import { rel } from '@/test-support/datastructureFixtures'
 import { DATASTRUCTURE_STATUS_TYPES, type DatastructureVersion } from '@/types/datastructures'
 
 import { useDatastructureVersion } from './useDatastructureVersion'
@@ -78,6 +79,53 @@ const validDiagram = () =>
     name: 'Struct',
     nodes: [classNode('a', 'Alpha')],
     edges: [],
+    lastModified: new Date(0),
+    isDirty: false,
+  }) as unknown as UMLDiagram
+
+/** validDiagram with the one class designated, rather than left to derivation. */
+const rootedSingleClassDiagram = () => {
+  const diagram = validDiagram()
+  ;(diagram.nodes[0].data.element as { isRoot?: boolean }).isRoot = true
+  return diagram
+}
+
+/** A one-Element structure whose Element is an enumeration, not a class. */
+const singleEnumDiagram = () =>
+  ({
+    id: 'diagram-1',
+    name: 'Struct',
+    nodes: [
+      {
+        id: 'node-s',
+        type: 'enumeration',
+        position: { x: 0, y: 0 },
+        data: {
+          element: {
+            id: 's',
+            name: 'Status',
+            type: 'enumeration',
+            literals: [
+              { id: 'l1', name: 'ACTIVE' },
+              { id: 'l2', name: 'INACTIVE' },
+            ],
+          },
+          label: 'Status',
+        },
+      },
+    ],
+    edges: [],
+    lastModified: new Date(0),
+    isDirty: false,
+  }) as unknown as UMLDiagram
+
+/** Two classes composing each other: every class is embedded, so the diagram has no root. */
+const rootlessDiagram = () =>
+  ({
+    id: 'diagram-1',
+    name: 'Struct',
+    nodes: [classNode('a', 'Alpha'), classNode('b', 'Beta')],
+    edges: [rel('ab', 'composition', 'a', 'b'), rel('ba', 'composition', 'b', 'a')],
     lastModified: new Date(0),
     isDirty: false,
   }) as unknown as UMLDiagram
@@ -153,8 +201,11 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     vi.clearAllMocks()
   })
 
-  it('refuses to release a version whose diagram yields no model', async () => {
-    const { hook, updateVersion, updateStatus } = setup(version())
+  it.each([
+    ['several root candidates', invalidDiagram(), 'ambiguousRoot'],
+    ['no root', rootlessDiagram(), 'noRoot'],
+  ])('refuses to release a version whose diagram has %s and names that reason', async (_label, styles, reason) => {
+    const { hook, updateVersion, updateStatus } = setup(version({ styles }))
 
     act(() => hook.result.current.handleStatusChange(DATASTRUCTURE_STATUS_TYPES.AVAILABLE))
     let saved: boolean | undefined
@@ -163,7 +214,9 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     })
 
     expect(saved).toBe(false)
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.saveInvalidModel'))
+    expect(toast.error).toHaveBeenCalledWith(
+      `datastructureVersions.errors.saveInvalidModel|umlModeler.rootValidation.${reason}`,
+    )
     expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
     expect(updateStatus.mutateAsync).not.toHaveBeenCalled()
   })
@@ -220,9 +273,7 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     expect(saved).toBe(true)
     expect(toast.error).not.toHaveBeenCalled()
 
-    // Saved under a DataStructure URN → the canonical $defs library: Alpha is the document root,
-    // designated by a top-level $ref equal to its own $defs member $id (no inline `properties`).
-    // Beta stays in $defs, unreferenced but preserved.
+    // Alpha is the root referenced in $ref, Beta stays in $defs, unreferenced.
     const payload = updateVersion.mutateAsync.mock.calls[0][0] as {
       data: { model: { $ref?: string; $defs?: Record<string, { $id?: string }> } }
     }
@@ -230,7 +281,7 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     expect(payload.data.model.$defs).toHaveProperty('Beta')
   })
 
-  it('passes the exported model through for a resolvable diagram', async () => {
+  it('sends the exported model for a single class that becomes the root by derivation', async () => {
     const { hook, updateVersion } = setup(version({ styles: validDiagram() }))
 
     act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
@@ -242,12 +293,55 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     expect(saved).toBe(true)
     expect(toast.warning).not.toHaveBeenCalled()
     const payload = updateVersion.mutateAsync.mock.calls[0][0] as { data: { model: Record<string, unknown> } }
-    // Saved under a DataStructure URN → the canonical $defs library: the root class Alpha is a $defs
-    // member stamped with its Element URN as $id, designated by a top-level $ref to that same URN
-    // (no inline root `properties`). Model Forge splits the members into Elements on ingest.
+    // The root class sits in $defs, a top-level $ref points at its $id
     const model = payload.data.model as { $ref?: string; $defs?: Record<string, { $id?: string }> }
     expect(model.$defs?.Alpha).toBeDefined()
     expect(model.$ref).toBe(model.$defs?.Alpha?.$id)
+  })
+
+  it('marking the only class as root does not change the saved model', async () => {
+    const modelOf = async (diagram: UMLDiagram) => {
+      const { hook, updateVersion } = setup(version({ styles: diagram }))
+      act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+      let saved: boolean | undefined
+      await act(async () => {
+        saved = await hook.result.current.saveDatastructureVersion(DS_ID)
+      })
+      expect(saved).toBe(true)
+      const payload = updateVersion.mutateAsync.mock.calls[0][0] as { data: { model: Record<string, unknown> } }
+      return payload.data.model as { $ref?: string; $defs?: Record<string, { $id?: string }> }
+    }
+
+    const designated = await modelOf(rootedSingleClassDiagram())
+    vi.clearAllMocks()
+    const derived = await modelOf(validDiagram())
+
+    expect(Object.keys(designated.$defs ?? {})).toEqual(['Alpha'])
+    expect(designated.$ref).toBe(designated.$defs?.Alpha?.$id)
+    expect(designated).toEqual(derived)
+  })
+
+  it('sends the exported model for a one-element structure holding an enumeration', async () => {
+    const { hook, updateVersion } = setup(version({ styles: singleEnumDiagram() }))
+
+    act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+    let saved: boolean | undefined
+    await act(async () => {
+      saved = await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(saved).toBe(true)
+    const payload = updateVersion.mutateAsync.mock.calls[0][0] as { data: { model: Record<string, unknown> } }
+    const model = payload.data.model as {
+      $ref?: string
+      type?: string
+      $defs?: Record<string, { $id?: string; enum?: string[] }>
+    }
+
+    expect(Object.keys(model.$defs ?? {})).toEqual(['Status'])
+    expect(model.$defs?.Status.enum).toEqual(['ACTIVE', 'INACTIVE'])
+    expect(model.$ref).toBe(model.$defs?.Status.$id)
+    expect(model.type).toBeUndefined()
   })
 })
 

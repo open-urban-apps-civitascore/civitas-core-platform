@@ -1,6 +1,8 @@
 import { assert, describe, expect, it } from 'vitest'
 
+import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
+import { datastructureFixtures, DS_URN } from '@/test-support/datastructureFixtures'
 import type {
   Datastructure,
   DatastructuresListData,
@@ -644,5 +646,93 @@ describe('getDatastructureFieldOptions', () => {
     expect(getDatastructureFieldOptions(versionOf({ styles: diagramOf([]) }))).toEqual([])
     expect(getDatastructureFieldOptions(versionOf({}))).toEqual([])
     expect(getDatastructureFieldOptions(undefined)).toEqual([])
+  })
+})
+
+/**
+ * The editor rehydrates from `styles`, never from the stored CORE model,
+ * so the provable statement is that a rehydrated diagram exports the same model again.
+ * This is rehydration, not reload: the payload comes from the test, not from the server.
+ */
+describe('the exported model survives a save/rehydrate round-trip', () => {
+  const formOf = (): DatastructureVersionFormData =>
+    ({
+      id: 'v1',
+      version: '1.0.0',
+      description: '',
+      dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
+      dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
+      modelName: 'Struct',
+    }) as DatastructureVersionFormData
+
+  const noEdit = (diagram: UMLDiagram) => diagram
+
+  const roundTrip = (diagram: UMLDiagram, edit: (diagram: UMLDiagram) => UMLDiagram = noEdit) => {
+    const before = buildUMLModelPayload(diagram, DS_URN).model
+    const persisted = JSON.parse(JSON.stringify(mapDatastructureVersionFormToApiData(formOf(), diagram, before)))
+    const rehydrated = buildSessionFromVersion(persisted as DatastructureVersion).diagram
+    return { before, after: buildUMLModelPayload(edit(rehydrated), DS_URN).model }
+  }
+
+  it.each(datastructureFixtures)('$label exports an equivalent model after rehydration', ({ diagram }) => {
+    const { before, after } = roundTrip(diagram)
+    expect(after).toEqual(before)
+  })
+
+  const idsOf = (model: Record<string, unknown>) =>
+    Object.entries((model.$defs ?? {}) as Record<string, { $id?: string }>).map(([key, def]) => [key, def.$id])
+
+  const refsOf = (model: Record<string, unknown>): string[] => {
+    const refs: string[] = []
+    const walk = (node: unknown) => {
+      if (Array.isArray(node)) return node.forEach(walk)
+      if (!node || typeof node !== 'object') return
+      for (const [key, value] of Object.entries(node)) {
+        if (key === '$ref' && typeof value === 'string') refs.push(value)
+        else walk(value)
+      }
+    }
+    walk(model.$defs)
+    return refs.sort()
+  }
+
+  it.each(datastructureFixtures)('$label keeps its Element identities across the round-trip', ({ diagram }) => {
+    const { before, after } = roundTrip(diagram)
+
+    expect(idsOf(after)).toEqual(idsOf(before))
+    expect(refsOf(after)).toEqual(refsOf(before))
+    expect(after.$ref).toBe(before.$ref)
+  })
+
+  it('names every member and cross-reference by its Element URN', () => {
+    const { before } = roundTrip(fixtureNamed('four cross-referencing elements under one root'))
+    const urn = (name: string) => `urn:core:platform:civitas:element:common:${name}:abc1234567:1.0.0`
+
+    expect(idsOf(before)).toEqual([
+      ['Station', urn('Station')],
+      ['Measurement', urn('Measurement')],
+      ['Reading', urn('Reading')],
+      ['Alert', urn('Alert')],
+    ])
+    // Measurement appears twice: both Reading and Alert inherit it.
+    expect(refsOf(before)).toEqual([urn('Alert'), urn('Measurement'), urn('Measurement'), urn('Reading')])
+    expect(before.$ref).toBe(urn('Station'))
+  })
+
+  const fixtureNamed = (label: string) => {
+    const fixture = datastructureFixtures.find(candidate => candidate.label === label)
+    assert(fixture, `no fixture labelled "${label}"`)
+    return fixture.diagram
+  }
+
+  it('moving a node changes no part of the exported model', () => {
+    const moveFirstNode = (diagram: UMLDiagram): UMLDiagram => ({
+      ...diagram,
+      nodes: diagram.nodes.map((node, index) => (index === 0 ? { ...node, position: { x: 512, y: 64 } } : node)),
+      viewport: { x: 10, y: 20, zoom: 2 },
+    })
+
+    const { before, after } = roundTrip(fixtureNamed('composition'), moveFirstNode)
+    expect(after).toEqual(before)
   })
 })

@@ -25,6 +25,7 @@ import {
   DatasourceFormAvailableSchema,
   DatasourceFormDraft,
   DatasourceFormDraftSchema,
+  DatasourceMetaPatchData,
   DatasourcePatchData,
   DatasourceStatusType,
   DatasourceTab,
@@ -119,14 +120,6 @@ export const useDatasourceForm = (
   const isInUseByReleased = datasource.inUseByReleased
   const canSetDraft = !isInUseByReleased
 
-  // The connector is pinned only on the released path. The backend runs the in-use constraints
-  // inside updateReleasedMeta, which a data source reaches only while it is AVAILABLE, and only for
-  // released referrers; a DRAFT one still goes through the plain PATCH, which accepts technical
-  // changes from an in-use source.
-  // Gate on the persisted status — the same value handleUpdateValues routes on — so the UI is
-  // neither stricter nor looser than the API.
-  const isConnectorLocked = isInUseByReleased && datasource.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
-
   // Zod v4 discriminatedUnion safeParse can throw on stale keys
   const canStage = useMemo(() => {
     try {
@@ -204,13 +197,18 @@ export const useDatasourceForm = (
     }
   }
 
+  const toReleasedPayload = (values: DatasourcePatchData): DatasourceMetaPatchData => {
+    const { id, description, datapoolScope, assignments } = values
+    return { id, name: nameWatch, description, datapoolScope, assignments }
+  }
+
   const handleUpdateValues = async (values: DatasourcePatchData) => {
     const hasInvalidAssignments = assignedGroups.some(group => group.assignedRoles.length === 0)
 
     try {
       const response =
         datasource.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
-          ? await updateReleasedDatasource.mutateAsync({ ...values, name: nameWatch })
+          ? await updateReleasedDatasource.mutateAsync(toReleasedPayload(values))
           : await updateDatasource.mutateAsync(values)
 
       toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.datasource') }))
@@ -323,7 +321,6 @@ export const useDatasourceForm = (
     isDraftMode,
     canStage,
     canSetDraft,
-    isConnectorLocked,
     completedTabs,
     submitDatasource,
     resetToInitialState,

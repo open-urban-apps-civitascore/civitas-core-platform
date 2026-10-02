@@ -18,12 +18,13 @@ export const useUpdateMutation = <TResponse, TData extends WithId<string>>({
   return useMutation<ApiServiceResponse<TResponse>, AxiosError, MutationData<TData>>({
     mutationFn: (data: MutationData<TData>) => {
       const url = isFn(endpoint) ? getRequestEndpoint(endpoint, data) : endpoint
+      const { id, ...body } = data
 
       return apiRequest<TResponse>({
         method: method,
-        endpoint: url || `/${mutationKey}/${data.id}`,
+        endpoint: url || `/${mutationKey}/${id}`,
         headers,
-        data: data,
+        data: body,
         errorMessage: errorMessage,
       })
     },

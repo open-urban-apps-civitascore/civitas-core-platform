@@ -20,7 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
  * be deleted while datasets are still assigned to it or while datasources are still scoped to it.
  */
 @Service
-public class DataPoolService extends BaseDataEntityService<DataPool, DataPoolInputDTO> {
+public class DataPoolService
+    extends BaseDataEntityService<DataPool, DataPoolInputDTO, DataPoolInputDTO> {
 
   private final DataPoolRepository dataPoolRepository;
   private final DataPoolMapper dataPoolMapper;
@@ -81,6 +82,16 @@ public class DataPoolService extends BaseDataEntityService<DataPool, DataPoolInp
 
   @Override
   protected ReleasableStatus getAvailableStatus() {
+    throw new UnsupportedOperationException("DataPool does not support release lifecycle");
+  }
+
+  @Override
+  public DataPool updateReleasedMeta(UUID id, DataPoolInputDTO meta) {
+    throw new UnsupportedOperationException("DataPool does not support release lifecycle");
+  }
+
+  @Override
+  public DataPoolInputDTO toMetaInput(DataPool entity) {
     throw new UnsupportedOperationException("DataPool does not support release lifecycle");
   }
 

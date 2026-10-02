@@ -703,7 +703,7 @@ class DataStructureControllerIntegrationTest
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
               ENDPOINT + "/" + releasedDataStructureId + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               input,
               getOutputTypeReference());
@@ -725,6 +725,24 @@ class DataStructureControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should keep the description when the released meta patch omits it")
+    void shouldKeepDescriptionWhenReleasedMetaPatchOmitsIt() {
+      ResponseEntity<DataStructureOutputDTO> response =
+          exchange(
+              ENDPOINT + "/" + releasedDataStructureId + "/released/meta",
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("name", "Renamed Released Data Structure"),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getName()).isEqualTo("Renamed Released Data Structure");
+      assertThat(response.getBody().getDescription())
+          .isEqualTo("Data structure for meta update testing");
+    }
+
+    @Test
     @DisplayName("Should fail to update released meta for DRAFT data structure")
     void shouldFailToUpdateReleasedMetaForDraftDataStructure() {
       DataStructure draftDataStructure =
@@ -741,7 +759,7 @@ class DataStructureControllerIntegrationTest
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
               ENDPOINT + "/" + draftDataStructure.getId() + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               input,
               getOutputTypeReference());
@@ -761,7 +779,7 @@ class DataStructureControllerIntegrationTest
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
               ENDPOINT + "/" + UUID.randomUUID() + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               input,
               getOutputTypeReference());
@@ -776,7 +794,7 @@ class DataStructureControllerIntegrationTest
     void shouldFailToUpdateReleasedMetaWithoutAuth() {
       ResponseEntity<String> response =
           performRequestWithoutAuth(
-              "/" + releasedDataStructureId + "/released/meta", HttpMethod.PUT);
+              "/" + releasedDataStructureId + "/released/meta", HttpMethod.PATCH);
 
       assertThat(response.getStatusCode())
           .as("Should return UNAUTHORIZED status")
@@ -793,7 +811,7 @@ class DataStructureControllerIntegrationTest
       ResponseEntity<DataStructureOutputDTO> response =
           exchange(
               ENDPOINT + "/" + releasedDataStructureId + "/released/meta",
-              HttpMethod.PUT,
+              HttpMethod.PATCH,
               createAuthHeaders(),
               input,
               getOutputTypeReference());
@@ -922,6 +940,50 @@ class DataStructureControllerIntegrationTest
       updateInput.setAssignments(Set.of(assignment2));
 
       performUpdate(id, updateInput);
+
+      ResponseEntity<List<AssignmentOutputDTO>> assignmentsResponse =
+          restTemplate.exchange(
+              ENDPOINT + "/" + id + "/assignments",
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<>() {});
+
+      assertThat(assignmentsResponse.getBody()).hasSize(1);
+      assertThat(assignmentsResponse.getBody().getFirst().getGroup().getId()).isEqualTo(groupId2);
+    }
+
+    @Test
+    @DisplayName("Should replace assignments of released data structure via released meta patch")
+    void shouldReplaceAssignmentsViaReleasedMeta() {
+      UUID groupId1 = createTestGroup();
+      UUID groupId2 = createTestGroup();
+      UUID roleId = createTestRole();
+
+      AssignmentScopedInputDTO assignment1 = new AssignmentScopedInputDTO();
+      assignment1.setGroupId(groupId1);
+      assignment1.setRoleId(roleId);
+
+      DataStructureInputDTO createInput = createValidInput();
+      createInput.setAssignments(Set.of(assignment1));
+      UUID id = performCreate(createInput).getBody().getId();
+
+      DataStructure dataStructure = dataStructureRepository.findById(id).orElseThrow();
+      dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      dataStructureRepository.save(dataStructure);
+
+      AssignmentScopedInputDTO assignment2 = new AssignmentScopedInputDTO();
+      assignment2.setGroupId(groupId2);
+      assignment2.setRoleId(roleId);
+
+      ResponseEntity<DataStructureOutputDTO> response =
+          exchange(
+              ENDPOINT + "/" + id + "/released/meta",
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("assignments", Set.of(assignment2)),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
       ResponseEntity<List<AssignmentOutputDTO>> assignmentsResponse =
           restTemplate.exchange(

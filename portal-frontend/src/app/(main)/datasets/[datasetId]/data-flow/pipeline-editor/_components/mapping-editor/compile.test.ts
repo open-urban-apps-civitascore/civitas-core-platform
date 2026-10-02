@@ -1,7 +1,11 @@
 import type { Edge, Node } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
 
-import type { MappingConfig, SchemaTree } from './_types'
+import { CONTRACT_URIS, contractErrors, readContract } from '@/test-support/coreContracts'
+import type { ContractOperation } from '@/test-support/mappingFixtures'
+import { mappingFixtures, nestedFixtures, sourceTree as fixtureSourceTree } from '@/test-support/mappingFixtures'
+
+import type { MappingConfig, SchemaTree, ValueNode } from './_types'
 import {
   compileCanvas,
   decompileConfig,
@@ -9,7 +13,7 @@ import {
   SOURCE_NODE_ID,
   TARGET_NODE_ID,
 } from './compile'
-import { concatInputPorts, transformDef } from './transforms'
+import { concatInputPorts, mappingRegistry, transformDef } from './transforms'
 
 const sourceTree: SchemaTree = {
   name: 'src',
@@ -335,5 +339,154 @@ describe('mapping editor compile', () => {
     const recompiled = compileCanvas(built.nodes, built.edges)
     expect(recompiled.fields).toEqual(compiled.fields)
     expect(Object.keys(recompiled.positions).sort()).toEqual(Object.keys(compiled.positions).sort())
+  })
+})
+
+const documentOf = (fields: Record<string, ValueNode>) => ({
+  $schema: CONTRACT_URIS.mapping,
+  id: 'urn:core:platform:civitas:mapping:common:M:abcdef1234:1.0.0',
+  source: 'urn:core:platform:civitas:datastructure:common:S:abcdef1234:1.0.0',
+  target: 'urn:core:platform:civitas:datastructure:common:T:abcdef1234:1.0.0',
+  fields,
+})
+
+describe('The operation the Mapping editor offers', () => {
+  const expectedOperation: Record<ContractOperation, ValueNode> = {
+    copy: '$.source',
+    concat: { op: 'concat', separator: '-', inputs: ['$.id', '$.suffix'] },
+    const: { op: 'const', value: 'fixed', valueType: 'String' },
+    toString: { op: 'toString', input: '$.id' },
+    toInt: { op: 'toInt', input: '$.id' },
+    toFloat: { op: 'toFloat', input: '$.id' },
+    toDate: { op: 'toDate', input: '$.day', pattern: 'yyyy-MM-dd' },
+    format: { op: 'format', input: '$.when', pattern: 'yyyy-MM-dd' },
+    geoPoint: { op: 'geoPoint', lon: '$.longitude', lat: '$.latitude' },
+  }
+
+  it.each(mappingFixtures)('$operation compiles to its CORE operation', fixture => {
+    const { fields } = compileCanvas(fixture.nodes, fixture.edges)
+    expect(fields[fixture.targetPath]).toEqual(expectedOperation[fixture.operation])
+  })
+
+  it.each(mappingFixtures)('$operation produces a contract-valid mapping document', fixture => {
+    const { fields } = compileCanvas(fixture.nodes, fixture.edges)
+    expect(contractErrors('mapping', documentOf(fields))).toEqual([])
+  })
+
+  it.each(mappingFixtures)('$operation is unchanged after rehydration', fixture => {
+    const fields = { [fixture.targetPath]: expectedOperation[fixture.operation] }
+    const built = decompileConfig({ fields, positions: {} }, fixtureSourceTree, fixture.targetTree)
+
+    const restored = built.nodes.find(node => node.type === 'transform')
+    expect(restored?.data.defType).toBe(fixture.operation === 'copy' ? undefined : fixture.operation)
+    expect(compileCanvas(built.nodes, built.edges).fields).toEqual(fields)
+  })
+
+  it('compiles a direct edge to the bare path, not a copy object', () => {
+    const copy = mappingFixtures.find(fixture => fixture.operation === 'copy')!
+    const { fields } = compileCanvas(copy.nodes, copy.edges)
+    expect(typeof fields[copy.targetPath]).toBe('string')
+  })
+
+  it('offers the same operations the mapping contract defines', () => {
+    const defs = readContract('mapping').$defs as Record<string, { properties?: { op?: { const?: string } } }>
+    const defined = Object.values(defs)
+      .map(def => def.properties?.op?.const)
+      .filter(Boolean)
+      .sort()
+
+    // 'copy' is the direct edge, it is not offered in the palette.
+    expect([...Object.keys(mappingRegistry.byType), 'copy'].sort()).toEqual(defined)
+  })
+
+  it('offers no free-text field beyond a date pattern, a literal value and a separator', () => {
+    const configFields = Object.fromEntries(
+      mappingRegistry.list.map(def => [
+        def.type,
+        Object.fromEntries(def.config.map(field => [field.key, field.control])),
+      ]),
+    )
+
+    expect(configFields).toEqual({
+      const: { type: 'select', value: 'text' },
+      concat: { separator: 'text' },
+      geoPoint: {},
+      toString: {},
+      toInt: {},
+      toFloat: {},
+      toUuid: {},
+      toDate: { pattern: 'text' },
+      toDateTime: { pattern: 'text' },
+      format: { pattern: 'text' },
+    })
+  })
+})
+
+describe('nested operations', () => {
+  const dateChain: ValueNode = {
+    op: 'format',
+    input: { op: 'toDate', input: '$.day', pattern: 'yyyy-MM-dd' },
+    pattern: 'yyyy-MM-dd',
+  }
+
+  const expectedFields: Record<string, Record<string, ValueNode>> = {
+    'three levels': {
+      '$.fullCode': { op: 'concat', separator: '-', inputs: [dateChain, '$.suffix'] },
+    },
+    'both fixed inputs of geoPoint': {
+      '$.geometry': {
+        op: 'geoPoint',
+        lon: { op: 'toFloat', input: '$.longitude' },
+        lat: { op: 'toFloat', input: '$.latitude' },
+      },
+    },
+    'one transform chain feeding two target fields': { '$.printed': dateChain, '$.text': dateChain },
+  }
+
+  it.each(nestedFixtures)('$label compiles to a nested CORE operation', fixture => {
+    expect(compileCanvas(fixture.nodes, fixture.edges).fields).toEqual(expectedFields[fixture.label])
+  })
+
+  it.each(nestedFixtures)('$label produces a contract-valid mapping document', fixture => {
+    const { fields } = compileCanvas(fixture.nodes, fixture.edges)
+    expect(contractErrors('mapping', documentOf(fields))).toEqual([])
+  })
+
+  it.each(nestedFixtures)('$label is unchanged after rehydration', fixture => {
+    const fields = expectedFields[fixture.label]
+    const built = decompileConfig({ fields, positions: {} }, fixtureSourceTree, fixture.targetTree)
+    expect(compileCanvas(built.nodes, built.edges).fields).toEqual(fields)
+  })
+
+  it('restores a transform chain feeding two target fields as one set of nodes', () => {
+    const shared = nestedFixtures.find(fixture => fixture.label === 'one transform chain feeding two target fields')!
+    const compiled = compileCanvas(shared.nodes, shared.edges)
+
+    const built = decompileConfig({ ...compiled }, fixtureSourceTree, shared.targetTree)
+    expect(built.nodes.filter(node => node.type === 'transform')).toHaveLength(2)
+  })
+})
+
+describe('a copy operation written as an object with sourcePath', () => {
+  const copy = mappingFixtures.find(fixture => fixture.operation === 'copy')!
+  const objectForm: ValueNode = { op: 'copy', sourcePath: '$.source' }
+
+  const reopened = (value: ValueNode) =>
+    decompileConfig({ ...documentOf({ '$.target': value }), positions: {} }, fixtureSourceTree, copy.targetTree)
+
+  const savedAgain = (value: ValueNode) => {
+    const built = reopened(value)
+    return compileCanvas(built.nodes, built.edges).fields
+  }
+
+  it('builds an edge from the source field it names', () => {
+    const edge = reopened(objectForm).edges.find(e => e.target === TARGET_NODE_ID && e.targetHandle === '$.target')
+    expect(edge?.source).toBe(SOURCE_NODE_ID)
+    expect(edge?.sourceHandle).toBe('$.source')
+  })
+
+  it('means the same as the shorthand path once saved again', () => {
+    expect(savedAgain(objectForm)).toEqual(savedAgain('$.source'))
+    expect(savedAgain(objectForm)['$.target']).toBe('$.source')
   })
 })

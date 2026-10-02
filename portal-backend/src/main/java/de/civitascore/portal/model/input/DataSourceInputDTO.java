@@ -4,7 +4,6 @@ import de.civitascore.portal.model.connector.MqttConnectorConfiguration;
 import de.civitascore.portal.model.connector.SqlConnectorConfiguration;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
 import java.util.Map;
 import java.util.UUID;
 import lombok.Data;
@@ -13,13 +12,7 @@ import lombok.EqualsAndHashCode;
 /** Input DTO for creating and updating data source resources. */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class DataSourceInputDTO extends BaseDataEntityInputDTO {
-
-  @Schema(description = "Data source name (required)")
-  @NotBlank(message = "Name is required") private String name;
-
-  @Schema(description = "Data source description (required)")
-  @NotBlank(message = "Description is required") private String description;
+public class DataSourceInputDTO extends DataSourceMetaInputDTO {
 
   @Schema(description = "Type of connector (e.g. MQTT, SQL)")
   private ConnectorType connectorType;
@@ -31,7 +24,4 @@ public class DataSourceInputDTO extends BaseDataEntityInputDTO {
 
   @Schema(description = "ID of the data structure version to associate")
   private UUID dataStructureVersionId;
-
-  @Schema(description = "Datapool scope configuration. Defaults to ALL if omitted on create.")
-  private DatapoolScopeInputDTO datapoolScope;
 }

@@ -138,4 +138,13 @@ describe('FrostPanel', () => {
 
     expect(screen.queryByText('frostPanel.expects')).not.toBeInTheDocument()
   })
+
+  it('shows the fixed server name, the internal server and the version', () => {
+    renderPanel()
+
+    const valueOf = (label: string) => screen.getByText(label).nextElementSibling
+    expect(valueOf('frostPanel.serverName')).toHaveTextContent('Sensor Data Storage')
+    expect(valueOf('frostPanel.serverUrl')).toHaveTextContent('frostPanel.internalServer')
+    expect(valueOf('frostPanel.version')).toHaveTextContent('1.1')
+  })
 })

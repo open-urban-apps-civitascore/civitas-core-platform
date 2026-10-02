@@ -218,19 +218,19 @@ POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/unrelease
 
 **Request**
 ```
-PUT {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/released/meta
+PATCH {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/released/meta
 
 Content-Type: application/json
 
 {
-  "modelName": "UpdatedModelName",
-  "styles": {}
+  "description": "Updated version description"
 }
 ```
 
 **Expected Response**
 - Status: `200 OK`
 - Released version metadata is updated
+- `model`, `styles` or `modelName` in the body: `400 Bad Request`
 
 **System Impact**
 

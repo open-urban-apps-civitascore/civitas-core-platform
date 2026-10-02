@@ -43,6 +43,16 @@
     <revision>0.1.0</revision>
     <!-- Host baseline: portal-backend builds with Java 25 (portal-backend/pom.xml). -->
     <java.version>25</java.version>
+    <!-- Spring Boot 4.1.1 pins the legacy Jackson 2 line (jackson-2-bom) to 2.21.5,
+         which is vulnerable to CVE-2026-68497. Override until a Spring Boot patch
+         ships a fixed jackson-2-bom. Raised to 2.22.3 (from 2.21.6) for
+         CVE-2026-91776 and CVE-2026-91777, which also affect 2.21.6.
+         Kept in sync with portal-backend/pom.xml. -->
+    <jackson-2-bom.version>2.22.3</jackson-2-bom.version>
+    <!-- Same CVE also affects Spring Boot 4.1.1's default Jackson 3 line
+         (jackson-bom, pinned to 3.1.5). Override until a Spring Boot patch
+         ships a fixed jackson-bom. Kept in sync with portal-backend/pom.xml. -->
+    <jackson-bom.version>3.2.3</jackson-bom.version>
     <!-- Reproducible builds: identical inputs produce byte-identical artifacts -->
     <project.build.outputTimestamp>2026-06-12T00:00:00Z</project.build.outputTimestamp>
     <!-- SBOM generator version (review finding BUILD-5). Pinned here so the CI `sbom`
@@ -60,6 +70,21 @@
          affected by GHSA-9xv2-5v5q-p794, GHSA-gcx9-497g-6cp6 and GHSA-h3x4-894j-xpx5. -->
     <tomcat.version>11.0.26</tomcat.version>
   </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- jackson-annotations doesn't follow jackson-databind's patch versioning (only
+           coarse 2.21/2.22 releases exist). jackson-databind 2.22.3 (jackson-2-bom.version
+           above) needs a class (JsonApplyView) that isn't in jackson-annotations 2.21 —
+           the version jackson-databind 3.2.3's own transitive dependency resolves to.
+           Force 2.22 so both Jackson lines load cleanly. -->
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-annotations</artifactId>
+        <version>2.22</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <modules>
     <module>model-forge-contract</module>

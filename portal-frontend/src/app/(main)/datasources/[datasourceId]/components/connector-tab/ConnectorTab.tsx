@@ -19,10 +19,11 @@ interface ConnectorTabProps {
   form: UseFormReturn<DatasourceFormDraft>
   connectorType?: ConnectorType
   isReadOnly?: boolean
-  isConnectorLocked?: boolean
+  isDatasourceReleased?: boolean
 }
 export const ConnectorTab = (props: ConnectorTabProps) => {
-  const { form, connectorType, isReadOnly = false, isConnectorLocked = false } = props
+  const { form, connectorType, isReadOnly = false, isDatasourceReleased = false } = props
+  const isDisabled = isReadOnly || isDatasourceReleased
   const t = useTranslations('datasources.connectorTab')
   const connectorTypeOptions: SelectOption[] = Object.keys(CONNECTOR_INPUTS).map(type => ({
     value: type as ConnectorType,
@@ -30,11 +31,6 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
   }))
 
   const connectorConfig = useMemo(() => (connectorType ? CONNECTOR_INPUTS[connectorType] : []), [connectorType])
-
-  // A pipeline that already reads from this data source pins its connector — the backend refuses a
-  // connector type or configuration change with 400 (see validateInUseConstraints in
-  // DataSourceService). Lock the fields here so the change is refused before the user types it.
-  const isLocked = isReadOnly || isConnectorLocked
 
   // Cross-field re-validation (e.g. MQTT's `tls` <-> `urls` scheme check) is declared once per
   // connector type in CONNECTOR_FIELD_REVALIDATION_RULES, colocated with the schema that owns the
@@ -67,12 +63,11 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
 
   return (
     <div>
-      {isConnectorLocked && !isReadOnly && (
+      {isDatasourceReleased && !isReadOnly && (
         <div className="mb-6">
-          <InfoBox text={t('inUseHint')} />
+          <InfoBox text={t('availableInfo')} />
         </div>
       )}
-
       <ContentCard className={cn('h-full overflow-auto mb-6')} footerElement={<FooterElement />}>
         <SubHeader title={t('title1')} className="pb-4  border-b-1" />
 
@@ -85,7 +80,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
           placeholder={t('typePlaceholder')}
           formItemProps={{ className: 'py-6' }}
           required
-          disabled={isLocked}
+          disabled={isDisabled}
         />
       </ContentCard>
 
@@ -106,7 +101,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
               shouldShowErrors
               required={property.required}
               className="py-3"
-              disabled={isLocked}
+              disabled={isDisabled}
             />
           ))}
         </ContentCard>

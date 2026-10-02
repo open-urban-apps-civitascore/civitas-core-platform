@@ -175,7 +175,7 @@ mock_pool_split(req) := {"status_code": 200, "body": {"poolId": "pool-a"}} if {
 test_and_permission_split_across_pools_denied if {
 	result := authz.decision with http.send as mock_pool_split
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/ds-99/released/meta")
+		with input as portal_request("PATCH", "/v1/datasets/ds-99/released/meta")
 	result.allow == false
 	result.reason == "permission_denied"
 }

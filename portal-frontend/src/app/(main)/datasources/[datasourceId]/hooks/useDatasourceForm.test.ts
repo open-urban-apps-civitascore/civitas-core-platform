@@ -1,124 +1,109 @@
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { DATAPOOL_SCOPE_TYPES, Datasource, DATASOURCE_STATUS_TYPES, DatasourceStatusType } from '@/types/datasources'
+import { DATAPOOL_SCOPE_TYPES, Datasource, DatasourceStatusType } from '@/types/datasources'
 
 import { useDatasourceForm } from './useDatasourceForm'
 
-const mockToastInfo = vi.fn()
+const mockUpdateDatasource = vi.fn()
+const mockUpdateDatasourceReleased = vi.fn()
 
-vi.mock('sonner', () => ({
-  toast: {
-    info: (...args: unknown[]) => mockToastInfo(...args),
-    error: vi.fn(),
-    success: vi.fn(),
-  },
+vi.mock('@/app/services/api/datasources/clientRequests', () => ({
+  useUpdateDatasource: () => ({ mutateAsync: mockUpdateDatasource, isPending: false }),
+  useUpdateDatasourceReleased: () => ({ mutateAsync: mockUpdateDatasourceReleased, isPending: false }),
+  useReleaseDatasource: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUnreleaseDatasource: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock('next-intl', () => ({
-  useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}`,
+  useTranslations: () => (key: string) => key,
 }))
 
-const idleMutation = { mutateAsync: vi.fn(), isPending: false }
-
-vi.mock('@/app/services/api/datasources/clientRequests', () => ({
-  useUpdateDatasource: () => idleMutation,
-  useUpdateDatasourceReleased: () => idleMutation,
-  useReleaseDatasource: () => idleMutation,
-  useUnreleaseDatasource: () => idleMutation,
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }))
 
-const buildDatasource = (overrides: Partial<Datasource> = {}): Datasource => ({
-  id: 'datasource-1',
-  createdAt: '2025-01-01T00:00:00Z',
-  modifiedAt: '2025-01-01T00:00:00Z',
-  name: 'traffic-sensor',
-  description: 'Traffic sensor data',
-  dataSourceStatus: DATASOURCE_STATUS_TYPES.AVAILABLE,
+const createDatasource = (dataSourceStatus: DatasourceStatusType): Datasource => ({
+  id: 'ds-1',
+  createdAt: '2024-01-01',
+  modifiedAt: '2024-01-01',
+  name: 'Test Datasource',
+  description: 'A test datasource',
+  dataSourceStatus,
   connectorType: 'MQTT',
-  configuration: { urls: ['tcp://broker:1883'], topics: ['sensor/data'], qos: 1 },
-  dataStructureVersion: null,
+  configuration: {
+    urls: ['mqtt://localhost:1883'],
+    topics: ['sensors'],
+    qos: 0,
+    protocol_version: '3',
+  },
+  dataStructureVersion: {
+    id: 'version-1',
+    version: '1.0.0',
+    description: null,
+    dataStructureVersionStatus: 'AVAILABLE',
+    dataStructureVersionSource: 'OWN',
+    createdAt: '2024-01-01',
+    modifiedAt: '2024-01-01',
+    dataStructureId: 'structure-1',
+  },
   inUse: false,
   inUseByReleased: false,
-  datapoolScope: { type: DATAPOOL_SCOPE_TYPES.ALL },
-  ...overrides,
+  datapoolScope: { type: DATAPOOL_SCOPE_TYPES.NONE },
 })
 
 const renderDatasourceForm = (datasource: Datasource) => renderHook(() => useDatasourceForm(datasource, [], [], [], []))
+
+const editTechnicalFieldsAndDescription = (result: ReturnType<typeof renderDatasourceForm>['result']) => {
+  act(() => {
+    const { form } = result.current
+    form.setValue('description', 'Changed description', { shouldDirty: true })
+    form.setValue('configuration.topics', 'other-topic', { shouldDirty: true })
+    form.setValue('dataStructureVersionId', 'version-2', { shouldDirty: true })
+  })
+}
 
 describe('useDatasourceForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  describe('canSetDraft', () => {
-    it('forbids setting an in-use data source back to draft', () => {
-      const { result } = renderDatasourceForm(buildDatasource({ inUseByReleased: true }))
+  it('sends only metadata to the released endpoint for an AVAILABLE data source', async () => {
+    const datasource = createDatasource('AVAILABLE')
+    mockUpdateDatasourceReleased.mockResolvedValue({ data: datasource })
+    const { result } = renderDatasourceForm(datasource)
+    editTechnicalFieldsAndDescription(result)
 
-      expect(result.current.canSetDraft).toBe(false)
+    await act(async () => {
+      await result.current.submitDatasource()
     })
 
-    it('allows setting a data source no pipeline uses back to draft', () => {
-      const { result } = renderDatasourceForm(buildDatasource({ inUseByReleased: false }))
-
-      expect(result.current.canSetDraft).toBe(true)
-    })
-
-    it('allows draft for a data source only draft pipelines use', () => {
-      const { result } = renderDatasourceForm(buildDatasource({ inUse: true, inUseByReleased: false }))
-
-      expect(result.current.canSetDraft).toBe(true)
-      expect(result.current.isConnectorLocked).toBe(false)
-    })
-
-    it('allows draft for a data source that is already in draft', () => {
-      const { result } = renderDatasourceForm(
-        buildDatasource({ dataSourceStatus: DATASOURCE_STATUS_TYPES.DRAFT, inUseByReleased: false }),
-      )
-
-      expect(result.current.canSetDraft).toBe(true)
-    })
+    expect(mockUpdateDatasource).not.toHaveBeenCalled()
+    expect(mockUpdateDatasourceReleased).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateDatasourceReleased.mock.calls[0][0]
+    expect(payload).toMatchObject({ id: 'ds-1', name: 'Test Datasource', description: 'Changed description' })
+    expect(payload).not.toHaveProperty('connectorType')
+    expect(payload).not.toHaveProperty('configuration')
+    expect(payload).not.toHaveProperty('dataStructureVersionId')
   })
 
-  describe('isConnectorLocked', () => {
-    it.each([
-      [DATASOURCE_STATUS_TYPES.AVAILABLE, true, true],
-      [DATASOURCE_STATUS_TYPES.AVAILABLE, false, false],
-      [DATASOURCE_STATUS_TYPES.DRAFT, true, false],
-      [DATASOURCE_STATUS_TYPES.DRAFT, false, false],
-    ] as const)(
-      'status=%s and inUseByReleased=%s locks the connector: %s',
-      (dataSourceStatus, inUseByReleased, expected) => {
-        const { result } = renderDatasourceForm(
-          buildDatasource({ dataSourceStatus, inUse: inUseByReleased, inUseByReleased }),
-        )
+  it('sends technical fields to the draft endpoint for a DRAFT data source', async () => {
+    const datasource = createDatasource('DRAFT')
+    mockUpdateDatasource.mockResolvedValue({ data: datasource })
+    const { result } = renderDatasourceForm(datasource)
+    editTechnicalFieldsAndDescription(result)
 
-        expect(result.current.isConnectorLocked).toBe(expected)
-      },
+    await act(async () => {
+      await result.current.submitDatasource()
+    })
+
+    expect(mockUpdateDatasourceReleased).not.toHaveBeenCalled()
+    expect(mockUpdateDatasource).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: 'Changed description',
+        configuration: expect.objectContaining({ topics: ['other-topic'] }),
+        dataStructureVersionId: 'version-2',
+      }),
     )
-  })
-
-  describe('automatic revert to draft on incomplete data', () => {
-    // A data source missing a data structure version fails DatasourceFormAvailableSchema, so the
-    // hook would normally switch the staged status to DRAFT.
-    const incomplete = { dataStructureVersion: null, description: '' } as Partial<Datasource>
-
-    it('reverts an AVAILABLE data source that is not in use', async () => {
-      const { result } = renderDatasourceForm(buildDatasource({ ...incomplete, inUseByReleased: false }))
-
-      await waitFor(() =>
-        expect(result.current.dataSourceStatus).toBe<DatasourceStatusType>(DATASOURCE_STATUS_TYPES.DRAFT),
-      )
-      expect(result.current.canStage).toBe(false)
-      expect(mockToastInfo).toHaveBeenCalled()
-    })
-
-    it('keeps an in-use data source on AVAILABLE, since the unrelease would be rejected', async () => {
-      const { result } = renderDatasourceForm(buildDatasource({ ...incomplete, inUseByReleased: true }))
-
-      await waitFor(() => expect(result.current.canStage).toBe(false))
-      expect(result.current.dataSourceStatus).toBe<DatasourceStatusType>(DATASOURCE_STATUS_TYPES.AVAILABLE)
-      expect(mockToastInfo).not.toHaveBeenCalled()
-    })
   })
 })

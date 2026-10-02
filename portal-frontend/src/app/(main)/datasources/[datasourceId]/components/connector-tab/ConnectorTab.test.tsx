@@ -105,7 +105,11 @@ const defaultValues: DatasourceFormDraft = {
   },
 }
 
-const renderConnectorTab = (values?: Partial<DatasourceFormDraft>, isReadOnly = false, isConnectorLocked = false) => {
+const renderConnectorTab = (
+  values?: Partial<DatasourceFormDraft>,
+  isReadOnly = false,
+  isDatasourceReleased = false,
+) => {
   const merged = { ...defaultValues, ...values }
   const Wrapper = () => {
     const form = useForm<DatasourceFormDraft>({
@@ -119,7 +123,7 @@ const renderConnectorTab = (values?: Partial<DatasourceFormDraft>, isReadOnly = 
           form={form}
           connectorType={merged.connectorType}
           isReadOnly={isReadOnly}
-          isConnectorLocked={isConnectorLocked}
+          isDatasourceReleased={isDatasourceReleased}
         />
       </Form>
     )
@@ -298,35 +302,22 @@ describe('ConnectorTab (integration)', () => {
     })
   })
 
-  describe('Connector locked (in use and released)', () => {
-    // The backend refuses a connector change on an in-use data source with 400, and the form only
-    // surfaces a generic update error. The fields stay locked so the rejection never happens.
-    it('locks the connector type and the configuration fields', () => {
+  describe('Released data source', () => {
+    it('disables the connector type and all configuration fields in edit mode', () => {
       renderConnectorTab(undefined, false, true)
-
       expect(screen.getByTestId('connectorTypeSelectTrigger')).toBeDisabled()
       expect(screen.getByLabelText(/URLs/)).toBeDisabled()
       expect(screen.getByRole('checkbox')).toBeDisabled()
     })
 
-    it('explains why the fields are locked', () => {
+    it('shows the released info in edit mode', () => {
       renderConnectorTab(undefined, false, true)
-
-      expect(screen.getByText('inUseHint')).toBeInTheDocument()
+      expect(screen.getByText('availableInfo')).toBeInTheDocument()
     })
 
-    it('does not repeat the hint in read-only mode, where nothing is editable anyway', () => {
-      renderConnectorTab(undefined, true, true)
-
-      expect(screen.queryByText('inUseHint')).not.toBeInTheDocument()
-    })
-
-    it('leaves the fields editable for a data source no pipeline uses', () => {
+    it('shows no released info for a draft data source', () => {
       renderConnectorTab(undefined, false, false)
-
-      expect(screen.getByTestId('connectorTypeSelectTrigger')).not.toBeDisabled()
-      expect(screen.getByLabelText(/URLs/)).not.toBeDisabled()
-      expect(screen.queryByText('inUseHint')).not.toBeInTheDocument()
+      expect(screen.queryByText('availableInfo')).not.toBeInTheDocument()
     })
   })
 })

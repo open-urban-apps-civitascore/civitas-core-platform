@@ -23,7 +23,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // The schemas are the SSOT and live with model-forge-runtime; the frontend reads them from there.
@@ -359,11 +359,24 @@ class ModuleGenerator {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-mkdirSync(OUT_DIR, { recursive: true });
+/** Generates one module per schema. Returns the emitted code keyed by output filename. */
+export function generateCoreTypes() {
+  const modules = {};
+  for (const { file, name, out } of SCHEMAS) {
+    const schema = JSON.parse(readFileSync(join(SCHEMA_DIR, file), "utf-8"));
+    modules[out] = new ModuleGenerator(schema, name, CROSS_MODULE_IMPORTS[name] ?? []).generate();
+  }
+  return modules;
+}
 
-for (const { file, name, out } of SCHEMAS) {
-  const schema = JSON.parse(readFileSync(join(SCHEMA_DIR, file), "utf-8"));
-  const code   = new ModuleGenerator(schema, name, CROSS_MODULE_IMPORTS[name] ?? []).generate();
-  writeFileSync(join(OUT_DIR, out), code, "utf-8");
-  console.log(`✓  ${file.padEnd(40)} → src/generated/core/${out}`);
+export { OUT_DIR, SCHEMAS };
+
+// Only write when run as a script; importing must not overwrite src/generated/core/.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  mkdirSync(OUT_DIR, { recursive: true });
+  const modules = generateCoreTypes();
+  for (const { file, out } of SCHEMAS) {
+    writeFileSync(join(OUT_DIR, out), modules[out], "utf-8");
+    console.log(`✓  ${file.padEnd(40)} → src/generated/core/${out}`);
+  }
 }

@@ -1,4 +1,8 @@
+import { act, render, screen } from '@testing-library/react'
+import { toast, Toaster } from 'sonner'
 import { describe, expect, it, vi } from 'vitest'
+
+import { MARKUP_NAME } from '@/test-support/markup'
 
 import { rootFailureMessage } from './rootFailureMessage'
 import type { RootResolutionFailure } from './umlContainment'
@@ -31,5 +35,16 @@ describe('rootFailureMessage', () => {
     rootFailureMessage(t, failure)
 
     expect(t).toHaveBeenCalledWith('rootValidation.misdirected', { name1: 'Gamma', name2: 'Delta' })
+  })
+
+  it('shows class names with markup characters of an ambiguous root as text in the toast', async () => {
+    const { container } = render(<Toaster />)
+
+    act(() => {
+      toast.error(rootFailureMessage(translator(), { code: 'ambiguousRoot', candidateNames: [MARKUP_NAME, 'Sensor'] }))
+    })
+
+    expect(await screen.findByText(MARKUP_NAME, { exact: false })).toBeInTheDocument()
+    expect(container.querySelector('img')).toBeNull()
   })
 })

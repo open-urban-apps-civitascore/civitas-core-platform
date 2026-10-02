@@ -12,8 +12,10 @@ import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.RoleType;
+import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
@@ -22,6 +24,7 @@ import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.DataSetMetaInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentScopedInputDTO;
 import de.civitascore.portal.model.input.validation.NamedApiAllowedSlugValidator;
@@ -34,6 +37,7 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.repository.UserRepository;
+import de.civitascore.portal.security.AllowedScopesFilter;
 import de.civitascore.portal.service.DataSetService;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
@@ -46,6 +50,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -1160,7 +1165,7 @@ class DataSetControllerIntegrationTest
       List<UUID> originalPipelineIds =
           dataSet.getPipelines().stream().map(Pipeline::getId).toList();
 
-      DataSetInputDTO updateInput = new DataSetInputDTO();
+      DataSetMetaInputDTO updateInput = new DataSetMetaInputDTO();
       updateInput.setName("Updated Released Dataset");
       updateInput.setDescription("Updated description for released dataset");
       updateInput.setOpenDataAccess(false);
@@ -1168,7 +1173,7 @@ class DataSetControllerIntegrationTest
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + dataSetId + "/released/meta",
-              org.springframework.http.HttpMethod.PUT,
+              org.springframework.http.HttpMethod.PATCH,
               createAuthHeaders(),
               updateInput,
               getOutputTypeReference());
@@ -1193,6 +1198,32 @@ class DataSetControllerIntegrationTest
           .extracting(PipelineSummaryDTO::getId)
           .containsExactlyInAnyOrderElementsOf(originalPipelineIds);
       assertThat(output.getDataSetStatus()).as("Status should remain unchanged").isEqualTo(status);
+    }
+
+    @Test
+    @DisplayName("Should keep omitted fields when patching released dataset metadata")
+    void shouldKeepOmittedFieldsWhenPatchingReleasedMeta() {
+      // Without this test an omitted openDataAccess could fall back to its input default and close
+      // an open dataset.
+      DataSet dataSet = createDataSetWithRelationships();
+      dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+      dataSet.setOpenDataAccess(true);
+      dataSet = dataSetRepository.save(dataSet);
+
+      ResponseEntity<DataSetOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + dataSet.getId() + "/released/meta",
+              org.springframework.http.HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("name", "Renamed Released Dataset"),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      DataSetOutputDTO output = response.getBody();
+      assertThat(output).isNotNull();
+      assertThat(output.getName()).isEqualTo("Renamed Released Dataset");
+      assertThat(output.getDescription()).isEqualTo("Test dataset with pipelines");
+      assertThat(output.getOpenDataAccess()).isTrue();
     }
 
     private UUID createTestGroup() {
@@ -1238,7 +1269,7 @@ class DataSetControllerIntegrationTest
       replacementAssignment.setGroupId(groupId2);
       replacementAssignment.setRoleId(roleId);
 
-      DataSetInputDTO releasedUpdateInput = new DataSetInputDTO();
+      DataSetMetaInputDTO releasedUpdateInput = new DataSetMetaInputDTO();
       releasedUpdateInput.setName("Updated Released Dataset With New Assignment");
       releasedUpdateInput.setDescription("Updated description for released dataset");
       releasedUpdateInput.setOpenDataAccess(false);
@@ -1247,7 +1278,7 @@ class DataSetControllerIntegrationTest
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + dataSetId + "/released/meta",
-              org.springframework.http.HttpMethod.PUT,
+              org.springframework.http.HttpMethod.PATCH,
               createAuthHeaders(),
               releasedUpdateInput,
               getOutputTypeReference());
@@ -1277,7 +1308,7 @@ class DataSetControllerIntegrationTest
     void shouldFailToUpdateDraftDataSetViaReleasedEndpoint() {
       UUID dataSetId = createTestEntity();
 
-      DataSetInputDTO updateInput = new DataSetInputDTO();
+      DataSetMetaInputDTO updateInput = new DataSetMetaInputDTO();
       updateInput.setName("Updated Name");
       updateInput.setDescription("Updated description");
       updateInput.setOpenDataAccess(false);
@@ -1285,7 +1316,7 @@ class DataSetControllerIntegrationTest
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + dataSetId + "/released/meta",
-              org.springframework.http.HttpMethod.PUT,
+              org.springframework.http.HttpMethod.PATCH,
               createAuthHeaders(),
               updateInput,
               getOutputTypeReference());
@@ -1316,7 +1347,7 @@ class DataSetControllerIntegrationTest
       List<UUID> originalPipelineIds =
           dataSet.getPipelines().stream().map(Pipeline::getId).toList();
 
-      DataSetInputDTO updateInput = new DataSetInputDTO();
+      DataSetMetaInputDTO updateInput = new DataSetMetaInputDTO();
       updateInput.setName("Updated Ready Dataset");
       updateInput.setDescription("Updated description for ready dataset");
       updateInput.setOpenDataAccess(false);
@@ -1324,7 +1355,7 @@ class DataSetControllerIntegrationTest
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + dataSetId + "/ready/meta",
-              org.springframework.http.HttpMethod.PUT,
+              org.springframework.http.HttpMethod.PATCH,
               createAuthHeaders(),
               updateInput,
               getOutputTypeReference());
@@ -1357,14 +1388,14 @@ class DataSetControllerIntegrationTest
       UUID dataSetId = dataSet.getId();
       String originalName = dataSet.getName();
 
-      DataSetInputDTO updateInput = new DataSetInputDTO();
+      DataSetMetaInputDTO updateInput = new DataSetMetaInputDTO();
       updateInput.setName("Updated While Saga Runs");
       updateInput.setDescription("a description");
 
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(
               getEndpointPath() + "/" + dataSetId + "/ready/meta",
-              org.springframework.http.HttpMethod.PUT,
+              org.springframework.http.HttpMethod.PATCH,
               createAuthHeaders(),
               updateInput);
 
@@ -1390,7 +1421,7 @@ class DataSetControllerIntegrationTest
       UUID dataSetId = dataSet.getId();
       String originalName = dataSet.getName();
 
-      DataSetInputDTO updateInput = new DataSetInputDTO();
+      DataSetMetaInputDTO updateInput = new DataSetMetaInputDTO();
       updateInput.setName("Updated Name");
       updateInput.setDescription("Updated description");
       updateInput.setOpenDataAccess(false);
@@ -1398,7 +1429,7 @@ class DataSetControllerIntegrationTest
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + dataSetId + "/ready/meta",
-              org.springframework.http.HttpMethod.PUT,
+              org.springframework.http.HttpMethod.PATCH,
               createAuthHeaders(),
               updateInput,
               getOutputTypeReference());
@@ -1416,33 +1447,38 @@ class DataSetControllerIntegrationTest
           .isEqualTo(status);
     }
 
-    @Test
-    @DisplayName("Should reject namedApis on /ready/meta endpoint")
-    void shouldRejectNamedApisViaReadyEndpoint() {
+    @ParameterizedTest
+    @CsvSource({"ready/meta, READY", "released/meta, AVAILABLE"})
+    @DisplayName(
+        "Should reject namedApis on the metadata endpoints and leave the dataset unchanged")
+    void shouldRejectNamedApisViaMetaEndpoints(String endpoint, DataSetStatus status) {
       DataSet dataSet = createDataSetWithRelationships();
-      dataSet.setDataSetStatus(DataSetStatus.READY);
+      dataSet.setDataSetStatus(status);
       dataSet = dataSetRepository.save(dataSet);
       UUID dataSetId = dataSet.getId();
+      String originalName = dataSet.getName();
 
-      DataSetInputDTO updateInput = new DataSetInputDTO();
-      updateInput.setName("Updated Ready Dataset");
-      updateInput.setDescription("Updated description");
-      updateInput.setNamedApis(List.of(namedApi("Traffic", "traffic", ApiStandard.STA, null)));
+      Map<String, Object> patch =
+          Map.of(
+              "name",
+              "Updated Dataset",
+              "namedApis",
+              List.of(namedApi("Traffic", "traffic", ApiStandard.STA, null)));
 
-      ResponseEntity<DataSetOutputDTO> response =
-          exchange(
-              getEndpointPath() + "/" + dataSetId + "/ready/meta",
-              org.springframework.http.HttpMethod.PUT,
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSetId + "/" + endpoint,
+              org.springframework.http.HttpMethod.PATCH,
               createAuthHeaders(),
-              updateInput,
-              getOutputTypeReference());
+              patch);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-
-      DataSet unchangedDataSet = dataSetRepository.findById(dataSetId).orElseThrow();
-      assertThat(unchangedDataSet.getName())
-          .as("The rejection must happen before anything is persisted")
-          .doesNotContain("Updated");
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail()).contains("namedApis");
+      DataSetOutputDTO unchanged = performGetById(dataSetId).getBody();
+      assertThat(unchanged).isNotNull();
+      assertThat(unchanged.getName()).isEqualTo(originalName);
+      assertThat(unchanged.getNamedApis()).isEmpty();
     }
 
     @Test
@@ -1471,7 +1507,7 @@ class DataSetControllerIntegrationTest
       replacementAssignment.setGroupId(groupId2);
       replacementAssignment.setRoleId(roleId);
 
-      DataSetInputDTO readyUpdateInput = new DataSetInputDTO();
+      DataSetMetaInputDTO readyUpdateInput = new DataSetMetaInputDTO();
       readyUpdateInput.setName("Updated Ready Dataset With New Assignment");
       readyUpdateInput.setDescription("Updated description for ready dataset");
       readyUpdateInput.setAssignments(Set.of(replacementAssignment));
@@ -1479,7 +1515,7 @@ class DataSetControllerIntegrationTest
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
               getEndpointPath() + "/" + dataSetId + "/ready/meta",
-              org.springframework.http.HttpMethod.PUT,
+              org.springframework.http.HttpMethod.PATCH,
               createAuthHeaders(),
               readyUpdateInput,
               getOutputTypeReference());
@@ -1643,6 +1679,149 @@ class DataSetControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
+    }
+  }
+
+  @Nested
+  @DisplayName("Metadata Patch DataPool Tests")
+  class MetaPatchDataPoolTests {
+
+    private DataPool pool;
+    private DataPool otherPool;
+
+    private DataSet dataSetInPool(DataSetStatus status) {
+      pool = portalData.dataPool();
+      otherPool = portalData.dataPool();
+      return portalData.dataSet(b -> b.dataPool(pool).dataSetStatus(status));
+    }
+
+    private ResponseEntity<DataSetOutputDTO> patchMeta(
+        UUID dataSetId, String endpoint, Map<String, Object> patch) {
+      return exchange(
+          getEndpointPath() + "/" + dataSetId + "/" + endpoint,
+          HttpMethod.PATCH,
+          createAuthHeaders(),
+          patch,
+          getOutputTypeReference());
+    }
+
+    private UUID storedPoolId(UUID dataSetId) {
+      DataSetOutputDTO stored = performGetById(dataSetId).getBody();
+      assertThat(stored).isNotNull();
+      return stored.getDatapool() == null ? null : stored.getDatapool().getId();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ready/meta, READY", "released/meta, AVAILABLE"})
+    @DisplayName("Should keep the data pool when a metadata patch omits datapoolId")
+    void patchMeta_whenDatapoolIdOmitted_shouldKeepPool(String endpoint, DataSetStatus status) {
+      DataSet dataSet = dataSetInPool(status);
+
+      ResponseEntity<DataSetOutputDTO> response =
+          patchMeta(dataSet.getId(), endpoint, Map.of("name", "Renamed Pooled Dataset"));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      DataSetOutputDTO stored = performGetById(dataSet.getId()).getBody();
+      assertThat(stored).isNotNull();
+      assertThat(stored.getName()).isEqualTo("Renamed Pooled Dataset");
+      assertThat(stored.getDatapool()).isNotNull();
+      assertThat(stored.getDatapool().getId()).isEqualTo(pool.getId());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ready/meta, READY", "released/meta, AVAILABLE"})
+    @DisplayName("Should move the dataset to the data pool a metadata patch names")
+    void patchMeta_whenDatapoolIdChanged_shouldMoveToNewPool(
+        String endpoint, DataSetStatus status) {
+      DataSet dataSet = dataSetInPool(status);
+
+      ResponseEntity<DataSetOutputDTO> response =
+          patchMeta(dataSet.getId(), endpoint, Map.of("datapoolId", otherPool.getId()));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(storedPoolId(dataSet.getId())).isEqualTo(otherPool.getId());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ready/meta, READY", "released/meta, AVAILABLE"})
+    @DisplayName("Should clear the data pool when a metadata patch sends datapoolId null")
+    void patchMeta_whenDatapoolIdNull_shouldClearPool(String endpoint, DataSetStatus status) {
+      DataSet dataSet = dataSetInPool(status);
+      Map<String, Object> patch = new HashMap<>();
+      patch.put("datapoolId", null);
+
+      ResponseEntity<DataSetOutputDTO> response = patchMeta(dataSet.getId(), endpoint, patch);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(storedPoolId(dataSet.getId())).isNull();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ready/meta, READY", "released/meta, AVAILABLE"})
+    @DisplayName("Should reject a metadata patch with a malformed datapoolId and keep the pool")
+    void patchMeta_whenDatapoolIdMalformed_shouldRejectAndKeepPool(
+        String endpoint, DataSetStatus status) {
+      DataSet dataSet = dataSetInPool(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSet.getId() + "/" + endpoint,
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("datapoolId", "abc"));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDetail()).contains("/datapoolId");
+      assertThat(storedPoolId(dataSet.getId())).isEqualTo(pool.getId());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ready/meta, READY", "released/meta, AVAILABLE"})
+    @DisplayName("Should reject a move to a data pool the caller may not use and keep the pool")
+    void patchMeta_whenTargetPoolNotAllowed_shouldRejectAndKeepPool(
+        String endpoint, DataSetStatus status) {
+      DataSet dataSet = dataSetInPool(status);
+      HttpHeaders poolOnlyHeaders =
+          withHeaders(
+              h -> {
+                h.set(AllowedScopesFilter.HEADER_NAME, "");
+                h.set(AllowedScopesFilter.HEADER_NAME_POOL, pool.getId().toString());
+              });
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSet.getId() + "/" + endpoint,
+              HttpMethod.PATCH,
+              poolOnlyHeaders,
+              Map.of("datapoolId", otherPool.getId()));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+      assertThat(storedPoolId(dataSet.getId())).isEqualTo(pool.getId());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ready/meta, READY", "released/meta, AVAILABLE"})
+    @DisplayName("Should reject a move that leaves a pipeline data source out of scope")
+    void patchMeta_whenDataSourceOutOfScopeForTargetPool_shouldRejectAndKeepPool(
+        String endpoint, DataSetStatus status) {
+      DataSet dataSet = dataSetInPool(status);
+      DataSource poolConfinedSource =
+          portalData.dataSource(
+              b -> b.datapoolScopeType(DatapoolScopeType.SPECIFIC).scopedDataPools(Set.of(pool)));
+      portalData.pipeline(dataSet, b -> b.dataSources(Set.of(poolConfinedSource)));
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + dataSet.getId() + "/" + endpoint,
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("datapoolId", otherPool.getId()));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getProperties()).containsKey("offendingDataSourceIds");
+      assertThat(storedPoolId(dataSet.getId())).isEqualTo(pool.getId());
     }
   }
 

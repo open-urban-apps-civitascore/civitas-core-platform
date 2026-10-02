@@ -2,11 +2,13 @@ package de.civitascore.portal.controller;
 
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
+import de.civitascore.portal.model.input.DataStructureVersionMetaInputDTO;
 import de.civitascore.portal.model.output.DataStructureVersionOutputDTO;
 import de.civitascore.portal.model.output.assembler.DataStructureVersionAssembler;
 import de.civitascore.portal.repository.specification.DataStructureVersionSpec;
 import de.civitascore.portal.service.DataStructureVersionService;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -25,9 +27,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -107,7 +109,7 @@ public class DataStructureVersionController
   @GetMapping("/{id}")
   @Operation(operationId = "getDataStructureVersion", summary = "Get data structure version by ID")
   public ResponseEntity<DataStructureVersionOutputDTO> getById(@PathVariable UUID id) {
-    DataStructureVersion entity = getService().findByIdOrThrow(id);
+    DataStructureVersion entity = requireOwnedByPathDataStructure(id);
     return ResponseEntity.ok(getAssembler().toOutput(entity));
   }
 
@@ -125,6 +127,7 @@ public class DataStructureVersionController
       summary = "Partially update a data structure version")
   public ResponseEntity<DataStructureVersionOutputDTO> patch(
       @PathVariable UUID id, @RequestBody JsonNode updates) throws IOException {
+    requireOwnedByPathDataStructure(id);
     return super.patch(id, updates);
   }
 
@@ -138,6 +141,7 @@ public class DataStructureVersionController
       operationId = "deleteDataStructureVersion",
       summary = "Delete a data structure version")
   public void delete(@PathVariable UUID id) {
+    requireOwnedByPathDataStructure(id);
     super.delete(id);
   }
 
@@ -175,36 +179,36 @@ public class DataStructureVersionController
       summary = "Replace a data structure version")
   public ResponseEntity<DataStructureVersionOutputDTO> update(
       @PathVariable UUID id, @Valid @RequestBody DataStructureVersionInputDTO input) {
+    requireOwnedByPathDataStructure(id);
     DataStructureVersionInputDTO preProcessedInput = preProcessInput(input);
     DataStructureVersion updated = getService().update(id, preProcessedInput);
     return ResponseEntity.ok(getAssembler().toOutput(updated));
   }
 
   /**
-   * Updates the metadata of a released data structure version.
+   * Applies a JSON merge patch to the metadata of a released data structure version.
    *
    * @param dataStructureId the UUID of the parent data structure
    * @param versionId the UUID of the released version
-   * @param input the validated version input DTO containing updated metadata
+   * @param updates the JSON node containing the metadata fields to update
    * @return the updated version output DTO with HTTP 200 status
    */
-  @PutMapping("/{versionId}/released/meta")
+  @PatchMapping("/{versionId}/released/meta")
   @Operation(
       operationId = "updateDataStructureVersionReleasedMeta",
       summary = "Update metadata of a released data structure version",
       description =
-          "Updates a released data structure version (AVAILABLE status). If the version is not in"
-              + " use by a DataSource or a DataSink, the model and styles can be replaced and the"
-              + " request must carry a model — it cannot be cleared. If the version is in use, only"
-              + " description and modelName can be changed. The version number is never a client"
-              + " input: replacing the model is an edit, so it stores a new registry version one"
-              + " minor above the current one, and the assigned number is returned. For DRAFT"
-              + " versions, use PUT"
+          "Applies a JSON merge patch to the description of a released data structure version"
+              + " (AVAILABLE status). An omitted field keeps its value. The description is the only"
+              + " field of a released version that can change; a request that contains any other"
+              + " field answers 400. For DRAFT versions, use PATCH"
               + " /datastructures/{dataStructureId}/versions/{versionId} instead.")
   @ApiResponse(responseCode = "200", description = "Released version metadata updated successfully")
   @ApiResponse(
       responseCode = "400",
-      description = "Invalid input (e.g. version is DRAFT)",
+      description =
+          "Invalid input (e.g. version is DRAFT, or the request contains a field other than"
+              + " description)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @ApiResponse(
       responseCode = "404",
@@ -214,13 +218,18 @@ public class DataStructureVersionController
       responseCode = "409",
       description = "Conflict (e.g. unique constraint violation)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content = @Content(schema = @Schema(implementation = DataStructureVersionMetaInputDTO.class)))
   public ResponseEntity<DataStructureVersionOutputDTO> updateReleasedMeta(
       @PathVariable UUID dataStructureId,
       @PathVariable UUID versionId,
-      @Valid @RequestBody DataStructureVersionInputDTO input) {
-    DataStructureVersionInputDTO preProcessedInput = preProcessInput(input);
+      @RequestBody JsonNode updates) {
+    DataStructureVersionMetaInputDTO current =
+        dataStructureVersionService.toMetaInput(
+            requireOwnedByDataStructure(dataStructureId, versionId));
     DataStructureVersion updated =
-        dataStructureVersionService.updateReleasedMeta(versionId, preProcessedInput);
+        dataStructureVersionService.updateReleasedMeta(
+            versionId, mergePatch(versionId, current, updates));
     return ResponseEntity.ok(dataStructureVersionAssembler.toOutput(updated));
   }
 
@@ -249,6 +258,7 @@ public class DataStructureVersionController
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataStructureVersionOutputDTO> releaseDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
+    requireOwnedByDataStructure(dataStructureId, versionId);
     DataStructureVersion released = dataStructureVersionService.release(versionId);
     return ResponseEntity.ok(dataStructureVersionAssembler.toOutput(released));
   }
@@ -283,7 +293,30 @@ public class DataStructureVersionController
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataStructureVersionOutputDTO> unreleaseDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
+    requireOwnedByDataStructure(dataStructureId, versionId);
     DataStructureVersion unreleased = dataStructureVersionService.unrelease(versionId);
     return ResponseEntity.ok(dataStructureVersionAssembler.toOutput(unreleased));
+  }
+
+  private DataStructureVersion requireOwnedByPathDataStructure(UUID versionId) {
+    return requireOwnedByDataStructure(
+        extractUUIDFromPathVariable("dataStructureId", DataStructureVersion.class), versionId);
+  }
+
+  /**
+   * Verifies the version belongs to the data structure named in the path. OPA authorizes these
+   * routes against the path's data structure only, so a foreign version must look like an unknown
+   * one.
+   *
+   * @return the addressed version
+   * @throws ResourceNotFoundException if the version does not exist or belongs to another data
+   *     structure
+   */
+  private DataStructureVersion requireOwnedByDataStructure(UUID dataStructureId, UUID versionId) {
+    DataStructureVersion version = dataStructureVersionService.findByIdOrThrow(versionId);
+    if (!dataStructureId.equals(version.getDataStructure().getId())) {
+      throw new ResourceNotFoundException(DataStructureVersion.class.getSimpleName(), versionId);
+    }
+    return version;
   }
 }

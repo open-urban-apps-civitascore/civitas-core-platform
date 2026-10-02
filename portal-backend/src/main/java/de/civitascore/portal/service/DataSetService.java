@@ -15,6 +15,7 @@ import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.DataSetMetaInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataPoolRepository;
@@ -54,7 +55,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Slf4j
 @Service
-public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputDTO> {
+public class DataSetService
+    extends BaseDataEntityService<DataSet, DataSetInputDTO, DataSetMetaInputDTO> {
 
   // Stable identifiers for drift events emitted by applyInfrastructureResult.
   private static final String DRIFT_ORPHAN_SLUGS = "orphan-slugs";
@@ -337,21 +339,18 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   /**
-   * Updates the editable metadata of a released dataset: {@code name}, {@code description}, {@code
-   * openDataAccess}, and {@code assignments}. The {@code namedApis} set is immutable while the
-   * dataset is in READY / AVAILABLE — per concept #1379 + #1384 the only path to change it is
-   * unrelease → edit in DRAFT → release. For AVAILABLE datasets with existing infrastructure,
-   * triggers a saga UPDATE if no saga is currently in-flight.
+   * Updates the metadata of a released dataset. For AVAILABLE datasets with existing
+   * infrastructure, triggers a saga UPDATE if no saga is currently in-flight.
    *
    * @param id the dataset ID
-   * @param input the update input
+   * @param meta the metadata
    * @return the updated dataset
-   * @throws InvalidInputException if the dataset is DRAFT or the input carries {@code namedApis}
+   * @throws InvalidInputException if the dataset is DRAFT
    * @throws SagaInFlightException if a saga is in-flight for this dataset
    */
   @Override
   @Transactional
-  public DataSet updateReleasedMeta(UUID id, DataSetInputDTO input) {
+  public DataSet updateReleasedMeta(UUID id, DataSetMetaInputDTO meta) {
     DataSet existingEntity = findByIdOrThrow(id);
     if (existingEntity.getDataSetStatus() == DataSetStatus.DRAFT) {
       throw new InvalidInputException(
@@ -359,7 +358,12 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           id,
           "This endpoint requires a released dataset (READY or AVAILABLE), current status: DRAFT");
     }
-    return updateMetaOf(existingEntity, input);
+    return updateMetaOf(existingEntity, meta);
+  }
+
+  @Override
+  public DataSetMetaInputDTO toMetaInput(DataSet entity) {
+    return dataSetMapper.toMetaInput(entity);
   }
 
   /**
@@ -367,7 +371,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * editing a staged dataset is an update, not a release.
    */
   @Transactional
-  public DataSet updateReadyMeta(UUID id, DataSetInputDTO input) {
+  public DataSet updateReadyMeta(UUID id, DataSetMetaInputDTO meta) {
     DataSet existingEntity = findByIdOrThrow(id);
     if (existingEntity.getDataSetStatus() != DataSetStatus.READY) {
       throw new InvalidInputException(
@@ -376,10 +380,10 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
           "This endpoint requires a READY dataset, current status: "
               + existingEntity.getDataSetStatus());
     }
-    return updateMetaOf(existingEntity, input);
+    return updateMetaOf(existingEntity, meta);
   }
 
-  private DataSet updateMetaOf(DataSet existingEntity, DataSetInputDTO input) {
+  private DataSet updateMetaOf(DataSet existingEntity, DataSetMetaInputDTO meta) {
     UUID id = existingEntity.getId();
     if (existingEntity.getPendingSagaType() != null) {
       throw new SagaInFlightException(
@@ -389,17 +393,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
               + existingEntity.getPendingSagaType());
     }
 
-    if (input.getNamedApis() != null) {
-      throw new InvalidInputException(
-          "namedApis",
-          id,
-          "Named APIs cannot be changed while the dataset is "
-              + existingEntity.getDataSetStatus()
-              + ". Unrelease the dataset and edit it in DRAFT.");
-    }
-
     Set<Pipeline> previousPipelines = new HashSet<>(existingEntity.getPipelines());
-    DataSet updated = super.update(id, input);
+    DataSet updated = super.update(id, dataSetMapper.toUpdateInput(meta));
 
     if (updated.getDataSetStatus() == DataSetStatus.AVAILABLE
         && updated.isProvisioned()
