@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -81,7 +82,7 @@ class ArtifactWriteAtomicityDatabaseTest extends AbstractRegistryDatabaseTest {
         assertThatThrownBy(() -> registry.inTransaction(() -> {
             registry.storeElement(schema("temperature"), Set.of());
             registry.storeElement(schema("humidity"), Set.of());
-            registry.storePipeline(urns.mint("pipeline"), mapper.readTree("{\"nodes\":[]}"), VersionBump.PATCH);
+            registry.storePipeline(urns.urn("pipeline", UUID.randomUUID()), mapper.readTree("{\"nodes\":[]}"), VersionBump.PATCH);
             throw new IllegalStateException("a later member of the import was rejected");
         })).isInstanceOf(IllegalStateException.class);
 

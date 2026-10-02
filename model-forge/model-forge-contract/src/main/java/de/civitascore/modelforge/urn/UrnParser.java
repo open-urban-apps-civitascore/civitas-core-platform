@@ -90,6 +90,16 @@ public final class UrnParser {
     }
 
     /**
+     * Whether {@code version} is a concrete version a CORE URN can carry: one to three numeric
+     * segments plus an optional SemVer pre-release/build suffix. A value that passes can be appended
+     * as the version segment without adding segments. {@link #LATEST} is a reference token, not a
+     * version.
+     */
+    public static boolean isVersion(String version) {
+        return version != null && VERSION.matcher(version).matches();
+    }
+
+    /**
      * Rejects URN strings that contain ASCII control characters (0x00–0x1F, 0x7F).
      *
      * <p>Prevents injection when the URN is used in SQL, log lines, or URL path segments.
@@ -262,7 +272,7 @@ public final class UrnParser {
         if (!ID.matcher(parts[ID_INDEX]).matches()) return null;
         if (parts.length > LOGICAL_SEGMENTS
                 && !LATEST.equals(parts[VERSION_INDEX])
-                && !VERSION.matcher(parts[VERSION_INDEX]).matches()) {
+                && !isVersion(parts[VERSION_INDEX])) {
             return null;
         }
         return parts;

@@ -222,11 +222,6 @@ public class ViewService {
             Optional<JsonNode> depSchema = registry.fetchElementOrXsd(concreteDepUrn);
             if (depSchema.isEmpty()) continue;
             embedded.add(concreteDepUrn);
-            // The root's $ref to this dependency is rewritten to its concrete versioned URN
-            // (see concreteRef/rewriteRefsToConcrete). The embedded resource's $id must equal
-            // that exact URN, otherwise the $ref dangles. For an XSD-authored Element the
-            // converted $id is type-/bundle-level (one segment longer than the artifact URN) and
-            // would never match — so we stamp the concrete dep URN as the embedded $id.
             String key = uniqueDefKey(defsNode,
                 depSchema.get().path("title").asText(UrnParser.logicalUrn(depUrn)), depUrn);
             defsNode.set(key, ensureEmbeddedId(depSchema.get(), concreteDepUrn));
@@ -348,14 +343,12 @@ public class ViewService {
     /**
      * Return a deep copy of an embedded dependency whose {@code $id} is exactly
      * {@code concreteDepUrn} — the concrete versioned artifact URN the document's
-     * {@code $ref} to this dependency resolves to. Stamping (rather than merely backfilling)
-     * is required for XSD-authored Elements: the converted schema carries a
-     * type-/bundle-level {@code $id} (e.g. {@code …:Person:Personentyp:1.0.0} or
-     * {@code …:Person:bundle:1.0.0}) that is one segment longer than the artifact URN and would
-     * never equal the {@code $ref}, leaving it dangling. Overwriting the {@code $id} is safe even
-     * for the multi-type {@code bundle} conversion: its internal {@code #/$defs/Type} and
-     * {@code properties} pointers are document-relative and rebase against whatever {@code $id} is
-     * stamped. JSON-authored deps already carry the artifact {@code $id}, so this is a no-op for them.
+     * {@code $ref} to this dependency resolves to; any other {@code $id} leaves that {@code $ref}
+     * dangling. Stamping rather than backfilling, because the stored {@code $id} rarely matches: an
+     * imported JSON Element carries its logical URN, and an XSD-authored Element converts to a
+     * per-type or {@code bundle} {@code $id}. Overwriting is safe for the multi-type {@code bundle}:
+     * its internal {@code #/$defs/Type} and {@code properties} pointers are document-relative and
+     * rebase against whatever {@code $id} is stamped.
      */
     private JsonNode ensureEmbeddedId(JsonNode schema, String concreteDepUrn) {
         ObjectNode copy = (ObjectNode) schema.deepCopy();

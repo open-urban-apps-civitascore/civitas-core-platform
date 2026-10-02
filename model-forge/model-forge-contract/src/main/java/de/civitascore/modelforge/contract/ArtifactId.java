@@ -3,7 +3,6 @@ package de.civitascore.modelforge.contract;
 import de.civitascore.modelforge.urn.UrnParser;
 import java.io.Serializable;
 import java.util.Objects;
-import java.util.UUID;
 
 /**
  * Stable identifier of a Model Forge artifact, carrying a CORE URN.
@@ -21,8 +20,8 @@ import java.util.UUID;
  * <p>Read operations on {@link de.civitascore.modelforge.facade.ModelForge} accept both: a logical
  * (or {@code :latest}) URN reads the current version, a versioned URN reads exactly that version.
  * Write operations return a <em>versioned</em> id (see {@link ImportResult}); Model Forge is the
- * sole version authority, so callers never choose the version segment. Use {@link #logicalUrn()},
- * {@link #version()} and {@link #id()} to take the id apart.
+ * sole version authority, so callers never choose the version segment. Use {@link #logicalUrn()}
+ * and {@link #version()} to take the id apart.
  */
 public record ArtifactId(String value) implements Serializable {
 
@@ -41,10 +40,5 @@ public record ArtifactId(String value) implements Serializable {
     /** The SemVer version segment, or {@code null} when this id is logical (version-free). */
     public String version() {
         return UrnParser.versionFromUrn(value);
-    }
-
-    /** The artifact's UUID, or {@code null} when the value is not a CORE URN. */
-    public UUID id() {
-        return UrnParser.idFromUrn(value);
     }
 }

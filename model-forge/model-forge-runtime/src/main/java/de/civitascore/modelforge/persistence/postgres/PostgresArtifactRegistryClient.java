@@ -102,7 +102,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         rows.addAll(ReferenceExtraction.associationRefs(associationTargets));
         return writeArtifact(urn, RegistryMapping.TYPE_ELEMENT, RegistryMapping.FORMAT_JSONSCHEMA,
             RegistryMapping.CONTENT_TYPE_JSON,
-            writeJson(schema), null, rows, bump, explicitVersion, bumpFromVersion, null, false);
+            writeJson(schema), null, rows, bump, explicitVersion, bumpFromVersion, null);
     }
 
     @Override
@@ -110,7 +110,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         JsonNode payload = m;
         return writeArtifact(id, RegistryMapping.TYPE_MAPPING, RegistryMapping.FORMAT_CORE_JSON,
             RegistryMapping.CONTENT_TYPE_JSON,
-            writeJson(payload), null, ReferenceExtraction.mappingRefs(payload), bump, null, null, null, false);
+            writeJson(payload), null, ReferenceExtraction.mappingRefs(payload), bump, null, null, null);
     }
 
     @Override
@@ -118,34 +118,34 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         JsonNode payload = p;
         return writeArtifact(id, RegistryMapping.TYPE_PIPELINE, RegistryMapping.FORMAT_CORE_JSON,
             RegistryMapping.CONTENT_TYPE_JSON,
-            writeJson(payload), null, ReferenceExtraction.pipelineRefs(payload), bump, null, null, null, false);
+            writeJson(payload), null, ReferenceExtraction.pipelineRefs(payload), bump, null, null, null);
     }
 
     @Override
     public String storeDataSource(String id, JsonNode s, VersionBump bump) {
         JsonNode payload = s;
         return writeArtifact(id, RegistryMapping.TYPE_DATASOURCE, RegistryMapping.FORMAT_CORE_JSON,
-            RegistryMapping.CONTENT_TYPE_JSON, writeJson(payload), null, ReferenceExtraction.dataSourceRefs(payload), bump, null, null, null, false);
+            RegistryMapping.CONTENT_TYPE_JSON, writeJson(payload), null, ReferenceExtraction.dataSourceRefs(payload), bump, null, null, null);
     }
 
     @Override
     public String storeDataSink(String id, JsonNode s, VersionBump bump) {
         JsonNode payload = s;
         return writeArtifact(id, RegistryMapping.TYPE_DATASINK, RegistryMapping.FORMAT_CORE_JSON,
-            RegistryMapping.CONTENT_TYPE_JSON, writeJson(payload), null, ReferenceExtraction.dataSinkRefs(payload), bump, null, null, null, false);
+            RegistryMapping.CONTENT_TYPE_JSON, writeJson(payload), null, ReferenceExtraction.dataSinkRefs(payload), bump, null, null, null);
     }
 
     @Override
     public String storeDataSet(String urn, JsonNode manifest, VersionBump bump) {
         return writeArtifact(UrnParser.logicalUrn(urn), RegistryMapping.TYPE_DATASET, RegistryMapping.FORMAT_CORE_JSON,
-            RegistryMapping.CONTENT_TYPE_JSON, writeJson(manifest), null, ReferenceExtraction.dataSetRefs(manifest), bump, null, null, null, false);
+            RegistryMapping.CONTENT_TYPE_JSON, writeJson(manifest), null, ReferenceExtraction.dataSetRefs(manifest), bump, null, null, null);
     }
 
     @Override
     public String storeDataStructure(String urn, JsonNode manifest, VersionBump bump, String bumpFromVersion) {
         return writeArtifact(UrnParser.logicalUrn(urn), RegistryMapping.TYPE_DATASTRUCTURE, RegistryMapping.FORMAT_CORE_JSON,
             RegistryMapping.CONTENT_TYPE_JSON, writeJson(manifest), null, ReferenceExtraction.dataStructureRefs(manifest), bump,
-            null, bumpFromVersion, null, false);
+            null, bumpFromVersion, null);
     }
 
     @Override
@@ -162,8 +162,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                 namespaces.deleteByArtifactId(artifactId);
                 xsd.extractTargetNamespace(xsdContent)
                     .ifPresent(ns -> namespaces.upsert(ns, artifactId, versionId, now));
-            },
-            false);
+            });
     }
 
     /**
@@ -659,7 +658,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
     private String writeArtifact(String urn, String artifactType, String format, String contentType,
                                  String contentJson, String contentText, List<ReferenceRow> refs,
                                  VersionBump bump, String explicitVersion, String bumpFromVersion,
-                                 PostInsert postInsert, boolean forceNewVersion) {
+                                 PostInsert postInsert) {
         // Reject control characters (CR/LF, etc.) in the client-supplied URN before it is persisted
         // or written to a plain-text log line — closes a CWE-117 log-forging/injection vector.
         UrnParser.requireNoControlChars(urn);
@@ -715,9 +714,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                         ? Optional.empty() : versions.find(artifactId, row.currentVersion());
                     // Idempotent only when the authored content of the current version, in the
                     // SAME format, is byte-identical. A different format is always a new version.
-                    // A rename forces a new version (forceNewVersion) so versioned title metadata
-                    // changes even when the content is unchanged.
-                    if (!forceNewVersion && current.isPresent() && format.equals(current.get().primaryFormat())) {
+                    if (current.isPresent() && format.equals(current.get().primaryFormat())) {
                         Optional<ArtifactRepresentationRow> rep =
                             representations.find(current.get().id(), format);
                         if (rep.isPresent() && hash.equals(rep.get().contentHash())) {

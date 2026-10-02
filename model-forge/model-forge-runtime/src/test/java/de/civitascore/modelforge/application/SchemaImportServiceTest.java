@@ -564,12 +564,12 @@ class SchemaImportServiceTest {
     void importXsd_acceptsTwoSegmentXoevVersion() {
         // Real XRepository/XÖV standards carry two-segment versions (e.g. 6.0, 5.5). They must
         // import cleanly — the version guard only blocks injection chars, not short versions.
+        String urn = "urn:core:platform:civitas:element:common:b4b1eaaf-8766-827e-b89a-95bf592cc9b2";
         SchemaImportResult r = svc.importXsd(new XsdImportRequest("xplanung", "6.0",
-            "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"/>", null));
+            "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"/>", urn, true));
 
         assertThat(r.diagnostics()).isEmpty();
-        assertThat(UrnParser.idFromUrn(r.resourceId())).isNotNull();
-        assertThat(UrnParser.versionFromUrn(r.resourceId())).isEqualTo("6.0");
+        verify(registry).storeXsdElement(eq(urn), anyString(), anySet(), eq("6.0"));
         verify(registry).nameArtifact(r.resourceId(), "xplanung");
     }
 

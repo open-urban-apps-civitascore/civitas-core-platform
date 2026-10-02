@@ -48,15 +48,6 @@ public class UrnService {
         return urn("element", UUID.randomUUID(), defaultVersion);
     }
 
-    public String mintElement(String version) {
-        return urn("element", UUID.randomUUID(), version);
-    }
-
-    /** A new URN of {@code artifactType} under a random UUID, at the default version. */
-    public String mint(String artifactType) {
-        return urn(artifactType, UUID.randomUUID(), defaultVersion);
-    }
-
     // ── From a known UUID ───────────────────────────────────────────────────────
 
     /** The URN of {@code artifactType} for {@code id}, at the default version. */

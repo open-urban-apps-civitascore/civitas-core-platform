@@ -501,7 +501,7 @@ class EmbeddedModelForgeOperationsTest {
             new CreateArtifactCommand(ArtifactKind.MAPPING, "Sensor to Obs", content)).artifactId();
 
         // Equal display names → two independent artifacts, each with a minted, versioned pin.
-        assertThat(first.id()).isNotNull();
+        assertThat(UrnParser.idFromUrn(first.value())).isNotNull();
         assertThat(UrnParser.versionFromUrn(first.value())).isEqualTo("1.0.0");
         assertThat(UrnParser.logicalUrn(first.value())).isNotEqualTo(UrnParser.logicalUrn(second.value()));
     }

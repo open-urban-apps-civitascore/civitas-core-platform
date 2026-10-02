@@ -81,7 +81,7 @@ public class SchemaImportService {
      */
     public SchemaImportResult importSchema(SchemaImportRequest req, Set<String> alsoAvailableLogicalUrns) {
         String explicitVersion = req.preserveVersion() ? req.version() : null;
-        if (explicitVersion != null && !isValidVersion(explicitVersion)) {
+        if (explicitVersion != null && !UrnParser.isVersion(explicitVersion)) {
             return importError("invalid-version",
                 "Version '" + explicitVersion + "' is not a valid version (expected e.g. 1.0, 6.0, or 1.0.0).");
         }
@@ -157,54 +157,32 @@ public class SchemaImportService {
         // (→ version.model_urn); otherwise the root Element's pin (first entry) is the root, as before.
         String rootPin = (dsRootUrn != null && dataStructurePin != null)
             ? dataStructurePin
-            : (pins.isEmpty() ? primaryResourceId(elements) : pins.getFirst());
+            : pins.getFirst();
         return new SchemaImportResult(rootPin, pins, List.of());
-    }
-
-    /**
-     * Whether {@code version} is safe to interpolate into a URN — 1–3 numeric segments plus an
-     * optional SemVer pre-release/build suffix. Two-segment versions are accepted because real
-     * XÖV/XRepository standards use them (e.g. 6.0, 5.5). Rejects anything else (in particular a
-     * {@code ':'}, which would inject extra colon-delimited URN segments — URN-injection /
-     * identity-confusion hardening).
-     */
-    private static boolean isValidVersion(String version) {
-        return version != null && version.matches("\\d+(\\.\\d+){0,2}([-+][0-9A-Za-z.-]+)?");
     }
 
     public SchemaImportResult importXsd(XsdImportRequest command) {
         String name = command.name();
         String version = command.version();
         String xsdContent = command.xsdContent();
-        String artifactId = command.artifactId();
+        String urn = command.artifactId();
         if (name == null || name.isBlank()) {
             return importError("name-missing", "XSD import requires a non-empty name.");
         }
         if (xsdContent == null || xsdContent.isBlank()) {
             return importError("content-missing", "XSD import requires non-empty XML content.");
         }
-        if (version != null && !version.isBlank() && !isValidVersion(version)) {
+        if (version != null && !version.isBlank() && !UrnParser.isVersion(version)) {
             return importError("invalid-version",
                 "Version '" + version + "' is not a valid version (expected e.g. 1.0, 6.0, or 1.0.0).");
         }
-        // A caller-supplied identity is stored verbatim as the logical URN, and logicalUrn() passes
-        // a non-URN through unchanged — so an unchecked value here is persisted as an identity that
-        // nothing navigating by URN can resolve. The JSON paths gate a caller `$id` the same way.
-        if (artifactId != null && !artifactId.isBlank() && !UrnParser.isUrn(artifactId)) {
+        // Refused here so the caller gets a diagnostic, not the registry's exception from requireUrn.
+        if (!UrnParser.isUrn(urn)) {
             return importError("invalid-artifact-id",
-                "Artifact id '" + artifactId + "' is not a CORE URN (expected "
+                "Artifact id '" + urn + "' is not a CORE URN (expected "
                     + "urn:core:<scope>:<owner>:<type>:<domain>:<uuid>"
                     + " with an optional :<version>).");
         }
-        // XSD shares the Element identity — the format is a stored representation, not in the URN.
-        // A fresh identity is minted; an explicit artifactId (e.g. the XRepository kennung-based
-        // URN) is caller-owned and respected as-is.
-        String urn = artifactId != null && !artifactId.isBlank()
-            ? artifactId
-            : version != null && !version.isBlank()
-            ? urns.mintElement(version)
-            : urns.mintElement();
-
         Set<String> importRefs =
             Optional.ofNullable(registry.extractImportRefs(xsdContent)).orElse(Set.of());
         // Store first, then register the graph node — so a failed/​rejected store (XXE guard,
@@ -599,8 +577,7 @@ public class SchemaImportService {
             JsonNode schema  = e.getValue();
             Set<String> refs         = refExtractor.extractRefs(schema);
             Set<String> associations = refExtractor.extractCoreRefTargets(schema);
-            String schemaId = schema.path("$id").asText(null);
-            String urn = UrnParser.isUrn(schemaId) ? schemaId : urns.mintElement();
+            String urn = schema.path("$id").asText();
             // Persist first, then register the graph node, so a failed store never leaves a phantom
             // node/edge. Persist the full (possibly cyclic) edge set — compositions ($ref) and
             // associations (x-core-ref) alike, so both are navigable as dependencies/dependents.
@@ -733,13 +710,9 @@ public class SchemaImportService {
         return urns.dataStructure(UrnParser.idFromUrn(members.getFirst()));
     }
 
-    /** The member Element URNs of an import, in order: each element's $id (or generated URN). */
-    private List<String> elementUrns(ObjectNode elements) {
+    private static List<String> elementUrns(ObjectNode elements) {
         List<String> urnList = new ArrayList<>();
-        elements.properties().forEach(e -> {
-            String id = e.getValue().path("$id").asText(null);
-            urnList.add(UrnParser.isUrn(id) ? id : urns.mintElement());
-        });
+        elements.properties().forEach(e -> urnList.add(e.getValue().path("$id").asText()));
         return urnList;
     }
 
@@ -753,18 +726,8 @@ public class SchemaImportService {
     /** Logical URNs of the elements created by this import — co-imported FK targets / self-refs. */
     private Set<String> importedLogicalUrns(ObjectNode elements) {
         Set<String> logical = new HashSet<>();
-        elements.properties().forEach(e -> {
-            String id = e.getValue().path("$id").asText(null);
-            if (UrnParser.isUrn(id)) logical.add(UrnParser.logicalUrn(id));
-        });
+        elements.properties().forEach(e -> logical.add(UrnParser.logicalUrn(e.getValue().path("$id").asText())));
         return logical;
-    }
-
-    private String primaryResourceId(ObjectNode elements) {
-        for (Map.Entry<String, JsonNode> first : elements.properties()) {
-            return first.getValue().path("$id").asText(urns.mintElement());
-        }
-        return urns.mintElement();
     }
 
     private SchemaImportResult importError(String code, String message) {

@@ -5,6 +5,7 @@ import de.civitascore.modelforge.core.port.ArtifactSearchCriteria;
 import de.civitascore.modelforge.urn.UrnParser;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -42,7 +43,7 @@ class ArtifactDisplayNameDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("An untitled artifact is listed by its UUID until it is named")
     void anUntitledArtifactIsListedByItsUuidUntilNamed() {
-        String pin = registry.storeMapping(urns.mint("mapping"), mapper.readTree("{\"fields\":{}}"), VersionBump.PATCH);
+        String pin = registry.storeMapping(urns.urn("mapping", UUID.randomUUID()), mapper.readTree("{\"fields\":{}}"), VersionBump.PATCH);
         String logical = UrnParser.logicalUrn(pin);
 
         assertThat(registry.displayNames(List.of(logical)))

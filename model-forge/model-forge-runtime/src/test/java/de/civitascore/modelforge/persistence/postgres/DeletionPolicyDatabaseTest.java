@@ -14,6 +14,7 @@ import tools.jackson.databind.JsonNode;
 
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -47,7 +48,7 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @DisplayName("Deleting a Data Structure removes the Elements only it uses")
     void deletingADataStructureRemovesTheElementsOnlyItUses() {
         String structurePin = registry.storeDataStructure(
-            urns.mint("datastructure"), dataStructure(), VersionBump.PATCH, null);
+            urns.urn("datastructure", UUID.randomUUID()), dataStructure(), VersionBump.PATCH, null);
 
         deletes.delete(structurePin, true);
 
@@ -60,7 +61,7 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @DisplayName("A cascade inside a unit that fails afterwards removes nothing at all")
     void aFailedUnitKeepsTheContainerAndItsMembers() {
         String structurePin = registry.storeDataStructure(
-            urns.mint("datastructure"), dataStructure(), VersionBump.PATCH, null);
+            urns.urn("datastructure", UUID.randomUUID()), dataStructure(), VersionBump.PATCH, null);
 
         assertThatThrownBy(() -> registry.<Void>inTransaction(() -> {
             deletes.delete(structurePin, true);
@@ -76,9 +77,9 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @DisplayName("An Element a second Data Structure also groups survives the delete")
     void anElementASecondDataStructureGroupsSurvives() {
         String sharedPin = registry.storeDataStructure(
-            urns.mint("datastructure"), dataStructureOf(readingPin), VersionBump.PATCH, null);
+            urns.urn("datastructure", UUID.randomUUID()), dataStructureOf(readingPin), VersionBump.PATCH, null);
         String structurePin = registry.storeDataStructure(
-            urns.mint("datastructure"), dataStructure(), VersionBump.PATCH, null);
+            urns.urn("datastructure", UUID.randomUUID()), dataStructure(), VersionBump.PATCH, null);
 
         deletes.delete(structurePin, true);
 
@@ -90,11 +91,11 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("Deleting a Pipeline removes the Mapping no other Pipeline uses, and nothing else")
     void deletingAPipelineRemovesItsMappingAndNothingElse() {
-        String sourcePin = registry.storeDataSource(urns.mint("datasource"), dataSource(), VersionBump.PATCH);
-        String sinkPin = registry.storeDataSink(urns.mint("datasink"), dataSink(), VersionBump.PATCH);
-        String mappingPin = registry.storeMapping(urns.mint("mapping"), mapping(), VersionBump.PATCH);
+        String sourcePin = registry.storeDataSource(urns.urn("datasource", UUID.randomUUID()), dataSource(), VersionBump.PATCH);
+        String sinkPin = registry.storeDataSink(urns.urn("datasink", UUID.randomUUID()), dataSink(), VersionBump.PATCH);
+        String mappingPin = registry.storeMapping(urns.urn("mapping", UUID.randomUUID()), mapping(), VersionBump.PATCH);
         String pipelinePin = registry.storePipeline(
-            urns.mint("pipeline"), pipeline(sourcePin, sinkPin, mappingPin), VersionBump.PATCH);
+            urns.urn("pipeline", UUID.randomUUID()), pipeline(sourcePin, sinkPin, mappingPin), VersionBump.PATCH);
 
         deletes.delete(pipelinePin, true);
 
@@ -108,12 +109,12 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("A Mapping a second Pipeline uses survives its Pipeline's delete")
     void aMappingASecondPipelineUsesSurvives() {
-        String sourcePin = registry.storeDataSource(urns.mint("datasource"), dataSource(), VersionBump.PATCH);
-        String sinkPin = registry.storeDataSink(urns.mint("datasink"), dataSink(), VersionBump.PATCH);
-        String mappingPin = registry.storeMapping(urns.mint("mapping"), mapping(), VersionBump.PATCH);
+        String sourcePin = registry.storeDataSource(urns.urn("datasource", UUID.randomUUID()), dataSource(), VersionBump.PATCH);
+        String sinkPin = registry.storeDataSink(urns.urn("datasink", UUID.randomUUID()), dataSink(), VersionBump.PATCH);
+        String mappingPin = registry.storeMapping(urns.urn("mapping", UUID.randomUUID()), mapping(), VersionBump.PATCH);
         String firstPin = registry.storePipeline(
-            urns.mint("pipeline"), pipeline(sourcePin, sinkPin, mappingPin), VersionBump.PATCH);
-        registry.storePipeline(urns.mint("pipeline"), pipeline(sourcePin, sinkPin, mappingPin), VersionBump.PATCH);
+            urns.urn("pipeline", UUID.randomUUID()), pipeline(sourcePin, sinkPin, mappingPin), VersionBump.PATCH);
+        registry.storePipeline(urns.urn("pipeline", UUID.randomUUID()), pipeline(sourcePin, sinkPin, mappingPin), VersionBump.PATCH);
 
         deletes.delete(firstPin, true);
 
@@ -124,7 +125,7 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("Deleting a Mapping leaves the two Data Structures it joined")
     void deletingAMappingLeavesTheStructuresItJoined() {
-        String mappingPin = registry.storeMapping(urns.mint("mapping"), mapping(), VersionBump.PATCH);
+        String mappingPin = registry.storeMapping(urns.urn("mapping", UUID.randomUUID()), mapping(), VersionBump.PATCH);
 
         deletes.delete(mappingPin, true);
 
@@ -136,7 +137,7 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("Deleting a Data Source removes nothing besides itself")
     void deletingADataSourceRemovesNothingElse() {
-        String sourcePin = registry.storeDataSource(urns.mint("datasource"), dataSource(), VersionBump.PATCH);
+        String sourcePin = registry.storeDataSource(urns.urn("datasource", UUID.randomUUID()), dataSource(), VersionBump.PATCH);
 
         deletes.delete(sourcePin, true);
 
@@ -147,9 +148,9 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("Deleting a Data Set takes a Mapping no Pipeline wired")
     void deletingADataSetTakesAMappingNoPipelineWired() {
-        String mappingPin = registry.storeMapping(urns.mint("mapping"), mapping(), VersionBump.PATCH);
+        String mappingPin = registry.storeMapping(urns.urn("mapping", UUID.randomUUID()), mapping(), VersionBump.PATCH);
         String dataSetPin = registry.storeDataSet(
-            urns.mint("dataset"), dataSetOfMappings(mappingPin), VersionBump.PATCH);
+            urns.urn("dataset", UUID.randomUUID()), dataSetOfMappings(mappingPin), VersionBump.PATCH);
 
         deletes.delete(dataSetPin, true);
 
@@ -163,13 +164,13 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("Deleting a Data Set takes its Pipelines, and through them their Mappings")
     void deletingADataSetTakesItsPipelinesAndTheirMappings() {
-        String sourcePin = registry.storeDataSource(urns.mint("datasource"), dataSource(), VersionBump.PATCH);
-        String sinkPin = registry.storeDataSink(urns.mint("datasink"), dataSink(), VersionBump.PATCH);
-        String mappingPin = registry.storeMapping(urns.mint("mapping"), mapping(), VersionBump.PATCH);
+        String sourcePin = registry.storeDataSource(urns.urn("datasource", UUID.randomUUID()), dataSource(), VersionBump.PATCH);
+        String sinkPin = registry.storeDataSink(urns.urn("datasink", UUID.randomUUID()), dataSink(), VersionBump.PATCH);
+        String mappingPin = registry.storeMapping(urns.urn("mapping", UUID.randomUUID()), mapping(), VersionBump.PATCH);
         String pipelinePin = registry.storePipeline(
-            urns.mint("pipeline"), pipeline(sourcePin, sinkPin, mappingPin), VersionBump.PATCH);
+            urns.urn("pipeline", UUID.randomUUID()), pipeline(sourcePin, sinkPin, mappingPin), VersionBump.PATCH);
         String dataSetPin = registry.storeDataSet(
-            urns.mint("dataset"), dataSetOfPipelines(pipelinePin), VersionBump.PATCH);
+            urns.urn("dataset", UUID.randomUUID()), dataSetOfPipelines(pipelinePin), VersionBump.PATCH);
 
         deletes.delete(dataSetPin, true);
 
@@ -186,11 +187,11 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("A Mapping a second Data Set also holds survives the delete of the first")
     void aMappingASecondDataSetHoldsSurvives() {
-        String mappingPin = registry.storeMapping(urns.mint("mapping"), mapping(), VersionBump.PATCH);
+        String mappingPin = registry.storeMapping(urns.urn("mapping", UUID.randomUUID()), mapping(), VersionBump.PATCH);
         String firstSet = registry.storeDataSet(
-            urns.mint("dataset"), dataSetOfMappings(mappingPin), VersionBump.PATCH);
+            urns.urn("dataset", UUID.randomUUID()), dataSetOfMappings(mappingPin), VersionBump.PATCH);
         String secondSet = registry.storeDataSet(
-            urns.mint("dataset"), dataSetOfMappings(mappingPin), VersionBump.PATCH);
+            urns.urn("dataset", UUID.randomUUID()), dataSetOfMappings(mappingPin), VersionBump.PATCH);
 
         deletes.delete(firstSet, true);
 
@@ -205,9 +206,9 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @DisplayName("Deleting a Data Set keeps the Data Structures it grouped")
     void deletingADataSetKeepsTheDataStructuresItGrouped() {
         String structurePin = registry.storeDataStructure(
-            urns.mint("datastructure"), dataStructure(), VersionBump.PATCH, null);
+            urns.urn("datastructure", UUID.randomUUID()), dataStructure(), VersionBump.PATCH, null);
         String dataSetPin = registry.storeDataSet(
-            urns.mint("dataset"), dataSetOf(structurePin), VersionBump.PATCH);
+            urns.urn("dataset", UUID.randomUUID()), dataSetOf(structurePin), VersionBump.PATCH);
 
         deletes.delete(dataSetPin, true);
 
@@ -220,12 +221,12 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("A reference pinned to one version leaves the other version free")
     void aReferencePinnedToOneVersionLeavesTheOtherFree() {
-        String structureUrn = urns.mint("datastructure");
+        String structureUrn = urns.urn("datastructure", UUID.randomUUID());
         String v1 = registry.storeDataStructure(structureUrn, dataStructureOf(stationPin), VersionBump.PATCH, null);
         registry.storeDataStructure(structureUrn, dataStructureOf(readingPin), VersionBump.MAJOR, null);
         assertThat(versionsOf(logical(structureUrn))).containsExactly("1.0.0", "2.0.0");
         // The sink writes into the first version and names it exactly.
-        String sink = registry.storeDataSink(urns.mint("datasink"), dataSinkFor(v1), VersionBump.PATCH);
+        String sink = registry.storeDataSink(urns.urn("datasink", UUID.randomUUID()), dataSinkFor(v1), VersionBump.PATCH);
 
         assertThat(registry.nonDataSetBlockingDependents(structureUrn, "1.0.0"))
             .containsExactly(logical(sink));
@@ -241,9 +242,9 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     void aMemberNamedByTheLatestTokenKeepsItsBlockers() {
         // A grouping may name its member by the latest token instead of a pinned version.
         String structurePin = registry.storeDataStructure(
-            urns.mint("datastructure"),
+            urns.urn("datastructure", UUID.randomUUID()),
             dataStructureOf(logical(stationPin) + ":latest"), VersionBump.PATCH, null);
-        String sink = registry.storeDataSink(urns.mint("datasink"), dataSinkFor(stationPin), VersionBump.PATCH);
+        String sink = registry.storeDataSink(urns.urn("datasink", UUID.randomUUID()), dataSinkFor(stationPin), VersionBump.PATCH);
 
         List<String> members = registry.ownedMemberUrns(structurePin, "1.0.0");
         assertThat(members).hasSize(1);
@@ -258,7 +259,7 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("A member is read at the version its owner pinned")
     void aMemberIsReadAtTheVersionItsOwnerPinned() {
-        String structureUrn = urns.mint("datastructure");
+        String structureUrn = urns.urn("datastructure", UUID.randomUUID());
         String v1 = registry.storeDataStructure(structureUrn, dataStructureOf(stationPin), VersionBump.PATCH, null);
         String v2 = registry.storeDataStructure(structureUrn, dataStructureOf(readingPin), VersionBump.MAJOR, null);
 
@@ -271,7 +272,7 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("A reference refuses the delete and the refusal names what holds it")
     void aReferenceRefusesTheDeleteAndNamesWhatHoldsIt() {
-        String mappingPin = registry.storeMapping(urns.mint("mapping"), mapping(), VersionBump.PATCH);
+        String mappingPin = registry.storeMapping(urns.urn("mapping", UUID.randomUUID()), mapping(), VersionBump.PATCH);
 
         assertThatThrownBy(() -> deletes.delete(stationPin))
             .isInstanceOf(ArtifactInUseException.class)
@@ -284,7 +285,7 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     void aReferenceASupersededVersionRecordedRefusesNothing() {
         // The sink writes into Station, then is repointed at Reading; its first version keeps the
         // Station edge as history.
-        String first = registry.storeDataSink(urns.mint("datasink"), dataSinkFor(stationPin), VersionBump.PATCH);
+        String first = registry.storeDataSink(urns.urn("datasink", UUID.randomUUID()), dataSinkFor(stationPin), VersionBump.PATCH);
         // Writing under the existing identity versions that sink; a bare name mints a new one.
         String repointed = registry.storeDataSink(logical(first), dataSinkFor(readingPin), VersionBump.MINOR);
         assertThat(versionsOf(logical(repointed))).containsExactly("1.0.0", "1.1.0");
@@ -300,9 +301,9 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @DisplayName("A member of one Data Set is deleted and unlinked from its manifest")
     void aMemberOfOneDataSetIsDeletedAndUnlinked() {
         String structurePin = registry.storeDataStructure(
-            urns.mint("datastructure"), dataStructureOf(readingPin), VersionBump.PATCH, null);
+            urns.urn("datastructure", UUID.randomUUID()), dataStructureOf(readingPin), VersionBump.PATCH, null);
         String dataSetPin = registry.storeDataSet(
-            urns.mint("dataset"), dataSetOf(structurePin), VersionBump.PATCH);
+            urns.urn("dataset", UUID.randomUUID()), dataSetOf(structurePin), VersionBump.PATCH);
 
         deletes.delete(structurePin);
 
@@ -317,10 +318,10 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @DisplayName("A member two Data Sets hold is refused until it is removed from one")
     void aMemberTwoDataSetsHoldIsRefused() {
         String structurePin = registry.storeDataStructure(
-            urns.mint("datastructure"), dataStructureOf(readingPin), VersionBump.PATCH, null);
-        registry.storeDataSet(urns.mint("dataset"), dataSetOf(structurePin), VersionBump.PATCH);
+            urns.urn("datastructure", UUID.randomUUID()), dataStructureOf(readingPin), VersionBump.PATCH, null);
+        registry.storeDataSet(urns.urn("dataset", UUID.randomUUID()), dataSetOf(structurePin), VersionBump.PATCH);
         String secondSet = registry.storeDataSet(
-            urns.mint("dataset"), dataSetOf(structurePin), VersionBump.PATCH);
+            urns.urn("dataset", UUID.randomUUID()), dataSetOf(structurePin), VersionBump.PATCH);
 
         assertThatThrownBy(() -> deletes.delete(structurePin)).isInstanceOf(ArtifactInUseException.class);
         assertThat(registry.fetch(structurePin)).isPresent();
@@ -334,9 +335,9 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("Removing one member leaves the Data Set's other members reachable")
     void removingOneMemberLeavesTheOtherMembersReachable() {
-        String stays = registry.storeMapping(urns.mint("mapping"), mapping(), VersionBump.PATCH);
-        String goes = registry.storeMapping(urns.mint("mapping"), mapping(), VersionBump.PATCH);
-        String dataSetUrn = urns.mint("dataset");
+        String stays = registry.storeMapping(urns.urn("mapping", UUID.randomUUID()), mapping(), VersionBump.PATCH);
+        String goes = registry.storeMapping(urns.urn("mapping", UUID.randomUUID()), mapping(), VersionBump.PATCH);
+        String dataSetUrn = urns.urn("dataset", UUID.randomUUID());
         registry.storeDataSet(dataSetUrn, dataSetOfMappings(stays, goes), VersionBump.PATCH);
 
         deletes.delete(goes);
