@@ -6,7 +6,7 @@ import { vi } from 'vitest'
 import { DatasetUpdateApiData } from '@/types/datasets'
 
 import { apiRequest } from '../request/apiRequest'
-import { useUpdateReadyDatasetMeta, useUpdateReleasedDatasetMeta } from './clientRequests'
+import { useUnstageDataset, useUpdateReadyDatasetMeta, useUpdateReleasedDatasetMeta } from './clientRequests'
 
 vi.mock('../request/apiRequest', () => ({
   apiRequest: vi.fn(),
@@ -41,5 +41,26 @@ describe('dataset metadata mutations', () => {
         data: { name: 'Name', description: 'Description' },
       }),
     )
+  })
+})
+
+describe('dataset transitions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(apiRequest).mockResolvedValue({ data: {} } as never)
+  })
+
+  it('invalidates the data sinks of the dataset after unstage', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
+    const { result } = renderHook(() => useUnstageDataset(), {
+      wrapper: ({ children }: PropsWithChildren) => (
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      ),
+    })
+
+    await result.current.mutateAsync('dataset-1')
+
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['datasinks', 'dataset-1'] })
   })
 })

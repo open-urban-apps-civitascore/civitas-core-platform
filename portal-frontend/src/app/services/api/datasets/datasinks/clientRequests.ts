@@ -7,7 +7,7 @@ import { CreateDataSinkInput, DataSink, DeleteDataSinkInput, UpdateDataSinkInput
 
 export const DATASINKS_QUERY_KEY = 'datasinks'
 
-export const useGetDataSinks = (datasetId: string, { params, isEnabled, refetchOnMount }: GetListInput = {}) =>
+export const useGetDataSinks = (datasetId: string, { params, isEnabled }: GetListInput = {}) =>
   useQuery<ApiServiceResponse<DataSink[]>>({
     queryKey: [DATASINKS_QUERY_KEY, datasetId],
     queryFn: () =>
@@ -19,7 +19,6 @@ export const useGetDataSinks = (datasetId: string, { params, isEnabled, refetchO
         errorMessage: 'An error occurred while loading data sinks.',
       }),
     enabled: isEnabled,
-    refetchOnMount,
   })
 
 export const useCreateDataSink = () => {

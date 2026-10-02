@@ -39,7 +39,6 @@ export type GetListInput = {
   params?: URLSearchParams
   isEnabled?: boolean
   queryKey?: string
-  refetchOnMount?: boolean | 'always'
 }
 
 export type GetItemInput = {
