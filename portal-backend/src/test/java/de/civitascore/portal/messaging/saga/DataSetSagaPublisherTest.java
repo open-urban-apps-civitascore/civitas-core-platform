@@ -390,6 +390,53 @@ class DataSetSagaPublisherTest {
     }
 
     @Test
+    @DisplayName("CREATE trigger carries the layer's published fields")
+    void createTriggerCarriesLayerFieldsPublishedByGeoServer() {
+      Layer l =
+          layer(UUID.randomUUID(), "layer1", "EPSG:4326", postgisSink(UUID.randomUUID(), "t"));
+      l.setTitle("Messstationen");
+      l.setDescription("Alle Stationen");
+      l.setAttribute(List.of("name", "temperature"));
+      l.setCqlFilter("temperature > 20");
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setLayers(Set.of(l));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      var entry = new JsonMapper().readTree(jsonCaptor.getValue()).get("layers").get(0);
+      assertThat(entry.get("title").asString()).isEqualTo("Messstationen");
+      assertThat(entry.get("description").asString()).isEqualTo("Alle Stationen");
+      assertThat(entry.get("attribute").get(0).asString()).isEqualTo("name");
+      assertThat(entry.get("attribute").get(1).asString()).isEqualTo("temperature");
+      assertThat(entry.get("cqlFilter").asString()).isEqualTo("temperature > 20");
+    }
+
+    @Test
+    @DisplayName("Unset layer fields are omitted from the trigger")
+    void unsetLayerFieldsAreOmitted() {
+      Layer l =
+          layer(UUID.randomUUID(), "layer1", "EPSG:4326", postgisSink(UUID.randomUUID(), "t"));
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setLayers(Set.of(l));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      var entry = new JsonMapper().readTree(jsonCaptor.getValue()).get("layers").get(0);
+      assertThat(entry.has("title")).isFalse();
+      assertThat(entry.has("description")).isFalse();
+      assertThat(entry.has("attribute")).isFalse();
+      assertThat(entry.has("cqlFilter")).isFalse();
+    }
+
+    @Test
     @DisplayName("Layer on a non-POSTGIS sink carries a null nativeName (adapter falls back)")
     void layerOnNonPostgisSinkHasNullNativeName() {
       DataSink sink = frostSink(UUID.randomUUID());
@@ -862,6 +909,7 @@ class DataSetSagaPublisherTest {
     private NamedApi api(String name, String slug, String routeId) {
       NamedApi api = new NamedApi();
       api.setName(name);
+      api.setDescription(name + " description");
       api.setSlug(slug);
       api.setStandard(ApiStandard.STA);
       api.setVersion("1.1");
@@ -893,12 +941,9 @@ class DataSetSagaPublisherTest {
       assertThat(bySlug).containsKeys("traffic", "weather");
       assertThat(bySlug.get("traffic").get("standard").asString()).isEqualTo("STA");
       assertThat(bySlug.get("traffic").get("version").asString()).isEqualTo("1.1");
-      // Saga contract carries only slug/standard/version: human-readable name and description
-      // stay portal-backend-private.
-      assertThat(bySlug.get("traffic").get("name")).as("name must not leak across saga").isNull();
-      assertThat(bySlug.get("traffic").get("description"))
-          .as("description must not leak across saga")
-          .isNull();
+      assertThat(bySlug.get("traffic").get("name").asString()).isEqualTo("Traffic Sensor Readings");
+      assertThat(bySlug.get("traffic").get("description").asString())
+          .isEqualTo("Traffic Sensor Readings description");
     }
 
     @Test

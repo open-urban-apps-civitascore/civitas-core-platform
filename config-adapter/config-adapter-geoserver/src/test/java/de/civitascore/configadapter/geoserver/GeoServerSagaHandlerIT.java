@@ -19,6 +19,7 @@ import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AppConfig;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
@@ -187,14 +188,131 @@ class GeoServerSagaHandlerIT extends AbstractGeoServerIT {
     assertEquals(404, featureTypeStatus(LAYER_POINT), "restore published nothing");
   }
 
+  @Test
+  void publishesTheLayerFieldsAndTheOwsApiAsServiceMetadata() {
+    Map<String, Object> layer = layerWithBoundingBox();
+    layer.put("title", "Sensoren");
+    layer.put("description", "Messstationen");
+    layer.put("attribute", List.of("sensor_id", "pm25"));
+    layer.put("geometryColumnRef", "geom");
+    layer.put("cqlFilter", "pm25 > 10");
+
+    assertStepCompleted(provision(List.of(layer), owsApi("Luftqualität", "Stationsdaten")));
+
+    JsonNode featureType = getJson(featureTypePath(LAYER_POINT)).get("featureType");
+    assertEquals("Sensoren", featureType.path("title").asText());
+    assertEquals("Messstationen", featureType.path("abstract").asText());
+    assertEquals("pm25 > 10", featureType.path("cqlFilter").asText());
+    assertEquals(List.of("sensor_id", "pm25", "geom"), attributeNames(featureType));
+    JsonNode wms = getJson(wmsSettingsPath()).get("wms");
+    assertEquals("Luftqualität", wms.path("title").asText());
+    assertEquals("Stationsdaten", wms.path("abstrct").asText());
+  }
+
+  /** A re-release runs the create steps against the workspace an unrelease left behind. */
+  @Test
+  void provisioningAnExistingWorkspaceConvergesAndClearsTheFields() {
+    Map<String, Object> layer = layerWithBoundingBox();
+    layer.put("title", "Sensoren");
+    layer.put("description", "Messstationen");
+    layer.put("attribute", List.of("name"));
+    layer.put("geometryColumnRef", "geom");
+    layer.put("cqlFilter", "pm25 > 10");
+    assertStepCompleted(provision(List.of(layer), owsApi("Luftqualität", "Stationsdaten")));
+
+    assertStepCompleted(provision(List.of(layerWithBoundingBox()), owsApi("Luft", null)));
+
+    JsonNode featureType = getJson(featureTypePath(LAYER_POINT)).get("featureType");
+    assertEquals(LAYER_POINT, featureType.path("title").asText(), "blank title → layer name");
+    assertEquals("", featureType.path("abstract").asText(""));
+    assertEquals("", featureType.path("cqlFilter").asText(""));
+    assertEquals(
+        List.of("sensor_id", "name", "pm25", "no2", "temperature", "geom"),
+        attributeNames(featureType),
+        "an empty selection publishes every column");
+    JsonNode wms = getJson(wmsSettingsPath()).get("wms");
+    assertEquals("Luft", wms.path("title").asText());
+    assertEquals("", wms.path("abstrct").asText(""));
+  }
+
+  /** GeoServer validates the filter only while computing the native bounding box itself. */
+  @Test
+  void anInvalidCqlFilterFailsTheStepWhenGeoServerComputesTheBoundingBox() {
+    Map<String, Object> layer = new HashMap<>(layer(LAYER_POINT));
+    layer.put("cqlFilter", "pm25 >>");
+
+    SagaCommandResult result = provision(List.of(layer), owsApi("Luft", null));
+
+    assertEquals("STEP_FAILED", result.type());
+    assertTrue(
+        String.valueOf(result.error()).contains("ECQL"),
+        () -> "GeoServer's reason is reported: " + result.error());
+    assertEquals(404, featureTypeStatus(LAYER_POINT), "nothing is published");
+  }
+
+  /** Pins that a supplied bounding box skips GeoServer's filter validation. */
+  @Test
+  void anInvalidCqlFilterIsStoredWhenTheLayerCarriesABoundingBox() {
+    Map<String, Object> layer = layerWithBoundingBox();
+    layer.put("cqlFilter", "pm25 >>");
+
+    assertStepCompleted(provision(List.of(layer), owsApi("Luft", null)));
+
+    JsonNode featureType = getJson(featureTypePath(LAYER_POINT)).get("featureType");
+    assertEquals("pm25 >>", featureType.path("cqlFilter").asText());
+  }
+
+  @Test
+  void anUnknownAttributeFailsTheStepWhenTheLayerCarriesABoundingBox() {
+    Map<String, Object> layer = layerWithBoundingBox();
+    layer.put("attribute", List.of("no_such_column"));
+    layer.put("geometryColumnRef", "geom");
+
+    SagaCommandResult result = provision(List.of(layer), owsApi("Luft", null));
+
+    assertEquals("STEP_FAILED", result.type());
+    assertTrue(
+        String.valueOf(result.error()).contains("does not have a property named no_such_column"),
+        () -> "GeoServer's reason is reported: " + result.error());
+  }
+
   // ── helpers: command construction ────────────────────────────────────────────
 
   private SagaCommandResult provision(List<Map<String, Object>> layers) {
+    return provision(layers, List.of());
+  }
+
+  private SagaCommandResult provision(
+      List<Map<String, Object>> layers, Map<String, Object> namedApi) {
+    return provision(layers, List.of(namedApi));
+  }
+
+  private SagaCommandResult provision(
+      List<Map<String, Object>> layers, List<Map<String, Object>> namedApis) {
     return handler.handle(
         command(
             "EXECUTE_STEP",
             "PROVISION_WORKSPACE",
-            Map.of("datasetId", DATASET_ID, "layers", layers)));
+            Map.of("datasetId", DATASET_ID, "layers", layers, "namedApis", namedApis)));
+  }
+
+  /** A layer shaped like the portal sends it: the native bounding box is always set. */
+  private static Map<String, Object> layerWithBoundingBox() {
+    Map<String, Object> layer = new HashMap<>(layer(LAYER_POINT));
+    layer.put(
+        "nativeBoundingBox", Map.of("minX", 13.2, "minY", 52.47, "maxX", 13.55, "maxY", 52.55));
+    return layer;
+  }
+
+  private static Map<String, Object> owsApi(String name, String description) {
+    Map<String, Object> api = new HashMap<>();
+    api.put("slug", "karte");
+    api.put("standard", "OWS");
+    api.put("name", name);
+    if (description != null) {
+      api.put("description", description);
+    }
+    return api;
   }
 
   private SagaCommandResult update(List<Map<String, Object>> layers) {
@@ -238,14 +356,30 @@ class GeoServerSagaHandlerIT extends AbstractGeoServerIT {
   }
 
   private int featureTypeStatus(String layer) {
-    return statusOf(
-        "/rest/workspaces/"
-            + WORKSPACE
-            + "/datastores/"
-            + DATASTORE
-            + "/featuretypes/"
-            + layer
-            + ".json");
+    return statusOf(featureTypePath(layer));
+  }
+
+  private static String featureTypePath(String layer) {
+    return "/rest/workspaces/"
+        + WORKSPACE
+        + "/datastores/"
+        + DATASTORE
+        + "/featuretypes/"
+        + layer
+        + ".json";
+  }
+
+  private static String wmsSettingsPath() {
+    return "/rest/services/wms/workspaces/" + WORKSPACE + "/settings.json";
+  }
+
+  private static List<String> attributeNames(JsonNode featureType) {
+    List<String> names = new ArrayList<>();
+    featureType
+        .path("attributes")
+        .path("attribute")
+        .forEach(a -> names.add(a.path("name").asText()));
+    return names;
   }
 
   private JsonNode getJson(String path) {

@@ -137,7 +137,7 @@ class GeoServerSagaHandlerTest {
         server.enqueue(created()); // workspace
         server.enqueue(ok()); // workspace wms service settings
 
-        // With a datasetName in the trigger, the workspace WMS/WFS services are titled with the
+        // With a datasetName in the trigger, the workspace WMS service is titled with the
         // human-facing dataset name (not the technical workspace name).
         SagaCommandResult result =
             handler.handle(
@@ -269,6 +269,7 @@ class GeoServerSagaHandlerTest {
                 .code(500)
                 .body("Resource named 'traffic_counts' already exists in store: 'ds'")
                 .build());
+        server.enqueue(ok()); // feature type update PUT
 
         SagaCommandResult result =
             handler.handle(
@@ -1048,6 +1049,7 @@ class GeoServerSagaHandlerTest {
     void treatsDuplicateWorkspaceAs409Idempotent() {
       try (GeoServerSagaHandler handler = createHandler()) {
         server.enqueue(new MockResponse.Builder().code(409).build()); // workspace 409 = exists
+        server.enqueue(ok()); // workspace wms service settings
         server.enqueue(created()); // datastore
 
         SagaCommandMessage command =
@@ -1070,6 +1072,7 @@ class GeoServerSagaHandlerTest {
                 .code(500)
                 .body("Workspace 'ds_existing' already exists")
                 .build());
+        server.enqueue(ok()); // workspace wms service settings
         server.enqueue(created()); // datastore
 
         SagaCommandMessage command =
@@ -1081,11 +1084,12 @@ class GeoServerSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
-        // Only a fresh 201 may configure the WMS service — doing it here would overwrite the
-        // service title of a workspace that already serves data.
-        assertEquals(2, server.getRequestCount());
-        assertFalse(server.takeRequest().getUrl().encodedPath().contains("/services/wms/"));
-        assertFalse(server.takeRequest().getUrl().encodedPath().contains("/services/wms/"));
+        // A re-release finds the workspace and still writes its WMS settings.
+        assertEquals(3, server.getRequestCount());
+        server.takeRequest(); // workspace
+        assertEquals(
+            "/geoserver/rest/services/wms/workspaces/ds_existing/settings",
+            server.takeRequest().getUrl().encodedPath());
       }
     }
 
@@ -1282,6 +1286,7 @@ class GeoServerSagaHandlerTest {
       try (GeoServerSagaHandler handler = createHandler()) {
         server.enqueue(snapshotResponse("t1"));
         server.enqueue(new MockResponse.Builder().code(409).build()); // workspace exists
+        server.enqueue(ok()); // workspace wms service settings
         server.enqueue(new MockResponse.Builder().code(409).build()); // datastore exists
         server.enqueue(ok()); // datastore update PUT
         server.enqueue(new MockResponse.Builder().code(409).build()); // feature type exists
@@ -1295,7 +1300,7 @@ class GeoServerSagaHandlerTest {
         assertEquals("STEP_COMPLETED", result.type());
         // Both the existing datastore and the existing feature type return 409 on POST and must be
         // updated via PUT (not silently ignored), so the workspace converges to the desired config.
-        assertEquals(6, server.getRequestCount());
+        assertEquals(7, server.getRequestCount());
       }
     }
 
@@ -1304,6 +1309,7 @@ class GeoServerSagaHandlerTest {
       try (GeoServerSagaHandler handler = createHandler()) {
         server.enqueue(snapshotResponse("t1"));
         server.enqueue(new MockResponse.Builder().code(409).build()); // workspace exists
+        server.enqueue(ok()); // workspace wms service settings
         server.enqueue(new MockResponse.Builder().code(409).build()); // datastore exists
         server.enqueue(ok()); // datastore update PUT
         server.enqueue(new MockResponse.Builder().code(409).build()); // feature type exists
@@ -1326,6 +1332,7 @@ class GeoServerSagaHandlerTest {
         // it.
         server.enqueue(snapshotResponse("t1", "removed_layer"));
         server.enqueue(new MockResponse.Builder().code(409).build()); // workspace exists
+        server.enqueue(ok()); // workspace wms service settings
         server.enqueue(new MockResponse.Builder().code(409).build()); // datastore exists
         server.enqueue(ok()); // datastore update PUT
         server.enqueue(new MockResponse.Builder().code(409).build()); // feature type exists
@@ -1346,6 +1353,7 @@ class GeoServerSagaHandlerTest {
       try (GeoServerSagaHandler handler = createHandler()) {
         server.enqueue(snapshotResponse("t1"));
         server.enqueue(new MockResponse.Builder().code(409).build()); // workspace exists
+        server.enqueue(ok()); // workspace wms service settings
         server.enqueue(new MockResponse.Builder().code(409).build()); // datastore exists
         server.enqueue(ok()); // datastore update PUT
         server.enqueue(new MockResponse.Builder().code(409).build()); // feature type exists
@@ -1357,7 +1365,7 @@ class GeoServerSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
-        assertEquals(6, server.getRequestCount());
+        assertEquals(7, server.getRequestCount());
       }
     }
 
@@ -1368,6 +1376,7 @@ class GeoServerSagaHandlerTest {
         // re-publishes all of them.
         server.enqueue(snapshotResponse("t1"));
         server.enqueue(new MockResponse.Builder().code(409).build()); // workspace precedes it
+        server.enqueue(ok()); // workspace wms service settings
         server.enqueue(new MockResponse.Builder().code(409).build()); // datastore precedes it
         server.enqueue(ok()); // datastore update PUT
         server.enqueue(
@@ -1391,6 +1400,7 @@ class GeoServerSagaHandlerTest {
       try (GeoServerSagaHandler handler = createHandler()) {
         server.enqueue(snapshotResponse("t1"));
         server.enqueue(new MockResponse.Builder().code(409).build()); // workspace exists
+        server.enqueue(ok()); // workspace wms service settings
         server.enqueue(new MockResponse.Builder().code(409).build()); // datastore exists
         server.enqueue(ok()); // datastore update PUT
         server.enqueue(
@@ -1709,7 +1719,277 @@ class GeoServerSagaHandlerTest {
     }
   }
 
+  @Nested
+  class PublishedMetadata {
+
+    @Test
+    void sendsTheLayerFieldsWithTheGeometryColumnAddedToTheAttributes()
+        throws InterruptedException {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        server.enqueue(created());
+        Map<String, Object> layer = new LinkedHashMap<>();
+        layer.put("layerName", "stations");
+        layer.put("title", "Stationen");
+        layer.put("description", "Messstationen");
+        layer.put("attribute", List.of("id"));
+        layer.put("cqlFilter", "id > 3");
+
+        SagaCommandResult result = provisionLayers(handler, layer, Map.of("geom", "EPSG:4326"));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        Map<String, Object> featureType = postedFeatureType(server.takeRequest());
+        assertEquals("Stationen", featureType.get("title"));
+        assertEquals("Messstationen", featureType.get("abstract"));
+        assertEquals("id > 3", featureType.get("cqlFilter"));
+        assertEquals(List.of("id", "geom"), attributeNames(featureType));
+      }
+    }
+
+    @Test
+    void sendsBlankFieldsAsClearedValuesSoAnUpdateOverwritesThem() throws InterruptedException {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        server.enqueue(created());
+
+        provisionLayers(handler, Map.of("layerName", "stations"), Map.of("geom", "EPSG:4326"));
+
+        Map<String, Object> featureType = postedFeatureType(server.takeRequest());
+        assertEquals("stations", featureType.get("title"), "a blank title falls back to the name");
+        assertEquals("", featureType.get("abstract"));
+        assertEquals("", featureType.get("cqlFilter"));
+        assertEquals(List.of(), attributeNames(featureType), "no selection → no restriction");
+      }
+    }
+
+    @Test
+    void doesNotRepeatAGeometryColumnTheUserSelected() throws InterruptedException {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        server.enqueue(created());
+
+        provisionLayers(
+            handler,
+            Map.of("layerName", "stations", "attribute", List.of("geom", "id")),
+            Map.of("geom", "EPSG:4326"));
+
+        assertEquals(
+            List.of("geom", "id"), attributeNames(postedFeatureType(server.takeRequest())));
+      }
+    }
+
+    @Test
+    void addsTheGeometryColumnTheLayerPicksAmongSeveral() throws InterruptedException {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        server.enqueue(created());
+        Map<String, String> geometries = new LinkedHashMap<>();
+        geometries.put("location", "EPSG:4326");
+        geometries.put("area", "EPSG:4326");
+
+        provisionLayers(
+            handler,
+            Map.of(
+                "layerName", "stations", "attribute", List.of("id"), "geometryColumnRef", "area"),
+            geometries);
+
+        assertEquals(
+            List.of("id", "area"), attributeNames(postedFeatureType(server.takeRequest())));
+      }
+    }
+
+    @Test
+    void usesTheGeometryColumnRefWhenTheSinkCarriesNoDataStructure() throws InterruptedException {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        server.enqueue(created());
+
+        provisionLayers(
+            handler,
+            Map.of(
+                "layerName", "stations", "attribute", List.of("id"), "geometryColumnRef", "geom"),
+            null);
+
+        assertEquals(
+            List.of("id", "geom"), attributeNames(postedFeatureType(server.takeRequest())));
+      }
+    }
+
+    @Test
+    void failsWhenAttributesAreRestrictedButNoGeometryColumnIsKnown() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        SagaCommandResult result =
+            provisionLayers(
+                handler, Map.of("layerName", "stations", "attribute", List.of("id")), null);
+
+        assertEquals("STEP_FAILED", result.type());
+        assertEquals(0, server.getRequestCount());
+      }
+    }
+
+    @Test
+    void provisioningAnExistingFeatureTypeWritesTheFieldsViaPut() throws InterruptedException {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        server.enqueue(
+            new MockResponse.Builder()
+                .code(500)
+                .body("Resource named 'stations' already exists in store: 'ds'")
+                .build());
+        server.enqueue(ok());
+
+        SagaCommandResult result =
+            provisionLayers(
+                handler,
+                Map.of("layerName", "stations", "title", "Stationen"),
+                Map.of("geom", "EPSG:4326"));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals("POST", server.takeRequest().getMethod());
+        RecordedRequest put = server.takeRequest();
+        assertEquals("PUT", put.getMethod());
+        assertEquals(
+            "/geoserver/rest/workspaces/ds_abc/datastores/ds_abc_postgis/featuretypes/stations",
+            put.getUrl().encodedPath());
+        assertEquals("Stationen", postedFeatureType(put).get("title"));
+      }
+    }
+
+    @Test
+    void failsWithGeoServersReasonWhenItRejectsTheCqlFilter() {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        server.enqueue(
+            new MockResponse.Builder()
+                .code(500)
+                .body("Failed to generate filter from ECQL string Encountered \" <GT> \">\"")
+                .build());
+
+        SagaCommandResult result =
+            provisionLayers(
+                handler,
+                Map.of("layerName", "stations", "cqlFilter", "id >>"),
+                Map.of("geom", "EPSG:4326"));
+
+        assertEquals("STEP_FAILED", result.type());
+        assertTrue(String.valueOf(result.error()).contains("ECQL"));
+      }
+    }
+
+    @Test
+    void titlesTheWmsServiceWithTheOwsApiEvenWhenTheWorkspaceExists() throws InterruptedException {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        server.enqueue(new MockResponse.Builder().code(409).build()); // workspace exists
+        server.enqueue(ok()); // workspace wms service settings
+
+        SagaCommandResult result =
+            createWorkspace(
+                handler,
+                List.of(
+                    Map.of("slug", "sta", "standard", "STA", "name", "Sensoren"),
+                    Map.of(
+                        "slug",
+                        "karte",
+                        "standard",
+                        "OWS",
+                        "name",
+                        "Luftkarte",
+                        "description",
+                        "Stationsdaten")));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        Map<String, Object> wms = takeWmsSettings();
+        assertEquals("Luftkarte", wms.get("title"));
+        assertEquals("Stationsdaten", wms.get("abstrct"));
+      }
+    }
+
+    @Test
+    void updateWritesTheOwsApiAsWmsServiceMetadata() throws InterruptedException {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        server.enqueue(emptySnapshotResponse());
+        server.enqueue(new MockResponse.Builder().code(409).build()); // workspace exists
+        server.enqueue(ok()); // workspace wms service settings
+        server.enqueue(created()); // datastore
+
+        SagaCommandResult result =
+            handler.handle(
+                createCommand(
+                    "EXECUTE_STEP",
+                    "UPDATE_WORKSPACE",
+                    Map.of(
+                        "datasetId",
+                        "ds-abc",
+                        "namedApis",
+                        List.of(
+                            Map.of(
+                                "slug",
+                                "karte",
+                                "standard",
+                                "OWS",
+                                "name",
+                                "Luftkarte",
+                                "description",
+                                "Stationsdaten")))));
+
+        assertEquals("STEP_COMPLETED", result.type());
+        server.takeRequest(); // snapshot
+        Map<String, Object> wms = takeWmsSettings();
+        assertEquals("Luftkarte", wms.get("title"));
+        assertEquals("Stationsdaten", wms.get("abstrct"));
+      }
+    }
+
+    @Test
+    void fallsBackToTheDatasetNameAndClearsTheAbstractWithoutAnOwsApiDescription()
+        throws InterruptedException {
+      try (GeoServerSagaHandler handler = createHandler()) {
+        server.enqueue(created());
+        server.enqueue(ok());
+
+        createWorkspace(handler, List.of(Map.of("slug", "karte", "standard", "OWS", "name", " ")));
+
+        Map<String, Object> wms = takeWmsSettings();
+        assertEquals("Luftqualität Datensatz", wms.get("title"));
+        assertEquals("", wms.get("abstrct"));
+      }
+    }
+
+    /** PROVISION_LAYERS for one layer; {@code geometries == null} sends no data sink. */
+    private SagaCommandResult provisionLayers(
+        GeoServerSagaHandler handler, Map<String, Object> layer, Map<String, String> geometries) {
+      Map<String, Object> payload = new LinkedHashMap<>();
+      payload.put("datasetId", "ds-abc");
+      if (geometries != null) {
+        payload.put("datasinks", List.of(postgisSinkWithGeometry("stations", geometries)));
+      }
+      payload.put("layers", List.of(layer));
+      return handler.handle(createCommand("EXECUTE_STEP", "PROVISION_LAYERS", payload));
+    }
+
+    private SagaCommandResult createWorkspace(
+        GeoServerSagaHandler handler, List<Map<String, Object>> namedApis) {
+      return handler.handle(
+          createCommand(
+              "EXECUTE_STEP",
+              "CREATE_WORKSPACE",
+              Map.of(
+                  "datasetId",
+                  "ds-abc",
+                  "datasetName",
+                  "Luftqualität Datensatz",
+                  "namedApis",
+                  namedApis)));
+    }
+
+    /** The {@code wms} settings body of the request following the workspace POST. */
+    private Map<String, Object> takeWmsSettings() throws InterruptedException {
+      server.takeRequest(); // workspace
+      return asMap(requestBodyAsMap(server.takeRequest()).get("wms"));
+    }
+  }
+
   // ============== HELPERS ==============
+
+  @SuppressWarnings("unchecked")
+  private static List<String> attributeNames(Map<String, Object> featureType) {
+    Map<String, Object> attributes = (Map<String, Object>) featureType.get("attributes");
+    List<Map<String, Object>> entries = (List<Map<String, Object>>) attributes.get("attribute");
+    return entries.stream().map(entry -> (String) entry.get("name")).toList();
+  }
 
   private GeoServerSagaHandler createHandler() {
     GeoServerSagaHandler handler = new GeoServerSagaHandler();

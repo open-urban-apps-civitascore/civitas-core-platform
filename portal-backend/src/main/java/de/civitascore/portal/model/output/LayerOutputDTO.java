@@ -29,9 +29,6 @@ public class LayerOutputDTO extends BaseOutputDTO {
   @Schema(description = "Human-readable description")
   private String description;
 
-  @Schema(description = "Keywords associated with the layer")
-  private List<String> keywords = new ArrayList<>();
-
   @Schema(description = "Attribute names exposed by the layer")
   private List<String> attribute = new ArrayList<>();
 

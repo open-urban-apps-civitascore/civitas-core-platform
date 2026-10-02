@@ -247,7 +247,11 @@ public class DataSetSagaPublisher {
         layer.getNativeBoundingBox(),
         layer.getLatLonBoundingBox(),
         layer.getDefaultStyle() != null ? layer.getDefaultStyle().getName() : null,
-        buildAlternativeStyleNames(layer));
+        buildAlternativeStyleNames(layer),
+        layer.getTitle(),
+        layer.getDescription(),
+        layer.getAttribute(),
+        layer.getCqlFilter());
   }
 
   /**
@@ -403,7 +407,14 @@ public class DataSetSagaPublisher {
       return null;
     }
     return dataset.getNamedApis().stream()
-        .map(api -> new NamedApi(api.getSlug(), api.getStandard().name(), api.getVersion()))
+        .map(
+            api ->
+                new NamedApi(
+                    api.getSlug(),
+                    api.getStandard().name(),
+                    api.getVersion(),
+                    api.getName(),
+                    api.getDescription()))
         .toList();
   }
 

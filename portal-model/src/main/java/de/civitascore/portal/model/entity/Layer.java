@@ -44,9 +44,6 @@ public class Layer extends DataSetOwnedEntity {
   @Column(name = "description", columnDefinition = "TEXT")
   private String description;
 
-  @Column(name = "keywords", columnDefinition = "text[]")
-  private List<String> keywords;
-
   @Column(name = "attribute", columnDefinition = "text[]")
   private List<String> attribute;
 

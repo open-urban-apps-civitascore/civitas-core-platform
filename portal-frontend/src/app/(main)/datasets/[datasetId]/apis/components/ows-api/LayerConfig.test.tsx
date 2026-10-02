@@ -77,7 +77,6 @@ const makeLayer = (overrides: Partial<LayerFormData> = {}): LayerFormData => ({
   title: 'Test Layer',
   layerName: 'test_layer',
   description: '',
-  keywords: [],
   dataSinkId: '00000000-0000-0000-0000-000000000003',
   attribute: ['attr1'],
   cqlFilter: '',

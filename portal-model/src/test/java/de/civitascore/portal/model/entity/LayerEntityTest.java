@@ -35,7 +35,6 @@ class LayerEntityTest {
       layer.setLayerName("traffic_layer");
       layer.setTitle("Traffic Layer");
       layer.setDescription("Displays traffic data");
-      layer.setKeywords(List.of("traffic", "transport"));
       layer.setAttribute(List.of("speed", "count"));
       layer.setGeometryColumnRef("geom");
       layer.setCqlFilter("speed > 50");
@@ -47,7 +46,6 @@ class LayerEntityTest {
       assertThat(layer.getDataSet()).isSameAs(dataSet);
       assertThat(layer.getDataSink()).isSameAs(dataSink);
       assertThat(layer.getLayerName()).isEqualTo("traffic_layer");
-      assertThat(layer.getKeywords()).containsExactly("traffic", "transport");
       assertThat(layer.getAttribute()).containsExactly("speed", "count");
       assertThat(layer.getDefaultStyle()).isSameAs(defaultStyle);
       assertThat(layer.getNativeBoundingBox()).containsKey("minx");

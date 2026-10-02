@@ -27,7 +27,6 @@ public class LayerInputDTO extends DataSetOwnedInputDTO {
 
   private String title;
   private String description;
-  private List<String> keywords;
   private List<String> attribute;
   private String geometryColumnRef;
   private String cqlFilter;
