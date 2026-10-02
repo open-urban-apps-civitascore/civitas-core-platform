@@ -5,11 +5,11 @@ import { apiRequest, type ApiServiceResponse } from '@/app/services/api/request/
 import { GetListInput } from '@/types/common'
 import { CreateDataSinkInput, DataSink, DeleteDataSinkInput, UpdateDataSinkInput } from '@/types/datasinks'
 
-const key = 'datasinks'
+export const DATASINKS_QUERY_KEY = 'datasinks'
 
-export const useGetDataSinks = (datasetId: string, { params, isEnabled }: GetListInput = {}) =>
+export const useGetDataSinks = (datasetId: string, { params, isEnabled, refetchOnMount }: GetListInput = {}) =>
   useQuery<ApiServiceResponse<DataSink[]>>({
-    queryKey: [key, datasetId],
+    queryKey: [DATASINKS_QUERY_KEY, datasetId],
     queryFn: () =>
       apiRequest<DataSink[]>({
         method: 'GET',
@@ -19,6 +19,7 @@ export const useGetDataSinks = (datasetId: string, { params, isEnabled }: GetLis
         errorMessage: 'An error occurred while loading data sinks.',
       }),
     enabled: isEnabled,
+    refetchOnMount,
   })
 
 export const useCreateDataSink = () => {
@@ -33,7 +34,7 @@ export const useCreateDataSink = () => {
         errorMessage: 'An error occurred while creating the data sink.',
       }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: [key, variables.datasetId] })
+      queryClient.invalidateQueries({ queryKey: [DATASINKS_QUERY_KEY, variables.datasetId] })
     },
   })
 }
@@ -49,7 +50,7 @@ export const useDeleteDataSink = () => {
         errorMessage: 'An error occurred while deleting the data sink.',
       }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: [key, variables.datasetId] })
+      queryClient.invalidateQueries({ queryKey: [DATASINKS_QUERY_KEY, variables.datasetId] })
     },
   })
 }
@@ -66,7 +67,7 @@ export const useUpdateDataSink = () => {
         errorMessage: 'An error occurred while updating the data sink.',
       }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: [key, variables.datasetId] })
+      queryClient.invalidateQueries({ queryKey: [DATASINKS_QUERY_KEY, variables.datasetId] })
     },
   })
 }

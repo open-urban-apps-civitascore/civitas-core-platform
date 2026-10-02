@@ -32,7 +32,8 @@ export interface DataSinkLocksLookup {
 
 export const useDataSinkLocks = (): DataSinkLocksLookup => {
   const { datasetId } = useParams<{ datasetId: string }>()
-  const { data, isLoading } = useGetDataSinks(datasetId, { isEnabled: !!datasetId })
+  // The release saga sets `provisioned` asynchronously, so cached sinks can be outdated.
+  const { data, isLoading } = useGetDataSinks(datasetId, { isEnabled: !!datasetId, refetchOnMount: 'always' })
 
   const locksById = useMemo(() => {
     const map = new Map<string, DataSinkLocks>()
