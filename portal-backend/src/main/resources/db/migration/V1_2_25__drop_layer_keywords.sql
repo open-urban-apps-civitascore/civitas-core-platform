@@ -1,2 +1,2 @@
--- Remove the layer keywords, which no published layer uses.
+-- Drop the unused layer keywords.
 ALTER TABLE layers DROP COLUMN IF EXISTS keywords;

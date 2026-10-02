@@ -209,7 +209,6 @@ class GeoServerSagaHandlerIT extends AbstractGeoServerIT {
     assertEquals("Stationsdaten", wms.path("abstrct").asText());
   }
 
-  /** A re-release runs the create steps against the workspace an unrelease left behind. */
   @Test
   void provisioningAnExistingWorkspaceConvergesAndClearsTheFields() {
     Map<String, Object> layer = layerWithBoundingBox();

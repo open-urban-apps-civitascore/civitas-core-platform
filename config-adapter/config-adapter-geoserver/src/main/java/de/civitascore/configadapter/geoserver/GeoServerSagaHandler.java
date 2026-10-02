@@ -737,10 +737,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
             + " geometry columns");
   }
 
-  /**
-   * The geometry column to keep in a restricted attribute list. Fails when none is known, because
-   * publishing unrestricted would expose deselected columns.
-   */
+  /** The geometry column of a restricted attribute list; fails rather than publish all columns. */
   private static String resolveGeometryColumn(
       Map<String, Object> layer, String layerName, Map<String, String> geometryCrs) {
     if (!geometryCrs.isEmpty()) {

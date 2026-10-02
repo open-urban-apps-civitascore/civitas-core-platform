@@ -14,9 +14,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 /**
  * A named API endpoint exposed by a dataset (per concept #1379, #1383, and #1384, ADR #1362).
  *
- * <p>This record is the saga-contract shape — it carries the fields config-adapter needs to
- * provision APISIX routes, plus the display name and description, which the GeoServer adapter
- * publishes as the title and abstract of the workspace's WMS service for an {@code OWS} API.
+ * <p>This record is the saga-contract shape: the fields for the APISIX route and, for an {@code
+ * OWS} API, the WMS service title and abstract.
  *
  * <p>{@code slug} is the URL segment in the public route {@code /v1/datasets/{datasetId}/{slug}}.
  * {@code standard} carries the API standard per ADR #1362 (controlled vocabulary {@code WFS}/{@code
