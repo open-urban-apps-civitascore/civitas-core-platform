@@ -85,6 +85,17 @@ describe('diagramSchema', () => {
     expect(result.data.importedStructures).toEqual(pins)
   })
 
+  it.each([
+    'urn:core:platform:civitas:datastructure:frost:Things:k3j4h5g6f7:1.0.0',
+    'urn:core:platform:civitas:datastructure:frost:9cc6ed95-0f8b-8ace-ab6e-83cdee87b3dd',
+    'urn:core:platform:civitas:element:frost:9cc6ed95-0f8b-8ace-ab6e-83cdee87b3dd:1.0.0',
+    '<img src=x onerror=alert(1)>',
+  ])('refuses a diagram whose imported structure is not a pinned data structure URN: %s', urn => {
+    const diagram = { id: 'diagram-1', name: 'Loaded', nodes: [], edges: [], importedStructures: [{ urn, name: 'X' }] }
+
+    expect(UMLDiagramSchema.safeParse(diagram).success).toBe(false)
+  })
+
   it('strips extra and transient react-flow fields from nodes and edges', () => {
     const diagramWithTransientFields = {
       id: 'diagram-1',

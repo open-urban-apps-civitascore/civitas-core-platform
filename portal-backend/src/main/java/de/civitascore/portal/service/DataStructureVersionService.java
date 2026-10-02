@@ -1,5 +1,6 @@
 package de.civitascore.portal.service;
 
+import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
@@ -33,6 +34,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DataStructureVersionService
     extends BaseService<DataStructureVersion, DataStructureVersionInputDTO> {
+
+  private static final String DATASTRUCTURE_TYPE = "datastructure";
+  private static final int URN_TYPE_SEGMENT = 4;
 
   private final DataSourceRepository dataSourceRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
@@ -72,6 +76,8 @@ public class DataStructureVersionService
   @Override
   protected DataStructureVersion postConvertToEntity(
       DataStructureVersion entity, DataStructureVersionInputDTO input) {
+    requirePinnedStructureUrns(input.getImportedStructureUrns());
+
     // Set dataStructure
     Optional.ofNullable(input.getDataStructureId())
         .map(dataStructureService::findByIdOrThrow)
@@ -148,6 +154,21 @@ public class DataStructureVersionService
     }
     entity.setModelUrn(pin.versionedUrn());
     entity.setVersion(pin.version());
+  }
+
+  private static void requirePinnedStructureUrns(List<String> importedStructureUrns) {
+    if (importedStructureUrns != null
+        && !importedStructureUrns.stream()
+            .allMatch(DataStructureVersionService::isPinnedDataStructureUrn)) {
+      throw new InvalidInputException(
+          "DataStructureVersion",
+          "importedStructureUrns",
+          "importedStructureUrns must name data structures by CORE URNs pinned to a version");
+    }
+  }
+
+  private static boolean isPinnedDataStructureUrn(String urn) {
+    return CoreUrn.isValid(urn) && DATASTRUCTURE_TYPE.equals(urn.split(":")[URN_TYPE_SEGMENT]);
   }
 
   /**

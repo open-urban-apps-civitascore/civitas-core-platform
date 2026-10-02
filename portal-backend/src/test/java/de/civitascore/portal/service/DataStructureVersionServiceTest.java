@@ -36,6 +36,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -514,6 +516,50 @@ class DataStructureVersionServiceTest {
           .storeModel(any(), any(), any(), any(), any(), any(), any());
       assertThat(result.getVersion()).isNull();
       assertThat(result.getModelUrn()).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = {
+          "<img src=x onerror=alert(1)>",
+          "urn:core:platform:civitas:datastructure:frost:Things:k3j4h5g6f7:1.0.0",
+          "urn:core:platform:civitas:element:common:7c96ac2d-1fad-817a-a9b0-c7374bba1952:1.0.0",
+          "urn:core:platform:civitas:datastructure:frost:09846bf2-00d1-8ef2-bede-0e5936586b89"
+        })
+    @DisplayName("An imported structure that is not a pinned data structure URN is refused")
+    void createWithInvalidImportedStructureIsRefused(String importedStructureUrn) {
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureId(UUID.randomUUID());
+      input.setModel(new HashMap<>(Map.of("title", "Observation")));
+      input.setImportedStructureUrns(List.of(importedStructureUrn));
+      when(dataStructureVersionMapper.toEntity(any())).thenReturn(new DataStructureVersion());
+
+      assertThatThrownBy(() -> dataStructureVersionService.create(input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("importedStructureUrns");
+      verifyNoInteractions(modelRegistryGateway);
+    }
+
+    @Test
+    @DisplayName("An imported structure named by a pinned data structure URN is accepted")
+    void createWithPinnedImportedStructureIsAccepted() {
+      UUID dataStructureId = UUID.randomUUID();
+      DataStructure dataStructure = new DataStructure();
+      dataStructure.setId(dataStructureId);
+      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureId(dataStructureId);
+      input.setModel(new HashMap<>(Map.of("title", "Observation")));
+      input.setImportedStructureUrns(
+          List.of(
+              "urn:core:platform:civitas:datastructure:frost:09846bf2-00d1-8ef2-bede-0e5936586b89:1.0.0"));
+
+      when(dataStructureVersionMapper.toEntity(any())).thenReturn(new DataStructureVersion());
+      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
+      when(dataStructureVersionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      assertThat(dataStructureVersionService.create(input).getVersion()).isEqualTo("1.0.0");
     }
 
     // Without the check the insert hits the unique constraint, and the 409 quotes the database.
