@@ -113,6 +113,13 @@ export const useDatasourceForm = (
   const isDraftMode = dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
   const hasStatusChanged = dataSourceStatus !== datasource.dataSourceStatus
 
+  // A data source a released dataset's pipeline still reads from cannot be unreleased — the backend
+  // rejects POST /unrelease with 409 RESOURCE_IN_USE (requireNoReleasedReferrer). Draft referrers do
+  // not block it. Gate the option here so the transition is refused before the user stages an
+  // unsaveable change.
+  const isInUseByReleased = datasource.inUseByReleased
+  const canSetDraft = !isInUseByReleased
+
   // Zod v4 discriminatedUnion safeParse can throw on stale keys
   const canStage = useMemo(() => {
     try {
@@ -137,14 +144,14 @@ export const useDatasourceForm = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectorTypeWatch, isDraftMode])
 
-  // Revert to draft when required fields become empty
+  // Revert to draft when required fields become empty — but never for an in-use data source
   useEffect(() => {
-    if (dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE && !canStage) {
+    if (dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE && !canStage && canSetDraft) {
       form.setValue('dataSourceStatus', DATASOURCE_STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canStage, dataSourceStatus, form])
+  }, [canStage, canSetDraft, dataSourceStatus, form])
 
   const completedTabs = useMemo((): DatasourceTab[] => {
     const completed: DatasourceTab[] = []
@@ -313,6 +320,7 @@ export const useDatasourceForm = (
     handleStatusChange,
     isDraftMode,
     canStage,
+    canSetDraft,
     completedTabs,
     submitDatasource,
     resetToInitialState,

@@ -140,6 +140,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     hasStatusChanged,
     handleStatusChange,
     canStage,
+    canSetDraft,
     completedTabs,
     submitDatasource,
     resetToInitialState: resetDatasourceToInitialState,
@@ -151,7 +152,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const [isDraftBlockedModalOpen, setIsDraftBlockedModalOpen] = useState(false)
 
   const handleStatusSelect = (newStatus: DatasourceStatusType) => {
-    if (newStatus === DATASOURCE_STATUS_TYPES.DRAFT && datasource.inUseByReleased) {
+    if (newStatus === DATASOURCE_STATUS_TYPES.DRAFT && !canSetDraft) {
       setIsDraftBlockedModalOpen(true)
       return
     }
