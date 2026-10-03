@@ -218,6 +218,7 @@ class FrostMappingCompilerTest {
     StaProperties properties =
         new StaProperties(
             List.of(new KeyAttribute("reference"), new FreeAttribute("operator", StaJsonType.ANY)),
+            List.of(),
             List.of(new KeyAttribute("reference")),
             List.of());
 
@@ -401,6 +402,230 @@ class FrostMappingCompilerTest {
     assertTrue(ex.getMessage().contains("$.Datastreams[].properties.reference"), ex.getMessage());
   }
 
+  // ─── The Location's properties bag ───────────────────────────────────────────
+
+  /** The bag the published ThingTree structure models: a Location reference beside the Thing's. */
+  private static final StaProperties WITH_LOCATION_BAG =
+      new StaProperties(
+          List.of(new KeyAttribute("reference")),
+          List.of(new KeyAttribute("reference"), new FreeAttribute("floor", StaJsonType.ANY)),
+          List.of(new KeyAttribute("reference")),
+          List.of());
+
+  /** A Thing with a creatable Location, extended by the given Location paths. */
+  private static MappingConfig locationMapping(Object... extraPathsAndValues) {
+    Map<String, ValueNode> fields = new LinkedHashMap<>(thingOnlyMapping().fields());
+    fields.put("$.Locations[].name", new CopyNode("$.siteName"));
+    fields.put("$.Locations[].description", new CopyNode("$.siteDesc"));
+    fields.put("$.Locations[].encodingType", new ConstNode("application/geo+json", null));
+    fields.put(
+        "$.Locations[].location", new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")));
+    for (int i = 0; i < extraPathsAndValues.length; i += 2) {
+      fields.put((String) extraPathsAndValues[i], (ValueNode) extraPathsAndValues[i + 1]);
+    }
+    return new MappingConfig(null, null, fields);
+  }
+
+  /** The rendered body from the Location on — the Thing's own bag comes before it. */
+  private static String locationOf(String body) {
+    int start = body.indexOf("\"Locations\":[{");
+    assertTrue(start > 0, body);
+    return body.substring(start);
+  }
+
+  @Test
+  void compile_withALocationReference_rendersItIntoTheLocationsBag() throws Exception {
+    String body =
+        compiler
+            .compile(
+                locationMapping("$.Locations[].properties.reference", new CopyNode("$.siteRef")),
+                WITH_LOCATION_BAG,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    // The port looks the Location up by this value under its Thing, so it must reach the bag of the
+    // Location and not the Thing's.
+    String location = locationOf(body);
+    assertTrue(location.contains("\"properties\":{\"reference\":\"${sta_7_reference"), location);
+  }
+
+  @Test
+  void compile_withALocationReferenceAlone_rendersTheLocation() throws Exception {
+    // The bag attribute alone is not a create intent, like the whole properties object today: the
+    // Location stays lookup-only, but the reference must still reach the body.
+    String body =
+        compiler
+            .compile(
+                mapping(
+                    "$.name", new CopyNode("$.station"),
+                    "$.description", new CopyNode("$.desc"),
+                    "$.properties.reference", new CopyNode("$.ref"),
+                    "$.Locations[].properties.reference", new CopyNode("$.siteRef")),
+                WITH_LOCATION_BAG,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"Locations\":[{\"properties\":{\"reference\":"), body);
+  }
+
+  @Test
+  void compile_withAFreeLocationAttribute_rendersItBesideTheReference() throws Exception {
+    String body =
+        compiler
+            .compile(
+                locationMapping(
+                    "$.Locations[].properties.reference", new CopyNode("$.siteRef"),
+                    "$.Locations[].properties.floor",
+                        new ConvertNode(ConversionOp.TO_INT, new CopyNode("$.floor"), null)),
+                WITH_LOCATION_BAG,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    String location = locationOf(body);
+    assertTrue(location.contains("\"reference\":"), location);
+    assertTrue(location.contains("\"floor\":${sta_8_floor:isEmpty()"), location);
+  }
+
+  @Test
+  void compile_withALowerCaseLocationsEdge_rendersTheLocationReference() throws Exception {
+    // A model exported from UML commonly spells the edge 'locations'; the bag below it is kept.
+    String body =
+        compiler
+            .compile(
+                mapping(
+                    "$.properties.reference", new CopyNode("$.ref"),
+                    "$.locations[].properties.reference", new CopyNode("$.siteRef")),
+                WITH_LOCATION_BAG,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"Locations\":[{\"properties\":{\"reference\":"), body);
+  }
+
+  @Test
+  void compile_withALocationReferenceTheStructureDoesNotModel_isRejected() {
+    // Without a properties class under the Location the attribute is not part of the vocabulary.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compiler.compile(
+                    locationMapping(
+                        "$.Locations[].properties.reference", new CopyNode("$.siteRef")),
+                    KEYS,
+                    SinkPort.THING_TREE));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+    assertTrue(
+        ex.getMessage()
+            .contains(
+                "unsupported FROST mapping target path: " + "'$.Locations[].properties.reference'"),
+        ex.getMessage());
+  }
+
+  @Test
+  void compile_withALocationAttributeTheStructureDoesNotModel_isRejected() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compiler.compile(
+                    locationMapping("$.Locations[].properties.room", new CopyNode("$.room")),
+                    WITH_LOCATION_BAG,
+                    SinkPort.THING_TREE));
+
+    assertTrue(ex.getMessage().contains("'$.Locations[].properties.room'"), ex.getMessage());
+  }
+
+  @Test
+  void compile_withTheWholeLocationPropertiesAndAnAttributeOfIt_isRejected() {
+    // The body holds the properties object once; rendering both would drop one without an error.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compiler.compile(
+                    locationMapping(
+                        "$.Locations[].properties", new CopyNode("$.siteProps"),
+                        "$.Locations[].properties.reference", new CopyNode("$.siteRef")),
+                    WITH_LOCATION_BAG,
+                    SinkPort.THING_TREE));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+    assertTrue(ex.getMessage().contains("map either the whole object"), ex.getMessage());
+  }
+
+  @Test
+  void compile_withTheWholeLocationPropertiesAlone_isStillAccepted() throws Exception {
+    String body =
+        compiler
+            .compile(
+                locationMapping("$.Locations[].properties", new CopyNode("$.siteProps")),
+                WITH_LOCATION_BAG,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertTrue(locationOf(body).contains("\"properties\":${sta_7_properties}"), body);
+  }
+
+  @Test
+  void compile_withALocationReferenceAndAPartialCreateSet_isRejected() {
+    // The reference does not lift the all-or-nothing rule of the Location's create set.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compiler.compile(
+                    mapping(
+                        "$.name", new CopyNode("$.station"),
+                        "$.description", new CopyNode("$.desc"),
+                        "$.properties.reference", new CopyNode("$.ref"),
+                        "$.Locations[].name", new CopyNode("$.siteName"),
+                        "$.Locations[].properties.reference", new CopyNode("$.siteRef")),
+                    WITH_LOCATION_BAG,
+                    SinkPort.THING_TREE));
+
+    assertTrue(ex.getMessage().contains("$.Locations[].location"), ex.getMessage());
+  }
+
+  @Test
+  void compile_intoTheThingsPort_rejectsALocationReference() {
+    // The Things port writes the Thing alone; a Location reference would be dropped silently.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compiler.compile(
+                    mapping(
+                        "$.name", new CopyNode("$.station"),
+                        "$.description", new CopyNode("$.desc"),
+                        "$.properties.reference", new CopyNode("$.ref"),
+                        "$.Locations[].properties.reference", new CopyNode("$.siteRef")),
+                    WITH_LOCATION_BAG,
+                    SinkPort.THINGS));
+
+    assertTrue(ex.getMessage().contains("Things port writes the Thing only"), ex.getMessage());
+  }
+
+  @Test
+  void rejectsALocationBagWithMoreThanOneMatchKey() {
+    IllegalArgumentException ex =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new StaProperties(
+                    List.of(new KeyAttribute("reference")),
+                    List.of(new KeyAttribute("reference"), new KeyAttribute("siteId")),
+                    List.of(),
+                    List.of()));
+    assertTrue(ex.getMessage().contains("location"), ex.getMessage());
+  }
+
   // ─── Body templates ─────────────────────────────────────────────────────────
 
   @Test
@@ -521,6 +746,7 @@ class FrostMappingCompilerTest {
     StaProperties properties =
         new StaProperties(
             List.of(new KeyAttribute("reference"), new FreeAttribute("sensor", StaJsonType.ANY)),
+            List.of(),
             List.of(new KeyAttribute("reference")),
             List.of());
 
@@ -633,6 +859,7 @@ class FrostMappingCompilerTest {
     StaProperties props =
         new StaProperties(
             List.of(new KeyAttribute("reference"), new FreeAttribute("owner", StaJsonType.ANY)),
+            List.of(),
             List.of(),
             List.of());
     FatalAdapterException ex =

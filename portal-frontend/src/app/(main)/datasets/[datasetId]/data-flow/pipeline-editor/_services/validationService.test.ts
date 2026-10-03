@@ -285,6 +285,55 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
     expect(errors[0].messageParams?.path).toBe('$.serialNumber')
   })
 
+  const creatableLocationFields = {
+    '$.Locations[].name': '$.loc',
+    '$.Locations[].description': '$.d',
+    '$.Locations[].encodingType': '$.e',
+    '$.Locations[].location': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
+  }
+  const WITH_LOCATION_BAG = { ...MATCH_KEYS, locationBag: ['$.Locations[].properties.reference'] }
+
+  it('accepts the Location reference once the structure models the Location bag', () => {
+    const result = validatePipeline(
+      wiredToFrost(
+        staMapping(
+          {
+            ...creatableThingFields,
+            ...creatableLocationFields,
+            '$.Locations[].properties.reference': '$.siteRef',
+          },
+          WITH_LOCATION_BAG,
+        ),
+      ),
+    )
+    expect(result.errors).toEqual([])
+  })
+
+  it('rejects the Location reference on a snapshot without the Location bag', () => {
+    const result = validatePipeline(
+      wiredToFrost(staMapping({ ...creatableThingFields, '$.Locations[].properties.reference': '$.siteRef' })),
+    )
+    const errors = result.errors.filter(e => e.messageKey === UNKNOWN_KEY)
+    expect(errors.map(error => error.messageParams?.path)).toEqual(['$.Locations[].properties.reference'])
+  })
+
+  it('rejects the whole Location properties beside an attribute of it', () => {
+    const result = validatePipeline(
+      wiredToFrost(
+        staMapping(
+          {
+            ...creatableThingFields,
+            ...creatableLocationFields,
+            '$.Locations[].properties': '$.siteProps',
+            '$.Locations[].properties.reference': '$.siteRef',
+          },
+          WITH_LOCATION_BAG,
+        ),
+      ),
+    )
+    expect(result.errors.some(e => e.messageKey === 'validation.messages.frostMappingNestedTargets')).toBe(true)
+  })
+
   it('accepts a full creatable chain including optional observation paths', () => {
     const result = validatePipeline(
       wiredToFrost(

@@ -467,8 +467,21 @@ describe('x-core-primaryKey marker', () => {
             },
           },
           name: { type: 'string' },
+          Locations: { type: 'array', items: { $ref: '#/$defs/Location' } },
           Datastreams: { type: 'array', items: { $ref: '#/$defs/Datastream' } },
         },
+      },
+      // The Location's bag is a named class, as in the published ThingTree structure.
+      Location: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          properties: { $ref: '#/$defs/LocationProperties' },
+        },
+      },
+      LocationProperties: {
+        type: 'object',
+        properties: { reference: { type: 'string', 'x-core-primaryKey': true } },
       },
       Datastream: {
         type: 'object',
@@ -500,6 +513,7 @@ describe('x-core-primaryKey marker', () => {
       // the bag exposes every attribute as a mappable target, including the non-scalar 'tags'
       thingBag: ['$.properties.stationRef', '$.properties.tags'],
       datastreamBag: ['$.Datastreams[].properties.dsRef'],
+      locationBag: ['$.Locations[].properties.reference'],
       // the model carries no Observation parameters
       observation: [],
       observationBag: [],
