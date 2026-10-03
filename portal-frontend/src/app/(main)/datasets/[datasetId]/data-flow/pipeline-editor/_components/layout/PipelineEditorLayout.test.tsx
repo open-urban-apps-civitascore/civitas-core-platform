@@ -68,6 +68,11 @@ vi.mock('@/app/services/api/mappings/clientRequests', () => ({
   useUpdateMapping: vi.fn(),
   useDeleteMapping: vi.fn(),
 }))
+// Only a pipeline without a stored graph reads its mapping documents and data structures; the
+// pipelines here are all loaded with one.
+vi.mock('../../_hooks/use-mapping-lookups', () => ({
+  useMappingLookups: () => ({ mappings: new Map(), dataStructures: [], isLoading: false }),
+}))
 
 const CREATED_SINK_URN = 'urn:core:platform:civitas:datasink:common:Created:zyxw987654:1.0.0'
 
