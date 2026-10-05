@@ -137,6 +137,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     {
       id: 'actions',
       cell: ({ row }: { row: Row<DatastructuresListData> }) => {
+        if (row.depth !== 0) return null
         const canDelete = hasScopedPermission(
           PERMISSION_NAMES.DATASTRUCTURE_DELETE,
           ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,

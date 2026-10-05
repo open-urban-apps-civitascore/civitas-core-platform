@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -111,6 +111,28 @@ describe('DatastructuresTable', () => {
       renderTable()
       const menuButtons = screen.getAllByRole('button', { name: 'Open menu' })
       expect(menuButtons).toHaveLength(2)
+    })
+
+    it('action menu is shown on the top-level row but not on version sub-rows', () => {
+      mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_DELETE])
+      const [datastructure] = mockDatastructures
+      renderTable({
+        ...defaultProps,
+        datastructures: [
+          {
+            ...datastructure,
+            versions: [{ ...datastructure, id: '00000000-0000-0000-0000-000000000011', versions: [] }],
+          },
+        ],
+        rowCount: 1,
+      })
+
+      const [topLevelRow] = screen.getAllByRole('row').slice(1)
+      fireEvent.click(within(within(topLevelRow).getByTestId('expanderCell')).getByRole('button'))
+
+      const [, , subRow] = screen.getAllByRole('row')
+      expect(within(topLevelRow).getByRole('button', { name: 'Open menu' })).toBeInTheDocument()
+      expect(within(subRow).queryByRole('button', { name: 'Open menu' })).toBeNull()
     })
   })
 })
