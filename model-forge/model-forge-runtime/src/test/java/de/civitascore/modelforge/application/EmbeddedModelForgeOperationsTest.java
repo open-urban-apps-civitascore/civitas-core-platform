@@ -554,8 +554,11 @@ class EmbeddedModelForgeOperationsTest {
 
     @Test
     void hasSingleRoot_artifactOfAnotherKind_isRefused() {
-        assertThatThrownBy(() -> operations.hasSingleRoot(
-            new ArtifactId("urn:core:platform:civitas:mapping:common:M:mm44abcd78:1.0.0")))
+        String mapping = "urn:core:platform:civitas:mapping:common:M:mm44abcd78:1.0.0";
+        when(registry.fetch(mapping)).thenReturn(Optional.of(mapper.createObjectNode().put("$id", mapping)));
+        when(registry.heldUrns(List.of(mapping))).thenReturn(Set.of(mapping));
+
+        assertThatThrownBy(() -> operations.hasSingleRoot(new ArtifactId(mapping)))
             .isInstanceOf(IllegalArgumentException.class);
     }
 
