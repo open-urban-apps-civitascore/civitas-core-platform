@@ -228,10 +228,10 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
    * properties}, and so may any number of free attributes alongside it. Null when the datasink
    * carries no structure — a passthrough flow needs none; the mapping compilation rejects a mapped
    * flow without keys, since only it knows a mapping is present. A structurally broken schema
-   * (unresolvable root, mis-shaped {@code Datastreams} class) throws {@link
+   * (unresolvable root, mis-shaped {@code Locations} or {@code Datastreams} class) throws {@link
    * IllegalArgumentException} instead of degrading to "no keys" — the caller turns it into a
-   * payload error; a legitimately absent {@code Datastreams} or {@code properties} class yields
-   * empty attributes.
+   * payload error; a legitimately absent {@code Locations}, {@code Datastreams} or {@code
+   * properties} class yields empty attributes.
    */
   @SuppressWarnings("unchecked")
   private static StaProperties resolveStaProperties(Map<String, Object> datasink, SinkPort port) {
@@ -246,12 +246,20 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       return StaProperties.ofObservation(entityBag(schema, List.of(), "parameters"));
     }
     ResolvedDefinition thing = DataStructureSchema.resolveDefinitionAt(schema, List.of());
-    String datastreamsProperty = entityPropertyName(thing.properties(), "Datastreams");
-    List<StaBagAttribute> datastreamBag =
-        datastreamsProperty != null
-            ? entityBag(schema, List.of(datastreamsProperty), "properties")
-            : List.of();
-    return new StaProperties(entityBag(schema, List.of(), "properties"), datastreamBag, List.of());
+    return new StaProperties(
+        entityBag(schema, List.of(), "properties"),
+        collectionBag(schema, thing, "Locations"),
+        collectionBag(schema, thing, "Datastreams"),
+        List.of());
+  }
+
+  /**
+   * The bag of an entity collection of the Thing, or empty when the structure does not model it.
+   */
+  private static List<StaBagAttribute> collectionBag(
+      Map<String, Object> schema, ResolvedDefinition thing, String collection) {
+    String property = entityPropertyName(thing.properties(), collection);
+    return property != null ? entityBag(schema, List.of(property), "properties") : List.of();
   }
 
   /** Finds an entity collection exported from a labelled or an unlabelled UML relationship. */

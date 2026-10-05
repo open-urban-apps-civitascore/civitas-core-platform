@@ -168,6 +168,12 @@ export interface StaTargetVocabulary {
   readonly thingBag: readonly string[]
   readonly datastreamBag: readonly string[]
   /**
+   * All record paths the Location's `properties` bag declares. None of them is a required key: the
+   * port gives a Location without a reference of its own the Thing's. Absent on a snapshot saved
+   * before the Location bag was derived; re-saving the mapping derives it.
+   */
+  readonly locationBag?: readonly string[]
+  /**
    * The measurement's match key, for a structure shaped like the `Observations` port publishes it.
    * Optional by design: a measurement without one is appended rather than upserted.
    */
@@ -185,9 +191,11 @@ export interface StaTargetVocabulary {
  */
 export const deriveStaMatchKeys = (targetTree: SchemaTree): StaTargetVocabulary => {
   const record = recordFields(targetTree)
+  const locations = record.find(child => child.name === 'Locations')?.children ?? []
   const datastreams = record.find(child => child.name === 'Datastreams')?.children ?? []
 
   const thingProperties = bagFields(record, 'properties')
+  const locationProperties = bagFields(locations, 'properties')
   const datastreamProperties = bagFields(datastreams, 'properties')
   // SensorThings gives the Observation 'parameters' instead of 'properties'; a structure shaped
   // like the Observations port publishes it carries that bag at the record root.
@@ -208,6 +216,7 @@ export const deriveStaMatchKeys = (targetTree: SchemaTree): StaTargetVocabulary 
       (thingMarked.length === 0 && thing.length > 0) || (datastreamMarked.length === 0 && datastream.length > 0),
     thingBag: thingProperties.map(node => node.path),
     datastreamBag: datastreamProperties.map(node => node.path),
+    locationBag: locationProperties.map(node => node.path),
     observation: observationMarked.length > 0 ? observationMarked : fallbackReference(observationParameters),
     observationBag: observationParameters.map(node => node.path),
   }

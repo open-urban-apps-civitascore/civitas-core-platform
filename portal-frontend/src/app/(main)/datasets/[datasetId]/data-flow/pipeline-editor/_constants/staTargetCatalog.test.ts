@@ -178,6 +178,7 @@ describe('deriveStaMatchKeys', () => {
       isFallback: false,
       thingBag: ['$.properties.stationRef'],
       datastreamBag: ['$.Datastreams[].properties.dsRef'],
+      locationBag: [],
       observation: [],
       observationBag: [],
     })
@@ -197,9 +198,40 @@ describe('deriveStaMatchKeys', () => {
       isFallback: true,
       thingBag: ['$.properties.reference'],
       datastreamBag: ['$.Datastreams[].properties.reference'],
+      locationBag: [],
       observation: [],
       observationBag: [],
     })
+  })
+
+  it('collects the Location bag as mappable paths without making any of them a required key', () => {
+    // The shape of the published ThingTree structure. The port gives a Location without a reference
+    // of its own the Thing's, so the marker on the Location reference does not make it required.
+    const tree = thingTree([
+      thingProperties([{ ...field('$.properties.reference', 'reference', 'str', true), primaryKey: true }]),
+      field('$.Locations', 'Locations', 'array', false, [
+        field('$.Locations[].name', 'name', 'str', true),
+        field('$.Locations[].properties', 'properties', 'object', false, [
+          { ...field('$.Locations[].properties.reference', 'reference', 'str', false), primaryKey: true },
+          field('$.Locations[].properties.floor', 'floor', 'int', false),
+        ]),
+      ]),
+    ])
+
+    const keys = deriveStaMatchKeys(tree)
+
+    expect(keys.locationBag).toEqual(['$.Locations[].properties.reference', '$.Locations[].properties.floor'])
+    expect(keys.thing).toEqual(['$.properties.reference'])
+    expect(keys.thingBag).toEqual(['$.properties.reference'])
+  })
+
+  it('yields an empty Location bag when the Location has no properties class', () => {
+    const tree = thingTree([
+      thingProperties([field('$.properties.reference', 'reference', 'str', true)]),
+      field('$.Locations', 'Locations', 'array', false, [field('$.Locations[].name', 'name', 'str', true)]),
+    ])
+
+    expect(deriveStaMatchKeys(tree).locationBag).toEqual([])
   })
 
   it('yields empty keys when the properties bag declares neither marker nor reference', () => {

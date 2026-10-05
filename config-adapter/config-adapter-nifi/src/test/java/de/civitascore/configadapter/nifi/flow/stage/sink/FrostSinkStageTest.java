@@ -329,6 +329,74 @@ class FrostSinkStageTest {
   }
 
   @Test
+  void parseSpec_withALocationPropertiesClass_derivesTheLocationBag() throws Exception {
+    // The shape of the published ThingTree structure: the Location's properties is a named class
+    // whose reference carries the marker. Without its bag, a Mapping that writes the reference is
+    // refused at publish although the port reads it.
+    Map<String, Object> datasink =
+        json(
+            """
+            { "configuration": { "port": "ThingTree" },
+              "dataStructure": {
+                "properties": { "thing": { "$ref": "#/$defs/Thing" } },
+                "$defs": {
+                  "Thing": {
+                    "properties": {
+                      "properties": { "$ref": "#/$defs/ThingProperties" },
+                      "Locations": { "type": "array", "items": { "$ref": "#/$defs/Location" } }
+                    }
+                  },
+                  "ThingProperties": {
+                    "type": "object",
+                    "properties": { "reference": { "type": "string", "x-core-primaryKey": true } }
+                  },
+                  "Location": {
+                    "properties": {
+                      "name": { "type": "string" },
+                      "properties": { "$ref": "#/$defs/LocationProperties" }
+                    }
+                  },
+                  "LocationProperties": {
+                    "type": "object",
+                    "properties": {
+                      "reference": { "type": "string", "x-core-primaryKey": true },
+                      "floor": { "type": "integer" }
+                    }
+                  }
+                }
+              }
+            }
+            """);
+
+    FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
+
+    assertEquals(
+        List.of(new KeyAttribute("reference"), new FreeAttribute("floor", StaJsonType.ANY)),
+        spec.staProperties().location());
+  }
+
+  @Test
+  void parseSpec_withALocationWithoutAPropertiesClass_yieldsAnEmptyLocationBag() throws Exception {
+    Map<String, Object> datasink =
+        json(
+            """
+            { "configuration": { "port": "ThingTree" },
+              "dataStructure": {
+                "properties": { "thing": { "$ref": "#/$defs/Thing" } },
+                "$defs": {
+                  "Thing": { "properties": {
+                      "properties": { "type": "object", "properties": {
+                          "reference": { "type": "string", "x-core-primaryKey": true } } },
+                      "Locations": { "type": "array", "items": { "$ref": "#/$defs/Location" } } } },
+                  "Location": { "properties": { "name": { "type": "string" } } } } } }
+            """);
+
+    FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
+
+    assertTrue(spec.staProperties().location().isEmpty());
+  }
+
+  @Test
   void missingDatastreamsClassYieldsEmptyDatastreamKeys() throws Exception {
     Map<String, Object> datasink =
         json(

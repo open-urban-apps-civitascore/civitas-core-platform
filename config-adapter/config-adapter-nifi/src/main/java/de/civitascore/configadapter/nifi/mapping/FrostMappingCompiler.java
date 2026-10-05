@@ -127,11 +127,15 @@ public class FrostMappingCompiler {
    * number of free attributes the tenant models alongside the key. Each entity's bag holds at most
    * one {@link KeyAttribute}.
    *
-   * <p>Which of the three carries anything follows the sink's port: a Thing-shaped structure (the
-   * {@code Things} and {@code ThingTree} ports) fills {@code thing} and {@code datastream}, an
-   * Observation-shaped one (the {@code Observations} port) fills {@code observation} alone.
+   * <p>Which of them carries anything follows the sink's port: a Thing-shaped structure (the {@code
+   * Things} and {@code ThingTree} ports) fills {@code thing}, {@code location} and {@code
+   * datastream}, an Observation-shaped one (the {@code Observations} port) fills {@code
+   * observation} alone.
    *
    * @param thing the Thing's bag attributes (its match key is required for a Thing-shaped target)
+   * @param location the Location's bag attributes (empty when the structure has no Locations class
+   *     or no properties class under it); none is required, because the port gives a Location
+   *     without a reference of its own the Thing's
    * @param datastream the Datastream's bag attributes (empty when the structure has no Datastreams
    *     class)
    * @param observation the Observation's {@code parameters} attributes; its match key is optional,
@@ -139,13 +143,16 @@ public class FrostMappingCompiler {
    */
   public record StaProperties(
       List<StaBagAttribute> thing,
+      List<StaBagAttribute> location,
       List<StaBagAttribute> datastream,
       List<StaBagAttribute> observation) {
     public StaProperties {
       thing = List.copyOf(Objects.requireNonNull(thing, "thing"));
+      location = List.copyOf(Objects.requireNonNull(location, "location"));
       datastream = List.copyOf(Objects.requireNonNull(datastream, "datastream"));
       observation = List.copyOf(Objects.requireNonNull(observation, "observation"));
       requireAtMostOneKey(thing, "thing");
+      requireAtMostOneKey(location, "location");
       requireAtMostOneKey(datastream, "datastream");
       requireAtMostOneKey(observation, "observation");
     }
@@ -178,12 +185,13 @@ public class FrostMappingCompiler {
 
     /** A Thing-shaped bag whose only attribute per entity is the named match key. */
     public static StaProperties ofKeys(List<String> thingKeys, List<String> datastreamKeys) {
-      return new StaProperties(keyAttributes(thingKeys), keyAttributes(datastreamKeys), List.of());
+      return new StaProperties(
+          keyAttributes(thingKeys), List.of(), keyAttributes(datastreamKeys), List.of());
     }
 
     /** An Observation-shaped bag, for the {@code Observations} port. */
     public static StaProperties ofObservation(List<StaBagAttribute> observation) {
-      return new StaProperties(List.of(), List.of(), observation);
+      return new StaProperties(List.of(), List.of(), List.of(), observation);
     }
 
     private static List<StaBagAttribute> keyAttributes(List<String> keys) {
@@ -279,7 +287,7 @@ public class FrostMappingCompiler {
       case THINGS -> {
         // The port writes the Thing and nothing else. Rendering the Thing alone would drop every
         // other field of the Mapping without an error, so such a Mapping is refused.
-        if (touches(mapping, StaEntity.LOCATION) || touchesDatastreamTier(mapping)) {
+        if (touchesLocation(mapping) || touchesDatastreamTier(mapping)) {
           throw reject(
               "the Things port writes the Thing only; map Locations, Datastreams and"
                   + " measurements into the ThingTree port");
@@ -323,11 +331,16 @@ public class FrostMappingCompiler {
       Map<String, StaTarget> targetsByPath) {
     Map<String, Object> tree =
         entityTree(mapping, StaEntity.THING, properties.thing(), flatKeyByPath, targetsByPath);
-    if (touches(mapping, StaEntity.LOCATION)) {
+    if (touchesLocation(mapping)) {
       tree.put(
           "Locations",
           List.of(
-              entityTree(mapping, StaEntity.LOCATION, List.of(), flatKeyByPath, targetsByPath)));
+              entityTree(
+                  mapping,
+                  StaEntity.LOCATION,
+                  properties.location(),
+                  flatKeyByPath,
+                  targetsByPath)));
     }
     if (!touchesDatastreamTier(mapping)) {
       return tree;
@@ -478,13 +491,13 @@ public class FrostMappingCompiler {
 
   /**
    * The full targetable vocabulary: the fixed catalog paths plus one schema-derived target per bag
-   * attribute of the Thing, the Datastream and the Observation ({@code KEY} for the match key,
-   * {@code OPTIONAL} for the free attributes, each carrying its modelled JSON type).
+   * attribute of the Thing, the Location, the Datastream and the Observation ({@code KEY} for the
+   * match key, {@code OPTIONAL} for the free attributes, each carrying its modelled JSON type).
    */
   private Map<String, StaTarget> targetsByPath(StaProperties properties) {
     Map<String, StaTarget> byPath = new LinkedHashMap<>();
     addTier(byPath, StaEntity.THING, properties.thing());
-    addTier(byPath, StaEntity.LOCATION, List.of());
+    addTier(byPath, StaEntity.LOCATION, properties.location());
     addTier(byPath, StaEntity.DATASTREAM, properties.datastream());
     addTier(byPath, StaEntity.OBSERVATION, properties.observation());
     addTier(byPath, StaEntity.FEATURE_OF_INTEREST, List.of());
@@ -586,10 +599,32 @@ public class FrostMappingCompiler {
             "a FROST mapping does not accept a null constant; omit the target field instead");
       }
     }
+    rejectNestedTargets(mapping, port);
+  }
+
+  /**
+   * A path and a path below it cannot both be mapped: the Location's {@code properties} is
+   * targetable as a whole object and, once the structure models its attributes, attribute by
+   * attribute. The body holds the object once, so one of the two would be dropped without an error.
+   */
+  private void rejectNestedTargets(MappingConfig mapping, SinkPort port)
+      throws FatalAdapterException {
+    for (String outer : mapping.fields().keySet()) {
+      for (String inner : mapping.fields().keySet()) {
+        if (inner.startsWith(outer + ".")) {
+          throw reject(
+              "a FROST mapping cannot map both '"
+                  + display(outer, port)
+                  + "' and '"
+                  + display(inner, port)
+                  + "'; map either the whole object or its attributes");
+        }
+      }
+    }
   }
 
   private void validateLocation(MappingConfig mapping) throws FatalAdapterException {
-    if (!touches(mapping, StaEntity.LOCATION)) {
+    if (!touchesLocation(mapping)) {
       return;
     }
     // A Location can be upserted through an already resolved Thing's navigation collection; the
@@ -725,6 +760,17 @@ public class FrostMappingCompiler {
    */
   private boolean isDatastreamNavigationTarget(StaTarget target) {
     return target.path().contains(".Sensor.") || target.path().contains(".ObservedProperty.");
+  }
+
+  /**
+   * Whether the mapping writes the Location at all. Unlike {@link #touches} this counts the
+   * attributes of its {@code properties} bag too: a Location reference alone still selects the
+   * Location to write. Every path under the prefix is a Location target, because the paths are
+   * validated against the vocabulary before this is asked.
+   */
+  private boolean touchesLocation(MappingConfig mapping) {
+    String prefix = StaEntity.LOCATION.pathPrefix() + ".";
+    return mapping.fields().keySet().stream().anyMatch(path -> path.startsWith(prefix));
   }
 
   private boolean touchesDatastreamTier(MappingConfig mapping) {

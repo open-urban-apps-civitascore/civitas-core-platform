@@ -533,9 +533,10 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
         errors.push(errorAt(node, 'validation.messages.mappingNotSaved', { label }))
         return
       }
+      const locationBag = keys.locationBag ?? []
       const allowed = isMeasurementPort
         ? new Set([...STA_OBSERVATION_FIXED_TARGET_PATHS, ...keys.observationBag])
-        : new Set([...STA_FIXED_TARGET_PATHS, ...keys.thingBag, ...keys.datastreamBag])
+        : new Set([...STA_FIXED_TARGET_PATHS, ...keys.thingBag, ...locationBag, ...keys.datastreamBag])
       const entity = (key: StaEntity['key']): StaEntity =>
         (isMeasurementPort ? STA_OBSERVATION_PORT_ENTITIES : STA_ENTITIES).find(
           candidate => candidate.key === key,
@@ -546,6 +547,15 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
       for (const path of assigned) {
         if (!allowed.has(path)) {
           errors.push(errorAt(node, 'validation.messages.frostMappingUnknownStaTarget', { label, path }))
+        }
+      }
+
+      // The body holds an object once, so the engine refuses a mapping that writes it whole and
+      // attribute by attribute (the Location's properties once its bag is modelled).
+      for (const outer of assigned) {
+        const inner = [...assigned].find(path => path.startsWith(`${outer}.`))
+        if (inner) {
+          errors.push(errorAt(node, 'validation.messages.frostMappingNestedTargets', { label, outer, inner }))
         }
       }
 
@@ -579,6 +589,7 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
       }
       checkKeyNames(isMeasurementPort ? keys.observationBag : keys.thingBag)
       if (!isMeasurementPort) {
+        checkKeyNames(locationBag)
         checkKeyNames(keys.datastreamBag)
       }
 
@@ -621,7 +632,7 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
       requireCompleteCreateSet(entity('thing'))
 
       const isThingCreatable = allAssigned(entity('thing').createPaths)
-      if (anyAssigned([...entity('location').createPaths, ...entity('location').optionalPaths])) {
+      if (anyAssigned([...entity('location').createPaths, ...entity('location').optionalPaths, ...locationBag])) {
         if (!isThingCreatable) {
           errors.push(errorAt(node, 'validation.messages.frostMappingLocationNeedsCreatableThing', { label }))
         }
