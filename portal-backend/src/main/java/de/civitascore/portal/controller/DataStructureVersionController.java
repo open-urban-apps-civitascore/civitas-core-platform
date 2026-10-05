@@ -132,17 +132,13 @@ public class DataStructureVersionController
   }
 
   /**
-   * Deletes a data structure version by its unique identifier.
-   *
-   * @param id the UUID of the version to delete
+   * Single versions are deleted only together with their data structure; the service delete logic
+   * stays so that this endpoint can be enabled again.
    */
   @Override
-  @Operation(
-      operationId = "deleteDataStructureVersion",
-      summary = "Delete a data structure version")
+  @Operation(hidden = true)
   public void delete(@PathVariable UUID id) {
-    requireOwnedByPathDataStructure(id);
-    super.delete(id);
+    throw new MethodNotAllowedException(HttpMethod.DELETE, Collections.emptySet());
   }
 
   /**
