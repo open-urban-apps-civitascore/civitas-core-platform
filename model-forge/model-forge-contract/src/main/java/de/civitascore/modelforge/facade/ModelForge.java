@@ -126,6 +126,19 @@ public interface ModelForge {
 
     ValidationResult validateInstance(ValidateInstanceCommand command);
 
+    /**
+     * Whether the model has exactly one root Element, the entry point every other member is read
+     * from. An Element is its own root. A DataStructure has one when its top-level {@code $ref}
+     * names one of its own {@code $defs} members.
+     *
+     * <p>Writes accept a DataStructure without a root, so that modelling is not interrupted. A
+     * caller whose step needs a root, such as publication, asks here.
+     *
+     * @throws IllegalArgumentException when the registry holds no such artifact, or it is neither an
+     *     Element nor a DataStructure
+     */
+    boolean hasSingleRoot(ArtifactId artifactId);
+
     // ── Dependency graph ─────────────────────────────────────────────────────
 
     DependencyGraphView dependencies(DependencyQuery query);

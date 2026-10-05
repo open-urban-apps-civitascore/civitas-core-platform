@@ -486,6 +486,79 @@ class EmbeddedModelForgeOperationsTest {
         verify(registry).fetch(versioned);
     }
 
+    // ── hasSingleRoot ────────────────────────────────────────────────────────────
+
+    private static final String STRUCTURE =
+        "urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b:1.0.0";
+    private static final String PERSON =
+        "urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.0";
+    private static final String ADDRESS =
+        "urn:core:platform:civitas:element:common:Address:aa22abcd34:1.0.0";
+
+    private void storedStructure(String rootRef) {
+        ObjectNode content = mapper.createObjectNode().put("$id", STRUCTURE);
+        ObjectNode defs = content.putObject("$defs");
+        defs.putObject("Person").put("$ref", PERSON);
+        defs.putObject("Address").put("$ref", ADDRESS);
+        if (rootRef != null) {
+            content.put("$ref", rootRef);
+        }
+        when(registry.fetch(STRUCTURE)).thenReturn(Optional.of(content));
+    }
+
+    @Test
+    void hasSingleRoot_rootRefNamesAMember_isTrue() {
+        storedStructure(PERSON);
+
+        assertThat(operations.hasSingleRoot(new ArtifactId(STRUCTURE))).isTrue();
+    }
+
+    @Test
+    void hasSingleRoot_rootRefPinsAnotherVersionOfAMember_isTrue() {
+        storedStructure("urn:core:platform:civitas:element:common:Person:pp11abcd12:2.0.0");
+
+        assertThat(operations.hasSingleRoot(new ArtifactId(STRUCTURE))).isTrue();
+    }
+
+    @Test
+    void hasSingleRoot_noRootRef_isFalse() {
+        storedStructure(null);
+
+        assertThat(operations.hasSingleRoot(new ArtifactId(STRUCTURE))).isFalse();
+    }
+
+    @Test
+    void hasSingleRoot_rootRefNamesAnElementOutsideTheMembers_isFalse() {
+        storedStructure("urn:core:platform:civitas:element:common:Stranger:ss33abcd56:1.0.0");
+
+        assertThat(operations.hasSingleRoot(new ArtifactId(STRUCTURE))).isFalse();
+    }
+
+    @Test
+    void hasSingleRoot_storedElement_isTrue() {
+        when(registry.heldUrns(List.of(PERSON))).thenReturn(Set.of(PERSON));
+
+        assertThat(operations.hasSingleRoot(new ArtifactId(PERSON))).isTrue();
+    }
+
+    @Test
+    void hasSingleRoot_unknownArtifact_isRefused() {
+        when(registry.fetch(STRUCTURE)).thenReturn(Optional.empty());
+        when(registry.heldUrns(List.of(PERSON))).thenReturn(Set.of());
+
+        assertThatThrownBy(() -> operations.hasSingleRoot(new ArtifactId(STRUCTURE)))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> operations.hasSingleRoot(new ArtifactId(PERSON)))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void hasSingleRoot_artifactOfAnotherKind_isRefused() {
+        assertThatThrownBy(() -> operations.hasSingleRoot(
+            new ArtifactId("urn:core:platform:civitas:mapping:common:M:mm44abcd78:1.0.0")))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
     // ── createArtifact: minted identities for the non-Element kinds ──────────────
 
     @Test

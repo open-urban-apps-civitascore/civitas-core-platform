@@ -239,6 +239,36 @@ public class EmbeddedModelForgeOperations implements ModelForge {
     }
 
     @Override
+    public boolean hasSingleRoot(ArtifactId artifactId) {
+        String urn = artifactId.value();
+        String type = UrnParser.artifactTypeFromUrn(urn);
+        if ("element".equals(type)) {
+            if (!registry.heldUrns(List.of(urn)).contains(urn)) {
+                throw new IllegalArgumentException("No Element " + urn + " in the registry");
+            }
+            return true;
+        }
+        if (!"datastructure".equals(type)) {
+            throw new IllegalArgumentException(
+                "Only an Element or a DataStructure has a root; " + urn + " is a " + type);
+        }
+        JsonNode dataStructure = elementQueryService.rawJsonSchema(urn)
+            .orElseThrow(() -> new IllegalArgumentException("No DataStructure " + urn + " in the registry"));
+        return designatesMemberAsRoot(dataStructure);
+    }
+
+    private static boolean designatesMemberAsRoot(JsonNode dataStructure) {
+        String root = dataStructure.path("$ref").asText(null);
+        if (!UrnParser.isUrn(root)) {
+            return false;
+        }
+        String rootLogical = UrnParser.logicalUrn(root);
+        return dataStructure.path("$defs").properties().stream()
+            .map(member -> member.getValue().path("$ref").asText(null))
+            .anyMatch(member -> UrnParser.isUrn(member) && rootLogical.equals(UrnParser.logicalUrn(member)));
+    }
+
+    @Override
     public DependencyGraphView dependencies(DependencyQuery query) {
         var source = query.artifactId();
         var targetUrns = query.maxDepth() != null

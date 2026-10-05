@@ -23,6 +23,11 @@ An artifact that groups Elements as its members. A different concept from the Po
 lifecycle, this one is the grouping in the registry it is translated into.
 _Avoid_: schema set, model group, bundle
 
+**Root**:
+The one member of a Data Structure that is its entry point, named by the Data Structure's top-level
+`$ref`. A Data Structure may be stored without one. An Element is its own root.
+_Avoid_: main type, top-level class
+
 **Import**:
 Turning one submitted document into artifacts — separating the members it declares into Elements and
 recording the grouping that holds them. Distinct from storing an artifact whose identity the caller

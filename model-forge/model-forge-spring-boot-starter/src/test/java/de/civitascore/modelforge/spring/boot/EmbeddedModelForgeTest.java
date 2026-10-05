@@ -84,6 +84,11 @@ class EmbeddedModelForgeTest {
                 }
 
                 @Override
+                public boolean hasSingleRoot(ArtifactId artifactId) {
+                    return true;
+                }
+
+                @Override
                 public DependencyGraphView dependencies(DependencyQuery query) {
                     return new DependencyGraphView(List.of(), List.of());
                 }
