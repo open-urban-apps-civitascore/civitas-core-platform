@@ -2210,7 +2210,7 @@ describe('PipelineEditorProviderComponent', () => {
       expect(contextRef.current?.pipelineDeleteBlockReason).toBe('lastFrostWithSta')
     })
 
-    it('returns null for a never-saved pipeline', () => {
+    it('returns null for a never-saved pipeline without sink nodes', () => {
       renderProvider(makeSession({ pipeline: { ...createEmptyPipeline('Test'), id: undefined } }))
 
       expect(contextRef.current?.pipelineDeleteBlockReason).toBeNull()

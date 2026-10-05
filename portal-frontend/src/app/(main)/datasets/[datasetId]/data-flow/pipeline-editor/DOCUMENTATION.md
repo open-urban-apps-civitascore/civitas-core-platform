@@ -656,15 +656,15 @@ If a step throws, the partial progress is written back to the session — still 
 
 Two more locks protect the last sink that an API of the dataset reads from:
 
-| Lock         | API | Sink node                    |
-| ------------ | --- | ---------------------------- |
-| `inUseBySta` | STA | FROST                        |
-| `inUseByOws` | OWS | Geo persistence (`POSTGIS`)  |
+| Lock         | API | Sink node                   |
+| ------------ | --- | --------------------------- |
+| `inUseBySta` | STA | FROST                       |
+| `inUseByOws` | OWS | Geo persistence (`POSTGIS`) |
 
 A lock applies to a sink node when all of these are true:
 
 - The dataset has the API.
-- No other pipeline has a sink of this type. Sinks of deleted pipelines (no `pipelineId`) do not count. Only pipelines in other tabs count, from their graph and also with unsaved nodes. This includes a new pipeline without an id. Sinks of pipelines without a tab do not count.
+- No other pipeline has a sink node of this type. Unsaved nodes count too. This includes the nodes of a new pipeline without an id.
 - The graph of the active pipeline has only this one node of this type. This includes a new node without `entityId`.
 
 `provisioned` and `inUseByLayer` win over both.
@@ -672,6 +672,18 @@ A lock applies to a sink node when all of these are true:
 `PipelineCanvas` sets `deletable: false` on a locked node. `onBeforeDelete` shows an error toast with the reason. It also cancels a delete that removes all nodes of one type at once, when `inUseBySta` or `inUseByOws` would apply to the last of them (`getLastApiSinkLockReason`).
 
 The `PipelineInspector` shows a notice with the lock reason. In read-only mode, only the `inUseByLayer` hint is shown.
+
+`useDataSinkLocks()` also returns `pipelineDeleteBlockReason` for the active pipeline. It uses `getPipelineDeleteBlockReason` (`src/utils/pipelineDeleteGuard.ts`):
+
+| Reason               | Condition                                                                |
+| -------------------- | ------------------------------------------------------------------------ |
+| `inUseByLayer`       | A saved sink of the pipeline is used by a layer.                         |
+| `lastPostgisWithOws` | The dataset has an OWS API, and no other pipeline has a Geo sink node.   |
+| `lastFrostWithSta`   | The dataset has an STA API, and no other pipeline has a FROST sink node. |
+
+For the two last reasons, the active pipeline must have a sink of this type, saved or as a node in its graph. A new pipeline without an id is checked too. Other pipelines count the same as for the sink locks above.
+
+`PipelineToolbar` shows an info modal with the reason instead of the delete confirmation.
 
 ### Save Button States
 

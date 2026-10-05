@@ -85,14 +85,13 @@ export const useDataSinkLocks = (
 
   const namedApis = useMemo(() => datasetData?.data?.namedApis ?? [], [datasetData?.data?.namedApis])
 
-  // Only pipelines in other tabs count, also with unsaved nodes.
+  // Unsaved sink nodes count too.
   const hasSinkInOtherPipeline = useCallback(
     (dataSinkType: DataSinkType) =>
       otherSessions.some(session => hasSinkNodeOfType(dataSinkType, session.pipeline.nodes)),
     [otherSessions],
   )
 
-  // Sinks of the active pipeline are counted from its graph nodes.
   const { isStaWithoutOtherFrostSink, isOwsWithoutOtherPostgisSink } = useMemo(
     () => ({
       isStaWithoutOtherFrostSink:
@@ -146,7 +145,7 @@ export const useDataSinkLocks = (
     [getSinkLockReason],
   )
 
-  // The per-node lock misses a delete of several sink nodes of the same pipeline at once.
+  // Blocks a delete that removes every sink node of one type at once.
   const getLastApiSinkLockReason = useCallback(
     (nodeIdsToDelete: string[]): ApiSinkLockReason | null => {
       if (isStaWithoutOtherFrostSink && isEveryNodeDeleted(frostNodeIds, nodeIdsToDelete)) return 'inUseBySta'
