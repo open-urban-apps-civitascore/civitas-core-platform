@@ -24,6 +24,7 @@ import de.civitascore.portal.modelregistry.VersionBump;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ModelRootMissingException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashMap;
@@ -346,8 +347,7 @@ class DataStructureVersionServiceTest {
       when(modelRegistryGateway.hasSingleRoot(version.getModelUrn())).thenReturn(false);
 
       assertThatThrownBy(() -> dataStructureVersionService.release(versionId))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("exactly one root Element");
+          .isInstanceOf(ModelRootMissingException.class);
       assertThat(version.getDataStructureVersionStatus())
           .isEqualTo(DataStructureVersionStatus.DRAFT);
       verify(dataStructureVersionRepository, never()).save(any());

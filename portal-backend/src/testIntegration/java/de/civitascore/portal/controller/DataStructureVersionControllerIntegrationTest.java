@@ -818,7 +818,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
               new ParameterizedTypeReference<ProblemDetail>() {});
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody().getDetail()).contains("exactly one root Element");
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:MODEL_ROOT_MISSING");
       assertThat(
               dataStructureVersionRepository
                   .findById(version.getId())

@@ -537,6 +537,13 @@ public class OpenApiConfig {
                       "DATASET_NOT_EDITABLE",
                       "A dataset and its sub-entities can only be changed while the dataset is "
                           + "DRAFT. Unstage or unrelease the dataset first.",
+                      path),
+                  "model_root_missing",
+                  problemExample(
+                      400,
+                      "MODEL_ROOT_MISSING",
+                      "DataStructureVersion model must designate exactly one root Element before"
+                          + " releasing",
                       path)));
       case "404" ->
           problemExamples(

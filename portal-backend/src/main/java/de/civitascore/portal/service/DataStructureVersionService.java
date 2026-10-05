@@ -13,6 +13,7 @@ import de.civitascore.portal.modelregistry.VersionBump;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ModelRootMissingException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.List;
@@ -238,8 +239,8 @@ public class DataStructureVersionService
    *
    * @param id the version ID
    * @return the released version
-   * @throws InvalidInputException if the version is already released, has no model, or its model
-   *     has no single root Element
+   * @throws InvalidInputException if the version is already released or has no model
+   * @throws ModelRootMissingException if the version's model has no single root Element
    */
   @Transactional
   public DataStructureVersion release(UUID id) {
@@ -259,10 +260,7 @@ public class DataStructureVersionService
     }
 
     if (!modelRegistryGateway.hasSingleRoot(version.getModelUrn())) {
-      throw new InvalidInputException(
-          "model",
-          id,
-          "DataStructureVersion model must designate exactly one root Element before releasing");
+      throw new ModelRootMissingException();
     }
 
     version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
