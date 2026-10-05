@@ -40,6 +40,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,7 +114,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   private static final String COMPENSATE_TYPE = "COMPENSATE_STEP";
   private static final String DATASINK_TYPE_POSTGIS = "POSTGIS";
   private static final String KEY_CREATED_TABLES = "createdTables";
-  private static final String KEY_CREATED_SCHEMAS = "createdSchemas";
+  private static final String KEY_CREATED_SCHEMA = "createdSchema";
 
   /** The shared schema that predates per-DataSet schemas; never dropped on deprovision. */
   private static final String SHARED_PUBLIC_SCHEMA = "public";
@@ -229,19 +230,17 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   private SagaCommandResult provisionSink(SagaCommandMessage command) throws SQLException {
     List<SinkSpec> sinks = parseSinks(command, true);
     List<Map<String, Object>> provisioned = new ArrayList<>();
-    List<Map<String, Object>> createdTables = new ArrayList<>();
-    Set<String> createdSchemas = new LinkedHashSet<>();
+    String schema = datasetSchemaName(command);
+    List<String> createdTables = new ArrayList<>();
+    AtomicBoolean createdSchema = new AtomicBoolean();
     ddl.runDdl(
         connection -> {
+          createdSchema.set(!exists(connection, dialect().schemaExistsQuery(), schema));
           List<String> statements = new ArrayList<>();
           for (SinkSpec sink : sinks) {
             TableConfig table = sink.table();
-            if (!exists(
-                connection, dialect().tableExistsQuery(), table.getSchema(), table.getName())) {
-              createdTables.add(sink.tableIdentifiers());
-            }
-            if (!exists(connection, dialect().schemaExistsQuery(), table.getSchema())) {
-              createdSchemas.add(table.getSchema());
+            if (!exists(connection, dialect().tableExistsQuery(), schema, table.getName())) {
+              createdTables.add(table.getName());
             }
             // createTable already emits CREATE SCHEMA for the table's schema.
             statements.addAll(dialect().createTable(table));
@@ -270,8 +269,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
         command.sagaId(),
         command.stepId(),
         Map.of("provisionedSinks", provisioned),
-        Map.of(
-            KEY_CREATED_TABLES, createdTables, KEY_CREATED_SCHEMAS, List.copyOf(createdSchemas)));
+        Map.of(KEY_CREATED_TABLES, createdTables, KEY_CREATED_SCHEMA, createdSchema.get()));
   }
 
   private static boolean exists(Connection connection, String query, String... binds)
@@ -294,7 +292,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
     List<String> statements = new ArrayList<>();
     Set<String> schemasToDrop = new LinkedHashSet<>();
     for (SinkSpec sink : sinks) {
-      if (createdBySaga != null && !createdBySaga.tables().contains(sink.tableIdentifiers())) {
+      if (createdBySaga != null && !createdBySaga.tables().contains(sink.table().getName())) {
         logger.info(
             "PostGIS table {} predates this saga, keeping it and its data, saga={}",
             Encode.forJava(sink.table().qualifiedName()),
@@ -311,7 +309,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
           && schema.getName() != null
           && !schema.getName().isBlank()
           && !SHARED_PUBLIC_SCHEMA.equalsIgnoreCase(schema.getName())
-          && (createdBySaga == null || createdBySaga.schemas().contains(schema.getName()))) {
+          && (createdBySaga == null || createdBySaga.schema())) {
         schemasToDrop.add(schema.getName());
       }
     }
@@ -423,30 +421,29 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   }
 
   /**
-   * What a {@code PROVISION_SINK} created, as opposed to found, read back from its compensation
-   * data. Absent from a forward {@code DEPROVISION_SINK}, which removes everything.
+   * The table names and the schema flag a {@code PROVISION_SINK} records for what it created rather
+   * than found. Only a compensation reads them; a forward {@code DEPROVISION_SINK} removes
+   * everything.
    */
-  private record ProvisionedByThisSaga(Set<Map<String, Object>> tables, Set<String> schemas) {
-    @SuppressWarnings("unchecked")
+  private record ProvisionedByThisSaga(Set<String> tables, boolean schema) {
+    /**
+     * Returns {@code null}, so that everything is dropped, when the compensation data carries no
+     * record. The saga runs a sink compensation only after a successful provision, so only a broken
+     * process definition gets here.
+     */
     static ProvisionedByThisSaga from(Map<String, Object> payload) {
       if (!(payload.get(KEY_CREATED_TABLES) instanceof List<?> tables)
-          || !(payload.get(KEY_CREATED_SCHEMAS) instanceof List<?> schemas)) {
+          || !(payload.get(KEY_CREATED_SCHEMA) instanceof Boolean schema)) {
         return null;
       }
-      Set<Map<String, Object>> tableIds = new HashSet<>();
-      tables.forEach(table -> tableIds.add(Map.copyOf((Map<String, Object>) table)));
-      Set<String> schemaNames = new HashSet<>();
-      schemas.forEach(schema -> schemaNames.add(String.valueOf(schema)));
-      return new ProvisionedByThisSaga(tableIds, schemaNames);
+      Set<String> tableNames = new HashSet<>();
+      tables.forEach(table -> tableNames.add(String.valueOf(table)));
+      return new ProvisionedByThisSaga(tableNames, schema);
     }
   }
 
   /** One PostGIS data sink resolved into the objects to provision/drop. */
   private record SinkSpec(SchemaConfig schema, TableConfig table, DbRoleConfig role) {
-    Map<String, Object> tableIdentifiers() {
-      return Map.of("schema", table.getSchema(), "table", table.getName());
-    }
-
     Map<String, Object> identifiers() {
       Map<String, Object> id = new LinkedHashMap<>();
       if (table.getSchema() != null && !table.getSchema().isBlank()) {

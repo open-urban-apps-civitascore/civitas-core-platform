@@ -321,10 +321,8 @@ class PostgisSagaHandlerTest {
       SagaCommandResult result = handler.handle(execute("PROVISION_SINK", postgisSinkTrigger()));
 
       assertEquals("STEP_COMPLETED", result.type());
-      assertEquals(
-          List.of(Map.of("schema", "ds_42", "table", "sensor_readings")),
-          result.compensationData().get("createdTables"));
-      assertEquals(List.of("ds_42"), result.compensationData().get("createdSchemas"));
+      assertEquals(List.of("sensor_readings"), result.compensationData().get("createdTables"));
+      assertEquals(true, result.compensationData().get("createdSchema"));
     }
 
     @Test

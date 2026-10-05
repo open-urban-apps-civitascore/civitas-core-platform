@@ -393,6 +393,9 @@ class DatasetCreateBpmnTest {
     assertEquals(
         List.of("PROVISION_SINK", "DEPROVISION_SINK"),
         sink.getAllValues().stream().map(SagaCommandMessage::operation).toList());
+    Map<String, Object> deprovision = sink.getAllValues().get(1).payload();
+    assertEquals(List.of("t1"), deprovision.get("createdTables"));
+    assertEquals(true, deprovision.get("createdSchema"));
   }
 
   private SagaCommandMessage captureCompensation(SagaCommandHandler handler) {
@@ -520,7 +523,7 @@ class DatasetCreateBpmnTest {
                 "saga-test-123",
                 "provision-sink",
                 Map.of("provisionedSinks", List.of(Map.of("schema", "ds_456", "table", "t1"))),
-                Map.of("provisionedSinks", List.of(Map.of("schema", "ds_456", "table", "t1")))));
+                Map.of("createdTables", List.of("t1"), "createdSchema", true)));
     when(postgisHandler.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
         .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "provision-sink"));
   }
