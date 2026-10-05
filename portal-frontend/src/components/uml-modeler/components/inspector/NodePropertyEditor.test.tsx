@@ -8,9 +8,14 @@ import { NodePropertyEditor } from './NodePropertyEditor'
 const updateNode = vi.fn()
 const setRootNode = vi.fn()
 let isReadOnly = false
+let diagramNodes: UMLNode[] = []
+
+vi.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => key,
+}))
 
 vi.mock('../../hooks/use-active-diagram', () => ({
-  useActiveDiagram: () => ({ updateNode, setRootNode }),
+  useActiveDiagram: () => ({ diagram: { nodes: diagramNodes }, updateNode, setRootNode }),
 }))
 
 vi.mock('../../hooks/use-read-only', () => ({
@@ -59,5 +64,52 @@ describe('NodePropertyEditor root checkbox', () => {
     isReadOnly = true
     render(<NodePropertyEditor node={node({})} />)
     expect(rootCheckbox()).toBeDisabled()
+  })
+})
+
+describe('NodePropertyEditor name validation', () => {
+  beforeEach(() => {
+    isReadOnly = false
+    diagramNodes = []
+  })
+
+  it('shows no error for a valid unique name', () => {
+    render(<NodePropertyEditor node={node({})} />)
+    expect(screen.getByPlaceholderText('Element name')).toHaveAttribute('aria-invalid', 'false')
+    expect(screen.queryByText('invalidCharacters')).not.toBeInTheDocument()
+  })
+
+  it('shows the character error for a name with a space', () => {
+    render(<NodePropertyEditor node={node({ name: 'Foo Bar' })} />)
+    expect(screen.getByText('invalidCharacters')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Element name')).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('shows the duplicate error when another class has the same name', () => {
+    const other = { ...node({}), id: 'node-2' } as UMLNode
+    diagramNodes = [node({}), other]
+    render(<NodePropertyEditor node={node({})} />)
+    expect(screen.getByText('duplicateElement')).toBeInTheDocument()
+  })
+
+  it('shows the duplicate error on an enumeration named like a class', () => {
+    const enumeration = node({ type: 'enumeration', literals: [] } as Partial<UMLElement>)
+    diagramNodes = [enumeration, { ...node({}), id: 'node-2' } as UMLNode]
+    render(<NodePropertyEditor node={enumeration} />)
+    expect(screen.getByText('duplicateElement')).toBeInTheDocument()
+  })
+
+  it('shows the character error on an enumeration', () => {
+    render(
+      <NodePropertyEditor
+        node={node({ type: 'enumeration', name: 'Neue Aufzählung', literals: [] } as Partial<UMLElement>)}
+      />,
+    )
+    expect(screen.getByText('invalidCharacters')).toBeInTheDocument()
+  })
+
+  it('shows the required error for an empty name', () => {
+    render(<NodePropertyEditor node={node({ name: '' })} />)
+    expect(screen.getByText('required')).toBeInTheDocument()
   })
 })

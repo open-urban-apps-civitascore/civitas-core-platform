@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { versionOfUrn } from '@/utils/coreUrn'
 
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
+import { hasInvalidNames } from '../../services/elementNameService'
 import { downloadJsonSchema, SchemaExportError } from '../../services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '../../services/modelUploadService'
 import { rootFailureMessage } from '../../services/rootFailureMessage'
@@ -56,6 +57,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const { diagram } = useActiveDiagram()
   const createModel = useCreateModel()
   const isSaving = createModel.isPending
+  const hasInvalidModelNames = hasInvalidNames(diagram.nodes)
   const t = useTranslations('umlModeler')
 
   const handleSave = useCallback(() => {
@@ -114,7 +116,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             variant="ghost"
             size="sm"
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || hasInvalidModelNames}
             className={`h-8 px-2 ${hasUnsavedChanges ? 'text-blue-600' : ''}`}
             title={isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save changes' : 'Save'}
           >

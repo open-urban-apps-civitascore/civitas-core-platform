@@ -103,7 +103,7 @@ export const DEFAULT_NAMES = {
   class: 'NeueKlasse',
   interface: 'NeuesInterface',
   abstractClass: 'NeueAbstrakteKlasse',
-  enumeration: 'NeueAufzählung',
+  enumeration: 'NeueAufzaehlung',
   attribute: 'neuesAttribut',
   operation: 'neueOperation',
   parameter: 'parameter',

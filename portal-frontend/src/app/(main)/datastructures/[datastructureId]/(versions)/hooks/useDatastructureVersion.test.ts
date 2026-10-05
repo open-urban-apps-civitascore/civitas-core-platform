@@ -343,6 +343,31 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
   })
 })
 
+describe('useDatastructureVersion — class names', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('refuses the save while two classes have the same name', async () => {
+    const styles = designatedRootDiagram()
+    styles.nodes[1].data.element.name = 'Alpha'
+    const { hook, updateVersion } = setup(version({ styles }))
+
+    act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+    let saved: boolean | undefined
+    await act(async () => {
+      saved = await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(hook.result.current.hasInvalidModelNames).toBe(true)
+    expect(saved).toBe(false)
+    expect(toast.error).toHaveBeenCalledWith(
+      'datastructureVersions.errors.saveInvalidModel|umlModeler.nameValidation.invalidNames',
+    )
+    expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
+  })
+})
+
 describe('useDatastructureVersion — released versions take no field update', () => {
   beforeEach(() => {
     vi.clearAllMocks()

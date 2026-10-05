@@ -1,11 +1,13 @@
 'use client'
 
 import { Plus, Trash2 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { ChangeEvent, useCallback, useState } from 'react'
 
 import { UML_STEREOTYPES } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
+import { getElementNameError, getOtherElementNames } from '../../services/elementNameService'
 import type { UMLNode } from '../../types/diagram'
 import { hasAttributes } from '../../types/uml'
 import { AttributeManager } from './AttributeManager'
@@ -26,11 +28,13 @@ export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({
   isStaticVisible = false,
   isDefaultValueVisible = false,
 }) => {
-  const { updateNode, setRootNode } = useActiveDiagram()
+  const { diagram, updateNode, setRootNode } = useActiveDiagram()
   const { isReadOnly } = useReadOnly()
+  const t = useTranslations('umlModeler.nameValidation')
   const [activeSection, setActiveSection] = useState<'basic' | 'attributes' | 'literals'>('basic')
 
   const element = node.data.element
+  const nameError = getElementNameError(element.name, getOtherElementNames(diagram.nodes, node.id))
 
   const handleNameChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -142,10 +146,14 @@ export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({
                 type="text"
                 value={element.name}
                 onChange={handleNameChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  nameError ? 'border-destructive' : 'border-gray-300'
+                }`}
                 placeholder="Element name"
                 disabled={isReadOnly}
+                aria-invalid={nameError !== undefined}
               />
+              {nameError && <p className="mt-1 text-xs text-destructive">{t(nameError)}</p>}
             </div>
 
             {/* Root designation — enumerations are scalar values and can never be the record root */}

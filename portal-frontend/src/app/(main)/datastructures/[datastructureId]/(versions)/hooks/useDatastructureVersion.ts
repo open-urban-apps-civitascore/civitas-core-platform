@@ -13,6 +13,7 @@ import {
   useUpdateDatastructureVersion,
 } from '@/app/services/api/datastructures/versions/clientRequests'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
+import { hasInvalidNames } from '@/components/uml-modeler/services/elementNameService'
 import { SchemaExportError } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
 import { rootFailureMessage } from '@/components/uml-modeler/services/rootFailureMessage'
@@ -89,6 +90,7 @@ export const useDatastructureVersion = ({ version, isCreateMode, onCreateVersion
   const nodes = modelSessionManager.activeSession?.diagram.nodes
   const edges = modelSessionManager.activeSession?.diagram.edges
   const modelName = modelSessionManager.activeSession?.diagram.name
+  const hasInvalidModelNames = hasInvalidNames(nodes ?? [])
   const activeSession = modelSessionManager.activeSession
   const activeSessionId = modelSessionManager.activeSessionId
   const shouldMarkModelFieldsDirty = !!activeSession?.isDirty
@@ -273,6 +275,10 @@ export const useDatastructureVersion = ({ version, isCreateMode, onCreateVersion
       handleFormValidationError(parsed.error)
       return false
     }
+    if (hasInvalidModelNames) {
+      toast.error(t('errors.saveInvalidModel', { reason: tUmlModeler('nameValidation.invalidNames') }))
+      return false
+    }
 
     try {
       const sessionDiagram = nodesWatch.length > 0 ? activeSession?.diagram || null : null
@@ -343,6 +349,7 @@ export const useDatastructureVersion = ({ version, isCreateMode, onCreateVersion
     handleStatusChange,
     resetToInitialState,
     hasUserChanges,
+    hasInvalidModelNames,
     resetSession,
     resetFormAndSession,
   }

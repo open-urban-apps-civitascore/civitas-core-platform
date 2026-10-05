@@ -1,36 +1,9 @@
+import { getNextElementName } from '../services/elementNameService'
 import type { UMLNode, UMLNodeData } from '../types/diagram'
 import type { UMLAbstractClass, UMLClass, UMLElement, UMLElementType, UMLEnumeration, UMLInterface } from '../types/uml'
-import { DEFAULT_NAMES } from './umlTypes'
 
 // Helper function to generate unique IDs
 const generateId = () => crypto.randomUUID()
-
-// Counter for auto-naming
-let elementCounter = {
-  class: 1,
-  interface: 1,
-  abstractClass: 1,
-  enumeration: 1,
-}
-
-// Get next auto-generated name for element type
-export const getNextElementName = (elementType: UMLElementType): string => {
-  const baseName = DEFAULT_NAMES[elementType]
-  const count = elementCounter[elementType]
-  elementCounter[elementType]++
-
-  return count === 1 ? baseName : `${baseName}${count}`
-}
-
-// Reset element counters (useful for new diagrams)
-export const resetElementCounters = (): void => {
-  elementCounter = {
-    class: 1,
-    interface: 1,
-    abstractClass: 1,
-    enumeration: 1,
-  }
-}
 
 // Default UML Class template. Operations are unsupported for the first release and
 // hidden from the editor, so a new class starts without one.
