@@ -228,8 +228,7 @@ public class ModelRegistryGateway {
   }
 
   /**
-   * Whether the model has exactly one root Element, the entry point its other Elements are read
-   * from. An Element model is its own root.
+   * Whether the model has a single root, as {@link ModelForge#hasSingleRoot} defines it.
    *
    * @param modelUrn CORE URN of a stored Element or Data structure model
    * @throws IllegalArgumentException when the registry holds no such model
