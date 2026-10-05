@@ -5,7 +5,11 @@
 import { useParams } from 'next/navigation'
 import { useCallback, useMemo } from 'react'
 
+import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientRequests'
+import { DATASINK_TYPES } from '@/types/datasinks'
+import { API_STANDARDS } from '@/types/namedApis'
+import { hasApiType } from '@/utils/namedApis'
 
 import { isFrostNodeData, isGeoPersistenceNodeData } from '../_types/nodes'
 import type { PipelineNode } from '../_types/pipeline'
@@ -18,7 +22,7 @@ export interface DataSinkLocks {
 const UNLOCKED: DataSinkLocks = { provisioned: false, inUseByLayer: false }
 
 /** Why a sink node must not be deleted. */
-export type SinkLockReason = 'provisioned' | 'inUseByLayer'
+export type SinkLockReason = 'provisioned' | 'inUseByLayer' | 'inUseBySta'
 
 export interface DataSinkLocksLookup {
   /** Locks of the sink with this backend id; everything false when the id is unknown. */
@@ -26,13 +30,16 @@ export interface DataSinkLocksLookup {
   getSinkLockReason: (node: PipelineNode) => SinkLockReason | null
   /** Lock reason of the first locked node among the selected ones. */
   getSelectionLockReason: (nodes: PipelineNode[]) => SinkLockReason | null
+  /** True when deleting these nodes leaves the STA API of the dataset without a FROST sink. */
+  wouldDeleteLastStaFrostSink: (nodeIdsToDelete: string[]) => boolean
   /** True while the sinks are still being loaded, so no lock is known yet. */
   isLoading: boolean
 }
 
-export const useDataSinkLocks = (): DataSinkLocksLookup => {
+export const useDataSinkLocks = (pipelineId?: string, nodes: PipelineNode[] = []): DataSinkLocksLookup => {
   const { datasetId } = useParams<{ datasetId: string }>()
   const { data, isLoading } = useGetDataSinks(datasetId, { isEnabled: !!datasetId })
+  const { data: datasetData } = useGetDataset({ id: datasetId, isEnabled: !!datasetId })
 
   const locksById = useMemo(() => {
     const map = new Map<string, DataSinkLocks>()
@@ -41,6 +48,18 @@ export const useDataSinkLocks = (): DataSinkLocksLookup => {
     }
     return map
   }, [data?.data])
+
+  // FROST sinks of the active pipeline are counted from its graph nodes.
+  const isStaWithoutOtherFrostSink = useMemo(() => {
+    const hasSta = hasApiType(datasetData?.data?.namedApis ?? [], API_STANDARDS.STA)
+    const hasFrostSinkInOtherPipeline = (data?.data ?? []).some(
+      sink => sink.dataSinkType === DATASINK_TYPES.FROST && sink.pipelineId && sink.pipelineId !== pipelineId,
+    )
+    return hasSta && !hasFrostSinkInOtherPipeline
+  }, [datasetData?.data?.namedApis, data?.data, pipelineId])
+
+  const frostNodeIds = useMemo(() => nodes.flatMap(node => (isFrostNodeData(node.data) ? [node.id] : [])), [nodes])
+  const frostNodeCount = frostNodeIds.length
 
   const getSinkLocks = useCallback(
     (entityId: string | undefined): DataSinkLocks => (entityId ? (locksById.get(entityId) ?? UNLOCKED) : UNLOCKED),
@@ -54,9 +73,10 @@ export const useDataSinkLocks = (): DataSinkLocksLookup => {
       const locks = getSinkLocks(node.data.entityId)
       if (locks.provisioned) return 'provisioned'
       if (locks.inUseByLayer) return 'inUseByLayer'
+      if (isFrostNodeData(node.data) && isStaWithoutOtherFrostSink && frostNodeCount === 1) return 'inUseBySta'
       return null
     },
-    [getSinkLocks],
+    [getSinkLocks, isStaWithoutOtherFrostSink, frostNodeCount],
   )
 
   const getSelectionLockReason = useCallback(
@@ -68,5 +88,14 @@ export const useDataSinkLocks = (): DataSinkLocksLookup => {
     [getSinkLockReason],
   )
 
-  return { getSinkLocks, getSinkLockReason, getSelectionLockReason, isLoading }
+  // The per-node lock misses a delete of several FROST nodes of the same pipeline at once.
+  const wouldDeleteLastStaFrostSink = useCallback(
+    (nodeIdsToDelete: string[]) => {
+      const isEveryFrostNodeDeleted = frostNodeIds.every(id => nodeIdsToDelete.includes(id))
+      return isStaWithoutOtherFrostSink && frostNodeCount > 0 && isEveryFrostNodeDeleted
+    },
+    [isStaWithoutOtherFrostSink, frostNodeIds, frostNodeCount],
+  )
+
+  return { getSinkLocks, getSinkLockReason, getSelectionLockReason, wouldDeleteLastStaFrostSink, isLoading }
 }

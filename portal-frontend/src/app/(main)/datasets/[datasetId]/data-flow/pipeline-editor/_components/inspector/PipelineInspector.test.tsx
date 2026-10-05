@@ -108,6 +108,12 @@ describe('PipelineInspector', () => {
     expect(screen.getByText('sink.locked.inUseByLayer.title')).toBeInTheDocument()
   })
 
+  it('labels the last FROST sink of an STA API as in use', () => {
+    renderInspector('inUseBySta')
+
+    expect(screen.getByText('sink.locked.inUseBySta.title')).toBeInTheDocument()
+  })
+
   it('keeps a layer-referenced sink editable', async () => {
     const updateNode = vi.fn()
     renderInspector('inUseByLayer', updateNode)

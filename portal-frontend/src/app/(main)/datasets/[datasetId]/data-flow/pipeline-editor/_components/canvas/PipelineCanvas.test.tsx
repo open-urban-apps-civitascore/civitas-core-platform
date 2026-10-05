@@ -34,7 +34,12 @@ const selectedSinkNode = {
   data: nodeData,
 } as PipelineNode
 
-const renderCanvas = (lockReason: SinkLockReason | null, dispatch = vi.fn(), isReadOnly = false) => {
+const renderCanvas = (
+  lockReason: SinkLockReason | null,
+  dispatch = vi.fn(),
+  isReadOnly = false,
+  isLastStaFrostSinkDelete = false,
+) => {
   const contextValue = {
     pipeline: { id: 'pipeline-1', name: 'Test', nodes: [selectedSinkNode], edges: [] },
     dispatch,
@@ -44,6 +49,7 @@ const renderCanvas = (lockReason: SinkLockReason | null, dispatch = vi.fn(), isR
     hideValidationPanel: vi.fn(),
     getSinkLockReason: () => lockReason,
     getSelectionLockReason: () => lockReason,
+    wouldDeleteLastStaFrostSink: () => isLastStaFrostSinkDelete,
   } as unknown as ActivePipelineContextValue
 
   render(
@@ -100,6 +106,23 @@ describe('PipelineCanvas', () => {
       await userEvent.keyboard('{Delete}')
 
       expect(toast.error).toHaveBeenCalledWith('sink.notRemovable.provisioned')
+    })
+
+    it('shows a toast that says why the last FROST sink of an STA API can not be deleted', async () => {
+      renderCanvas('inUseBySta')
+
+      await userEvent.keyboard('{Delete}')
+
+      expect(toast.error).toHaveBeenCalledWith('sink.notRemovable.inUseBySta')
+    })
+
+    it('keeps the nodes when the delete removes every FROST sink of an STA API', async () => {
+      const dispatch = renderCanvas(null, vi.fn(), false, true)
+
+      await userEvent.keyboard('{Delete}')
+
+      expect(removedNodeIds(dispatch)).toEqual([])
+      expect(toast.error).toHaveBeenCalledWith('sink.notRemovable.inUseBySta')
     })
 
     it('shows no toast in a read-only pipeline', async () => {

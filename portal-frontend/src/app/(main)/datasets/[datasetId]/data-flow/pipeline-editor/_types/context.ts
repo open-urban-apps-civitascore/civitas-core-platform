@@ -129,6 +129,8 @@ export interface ActivePipelineContextValue {
   getSinkLockReason: (node: PipelineNode) => SinkLockReason | null
   /** Lock reason of the first locked node among the selected ones */
   getSelectionLockReason: (nodes: PipelineNode[]) => SinkLockReason | null
+  /** Whether deleting these nodes leaves the STA API of the dataset without a FROST sink */
+  wouldDeleteLastStaFrostSink: (nodeIdsToDelete: string[]) => boolean
 
   // ===== Session Info =====
   /** ID of the active session */

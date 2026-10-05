@@ -1344,11 +1344,16 @@
         "inUseByLayer": {
           "title": "In use",
           "tooltip": "This Data storage is used by API layers. To edit or remove it, the layer assignments must be removed first."
+        },
+        "inUseBySta": {
+          "title": "In use",
+          "tooltip": "This Data storage is used by a SensorThings API. Delete the API first to delete the Data storage."
         }
       },
       "notRemovable": {
         "provisioned": "Data storage can not be removed. This Data storage has been provisioned and can no longer be removed.",
-        "inUseByLayer": "Data storage can not be removed. This Data storage is used by API layers. Remove the layer assignments first."
+        "inUseByLayer": "Data storage can not be removed. This Data storage is used by API layers. Remove the layer assignments first.",
+        "inUseBySta": "Data storage cannot be deleted. This Data storage is used by a SensorThings API. Delete the API first."
       }
     },
     "frostPanel": {

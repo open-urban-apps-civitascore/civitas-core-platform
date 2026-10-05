@@ -645,7 +645,7 @@ If a step throws, the partial progress is written back to the session — still 
 
 ### Locked Data Sinks
 
-`GET /datasets/{datasetId}/datasinks` reports two flags per sink, `provisioned` and `inUseByLayer`. `useDataSinkLocks()` reads the flags once and tells the canvas and the inspector which lock a node has. It finds the sink through the node's `entityId`, so a node without one is new and never locked.
+`GET /datasets/{datasetId}/datasinks` reports two flags per sink, `provisioned` and `inUseByLayer`. `useDataSinkLocks()` reads the flags once and tells the canvas and the inspector which lock a node has. It finds the sink through the node's `entityId`, so a node without one is new and never has these two locks.
 
 | Flag           | Delete | Data structure       | Table name |
 | -------------- | ------ | -------------------- | ---------- |
@@ -654,7 +654,15 @@ If a step throws, the partial progress is written back to the session — still 
 
 `provisioned` wins when both apply.
 
-`PipelineCanvas` sets `deletable: false` on a locked node. `onBeforeDelete` shows an error toast with the reason.
+A third lock, `inUseBySta`, protects the last FROST sink of a dataset with an STA API. It applies to a FROST node when all of these are true:
+
+- The dataset has an STA API.
+- No other pipeline has a FROST sink. Sinks of deleted pipelines (no `pipelineId`) do not count.
+- The graph of the active pipeline has only this one FROST node. This includes a new node without `entityId`.
+
+`provisioned` and `inUseByLayer` win over `inUseBySta`.
+
+`PipelineCanvas` sets `deletable: false` on a locked node. `onBeforeDelete` shows an error toast with the reason. It also cancels a delete that removes all FROST nodes at once, when `inUseBySta` would apply to the last of them (`wouldDeleteLastStaFrostSink`).
 
 The `PipelineInspector` shows a notice with the lock reason. In read-only mode, only the `inUseByLayer` hint is shown.
 

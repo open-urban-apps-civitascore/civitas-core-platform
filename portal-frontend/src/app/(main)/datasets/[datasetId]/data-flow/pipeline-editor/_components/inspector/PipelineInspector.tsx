@@ -88,6 +88,13 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
             tooltip={t('sink.locked.inUseByLayer.tooltip')}
           />
         )}
+        {lockReason === 'inUseBySta' && (
+          <InspectorNotice
+            icon={Link}
+            title={t('sink.locked.inUseBySta.title')}
+            tooltip={t('sink.locked.inUseBySta.tooltip')}
+          />
+        )}
         {isLocked ? (
           <div className="pointer-events-none opacity-60" aria-disabled>
             {panel}
