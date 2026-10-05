@@ -54,7 +54,7 @@
         <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
-        <config-adapter.version>1.0.2-MR-903-SNAPSHOT</config-adapter.version>
+        <config-adapter.version>1.0.2-MR-902-SNAPSHOT</config-adapter.version>
         <portal-model.version>1.0.0</portal-model.version>
         <at.yawk.lz4.version>1.11.2</at.yawk.lz4.version>
         <!-- develop's snapshot, so a flagless build (generate-graph-backend, a fresh clone)
