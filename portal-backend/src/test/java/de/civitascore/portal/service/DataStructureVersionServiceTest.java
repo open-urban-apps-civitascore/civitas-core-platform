@@ -9,6 +9,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
@@ -307,8 +308,8 @@ class DataStructureVersionServiceTest {
     }
 
     @Test
-    @DisplayName("Should allow release when version carries a stored model (registry pin)")
-    void shouldAllowReleaseWhenModelPresent() {
+    @DisplayName("Should allow release when the stored model has a single root Element")
+    void shouldAllowReleaseWhenModelHasSingleRoot() {
       UUID versionId = UUID.randomUUID();
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
@@ -318,6 +319,7 @@ class DataStructureVersionServiceTest {
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.save(version)).thenReturn(version);
+      when(modelRegistryGateway.hasSingleRoot(version.getModelUrn())).thenReturn(true);
 
       DataStructureVersion result = dataStructureVersionService.release(versionId);
 
@@ -325,9 +327,30 @@ class DataStructureVersionServiceTest {
           .isEqualTo(DataStructureVersionStatus.AVAILABLE);
       verify(dataStructureVersionRepository).save(version);
 
-      // Releasing changes status only. Asserted rather than assumed, so adding a registry call here
-      // fails the test instead of silently changing what a release does.
-      verifyNoInteractions(modelRegistryGateway);
+      // Releasing only reads the root from the registry. Asserted rather than assumed, so adding a
+      // registry write here fails the test instead of silently changing what a release does.
+      verify(modelRegistryGateway).hasSingleRoot(version.getModelUrn());
+      verifyNoMoreInteractions(modelRegistryGateway);
+    }
+
+    @Test
+    @DisplayName("Should block release when the stored model has no single root Element")
+    void shouldBlockReleaseWhenModelHasNoSingleRoot() {
+      UUID versionId = UUID.randomUUID();
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      version.setModelUrn("urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b:1.0.0");
+
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
+      when(modelRegistryGateway.hasSingleRoot(version.getModelUrn())).thenReturn(false);
+
+      assertThatThrownBy(() -> dataStructureVersionService.release(versionId))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("exactly one root Element");
+      assertThat(version.getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.DRAFT);
+      verify(dataStructureVersionRepository, never()).save(any());
     }
 
     @Test

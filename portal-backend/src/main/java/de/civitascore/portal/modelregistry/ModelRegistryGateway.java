@@ -228,6 +228,17 @@ public class ModelRegistryGateway {
   }
 
   /**
+   * Whether the model has exactly one root Element, the entry point its other Elements are read
+   * from. An Element model is its own root.
+   *
+   * @param modelUrn CORE URN of a stored Element or Data structure model
+   * @throws IllegalArgumentException when the registry holds no such model
+   */
+  public boolean hasSingleRoot(String modelUrn) {
+    return modelForge.hasSingleRoot(new ArtifactId(modelUrn));
+  }
+
+  /**
    * What stands in the way of deleting the model, named so a caller can go and remove it. Empty
    * when nothing does.
    *

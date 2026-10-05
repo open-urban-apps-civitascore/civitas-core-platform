@@ -242,11 +242,12 @@ public class DataStructureVersionController
       summary = "Release a data structure version",
       description =
           "Releases a data structure version by setting status to AVAILABLE. Requires a model"
-              + " (JSON schema) to be present.")
+              + " (JSON schema) with exactly one root Element.")
   @ApiResponse(responseCode = "200", description = "Data structure version released successfully")
   @ApiResponse(
       responseCode = "400",
-      description = "Invalid input (e.g. already released or missing model)",
+      description =
+          "Invalid input (e.g. already released, missing model, or no single root Element)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @ApiResponse(
       responseCode = "404",

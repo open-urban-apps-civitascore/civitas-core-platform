@@ -233,12 +233,13 @@ public class DataStructureVersionService
   }
 
   /**
-   * Releases a data structure version by validating it has a model (JSON schema) and setting status
-   * to AVAILABLE.
+   * Releases a data structure version by validating it has a model (JSON schema) with exactly one
+   * root Element and setting status to AVAILABLE.
    *
    * @param id the version ID
    * @return the released version
-   * @throws InvalidInputException if the version has no model or is already released
+   * @throws InvalidInputException if the version is already released, has no model, or its model
+   *     has no single root Element
    */
   @Transactional
   public DataStructureVersion release(UUID id) {
@@ -255,6 +256,13 @@ public class DataStructureVersionService
     if (version.getModelUrn() == null) {
       throw new InvalidInputException(
           "model", id, "DataStructureVersion must contain a model before releasing");
+    }
+
+    if (!modelRegistryGateway.hasSingleRoot(version.getModelUrn())) {
+      throw new InvalidInputException(
+          "model",
+          id,
+          "DataStructureVersion model must designate exactly one root Element before releasing");
     }
 
     version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);

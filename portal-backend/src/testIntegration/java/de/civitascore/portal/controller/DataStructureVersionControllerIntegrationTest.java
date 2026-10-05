@@ -787,6 +787,87 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .as("Should return UNAUTHORIZED status")
           .isEqualTo(HttpStatus.UNAUTHORIZED);
     }
+
+    @Test
+    @DisplayName("Should release a Data structure model whose root names its one Element")
+    void shouldReleaseDataStructureModelWithRootElement() {
+      DataStructureVersion version = draftWithDataStructureModel(true);
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              releasePath(version),
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName("Should fail to release a Data structure model without a root Element")
+    void shouldFailToReleaseDataStructureModelWithoutRootElement() {
+      DataStructureVersion version = draftWithDataStructureModel(false);
+
+      ResponseEntity<ProblemDetail> response =
+          restTemplate.exchange(
+              releasePath(version),
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<ProblemDetail>() {});
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getDetail()).contains("exactly one root Element");
+      assertThat(
+              dataStructureVersionRepository
+                  .findById(version.getId())
+                  .orElseThrow()
+                  .getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.DRAFT);
+    }
+
+    private String releasePath(DataStructureVersion version) {
+      return "/datastructures/"
+          + version.getDataStructure().getId()
+          + "/versions/"
+          + version.getId()
+          + "/release";
+    }
+
+    /** A draft version whose model is a Data structure document, as the UML editor stores it. */
+    private DataStructureVersion draftWithDataStructureModel(boolean designateRoot) {
+      String disambiguator = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+      Map<String, Object> model = new HashMap<>();
+      model.put("$schema", "https://json-schema.org/draft/2020-12/schema");
+      model.put("$id", "urn:core:platform:civitas:datastructure:common:People:" + disambiguator);
+      model.put("title", "People");
+      model.put(
+          "$defs",
+          Map.of(
+              "Person",
+              Map.of(
+                  "$id",
+                  "urn:core:platform:civitas:element:common:Person:" + disambiguator,
+                  "type",
+                  "object",
+                  "properties",
+                  Map.of("name", Map.of("type", "string")))));
+      if (designateRoot) {
+        model.put("$ref", "#/$defs/Person");
+      }
+      DataStructure dataStructure =
+          portalData.dataStructure(
+              b ->
+                  b.name("People " + disambiguator).dataStructureStatus(DataStructureStatus.DRAFT));
+      DataStructureVersion version =
+          portalData.dataStructureVersion(
+              dataStructure,
+              b ->
+                  b.dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
+                      .modelName("People"));
+      return portalData.attachModel(version, model);
+    }
   }
 
   @Nested
