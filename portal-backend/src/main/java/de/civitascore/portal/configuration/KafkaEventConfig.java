@@ -1,9 +1,11 @@
 package de.civitascore.portal.configuration;
 
+import de.civitascore.portal.messaging.saga.InvalidSagaResultException;
 import jakarta.annotation.PostConstruct;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -15,8 +17,10 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.support.KafkaUtils;
 import org.springframework.util.backoff.FixedBackOff;
 
 /**
@@ -24,8 +28,12 @@ import org.springframework.util.backoff.FixedBackOff;
  * Configures an idempotent producer with compression and a consumer factory with dead-letter queue
  * support.
  */
+@Slf4j
 @Configuration
 public class KafkaEventConfig {
+
+  private static final long RETRY_INTERVAL_MS = 1000L;
+  private static final long MAX_RETRIES = 3;
 
   private final KafkaProperties kafkaProperties;
 
@@ -76,10 +84,10 @@ public class KafkaEventConfig {
   }
 
   /**
-   * Kafka listener container factory for the saga result listener with dead-letter queue (DLQ)
-   * support. Failed messages are retried up to 3 times with a 1-second interval, then published to
-   * {@code <original-topic>.DLT} for manual inspection. This prevents processing failures (e.g.,
-   * dataset not found, deserialization errors) from being silently dropped.
+   * Kafka listener container factory for the saga result and pipeline status listeners. A failed
+   * record is retried 3 times, 1 second apart, then published to {@code <original-topic>-dlt}. An
+   * {@link InvalidSagaResultException} skips the retries. If the publish fails, the record is
+   * discarded.
    */
   @Bean
   public ConcurrentKafkaListenerContainerFactory<String, String> sagaKafkaListenerContainerFactory(
@@ -95,15 +103,42 @@ public class KafkaEventConfig {
     DefaultKafkaConsumerFactory<String, String> consumerFactory =
         new DefaultKafkaConsumerFactory<>(consumerProps);
 
-    DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(eventKafkaTemplate);
-    // 3 retries, 1 second apart; on exhaustion the message is sent to <topic>.DLT
-    DefaultErrorHandler errorHandler =
-        new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 3));
-
     ConcurrentKafkaListenerContainerFactory<String, String> factory =
         new ConcurrentKafkaListenerContainerFactory<>();
     factory.setConsumerFactory(consumerFactory);
-    factory.setCommonErrorHandler(errorHandler);
+    factory.setCommonErrorHandler(
+        sagaErrorHandler(new DeadLetterPublishingRecoverer(eventKafkaTemplate)));
     return factory;
+  }
+
+  static DefaultErrorHandler sagaErrorHandler(ConsumerRecordRecoverer deadLetterRecoverer) {
+    DefaultErrorHandler errorHandler =
+        new DefaultErrorHandler(
+            discardIfRecoveryFails(deadLetterRecoverer),
+            new FixedBackOff(RETRY_INTERVAL_MS, MAX_RETRIES));
+    errorHandler.addNotRetryableExceptions(InvalidSagaResultException.class);
+    return errorHandler;
+  }
+
+  /**
+   * A recoverer that throws makes the error handler seek back and start the retries again, with no
+   * limit. Catching the failure ends that cycle at the cost of the record.
+   */
+  private static ConsumerRecordRecoverer discardIfRecoveryFails(ConsumerRecordRecoverer recoverer) {
+    return (record, exception) -> {
+      try {
+        recoverer.accept(record, exception);
+        log.error(
+            "Sent unprocessable record {} to the dead-letter topic",
+            KafkaUtils.format(record),
+            exception);
+      } catch (RuntimeException recoveryFailure) {
+        exception.addSuppressed(recoveryFailure);
+        log.error(
+            "Discarded unprocessable record {}, the dead-letter publish failed",
+            KafkaUtils.format(record),
+            exception);
+      }
+    };
   }
 }
