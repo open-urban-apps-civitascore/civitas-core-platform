@@ -1335,12 +1335,17 @@
         "inUseBySta": {
           "title": "In Verwendung",
           "tooltip": "Dieser Datenspeicher wird von einer SensorThings API verwendet. Zum Löschen des Datenspeichers muss zuerst die API gelöscht werden."
+        },
+        "inUseByOws": {
+          "title": "In Verwendung",
+          "tooltip": "Dieser Datenspeicher wird von der WFS/WMS API verwendet. Zum Löschen des Datenspeichers muss zuerst die API gelöscht werden."
         }
       },
       "notRemovable": {
         "provisioned": "Datenspeicher kann nicht entfernt werden. Dieser Datenspeicher wurde bereitgestellt und kann nicht mehr entfernt werden.",
         "inUseByLayer": "Datenspeicher kann nicht entfernt werden. Dieser Datenspeicher wird von API-Layern verwendet. Heben Sie zuerst die Layer-Zuordnungen auf.",
-        "inUseBySta": "Datenspeicher kann nicht gelöscht werden. Dieser Datenspeicher wird von einer SensorThings API verwendet. Zuerst muss die API gelöscht werden."
+        "inUseBySta": "Datenspeicher kann nicht gelöscht werden. Dieser Datenspeicher wird von einer SensorThings API verwendet. Zuerst muss die API gelöscht werden.",
+        "inUseByOws": "Datenspeicher kann nicht gelöscht werden. Dieser Datenspeicher wird von der WFS/WMS API verwendet. Zuerst muss die API gelöscht werden."
       }
     },
     "frostPanel": {

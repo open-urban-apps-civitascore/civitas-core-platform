@@ -114,6 +114,12 @@ describe('PipelineInspector', () => {
     expect(screen.getByText('sink.locked.inUseBySta.title')).toBeInTheDocument()
   })
 
+  it('labels the last Geo sink of an OWS API as in use', () => {
+    renderInspector('inUseByOws')
+
+    expect(screen.getByText('sink.locked.inUseByOws.title')).toBeInTheDocument()
+  })
+
   it('keeps a layer-referenced sink editable', async () => {
     const updateNode = vi.fn()
     renderInspector('inUseByLayer', updateNode)

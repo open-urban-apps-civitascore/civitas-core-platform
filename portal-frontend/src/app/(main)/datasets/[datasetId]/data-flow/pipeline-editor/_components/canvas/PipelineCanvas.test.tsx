@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 
 import { ActivePipelineContext } from '../../_hooks/use-active-pipeline'
-import type { SinkLockReason } from '../../_hooks/use-datasink-locks'
+import type { ApiSinkLockReason, SinkLockReason } from '../../_hooks/use-datasink-locks'
 import { ReadOnlyProvider } from '../../_hooks/use-pipeline-read-only'
 import type { ActivePipelineContextValue } from '../../_types/context'
 import type { GeoPersistenceNodeData } from '../../_types/nodes'
@@ -38,7 +38,7 @@ const renderCanvas = (
   lockReason: SinkLockReason | null,
   dispatch = vi.fn(),
   isReadOnly = false,
-  isLastStaFrostSinkDelete = false,
+  lastApiSinkLockReason: ApiSinkLockReason | null = null,
 ) => {
   const contextValue = {
     pipeline: { id: 'pipeline-1', name: 'Test', nodes: [selectedSinkNode], edges: [] },
@@ -49,7 +49,7 @@ const renderCanvas = (
     hideValidationPanel: vi.fn(),
     getSinkLockReason: () => lockReason,
     getSelectionLockReason: () => lockReason,
-    wouldDeleteLastStaFrostSink: () => isLastStaFrostSinkDelete,
+    getLastApiSinkLockReason: () => lastApiSinkLockReason,
   } as unknown as ActivePipelineContextValue
 
   render(
@@ -117,7 +117,7 @@ describe('PipelineCanvas', () => {
     })
 
     it('keeps the nodes when the delete removes every FROST sink of an STA API', async () => {
-      const dispatch = renderCanvas(null, vi.fn(), false, true)
+      const dispatch = renderCanvas(null, vi.fn(), false, 'inUseBySta')
 
       await userEvent.keyboard('{Delete}')
 

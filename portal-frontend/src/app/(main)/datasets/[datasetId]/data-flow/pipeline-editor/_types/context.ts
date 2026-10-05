@@ -9,7 +9,7 @@ import type { Connection } from '@xyflow/react'
 
 import type { PipelineDeleteBlockReason } from '@/utils/pipelineDeleteGuard'
 
-import type { DataSinkLocks, SinkLockReason } from '../_hooks/use-datasink-locks'
+import type { ApiSinkLockReason, DataSinkLocks, SinkLockReason } from '../_hooks/use-datasink-locks'
 import type { PipelineReducerAction } from '../_services/pipelineService'
 import type { ValidationResultWithNodeStatus } from '../_services/validationService'
 import type { PipelineNodeData } from './nodes'
@@ -129,8 +129,8 @@ export interface ActivePipelineContextValue {
   getSinkLockReason: (node: PipelineNode) => SinkLockReason | null
   /** Lock reason of the first locked node among the selected ones */
   getSelectionLockReason: (nodes: PipelineNode[]) => SinkLockReason | null
-  /** Whether deleting these nodes leaves the STA API of the dataset without a FROST sink */
-  wouldDeleteLastStaFrostSink: (nodeIdsToDelete: string[]) => boolean
+  /** The API that deleting these nodes leaves without a sink, or null when there is none */
+  getLastApiSinkLockReason: (nodeIdsToDelete: string[]) => ApiSinkLockReason | null
 
   // ===== Session Info =====
   /** ID of the active session */

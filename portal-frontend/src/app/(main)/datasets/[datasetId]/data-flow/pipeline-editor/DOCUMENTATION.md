@@ -654,15 +654,22 @@ If a step throws, the partial progress is written back to the session — still 
 
 `provisioned` wins when both apply.
 
-A third lock, `inUseBySta`, protects the last FROST sink of a dataset with an STA API. It applies to a FROST node when all of these are true:
+Two more locks protect the last sink that an API of the dataset reads from:
 
-- The dataset has an STA API.
-- No other pipeline has a FROST sink. Sinks of deleted pipelines (no `pipelineId`) do not count.
-- The graph of the active pipeline has only this one FROST node. This includes a new node without `entityId`.
+| Lock         | API | Sink node                    |
+| ------------ | --- | ---------------------------- |
+| `inUseBySta` | STA | FROST                        |
+| `inUseByOws` | OWS | Geo persistence (`POSTGIS`)  |
 
-`provisioned` and `inUseByLayer` win over `inUseBySta`.
+A lock applies to a sink node when all of these are true:
 
-`PipelineCanvas` sets `deletable: false` on a locked node. `onBeforeDelete` shows an error toast with the reason. It also cancels a delete that removes all FROST nodes at once, when `inUseBySta` would apply to the last of them (`wouldDeleteLastStaFrostSink`).
+- The dataset has the API.
+- No other pipeline has a sink of this type. Sinks of deleted pipelines (no `pipelineId`) do not count.
+- The graph of the active pipeline has only this one node of this type. This includes a new node without `entityId`.
+
+`provisioned` and `inUseByLayer` win over both.
+
+`PipelineCanvas` sets `deletable: false` on a locked node. `onBeforeDelete` shows an error toast with the reason. It also cancels a delete that removes all nodes of one type at once, when `inUseBySta` or `inUseByOws` would apply to the last of them (`getLastApiSinkLockReason`).
 
 The `PipelineInspector` shows a notice with the lock reason. In read-only mode, only the `inUseByLayer` hint is shown.
 

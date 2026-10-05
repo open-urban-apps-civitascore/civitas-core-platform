@@ -142,7 +142,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     getSinkLocks,
     getSinkLockReason,
     getSelectionLockReason,
-    wouldDeleteLastStaFrostSink,
+    getLastApiSinkLockReason,
     isLoading: isLoadingSinkLocks,
   } = useDataSinkLocks(pipeline.id, pipeline.nodes)
 
@@ -856,7 +856,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       getSinkLocks,
       getSinkLockReason,
       getSelectionLockReason,
-      wouldDeleteLastStaFrostSink,
+      getLastApiSinkLockReason,
 
       // Session info
       activeSessionId: activeSession?.id || null,
@@ -900,7 +900,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       getSinkLocks,
       getSinkLockReason,
       getSelectionLockReason,
-      wouldDeleteLastStaFrostSink,
+      getLastApiSinkLockReason,
     ],
   )
 

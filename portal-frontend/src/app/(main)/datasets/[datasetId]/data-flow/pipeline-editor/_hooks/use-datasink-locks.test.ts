@@ -235,8 +235,52 @@ describe('useDataSinkLocks', () => {
 
       const { result } = renderHook(() => useDataSinkLocks('pipeline-1', [frostNode, secondFrostNode]))
 
-      expect(result.current.wouldDeleteLastStaFrostSink(['frost-1', 'frost-2'])).toBe(true)
-      expect(result.current.wouldDeleteLastStaFrostSink(['frost-1'])).toBe(false)
+      expect(result.current.getLastApiSinkLockReason(['frost-1', 'frost-2'])).toBe('inUseBySta')
+      expect(result.current.getLastApiSinkLockReason(['frost-1'])).toBeNull()
+    })
+  })
+
+  describe('last Geo sink of an OWS API', () => {
+    const geoNode = makeSinkNode('sink-1')
+    const OWS_API: NamedApi = { name: 'OWS', slug: 'ows', standard: API_STANDARDS.OWS }
+
+    beforeEach(() => {
+      mockNamedApis([OWS_API])
+    })
+
+    it('locks the only Geo sink node when no other pipeline has a POSTGIS sink', () => {
+      mockDataSinks([{ id: 'sink-1', pipelineId: 'pipeline-1', dataSinkType: DATASINK_TYPES.POSTGIS }])
+
+      const { result } = renderHook(() => useDataSinkLocks('pipeline-1', [geoNode]))
+
+      expect(result.current.getSinkLockReason(geoNode)).toBe('inUseByOws')
+    })
+
+    it('leaves the Geo sink node unlocked when another pipeline has a POSTGIS sink', () => {
+      mockDataSinks([{ id: 'sink-2', pipelineId: 'pipeline-2', dataSinkType: DATASINK_TYPES.POSTGIS }])
+
+      const { result } = renderHook(() => useDataSinkLocks('pipeline-1', [geoNode]))
+
+      expect(result.current.getSinkLockReason(geoNode)).toBeNull()
+    })
+
+    it('reports the layer lock before the OWS lock', () => {
+      mockDataSinks([
+        { id: 'sink-1', pipelineId: 'pipeline-1', dataSinkType: DATASINK_TYPES.POSTGIS, inUseByLayer: true },
+      ])
+
+      const { result } = renderHook(() => useDataSinkLocks('pipeline-1', [geoNode]))
+
+      expect(result.current.getSinkLockReason(geoNode)).toBe('inUseByLayer')
+    })
+
+    it('does not lock a FROST node for an OWS API', () => {
+      mockDataSinks([])
+      const frostNode = makeFrostNode('frost-1')
+
+      const { result } = renderHook(() => useDataSinkLocks('pipeline-1', [frostNode]))
+
+      expect(result.current.getSinkLockReason(frostNode)).toBeNull()
     })
   })
 })
