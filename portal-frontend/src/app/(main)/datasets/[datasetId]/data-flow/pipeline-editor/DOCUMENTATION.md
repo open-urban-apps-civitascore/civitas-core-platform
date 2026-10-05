@@ -664,7 +664,7 @@ Two more locks protect the last sink that an API of the dataset reads from:
 A lock applies to a sink node when all of these are true:
 
 - The dataset has the API.
-- No other pipeline has a sink of this type. Sinks of deleted pipelines (no `pipelineId`) do not count.
+- No other pipeline has a sink of this type. Sinks of deleted pipelines (no `pipelineId`) do not count. Only pipelines in other tabs count, from their graph and also with unsaved nodes. This includes a new pipeline without an id. Sinks of pipelines without a tab do not count.
 - The graph of the active pipeline has only this one node of this type. This includes a new node without `entityId`.
 
 `provisioned` and `inUseByLayer` win over both.

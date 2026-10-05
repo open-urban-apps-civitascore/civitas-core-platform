@@ -4,26 +4,41 @@ import { hasApiType } from '@/utils/namedApis'
 
 export type PipelineDeleteBlockReason = 'inUseByLayer' | 'lastPostgisWithOws' | 'lastFrostWithSta'
 
-// Sinks of deleted pipelines have no pipelineId and do not count.
-const isLastSinkTypeInPipelines = (pipelineId: string, dataSinks: DataSink[], dataSinkType: DataSinkType) => {
-  const sinksInPipelines = dataSinks.filter(sink => sink.dataSinkType === dataSinkType && sink.pipelineId)
-  return sinksInPipelines.length > 0 && sinksInPipelines.every(sink => sink.pipelineId === pipelineId)
+type HasSinkOfType = (dataSinkType: DataSinkType) => boolean
+
+export interface PipelineSinkChecks {
+  hasSinkInPipeline: HasSinkOfType
+  hasSinkInOtherPipeline: HasSinkOfType
 }
 
+// An unsaved pipeline has no pipelineId and owns no saved sink.
+const isSinkOfPipeline = (sink: DataSink, pipelineId: string | undefined) =>
+  !!pipelineId && sink.pipelineId === pipelineId
+
+export const getSavedSinkChecks = (pipelineId: string | undefined, dataSinks: DataSink[]): PipelineSinkChecks => ({
+  hasSinkInPipeline: dataSinkType =>
+    dataSinks.some(sink => isSinkOfPipeline(sink, pipelineId) && sink.dataSinkType === dataSinkType),
+  // Sinks of deleted pipelines have no pipelineId and do not count.
+  hasSinkInOtherPipeline: dataSinkType =>
+    dataSinks.some(sink => sink.dataSinkType === dataSinkType && sink.pipelineId && sink.pipelineId !== pipelineId),
+})
+
 export const getPipelineDeleteBlockReason = (
-  pipelineId: string,
+  pipelineId: string | undefined,
   dataSinks: DataSink[],
   namedApis: NamedApi[],
+  sinkChecks: PipelineSinkChecks = getSavedSinkChecks(pipelineId, dataSinks),
 ): PipelineDeleteBlockReason | null => {
-  const isUsedByLayer = dataSinks.some(sink => sink.pipelineId === pipelineId && sink.inUseByLayer)
+  const isUsedByLayer = dataSinks.some(sink => isSinkOfPipeline(sink, pipelineId) && sink.inUseByLayer)
   if (isUsedByLayer) return 'inUseByLayer'
 
-  const isLastPostgisWithOws =
-    hasApiType(namedApis, API_STANDARDS.OWS) && isLastSinkTypeInPipelines(pipelineId, dataSinks, DATASINK_TYPES.POSTGIS)
+  const isLastSinkOfType = (dataSinkType: DataSinkType) =>
+    sinkChecks.hasSinkInPipeline(dataSinkType) && !sinkChecks.hasSinkInOtherPipeline(dataSinkType)
+
+  const isLastPostgisWithOws = hasApiType(namedApis, API_STANDARDS.OWS) && isLastSinkOfType(DATASINK_TYPES.POSTGIS)
   if (isLastPostgisWithOws) return 'lastPostgisWithOws'
 
-  const isLastFrostWithSta =
-    hasApiType(namedApis, API_STANDARDS.STA) && isLastSinkTypeInPipelines(pipelineId, dataSinks, DATASINK_TYPES.FROST)
+  const isLastFrostWithSta = hasApiType(namedApis, API_STANDARDS.STA) && isLastSinkOfType(DATASINK_TYPES.FROST)
   if (isLastFrostWithSta) return 'lastFrostWithSta'
 
   return null

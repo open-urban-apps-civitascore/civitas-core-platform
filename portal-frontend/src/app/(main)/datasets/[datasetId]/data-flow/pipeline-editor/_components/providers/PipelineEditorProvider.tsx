@@ -19,7 +19,6 @@ import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import {
   useCreateDataSink,
   useDeleteDataSink,
-  useGetDataSinks,
   useUpdateDataSink,
 } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { useCreateMapping, useDeleteMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
@@ -40,7 +39,6 @@ import {
   isTableNameConflictError,
   isUnconfirmedDataLossError,
 } from '@/utils/errors'
-import { getPipelineDeleteBlockReason } from '@/utils/pipelineDeleteGuard'
 
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
@@ -123,7 +121,6 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   // ===== Backend API Hooks =====
   const pipelinesQuery = useGetPipelines(datasetId)
   const datasetQuery = useGetDataset({ id: datasetId })
-  const dataSinksQuery = useGetDataSinks(datasetId, { isEnabled: !!datasetId })
   const createPipelineMutation = useCreatePipeline(datasetId)
   const updatePipelineMutation = useUpdatePipeline(datasetId)
   const deletePipelineMutation = useDeletePipeline(datasetId)
@@ -138,13 +135,19 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   const { canDeletePipeline: canDelete } = useDatasetPermissions(datasetQuery.data?.data)
 
+  const otherSessions = useMemo(
+    () => sessionManager.sessions.filter(session => session.id !== activeSession?.id),
+    [sessionManager.sessions, activeSession?.id],
+  )
+
   const {
     getSinkLocks,
     getSinkLockReason,
     getSelectionLockReason,
     getLastApiSinkLockReason,
+    pipelineDeleteBlockReason,
     isLoading: isLoadingSinkLocks,
-  } = useDataSinkLocks(pipeline.id, pipeline.nodes)
+  } = useDataSinkLocks(pipeline.id, pipeline.nodes, otherSessions)
 
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
@@ -487,15 +490,6 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   }, [activeSession, sessionManager, deletePipelineMutation, canDelete, t])
 
   const isDeleting = deletePipelineMutation.isPending
-
-  const pipelineDeleteBlockReason = useMemo(() => {
-    if (!pipeline.id) return null
-    return getPipelineDeleteBlockReason(
-      pipeline.id,
-      dataSinksQuery.data?.data ?? [],
-      datasetQuery.data?.data?.namedApis ?? [],
-    )
-  }, [pipeline.id, dataSinksQuery.data?.data, datasetQuery.data?.data?.namedApis])
 
   // ===== Loading State =====
   // Without the locks every node looks deletable, so the editor waits for them too.

@@ -10,9 +10,15 @@ import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientReq
 import { DATASINK_TYPES, DataSinkType } from '@/types/datasinks'
 import { API_STANDARDS } from '@/types/namedApis'
 import { hasApiType } from '@/utils/namedApis'
+import {
+  getPipelineDeleteBlockReason,
+  getSavedSinkChecks,
+  type PipelineDeleteBlockReason,
+} from '@/utils/pipelineDeleteGuard'
 
 import { isFrostNodeData, isGeoPersistenceNodeData, type PipelineNodeData } from '../_types/nodes'
 import type { PipelineNode } from '../_types/pipeline'
+import type { PipelineSession } from '../_types/session'
 
 export interface DataSinkLocks {
   provisioned: boolean
@@ -38,6 +44,14 @@ const getNodeIdsOfType = (nodes: PipelineNode[], isOfType: (data: PipelineNodeDa
 const isEveryNodeDeleted = (nodeIds: string[], nodeIdsToDelete: string[]) =>
   nodeIds.length > 0 && nodeIds.every(nodeId => nodeIdsToDelete.includes(nodeId))
 
+const IS_SINK_NODE_OF_TYPE: Record<DataSinkType, (data: PipelineNodeData) => boolean> = {
+  [DATASINK_TYPES.FROST]: isFrostNodeData,
+  [DATASINK_TYPES.POSTGIS]: isGeoPersistenceNodeData,
+}
+
+const hasSinkNodeOfType = (dataSinkType: DataSinkType, nodes: PipelineNode[]): boolean =>
+  nodes.some(node => IS_SINK_NODE_OF_TYPE[dataSinkType](node.data))
+
 export interface DataSinkLocksLookup {
   /** Locks of the sink with this backend id; everything false when the id is unknown. */
   getSinkLocks: (entityId: string | undefined) => DataSinkLocks
@@ -46,11 +60,17 @@ export interface DataSinkLocksLookup {
   getSelectionLockReason: (nodes: PipelineNode[]) => SinkLockReason | null
   /** The API that deleting these nodes leaves without a sink, or null when there is none. */
   getLastApiSinkLockReason: (nodeIdsToDelete: string[]) => ApiSinkLockReason | null
+  /** Why the active pipeline must not be deleted; null when it can be deleted. */
+  pipelineDeleteBlockReason: PipelineDeleteBlockReason | null
   /** True while the sinks or the dataset are still being loaded, so no lock is known yet. */
   isLoading: boolean
 }
 
-export const useDataSinkLocks = (pipelineId?: string, nodes: PipelineNode[] = []): DataSinkLocksLookup => {
+export const useDataSinkLocks = (
+  pipelineId?: string,
+  nodes: PipelineNode[] = [],
+  otherSessions: readonly PipelineSession[] = [],
+): DataSinkLocksLookup => {
   const { datasetId } = useParams<{ datasetId: string }>()
   const { data, isLoading: isLoadingDataSinks } = useGetDataSinks(datasetId, { isEnabled: !!datasetId })
   const { data: datasetData, isLoading: isLoadingDataset } = useGetDataset({ id: datasetId, isEnabled: !!datasetId })
@@ -63,20 +83,35 @@ export const useDataSinkLocks = (pipelineId?: string, nodes: PipelineNode[] = []
     return map
   }, [data?.data])
 
+  const namedApis = useMemo(() => datasetData?.data?.namedApis ?? [], [datasetData?.data?.namedApis])
+
+  // Only pipelines in other tabs count, also with unsaved nodes.
+  const hasSinkInOtherPipeline = useCallback(
+    (dataSinkType: DataSinkType) =>
+      otherSessions.some(session => hasSinkNodeOfType(dataSinkType, session.pipeline.nodes)),
+    [otherSessions],
+  )
+
   // Sinks of the active pipeline are counted from its graph nodes.
-  const { isStaWithoutOtherFrostSink, isOwsWithoutOtherPostgisSink } = useMemo(() => {
-    const namedApis = datasetData?.data?.namedApis ?? []
-    const hasSinkInOtherPipeline = (dataSinkType: DataSinkType) =>
-      (data?.data ?? []).some(
-        sink => sink.dataSinkType === dataSinkType && sink.pipelineId && sink.pipelineId !== pipelineId,
-      )
-    return {
+  const { isStaWithoutOtherFrostSink, isOwsWithoutOtherPostgisSink } = useMemo(
+    () => ({
       isStaWithoutOtherFrostSink:
         hasApiType(namedApis, API_STANDARDS.STA) && !hasSinkInOtherPipeline(DATASINK_TYPES.FROST),
       isOwsWithoutOtherPostgisSink:
         hasApiType(namedApis, API_STANDARDS.OWS) && !hasSinkInOtherPipeline(DATASINK_TYPES.POSTGIS),
-    }
-  }, [datasetData?.data?.namedApis, data?.data, pipelineId])
+    }),
+    [namedApis, hasSinkInOtherPipeline],
+  )
+
+  const pipelineDeleteBlockReason = useMemo(() => {
+    const dataSinks = data?.data ?? []
+    const savedSinkChecks = getSavedSinkChecks(pipelineId, dataSinks)
+    return getPipelineDeleteBlockReason(pipelineId, dataSinks, namedApis, {
+      hasSinkInPipeline: dataSinkType =>
+        savedSinkChecks.hasSinkInPipeline(dataSinkType) || hasSinkNodeOfType(dataSinkType, nodes),
+      hasSinkInOtherPipeline,
+    })
+  }, [pipelineId, data?.data, namedApis, nodes, hasSinkInOtherPipeline])
 
   const frostNodeIds = useMemo(() => getNodeIdsOfType(nodes, isFrostNodeData), [nodes])
   const geoNodeIds = useMemo(() => getNodeIdsOfType(nodes, isGeoPersistenceNodeData), [nodes])
@@ -126,6 +161,7 @@ export const useDataSinkLocks = (pipelineId?: string, nodes: PipelineNode[] = []
     getSinkLockReason,
     getSelectionLockReason,
     getLastApiSinkLockReason,
+    pipelineDeleteBlockReason,
     isLoading: isLoadingDataSinks || isLoadingDataset,
   }
 }
