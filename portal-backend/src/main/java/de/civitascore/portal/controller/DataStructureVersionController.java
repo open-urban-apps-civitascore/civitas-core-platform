@@ -132,10 +132,8 @@ public class DataStructureVersionController
   }
 
   /**
-   * Deleting a single version is not supported on this endpoint; throws MethodNotAllowedException.
-   *
-   * @param id the UUID of the version (unused)
-   * @throws org.springframework.web.server.MethodNotAllowedException always
+   * Single versions are deleted only together with their data structure; the service delete logic
+   * stays so that this endpoint can be enabled again.
    */
   @Override
   @Operation(hidden = true)
