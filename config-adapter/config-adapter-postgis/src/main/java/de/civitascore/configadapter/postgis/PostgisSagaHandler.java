@@ -29,6 +29,9 @@ import de.civitascore.configadapter.model.postgis.TableConfig;
 import de.civitascore.configadapter.postgis.ddl.DataStructureTableMapper;
 import de.civitascore.configadapter.postgis.ddl.GrantReconciler;
 import de.civitascore.configadapter.postgis.dialect.SqlDialect;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -92,8 +95,9 @@ import org.slf4j.LoggerFactory;
  * <p>{@code PROVISION_SINK} creates the schema, table, and read role + grants for each sink in one
  * transaction; {@code DEPROVISION_SINK} drops the table and role, then drops the per-DataSet schema
  * ({@code RESTRICT} — left in place if still non-empty; never {@code public}). Both re-derive their
- * targets from {@code datasinks} + {@code datasetId}, so the compensation/forward-delete paths are
- * symmetric.
+ * targets from {@code datasinks} + {@code datasetId}. As a compensation, {@code DEPROVISION_SINK}
+ * drops only the tables and schema the provision created rather than found: a re-release finds the
+ * tables an unrelease kept, and a later step's failure must not destroy their data.
  *
  * <p>CREATE/PROVISION are idempotent (duplicate-object SQLStates absorbed); DROP/DEPROVISION are
  * idempotent (missing-object SQLStates absorbed), so steps and compensations are safe to retry.
@@ -108,6 +112,8 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   private static final String ADAPTER_NAME = "postgis";
   private static final String COMPENSATE_TYPE = "COMPENSATE_STEP";
   private static final String DATASINK_TYPE_POSTGIS = "POSTGIS";
+  private static final String KEY_CREATED_TABLES = "createdTables";
+  private static final String KEY_CREATED_SCHEMAS = "createdSchemas";
 
   /** The shared schema that predates per-DataSet schemas; never dropped on deprovision. */
   private static final String SHARED_PUBLIC_SCHEMA = "public";
@@ -222,38 +228,79 @@ public class PostgisSagaHandler implements SagaCommandHandler {
 
   private SagaCommandResult provisionSink(SagaCommandMessage command) throws SQLException {
     List<SinkSpec> sinks = parseSinks(command, true);
-    List<String> statements = new ArrayList<>();
     List<Map<String, Object>> provisioned = new ArrayList<>();
-    for (SinkSpec sink : sinks) {
-      // createTable already emits CREATE SCHEMA for the table's schema.
-      statements.addAll(dialect().createTable(sink.table()));
-      if (sink.role() != null) {
-        String password = ddl.resolvePassword(sink.role().getPassword());
-        statements.addAll(dialect().createRole(sink.role(), password));
-        appendGrantStatements(statements, sink.role().getName(), sink.role().getGrants());
-        statements.add(
-            dialect()
-                .grantSelectOnTable(
-                    sink.role().getName(), sink.table().getSchema(), sink.table().getName()));
-      }
-      provisioned.add(sink.identifiers());
-    }
-    ddl.runDdl(statements, true, false);
+    List<Map<String, Object>> createdTables = new ArrayList<>();
+    Set<String> createdSchemas = new LinkedHashSet<>();
+    ddl.runDdl(
+        connection -> {
+          List<String> statements = new ArrayList<>();
+          for (SinkSpec sink : sinks) {
+            TableConfig table = sink.table();
+            if (!exists(
+                connection, dialect().tableExistsQuery(), table.getSchema(), table.getName())) {
+              createdTables.add(sink.tableIdentifiers());
+            }
+            if (!exists(connection, dialect().schemaExistsQuery(), table.getSchema())) {
+              createdSchemas.add(table.getSchema());
+            }
+            // createTable already emits CREATE SCHEMA for the table's schema.
+            statements.addAll(dialect().createTable(table));
+            if (sink.role() != null) {
+              String password = ddl.resolvePassword(sink.role().getPassword());
+              statements.addAll(dialect().createRole(sink.role(), password));
+              appendGrantStatements(statements, sink.role().getName(), sink.role().getGrants());
+              statements.add(
+                  dialect()
+                      .grantSelectOnTable(
+                          sink.role().getName(), table.getSchema(), table.getName()));
+            }
+            provisioned.add(sink.identifiers());
+          }
+          return statements;
+        },
+        true,
+        false);
 
     logger.info(
-        "PostGIS sink(s) provisioned: {}, saga={}",
+        "PostGIS sink(s) provisioned: {}, of which newly created: {}, saga={}",
         Encode.forJava(String.valueOf(provisioned)),
+        Encode.forJava(String.valueOf(createdTables)),
         Encode.forJava(command.sagaId()));
-    Map<String, Object> data = Map.of("provisionedSinks", provisioned);
-    return SagaCommandResult.success(command.sagaId(), command.stepId(), data, data);
+    return SagaCommandResult.success(
+        command.sagaId(),
+        command.stepId(),
+        Map.of("provisionedSinks", provisioned),
+        Map.of(
+            KEY_CREATED_TABLES, createdTables, KEY_CREATED_SCHEMAS, List.copyOf(createdSchemas)));
+  }
+
+  private static boolean exists(Connection connection, String query, String... binds)
+      throws SQLException {
+    try (PreparedStatement ps = connection.prepareStatement(query)) {
+      for (int i = 0; i < binds.length; i++) {
+        ps.setString(i + 1, binds[i]);
+      }
+      try (ResultSet rs = ps.executeQuery()) {
+        return rs.next();
+      }
+    }
   }
 
   private SagaCommandResult deprovisionSink(SagaCommandMessage command, boolean compensation)
       throws SQLException {
     List<SinkSpec> sinks = parseSinks(command, false);
+    ProvisionedByThisSaga createdBySaga =
+        compensation ? ProvisionedByThisSaga.from(command.payload()) : null;
     List<String> statements = new ArrayList<>();
     Set<String> schemasToDrop = new LinkedHashSet<>();
     for (SinkSpec sink : sinks) {
+      if (createdBySaga != null && !createdBySaga.tables().contains(sink.tableIdentifiers())) {
+        logger.info(
+            "PostGIS table {} predates this saga, keeping it and its data, saga={}",
+            Encode.forJava(sink.table().qualifiedName()),
+            Encode.forJava(command.sagaId()));
+        continue;
+      }
       if (sink.role() != null) {
         statements.addAll(dialect().dropRole(sink.role()));
       }
@@ -263,7 +310,8 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       if (schema != null
           && schema.getName() != null
           && !schema.getName().isBlank()
-          && !SHARED_PUBLIC_SCHEMA.equalsIgnoreCase(schema.getName())) {
+          && !SHARED_PUBLIC_SCHEMA.equalsIgnoreCase(schema.getName())
+          && (createdBySaga == null || createdBySaga.schemas().contains(schema.getName()))) {
         schemasToDrop.add(schema.getName());
       }
     }
@@ -374,8 +422,31 @@ public class PostgisSagaHandler implements SagaCommandHandler {
     return type.cast(config);
   }
 
+  /**
+   * What a {@code PROVISION_SINK} created, as opposed to found, read back from its compensation
+   * data. Absent from a forward {@code DEPROVISION_SINK}, which removes everything.
+   */
+  private record ProvisionedByThisSaga(Set<Map<String, Object>> tables, Set<String> schemas) {
+    @SuppressWarnings("unchecked")
+    static ProvisionedByThisSaga from(Map<String, Object> payload) {
+      if (!(payload.get(KEY_CREATED_TABLES) instanceof List<?> tables)
+          || !(payload.get(KEY_CREATED_SCHEMAS) instanceof List<?> schemas)) {
+        return null;
+      }
+      Set<Map<String, Object>> tableIds = new HashSet<>();
+      tables.forEach(table -> tableIds.add(Map.copyOf((Map<String, Object>) table)));
+      Set<String> schemaNames = new HashSet<>();
+      schemas.forEach(schema -> schemaNames.add(String.valueOf(schema)));
+      return new ProvisionedByThisSaga(tableIds, schemaNames);
+    }
+  }
+
   /** One PostGIS data sink resolved into the objects to provision/drop. */
   private record SinkSpec(SchemaConfig schema, TableConfig table, DbRoleConfig role) {
+    Map<String, Object> tableIdentifiers() {
+      return Map.of("schema", table.getSchema(), "table", table.getName());
+    }
+
     Map<String, Object> identifiers() {
       Map<String, Object> id = new LinkedHashMap<>();
       if (table.getSchema() != null && !table.getSchema().isBlank()) {

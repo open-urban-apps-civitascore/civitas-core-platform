@@ -21,6 +21,8 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -162,6 +164,104 @@ class PostgisSagaHandlerIT extends AbstractPostgisIT {
     assertFalse(tableExists("sink_it", "observations"), "table should be dropped");
     assertFalse(roleExists("sink_it_geo"), "read role should be dropped");
     assertFalse(schemaExists("sink_it"), "the now-empty per-DataSet schema should be dropped");
+  }
+
+  @Test
+  void compensatingAReProvisionKeepsTheTableAndItsRows() throws Exception {
+    Map<String, Object> trigger = sinkTrigger("reuse-it", "kept");
+    handler.handle(execute("PROVISION_SINK", trigger));
+    insertRow("reuse_it", "kept");
+
+    SagaCommandResult reProvisioned = handler.handle(execute("PROVISION_SINK", trigger));
+    SagaCommandResult compensated =
+        handler.handle(
+            compensate("DEPROVISION_SINK", withCompensationData(trigger, reProvisioned)));
+
+    assertEquals("COMPENSATION_COMPLETED", compensated.type());
+    assertEquals(1, rowCount("reuse_it", "kept"));
+  }
+
+  @Test
+  void compensationDropsOnlyTheTablesTheProvisionCreated() throws Exception {
+    handler.handle(execute("PROVISION_SINK", sinkTrigger("mixed-it", "existing")));
+    Map<String, Object> trigger = sinkTrigger("mixed-it", "existing", "added");
+
+    SagaCommandResult provisioned = handler.handle(execute("PROVISION_SINK", trigger));
+    SagaCommandResult compensated =
+        handler.handle(compensate("DEPROVISION_SINK", withCompensationData(trigger, provisioned)));
+
+    assertEquals("COMPENSATION_COMPLETED", compensated.type());
+    assertTrue(tableExists("mixed_it", "existing"));
+    assertFalse(tableExists("mixed_it", "added"));
+  }
+
+  @Test
+  void compensatingAFirstProvisionDropsTableAndSchema() throws Exception {
+    Map<String, Object> trigger = sinkTrigger("fresh-it", "fresh");
+
+    SagaCommandResult provisioned = handler.handle(execute("PROVISION_SINK", trigger));
+    SagaCommandResult compensated =
+        handler.handle(compensate("DEPROVISION_SINK", withCompensationData(trigger, provisioned)));
+
+    assertEquals("COMPENSATION_COMPLETED", compensated.type());
+    assertFalse(tableExists("fresh_it", "fresh"));
+    assertFalse(schemaExists("fresh_it"));
+  }
+
+  @Test
+  void forwardDeprovisionDropsTablesAnEarlierProvisionCreated() throws Exception {
+    Map<String, Object> trigger = sinkTrigger("delete-it", "doomed");
+    handler.handle(execute("PROVISION_SINK", trigger));
+    SagaCommandResult reProvisioned = handler.handle(execute("PROVISION_SINK", trigger));
+
+    SagaCommandResult deleted =
+        handler.handle(execute("DEPROVISION_SINK", withCompensationData(trigger, reProvisioned)));
+
+    assertEquals("STEP_COMPLETED", deleted.type());
+    assertFalse(tableExists("delete_it", "doomed"));
+    assertFalse(schemaExists("delete_it"));
+  }
+
+  /** The payload a saga compensation receives: the step's compensation data over the trigger. */
+  private static Map<String, Object> withCompensationData(
+      Map<String, Object> trigger, SagaCommandResult step) {
+    Map<String, Object> payload = new HashMap<>(trigger);
+    payload.putAll(step.compensationData());
+    return payload;
+  }
+
+  private static Map<String, Object> sinkTrigger(String datasetId, String... tables) {
+    List<Map<String, Object>> sinks = new ArrayList<>();
+    for (String table : tables) {
+      sinks.add(
+          Map.of(
+              "type",
+              "POSTGIS",
+              "configuration",
+              Map.of(
+                  "tableName",
+                  table,
+                  "columns",
+                  List.of(Map.of("name", "id", "type", "BIGINT", "nullable", false)),
+                  "primaryKey",
+                  List.of("id"))));
+    }
+    return Map.of("datasetId", datasetId, "datasinks", sinks);
+  }
+
+  private static void insertRow(String schema, String table) throws SQLException {
+    try (Connection connection = DriverManager.getConnection(jdbcUrl(), username(), password());
+        Statement statement = connection.createStatement()) {
+      statement.execute("INSERT INTO " + schema + "." + table + " (id) VALUES (1)");
+    }
+  }
+
+  private static int rowCount(String schema, String table) throws SQLException {
+    try (Connection connection = DriverManager.getConnection(jdbcUrl(), username(), password());
+        Statement statement = connection.createStatement();
+        ResultSet rs = statement.executeQuery("SELECT count(*) FROM " + schema + "." + table)) {
+      return rs.next() ? rs.getInt(1) : 0;
+    }
   }
 
   private static Map<String, Object> postgisSinkTrigger() {

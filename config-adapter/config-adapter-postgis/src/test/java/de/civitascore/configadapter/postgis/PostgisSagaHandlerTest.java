@@ -22,6 +22,8 @@ import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
@@ -49,6 +51,9 @@ class PostgisSagaHandlerTest {
 
     when(mockConnectionProvider.getConnection()).thenReturn(mockConnection);
     when(mockConnection.createStatement()).thenReturn(mockStatement);
+    PreparedStatement mockCatalogQuery = mock(PreparedStatement.class);
+    when(mockConnection.prepareStatement(anyString())).thenReturn(mockCatalogQuery);
+    when(mockCatalogQuery.executeQuery()).thenReturn(mock(ResultSet.class));
 
     when(mockConfig.getProperty("postgis.jdbc.url")).thenReturn("jdbc:postgresql://h/db");
     when(mockConfig.getProperty("postgis.jdbc.user")).thenReturn("user");
@@ -312,11 +317,14 @@ class PostgisSagaHandlerTest {
     }
 
     @Test
-    void provisionSinkReturnsProvisionedSinksAsCompensationData() {
+    void provisionSinkReportsWhatItCreatedAsCompensationData() {
       SagaCommandResult result = handler.handle(execute("PROVISION_SINK", postgisSinkTrigger()));
 
       assertEquals("STEP_COMPLETED", result.type());
-      assertTrue(result.compensationData().containsKey("provisionedSinks"));
+      assertEquals(
+          List.of(Map.of("schema", "ds_42", "table", "sensor_readings")),
+          result.compensationData().get("createdTables"));
+      assertEquals(List.of("ds_42"), result.compensationData().get("createdSchemas"));
     }
 
     @Test
