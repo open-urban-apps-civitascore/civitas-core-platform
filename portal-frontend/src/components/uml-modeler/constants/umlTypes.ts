@@ -146,6 +146,10 @@ export const UML_COLORS = {
     border: '#0066cc',
     shadow: '0 0 0 2px rgba(0, 102, 204, 0.3)',
   },
+  invalid: {
+    border: 'var(--destructive)',
+    selectedShadow: '0 0 0 3px rgba(0, 102, 204, 0.8)',
+  },
 }
 
 // Edge/Relationship styling
