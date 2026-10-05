@@ -43,6 +43,7 @@ const mockDataset = (overrides: Partial<Dataset> = {}) =>
   vi.mocked(getDataset).mockResolvedValue({ data: makeDataset(overrides) } as Awaited<ReturnType<typeof getDataset>>)
 
 const owsApi: NamedApi = { id: 'api-1', name: 'My OWS API', slug: 'my-ows', standard: 'OWS' }
+const staApi: NamedApi = { id: 'api-2', name: 'My STA API', slug: 'my-sta', standard: 'STA' }
 
 const openPage = (type = 'sensorthings') =>
   ApisPage({
@@ -84,6 +85,13 @@ describe('ApisPage', () => {
       mockDataset({ namedApis: [owsApi] })
 
       await expect(openPage('ows')).rejects.toThrow(REDIRECT)
+      expect(redirect).toHaveBeenCalledWith(`/datasets/${DATASET_ID}`)
+    })
+
+    it('redirects when a SensorThings api already exists on a DRAFT dataset', async () => {
+      mockDataset({ namedApis: [staApi] })
+
+      await expect(openPage('sensorthings')).rejects.toThrow(REDIRECT)
       expect(redirect).toHaveBeenCalledWith(`/datasets/${DATASET_ID}`)
     })
 

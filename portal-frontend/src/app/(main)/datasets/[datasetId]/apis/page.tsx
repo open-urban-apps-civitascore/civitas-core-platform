@@ -30,6 +30,10 @@ const ApisPage = async (props: ApisPageProps) => {
     redirect(`/datasets/${datasetId}`)
   }
 
+  if (type === API_TYPE_QUERY.SENSORTHINGS && hasApiType(dataset.namedApis ?? [], API_STANDARDS.STA)) {
+    redirect(`/datasets/${datasetId}`)
+  }
+
   return <ApiConfigPage testId="apiConfigPage" dataset={dataset} apiType={type} />
 }
 

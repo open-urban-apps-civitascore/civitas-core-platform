@@ -21,7 +21,12 @@ vi.mock('next-intl', () => ({
 
 vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
   useGetDataSinks: vi.fn().mockReturnValue({
-    data: { data: [{ id: 'sink-1', dataSinkType: 'POSTGIS' }] },
+    data: {
+      data: [
+        { id: 'sink-1', dataSinkType: 'POSTGIS', pipelineId: 'pipeline-1' },
+        { id: 'sink-2', dataSinkType: 'FROST', pipelineId: 'pipeline-1' },
+      ],
+    },
   }),
 }))
 
@@ -83,6 +88,25 @@ describe('ApiList', () => {
       await userEvent.click(screen.getByText('addButton'))
       const link = screen.getByText('sensorThings').closest('a')
       expect(link).toHaveAttribute('href', '/datasets/ds-1/apis?type=sensorthings')
+    })
+
+    it('SensorThings item is disabled when a SensorThings api already exists', async () => {
+      renderComponent({ apis: [makeApi({ standard: API_STANDARDS.STA })] })
+      await userEvent.click(screen.getByText('addButton'))
+      const item = screen.getByText('sensorThings').closest('[role="menuitem"]')
+      expect(item).toHaveAttribute('data-disabled')
+      expect(screen.getByText('sensorThings').closest('a')).toBeNull()
+    })
+
+    it('SensorThings item is disabled when no pipeline has a FROST data sink', async () => {
+      vi.mocked(useGetDataSinks).mockReturnValueOnce({
+        data: { data: [{ id: 'sink-2', dataSinkType: 'FROST', pipelineId: null }] },
+      } as never)
+      renderComponent()
+      await userEvent.click(screen.getByText('addButton'))
+      const item = screen.getByText('sensorThings').closest('[role="menuitem"]')
+      expect(item).toHaveAttribute('data-disabled')
+      expect(screen.getByText('sensorThings').closest('a')).toBeNull()
     })
 
     it('OWS link points to the ows type route when no OWS api exists', async () => {
