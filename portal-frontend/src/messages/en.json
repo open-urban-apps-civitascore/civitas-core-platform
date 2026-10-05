@@ -331,6 +331,12 @@
               "description": "Do you really want to delete the pipeline \"{name}\"? This action cannot be undone.",
               "confirm": "Delete"
             },
+            "deleteBlocked": {
+              "title": "Pipeline cannot be deleted",
+              "inUseByLayer": "This Pipeline contains a Geospatial Data storage that is used by a Layer in the WFS/WMS API. Delete the Layer first.",
+              "lastPostgisWithOws": "This Pipeline contains a Geospatial Data storage that is used by the WFS/WMS API. Delete the API first.",
+              "lastFrostWithSta": "This Pipeline contains a Sensor Data storage that is used by the SensorThings API. Delete the API first."
+            },
             "messages": {
               "deleteSuccess": "Pipeline has been successfully deleted.",
               "deleteError": "An error occurred while deleting the pipeline. Please try again."

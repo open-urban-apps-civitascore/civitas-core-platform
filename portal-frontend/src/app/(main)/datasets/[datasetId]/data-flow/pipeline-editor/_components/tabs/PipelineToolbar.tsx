@@ -14,6 +14,7 @@ import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { InfoModal } from '@/components/modals/info-modal/InfoModal'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -41,12 +42,22 @@ interface PipelineToolbarProps {
  */
 export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = '' }) => {
   const t = useTranslations('pipelineEditor')
-  const { pipeline, runValidation, deletePipeline, renamePipeline, isDirty, isDeleting, activeSessionId } =
-    useActivePipeline()
+  const tDeleteBlocked = useTranslations('datasets.overview.completion.dataFlow.pipelines.deleteBlocked')
+  const {
+    pipeline,
+    runValidation,
+    deletePipeline,
+    renamePipeline,
+    isDirty,
+    isDeleting,
+    pipelineDeleteBlockReason,
+    activeSessionId,
+  } = useActivePipeline()
   const { datasetId } = useParams<{ datasetId: string }>()
   const { canDeletePipeline: canDelete, canEditPipeline: canEdit } = useDatasetPermissionsById(datasetId)
 
   const [shouldShowDeleteConfirm, setShouldShowDeleteConfirm] = useState(false)
+  const [shouldShowDeleteBlocked, setShouldShowDeleteBlocked] = useState(false)
   const [isEditingName, setIsEditingName] = useState(false)
   const [editName, setEditName] = useState('')
   const pendingRenameRef = useRef(false)
@@ -84,6 +95,14 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
     setShouldShowDeleteConfirm(false)
     deletePipeline()
   }, [deletePipeline])
+
+  const handleDeleteSelect = useCallback(() => {
+    if (pipelineDeleteBlockReason) {
+      setShouldShowDeleteBlocked(true)
+      return
+    }
+    setShouldShowDeleteConfirm(true)
+  }, [pipelineDeleteBlockReason])
 
   const handleRenameSelect = useCallback(() => {
     pendingRenameRef.current = true
@@ -167,7 +186,7 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
                     )}
                     {canDiscard && (
                       <DropdownMenuItem
-                        onClick={() => setShouldShowDeleteConfirm(true)}
+                        onClick={handleDeleteSelect}
                         className="text-destructive focus:text-destructive"
                         disabled={isDeleting}
                       >
@@ -204,6 +223,16 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
         onDiscard={() => setShouldShowDeleteConfirm(false)}
         isLoading={isDeleting}
       />
+
+      {pipelineDeleteBlockReason && (
+        <InfoModal
+          open={shouldShowDeleteBlocked}
+          onOpenChange={setShouldShowDeleteBlocked}
+          title={tDeleteBlocked('title')}
+          description={tDeleteBlocked(pipelineDeleteBlockReason)}
+          onClose={() => setShouldShowDeleteBlocked(false)}
+        />
+      )}
     </>
   )
 }

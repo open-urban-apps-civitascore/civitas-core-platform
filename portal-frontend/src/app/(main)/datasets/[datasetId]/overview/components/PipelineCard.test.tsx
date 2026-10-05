@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PipelineBasicInfo } from '@/types/datasets'
+import { PipelineDeleteBlockReason } from '@/utils/pipelineDeleteGuard'
 
 import { PipelineCard } from './PipelineCard'
 
@@ -50,6 +51,7 @@ const defaultProps = {
   pipeline: makePipeline(),
   badges: [] as string[],
   canDelete: true,
+  deleteBlockReason: null as PipelineDeleteBlockReason | null,
 }
 
 const renderComponent = (props: Partial<typeof defaultProps> = {}) =>
@@ -196,6 +198,27 @@ describe('PipelineCard', () => {
         expect(toast.success).toHaveBeenCalled()
         expect(mockRefresh).toHaveBeenCalled()
       })
+    })
+
+    it('shows the info modal instead of the confirmation when the delete is blocked', async () => {
+      renderComponent({ deleteBlockReason: 'inUseByLayer' })
+      await openMenu()
+      await userEvent.click(screen.getByTestId('pipelineCardMenuDelete-pipeline-1'))
+
+      expect(screen.getByTestId('infoModal')).toBeInTheDocument()
+      expect(screen.getByText('deleteBlocked.title')).toBeInTheDocument()
+      expect(screen.getByText('deleteBlocked.inUseByLayer')).toBeInTheDocument()
+      expect(screen.queryByTestId('exitWarningModal')).not.toBeInTheDocument()
+    })
+
+    it('closes the info modal without deleting the pipeline', async () => {
+      renderComponent({ deleteBlockReason: 'lastFrostWithSta' })
+      await openMenu()
+      await userEvent.click(screen.getByTestId('pipelineCardMenuDelete-pipeline-1'))
+      await userEvent.click(screen.getByTestId('closeButton'))
+
+      expect(screen.queryByTestId('infoModal')).not.toBeInTheDocument()
+      expect(mockDeletePipelineMutateAsync).not.toHaveBeenCalled()
     })
 
     it('shows an error toast when deletePipeline rejects', async () => {

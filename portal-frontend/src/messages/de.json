@@ -330,6 +330,12 @@
               "description": "Möchtest du die Pipeline „{name}“ wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
               "confirm": "Löschen"
             },
+            "deleteBlocked": {
+              "title": "Pipeline kann nicht gelöscht werden",
+              "inUseByLayer": "Ein Geodaten-Speicher der Pipeline wird von einem Layer der WFS/WMS API verwendet. Zuerst muss der Layer gelöscht werden.",
+              "lastPostgisWithOws": "Ein Geodaten-Speicher der Pipeline wird von der WFS/WMS API verwendet. Zuerst muss die API gelöscht werden.",
+              "lastFrostWithSta": "Ein Sensordaten-Speicher der Pipeline wird von der SensorThings API verwendet. Zuerst muss die API gelöscht werden."
+            },
             "messages": {
               "deleteSuccess": "Pipeline wurde erfolgreich gelöscht.",
               "deleteError": "Beim Löschen der Pipeline ist ein Fehler aufgetreten. Bitte versuche es erneut."

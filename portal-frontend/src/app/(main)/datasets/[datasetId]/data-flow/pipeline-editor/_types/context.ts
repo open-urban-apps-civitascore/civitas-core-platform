@@ -7,6 +7,8 @@
 
 import type { Connection } from '@xyflow/react'
 
+import type { PipelineDeleteBlockReason } from '@/utils/pipelineDeleteGuard'
+
 import type { DataSinkLocks, SinkLockReason } from '../_hooks/use-datasink-locks'
 import type { PipelineReducerAction } from '../_services/pipelineService'
 import type { ValidationResultWithNodeStatus } from '../_services/validationService'
@@ -109,6 +111,8 @@ export interface ActivePipelineContextValue {
   deletePipeline: () => void
   /** Whether a delete operation is currently in progress */
   isDeleting: boolean
+  /** Why the active pipeline must not be deleted; null when it can be deleted */
+  pipelineDeleteBlockReason: PipelineDeleteBlockReason | null
   /** Whether the pipelines and the data sink locks are being loaded from the backend */
   isLoadingEditor: boolean
   /** Save all dirty pipelines across all tabs. Returns true if all saves succeeded. */
