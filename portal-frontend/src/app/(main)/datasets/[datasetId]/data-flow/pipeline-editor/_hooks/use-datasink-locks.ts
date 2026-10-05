@@ -46,14 +46,14 @@ export interface DataSinkLocksLookup {
   getSelectionLockReason: (nodes: PipelineNode[]) => SinkLockReason | null
   /** The API that deleting these nodes leaves without a sink, or null when there is none. */
   getLastApiSinkLockReason: (nodeIdsToDelete: string[]) => ApiSinkLockReason | null
-  /** True while the sinks are still being loaded, so no lock is known yet. */
+  /** True while the sinks or the dataset are still being loaded, so no lock is known yet. */
   isLoading: boolean
 }
 
 export const useDataSinkLocks = (pipelineId?: string, nodes: PipelineNode[] = []): DataSinkLocksLookup => {
   const { datasetId } = useParams<{ datasetId: string }>()
-  const { data, isLoading } = useGetDataSinks(datasetId, { isEnabled: !!datasetId })
-  const { data: datasetData } = useGetDataset({ id: datasetId, isEnabled: !!datasetId })
+  const { data, isLoading: isLoadingDataSinks } = useGetDataSinks(datasetId, { isEnabled: !!datasetId })
+  const { data: datasetData, isLoading: isLoadingDataset } = useGetDataset({ id: datasetId, isEnabled: !!datasetId })
 
   const locksById = useMemo(() => {
     const map = new Map<string, DataSinkLocks>()
@@ -121,5 +121,11 @@ export const useDataSinkLocks = (pipelineId?: string, nodes: PipelineNode[] = []
     [frostNodeIds, geoNodeIds, isStaWithoutOtherFrostSink, isOwsWithoutOtherPostgisSink],
   )
 
-  return { getSinkLocks, getSinkLockReason, getSelectionLockReason, getLastApiSinkLockReason, isLoading }
+  return {
+    getSinkLocks,
+    getSinkLockReason,
+    getSelectionLockReason,
+    getLastApiSinkLockReason,
+    isLoading: isLoadingDataSinks || isLoadingDataset,
+  }
 }

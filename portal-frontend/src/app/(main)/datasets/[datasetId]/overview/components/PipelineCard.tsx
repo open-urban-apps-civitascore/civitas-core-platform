@@ -25,9 +25,17 @@ interface PipelineCardProps {
   badges: string[]
   canDelete: boolean
   deleteBlockReason: PipelineDeleteBlockReason | null
+  isDeleteDisabled: boolean
 }
 
-export const PipelineCard = ({ datasetId, pipeline, badges, canDelete, deleteBlockReason }: PipelineCardProps) => {
+export const PipelineCard = ({
+  datasetId,
+  pipeline,
+  badges,
+  canDelete,
+  deleteBlockReason,
+  isDeleteDisabled,
+}: PipelineCardProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.pipelines')
   const locale = useLocale()
   const router = useRouter()
@@ -91,6 +99,7 @@ export const PipelineCard = ({ datasetId, pipeline, badges, canDelete, deleteBlo
               {canDelete && (
                 <DropdownMenuItem
                   variant="destructive"
+                  disabled={isDeleteDisabled}
                   onClick={e => {
                     e.stopPropagation()
                     if (deleteBlockReason) {

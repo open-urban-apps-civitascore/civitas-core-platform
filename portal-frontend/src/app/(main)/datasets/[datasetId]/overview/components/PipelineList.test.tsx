@@ -18,16 +18,19 @@ vi.mock('./PipelineCard', () => ({
     badges,
     canDelete,
     deleteBlockReason,
+    isDeleteDisabled,
   }: {
     pipeline: PipelineBasicInfo
     badges: string[]
     canDelete: boolean
     deleteBlockReason: string | null
+    isDeleteDisabled: boolean
   }) => (
     <div
       data-testid={`pipelineCard-${pipeline.id}`}
       data-can-delete={canDelete}
       data-delete-block-reason={deleteBlockReason ?? ''}
+      data-delete-disabled={isDeleteDisabled}
     >
       {pipeline.name}
       {badges.map(label => (
@@ -124,6 +127,17 @@ describe('PipelineList', () => {
 
       expect(screen.getByTestId('pipelineCard-p1')).toHaveAttribute('data-delete-block-reason', 'lastFrostWithSta')
       expect(screen.getByTestId('pipelineCard-p2')).toHaveAttribute('data-delete-block-reason', '')
+    })
+
+    it.each([
+      ['loading', { isLoading: true, isError: false }],
+      ['failed', { isLoading: false, isError: true }],
+    ])('disables the delete when the data sinks request is %s', (_state, requestState) => {
+      vi.mocked(useGetDataSinks).mockReturnValue({ data: undefined, ...requestState } as never)
+
+      renderComponent({ pipelines: [makePipeline({ id: 'p1' })] })
+
+      expect(screen.getByTestId('pipelineCard-p1')).toHaveAttribute('data-delete-disabled', 'true')
     })
 
     it('does not show the empty message when there are pipelines', () => {

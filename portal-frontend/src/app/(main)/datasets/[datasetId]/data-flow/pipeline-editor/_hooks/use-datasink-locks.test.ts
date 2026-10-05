@@ -172,6 +172,19 @@ describe('useDataSinkLocks', () => {
     expect(result.current.getSelectionLockReason([select(makeSinkNode('sink-1'))])).toBeNull()
   })
 
+  it('stays loading while the dataset is loading', () => {
+    vi.mocked(useGetDataSinks).mockReturnValue({ data: { data: [] }, isLoading: false } as unknown as ReturnType<
+      typeof useGetDataSinks
+    >)
+    vi.mocked(useGetDataset).mockReturnValue({ data: undefined, isLoading: true } as unknown as ReturnType<
+      typeof useGetDataset
+    >)
+
+    const { result } = renderHook(() => useDataSinkLocks())
+
+    expect(result.current.isLoading).toBe(true)
+  })
+
   describe('last FROST sink of an STA API', () => {
     const frostNode = makeFrostNode('frost-1', 'sink-1')
 

@@ -67,7 +67,7 @@ export const PipelineList = ({
   const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
   const { data: pipelinesData } = useGetPipelines(datasetId)
   const { data: datasourcesData } = useGetDatasources({ isEnabled: canReadDatasources })
-  const { data: dataSinksData } = useGetDataSinks(datasetId)
+  const { data: dataSinksData, isLoading: isLoadingDataSinks, isError: isDataSinksError } = useGetDataSinks(datasetId)
   const seenErrors = useRef(new Set<string>())
 
   useEffect(() => {
@@ -123,6 +123,7 @@ export const PipelineList = ({
               badges={badgesByPipelineId.get(pipeline.id) ?? []}
               canDelete={canDeletePipeline}
               deleteBlockReason={getPipelineDeleteBlockReason(pipeline.id, dataSinksData?.data ?? [], namedApis)}
+              isDeleteDisabled={isLoadingDataSinks || isDataSinksError}
             />
           ))}
         </div>

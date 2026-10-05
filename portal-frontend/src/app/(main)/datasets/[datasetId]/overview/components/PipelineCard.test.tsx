@@ -52,6 +52,7 @@ const defaultProps = {
   badges: [] as string[],
   canDelete: true,
   deleteBlockReason: null as PipelineDeleteBlockReason | null,
+  isDeleteDisabled: false,
 }
 
 const renderComponent = (props: Partial<typeof defaultProps> = {}) =>
@@ -139,6 +140,12 @@ describe('PipelineCard', () => {
       renderComponent({ canDelete: true })
       await openMenu()
       expect(screen.getByTestId('pipelineCardMenuDelete-pipeline-1')).toBeInTheDocument()
+    })
+
+    it('disables the delete item when isDeleteDisabled is true', async () => {
+      renderComponent({ isDeleteDisabled: true })
+      await openMenu()
+      expect(screen.getByTestId('pipelineCardMenuDelete-pipeline-1')).toHaveAttribute('data-disabled')
     })
 
     it('hides the delete item when canDelete is false', async () => {
