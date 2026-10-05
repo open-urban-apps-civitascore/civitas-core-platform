@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
 
+import { DATASINKS_QUERY_KEY } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useDataQuery } from '@/hooks/use-data-query'
@@ -106,8 +107,10 @@ const useDatasetTransition = (action: 'stage' | 'unstage' | 'release' | 'unrelea
         headers: { 'x-api-request': 'true' },
         errorMessage: `An error occurred while trying to ${action} dataset`,
       }),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: [key] })
+      // After provisioning and back in DRAFT the pipeline editor needs the final `provisioned` flag of the sinks.
+      if (action === 'unstage') queryClient.invalidateQueries({ queryKey: [DATASINKS_QUERY_KEY, id] })
     },
     onError: error => {
       console.error(`Error during ${action}:`, (error as Error).message)
