@@ -1,17 +1,15 @@
-<!-- VENDORED from agent-context@37494c39 — DO NOT EDIT HERE.
+<!-- VENDORED from agent-context@82657266 — DO NOT EDIT HERE.
      Change it in civitas-connect/civitas-core/civitas-core-v2/agent-context, then run ./sync-to-targets.sh -->
 
 <!-- COPY — DO NOT EDIT HERE. Refresh with ./sync-guidelines.sh
-     Source: documentation@e2f8a6fc · version 2.0-rc2 · Development/Code_Style_Guides/Backend-Style-Guide.md
-     Web:    https://docs.core.civitasconnect.digital/docs_v2/Development/Code_Style_Guides/Backend-Style-Guide -->
+     Source: documentation@9ba48deb · version next · Development/backend-development/java-development/java-style-guide.md
+     Web:    https://docs.core.civitasconnect.digital/docs_v2/next/Development/backend-development/java-development/java-style-guide -->
 
 ---
-sidebar_position: 2
+sidebar_position: 1
 ---
 
-# Backend Style Guide
-
-**Version 0.9**
+# Java Style Guide
 
 This section contains the code style guide for the CIVITAS/CORE V2 backend code. This guide should be followed at all times and considered during code reviews to maintain a clean, consistent, and readable codebase.
 

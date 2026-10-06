@@ -1,17 +1,15 @@
-<!-- VENDORED from agent-context@37494c39 — DO NOT EDIT HERE.
+<!-- VENDORED from agent-context@82657266 — DO NOT EDIT HERE.
      Change it in civitas-connect/civitas-core/civitas-core-v2/agent-context, then run ./sync-to-targets.sh -->
 
 <!-- COPY — DO NOT EDIT HERE. Refresh with ./sync-guidelines.sh
-     Source: documentation@e2f8a6fc · version 2.0-rc2 · Development/Code_Style_Guides/Frontend-Style-Guide.md
-     Web:    https://docs.core.civitasconnect.digital/docs_v2/Development/Code_Style_Guides/Frontend-Style-Guide -->
+     Source: documentation@9ba48deb · version next · Development/frontend-development/frontend-style-guide.md
+     Web:    https://docs.core.civitasconnect.digital/docs_v2/next/Development/frontend-development/frontend-style-guide -->
 
 ---
-sidebar_position: 2
+sidebar_position: 3
 ---
 
 # Frontend Style Guide
-
-**Version 0.9**
 
 This section contains the code style guide for the CIVITAS/CORE V2 frontend code. This style guide should be respected at any point and also be considered in code reviews to achieve a clean, consistent codebase with a good readability.
 

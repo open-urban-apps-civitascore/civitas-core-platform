@@ -1,9 +1,9 @@
-<!-- VENDORED from agent-context@37494c39 — DO NOT EDIT HERE.
+<!-- VENDORED from agent-context@82657266 — DO NOT EDIT HERE.
      Change it in civitas-connect/civitas-core/civitas-core-v2/agent-context, then run ./sync-to-targets.sh -->
 
 <!-- COPY — DO NOT EDIT HERE. Refresh with ./sync-guidelines.sh
-     Source: documentation@e2f8a6fc · version 2.0-rc2 · Architecture/Architecture_General/Architecture_Principles.md
-     Web:    https://docs.core.civitasconnect.digital/docs_v2/Architecture/Architecture_General/Architecture_Principles -->
+     Source: documentation@9ba48deb · version next · Architecture/platform-architecture/architecture-principles.md
+     Web:    https://docs.core.civitasconnect.digital/docs_v2/next/Architecture/platform-architecture/architecture-principles -->
 
 ---
 sidebar_position: 3

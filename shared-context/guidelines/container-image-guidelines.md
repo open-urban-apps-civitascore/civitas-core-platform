@@ -1,12 +1,12 @@
-<!-- VENDORED from agent-context@37494c39 — DO NOT EDIT HERE.
+<!-- VENDORED from agent-context@82657266 — DO NOT EDIT HERE.
      Change it in civitas-connect/civitas-core/civitas-core-v2/agent-context, then run ./sync-to-targets.sh -->
 
 <!-- COPY — DO NOT EDIT HERE. Refresh with ./sync-guidelines.sh
-     Source: documentation@e2f8a6fc · version 2.0-rc2 · Development/Code_Style_Guides/Container_Image_Guidelines.md
-     Web:    https://docs.core.civitasconnect.digital/docs_v2/Development/Code_Style_Guides/Container_Image_Guidelines -->
+     Source: documentation@9ba48deb · version next · Development/devops/container-image-guidelines.md
+     Web:    https://docs.core.civitasconnect.digital/docs_v2/next/Development/devops/container-image-guidelines -->
 
 ---
-sidebar_position: 5
+sidebar_position: 2
 ---
 
 # Secure Container Image Guidelines
