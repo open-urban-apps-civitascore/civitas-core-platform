@@ -1,6 +1,7 @@
 'use client'
 
 import { Plus, Trash2 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useCallback } from 'react'
 
 import { BasicSelect } from '@/components/select/basicSelect/BasicSelect'
@@ -17,6 +18,7 @@ import {
 } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
+import { getAttributeNameError, getNextAttributeName, getOtherMemberNames } from '../../services/elementNameService'
 import { canMultiplicityBePrimaryKey } from '../../services/jsonSchemaExportService'
 import { type UMLAttribute, type UMLElement, type UMLGeometryType, type UMLPrimitiveType } from '../../types/uml'
 
@@ -32,14 +34,16 @@ interface AttributeManagerProps {
 export const AttributeManager: React.FC<AttributeManagerProps> = props => {
   const { nodeId, element, isStaticVisible = false, isDefaultValueVisible = false } = props
   const { isReadOnly } = useReadOnly()
+  const t = useTranslations('umlModeler.nameValidation')
 
   const { updateNode } = useActiveDiagram()
 
   const addAttribute = useCallback(() => {
     if ('attributes' in element) {
+      const takenNames = element.attributes.map(attribute => attribute.name)
       const newAttribute: UMLAttribute = {
         id: crypto.randomUUID(),
-        name: 'neuesAttribut',
+        name: getNextAttributeName(takenNames),
         type: 'String',
         isId: false,
       }
@@ -145,6 +149,12 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
     updateNode(nodeId, { attributes: updatedAttributes })
   }
 
+  const duplicateAttributeIds = new Set(
+    element.attributes
+      .filter(attribute => getAttributeNameError(attribute.name, getOtherMemberNames(element.attributes, attribute.id)))
+      .map(attribute => attribute.id),
+  )
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -183,10 +193,17 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
                 type="text"
                 value={attribute.name}
                 onChange={e => updateAttribute(attribute.id, { name: e.target.value })}
-                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className={cn(
+                  'w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500',
+                  duplicateAttributeIds.has(attribute.id) ? 'border-destructive' : 'border-gray-300',
+                )}
                 placeholder="attributeName"
                 disabled={isReadOnly}
+                aria-invalid={duplicateAttributeIds.has(attribute.id)}
               />
+              {duplicateAttributeIds.has(attribute.id) && (
+                <p className="mt-1 text-xs text-destructive">{t('duplicateAttribute')}</p>
+              )}
             </div>
 
             {/* Type */}

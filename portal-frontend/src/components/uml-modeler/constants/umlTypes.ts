@@ -112,7 +112,7 @@ export const DEFAULT_NAMES = {
   class: 'NeueKlasse',
   interface: 'NeuesInterface',
   abstractClass: 'NeueAbstrakteKlasse',
-  enumeration: 'NeueAufzählung',
+  enumeration: 'NeueAufzaehlung',
   attribute: 'neuesAttribut',
   operation: 'neueOperation',
   parameter: 'parameter',
@@ -154,6 +154,10 @@ export const UML_COLORS = {
   selected: {
     border: '#0066cc',
     shadow: '0 0 0 2px rgba(0, 102, 204, 0.3)',
+  },
+  invalid: {
+    border: 'var(--destructive)',
+    selectedShadow: '0 0 0 3px rgba(0, 102, 204, 0.8)',
   },
 }
 

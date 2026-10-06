@@ -343,6 +343,68 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
   })
 })
 
+describe('useDatastructureVersion — class names', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('refuses the save while two classes have the same name', async () => {
+    const styles = designatedRootDiagram()
+    styles.nodes[1].data.element.name = 'Alpha'
+    const { hook, updateVersion } = setup(version({ styles }))
+
+    act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+    let saved: boolean | undefined
+    await act(async () => {
+      saved = await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(saved).toBe(false)
+    expect(toast.error).toHaveBeenCalledWith(
+      'datastructureVersions.errors.saveInvalidModel|umlModeler.nameValidation.invalidNames',
+    )
+    expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
+  })
+
+  it('refuses to release a draft while two classes have the same name', async () => {
+    const styles = designatedRootDiagram()
+    styles.nodes[1].data.element.name = 'Alpha'
+    const { hook, updateStatus } = setup(version({ styles }))
+
+    act(() => hook.result.current.handleStatusChange(DATASTRUCTURE_STATUS_TYPES.AVAILABLE))
+    let saved: boolean | undefined
+    await act(async () => {
+      saved = await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(saved).toBe(false)
+    expect(toast.error).toHaveBeenCalledWith(
+      'datastructureVersions.errors.saveInvalidModel|umlModeler.nameValidation.invalidNames',
+    )
+    expect(updateStatus.mutateAsync).not.toHaveBeenCalled()
+  })
+
+  it('unreleases an available version that still has an invalid name', async () => {
+    const styles = rootedSingleClassDiagram()
+    styles.nodes[0].data.element.name = 'Neue Klasse'
+    const { hook, updateStatus } = setup(
+      version({ dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE, styles }),
+    )
+
+    act(() => hook.result.current.handleStatusChange(DATASTRUCTURE_STATUS_TYPES.DRAFT))
+    let saved: boolean | undefined
+    await act(async () => {
+      saved = await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(saved).toBe(true)
+    expect(toast.error).not.toHaveBeenCalled()
+    expect(updateStatus.mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ endpoint: `/datastructures/${DS_ID}/versions/v1/unrelease` }),
+    )
+  })
+})
+
 describe('useDatastructureVersion — released versions take no field update', () => {
   beforeEach(() => {
     vi.clearAllMocks()

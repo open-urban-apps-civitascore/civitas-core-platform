@@ -13,6 +13,7 @@ import {
   useUpdateDatastructureVersion,
 } from '@/app/services/api/datastructures/versions/clientRequests'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
+import { hasInvalidNamesInDiagram } from '@/components/uml-modeler/services/elementNameService'
 import { SchemaExportError } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
 import { rootFailureMessage } from '@/components/uml-modeler/services/rootFailureMessage'
@@ -108,6 +109,10 @@ export const useDatastructureVersion = ({ version, isCreateMode, onCreateVersion
   const nodesWatch = form.watch('nodes')
 
   const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
+  const isUnreleasing =
+    initialFormValues.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && isDraftMode
+  // Available versions are read-only, so invalid names can only be fixed after the unrelease.
+  const isSaveBlockedByInvalidNames = !isUnreleasing && hasInvalidNamesInDiagram(nodes ?? [])
 
   useEffect(() => {
     form.setValue('modelName', modelName || null, { shouldDirty: shouldMarkModelFieldsDirty })
@@ -279,6 +284,10 @@ export const useDatastructureVersion = ({ version, isCreateMode, onCreateVersion
     const parsed = parseDatastructureVersionFormData(form.getValues(), isDraftMode)
     if (!parsed.success) {
       handleFormValidationError(parsed.error)
+      return false
+    }
+    if (isSaveBlockedByInvalidNames) {
+      toast.error(t('errors.saveInvalidModel', { reason: tUmlModeler('nameValidation.invalidNames') }))
       return false
     }
 

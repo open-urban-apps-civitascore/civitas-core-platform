@@ -1,9 +1,10 @@
 'use client'
 
-import { Handle, Position } from '@xyflow/react'
+import { Handle, Position, useNodeId } from '@xyflow/react'
 import type { CSSProperties, ReactNode } from 'react'
 
 import { NODE_DIMENSIONS, UML_COLORS } from '../../constants/umlTypes'
+import { useInvalidNodeIds } from '../../hooks/use-invalid-node-ids'
 import type { UMLElementType } from '../../types/uml'
 
 interface BaseUMLNodeProps {
@@ -17,16 +18,28 @@ interface BaseUMLNodeProps {
   className?: string
 }
 
+const getBorderColor = (elementType: UMLElementType, isSelected: boolean, isInvalid: boolean): string => {
+  if (isInvalid) return UML_COLORS.invalid.border
+  if (isSelected) return UML_COLORS.selected.border
+  return UML_COLORS[elementType].border
+}
+
+const getBoxShadow = (isSelected: boolean, isInvalid: boolean): string => {
+  if (!isSelected) return 'none'
+  if (isInvalid) return UML_COLORS.invalid.selectedShadow
+  return UML_COLORS.selected.shadow
+}
+
 // Get styling for UML node based on type and selection state
-export const getNodeStyle = (elementType: UMLElementType, isSelected: boolean): CSSProperties => ({
+export const getNodeStyle = (elementType: UMLElementType, isSelected: boolean, isInvalid = false): CSSProperties => ({
   background: UML_COLORS[elementType].background,
-  border: `2px solid ${isSelected ? UML_COLORS.selected.border : UML_COLORS[elementType].border}`,
+  border: `2px solid ${getBorderColor(elementType, isSelected, isInvalid)}`,
   borderRadius: '4px',
   minWidth: NODE_DIMENSIONS.minWidth,
   fontFamily: 'monospace',
   fontSize: '12px',
   color: UML_COLORS[elementType].text,
-  boxShadow: isSelected ? UML_COLORS.selected.shadow : 'none',
+  boxShadow: getBoxShadow(isSelected, isInvalid),
   transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
   display: 'flex',
   flexDirection: 'column',
@@ -44,8 +57,12 @@ export const BaseUMLNode: React.FC<BaseUMLNodeProps> = ({
   children,
   className = '',
 }) => {
+  const nodeId = useNodeId()
+  const invalidNodeIds = useInvalidNodeIds()
+  const isInvalid = nodeId !== null && invalidNodeIds.has(nodeId)
+
   return (
-    <div className={`uml-node ${className}`} style={getNodeStyle(elementType, isSelected)}>
+    <div className={`uml-node ${className}`} style={getNodeStyle(elementType, isSelected, isInvalid)}>
       {/* Universal connection handles - invisible for clean UML appearance */}
 
       <Handle type="source" position={Position.Top} id="universal" />

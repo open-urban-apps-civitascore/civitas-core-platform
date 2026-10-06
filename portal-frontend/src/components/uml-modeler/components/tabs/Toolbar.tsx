@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { versionOfUrn } from '@/utils/coreUrn'
 
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
+import { hasInvalidNamesInDiagram } from '../../services/elementNameService'
 import { downloadJsonSchema, SchemaExportError } from '../../services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '../../services/modelUploadService'
 import { rootFailureMessage } from '../../services/rootFailureMessage'
@@ -60,6 +61,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
   const handleSave = useCallback(() => {
     if (isSaving) return
+    if (hasInvalidNamesInDiagram(diagram.nodes)) {
+      toast.error(t('nameValidation.invalidNames'))
+      return
+    }
 
     let payload
     try {

@@ -1680,6 +1680,14 @@
       "success": "Diagram exported successfully",
       "error": "Failed to export diagram. Please try again."
     },
+    "nameValidation": {
+      "required": "Enter a name.",
+      "invalidCharacters": "Only letters (a–z, A–Z), digits and underscores are allowed. The first character must be a letter or an underscore.",
+      "duplicateElement": "Another element in the diagram already has this name.",
+      "duplicateAttribute": "Another attribute of this class already has this name.",
+      "duplicateEnumValue": "Several values have the same name.",
+      "invalidNames": "At least one name of an element, attribute or enumeration value is not valid or is used more than once."
+    },
     "rootValidation": {
       "noRoot": "No root class can be determined in the diagram — every class is embedded in another one (cyclic structure).",
       "ambiguousRoot": "The diagram has several possible root classes ({names}). Mark the root class in the class properties or connect the classes into a hierarchy.",

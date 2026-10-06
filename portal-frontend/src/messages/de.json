@@ -1667,6 +1667,14 @@
       "success": "Diagramm erfolgreich exportiert",
       "error": "Diagramm konnte nicht exportiert werden. Bitte versuchen Sie es erneut."
     },
+    "nameValidation": {
+      "required": "Geben Sie einen Namen ein.",
+      "invalidCharacters": "Erlaubt sind nur Buchstaben (a–z, A–Z), Ziffern und Unterstriche. Das erste Zeichen muss ein Buchstabe oder ein Unterstrich sein.",
+      "duplicateElement": "Ein anderes Element im Diagramm hat bereits diesen Namen.",
+      "duplicateAttribute": "Ein anderes Attribut dieser Klasse hat bereits diesen Namen.",
+      "duplicateEnumValue": "Mehrere Werte haben denselben Namen.",
+      "invalidNames": "Mindestens ein Name eines Elements, Attributs oder Enum-Werts ist ungültig oder wird mehrfach verwendet."
+    },
     "rootValidation": {
       "noRoot": "Im Diagramm lässt sich keine Wurzelklasse bestimmen — jede Klasse ist in eine andere eingebettet (zyklische Struktur).",
       "ambiguousRoot": "Das Diagramm hat mehrere mögliche Wurzelklassen ({names}). Markieren Sie die Wurzelklasse in den Klasseneigenschaften oder verbinden Sie die Klassen zu einer Hierarchie.",
