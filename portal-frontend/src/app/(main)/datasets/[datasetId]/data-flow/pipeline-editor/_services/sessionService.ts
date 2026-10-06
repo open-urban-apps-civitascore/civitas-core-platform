@@ -164,7 +164,7 @@ export const sessionReducer = (state: PipelineSessionState, action: PipelineSess
     }
 
     case 'UPDATE_SESSION_PIPELINE': {
-      const { sessionId, pipeline, shouldPreserveDirty } = action.payload
+      const { sessionId, pipeline } = action.payload
 
       return {
         ...state,
@@ -174,7 +174,6 @@ export const sessionReducer = (state: PipelineSessionState, action: PipelineSess
           return {
             ...session,
             pipeline: nextPipeline,
-            ...(shouldPreserveDirty ? {} : { lastModified: new Date() }),
           }
         }),
       }
