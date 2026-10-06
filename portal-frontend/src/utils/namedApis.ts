@@ -2,10 +2,11 @@ import proj4 from 'proj4'
 
 import { GEOJSON_REF_BASE } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import { crsOptions } from '@/const/crs'
-import { DataSink } from '@/types/datasinks'
+import { DataSink, DATASINK_TYPES } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
 import { BoundingBox, Layer, LayerApiPayload, LayerFormData } from '@/types/layers'
 import {
+  API_STANDARDS,
   ApiStandard,
   DEFAULTS_BY_TYPE,
   NamedApi,
@@ -17,6 +18,13 @@ import { Style, StyleFormData, StyleInput } from '@/types/styles'
 
 export const hasApiType = (apis: NamedApi[], apiType: ApiStandard): boolean =>
   apis.some(api => api.standard === apiType)
+
+export const canCreateStaApi = (apis: NamedApi[], dataSinks: DataSink[]): boolean =>
+  !hasApiType(apis, API_STANDARDS.STA) &&
+  dataSinks.some(dataSink => dataSink.dataSinkType === DATASINK_TYPES.FROST && dataSink.pipelineId)
+
+export const canCreateOwsApi = (apis: NamedApi[], dataSinks: DataSink[]): boolean =>
+  !hasApiType(apis, API_STANDARDS.OWS) && dataSinks.some(dataSink => dataSink.dataSinkType === DATASINK_TYPES.POSTGIS)
 
 type BoundingBoxPayload = { minX: number; minY: number; maxX: number; maxY: number; crs: string }
 

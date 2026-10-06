@@ -6,9 +6,8 @@ import { useTranslations } from 'next-intl'
 import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { DATASINK_TYPES } from '@/types/datasinks'
-import { API_STANDARDS, NamedApi } from '@/types/namedApis'
-import { hasApiType } from '@/utils/namedApis'
+import { NamedApi } from '@/types/namedApis'
+import { canCreateOwsApi, canCreateStaApi } from '@/utils/namedApis'
 
 import { AddApiMenuItem } from './AddApiMenuItem'
 import { ApiCard } from './ApiCard'
@@ -23,20 +22,11 @@ interface ApiListProps {
 
 export const ApiList = ({ datasetId, apis, canEdit, canView, isOpenDataAccess }: ApiListProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.apis')
-  const hasOws = hasApiType(apis, API_STANDARDS.OWS)
-  const hasSta = hasApiType(apis, API_STANDARDS.STA)
-
   const { data: dataSinksData } = useGetDataSinks(datasetId)
+  const dataSinks = dataSinksData?.data ?? []
 
-  const postgisDataSinks =
-    dataSinksData?.data.filter(dataSink => dataSink.dataSinkType === DATASINK_TYPES.POSTGIS) || []
-  const hasPostgisDataSinks = postgisDataSinks.length > 0
-
-  const canCreateOwsApi = !hasOws && hasPostgisDataSinks
-
-  const hasFrostSinkInPipeline =
-    dataSinksData?.data.some(dataSink => dataSink.dataSinkType === DATASINK_TYPES.FROST && dataSink.pipelineId) ?? false
-  const canCreateStaApi = !hasSta && hasFrostSinkInPipeline
+  const canCreateSta = canCreateStaApi(apis, dataSinks)
+  const canCreateOws = canCreateOwsApi(apis, dataSinks)
 
   return (
     <div className="py-3">
@@ -56,13 +46,13 @@ export const ApiList = ({ datasetId, apis, canEdit, canView, isOpenDataAccess }:
                 href={`/datasets/${datasetId}/apis?type=sensorthings`}
                 title={t('sensorThings')}
                 subtitle={t('sensorThingsSubtitle')}
-                canCreate={canCreateStaApi}
+                canCreate={canCreateSta}
               />
               <AddApiMenuItem
                 href={`/datasets/${datasetId}/apis?type=ows`}
                 title={t('ows')}
                 subtitle={t('owsSubtitle')}
-                canCreate={canCreateOwsApi}
+                canCreate={canCreateOws}
               />
             </DropdownMenuContent>
           </DropdownMenu>
