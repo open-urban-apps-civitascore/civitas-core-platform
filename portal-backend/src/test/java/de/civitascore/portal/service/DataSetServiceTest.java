@@ -96,11 +96,11 @@ class DataSetServiceTest {
     // Persisting a dataset creates its Model Forge manifest; return a dummy pin so tests exercising
     // create/update do not NPE (lenient — not every test triggers a persist).
     lenient()
-        .when(modelRegistryGateway.createDataSetManifest(any()))
+        .when(modelRegistryGateway.createDataSetManifest(any(), any()))
         .thenReturn(
             new ModelRegistryGateway.ModelPin(
-                "urn:core:platform:civitas:dataset:common:test:abcdefghij",
-                "urn:core:platform:civitas:dataset:common:test:abcdefghij:1.0.0",
+                "urn:core:platform:civitas:dataset:common:83ebca2a-bf11-88fe-8a5b-692d06529fd7",
+                "urn:core:platform:civitas:dataset:common:83ebca2a-bf11-88fe-8a5b-692d06529fd7:1.0.0",
                 "1.0.0"));
     return new DataSetService(
         dataSetRepository,
@@ -176,7 +176,8 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = draftDataSet(id);
       Pipeline p = new Pipeline();
-      p.setModelUrn("urn:core:platform:civitas:pipeline:common:Flow:abcdefghij:1.0.0");
+      p.setModelUrn(
+          "urn:core:platform:civitas:pipeline:common:0f06f650-1a5b-8a24-82f4-c0437cf5f796:1.0.0");
       p.setDataSources(new HashSet<>(List.of(new DataSource())));
       ds.getPipelines().add(p);
 
@@ -255,7 +256,8 @@ class DataSetServiceTest {
     private DataSet draftDataSetWithPipeline(UUID id) {
       DataSet ds = draftDataSet(id);
       Pipeline p = new Pipeline();
-      p.setModelUrn("urn:core:platform:civitas:pipeline:common:Flow:abcdefghij:1.0.0");
+      p.setModelUrn(
+          "urn:core:platform:civitas:pipeline:common:0f06f650-1a5b-8a24-82f4-c0437cf5f796:1.0.0");
       p.setDataSources(new HashSet<>(List.of(new DataSource())));
       ds.getPipelines().add(p);
       return ds;
@@ -484,7 +486,8 @@ class DataSetServiceTest {
 
     private void addPipelineWithSource(DataSet dataSet, DataSource source) {
       Pipeline p = new Pipeline();
-      p.setModelUrn("urn:core:platform:civitas:pipeline:common:Flow:abcdefghij:1.0.0");
+      p.setModelUrn(
+          "urn:core:platform:civitas:pipeline:common:0f06f650-1a5b-8a24-82f4-c0437cf5f796:1.0.0");
       p.setDataSources(new HashSet<>(Set.of(source)));
       dataSet.getPipelines().add(p);
     }
@@ -2065,9 +2068,9 @@ class DataSetServiceTest {
     }
 
     private static final String PIPELINE_URN =
-        "urn:core:platform:civitas:pipeline:common:doomed-pipeline:abcdefghij";
+        "urn:core:platform:civitas:pipeline:common:693e0c61-f16a-805a-b831-68467243ee12";
     private static final String SINK_URN =
-        "urn:core:platform:civitas:data-sink:common:doomed-sink:abcdefghij";
+        "urn:core:platform:civitas:datasink:common:00000000-0000-4000-8000-000000000011";
 
     /** A dataset carrying one pipeline that wires one mapping and one sink. */
     private DataSet datasetWithOwnedArtifacts(UUID id, String manifestUrn) {
@@ -2098,7 +2101,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds =
           datasetWithOwnedArtifacts(
-              id, "urn:core:platform:civitas:dataset:common:doomed:abcdefghij");
+              id, "urn:core:platform:civitas:dataset:common:4a91a939-edf2-82e0-be60-14a28715e829");
       ds.setProvisioned(false);
       stubOwnedArtifacts(id, ds);
 
@@ -2116,7 +2119,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds =
           datasetWithOwnedArtifacts(
-              id, "urn:core:platform:civitas:dataset:common:ordered:abcdefghij");
+              id, "urn:core:platform:civitas:dataset:common:97c2bd7f-5507-8cc1-a8e1-9444d7c1e694");
       ds.setProvisioned(false);
       stubOwnedArtifacts(id, ds);
 
@@ -2135,7 +2138,7 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds =
           datasetWithOwnedArtifacts(
-              id, "urn:core:platform:civitas:dataset:common:shared:abcdefghij");
+              id, "urn:core:platform:civitas:dataset:common:8954c085-5ac1-83bf-8a50-2249baafd63e");
       ds.setProvisioned(false);
       stubOwnedArtifacts(id, ds);
       doThrow(new IllegalStateException("still referenced"))
@@ -2155,12 +2158,13 @@ class DataSetServiceTest {
       DataSet ds = readyDataSet(id);
       ds.setProvisioned(true);
       ds.setPendingSagaType(PendingSagaType.DELETE);
-      ds.setManifestLogicalUrn("urn:core:platform:civitas:dataset:common:torn-down:abcdefghij");
+      ds.setManifestLogicalUrn(
+          "urn:core:platform:civitas:dataset:common:f6270e94-174b-8a30-b5bb-d9a07194d9ef");
 
       DataSink sink = new DataSink();
       sink.setId(UUID.randomUUID());
       sink.setConfigurationLogicalUrn(
-          "urn:core:platform:civitas:data-sink:common:torn-down-sink:abcdefghij");
+          "urn:core:platform:civitas:datasink:common:00000000-0000-4000-8000-000000000012");
 
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(sink));
@@ -2188,12 +2192,13 @@ class DataSetServiceTest {
       DataSet ds = readyDataSet(id);
       ds.setProvisioned(true);
       ds.setPendingSagaType(PendingSagaType.DELETE);
-      ds.setManifestLogicalUrn("urn:core:platform:civitas:dataset:common:torn-down:abcdefghij");
+      ds.setManifestLogicalUrn(
+          "urn:core:platform:civitas:dataset:common:f6270e94-174b-8a30-b5bb-d9a07194d9ef");
 
       DataSink sink = new DataSink();
       sink.setId(UUID.randomUUID());
       sink.setConfigurationLogicalUrn(
-          "urn:core:platform:civitas:data-sink:common:torn-down-sink:abcdefghij");
+          "urn:core:platform:civitas:datasink:common:00000000-0000-4000-8000-000000000012");
 
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(sink));

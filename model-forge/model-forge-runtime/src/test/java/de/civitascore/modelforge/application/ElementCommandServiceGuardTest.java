@@ -37,7 +37,7 @@ class ElementCommandServiceGuardTest {
     private ArtifactRegistry registry;
     private ElementCommandService elements;
 
-    private static final String URN = "urn:core:platform:civitas:element:common:Station:ab12cd34";
+    private static final String URN = "urn:core:platform:civitas:element:common:9c8fd04a-cfa9-8dba-b546-c54c62c75802";
     private static final String XSD = "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"/>";
 
     @BeforeEach
@@ -70,7 +70,7 @@ class ElementCommandServiceGuardTest {
             .isInstanceOf(ValidationFailedException.class)
             .hasMessageContaining("StationJson");
 
-        verify(registry, never()).storeElement(anyString(), any(), anySet(), anySet(),
+        verify(registry, never()).storeElement(any(), anySet(), anySet(),
             nullable(String.class), any(VersionBump.class), nullable(String.class));
     }
 
@@ -97,13 +97,13 @@ class ElementCommandServiceGuardTest {
             .satisfies(e -> assertThat(((ValidationFailedException) e).diagnostics())
                 .extracting(d -> d.path()).contains("/type"));
 
-        verify(registry, never()).storeElement(anyString(), any(), anySet(), anySet(),
+        verify(registry, never()).storeElement(any(), anySet(), anySet(),
             nullable(String.class), any(VersionBump.class), nullable(String.class));
     }
 
     @Test
     void storeJsonSchemaAcceptsAConformingSchema() {
-        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class),
+        when(registry.storeElement(any(), anySet(), anySet(), nullable(String.class),
             any(VersionBump.class), nullable(String.class))).thenReturn(URN + ":1.0.0");
 
         String pin = elements.storeJsonSchema(URN,

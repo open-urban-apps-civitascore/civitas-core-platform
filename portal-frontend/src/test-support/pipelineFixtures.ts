@@ -15,13 +15,15 @@ import type {
 } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types/pipeline'
 import { PIPELINE_NODE_TYPES } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types/pipeline'
 
-export const DATA_SOURCE_URN = 'urn:core:platform:civitas:datasource:common:Mqtt:abcdef1234:1.0.0'
-export const POSTGIS_SINK_URN = 'urn:core:platform:civitas:datasink:common:Postgis:abcdef1234:1.0.0'
-export const FROST_SINK_URN = 'urn:core:platform:civitas:datasink:common:Frost:abcdef1234:1.0.0'
-export const MAPPING_URN = 'urn:core:platform:civitas:mapping:common:SrcToTgt:abcdef1234:1.0.0'
-export const MAPPING_LOGICAL_URN = 'urn:core:platform:civitas:mapping:common:SrcToTgt:abcdef1234'
-export const SOURCE_STRUCTURE_URN = 'urn:core:platform:civitas:datastructure:common:Src:abcdef1234:1.0.0'
-export const TARGET_STRUCTURE_URN = 'urn:core:platform:civitas:datastructure:common:Tgt:abcdef1234:1.0.0'
+export const DATA_SOURCE_URN = 'urn:core:platform:civitas:datasource:common:56c71886-6233-8eb0-9033-d69d254841d1:1.0.0'
+export const POSTGIS_SINK_URN = 'urn:core:platform:civitas:datasink:common:4994500e-ec45-8637-87f5-79a658893245:1.0.0'
+export const FROST_SINK_URN = 'urn:core:platform:civitas:datasink:common:0873a423-e6e3-84e5-9de8-41cd4e867ba5:1.0.0'
+export const MAPPING_URN = 'urn:core:platform:civitas:mapping:common:f7628c46-674f-829e-9732-40bd589ed5a6:1.0.0'
+export const MAPPING_LOGICAL_URN = 'urn:core:platform:civitas:mapping:common:f7628c46-674f-829e-9732-40bd589ed5a6'
+export const SOURCE_STRUCTURE_URN =
+  'urn:core:platform:civitas:datastructure:common:18d96956-ef2a-88c1-8dd9-92b256c70a93:1.0.0'
+export const TARGET_STRUCTURE_URN =
+  'urn:core:platform:civitas:datastructure:common:995f411c-3be9-8ec2-8159-55f9d0c50168:1.0.0'
 
 export interface FixtureNode {
   id: string

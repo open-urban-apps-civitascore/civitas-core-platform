@@ -1,9 +1,9 @@
 {
   "$schema":        "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSource",
-  "id":             "urn:core:platform:civitas:datasource:smartmeter:meter-db:1.0.0",
+  "id":             "urn:core:platform:civitas:datasource:smartmeter:334f9d31-05d6-8cd9-bbd0-8043b0c17103:1.0.0",
   "title":          "Zählerstammdaten PostgreSQL",
   "connectionType": "sql",
-  "element":        "urn:core:platform:civitas:element:smartmeter:MeterMasterData:1.0.0",
+  "element":        "urn:core:platform:civitas:element:smartmeter:eb20917f-cbd4-8a66-9f65-bfaa2b08c0a3:1.0.0",
   "driver":         "postgres",
   "dsn":            "jdbc:postgresql://postgres:5432/coredata",
   "table":          "meter_master_data",

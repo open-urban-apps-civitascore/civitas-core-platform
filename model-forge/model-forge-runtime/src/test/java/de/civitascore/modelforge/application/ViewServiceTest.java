@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 
@@ -30,9 +31,9 @@ class ViewServiceTest {
 
     // ── URNs ──────────────────────────────────────────────────────────────────
 
-    private static final String OBS_URN    = "urn:core:platform:civitas:element:common:Observation:ulhry9fjx6:1.0.0";
-    private static final String SENSOR_URN = "urn:core:platform:civitas:element:common:SensorReading:d28s38wfmi:1.0.0";
-    private static final String GEO_URN    = "urn:core:platform:civitas:element:common:GeoPoint:3ak90vqrog:1.0.0";
+    private static final String OBS_URN    = "urn:core:platform:civitas:element:common:4560fbf9-5824-85f9-b58f-5e1049048f42:1.0.0";
+    private static final String SENSOR_URN = "urn:core:platform:civitas:element:common:0062782c-5353-87ad-b8d4-c1b90ed9b00a:1.0.0";
+    private static final String GEO_URN    = "urn:core:platform:civitas:element:common:da736e5f-bb91-88a6-abaa-761d911af81a:1.0.0";
 
     // ── Schemas ───────────────────────────────────────────────────────────────
 
@@ -104,9 +105,9 @@ class ViewServiceTest {
 
         // Stub both versioned URNs (used by inline) and logical URNs
         // (used by bundle when iterating dependency graph entries).
-        String geoL    = "urn:core:platform:civitas:element:common:GeoPoint:3ak90vqrog";
-        String sensorL = "urn:core:platform:civitas:element:common:SensorReading:d28s38wfmi";
-        String obsL    = "urn:core:platform:civitas:element:common:Observation:ulhry9fjx6";
+        String geoL    = "urn:core:platform:civitas:element:common:da736e5f-bb91-88a6-abaa-761d911af81a";
+        String sensorL = "urn:core:platform:civitas:element:common:0062782c-5353-87ad-b8d4-c1b90ed9b00a";
+        String obsL    = "urn:core:platform:civitas:element:common:4560fbf9-5824-85f9-b58f-5e1049048f42";
         when(mockRegistry.fetchElementOrXsd(GEO_URN)).thenReturn(Optional.of(GEO_SCHEMA));
         when(mockRegistry.fetchElementOrXsd(geoL)).thenReturn(Optional.of(GEO_SCHEMA));
         when(mockRegistry.fetchElementOrXsd(SENSOR_URN)).thenReturn(Optional.of(SENSOR_SCHEMA));
@@ -193,7 +194,7 @@ class ViewServiceTest {
     void inline_preservesUnknownExtensionKeyword_xCorePrimaryKey() {
         // The config-adapter contract (PostGIS/NiFi read x-core-primaryKey): a derived view must
         // carry the keyword through unchanged — on the root AND on an inlined dependency.
-        String siteUrn = "urn:core:platform:civitas:element:common:Site:yddl6euvis:1.0.0";
+        String siteUrn = "urn:core:platform:civitas:element:common:6291fc8f-d361-877b-8cf9-419e4cd1bffa:1.0.0";
         stubWithPrimaryKey(GEO_URN, "geoId");
         ObjectNode site = MAPPER.createObjectNode();
         site.put("$id", siteUrn);
@@ -213,7 +214,7 @@ class ViewServiceTest {
 
     @Test
     void bundle_preservesUnknownExtensionKeyword_xCorePrimaryKey() {
-        String siteUrn = "urn:core:platform:civitas:element:common:Site:yddl6euvis:1.0.0";
+        String siteUrn = "urn:core:platform:civitas:element:common:6291fc8f-d361-877b-8cf9-419e4cd1bffa:1.0.0";
         stubWithPrimaryKey(GEO_URN, "geoId");
         ObjectNode site = MAPPER.createObjectNode();
         site.put("$id", siteUrn);
@@ -237,8 +238,8 @@ class ViewServiceTest {
 
     @Test
     void latestRef_isRewrittenToConcreteVersionInViews() {
-        String geoLatest = "urn:core:platform:civitas:element:common:GeoPoint:3ak90vqrog:latest";
-        String trackerUrn = "urn:core:platform:civitas:element:common:Tracker:tr9g67qgnh:1.0.0";
+        String geoLatest = "urn:core:platform:civitas:element:common:da736e5f-bb91-88a6-abaa-761d911af81a:latest";
+        String trackerUrn = "urn:core:platform:civitas:element:common:9bfb379a-211c-8858-9e25-578f770396ed:1.0.0";
         ObjectNode root = MAPPER.createObjectNode();
         root.put("$id", trackerUrn);
         root.put("type", "object");
@@ -328,14 +329,14 @@ class ViewServiceTest {
                     .<ObjectNode>put("$ref", GEO_URN)
                     .put("title", "Sampling spot"));
             ObjectNode schema = MAPPER.createObjectNode();
-            schema.put("$id", "urn:core:platform:civitas:element:common:Site:yddl6euvis:1.0.0");
+            schema.put("$id", "urn:core:platform:civitas:element:common:6291fc8f-d361-877b-8cf9-419e4cd1bffa:1.0.0");
             schema.put("type", "object");
             schema.set("properties", props);
-            when(mockRegistry.fetchElementOrXsd("urn:core:platform:civitas:element:common:Site:yddl6euvis:1.0.0"))
+            when(mockRegistry.fetchElementOrXsd("urn:core:platform:civitas:element:common:6291fc8f-d361-877b-8cf9-419e4cd1bffa:1.0.0"))
                     .thenReturn(Optional.of(schema));
 
             Optional<JsonNode> result =
-                    viewService.inline("urn:core:platform:civitas:element:common:Site:yddl6euvis:1.0.0");
+                    viewService.inline("urn:core:platform:civitas:element:common:6291fc8f-d361-877b-8cf9-419e4cd1bffa:1.0.0");
 
             assertThat(result).isPresent();
             JsonNode spot = result.get().path("properties").path("spot");
@@ -384,8 +385,8 @@ class ViewServiceTest {
         @Test
         void cycle_leavesRefIntactAndDoesNotLoop() {
             // Create a cyclic schema: Alpha.$ref → Beta, Beta.$ref → Alpha
-            String alphaUrn = "urn:core:platform:civitas:element:common:Alpha:xp1yy8mi4n:1.0.0";
-            String betaUrn  = "urn:core:platform:civitas:element:common:Beta:4f0dvxin83:1.0.0";
+            String alphaUrn = "urn:core:platform:civitas:element:common:3b447f47-bbb2-8a14-9d91-0b3d76281ab3:1.0.0";
+            String betaUrn  = "urn:core:platform:civitas:element:common:245ff6a7-880f-85b6-acdc-67305717aae8:1.0.0";
 
             ObjectNode alphaSchema = MAPPER.createObjectNode();
             alphaSchema.put("$id", alphaUrn);
@@ -422,7 +423,7 @@ class ViewServiceTest {
         @Test
         void xsdAndJsonSchemaMixed_transparentlyResolved() {
             // An XSD URN whose fetch transparently returns a JSON Schema node
-            String xsdUrn = "urn:core:platform:civitas:element:common:AirQuality:wyonmizavr:1.0.0";
+            String xsdUrn = "urn:core:platform:civitas:element:common:dc4a8bb2-8d68-8d34-9955-a1da973b7eff:1.0.0";
             ObjectNode convertedXsd = MAPPER.createObjectNode();
             convertedXsd.put("$id", xsdUrn);
             convertedXsd.put("type", "object");
@@ -596,7 +597,7 @@ class ViewServiceTest {
 
             // CORE dep embedded under the collision-free fallback key (the logical URN),
             // carrying its own $id so absolute refs to it still resolve.
-            String logicalGeo = "urn:core:platform:civitas:element:common:GeoPoint:3ak90vqrog";
+            String logicalGeo = "urn:core:platform:civitas:element:common:da736e5f-bb91-88a6-abaa-761d911af81a";
             JsonNode coreGeo = defs.path(logicalGeo);
             assertThat(coreGeo.path("$id").asText()).isEqualTo(GEO_URN);
             assertThat(coreGeo.path("type").asText()).isEqualTo("object");
@@ -666,10 +667,10 @@ class ViewServiceTest {
         @Test
         void diamond_isSelfContained() {
             // Root → Left, Root → Right, Left → Leaf, Right → Leaf
-            String rootU  = "urn:core:platform:civitas:element:common:DiaRoot:p0qrt4g4of:1.0.0";
-            String leftU  = "urn:core:platform:civitas:element:common:DiaLeft:wt5tlk2msa:1.0.0";
-            String rightU = "urn:core:platform:civitas:element:common:DiaRight:0no7xq907w:1.0.0";
-            String leafU  = "urn:core:platform:civitas:element:common:DiaLeaf:tu4klmd7l1:1.0.0";
+            String rootU  = "urn:core:platform:civitas:element:common:43558e28-9dd5-8c8b-a875-8acc2748e972:1.0.0";
+            String leftU  = "urn:core:platform:civitas:element:common:f67c92d2-afa8-8a6d-bf2a-29b5e96802a6:1.0.0";
+            String rightU = "urn:core:platform:civitas:element:common:80f9035f-337e-8166-8a21-e67fba768219:1.0.0";
+            String leafU  = "urn:core:platform:civitas:element:common:62276e42-b0d8-8f66-9723-089c47302035:1.0.0";
 
             stubObj(rootU, props -> {
                 props.set("l", MAPPER.createObjectNode().put("$ref", leftU));
@@ -692,8 +693,8 @@ class ViewServiceTest {
         @Test
         void cycle_bundleTerminatesAndIsSelfContained() {
             // Alpha → Beta → Alpha
-            String alphaU = "urn:core:platform:civitas:element:common:Alpha:xp1yy8mi4n:1.0.0";
-            String betaU  = "urn:core:platform:civitas:element:common:Beta:4f0dvxin83:1.0.0";
+            String alphaU = "urn:core:platform:civitas:element:common:3b447f47-bbb2-8a14-9d91-0b3d76281ab3:1.0.0";
+            String betaU  = "urn:core:platform:civitas:element:common:245ff6a7-880f-85b6-acdc-67305717aae8:1.0.0";
 
             stubObj(alphaU, props -> props.set("next", MAPPER.createObjectNode().put("$ref", betaU)));
             stubObj(betaU,  props -> props.set("back", MAPPER.createObjectNode().put("$ref", alphaU)));
@@ -707,7 +708,9 @@ class ViewServiceTest {
             assertSelfContained(result.get());
             // Beta embedded as a resource; the root (Alpha) provides the Alpha $id itself.
             assertThat(result.get().path("$id").asText()).isEqualTo(alphaU);
-            assertThat(result.get().path("$defs").path("Beta").path("$id").asText()).isEqualTo(betaU);
+            Set<String> embeddedIds = new HashSet<>();
+            collectIds(result.get().path("$defs"), embeddedIds);
+            assertThat(embeddedIds).contains(betaU).doesNotContain(alphaU);
         }
 
         @Test
@@ -734,19 +737,14 @@ class ViewServiceTest {
 
         @Test
         void xsdConvertedDep_withTypeLevelId_isSelfContained() {
-            // DSVIEW-1 guard: an XSD-authored Element converts to a JSON Schema whose
-            // $id is TYPE-LEVEL — one segment longer than the model_forge.artifact URN (the XÖV/XMeld
-            // case, e.g. ...:Person:Personentyp:1.0.0). The root pins the *model_forge.artifact* URN in
-            // its $ref, so the embedded resource's $id must be stamped to the model_forge.artifact URN;
-            // otherwise the $ref dangles and the bundle is not self-contained.
-            String xsdDepUrn   = "urn:core:platform:civitas:element:xmeld:Person:o73r9yb879:1.0.0";
-            // Converted schema's $id is type-level (model_forge.artifact URN + ":Personentyp:1.0.0"-style
-            // extra segment) — deliberately NOT equal to the model_forge.artifact URN, so the old guard
-            // (existing == null || !isUrn(existing)) would have kept it and dangled the $ref.
-            String typeLevelId = "urn:core:platform:civitas:element:xmeld:Person:o73r9yb879:Personentyp:1.0.0";
+            // Without the restamp, an XSD-converted dependency keeps its type-level $id and the root's
+            // $ref dangles.
+            String xsdDepUrn   = "urn:core:platform:civitas:element:xmeld:d002c1b7-0339-8820-9671-6bf33eeceaa3:1.0.0";
+            String typeLevelId = "urn:core:platform:civitas:element:xmeld:d002c1b7-0339-8820-9671-6bf33eeceaa3:Personentyp:1.0.0";
 
             ObjectNode convertedXsd = MAPPER.createObjectNode();
             convertedXsd.put("$id", typeLevelId);
+            convertedXsd.put("title", "Person");
             convertedXsd.put("type", "object");
             convertedXsd.set("properties", MAPPER.createObjectNode()
                     .set("name", MAPPER.createObjectNode().put("type", "string")));
@@ -793,9 +791,9 @@ class ViewServiceTest {
      */
     @Test
     void bundle_resolvesSiblingRefsAgainstTheManifestPins() {
-        String headLogical = "urn:core:platform:civitas:element:common:Head:hh00000001";
-        String lineLogical = "urn:core:platform:civitas:element:common:Line:ll00000001";
-        String dsUrn       = "urn:core:platform:civitas:datastructure:common:Order:ds00000001:1.0.0";
+        String headLogical = "urn:core:platform:civitas:element:common:be9fc824-f6a0-81ae-98b9-7550b7878e08";
+        String lineLogical = "urn:core:platform:civitas:element:common:a9ce2d55-412f-8b25-8f21-9c860ecd14b5";
+        String dsUrn       = "urn:core:platform:civitas:datastructure:common:4e0604c3-1372-884e-91a3-68ed0ec7aa03:1.0.0";
 
         // Head references its sibling logically.
         ObjectNode head = MAPPER.createObjectNode();
@@ -811,7 +809,7 @@ class ViewServiceTest {
         lineCurrent.path("properties").require().withObject("b").put("type", "string");
 
         ObjectNode manifest = MAPPER.createObjectNode();
-        manifest.put("$id", "urn:core:platform:civitas:datastructure:common:Order:ds00000001");
+        manifest.put("$id", "urn:core:platform:civitas:datastructure:common:4e0604c3-1372-884e-91a3-68ed0ec7aa03");
         ObjectNode defs = manifest.putObject("$defs");
         defs.putObject("Head").put("$ref", headLogical + ":1.0.0");
         defs.putObject("Line").put("$ref", lineLogical + ":1.0.0");
@@ -845,8 +843,8 @@ class ViewServiceTest {
      */
     @Test
     void bundle_doesNotPinFromAnOrdinaryElementsOwnDefs() {
-        String targetLogical = "urn:core:platform:civitas:element:common:Target:tt00000001";
-        String elementUrn    = "urn:core:platform:civitas:element:common:Holder:hd00000001:1.0.0";
+        String targetLogical = "urn:core:platform:civitas:element:common:5bc6f176-9241-890d-8968-6a564d69af20";
+        String elementUrn    = "urn:core:platform:civitas:element:common:1ab78342-e566-8c67-91a9-1cd2839ee094:1.0.0";
 
         ObjectNode element = MAPPER.createObjectNode();
         element.put("$id", elementUrn);
@@ -881,9 +879,9 @@ class ViewServiceTest {
      */
     @Test
     void bundle_leavesAnExplicitLatestReferenceResolvingToCurrent() {
-        String headLogical = "urn:core:platform:civitas:element:common:Head:hh00000001";
-        String lineLogical = "urn:core:platform:civitas:element:common:Line:ll00000001";
-        String dsUrn       = "urn:core:platform:civitas:datastructure:common:Order:ds00000001:1.0.0";
+        String headLogical = "urn:core:platform:civitas:element:common:be9fc824-f6a0-81ae-98b9-7550b7878e08";
+        String lineLogical = "urn:core:platform:civitas:element:common:a9ce2d55-412f-8b25-8f21-9c860ecd14b5";
+        String dsUrn       = "urn:core:platform:civitas:datastructure:common:4e0604c3-1372-884e-91a3-68ed0ec7aa03:1.0.0";
 
         ObjectNode head = MAPPER.createObjectNode();
         head.put("$id", headLogical);
@@ -895,7 +893,7 @@ class ViewServiceTest {
         line.putObject("properties").putObject("a").put("type", "string");
 
         ObjectNode manifest = MAPPER.createObjectNode();
-        manifest.put("$id", "urn:core:platform:civitas:datastructure:common:Order:ds00000001");
+        manifest.put("$id", "urn:core:platform:civitas:datastructure:common:4e0604c3-1372-884e-91a3-68ed0ec7aa03");
         ObjectNode defs = manifest.putObject("$defs");
         defs.putObject("Head").put("$ref", headLogical + ":1.0.0");
         defs.putObject("Line").put("$ref", lineLogical + ":1.0.0");

@@ -1,9 +1,9 @@
 {
   "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
-  "id": "urn:core:platform:civitas:mapping:taf10-grid:gridnode-to-sta-thing:1.0.0",
+  "id": "urn:core:platform:civitas:mapping:taf10-grid:64b40024-aa86-8fd9-bdde-10c5267c41ba:1.0.0",
   "title": "GridNodeMasterData -> STAThing",
-  "source": "urn:core:platform:civitas:element:taf10-grid:GridNodeMasterData:1.0.0",
-  "target": "urn:core:platform:civitas:element:sta:STAThing:1.0.0",
+  "source": "urn:core:platform:civitas:element:taf10-grid:282aea29-45de-8e68-9361-bd477e45b231:1.0.0",
+  "target": "urn:core:platform:civitas:element:sta:513c5444-b723-8341-b283-ea96fea99b16:1.0.0",
   "fields": {
     "name": { "op": "copy", "input": "$.gridNodeName" },
     "description": {

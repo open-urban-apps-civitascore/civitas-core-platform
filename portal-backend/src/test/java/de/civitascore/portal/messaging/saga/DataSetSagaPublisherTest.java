@@ -65,7 +65,7 @@ class DataSetSagaPublisherTest {
   }
 
   private static String datasourceUrn(UUID id) {
-    return "urn:core:platform:civitas:data-source:common:src-" + id + ":1.0.0";
+    return "urn:core:platform:civitas:datasource:common:" + id + ":1.0.0";
   }
 
   private DataSource dataSource(UUID id, ConnectorType type) {
@@ -97,7 +97,7 @@ class DataSetSagaPublisherTest {
    * Lenient so tests that fail the publish before reading the sink don't trip strict stubbing.
    */
   private void stubSinkConfiguration(DataSink sink, Map<String, Object> cfg) {
-    String urn = "urn:core:platform:civitas:data-sink:common:sink-" + sink.getId() + ":1.0.0";
+    String urn = "urn:core:platform:civitas:datasink:common:" + sink.getId() + ":1.0.0";
     sink.setConfigurationUrn(urn);
     lenient()
         .when(modelRegistryGateway.fetchPayload(urn))
@@ -200,7 +200,8 @@ class DataSetSagaPublisherTest {
     void carriesPersistedModelOnSink() {
       UUID sinkId = UUID.randomUUID();
       Pipeline pipeline = pipeline(UUID.randomUUID());
-      String modelUrn = "urn:core:platform:civitas:element:common:observation:2.0.0";
+      String modelUrn =
+          "urn:core:platform:civitas:element:common:5cf6e9e7-fa0d-877a-bda7-df0cc339e439:2.0.0";
       DataSink sink = postgisSink(sinkId, modelUrn, "sensor_observations");
       DataSet dataSet = datasetWithPipeline(pipeline);
 
@@ -236,7 +237,7 @@ class DataSetSagaPublisherTest {
       var ds = datasinks.get(0);
       assertThat(ds.get("id").asString())
           .as("datasink is keyed by its configuration CORE URN, not its GUID")
-          .isEqualTo("urn:core:platform:civitas:data-sink:common:sink-" + sinkId + ":1.0.0");
+          .isEqualTo("urn:core:platform:civitas:datasink:common:" + sinkId + ":1.0.0");
       assertThat(ds.get("type").asString()).isEqualTo("POSTGIS");
       assertThat(ds.get("configuration").get("tableName").asString())
           .isEqualTo("sensor_observations");
@@ -257,7 +258,8 @@ class DataSetSagaPublisherTest {
     @DisplayName("fails the publish when a referenced element cannot be resolved")
     void failsWhenSchemaUnresolved() {
       Pipeline pipeline = pipeline(UUID.randomUUID());
-      String elementUrn = "urn:core:platform:civitas:element:common:observation:2.0.0";
+      String elementUrn =
+          "urn:core:platform:civitas:element:common:5cf6e9e7-fa0d-877a-bda7-df0cc339e439:2.0.0";
       DataSink sink = postgisSink(UUID.randomUUID(), elementUrn, "sensor_observations");
       DataSet dataSet = datasetWithPipeline(pipeline);
 
@@ -272,7 +274,8 @@ class DataSetSagaPublisherTest {
     @DisplayName("fails the publish when the registry resolves the element to an empty model")
     void failsWhenReferencedElementResolvesToEmptyModel() {
       Pipeline pipeline = pipeline(UUID.randomUUID());
-      String elementUrn = "urn:core:platform:civitas:element:common:observation:2.0.0";
+      String elementUrn =
+          "urn:core:platform:civitas:element:common:5cf6e9e7-fa0d-877a-bda7-df0cc339e439:2.0.0";
       DataSink sink = postgisSink(UUID.randomUUID(), elementUrn, "sensor_observations");
       DataSet dataSet = datasetWithPipeline(pipeline);
 
@@ -316,7 +319,8 @@ class DataSetSagaPublisherTest {
     void deleteTriggerCarriesDatasinks() {
       UUID sinkId = UUID.randomUUID();
       Pipeline pipeline = pipeline(UUID.randomUUID());
-      String modelUrn = "urn:core:platform:civitas:element:common:observation:1.0.0";
+      String modelUrn =
+          "urn:core:platform:civitas:element:common:5cf6e9e7-fa0d-877a-bda7-df0cc339e439:1.0.0";
       DataSink sink = postgisSink(sinkId, modelUrn, "sensor_observations");
       DataSet dataSet = datasetWithPipeline(pipeline);
 
@@ -339,7 +343,7 @@ class DataSetSagaPublisherTest {
       var ds = datasinks.get(0);
       assertThat(ds.get("id").asString())
           .as("datasink is keyed by its configuration CORE URN, not its GUID")
-          .isEqualTo("urn:core:platform:civitas:data-sink:common:sink-" + sinkId + ":1.0.0");
+          .isEqualTo("urn:core:platform:civitas:datasink:common:" + sinkId + ":1.0.0");
       assertThat(ds.get("type").asString()).isEqualTo("POSTGIS");
       assertThat(ds.get("configuration").get("tableName").asString())
           .isEqualTo("sensor_observations");
@@ -804,7 +808,8 @@ class DataSetSagaPublisherTest {
     void pipelineModelServedFromRegistry() {
       DataSource ds = dataSource(UUID.randomUUID(), ConnectorType.MQTT);
       Pipeline p = pipeline(UUID.randomUUID(), ds);
-      String urn = "urn:core:platform:civitas:pipeline:common:pipe:1.2.0";
+      String urn =
+          "urn:core:platform:civitas:pipeline:common:8a46d02f-0994-8f94-8b55-031414ee2859:1.2.0";
       p.setModelUrn(urn);
       // fetchPayload returns the stored document already split: content without x-ui-styles,
       // the React Flow layout separately. The saga ships only the content.
@@ -838,8 +843,10 @@ class DataSetSagaPublisherTest {
     void pipelineShipsMappingsForDependencies() {
       DataSource ds = dataSource(UUID.randomUUID(), ConnectorType.MQTT);
       Pipeline p = pipeline(UUID.randomUUID(), ds);
-      String pipelineUrn = "urn:core:platform:civitas:pipeline:common:pipe:1.0.0";
-      String mappingUrn = "urn:core:dataset:neustadt:mapping:traffic:M:0000000001:1.0.0";
+      String pipelineUrn =
+          "urn:core:platform:civitas:pipeline:common:8a46d02f-0994-8f94-8b55-031414ee2859:1.0.0";
+      String mappingUrn =
+          "urn:core:dataset:neustadt:mapping:traffic:b539f598-2ce4-8cb9-8068-920e30194249:1.0.0";
       p.setModelUrn(pipelineUrn);
       // The saga learns which Mappings the pipeline uses from Model Forge's dependency graph (an
       // envelope concern) — never by parsing the pipeline document — then ships each Mapping's

@@ -1,9 +1,9 @@
 {
   "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
-  "id":     "urn:core:platform:civitas:mapping:smartmeter:sml-to-activepowerminus:1.0.0",
+  "id":     "urn:core:platform:civitas:mapping:smartmeter:85360905-af6e-88da-9855-3f24cdf39280:1.0.0",
   "title":  "SMLReading Wirkleistung Lieferung → STA Observation",
-  "source": "urn:core:platform:civitas:element:smartmeter:SMLReading:1.0.0",
-  "target": "urn:core:platform:civitas:element:sta:STAObservation:1.0.0",
+  "source": "urn:core:platform:civitas:element:smartmeter:76837a37-9208-8227-b886-e4de559d9479:1.0.0",
+  "target": "urn:core:platform:civitas:element:sta:61296fa8-8cca-8d83-af42-51e12c991cd8:1.0.0",
   "fields": {
     "phenomenonTime": { "op": "copy", "input": "$.timestamp" },
     "resultTime":     { "op": "copy", "input": "$.timestamp" },

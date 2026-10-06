@@ -9,7 +9,6 @@ import de.civitascore.modelforge.core.port.XRepositorySearchResult;
 import de.civitascore.modelforge.core.port.XsdSchemaConversionException;
 import de.civitascore.modelforge.core.port.XsdSchemaConverter;
 import de.civitascore.modelforge.urn.UrnParser;
-import de.civitascore.modelforge.urn.UrnService;
 import de.civitascore.modelforge.util.JsonSchema;
 
 import de.civitascore.modelforge.util.SecureXsdParser;
@@ -30,19 +29,16 @@ public class XRepositoryService {
     private final XRepositoryCatalog       client;
     private final XsdSchemaConverter       converter;
     private final SchemaImportService      importService;
-    private final UrnService               urns;
     private final ObjectMapper             mapper;
 
     public XRepositoryService(
             XRepositoryCatalog client,
             XsdSchemaConverter converter,
             SchemaImportService importService,
-            UrnService urns,
             ObjectMapper mapper) {
         this.client        = client;
         this.converter     = converter;
         this.importService = importService;
-        this.urns          = urns;
         this.mapper        = mapper;
     }
 
@@ -85,19 +81,17 @@ public class XRepositoryService {
         // ── XSD path: store raw XSD ──────────────────────────
         if (req.effectiveImportAsXsd()) {
             String domain = domainFromIdentifier(req.identifier());
-            // The name segment is derived from the per-artifact identifier (not the domain), so two
-            // distinct XSDs in the same domain map to distinct URNs instead of silently overwriting
-            // each other's version history.
             String name = nameFromIdentifier(req.identifier(), domain);
             // Format-agnostic identity: the URN uses ':element:'; the XSD-ness is recorded as
             // the version's stored representation format, not the URN type segment. scope/owner are
-            // sanitized like domain/name (sanitize() maps ':' to '-') so a ':' in urnScope/urnOwner
+            // sanitized like domain (sanitize() maps ':' to '-') so a ':' in urnScope/urnOwner
             // cannot inject extra URN segments (identity forgery); the version is guarded by importXsd.
-            // The disambiguator is DERIVED (not random) from the stable external identity so
-            // re-importing the same standard resolves to the same URN instead of a duplicate.
-            String disc = urns.disambiguatorFor(name);
-            String xsdUrn = String.format("urn:core:%s:%s:element:%s:%s:%s:%s",
-                sanitize(req.effectiveScope()), sanitize(req.effectiveOwner()), domain, name, disc, req.version());
+            // The UUID is DERIVED (not random) from the domain and the version-free name, so every
+            // version of one standard lands in one history, and two distinct XSDs in one domain
+            // never share one.
+            String xsdUrn = String.format("urn:core:%s:%s:element:%s:%s:%s",
+                sanitize(req.effectiveScope()), sanitize(req.effectiveOwner()), domain,
+                UrnParser.deriveId("xrepository:" + domain + ":" + name), req.version());
             // Delegate to the import service so the DataSet link (elementRefs) and the
             // dependency-graph registration happen exactly like for direct XSD imports.
             // Use the per-artifact name as the import label so the XSD import title reflects the
@@ -185,17 +179,17 @@ public class XRepositoryService {
     }
 
     /**
-     * A per-artifact name slug from the XRepository identifier (its last meaningful segment with any
-     * trailing version suffix stripped), so two distinct XSDs in the same domain do not collide on
-     * one URN, while the <em>same</em> schema keeps a stable name across versions. Falls back to the
-     * domain. Example: {@code urn:xoev-de:xmeld:profil:nachricht_5.5} → {@code nachricht}.
+     * A per-artifact name from the XRepository identifier (its last meaningful segment with any
+     * trailing version suffix stripped). It is the display name and also the key the artifact's UUID
+     * derives from; changing it re-keys the artifact. Falls back to the domain. Example: {@code urn:xoev-de:xmeld:profil:nachricht_5.5} →
+     * {@code nachricht}.
      */
     private String nameFromIdentifier(String identifier, String domain) {
         if (identifier != null && !identifier.isBlank()) {
             String[] parts = identifier.split(":");
             for (int i = parts.length - 1; i >= 0; i--) {
                 // Strip a trailing version suffix (e.g. "_5.5", "-6.0") so it does not leak into the
-                // stable name segment — the concrete version lives in the URN's version segment.
+                // stable name — the concrete version lives in the URN's version segment.
                 String seg = sanitize(parts[i].replaceAll("[_-]?\\d+(\\.\\d+)*$", ""));
                 if (!seg.isBlank()) return seg;
             }

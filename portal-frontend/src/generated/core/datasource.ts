@@ -13,7 +13,10 @@ export const MqttDataSourceSchema = z
     /** Versioned CORE URN of this DataSource. */
     id: z
       .string()
-      .regex(/^urn:core:[^:]+:[^:]+:datasource:[^:]+:[^:]+:[^:]+(:[^:]+)?$/, 'Must be a versioned CORE DataSource URN'),
+      .regex(
+        /^urn:core:[^:]+:[^:]+:datasource:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$/,
+        'Must be a versioned CORE DataSource URN',
+      ),
     /** Human-readable display name. */
     title: z.string().optional(),
     description: z.string().optional(),
@@ -26,7 +29,7 @@ export const MqttDataSourceSchema = z
     element: z
       .string()
       .regex(
-        /^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$/,
+        /^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$/,
         'Must be a versioned CORE DataStructure URN',
       )
       .optional(),
@@ -70,7 +73,10 @@ export const SqlDataSourceSchema = z
     /** Versioned CORE URN of this DataSource. */
     id: z
       .string()
-      .regex(/^urn:core:[^:]+:[^:]+:datasource:[^:]+:[^:]+:[^:]+(:[^:]+)?$/, 'Must be a versioned CORE DataSource URN'),
+      .regex(
+        /^urn:core:[^:]+:[^:]+:datasource:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$/,
+        'Must be a versioned CORE DataSource URN',
+      ),
     /** Human-readable display name. */
     title: z.string().optional(),
     description: z.string().optional(),
@@ -83,7 +89,7 @@ export const SqlDataSourceSchema = z
     element: z
       .string()
       .regex(
-        /^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$/,
+        /^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$/,
         'Must be a versioned CORE DataStructure URN',
       )
       .optional(),

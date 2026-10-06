@@ -125,7 +125,10 @@ export const PipelineSchema = z.object({
   /** Versioned CORE URN of this Pipeline. */
   id: z
     .string()
-    .regex(/^urn:core:[^:]+:[^:]+:pipeline:[^:]+:[^:]+:[^:]+(:[^:]+)?$/, 'Must be a versioned CORE Pipeline URN'),
+    .regex(
+      /^urn:core:[^:]+:[^:]+:pipeline:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$/,
+      'Must be a versioned CORE Pipeline URN',
+    ),
   /** Human-readable display name. */
   title: z.string().optional(),
   description: z.string().optional(),

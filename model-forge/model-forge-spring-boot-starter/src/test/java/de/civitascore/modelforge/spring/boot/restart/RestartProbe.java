@@ -39,7 +39,6 @@ import java.util.Set;
 public class RestartProbe {
 
     static final String NAMESPACE = "urn:example:station";
-    static final String ELEMENT_NAME = "StationXsd";
 
     /** Printed on the write run so the verifying run can be given the exact URN. */
     static final String WROTE_PREFIX = "PROBE-WROTE ";
@@ -87,10 +86,8 @@ public class RestartProbe {
     }
 
     private static int write(ArtifactRegistry registry, UrnService urns) {
-        // storeXsdElement takes a URN, not a display name, and stores whatever it is given as the
-        // logical identity — so the URN is minted here rather than passing ELEMENT_NAME.
         String xsdPin = registry.storeXsdElement(
-            urns.mintElement(ELEMENT_NAME), XSD, Set.of(), null, VersionBump.PATCH);
+            urns.mintElement(), XSD, Set.of(), null, VersionBump.PATCH);
         System.out.println(WROTE_PREFIX + xsdPin);
         return 0;
     }

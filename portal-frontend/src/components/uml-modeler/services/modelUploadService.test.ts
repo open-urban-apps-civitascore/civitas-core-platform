@@ -121,11 +121,4 @@ describe('buildUMLModelPayload', () => {
     expect(payload.model.$defs).toBeUndefined()
     expect(payload.model.$ref).toBeUndefined()
   })
-
-  it('should pass modelUri through to the JSON Schema $id', () => {
-    const diagram = createTestDiagram()
-    const payload = buildUMLModelPayload(diagram, 'http://example.org/model')
-
-    expect(payload.model.$id).toBe('http://example.org/model')
-  })
 })

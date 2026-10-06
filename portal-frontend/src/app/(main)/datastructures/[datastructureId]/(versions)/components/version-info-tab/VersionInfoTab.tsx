@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { UseFormReturn } from 'react-hook-form'
 
+import { useGetPublishedStructures } from '@/app/services/api/published-structures/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { FormTextArea } from '@/components/form/fields/FormTextArea'
@@ -12,32 +13,34 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Form } from '@/components/ui/form'
 import { cn } from '@/lib/utils'
 import { DatastructureVersionFormData } from '@/types/datastructures'
+import { logicalUrnOf, versionOfUrn } from '@/utils/coreUrn'
 
 /**
  * The published structures the version was built from. The version is what matters — a later
  * version of a structure does not change this one — so it is read off the pinned URN and the
- * whole URN stays available as the title.
+ * whole URN stays available as the title. The URN carries no name, so the name comes from the
+ * structures the platform publishes; a structure no longer published shows its logical URN.
  */
-const ImportedStructures = ({ urns, label }: { urns: string[]; label: string }) => (
-  <div className="space-y-1">
-    <p className="text-sm font-medium">{label}</p>
-    <ul className="text-muted-foreground space-y-0.5 text-sm">
-      {urns.map(urn => (
-        <li key={urn} title={urn}>
-          {nameOf(urn)} {versionOf(urn)}
-        </li>
-      ))}
-    </ul>
-  </div>
-)
-
-/** The name segment of a CORE URN. */
-const nameOf = (urn: string): string => urn.split(':')[6] ?? urn
-
-/** The version segment of a CORE URN, or nothing when it carries none. */
-const versionOf = (urn: string): string => {
-  const segments = urn.split(':')
-  return segments.length > 8 ? segments[8] : ''
+const ImportedStructures = ({ urns, label }: { urns: string[]; label: string }) => {
+  const sinks = useGetPublishedStructures()
+  const nameByLogicalUrn = new Map<string, string>()
+  for (const sink of sinks.data?.data ?? []) {
+    for (const structure of sink.structures) {
+      if (structure.urn) nameByLogicalUrn.set(logicalUrnOf(structure.urn), structure.name)
+    }
+  }
+  return (
+    <div className="space-y-1">
+      <p className="text-sm font-medium">{label}</p>
+      <ul className="text-muted-foreground space-y-0.5 text-sm">
+        {urns.map(urn => (
+          <li key={urn} title={urn}>
+            {nameByLogicalUrn.get(logicalUrnOf(urn)) ?? logicalUrnOf(urn)} {versionOfUrn(urn)}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
 }
 
 interface VersionInfoTabProps {

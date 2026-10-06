@@ -248,10 +248,11 @@ class ArtifactReferenceRepository {
      * may be the logical form, a pinned {@code …:version}, or {@code …:latest}.
      */
     void linkDanglingTargets(String logicalUrn, UUID targetArtifactId) {
-        // The logical URN's name segment is client-supplied ($id) and survives verbatim, so it may
-        // contain LIKE metacharacters ('_' / '%'). Escape them (and the escape char itself) and
-        // declare an explicit ESCAPE so the prefix match is literal — otherwise a name with '_'/'%'
-        // could match the wrong target. The exact-match branch covers the non-versioned logical URN.
+        // The logical URN's scope, owner and domain segments are client-supplied ($id) and survive
+        // verbatim, so they may contain LIKE metacharacters ('_' / '%'). Escape them (and the escape
+        // char itself) and declare an explicit ESCAPE so the prefix match is literal — otherwise a
+        // segment with '_'/'%' could match the wrong target. The exact-match branch covers the
+        // non-versioned logical URN.
         String prefix = logicalUrn.replace("\\", "\\\\").replace("_", "\\_").replace("%", "\\%") + ":%";
         jdbc.sql("""
                 update model_forge.artifact_reference set target_artifact_id = :aid

@@ -282,6 +282,21 @@ class DataSourceControllerIntegrationTest
       assertThat(config.get("user")).isEqualTo("admin");
       assertThat(config.get("password")).isEqualTo(ConnectorHandler.MASKED_VALUE);
     }
+
+    @Test
+    @DisplayName("Should store the configuration under the data source's id")
+    void shouldStoreTheConfigurationUnderTheDataSourceId() {
+      ResponseEntity<DataSourceOutputDTO> response = performCreate(createValidSqlInput());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      UUID dataSourceId = response.getBody().getId();
+      assertThat(
+              dataSourceRepository
+                  .findById(dataSourceId)
+                  .orElseThrow()
+                  .getConfigurationLogicalUrn())
+          .isEqualTo("urn:core:platform:civitas:datasource:common:" + dataSourceId);
+    }
   }
 
   @Nested

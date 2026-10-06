@@ -10,6 +10,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -20,8 +21,7 @@ import org.springframework.stereotype.Component;
  * <p>Found by structure and major, not by the pinned string: editing a draft version's model
  * advances its pin inside its own major, so the string a flow recorded stops naming any record
  * while the record that owns it is still there. A later major is a record of its own and stays out
- * of reach. A model the platform keeps no record of — an element, a mapping, a sink configuration —
- * is governed by nothing.
+ * of reach.
  */
 @Component
 @RequiredArgsConstructor
@@ -49,44 +49,45 @@ public class GoverningVersionLookup {
     if (pinnedUrns == null || pinnedUrns.isEmpty()) {
       return Map.of();
     }
-    Map<String, String> logicalByPin = new HashMap<>();
+    Map<String, UUID> structureByPin = new HashMap<>();
     for (String pin : pinnedUrns) {
-      logicalByPin.put(pin, modelRegistryGateway.logicalUrn(pin));
+      modelRegistryGateway.modelIdOf(pin).ifPresent(id -> structureByPin.put(pin, id));
     }
-    Map<String, List<DataStructureVersion>> byStructure =
-        recordsOfStructures(List.copyOf(new LinkedHashSet<>(logicalByPin.values()))).stream()
-            // A structure that never had a model stored carries no logical URN and governs nothing.
-            .filter(version -> version.getDataStructure().getModelLogicalUrn() != null)
-            .collect(
-                Collectors.groupingBy(version -> version.getDataStructure().getModelLogicalUrn()));
+    if (structureByPin.isEmpty()) {
+      return Map.of();
+    }
+    Map<UUID, List<DataStructureVersion>> byStructure =
+        recordsOfStructures(List.copyOf(new LinkedHashSet<>(structureByPin.values()))).stream()
+            .collect(Collectors.groupingBy(version -> version.getDataStructure().getId()));
 
     Map<String, List<DataStructureVersion>> governing = new HashMap<>();
-    for (String pin : pinnedUrns) {
-      List<DataStructureVersion> candidates = byStructure.get(logicalByPin.get(pin));
-      if (candidates == null) {
-        continue;
-      }
-      String major = majorOf(pin, logicalByPin.get(pin));
-      List<DataStructureVersion> owning =
-          major == null
-              ? candidates
-              : candidates.stream().filter(version -> major.equals(majorOf(version))).toList();
-      if (!owning.isEmpty()) {
-        governing.put(pin, owning);
-      }
-    }
+    structureByPin.forEach(
+        (pin, structureId) -> {
+          List<DataStructureVersion> candidates = byStructure.get(structureId);
+          if (candidates == null) {
+            return;
+          }
+          String major = majorOf(pin, modelRegistryGateway.logicalUrn(pin));
+          List<DataStructureVersion> owning =
+              major == null
+                  ? candidates
+                  : candidates.stream().filter(version -> major.equals(majorOf(version))).toList();
+          if (!owning.isEmpty()) {
+            governing.put(pin, owning);
+          }
+        });
     return governing;
   }
 
-  private List<DataStructureVersion> recordsOfStructures(List<String> logicalUrns) {
-    if (logicalUrns.size() <= BATCH_SIZE) {
-      return dataStructureVersionRepository.findAllByDataStructure_ModelLogicalUrnIn(logicalUrns);
+  private List<DataStructureVersion> recordsOfStructures(List<UUID> structureIds) {
+    if (structureIds.size() <= BATCH_SIZE) {
+      return dataStructureVersionRepository.findAllByDataStructure_IdIn(structureIds);
     }
     List<DataStructureVersion> records = new ArrayList<>();
-    for (int from = 0; from < logicalUrns.size(); from += BATCH_SIZE) {
+    for (int from = 0; from < structureIds.size(); from += BATCH_SIZE) {
       records.addAll(
-          dataStructureVersionRepository.findAllByDataStructure_ModelLogicalUrnIn(
-              logicalUrns.subList(from, Math.min(from + BATCH_SIZE, logicalUrns.size()))));
+          dataStructureVersionRepository.findAllByDataStructure_IdIn(
+              structureIds.subList(from, Math.min(from + BATCH_SIZE, structureIds.size()))));
     }
     return records;
   }

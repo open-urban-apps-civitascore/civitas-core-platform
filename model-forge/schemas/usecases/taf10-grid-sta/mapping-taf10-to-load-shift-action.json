@@ -1,10 +1,10 @@
 {
   "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
-  "id": "urn:core:platform:civitas:mapping:taf10-grid:taf10-to-load-shift-action:1.0.0",
+  "id": "urn:core:platform:civitas:mapping:taf10-grid:7913259f-ace7-88aa-b5ab-41acfbc3fe29:1.0.0",
   "title": "TAF10 Load Peak -> SwitchingAction (shift controllable load)",
   "description": "Emitted only for a load peak — the measured grid import exceeds the grid node's maxLoadW threshold. The mitigation is to shift controllable load, not to curtail generation.",
-  "source": "urn:core:platform:civitas:element:taf10-grid:TAF10GridReading:1.0.0",
-  "target": "urn:core:platform:civitas:element:taf10-grid:SwitchingAction:1.0.0",
+  "source": "urn:core:platform:civitas:element:taf10-grid:fb8586b6-92ea-8bca-a3a7-a8e99a377b83:1.0.0",
+  "target": "urn:core:platform:civitas:element:taf10-grid:3fd993e2-e14c-8eb4-9cf7-c83ced426d7a:1.0.0",
   "fields": {
     "gridNodeId": { "op": "copy", "input": "$.gridNodeId" },
     "requestedAt": { "op": "copy", "input": "$.timestamp" },

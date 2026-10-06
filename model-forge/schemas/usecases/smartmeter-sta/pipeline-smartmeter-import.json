@@ -1,6 +1,6 @@
 {
   "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Pipeline",
-  "id":    "urn:core:platform:civitas:pipeline:smartmeter:Smartmeter-Import:1.0.0",
+  "id":    "urn:core:platform:civitas:pipeline:smartmeter:2eabd2cb-7910-88d0-ac5c-7300f6a7ab26:1.0.0",
   "title": "Smart Meter SML Import",
   "debug": false,
   "nodes": [
@@ -10,7 +10,7 @@
     },
     {
       "id": "n-source", "kind": "source", "label": "SML MQTT",
-      "sourceRef": "urn:core:platform:civitas:datasource:smartmeter:sml-mqtt:1.0.0",
+      "sourceRef": "urn:core:platform:civitas:datasource:smartmeter:87465c79-d00f-8ed3-a3a1-ec3b84dd770b:1.0.0",
       "x-ui-position": { "x": 220, "y": 300 }
     },
     {
@@ -20,38 +20,38 @@
     },
     {
       "id": "n-enrich", "kind": "enrich", "label": "Zählerstammdaten anreichern",
-      "lookupSourceRef": "urn:core:platform:civitas:datasource:smartmeter:meter-db:1.0.0",
+      "lookupSourceRef": "urn:core:platform:civitas:datasource:smartmeter:334f9d31-05d6-8cd9-bbd0-8043b0c17103:1.0.0",
       "lookupKey": "$.meterId",
       "x-ui-position": { "x": 580, "y": 300 }
     },
     {
       "id": "n-map-p-plus", "kind": "mapping", "label": "Wirkleistung Bezug",
-      "mappingRef": "urn:core:platform:civitas:mapping:smartmeter:sml-to-activepowerplus:1.0.0",
+      "mappingRef": "urn:core:platform:civitas:mapping:smartmeter:c508c787-1aaf-8f20-aca4-7a037ea54917:1.0.0",
       "x-ui-position": { "x": 780, "y": 140 }
     },
     {
       "id": "n-map-p-minus", "kind": "mapping", "label": "Wirkleistung Lieferung",
-      "mappingRef": "urn:core:platform:civitas:mapping:smartmeter:sml-to-activepowerminus:1.0.0",
+      "mappingRef": "urn:core:platform:civitas:mapping:smartmeter:85360905-af6e-88da-9855-3f24cdf39280:1.0.0",
       "x-ui-position": { "x": 780, "y": 300 }
     },
     {
       "id": "n-map-voltage", "kind": "mapping", "label": "Spannung",
-      "mappingRef": "urn:core:platform:civitas:mapping:smartmeter:sml-to-voltage:1.0.0",
+      "mappingRef": "urn:core:platform:civitas:mapping:smartmeter:20fbe55e-175c-83b9-833c-da2fd5e70ca8:1.0.0",
       "x-ui-position": { "x": 780, "y": 460 }
     },
     {
       "id": "n-sink-p-plus", "kind": "sink", "label": "FROST Wirkleistung Bezug",
-      "sinkRef": "urn:core:platform:civitas:datasink:smartmeter:frost-observations:1.0.0",
+      "sinkRef": "urn:core:platform:civitas:datasink:smartmeter:c973c40f-2662-81b4-a6c0-81f48107eea9:1.0.0",
       "x-ui-position": { "x": 980, "y": 140 }
     },
     {
       "id": "n-sink-p-minus", "kind": "sink", "label": "FROST Wirkleistung Lieferung",
-      "sinkRef": "urn:core:platform:civitas:datasink:smartmeter:frost-observations:1.0.0",
+      "sinkRef": "urn:core:platform:civitas:datasink:smartmeter:c973c40f-2662-81b4-a6c0-81f48107eea9:1.0.0",
       "x-ui-position": { "x": 980, "y": 300 }
     },
     {
       "id": "n-sink-voltage", "kind": "sink", "label": "FROST Spannung",
-      "sinkRef": "urn:core:platform:civitas:datasink:smartmeter:frost-observations:1.0.0",
+      "sinkRef": "urn:core:platform:civitas:datasink:smartmeter:c973c40f-2662-81b4-a6c0-81f48107eea9:1.0.0",
       "x-ui-position": { "x": 980, "y": 460 }
     },
     {

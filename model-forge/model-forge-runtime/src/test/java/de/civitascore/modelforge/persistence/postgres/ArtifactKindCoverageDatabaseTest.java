@@ -10,6 +10,7 @@ import tools.jackson.databind.JsonNode;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -31,8 +32,8 @@ class ArtifactKindCoverageDatabaseTest extends AbstractRegistryDatabaseTest {
 
     @BeforeEach
     void storeTheElementsEverythingElseReferences() {
-        stationPin = registry.storeElement("Station", schema("stationId"), Set.of());
-        readingPin = registry.storeElement("Reading", schema("temperature"), Set.of());
+        stationPin = registry.storeElement(schema("stationId"), Set.of());
+        readingPin = registry.storeElement(schema("temperature"), Set.of());
     }
 
     @Test
@@ -54,7 +55,7 @@ class ArtifactKindCoverageDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("A mapping's source and target each name one specific version")
     void mappingSourceAndTargetNameOneVersionEach() {
-        String mappingPin = registry.storeMapping("StationToReading", mapping(), VersionBump.PATCH);
+        String mappingPin = registry.storeMapping(urns.urn("mapping", UUID.randomUUID()), mapping(), VersionBump.PATCH);
 
         Map<String, List<String>> byType = registry.referencesByType(mappingPin);
         assertThat(byType.get("mapping-source")).containsExactly(stationPin);
@@ -67,12 +68,12 @@ class ArtifactKindCoverageDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("A pipeline records an edge for each node reference it declares")
     void pipelineRecordsItsNodeReferences() {
-        String sourcePin = registry.storeDataSource("StationFeed", dataSource(), VersionBump.PATCH);
-        String sinkPin = registry.storeDataSink("ReadingStore", dataSink(), VersionBump.PATCH);
-        String mappingPin = registry.storeMapping("StationToReading", mapping(), VersionBump.PATCH);
+        String sourcePin = registry.storeDataSource(urns.urn("datasource", UUID.randomUUID()), dataSource(), VersionBump.PATCH);
+        String sinkPin = registry.storeDataSink(urns.urn("datasink", UUID.randomUUID()), dataSink(), VersionBump.PATCH);
+        String mappingPin = registry.storeMapping(urns.urn("mapping", UUID.randomUUID()), mapping(), VersionBump.PATCH);
 
         String pipelinePin = registry.storePipeline(
-            "WeatherIngest", pipeline(sourcePin, sinkPin, mappingPin), VersionBump.PATCH);
+            urns.urn("pipeline", UUID.randomUUID()), pipeline(sourcePin, sinkPin, mappingPin), VersionBump.PATCH);
 
         assertThat(registry.fetchArtifactRefUrns(pipelinePin))
             .containsExactlyInAnyOrder(sourcePin, sinkPin, mappingPin);
@@ -82,7 +83,7 @@ class ArtifactKindCoverageDatabaseTest extends AbstractRegistryDatabaseTest {
     @DisplayName("A DataStructure records an edge to each member Element it groups")
     void dataStructureRecordsItsMembers() {
         String structurePin = registry.storeDataStructure(
-            urns.mintDataStructure("WeatherStructure"), dataStructure(), VersionBump.PATCH, null);
+            urns.urn("datastructure", UUID.randomUUID()), dataStructure(), VersionBump.PATCH, null);
 
         assertThat(registry.fetchArtifactRefUrns(structurePin))
             .containsExactlyInAnyOrder(stationPin, readingPin);
@@ -91,8 +92,8 @@ class ArtifactKindCoverageDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("A DataSource and DataSink each record an edge to the Element describing their payload")
     void dataSourceAndSinkRecordTheirElement() {
-        String sourcePin = registry.storeDataSource("StationFeed", dataSource(), VersionBump.PATCH);
-        String sinkPin = registry.storeDataSink("ReadingStore", dataSink(), VersionBump.PATCH);
+        String sourcePin = registry.storeDataSource(urns.urn("datasource", UUID.randomUUID()), dataSource(), VersionBump.PATCH);
+        String sinkPin = registry.storeDataSink(urns.urn("datasink", UUID.randomUUID()), dataSink(), VersionBump.PATCH);
 
         assertThat(registry.fetchArtifactRefUrns(sourcePin)).containsExactly(stationPin);
         assertThat(registry.fetchArtifactRefUrns(sinkPin)).containsExactly(readingPin);
@@ -102,11 +103,11 @@ class ArtifactKindCoverageDatabaseTest extends AbstractRegistryDatabaseTest {
     @DisplayName("A DataSet records an edge to every artifact it collects")
     void dataSetRecordsItsMembers() {
         String structurePin = registry.storeDataStructure(
-            urns.mintDataStructure("WeatherStructure"), dataStructure(), VersionBump.PATCH, null);
-        String mappingPin = registry.storeMapping("StationToReading", mapping(), VersionBump.PATCH);
+            urns.urn("datastructure", UUID.randomUUID()), dataStructure(), VersionBump.PATCH, null);
+        String mappingPin = registry.storeMapping(urns.urn("mapping", UUID.randomUUID()), mapping(), VersionBump.PATCH);
 
         String dataSetPin = registry.storeDataSet(
-            urns.mintDataSet("WeatherSet"), dataSet(structurePin, mappingPin), VersionBump.PATCH);
+            urns.urn("dataset", UUID.randomUUID()), dataSet(structurePin, mappingPin), VersionBump.PATCH);
 
         assertThat(registry.fetchArtifactRefUrns(dataSetPin))
             .containsExactlyInAnyOrder(structurePin, mappingPin);
@@ -115,11 +116,11 @@ class ArtifactKindCoverageDatabaseTest extends AbstractRegistryDatabaseTest {
 
     /** One artifact of each modelled kind, wired as a single weather feed. */
     private Map<String, String> storeTheFeed() {
-        String sourcePin = registry.storeDataSource("StationFeed", dataSource(), VersionBump.PATCH);
-        String sinkPin = registry.storeDataSink("ReadingStore", dataSink(), VersionBump.PATCH);
-        String mappingPin = registry.storeMapping("StationToReading", mapping(), VersionBump.PATCH);
+        String sourcePin = registry.storeDataSource(urns.urn("datasource", UUID.randomUUID()), dataSource(), VersionBump.PATCH);
+        String sinkPin = registry.storeDataSink(urns.urn("datasink", UUID.randomUUID()), dataSink(), VersionBump.PATCH);
+        String mappingPin = registry.storeMapping(urns.urn("mapping", UUID.randomUUID()), mapping(), VersionBump.PATCH);
         String structurePin = registry.storeDataStructure(
-            urns.mintDataStructure("WeatherStructure"), dataStructure(), VersionBump.PATCH, null);
+            urns.urn("datastructure", UUID.randomUUID()), dataStructure(), VersionBump.PATCH, null);
         return Map.of(
             "element", stationPin,
             "datastructure", structurePin,
@@ -127,9 +128,9 @@ class ArtifactKindCoverageDatabaseTest extends AbstractRegistryDatabaseTest {
             "datasink", sinkPin,
             "mapping", mappingPin,
             "pipeline", registry.storePipeline(
-                "WeatherIngest", pipeline(sourcePin, sinkPin, mappingPin), VersionBump.PATCH),
+                urns.urn("pipeline", UUID.randomUUID()), pipeline(sourcePin, sinkPin, mappingPin), VersionBump.PATCH),
             "dataset", registry.storeDataSet(
-                urns.mintDataSet("WeatherSet"), dataSet(structurePin, mappingPin), VersionBump.PATCH));
+                urns.urn("dataset", UUID.randomUUID()), dataSet(structurePin, mappingPin), VersionBump.PATCH));
     }
 
     private JsonNode schema(String property) {

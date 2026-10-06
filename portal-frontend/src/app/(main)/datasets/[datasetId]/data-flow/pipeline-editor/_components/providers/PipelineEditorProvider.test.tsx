@@ -184,7 +184,7 @@ const makeGeoPersistenceNode = (id: string, entityId?: string, tableName = `tabl
 const makeResourceInUseError = () =>
   mockApiError(
     409,
-    'Cannot delete urn:core:mapping:x — still referenced by: urn:core:pipeline:y',
+    'Cannot delete urn:core:platform:civitas:mapping:common:00000000-0000-4000-8000-000000000043 — still referenced by: urn:core:platform:civitas:pipeline:common:00000000-0000-4000-8000-000000000044',
     'urn:civitas:error:RESOURCE_IN_USE',
   )
 
@@ -1354,9 +1354,12 @@ describe('PipelineEditorProviderComponent', () => {
     })
 
     it('retains refs obtained before a later save step fails, so a retry does not re-POST', async () => {
-      const mockCreateDataSinkMutateAsync = vi
-        .fn()
-        .mockResolvedValue({ data: { id: 'new-dataSink-id', configurationUrn: 'urn:core:sink-config' } })
+      const mockCreateDataSinkMutateAsync = vi.fn().mockResolvedValue({
+        data: {
+          id: 'new-dataSink-id',
+          configurationUrn: 'urn:core:platform:civitas:datasink:common:00000000-0000-4000-8000-000000000046:1.0.0',
+        },
+      })
       vi.mocked(useCreateDataSink).mockReturnValue({
         mutate: vi.fn(),
         mutateAsync: mockCreateDataSinkMutateAsync,

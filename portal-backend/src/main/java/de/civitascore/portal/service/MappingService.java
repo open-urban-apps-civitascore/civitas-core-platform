@@ -1,5 +1,6 @@
 package de.civitascore.portal.service;
 
+import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.PayloadKind;
@@ -86,6 +87,8 @@ public class MappingService {
     return registry.storePayload(
         PayloadKind.MAPPING,
         Optional.ofNullable(logicalUrn),
+        // A Mapping has no portal row, so Model Forge mints its UUID.
+        null,
         deriveName(content),
         content,
         styles,
@@ -130,7 +133,8 @@ public class MappingService {
 
   /**
    * A mapping's {@code source} and {@code target} name the DataStructures it maps between. Both are
-   * optional — a draft need not have picked them yet — but one that is present has to resolve:
+   * optional — a draft need not have picked them yet — but one that is present has to be pinned to
+   * a SemVer version, the form the deployment accepts ({@link CoreUrn}), and has to resolve:
    * otherwise the mapping pins a structure, or a version of one, that does not exist, and the
    * reference is only discovered when the dataset is released and the deployment engine tries to
    * read the schema. A URN that does not resolve and one the caller may not see are reported
@@ -141,12 +145,12 @@ public class MappingService {
     if (raw == null) {
       return;
     }
-    if (!(raw instanceof String urn) || urn.isBlank()) {
-      throw new InvalidInputException(ENTITY_NAME, field, field + " must be a CORE URN");
+    if (!(raw instanceof String urn) || !CoreUrn.isValid(urn)) {
+      throw new InvalidInputException(
+          ENTITY_NAME, field, field + " must be a CORE URN pinned to a version");
     }
     if (registry.fetchModel(urn).isEmpty()) {
-      throw new InvalidInputException(
-          ENTITY_NAME, field, "Referenced model is not available: " + urn);
+      throw new InvalidInputException(ENTITY_NAME, field, "Referenced model is not available");
     }
   }
 

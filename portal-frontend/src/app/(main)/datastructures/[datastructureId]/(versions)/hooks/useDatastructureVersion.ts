@@ -16,7 +16,7 @@ import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi
 import { SchemaExportError } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
 import { rootFailureMessage } from '@/components/uml-modeler/services/rootFailureMessage'
-import { DataStructureSchema } from '@/generated/core'
+import { DataStructureDraftSchema } from '@/generated/core'
 import { useError } from '@/hooks/use-error'
 import { STATUS_TYPES } from '@/types/common'
 import {
@@ -39,7 +39,6 @@ import {
 } from '@/utils/datastructures'
 import { isResourceInUseError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
-import { buildDataStructureLogicalUrn } from '@/utils/urn'
 
 const draftResolver: Resolver<DatastructureVersionFormData> = zodResolver(DatastructureVersionFormDraftSchema)
 // The available schema narrows modelName to a non-null string, the form values stay the draft shape.
@@ -67,18 +66,12 @@ export const defaultDatastructureVersionFormData: DatastructureVersionFormData =
 
 interface UseDatastructureVersionProps {
   datastructureId: string
-  dataStructureName: string
   version: DatastructureVersion | null
   isCreateMode: boolean
   onCreateVersion?: (data: DatastructureVersion) => void
 }
 
-export const useDatastructureVersion = ({
-  dataStructureName,
-  version,
-  isCreateMode,
-  onCreateVersion,
-}: UseDatastructureVersionProps) => {
+export const useDatastructureVersion = ({ version, isCreateMode, onCreateVersion }: UseDatastructureVersionProps) => {
   const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
   const tUmlModeler = useTranslations('umlModeler')
@@ -283,16 +276,10 @@ export const useDatastructureVersion = ({
 
     try {
       const sessionDiagram = nodesWatch.length > 0 ? activeSession?.diagram || null : null
-      // The model document IS the DataStructure: its $id is the DataStructure URN. Model Forge folds
-      // the wrapper into a single DataStructure artifact (carrying the shape + styles) that CONTAINS
-      // its member Elements (the $defs classes) — with no separate root Element. Mappings and sinks
-      // pin a version of this same identity, so the model carries the logical form: the registry
-      // assigns the version on store, and one authored here would only be a guess.
-      const modelUri = sessionDiagram ? buildDataStructureLogicalUrn(dataStructureName, datastructureId) : undefined
       let model: Record<string, unknown> | null = null
       if (sessionDiagram) {
         try {
-          model = buildUMLModelPayload(sessionDiagram, modelUri).model
+          model = buildUMLModelPayload(sessionDiagram).model
         } catch (error) {
           if (!(error instanceof SchemaExportError)) throw error
           // No version is saved without a model, draft included: a version whose diagram never
@@ -305,10 +292,9 @@ export const useDatastructureVersion = ({
         }
         // Validate the assembled CORE DataStructure document against the generated schema before
         // sending — the frontend guarantees a schema-valid payload to the (schema-agnostic) backend,
-        // mirroring the pipeline/mapping/datasource editors. Model Forge splits the $defs members into
-        // Element artifacts on ingest; the host only ever stores the envelope.
+        // mirroring the pipeline/mapping/datasource editors.
         if (model) {
-          const validated = DataStructureSchema.safeParse(model)
+          const validated = DataStructureDraftSchema.safeParse(model)
           if (!validated.success) {
             console.error('DataStructure model failed CORE schema validation:', validated.error.issues, model)
             toast.error(tCommon('errors.unexpectedError'))

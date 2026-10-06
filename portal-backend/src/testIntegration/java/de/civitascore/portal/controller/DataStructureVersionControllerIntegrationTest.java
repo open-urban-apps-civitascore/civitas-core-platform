@@ -15,6 +15,7 @@ import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionMetaInputDTO;
 import de.civitascore.portal.model.output.DataStructureVersionOutputDTO;
 import de.civitascore.portal.model.output.summary.DataStructureSummaryDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
@@ -22,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +48,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   @Autowired protected PortalTestDataFactory portalData;
 
   @Autowired private DataStructureRepository dataStructureRepository;
+
+  @Autowired private ModelRegistryGateway modelRegistryGateway;
 
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
 
@@ -152,6 +156,40 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(secondResponse.getStatusCode())
           .as("The number is already taken by the version holding this content")
           .isEqualTo(HttpStatus.CONFLICT);
+      assertThat(secondResponse.getBody().getDetail())
+          .startsWith("The model is unchanged from version ")
+          .doesNotContain("data_structure_id");
+    }
+
+    @Test
+    @DisplayName("A UML model is stored under the data structure's id")
+    void umlModelIsStoredUnderTheDataStructureId() {
+      DataStructure structure = portalData.dataStructure(b -> b.name("OriginalName"));
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDescription("UML model");
+      input.setModelName("Uml");
+      input.setModel(
+          Map.of(
+              "$schema", "https://json-schema.org/draft/2020-12/schema",
+              "title", "OriginalName",
+              "$defs",
+                  Map.of(
+                      "Sensor",
+                      Map.of(
+                          "type", "object", "properties", Map.of("id", Map.of("type", "string")))),
+              "$ref", "#/$defs/Sensor"));
+
+      ResponseEntity<DataStructureVersionOutputDTO> created =
+          restTemplate.exchange(
+              "/datastructures/" + structure.getId() + "/versions",
+              HttpMethod.POST,
+              new HttpEntity<>(input, createAuthHeaders()),
+              getOutputTypeReference());
+      assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      String modelUrn = created.getBody().getModelUrn();
+      assertThat(modelUrn)
+          .isEqualTo(
+              "urn:core:platform:civitas:datastructure:common:" + structure.getId() + ":1.0.0");
     }
 
     @Test
@@ -507,6 +545,46 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   @Nested
   @DisplayName("Patch DataStructureVersion Tests")
   class PatchDataStructureVersionTests {
+
+    /** Catches a PATCH that stores the bundled read-back of a UML model again as a new version. */
+    @Test
+    @DisplayName("Patching the description of a UML model leaves its version and pin alone")
+    void patchingTheDescriptionOfAUmlModelKeepsItsVersion() {
+      DataStructure structure = portalData.dataStructure(b -> b.name("Uml"));
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDescription("UML model");
+      input.setModelName("Uml");
+      input.setModel(
+          Map.of(
+              "$schema", "https://json-schema.org/draft/2020-12/schema",
+              "title", "Uml",
+              "$defs",
+                  Map.of(
+                      "Sensor",
+                      Map.of(
+                          "type", "object", "properties", Map.of("id", Map.of("type", "string")))),
+              "$ref", "#/$defs/Sensor"));
+      String endpoint = "/datastructures/" + structure.getId() + "/versions";
+      DataStructureVersionOutputDTO created =
+          restTemplate
+              .exchange(
+                  endpoint,
+                  HttpMethod.POST,
+                  new HttpEntity<>(input, createAuthHeaders()),
+                  getOutputTypeReference())
+              .getBody();
+
+      ResponseEntity<DataStructureVersionOutputDTO> patched =
+          restTemplate.exchange(
+              endpoint + "/" + created.getId(),
+              HttpMethod.PATCH,
+              new HttpEntity<>(Map.of("description", "Patched"), createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(patched.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patched.getBody().getVersion()).isEqualTo(created.getVersion());
+      assertThat(patched.getBody().getModelUrn()).isEqualTo(created.getModelUrn());
+    }
 
     @Test
     @DisplayName("Should patch description without affecting the model")
@@ -1249,6 +1327,136 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getBody().isInUse())
           .as("inUse should be false when no DataSource references this version")
           .isFalse();
+    }
+  }
+
+  @Nested
+  @DisplayName("Model identity")
+  class ModelIdentityTests {
+
+    private String foreignDataStructureUrn;
+    private Optional<ModelRegistryGateway.RegistryDocument> foreignModelBefore;
+    private String foreignMemberUrn;
+    private Optional<ModelRegistryGateway.RegistryDocument> foreignMemberBefore;
+
+    @BeforeEach
+    void storeForeignDataStructure() {
+      assertThat(
+              modelRegistryGateway.artifactType(
+                  dataStructureRepository
+                      .findById(dataStructureId)
+                      .orElseThrow()
+                      .getModelLogicalUrn()))
+          .as("the host is stored as an Element, so the host-id import path is not taken")
+          .isEqualTo("element");
+
+      DataStructure foreign = portalData.dataStructure(b -> b.name("Foreign"));
+      portalData.attachModel(portalData.dataStructureVersion(foreign), modelWithAnAddressMember());
+      foreignDataStructureUrn = "urn:core:platform:civitas:datastructure:common:" + foreign.getId();
+      foreignModelBefore = modelRegistryGateway.fetchStoredModel(foreignDataStructureUrn);
+      assertThat(foreignModelBefore).isPresent();
+
+      foreignMemberUrn =
+          modelRegistryGateway.logicalUrn(
+              addressReferenceOf(
+                  modelRegistryGateway
+                      .fetchStoredModel(
+                          dataStructureRepository
+                              .findById(foreign.getId())
+                              .orElseThrow()
+                              .getModelLogicalUrn())
+                      .orElseThrow()
+                      .content()));
+      foreignMemberBefore = modelRegistryGateway.fetchStoredModel(foreignMemberUrn);
+      assertThat(foreignMemberBefore).isPresent();
+    }
+
+    private Map<String, Object> modelWithAnAddressMember() {
+      Map<String, Object> model = portalData.dataStructureVersionModel("Foreign");
+      model.put("$defs", Map.of("Address", Map.of("type", "object")));
+      model.put("properties", Map.of("address", Map.of("$ref", "#/$defs/Address")));
+      return model;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String addressReferenceOf(Map<String, Object> rootElement) {
+      Map<String, Object> properties = (Map<String, Object>) rootElement.get("properties");
+      return (String) ((Map<String, Object>) properties.get("address")).get("$ref");
+    }
+
+    private Map<String, Object> modelWithAMemberClaimingTheForeignMember() {
+      Map<String, Object> model = portalData.dataStructureVersionModel("Hijack");
+      model.put("$id", "urn:core:platform:civitas:datastructure:common:" + dataStructureId);
+      model.put(
+          "$defs",
+          Map.of(
+              "Address",
+              Map.of(
+                  "$id",
+                  foreignMemberUrn,
+                  "type",
+                  "object",
+                  "properties",
+                  Map.of("injected", Map.of("type", "string")))));
+      model.put("properties", Map.of("address", Map.of("$ref", "#/$defs/Address")));
+      return model;
+    }
+
+    private Map<String, Object> modelClaimingTheForeignDataStructure() {
+      Map<String, Object> model = portalData.dataStructureVersionModel("Hijack");
+      model.put("$id", foreignDataStructureUrn);
+      return model;
+    }
+
+    @Test
+    @DisplayName("POST refuses a model whose $id names another data structure")
+    void postRefusesAModelNamingAnotherDataStructure() {
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setModelName("Hijack");
+      input.setModel(modelClaimingTheForeignDataStructure());
+
+      ResponseEntity<ProblemDetail> response =
+          restTemplate.exchange(
+              getEndpoint(),
+              HttpMethod.POST,
+              new HttpEntity<>(input, createAuthHeaders()),
+              ProblemDetail.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(modelRegistryGateway.fetchStoredModel(foreignDataStructureUrn))
+          .isEqualTo(foreignModelBefore);
+    }
+
+    @Test
+    @DisplayName("PATCH refuses a model whose $id names another data structure")
+    void patchRefusesAModelNamingAnotherDataStructure() {
+      ResponseEntity<ProblemDetail> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1,
+              HttpMethod.PATCH,
+              new HttpEntity<>(
+                  Map.of("model", modelClaimingTheForeignDataStructure()), createAuthHeaders()),
+              ProblemDetail.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(modelRegistryGateway.fetchStoredModel(foreignDataStructureUrn))
+          .isEqualTo(foreignModelBefore);
+    }
+
+    @Test
+    @DisplayName("PATCH keeps a member $id off another data structure's Element")
+    void patchKeepsAMemberOffAnotherDataStructuresElement() {
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1,
+              HttpMethod.PATCH,
+              new HttpEntity<>(
+                  Map.of("model", modelWithAMemberClaimingTheForeignMember()), createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(modelRegistryGateway.fetchStoredModel(foreignMemberUrn))
+          .isEqualTo(foreignMemberBefore);
     }
   }
 

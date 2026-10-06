@@ -149,8 +149,8 @@ describe('mapping editor compile', () => {
     // Reopening the editor must keep the wire on the latitude port, not longitude.
     const config: MappingConfig = {
       $schema: 'https://civitasconnect.digital/core/mapping/v1',
-      source: 'urn:core:datastructure:a:b',
-      target: 'urn:core:datastructure:c:d',
+      source: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000041:1.0.0',
+      target: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000042:1.0.0',
       fields,
       positions: {},
     }
@@ -231,8 +231,8 @@ describe('mapping editor compile', () => {
   it('does not wire an unconnected conversion input to the source node', () => {
     const config: MappingConfig = {
       $schema: 'https://civitasconnect.digital/core/mapping/v1',
-      source: 'urn:core:datastructure:a:b',
-      target: 'urn:core:datastructure:c:d',
+      source: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000041:1.0.0',
+      target: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000042:1.0.0',
       fields: { '$.title': { op: 'toString', input: '' } },
       positions: {},
     }
@@ -245,8 +245,8 @@ describe('mapping editor compile', () => {
   it('restores a single shared node when one transform feeds multiple target ports', () => {
     const config: MappingConfig = {
       $schema: 'https://civitasconnect.digital/core/mapping/v1',
-      source: 'urn:core:datastructure:a:b',
-      target: 'urn:core:datastructure:c:d',
+      source: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000041:1.0.0',
+      target: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000042:1.0.0',
       fields: {
         '$.title': { op: 'const', value: 'x', valueType: 'String' },
         '$.fullCode': { op: 'const', value: 'x', valueType: 'String' },
@@ -331,8 +331,8 @@ describe('mapping editor compile', () => {
 
     const config: MappingConfig = {
       $schema: 'https://civitasconnect.digital/core/mapping/v1',
-      source: 'urn:core:datastructure:a:b',
-      target: 'urn:core:datastructure:c:d',
+      source: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000041:1.0.0',
+      target: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000042:1.0.0',
       ...compiled,
     }
     const built = decompileConfig(config, sourceTree, targetTree)
@@ -344,9 +344,9 @@ describe('mapping editor compile', () => {
 
 const documentOf = (fields: Record<string, ValueNode>) => ({
   $schema: CONTRACT_URIS.mapping,
-  id: 'urn:core:platform:civitas:mapping:common:M:abcdef1234:1.0.0',
-  source: 'urn:core:platform:civitas:datastructure:common:S:abcdef1234:1.0.0',
-  target: 'urn:core:platform:civitas:datastructure:common:T:abcdef1234:1.0.0',
+  id: 'urn:core:platform:civitas:mapping:common:2e01b235-7928-8608-863f-5f7123472030:1.0.0',
+  source: 'urn:core:platform:civitas:datastructure:common:531147d0-9580-8544-8601-804d11141d60:1.0.0',
+  target: 'urn:core:platform:civitas:datastructure:common:45074f30-2cfc-8d5e-8e70-95366202ba43:1.0.0',
   fields,
 })
 

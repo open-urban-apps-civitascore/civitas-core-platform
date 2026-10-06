@@ -1,5 +1,6 @@
 package de.civitascore.portal.service;
 
+import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.model.datasink.FrostSinkPort;
 import de.civitascore.portal.model.embedded.DataSinkType;
@@ -190,21 +191,34 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
     entity.setDataSet(dataSet);
 
     validateConfiguration(input.getDataSinkType(), input.getConfiguration());
-    storeConfigurationInRegistry(entity, input);
+    if (entity.getId() != null) {
+      storeConfigurationInRegistry(entity, input);
+    }
 
     return super.postConvertToEntity(entity, input);
   }
 
   @Override
   protected DataSink preSave(DataSink entity) {
-    validateUniquePostgisTableName(entity);
+    validateUniquePostgisTableName(entity, false);
     return super.preSave(entity);
+  }
+
+  /**
+   * Stores the configuration of a new sink and checks its table name, which {@link #preSave} could
+   * not: the name lives in the stored configuration.
+   */
+  @Override
+  protected DataSink postCreate(DataSink saved, DataSinkInputDTO input) {
+    storeConfigurationInRegistry(saved, input);
+    validateUniquePostgisTableName(saved, true);
+    return super.postCreate(saved, input);
   }
 
   /**
    * The dataset's POSTGIS sinks share one schema, so one {@code tableName} is one physical table.
    */
-  private void validateUniquePostgisTableName(DataSink entity) {
+  private void validateUniquePostgisTableName(DataSink entity, boolean created) {
     if (entity.getDataSinkType() != DataSinkType.POSTGIS) {
       return;
     }
@@ -221,7 +235,7 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
         .ifPresent(
             _ -> {
               throw new UniqueConstraintViolationException(
-                  duplicateTableNameMessage(entity, tableName));
+                  duplicateTableNameMessage(created, tableName));
             });
   }
 
@@ -230,8 +244,8 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
    * a sink that already collides is rejected by a request that changed nothing about its name. That
    * reads as a bug in the request unless the message points at the stored value.
    */
-  private static String duplicateTableNameMessage(DataSink entity, String tableName) {
-    if (entity.getId() == null) {
+  private static String duplicateTableNameMessage(boolean created, String tableName) {
+    if (created) {
       return "Another POSTGIS DataSink of this dataset already uses tableName '%s';"
               .formatted(tableName)
           + " they would share one physical table";
@@ -302,6 +316,7 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
         modelRegistryGateway.storePayload(
             PayloadKind.DATA_SINK,
             Optional.ofNullable(entity.getConfigurationLogicalUrn()),
+            entity.getId(),
             deriveArtifactName(input, configuration),
             payload,
             null);
@@ -312,9 +327,8 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
   }
 
   /**
-   * Derives a readable registry artifact name for the sink configuration: the POSTGIS table name
-   * when present, otherwise the sink type. Model Forge appends a UUID, so equal names never
-   * collide.
+   * Derives a readable registry display name for the sink configuration: the POSTGIS table name
+   * when present, otherwise the sink type.
    */
   private static String deriveArtifactName(DataSinkInputDTO input, Map<String, Object> config) {
     if (config.get("tableName") instanceof String tableName && !tableName.isBlank()) {
@@ -391,8 +405,8 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
    * deploy engine.
    *
    * <p>An empty configuration stays valid: the editor creates the node before the modeller picks a
-   * port, and a Data sink that predates the port has none either. What a missing port costs is
-   * decided at publish time — a Dataset does not release without one.
+   * port. What a missing port costs is decided at publish time — a Dataset does not release without
+   * one.
    */
   private void validateFrostConfiguration(Map<String, Object> config) {
     if (config == null || config.isEmpty()) {
@@ -465,21 +479,19 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
   }
 
   /**
-   * Validates the {@code element} soft reference: it must be a non-blank CORE URN that resolves to
-   * an existing model (Element) in the registry. Model Forge tracks this URN as a {@code
-   * datasink-element} dependency edge when the configuration is stored, which is what the in-use
-   * guard on {@code DataStructureVersion} queries.
+   * Validates the {@code element} soft reference: it must be a CORE URN pinned to a SemVer version,
+   * the form the deployment accepts ({@link CoreUrn}), and resolve to an existing model (Element)
+   * in the registry. Model Forge tracks this URN as a {@code datasink-element} dependency edge when
+   * the configuration is stored, which is what the in-use guard on {@code DataStructureVersion}
+   * queries.
    */
   private void requireExistingElement(Object elementRaw) {
-    if (!(elementRaw instanceof String urn) || urn.isBlank()) {
+    if (!(elementRaw instanceof String urn) || !CoreUrn.isValid(urn)) {
       throw new InvalidInputException(
-          "DataSink", "configuration.element", "element must be a CORE URN");
+          "DataSink", "configuration.element", "element must be a CORE URN pinned to a version");
     }
     if (modelRegistryGateway.fetchModel(urn).isEmpty()) {
-      throw new InvalidInputException(
-          "DataSink",
-          "configuration.element",
-          "Referenced Element not found in the model registry: " + urn);
+      throw referencedStructureNotAvailable();
     }
     authorizeReferencedStructure(urn);
   }
@@ -487,21 +499,20 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
   /**
    * Authorizes the caller against the DataStructure that owns the referenced {@code element} URN.
    *
-   * <p>The sink's {@code element} is a versioned CORE {@code :datastructure:} URN (the mapping's
-   * target structure). It is resolved to the owning portal DataStructure via that structure's
-   * {@code modelUrn}, matched version-agnostically since every version of a structure shares the
-   * same parent. The DataStructure is DATASTRUCTURE-scoped, which the DATASET-typed route header
-   * cannot cover — so DataSinkService authorizes the reference here (DataSinkController is a plain
-   * BaseController with no scope filtering of its own). A URN that resolves to no known
-   * DataStructure and an unauthorized one must yield the SAME outward failure, otherwise the
-   * difference is an existence oracle over structure URNs; both raise the identical "not available"
-   * 400 and the real denial is logged by {@link ScopeAccessAuthorizer} for audit.
+   * <p>The sink's {@code element} is a versioned CORE {@code :element:} or {@code :datastructure:}
+   * URN (the mapping's target structure). Its UUID is the id of the owning portal DataStructure,
+   * which must hold at least one version. The DataStructure is DATASTRUCTURE-scoped, which the
+   * DATASET-typed route header cannot cover — so DataSinkService authorizes the reference here
+   * (DataSinkController is a plain BaseController with no scope filtering of its own). A URN that
+   * resolves to no known DataStructure and an unauthorized one must yield the SAME outward failure,
+   * otherwise the difference is an existence oracle over structure URNs; both raise the identical
+   * "not available" 400 and the real denial is logged by {@link ScopeAccessAuthorizer} for audit.
    */
   private void authorizeReferencedStructure(String elementUrn) {
     UUID dataStructureId =
-        dataStructureVersionRepository
-            .findFirstByModelUrnStartingWith(modelRegistryGateway.logicalUrn(elementUrn) + ":")
-            .map(dsv -> dsv.getDataStructure().getId())
+        modelRegistryGateway
+            .modelIdOf(elementUrn)
+            .filter(dataStructureVersionRepository::existsByDataStructure_Id)
             .orElseThrow(this::referencedStructureNotAvailable);
     try {
       scopeAccessAuthorizer.authorizeReferences(ScopeType.DATASTRUCTURE, Set.of(dataStructureId));

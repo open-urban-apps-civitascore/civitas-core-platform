@@ -33,7 +33,9 @@ _Avoid_: upload, ingest, load
 
 **URN**:
 The identifier every artifact carries. The registry is its sole authority: a caller may propose one,
-but what the registry assigns is what the artifact is.
+but what the registry assigns is what the artifact is. It holds the artifact's UUID and never its
+name, so a rename leaves every reference intact. A member Element's UUID derives from its
+grouping's UUID and the member's key.
 _Avoid_: id, key, name
 
 **Logical URN**:
@@ -44,11 +46,6 @@ _Avoid_: base urn, unversioned id
 **Versioned URN**:
 The identifier of one exact version. What a reference uses when it must not move.
 _Avoid_: full urn, pinned id
-
-**Disambiguator**:
-The part of an identity that keeps two artifacts with the same name apart. Two documents may
-legitimately share a name; they never share an identity.
-_Avoid_: suffix, hash, discriminator
 
 **Pin**:
 The versioned URN a write resolved to, returned by the write itself so a caller never has to read

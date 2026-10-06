@@ -3,14 +3,13 @@ package de.civitascore.modelforge.application;
 /**
  * Internal service input for a raw XSD import (no JSON Schema conversion) — the XSD counterpart to
  * {@link SchemaImportRequest}. Unlike JSON Schema, XSD carries no {@code $id}/{@code title} of its
- * own, so {@code name} is required and {@code artifactId} is the caller-owned escape hatch for an
- * explicit identity (e.g. an XRepository "Kennung"-derived URN).
+ * own, so {@code name} and the caller-owned {@code artifactId} (e.g. an XRepository
+ * "Kennung"-derived URN) are required.
  *
- * @param name            display name; also the source for a minted identity when {@code artifactId} is absent
- * @param version         version segment; only interpolated into a minted identity, or (with
- *                         {@link #preserveVersion}) adopted verbatim as the stored version
+ * @param name            display name
+ * @param version         the upstream version, refused when malformed; stored only with {@code preserveVersion}
  * @param xsdContent      the raw XSD document text
- * @param artifactId      an explicit, caller-owned CORE URN identity; {@code null} mints one from {@code name}
+ * @param artifactId      the caller-owned CORE URN identity
  * @param preserveVersion when {@code true}, {@code version} is adopted verbatim as the stored
  *     Element's version instead of Model Forge's usual version authority — see
  *     {@code ArtifactRegistry#storeElement}'s equivalent parameter

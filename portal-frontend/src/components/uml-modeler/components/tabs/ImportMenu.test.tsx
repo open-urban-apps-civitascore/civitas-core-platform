@@ -35,7 +35,7 @@ vi.mock('@/app/services/api/published-structures/clientRequests', () => ({
             {
               key: 'thing-tree',
               name: 'ThingTree',
-              urn: 'urn:core:platform:civitas:datastructure:frost:ThingTree:0123456789:1.0.0',
+              urn: 'urn:core:platform:civitas:datastructure:frost:9cc6ed95-0f8b-8ace-ab6e-83cdee87b3dd:1.0.0',
             },
             { key: 'things', name: 'Things' },
           ],

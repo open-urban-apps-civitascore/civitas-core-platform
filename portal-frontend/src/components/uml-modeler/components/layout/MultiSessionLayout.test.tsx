@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ReadOnlyProvider } from '../../hooks/use-read-only'
 import * as diagramFileService from '../../services/diagramFileService'
-import { DiagramExportError, DiagramImportError } from '../../services/diagramFileService'
+import { DiagramImportError } from '../../services/diagramFileService'
 import { SchemaExportError } from '../../services/jsonSchemaExportService'
 import type { UMLDiagram, UMLNode } from '../../types/diagram'
 import type { DiagramSession, UseMultiSessionReturn } from '../../types/session'
@@ -278,7 +278,10 @@ describe('MultiSessionLayout Import & Export', () => {
   it('adds the classes of the file beside the existing ones when choosing add', async () => {
     const existingNode = createSampleNode('node-existing', 'ExistingClass')
     const pins = [
-      { urn: 'urn:core:platform:civitas:datastructure:frost:ThingTree:0123456789:1.0.0', name: 'ThingTree' },
+      {
+        urn: 'urn:core:platform:civitas:datastructure:frost:9cc6ed95-0f8b-8ace-ab6e-83cdee87b3dd:1.0.0',
+        name: 'ThingTree',
+      },
     ]
     const document = {
       $ref: '#/$defs/Station',
@@ -339,18 +342,5 @@ describe('MultiSessionLayout Import & Export', () => {
     fireEvent.click(screen.getByText('export.title'))
 
     expect(toast.error).toHaveBeenCalledWith('rootValidation.noRoot')
-  })
-
-  it('names the reason when export fails because no CORE URN can be built', () => {
-    vi.spyOn(diagramFileService, 'buildDiagramExport').mockImplementationOnce(() => {
-      throw new DiagramExportError('INVALID_URN', 'no urn')
-    })
-
-    renderLayout()
-
-    fireEvent.click(screen.getByText('export.title'))
-
-    // Not the generic 'export.error': retrying cannot help, so the message has to say what to change.
-    expect(toast.error).toHaveBeenCalledWith('export.errors.INVALID_URN')
   })
 })

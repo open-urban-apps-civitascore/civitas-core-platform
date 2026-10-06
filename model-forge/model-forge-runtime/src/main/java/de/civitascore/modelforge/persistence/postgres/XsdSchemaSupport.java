@@ -58,9 +58,10 @@ class XsdSchemaSupport {
      * so a multi-version XSD never returns another version's conversion.
      *
      * @param urn         the (versioned or logical) XSD URN
+     * @param title       the artifact's display name, the title of a multi-type bundle; may be null
      * @param rawXsd      supplier of the raw XSD text for {@code urn}
      */
-    Optional<JsonNode> toJsonSchema(String urn, Supplier<Optional<String>> rawXsd) {
+    Optional<JsonNode> toJsonSchema(String urn, String title, Supplier<Optional<String>> rawXsd) {
         if (converter == null) return Optional.empty();
         String reqVersion = UrnParser.versionFromUrn(urn);
         // A concrete version pins the cache key; a logical/:latest URN (no resolvable version)
@@ -74,12 +75,12 @@ class XsdSchemaSupport {
         return rawXsd.get().map(xsd -> {
             String logical    = UrnParser.logicalUrn(urn);
             String version    = UrnParser.versionFromUrn(urn);
-            // The logical URN is already the canonical ':element:' identity (the format is no
-            // longer part of the URN), so it is the prefix for the converted schema's $id verbatim.
             String jsonPrefix = logical;
             String ver        = version != null ? version : "1.0.0";
 
-            var schemas = converter.convert(xsd, jsonPrefix);
+            // A type id must never parse as a CORE URN: a view resolves URN-shaped $refs against the
+            // registry, and these types are not artifacts of their own.
+            var schemas = converter.convert(xsd, jsonPrefix + ":type");
             if (schemas.isEmpty()) {
                 ObjectNode placeholder = mapper.createObjectNode();
                 placeholder.put("$schema", JsonSchema.DRAFT_2020_12);
@@ -97,7 +98,7 @@ class XsdSchemaSupport {
             ObjectNode bundle = mapper.createObjectNode();
             bundle.put("$schema", JsonSchema.DRAFT_2020_12);
             bundle.put("$id",     jsonPrefix + ":bundle:" + ver);
-            bundle.put("title",   UrnParser.nameFromUrn(urn));
+            if (title != null) bundle.put("title", title);
             bundle.put("x-xsd-source", urn);
             bundle.put("type",    "object");
             var defs  = mapper.createObjectNode();

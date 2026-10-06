@@ -28,6 +28,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
@@ -44,15 +46,15 @@ class MappingServiceTest {
 
   private static final UUID DATA_SET_ID = UUID.fromString("11111111-1111-4000-8000-000000000001");
   private static final String MANIFEST_URN =
-      "urn:core:platform:civitas:dataset:common:Traffic:ds01234567";
+      "urn:core:platform:civitas:dataset:common:dae07e27-2d14-8b0c-a5c3-d3f788db5acd";
 
   private static final String LOGICAL_URN =
-      "urn:core:platform:civitas:mapping:common:mapping:abc1234567";
+      "urn:core:platform:civitas:mapping:common:0bdbebd9-e766-86ff-bec5-f04da0a8abdd";
   private static final String VERSIONED_URN = LOGICAL_URN + ":1.0.0";
 
   /** A mapping of a different DataSet — never a member of the manifest under test. */
   private static final String FOREIGN_URN =
-      "urn:core:platform:civitas:mapping:common:other:zzz9999999";
+      "urn:core:platform:civitas:mapping:common:835fdb09-4274-85a1-b063-a3e3127d3dc6";
 
   @Mock private ModelRegistryGateway registry;
   @Mock private DataSetService dataSetService;
@@ -91,7 +93,7 @@ class MappingServiceTest {
   }
 
   private void stubStore() {
-    when(registry.storePayload(eq(PayloadKind.MAPPING), any(), any(), any(), any(), any()))
+    when(registry.storePayload(eq(PayloadKind.MAPPING), any(), any(), any(), any(), any(), any()))
         .thenReturn(pin());
   }
 
@@ -114,7 +116,7 @@ class MappingServiceTest {
     assertThat(result.logicalUrn()).isEqualTo(LOGICAL_URN);
     verify(registry)
         .storePayload(
-            eq(PayloadKind.MAPPING), logicalUrnCaptor.capture(), any(), any(), any(), any());
+            eq(PayloadKind.MAPPING), logicalUrnCaptor.capture(), any(), any(), any(), any(), any());
     assertThat(logicalUrnCaptor.getValue()).isEmpty();
   }
 
@@ -126,7 +128,8 @@ class MappingServiceTest {
     mappingService.store(DATA_SET_ID, null, Map.of("fields", Map.of()));
 
     verify(registry)
-        .storePayload(eq(PayloadKind.MAPPING), any(), any(), any(), any(), dataSetCaptor.capture());
+        .storePayload(
+            eq(PayloadKind.MAPPING), any(), any(), any(), any(), any(), dataSetCaptor.capture());
     assertThat(dataSetCaptor.getValue()).isEqualTo(MANIFEST_URN);
   }
 
@@ -139,7 +142,7 @@ class MappingServiceTest {
 
     verify(registry)
         .storePayload(
-            eq(PayloadKind.MAPPING), logicalUrnCaptor.capture(), any(), any(), any(), any());
+            eq(PayloadKind.MAPPING), logicalUrnCaptor.capture(), any(), any(), any(), any(), any());
     assertThat(logicalUrnCaptor.getValue()).contains(LOGICAL_URN);
   }
 
@@ -159,6 +162,7 @@ class MappingServiceTest {
             eq(PayloadKind.MAPPING),
             any(),
             any(),
+            any(),
             contentCaptor.capture(),
             stylesCaptor.capture(),
             any());
@@ -174,7 +178,8 @@ class MappingServiceTest {
     mappingService.store(DATA_SET_ID, null, Map.of("title", "My Mapping", "fields", Map.of()));
 
     verify(registry)
-        .storePayload(eq(PayloadKind.MAPPING), any(), nameCaptor.capture(), any(), any(), any());
+        .storePayload(
+            eq(PayloadKind.MAPPING), any(), any(), nameCaptor.capture(), any(), any(), any());
     assertThat(nameCaptor.getValue()).isEqualTo("My Mapping");
   }
 
@@ -185,7 +190,8 @@ class MappingServiceTest {
     mappingService.store(DATA_SET_ID, null, Map.of("fields", Map.of()));
 
     verify(registry)
-        .storePayload(eq(PayloadKind.MAPPING), any(), nameCaptor.capture(), any(), any(), any());
+        .storePayload(
+            eq(PayloadKind.MAPPING), any(), any(), nameCaptor.capture(), any(), any(), any());
     assertThat(nameCaptor.getValue()).isEqualTo("mapping");
   }
 
@@ -196,7 +202,8 @@ class MappingServiceTest {
     mappingService.store(DATA_SET_ID, null, null);
 
     verify(registry)
-        .storePayload(eq(PayloadKind.MAPPING), any(), any(), contentCaptor.capture(), any(), any());
+        .storePayload(
+            eq(PayloadKind.MAPPING), any(), any(), any(), contentCaptor.capture(), any(), any());
     assertThat(contentCaptor.getValue()).isEmpty();
   }
 
@@ -269,7 +276,7 @@ class MappingServiceTest {
     assertThatThrownBy(() -> mappingService.store(DATA_SET_ID, FOREIGN_URN, Map.of()))
         .isInstanceOf(ResourceNotFoundException.class);
 
-    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any());
+    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
   }
 
   @Test
@@ -281,13 +288,13 @@ class MappingServiceTest {
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("no manifest");
 
-    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any());
+    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
   }
 
   private static final String SOURCE_URN =
-      "urn:core:platform:civitas:element:common:MaplSource:src1234567:1.0.0";
+      "urn:core:platform:civitas:element:common:07ee560b-697b-87ca-a0ac-aa2a0e481164:1.0.0";
   private static final String TARGET_URN =
-      "urn:core:platform:civitas:element:common:MaplTarget:tgt1234567:1.0.0";
+      "urn:core:platform:civitas:element:common:4431ae01-c275-8ce0-9250-14c0de69c06a:1.0.0";
 
   private void stubResolvable(String... urns) {
     for (String urn : urns) {
@@ -306,13 +313,15 @@ class MappingServiceTest {
     mappingService.store(
         DATA_SET_ID, null, Map.of("source", SOURCE_URN, "target", TARGET_URN, "fields", Map.of()));
 
-    verify(registry).storePayload(eq(PayloadKind.MAPPING), any(), any(), any(), any(), any());
+    verify(registry)
+        .storePayload(eq(PayloadKind.MAPPING), any(), any(), any(), any(), any(), any());
   }
 
   @Test
   @DisplayName("a source that does not resolve is refused before anything is stored")
   void store_whenSourceDoesNotResolve_isRefused() {
-    when(registry.fetchModel("urn:core:platform:civitas:element:common:Ghost:zzz9999999:1.0.0"))
+    when(registry.fetchModel(
+            "urn:core:platform:civitas:element:common:99d9ab54-d6f3-8c7e-a746-f62a4a18fae6:1.0.0"))
         .thenReturn(Optional.empty());
 
     assertThatThrownBy(
@@ -322,20 +331,21 @@ class MappingServiceTest {
                     null,
                     Map.of(
                         "source",
-                        "urn:core:platform:civitas:element:common:Ghost:zzz9999999:1.0.0",
+                        "urn:core:platform:civitas:element:common:99d9ab54-d6f3-8c7e-a746-f62a4a18fae6:1.0.0",
                         "fields",
                         Map.of())))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("not available");
 
-    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any());
+    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
   }
 
   @Test
   @DisplayName("a target pinning a version that does not exist is refused")
   void store_whenTargetVersionDoesNotResolve_isRefused() {
     stubResolvable(SOURCE_URN);
-    String missingVersion = "urn:core:platform:civitas:element:common:MaplTarget:tgt1234567:9.9.9";
+    String missingVersion =
+        "urn:core:platform:civitas:element:common:4431ae01-c275-8ce0-9250-14c0de69c06a:9.9.9";
     when(registry.fetchModel(missingVersion)).thenReturn(Optional.empty());
 
     assertThatThrownBy(
@@ -347,7 +357,28 @@ class MappingServiceTest {
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("not available");
 
-    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any());
+    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
+  }
+
+  // The config-adapter refuses an unpinned endpoint only at deploy time, after the release.
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "urn:core:platform:civitas:element:common:07ee560b-697b-87ca-a0ac-aa2a0e481164",
+        "urn:core:platform:civitas:element:common:07ee560b-697b-87ca-a0ac-aa2a0e481164:latest",
+        "urn:core:platform:civitas:element:common:07ee560b-697b-87ca-a0ac-aa2a0e481164:1.0"
+      })
+  @DisplayName("an endpoint not pinned to a SemVer version is refused before anything is stored")
+  void store_whenEndpointNotPinned_isRefused(String unpinned) {
+    assertThatThrownBy(
+            () ->
+                mappingService.store(
+                    DATA_SET_ID, null, Map.of("source", unpinned, "fields", Map.of())))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("pinned to a version");
+
+    verify(registry, never()).fetchModel(any());
+    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
   }
 
   @Test
@@ -357,7 +388,8 @@ class MappingServiceTest {
 
     mappingService.store(DATA_SET_ID, null, Map.of("fields", Map.of()));
 
-    verify(registry).storePayload(eq(PayloadKind.MAPPING), any(), any(), any(), any(), any());
+    verify(registry)
+        .storePayload(eq(PayloadKind.MAPPING), any(), any(), any(), any(), any(), any());
     verify(registry, never()).fetchModel(any());
   }
 
@@ -368,7 +400,7 @@ class MappingServiceTest {
             () ->
                 mappingService.store(
                     DATA_SET_ID,
-                    "urn:core:evil:attacker:mapping:hijack:Injected:0000000000",
+                    "urn:core:evil:attacker:mapping:hijack:19f13b09-afa8-8095-9669-dc33c10412e9",
                     Map.of()))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("own namespace");
@@ -399,7 +431,7 @@ class MappingServiceTest {
     assertThat(created.logicalUrn()).isEqualTo(LOGICAL_URN);
     verify(registry)
         .storePayload(
-            eq(PayloadKind.MAPPING), logicalUrnCaptor.capture(), any(), any(), any(), any());
+            eq(PayloadKind.MAPPING), logicalUrnCaptor.capture(), any(), any(), any(), any(), any());
     assertThat(logicalUrnCaptor.getValue()).isEmpty();
   }
 

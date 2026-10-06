@@ -1,9 +1,9 @@
 {
   "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
-  "id":     "urn:core:platform:civitas:mapping:smartmeter:meter-to-sta-thing:1.0.0",
+  "id":     "urn:core:platform:civitas:mapping:smartmeter:f9c11c29-89ee-8863-8583-d12aa288a5a0:1.0.0",
   "title":  "MeterMasterData → STAThing",
-  "source": "urn:core:platform:civitas:element:smartmeter:MeterMasterData:1.0.0",
-  "target": "urn:core:platform:civitas:element:sta:STAThing:1.0.0",
+  "source": "urn:core:platform:civitas:element:smartmeter:eb20917f-cbd4-8a66-9f65-bfaa2b08c0a3:1.0.0",
+  "target": "urn:core:platform:civitas:element:sta:513c5444-b723-8341-b283-ea96fea99b16:1.0.0",
   "fields": {
     "name":                    { "op": "copy",   "input": "$.owner" },
     "description": {

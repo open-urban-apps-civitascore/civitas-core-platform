@@ -95,7 +95,8 @@ class PipelineAssemblerTest {
     UUID pipelineId = UUID.randomUUID();
     Pipeline pipeline = new Pipeline();
     pipeline.setId(pipelineId);
-    String urn = "urn:core:platform:civitas:pipeline:common:pipe:1.0.0";
+    String urn =
+        "urn:core:platform:civitas:pipeline:common:8a46d02f-0994-8f94-8b55-031414ee2859:1.0.0";
     pipeline.setModelUrn(urn);
 
     when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of());
@@ -132,7 +133,8 @@ class PipelineAssemblerTest {
     UUID pipelineId = UUID.randomUUID();
     Pipeline pipeline = new Pipeline();
     pipeline.setId(pipelineId);
-    String urn = "urn:core:platform:civitas:pipeline:common:pipe:1.0.0";
+    String urn =
+        "urn:core:platform:civitas:pipeline:common:8a46d02f-0994-8f94-8b55-031414ee2859:1.0.0";
     pipeline.setModelUrn(urn);
 
     when(pipelineMapper.toInput(pipeline)).thenReturn(new PipelineInputDTO());

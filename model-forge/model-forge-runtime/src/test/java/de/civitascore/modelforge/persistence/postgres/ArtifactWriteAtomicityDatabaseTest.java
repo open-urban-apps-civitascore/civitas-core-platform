@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -32,8 +33,8 @@ class ArtifactWriteAtomicityDatabaseTest extends AbstractRegistryDatabaseTest {
     @DisplayName("An import whose later member carries unsafe XML keeps none of its earlier members")
     void unsafeMemberRollsBackTheWholeImport() {
         assertThatThrownBy(() -> registry.inTransaction(() -> {
-            registry.storeElement("Station", schema("temperature"), Set.of());
-            return registry.storeXsdElement(urns.mintElement("Reading"), XSD_WITH_DOCTYPE, Set.of());
+            registry.storeElement(schema("temperature"), Set.of());
+            return registry.storeXsdElement(urns.mintElement(), XSD_WITH_DOCTYPE, Set.of());
         }))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("Unsafe XML");
@@ -47,12 +48,12 @@ class ArtifactWriteAtomicityDatabaseTest extends AbstractRegistryDatabaseTest {
     @DisplayName("A rejected import leaves no reference edges from the members it had already written")
     void rejectedImportLeavesNoPartialReferenceGraph() {
         // A previously imported Element the new group's members legitimately reference.
-        String existingPin = registry.storeElement("Target", schema("value"), Set.of());
+        String existingPin = registry.storeElement(schema("value"), Set.of());
         int edgesBefore = rows("artifact_reference").size();
 
         assertThatThrownBy(() -> registry.inTransaction(() -> {
-            registry.storeElement("Referrer", schema("value"), Set.of(existingPin));
-            return registry.storeXsdElement(urns.mintElement("Reading"), XSD_WITH_DOCTYPE, Set.of());
+            registry.storeElement(schema("value"), Set.of(existingPin));
+            return registry.storeXsdElement(urns.mintElement(), XSD_WITH_DOCTYPE, Set.of());
         })).isInstanceOf(IllegalArgumentException.class);
 
         assertThat(rows("artifact_reference"))
@@ -64,10 +65,10 @@ class ArtifactWriteAtomicityDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("A successful import keeps every member and its reference edges")
     void successfulImportKeepsTheWholeUnit() {
-        String targetPin = registry.storeElement("Target", schema("value"), Set.of());
+        String targetPin = registry.storeElement(schema("value"), Set.of());
 
         String referrerPin = registry.inTransaction(
-            () -> registry.storeElement("Referrer", schema("value"), Set.of(targetPin)));
+            () -> registry.storeElement(schema("value"), Set.of(targetPin)));
 
         assertThat(registry.fetch(referrerPin)).isPresent();
         assertThat(registry.fetchArtifactRefUrns(referrerPin)).contains(targetPin);
@@ -79,9 +80,9 @@ class ArtifactWriteAtomicityDatabaseTest extends AbstractRegistryDatabaseTest {
         // Stands for the import service rejecting a later member (a schema that fails validation):
         // the unit of work is the whole group, so every member written so far must go.
         assertThatThrownBy(() -> registry.inTransaction(() -> {
-            registry.storeElement("Station", schema("temperature"), Set.of());
-            registry.storeElement("Sensor", schema("humidity"), Set.of());
-            registry.storePipeline("Ingest", mapper.readTree("{\"nodes\":[]}"), VersionBump.PATCH);
+            registry.storeElement(schema("temperature"), Set.of());
+            registry.storeElement(schema("humidity"), Set.of());
+            registry.storePipeline(urns.urn("pipeline", UUID.randomUUID()), mapper.readTree("{\"nodes\":[]}"), VersionBump.PATCH);
             throw new IllegalStateException("a later member of the import was rejected");
         })).isInstanceOf(IllegalStateException.class);
 

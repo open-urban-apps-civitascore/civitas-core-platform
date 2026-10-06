@@ -37,7 +37,7 @@ class GraphParserTest {
         "nodes": [
           { "id": "n-start", "kind": "start" },
           { "id": "n-map", "kind": "mapping",
-            "mappingRef": "urn:core:dataset:d:mapping:c:M:0000000001:1.0.0" },
+            "mappingRef": "urn:core:dataset:d:mapping:c:d09bf927-1f3f-8cde-8ff9-6bd3460bee1a:1.0.0" },
           { "id": "n-end", "kind": "end" }
         ],
         "edges": [
@@ -55,7 +55,8 @@ class GraphParserTest {
     assertEquals(2, graph.edges().size());
     assertEquals("mapping", graph.nodes().get(1).kind());
     assertEquals(
-        "urn:core:dataset:d:mapping:c:M:0000000001:1.0.0", graph.nodes().get(1).mappingRef());
+        "urn:core:dataset:d:mapping:c:d09bf927-1f3f-8cde-8ff9-6bd3460bee1a:1.0.0",
+        graph.nodes().get(1).mappingRef());
   }
 
   @Test
@@ -76,7 +77,7 @@ class GraphParserTest {
             { "nodes": [
                 { "kind": "source" },
                 { "id": "n-map", "kind": "mapping",
-                  "mappingRef": "urn:core:dataset:d:mapping:c:M:0000000001:1.0.0" } ],
+                  "mappingRef": "urn:core:dataset:d:mapping:c:d09bf927-1f3f-8cde-8ff9-6bd3460bee1a:1.0.0" } ],
               "edges": [] }
             """);
 
@@ -107,7 +108,7 @@ class GraphParserTest {
             { "nodes": [
                 { "id": "n-src", "kind": "source" },
                 { "id": "n-map", "kind": "mapping",
-                  "mappingRef": "urn:core:dataset:d:mapping:c:M:0000000001:1.0.0" } ],
+                  "mappingRef": "urn:core:dataset:d:mapping:c:d09bf927-1f3f-8cde-8ff9-6bd3460bee1a:1.0.0" } ],
               "edges": [
                 { "id": "e1", "source": "n-src", "target": "n-map" },
                 { "id": "e2", "source": "n-map", "target": "ghost-deleted" } ] }

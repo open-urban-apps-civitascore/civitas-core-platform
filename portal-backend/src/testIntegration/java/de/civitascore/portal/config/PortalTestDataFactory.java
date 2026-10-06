@@ -101,6 +101,7 @@ public class PortalTestDataFactory {
     ModelRegistryGateway.ModelPin pin =
         modelRegistryGateway.storeModel(
             Optional.ofNullable(parent.getModelLogicalUrn()),
+            parent.getId(),
             parent.getName(),
             model,
             styles,
@@ -128,6 +129,7 @@ public class PortalTestDataFactory {
         modelRegistryGateway.storePayload(
             PayloadKind.PIPELINE,
             Optional.ofNullable(pipeline.getModelLogicalUrn()),
+            pipeline.getId(),
             pipeline.getName(),
             model,
             styles);
@@ -153,6 +155,7 @@ public class PortalTestDataFactory {
         modelRegistryGateway.storePayload(
             PayloadKind.DATA_SINK,
             Optional.ofNullable(sink.getConfigurationLogicalUrn()),
+            sink.getId(),
             payload.get("tableName") instanceof String tableName ? tableName : "datasink",
             payload,
             null);
@@ -180,6 +183,7 @@ public class PortalTestDataFactory {
         modelRegistryGateway.storePayload(
             PayloadKind.DATA_SOURCE,
             Optional.ofNullable(dataSource.getConfigurationLogicalUrn()),
+            dataSource.getId(),
             dataSource.getName() != null ? dataSource.getName() : "datasource",
             payload,
             null);
@@ -353,12 +357,7 @@ public class PortalTestDataFactory {
     return dataStructureVersionRepository.save(builder.build());
   }
 
-  /**
-   * A minimal, well-formed JSON Schema document suitable for a data structure version's model. No
-   * {@code $id} is set — Model Forge is the sole version authority and mints the CORE URN itself; a
-   * caller-supplied {@code $id} that isn't a full, well-formed CORE URN gets stored verbatim and
-   * breaks version extraction downstream.
-   */
+  /** A minimal, well-formed JSON Schema document suitable for a data structure version's model. */
   public Map<String, Object> dataStructureVersionModel(String title) {
     Map<String, Object> schema = new HashMap<>();
     schema.put("title", title);

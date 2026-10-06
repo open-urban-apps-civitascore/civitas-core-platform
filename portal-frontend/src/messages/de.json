@@ -1646,10 +1646,7 @@
       "title": "Exportieren",
       "file": "Diagramm exportieren",
       "success": "Diagramm erfolgreich exportiert",
-      "error": "Diagramm konnte nicht exportiert werden. Bitte versuchen Sie es erneut.",
-      "errors": {
-        "INVALID_URN": "Aus dem Namen der Datenstruktur lässt sich keine gültige CORE-URN bilden. Der Name muss mindestens einen Buchstaben oder eine Ziffer enthalten."
-      }
+      "error": "Diagramm konnte nicht exportiert werden. Bitte versuchen Sie es erneut."
     },
     "rootValidation": {
       "noRoot": "Im Diagramm lässt sich keine Wurzelklasse bestimmen — jede Klasse ist in eine andere eingebettet (zyklische Struktur).",

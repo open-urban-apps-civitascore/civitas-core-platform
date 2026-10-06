@@ -51,13 +51,13 @@ import org.springframework.security.access.AccessDeniedException;
 class PipelineClosureValidatorTest {
 
   private static final String PIPELINE_URN =
-      "urn:core:platform:civitas:pipeline:common:Ingest:aaaaaaaaaa:1.0.0";
+      "urn:core:platform:civitas:pipeline:common:a8ff27eb-c6c3-8136-9fac-596b9b92356a:1.0.0";
   private static final String OTHER_PIPELINE_URN =
-      "urn:core:platform:civitas:pipeline:common:Second:dddddddddd:1.0.0";
+      "urn:core:platform:civitas:pipeline:common:896b1290-56de-81ab-9dda-d64c011d4e56:1.0.0";
   private static final String STRUCTURE_URN =
-      "urn:core:platform:civitas:datastructure:common:Sensor:bbbbbbbbbb:1.0.0";
+      "urn:core:platform:civitas:datastructure:common:6ddf8001-3ba6-83db-8d23-b547419c1ff2:1.0.0";
   private static final String ELEMENT_URN =
-      "urn:core:platform:civitas:element:common:Address:cccccccccc:1.0.0";
+      "urn:core:platform:civitas:element:common:d765420c-9793-8201-bca9-6167ec41c109:1.0.0";
 
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private GoverningVersionLookup governingVersions;

@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { PINNED_DATASTRUCTURE_URN } from '@/utils/coreUrn'
+
 export const UMLPrimitiveTypeSchema = z.enum([
   'String',
   'Integer',
@@ -190,7 +192,9 @@ export const RawUMLDiagramSchema = z.object({
   isDirty: z.boolean().optional(),
   // The published structures the diagram was built from. Without them a file import would drop
   // the pins, and the next save would record no provenance.
-  importedStructures: z.array(z.object({ urn: z.string(), name: z.string() })).optional(),
+  importedStructures: z
+    .array(z.object({ urn: z.string().regex(PINNED_DATASTRUCTURE_URN), name: z.string() }))
+    .optional(),
 })
 
 export const UMLDiagramSchema = RawUMLDiagramSchema.superRefine((diagram, ctx) => {

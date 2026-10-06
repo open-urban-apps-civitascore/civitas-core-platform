@@ -1,5 +1,6 @@
 package de.civitascore.portal.service;
 
+import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
@@ -13,6 +14,7 @@ import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
+import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -32,6 +34,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DataStructureVersionService
     extends BaseService<DataStructureVersion, DataStructureVersionInputDTO> {
+
+  private static final String DATASTRUCTURE_TYPE = "datastructure";
+  private static final int URN_TYPE_SEGMENT = 4;
 
   private final DataSourceRepository dataSourceRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
@@ -71,6 +76,8 @@ public class DataStructureVersionService
   @Override
   protected DataStructureVersion postConvertToEntity(
       DataStructureVersion entity, DataStructureVersionInputDTO input) {
+    requirePinnedStructureUrns(input.getImportedStructureUrns());
+
     // Set dataStructure
     Optional.ofNullable(input.getDataStructureId())
         .map(dataStructureService::findByIdOrThrow)
@@ -107,8 +114,7 @@ public class DataStructureVersionService
    * Stores the input's model (styles merged in as {@code x-ui-styles} by the gateway) in Model
    * Forge (the version authority) and mirrors the assigned versioned URN and version string onto
    * the shell. Skipped when the input carries no model — a draft without a model stays unpinned, an
-   * update without a model keeps the version's current content pin. The parent's stable logical URN
-   * is minted on the first store and reused for every later version.
+   * update without a model keeps the version's current content pin.
    *
    * @param entity the data structure version entity
    * @param input the input DTO carrying the model and its styles
@@ -129,6 +135,7 @@ public class DataStructureVersionService
     ModelRegistryGateway.ModelPin pin =
         modelRegistryGateway.storeModel(
             Optional.ofNullable(parent.getModelLogicalUrn()),
+            parent.getId(),
             parent.getName(),
             input.getModel(),
             input.getStyles(),
@@ -138,11 +145,41 @@ public class DataStructureVersionService
             // version was saved, so a model arriving on a later save still starts a major.
             entity.getModelUrn() == null ? VersionBump.MAJOR : VersionBump.MINOR,
             entity.getModelUrn() == null ? null : entity.getVersion());
+    if (entity.getModelUrn() == null) {
+      requireNewModelVersion(parent.getId(), pin);
+    }
     if (parent.getModelLogicalUrn() == null) {
       parent.setModelLogicalUrn(pin.logicalUrn());
     }
     entity.setModelUrn(pin.versionedUrn());
     entity.setVersion(pin.version());
+  }
+
+  private static void requirePinnedStructureUrns(List<String> importedStructureUrns) {
+    if (importedStructureUrns != null
+        && !importedStructureUrns.stream()
+            .allMatch(DataStructureVersionService::isPinnedDataStructureUrn)) {
+      throw new InvalidInputException(
+          "DataStructureVersion",
+          "importedStructureUrns",
+          "importedStructureUrns must name data structures by CORE URNs pinned to a version");
+    }
+  }
+
+  private static boolean isPinnedDataStructureUrn(String urn) {
+    return CoreUrn.isValid(urn) && DATASTRUCTURE_TYPE.equals(urn.split(":")[URN_TYPE_SEGMENT]);
+  }
+
+  /**
+   * Model Forge stores no new version for content identical to its newest one and returns that
+   * version's pin, which another version of this structure already holds.
+   */
+  private void requireNewModelVersion(UUID dataStructureId, ModelRegistryGateway.ModelPin pin) {
+    if (dataStructureVersionRepository.existsByDataStructureIdAndModelUrn(
+        dataStructureId, pin.versionedUrn())) {
+      throw new UniqueConstraintViolationException(
+          "The model is unchanged from version " + pin.version() + ", so it starts no new version");
+    }
   }
 
   /**

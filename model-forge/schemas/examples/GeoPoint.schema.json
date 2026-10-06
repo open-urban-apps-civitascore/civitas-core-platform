@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id":     "urn:core:platform:civitas:element:common:GeoPoint:1.0.0",
+  "$id":     "urn:core:platform:civitas:element:common:f1ebc343-33a2-8681-8e4a-aecfaeaa8e1e:1.0.0",
   "title":   "GeoPoint",
   "description": "A WGS-84 geographic coordinate with optional elevation. Shared base type used by sensor and observation schemas.",
   "type": "object",

@@ -40,8 +40,8 @@ class BundledViewSelfContainmentDatabaseTest extends AbstractRegistryDatabaseTes
 
     @BeforeEach
     void storeAReadingThatComposesAStation() {
-        stationPin = registry.storeElement("Station", stationSchema(), Set.of());
-        readingPin = registry.storeElement("Reading", readingSchema(), Set.of(stationPin));
+        stationPin = registry.storeElement(stationSchema(), Set.of());
+        readingPin = registry.storeElement(readingSchema(), Set.of(stationPin));
 
         var graph = new DependencyGraphService(registry);
         graph.rebuild();

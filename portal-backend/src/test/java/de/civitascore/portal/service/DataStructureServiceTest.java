@@ -32,9 +32,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class DataStructureServiceTest {
 
   private static final String MODEL_URN =
-      "urn:core:platform:civitas:element:common:Reading:8kq2n4p1vd:1.0.0";
+      "urn:core:platform:civitas:element:common:e5eaeb37-4c14-8bb9-903b-4f86897bfcea:1.0.0";
   private static final String BLOCKER_URN =
-      "urn:core:platform:civitas:datasink:common:Store:4rrb1hifsm";
+      "urn:core:platform:civitas:datasink:common:762a05c3-4783-8446-b3cb-8240eee1227a";
 
   @Mock private DataStructureRepository dataStructureRepository;
   @Mock private DataStructureMapper dataStructureMapper;

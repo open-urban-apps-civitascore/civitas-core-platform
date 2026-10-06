@@ -26,15 +26,22 @@ const clazz = (id: string, name: string, isRoot = false): UMLElement => ({
   ...(isRoot ? { isRoot: true } : {}),
 })
 
+/** A stable stand-in for the UUID the backend gives each published structure. */
+const idOf = (name: string): string =>
+  `00000000-0000-4000-8000-${[...name]
+    .reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) % 0xffffffffffff, 7)
+    .toString(16)
+    .padStart(12, '0')}`
+
 /** What the menu knows about the structure it loads: its name and the version it pins. */
 const source = (name: string, version = '1.0.0') => ({
-  urn: `urn:core:platform:civitas:datastructure:frost:${name}:0123456789:${version}`,
+  urn: `urn:core:platform:civitas:datastructure:frost:${idOf(name)}:${version}`,
   name,
 })
 
 /** A published structure: a wrapper root over one class, as the generator writes it. */
 const published = (rootName: string, extra: string[] = []) => ({
-  $id: `urn:core:platform:civitas:datastructure:frost:${rootName}:0123456789`,
+  $id: `urn:core:platform:civitas:datastructure:frost:${idOf(rootName)}`,
   title: rootName,
   type: 'object',
   properties: { root: { $ref: `#/$defs/${rootName}` } },
@@ -102,13 +109,13 @@ describe('mergeStructureIntoDiagram', () => {
     expect(holding?.data?.relationship.sourceRole).toBe('detail')
   })
 
-  it('renames a class that only normalizes to a taken name', () => {
-    // Both forms derive the same Element URN, so the registry would fold them into one member.
+  it('keeps a class whose name differs from a taken one only in spelling', () => {
+    // Each $defs key derives its own Element URN, so a rename here would only confuse the modeller.
     const existing = diagram([clazz('e1', 'Dataset', true), clazz('e2', 'Thing Tree')])
 
     const result = mergeStructureIntoDiagram(existing, published('ThingTree'), source('ThingTree'))
 
-    expect(result.renamed).toEqual([{ from: 'ThingTree', to: 'ThingTree_1' }])
+    expect(result.renamed).toEqual([])
   })
 
   it('places the loaded classes clear of what is already drawn', () => {

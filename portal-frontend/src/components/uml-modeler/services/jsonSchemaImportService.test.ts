@@ -240,7 +240,7 @@ describe('importFromJsonSchema — round trip against the export', () => {
 
 describe('importFromJsonSchema', () => {
   const structure = {
-    $id: 'urn:core:platform:civitas:datastructure:frost:Things:4eg5hgeyxv',
+    $id: 'urn:core:platform:civitas:datastructure:frost:08794fc1-5b37-8b97-b2e0-d48233dc575d',
     title: 'Things',
     type: 'object',
     properties: { thing: { $ref: '#/$defs/Thing' } },
@@ -318,7 +318,7 @@ describe('importFromJsonSchema', () => {
 
 describe('importFromJsonSchema — designated root and inherited shapes', () => {
   it('takes a wrapper that names its member by URN as the root, without a class of its own', () => {
-    const urn = 'urn:core:platform:civitas:element:frost:Thing:0123456789:1.0.0'
+    const urn = 'urn:core:platform:civitas:element:frost:9dfd7016-feb9-84a6-9511-9a50380ec49f:1.0.0'
     const document: JsonSchemaObject = {
       type: 'object',
       title: 'Wrapper',

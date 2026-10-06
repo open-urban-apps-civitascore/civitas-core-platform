@@ -1,5 +1,5 @@
 {
-  "$id": "urn:core:platform:civitas:datastructure:frost:Observations:4sntm03fzg",
+  "$id": "urn:core:platform:civitas:datastructure:frost:59fe166d-a32b-8cc8-87f1-73a72615f3e8",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Observations",
   "type": "object",

@@ -1,9 +1,9 @@
 {
   "$schema":        "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSource",
-  "id":             "urn:core:platform:civitas:datasource:smartmeter:sml-mqtt:1.0.0",
+  "id":             "urn:core:platform:civitas:datasource:smartmeter:87465c79-d00f-8ed3-a3a1-ec3b84dd770b:1.0.0",
   "title":          "Smart Meter SML MQTT",
   "connectionType": "mqtt",
-  "element":        "urn:core:platform:civitas:element:smartmeter:SMLReading:1.0.0",
+  "element":        "urn:core:platform:civitas:element:smartmeter:76837a37-9208-8227-b886-e4de559d9479:1.0.0",
   "urls":           ["mqtt://mosquitto:1883"],
   "topics":         ["smartmeter/sml/+"],
   "qos":            1

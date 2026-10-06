@@ -1,6 +1,6 @@
 {
   "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Pipeline",
-  "id": "urn:core:platform:civitas:pipeline:luftqualitaet:Luftqualitaet-Import:1.0.0",
+  "id": "urn:core:platform:civitas:pipeline:luftqualitaet:828cf9fe-8500-86ad-90fd-a7fe0d82ea1b:1.0.0",
   "title": "Luftqualitaets-Import",
   "debug": false,
   "nodes": [
@@ -17,7 +17,7 @@
       "id": "n-source",
       "kind": "source",
       "label": "Luftqualitaet MQTT",
-      "sourceRef": "urn:core:platform:civitas:datasource:luftqualitaet:airquality-mqtt:1.0.0",
+      "sourceRef": "urn:core:platform:civitas:datasource:luftqualitaet:a0c94f4e-308e-871b-b8c4-8e7e935d6cb1:1.0.0",
       "x-ui-position": {
         "x": 220,
         "y": 300
@@ -37,7 +37,7 @@
       "id": "n-enrich",
       "kind": "enrich",
       "label": "Stammdaten anreichern",
-      "lookupSourceRef": "urn:core:platform:civitas:datasource:luftqualitaet:station-db:1.0.0",
+      "lookupSourceRef": "urn:core:platform:civitas:datasource:luftqualitaet:04253a60-f4eb-8ed4-993e-005b021d39d0:1.0.0",
       "lookupKey": "$.stationId",
       "x-ui-position": {
         "x": 580,
@@ -48,7 +48,7 @@
       "id": "n-map-no2",
       "kind": "mapping",
       "label": "NO2 normalisieren",
-      "mappingRef": "urn:core:platform:civitas:mapping:luftqualitaet:airquality-no2-to-observation:1.0.0",
+      "mappingRef": "urn:core:platform:civitas:mapping:luftqualitaet:9fd95a60-25ed-8998-8cde-31525e069074:1.0.0",
       "x-ui-position": {
         "x": 780,
         "y": 140
@@ -58,7 +58,7 @@
       "id": "n-map-pm25",
       "kind": "mapping",
       "label": "PM2.5 normalisieren",
-      "mappingRef": "urn:core:platform:civitas:mapping:luftqualitaet:airquality-pm25-to-observation:1.0.0",
+      "mappingRef": "urn:core:platform:civitas:mapping:luftqualitaet:c48b90e0-4047-8f86-bbf6-4fed6dd06b56:1.0.0",
       "x-ui-position": {
         "x": 780,
         "y": 300
@@ -68,7 +68,7 @@
       "id": "n-map-co",
       "kind": "mapping",
       "label": "CO normalisieren",
-      "mappingRef": "urn:core:platform:civitas:mapping:luftqualitaet:airquality-co-to-observation:1.0.0",
+      "mappingRef": "urn:core:platform:civitas:mapping:luftqualitaet:9d3e2518-756b-8426-a6f0-a7926ae24b3e:1.0.0",
       "x-ui-position": {
         "x": 780,
         "y": 460
@@ -78,7 +78,7 @@
       "id": "n-sink-no2",
       "kind": "sink",
       "label": "FROST NO2",
-      "sinkRef": "urn:core:platform:civitas:datasink:luftqualitaet:frost-observations:1.0.0",
+      "sinkRef": "urn:core:platform:civitas:datasink:luftqualitaet:81e33fe1-6c74-853f-9814-c08469ca17f8:1.0.0",
       "x-ui-position": {
         "x": 980,
         "y": 140
@@ -88,7 +88,7 @@
       "id": "n-sink-pm25",
       "kind": "sink",
       "label": "FROST PM2.5",
-      "sinkRef": "urn:core:platform:civitas:datasink:luftqualitaet:frost-observations:1.0.0",
+      "sinkRef": "urn:core:platform:civitas:datasink:luftqualitaet:81e33fe1-6c74-853f-9814-c08469ca17f8:1.0.0",
       "x-ui-position": {
         "x": 980,
         "y": 300
@@ -98,7 +98,7 @@
       "id": "n-sink-co",
       "kind": "sink",
       "label": "FROST CO",
-      "sinkRef": "urn:core:platform:civitas:datasink:luftqualitaet:frost-observations:1.0.0",
+      "sinkRef": "urn:core:platform:civitas:datasink:luftqualitaet:81e33fe1-6c74-853f-9814-c08469ca17f8:1.0.0",
       "x-ui-position": {
         "x": 980,
         "y": 460

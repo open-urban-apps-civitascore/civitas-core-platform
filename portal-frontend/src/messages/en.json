@@ -1659,10 +1659,7 @@
       "title": "Export",
       "file": "Export diagram",
       "success": "Diagram exported successfully",
-      "error": "Failed to export diagram. Please try again.",
-      "errors": {
-        "INVALID_URN": "The data structure name does not yield a valid CORE URN. It must contain at least one letter or digit."
-      }
+      "error": "Failed to export diagram. Please try again."
     },
     "rootValidation": {
       "noRoot": "No root class can be determined in the diagram — every class is embedded in another one (cyclic structure).",

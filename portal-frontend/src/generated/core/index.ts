@@ -18,6 +18,7 @@ import { MappingSchema } from './mapping'
 import { PipelineSchema } from './pipeline'
 import { MqttDataSourceSchema, SqlDataSourceSchema } from './datasource'
 import { FrostDataSinkSchema, PostgisDataSinkSchema } from './datasink'
+import { DataStructureSchema } from './datastructure'
 
 /**
  * Pipeline document as produced by the editor: no `$schema`/`id` (Model Forge stamps those on
@@ -45,3 +46,15 @@ export const DataSinkDraftSchema = z.discriminatedUnion('connectionType', [
   FrostDataSinkSchema.omit({ $schema: true, id: true }),
   PostgisDataSinkSchema.omit({ $schema: true, id: true }),
 ])
+
+/**
+ * DataStructure document as produced by the UML editor: its `$id` is a placeholder the backend
+ * replaces with the Data structure's URN, and the root `$ref` is a local `#/$defs/<key>` pointer to
+ * the root member. Validate the outbound model against this.
+ */
+export const DataStructureDraftSchema = DataStructureSchema.omit({ $id: true, $ref: true }).extend({
+  $ref: z
+    .string()
+    .regex(/^#\/\$defs\/[^/]+$/, 'Must be a local #/$defs/ pointer')
+    .optional(),
+})

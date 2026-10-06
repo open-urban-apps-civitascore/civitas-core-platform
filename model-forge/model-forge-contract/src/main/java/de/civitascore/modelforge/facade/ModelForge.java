@@ -167,12 +167,12 @@ public interface ModelForge {
 
     /**
      * Creates a <em>new</em> Mapping, Pipeline, DataSource, DataSink, DataSet or DataStructure.
-     * Model Forge mints the URN from the command's display name (clean {@code name} segment plus a
-     * short disambiguator segment, so equal names never collide), stamps it into the document's {@code id} and
-     * returns the <em>versioned</em> pin plus the artifact's outgoing
-     * {@link ArtifactWriteResult#dependencies() dependency lists}. Store the returned id and pass
-     * it to {@link #saveArtifact(SaveArtifactCommand)} for follow-up versions. Elements are
-     * created via {@link #importSchema(ImportSchemaCommand)} instead.
+     * Model Forge builds the URN from the command's UUID (or a minted one), stamps it into the
+     * document's {@code id}, records the display name beside it when the document has no title of
+     * its own and returns the <em>versioned</em> pin plus the artifact's outgoing
+     * {@link ArtifactWriteResult#dependencies() dependency lists}.
+     * Store the returned id and pass it to {@link #saveArtifact(SaveArtifactCommand)} for follow-up
+     * versions. Elements are created via {@link #importSchema(ImportSchemaCommand)} instead.
      *
      * @throws IllegalArgumentException when {@code command.kind()} is {@code ELEMENT}
      * @throws ValidationFailedException when the content fails schema validation or has an

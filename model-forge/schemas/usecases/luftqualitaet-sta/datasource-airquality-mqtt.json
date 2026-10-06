@@ -1,9 +1,9 @@
 {
   "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSource",
-  "id": "urn:core:platform:civitas:datasource:luftqualitaet:airquality-mqtt:1.0.0",
+  "id": "urn:core:platform:civitas:datasource:luftqualitaet:a0c94f4e-308e-871b-b8c4-8e7e935d6cb1:1.0.0",
   "title": "Luftqualitaet Messstationen MQTT",
   "connectionType": "mqtt",
-  "element": "urn:core:platform:civitas:element:luftqualitaet:AirQualityRawReading:1.0.0",
+  "element": "urn:core:platform:civitas:element:luftqualitaet:be49ab6e-d247-880e-95cd-4dadeedd7e25:1.0.0",
   "urls": ["mqtt://mosquitto:1883"],
   "topics": ["luftqualitaet/readings/+"],
   "qos": 1

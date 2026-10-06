@@ -90,7 +90,7 @@ describe('the ThingTree structure', () => {
     }
 
     const result = mergeStructureIntoDiagram(existing, publishedStructure('thing-tree'), {
-      urn: 'urn:core:platform:civitas:datastructure:frost:ThingTree:r32e0hmgn1:1.0.0',
+      urn: 'urn:core:platform:civitas:datastructure:frost:498dc0d3-5a56-8cb1-aae8-070998473d8a:1.0.0',
       name: 'ThingTree',
     })
     const merged: UMLDiagram = {

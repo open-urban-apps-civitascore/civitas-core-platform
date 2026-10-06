@@ -50,6 +50,7 @@ const mixedDatastructures = [
       {
         id: 'v-1',
         version: '1.0',
+        modelUrn: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000001:1.0',
         description: 'Available version',
         dataStructureVersionStatus: 'AVAILABLE' as const,
         dataStructureVersionSource: null,
@@ -134,7 +135,7 @@ describe('DataModelImportModal', () => {
 
     expect(mockOnSelectVersion).toHaveBeenCalledWith(
       { 'ds-1/v-1': true },
-      { datastructureId: 'ds-1', name: 'Available DS', version: '1.0' },
+      { modelUrn: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000001:1.0' },
     )
   })
 

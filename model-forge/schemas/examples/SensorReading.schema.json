@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id":     "urn:core:platform:civitas:element:common:SensorReading:1.0.0",
+  "$id":     "urn:core:platform:civitas:element:common:bb784821-3369-8795-8731-904750c5b1e1:1.0.0",
   "title":   "SensorReading",
   "description": "A raw sensor reading as published to the MQTT broker. Produced by IoT devices (temperature sensors, weather stations, etc.).",
   "type": "object",
@@ -32,7 +32,7 @@
       "description": "Temperature unit. Defaults to Celsius."
     },
     "location": {
-      "$ref": "urn:core:platform:civitas:element:common:GeoPoint:1.0.0",
+      "$ref": "urn:core:platform:civitas:element:common:f1ebc343-33a2-8681-8e4a-aecfaeaa8e1e:1.0.0",
       "description": "GPS coordinates of the sensor, if available."
     }
   }

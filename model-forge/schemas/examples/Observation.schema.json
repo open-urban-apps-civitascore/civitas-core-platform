@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id":     "urn:core:platform:civitas:element:common:Observation:1.0.0",
+  "$id":     "urn:core:platform:civitas:element:common:1722a13b-2b05-8d3a-b0cf-4d0dbf215aa0:1.0.0",
   "title":   "Observation",
   "description": "A normalised observation record stored in the database. Inspired by OGC SensorThings API. Produced by the sensor-to-observation mapping.",
   "type": "object",
@@ -30,7 +30,7 @@
       "description": "Origin of the observation, e.g. 'mqtt', 'api', 'manual'."
     },
     "location": {
-      "$ref": "urn:core:platform:civitas:element:common:GeoPoint:1.0.0",
+      "$ref": "urn:core:platform:civitas:element:common:f1ebc343-33a2-8681-8e4a-aecfaeaa8e1e:1.0.0",
       "description": "Sensor location, if available."
     }
   }

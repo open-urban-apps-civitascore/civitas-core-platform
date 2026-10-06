@@ -19,10 +19,10 @@ import static org.mockito.Mockito.when;
 class DependencyGraphServiceTest {
 
     // Versioned URNs used in tests
-    private static final String A_V = "urn:core:platform:civitas:element:common:Observation:ulhry9fjx6:1.0.0";
-    private static final String B_V = "urn:core:platform:civitas:element:common:SensorReading:d28s38wfmi:1.0.0";
-    private static final String C_V = "urn:core:platform:civitas:element:common:GeoPoint:3ak90vqrog:1.0.0";
-    private static final String D_V = "urn:core:platform:civitas:element:common:Address:enzw5n1szv:1.0.0";
+    private static final String A_V = "urn:core:platform:civitas:element:common:4560fbf9-5824-85f9-b58f-5e1049048f42:1.0.0";
+    private static final String B_V = "urn:core:platform:civitas:element:common:0062782c-5353-87ad-b8d4-c1b90ed9b00a:1.0.0";
+    private static final String C_V = "urn:core:platform:civitas:element:common:da736e5f-bb91-88a6-abaa-761d911af81a:1.0.0";
+    private static final String D_V = "urn:core:platform:civitas:element:common:63e7d4dc-ffab-8076-b7d9-43c0eefd4da7:1.0.0";
 
     // The graph keys nodes by their versioned URN (no logical normalisation), so queries and
     // assertions use the versioned form — these alias the versioned constants for readability.
@@ -62,7 +62,7 @@ class DependencyGraphServiceTest {
         // CRIT-1 backstop: a node registered under the logical URN (no version) stays reachable
         // when a pinned-version query resolves to a versioned key that has no exact node. The
         // fallback only applies when the queried version actually exists in the registry.
-        String logical = "urn:core:platform:civitas:element:common:SensorReading:d28s38wfmi";
+        String logical = "urn:core:platform:civitas:element:common:0062782c-5353-87ad-b8d4-c1b90ed9b00a";
         var registry = mock(ArtifactRegistry.class);
         when(registry.resolveReference(B_V)).thenReturn(java.util.Optional.of(B_V));
         var g = new DependencyGraphService(registry);
@@ -319,7 +319,7 @@ class DependencyGraphServiceTest {
         int n = 16;
         String[] urns = new String[n];
         for (int i = 0; i < n; i++) {
-            urns[i] = "urn:core:platform:civitas:element:common:Node:hf6brenbic" + i + ":1.0.0";
+            urns[i] = "urn:core:platform:civitas:element:common:36a5abcd-a749-872f-9721-b216dca9b592" + i + ":1.0.0";
         }
 
         var executor = Executors.newFixedThreadPool(n);
@@ -355,7 +355,7 @@ class DependencyGraphServiceTest {
         // returns the verbatim versioned URNs).
         for (int i = 0; i < n; i++) {
             assertThat(graph.getDependencies(urns[i]))
-                .containsExactly("urn:core:platform:civitas:element:common:Node:hf6brenbic" + ((i + 1) % n) + ":1.0.0");
+                .containsExactly("urn:core:platform:civitas:element:common:36a5abcd-a749-872f-9721-b216dca9b592" + ((i + 1) % n) + ":1.0.0");
         }
     }
 
@@ -364,10 +364,10 @@ class DependencyGraphServiceTest {
     // Pipeline nodes, DataStructure/DataSet *Refs). The graph mirrors those rows for EVERY
     // artifact type — not just Elements — so all kinds are navigable.
 
-    private static final String MAPPING_V  = "urn:core:platform:civitas:mapping:common:m1:mdqlihwds3:1.0.0";
-    private static final String MAPPING_L  = "urn:core:platform:civitas:mapping:common:m1:mdqlihwds3";
-    private static final String DS_V       = "urn:core:platform:civitas:datastructure:common:d1:vbrfl8zinc:1.0.0";
-    private static final String DS_L       = "urn:core:platform:civitas:datastructure:common:d1:vbrfl8zinc";
+    private static final String MAPPING_V  = "urn:core:platform:civitas:mapping:common:fe3634d2-c828-8bb9-a340-110e93f2b0ed:1.0.0";
+    private static final String MAPPING_L  = "urn:core:platform:civitas:mapping:common:fe3634d2-c828-8bb9-a340-110e93f2b0ed";
+    private static final String DS_V       = "urn:core:platform:civitas:datastructure:common:d9d0d267-d8e1-8d73-8b58-4307281607ac:1.0.0";
+    private static final String DS_L       = "urn:core:platform:civitas:datastructure:common:d9d0d267-d8e1-8d73-8b58-4307281607ac";
 
     @Test
     void registerFromRegistry_indexesAMappingsSourceAndTargetEdges() {
@@ -402,8 +402,8 @@ class DependencyGraphServiceTest {
         assertThat(g.getDependents(B_V)).containsExactly(DS_V);
     }
 
-    private static final String READING_V1 = "urn:core:platform:civitas:element:common:Reading:d28s38wfmi:1.0.0";
-    private static final String READING_V2 = "urn:core:platform:civitas:element:common:Reading:d28s38wfmi:2.0.0";
+    private static final String READING_V1 = "urn:core:platform:civitas:element:common:ae5c99aa-707a-863c-8c9e-185330bca3dc:1.0.0";
+    private static final String READING_V2 = "urn:core:platform:civitas:element:common:ae5c99aa-707a-863c-8c9e-185330bca3dc:2.0.0";
 
     @Test
     void rebuild_supersededVersionKeepsItsOwnEdges() {

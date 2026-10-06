@@ -49,7 +49,7 @@ class DataSinkAssemblerTest {
     if (configuration == null || configuration.isEmpty()) {
       return;
     }
-    String urn = "urn:core:platform:civitas:data-sink:common:sink-" + UUID.randomUUID() + ":1.0.0";
+    String urn = "urn:core:platform:civitas:datasink:common:" + UUID.randomUUID() + ":1.0.0";
     entity.setConfigurationUrn(urn);
     lenient()
         .when(modelRegistryGateway.fetchPayload(urn))
@@ -113,7 +113,8 @@ class DataSinkAssemblerTest {
     @Test
     @DisplayName("Should echo the referenced element URN back onto the output")
     void shouldEchoElement() {
-      String elementUrn = "urn:core:platform:civitas:element:common:target:1.0.0";
+      String elementUrn =
+          "urn:core:platform:civitas:element:common:04bf31b8-bbf7-8d98-8912-f0bfa0e8585a:1.0.0";
       DataSink entity = sinkWithPipeline(DataSinkType.FROST, Map.of("element", elementUrn));
 
       DataSinkOutputDTO result = assembler.enrichDto(new DataSinkOutputDTO(), entity);
@@ -131,7 +132,8 @@ class DataSinkAssemblerTest {
     @Test
     @DisplayName("Should build PostgisConfigurationOutput with tableName and element URN")
     void shouldBuildPostgisConfigurationWithElement() {
-      String elementUrn = "urn:core:platform:civitas:element:common:observation:1.0.0";
+      String elementUrn =
+          "urn:core:platform:civitas:element:common:5cf6e9e7-fa0d-877a-bda7-df0cc339e439:1.0.0";
       DataSink entity =
           sinkWithPipeline(
               DataSinkType.POSTGIS, Map.of("tableName", "traffic_data", "element", elementUrn));
@@ -166,7 +168,8 @@ class DataSinkAssemblerTest {
     @Test
     @DisplayName("Should resolve the element URN to the DataStructureVersion it pins")
     void shouldResolveElementUrnToDataStructureVersion() {
-      String elementUrn = "urn:core:platform:civitas:element:common:SldTestModel:dpvxg3i2hx:1.0.0";
+      String elementUrn =
+          "urn:core:platform:civitas:element:common:c9280090-dc73-84a5-be15-9e6b878f1cb7:1.0.0";
       DataStructureVersionSummaryDTO expected = stubResolvedVersion(elementUrn);
       DataSink entity =
           sinkWithPipeline(
@@ -183,7 +186,8 @@ class DataSinkAssemblerTest {
     @Test
     @DisplayName("Should leave dataStructureVersion unset when the element URN resolves to nothing")
     void shouldLeaveVersionUnsetWhenElementResolvesToNothing() {
-      String elementUrn = "urn:core:platform:civitas:element:common:gone:1.0.0";
+      String elementUrn =
+          "urn:core:platform:civitas:element:common:02fbbf15-184b-85c7-ac0b-e24c7eb3f80f:1.0.0";
       lenient().when(governingVersions.governing(elementUrn)).thenReturn(Optional.empty());
       DataSink entity =
           sinkWithPipeline(

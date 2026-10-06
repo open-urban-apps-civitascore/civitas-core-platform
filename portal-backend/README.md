@@ -155,6 +155,8 @@ Flyway migrations live in `src/main/resources/db/migration`. To add one:
 3. Name the file `V<major>_<minor>_<patch>__<description>.sql`, for example `V1_2_20__drop_unused_columns.sql`.
 4. Write the new file name into `LATEST` in the same folder.
 
+A migration that SQL cannot express is a Flyway Java migration in `src/main/java/db/migration`, named `V<major>_<minor>_<patch>__<description>.java`. The same rules apply, and `LATEST` names it too. Flyway keeps no checksum of a Java migration, so it does not notice when one changes; the check script below does.
+
 Two merge requests that both add a migration then write different file names into `LATEST` and conflict there, so the second one has to rebase and take the next version. A migration that is on `develop` never changes; fix it with a new one.
 
 `node ../.gitlab/ci/scripts/check-migrations.mjs origin/develop` checks these rules locally (fetch first); CI runs it against the merge request target.

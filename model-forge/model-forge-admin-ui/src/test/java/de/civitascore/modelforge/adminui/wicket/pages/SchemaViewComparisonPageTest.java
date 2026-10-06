@@ -38,7 +38,7 @@ class SchemaViewComparisonPageTest extends AbstractWicketPageTest {
 
     @Test
     void showsBundledAndInlinedContentForAnExistingArtifact() {
-        String urn = "urn:core:platform:civitas:element:common:Thing:1.0.0";
+        String urn = "urn:core:platform:civitas:element:common:d9e5d4ce-e872-8435-beb7-2038c6a6866a:1.0.0";
         var id = new ArtifactId(urn);
         when(modelForge.getBundledView(any(SchemaViewQuery.class)))
             .thenReturn(Optional.of(new ArtifactView(id, JSON.readTree("{\"$ref\":\"#/$defs/Thing\"}"))));

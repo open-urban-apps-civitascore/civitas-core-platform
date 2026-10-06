@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:core:platform:civitas:element:sta:STAObservation:1.0.0",
+  "$id": "urn:core:platform:civitas:element:sta:61296fa8-8cca-8d83-af42-51e12c991cd8:1.0.0",
   "title": "STAObservation",
   "description": "OGC SensorThings API v1.1 Observation entity. One individual measurement result posted to POST /FROST-Server/v1.1/Observations. The Datastream @iot.id link implicitly carries Thing, Sensor, ObservedProperty, and unit.",
   "type": "object",

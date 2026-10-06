@@ -55,7 +55,7 @@ class SchemaAcceptanceBoundaryTest {
             {
               "$schema": "https://json-schema.org/draft/2020-12/schema",
               "properties": {
-                "station": { "$ref": "urn:core:platform:civitas:element:common:Station:abc1234567:1.0.0" }
+                "station": { "$ref": "urn:core:platform:civitas:element:common:b4b1eaaf-8766-827e-b89a-95bf592cc9b2:1.0.0" }
               }
             }
             """)))

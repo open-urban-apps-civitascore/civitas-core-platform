@@ -144,7 +144,12 @@ describe('diagramReducer — MERGE_STRUCTURE', () => {
       type: 'composition',
       data: { relationship: { id: 'r1', type: 'composition', source: 'n2', target: 'n1' } },
     } as unknown as UMLDiagram['edges'][number]
-    const pins = [{ urn: 'urn:core:platform:civitas:datastructure:frost:Things:0123456789:1.0.0', name: 'Things' }]
+    const pins = [
+      {
+        urn: 'urn:core:platform:civitas:datastructure:frost:68606c30-9a4a-8774-b59a-63ccfb3a0c98:1.0.0',
+        name: 'Things',
+      },
+    ]
 
     const merged = diagramReducer(existing, {
       type: 'MERGE_STRUCTURE',

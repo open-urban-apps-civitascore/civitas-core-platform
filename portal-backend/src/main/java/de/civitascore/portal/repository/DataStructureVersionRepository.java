@@ -24,32 +24,21 @@ public interface DataStructureVersionRepository extends BaseRepository<DataStruc
   @Override
   @NonNull Optional<DataStructureVersion> findById(@NonNull UUID id);
 
-  /**
-   * Finds any version whose {@code modelUrn} begins with the given prefix — typically the logical
-   * ({@code version}-free) CORE URN of a DataStructure followed by {@code ":"}, so it matches every
-   * stored version of that structure. Used to resolve a versioned {@code :datastructure:} URN
-   * referenced by a DataSink back to its owning portal DataStructure for authorization: every
-   * version shares the same parent, so the first match suffices. The {@code dataStructure} is
-   * eagerly fetched so the caller can read its id outside the persistence context.
-   *
-   * @param modelUrnPrefix the {@code modelUrn} prefix to match (e.g. {@code logicalUrn + ":"})
-   * @return a matching version, or empty if no stored version references that structure
-   */
-  @EntityGraph(attributePaths = {"dataStructure"})
-  Optional<DataStructureVersion> findFirstByModelUrnStartingWith(String modelUrnPrefix);
+  boolean existsByDataStructure_Id(UUID dataStructureId);
+
+  boolean existsByDataStructureIdAndModelUrn(UUID dataStructureId, String modelUrn);
 
   /**
-   * Every version record of the structures these version-free URNs name.
+   * Every version record of these structures.
    *
    * <p>A flow pins one version, but a draft version's pin advances inside its own major whenever
    * its model changes, so the pinned string stops naming any record. Resolving by structure and
    * major finds the record that owns the pin, while a later major stays out of reach because it is
    * a different record with a lifecycle of its own.
    *
-   * @param modelLogicalUrns the version-free CORE URNs of the owning structures
+   * @param dataStructureIds the ids of the owning structures
    * @return every version record of those structures, parents eagerly fetched
    */
   @EntityGraph(attributePaths = {"dataStructure"})
-  List<DataStructureVersion> findAllByDataStructure_ModelLogicalUrnIn(
-      Collection<String> modelLogicalUrns);
+  List<DataStructureVersion> findAllByDataStructure_IdIn(Collection<UUID> dataStructureIds);
 }

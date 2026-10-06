@@ -348,7 +348,7 @@ export const buildDataSinkPayloads = (pipeline: Pipeline): DataSinkNodePayload[]
 /**
  * The versioned CORE URN of the target DataStructure of the last mapping feeding the given sink
  * node — a backward walk stopping at the first mapping it reaches. The URN comes from the mapping's
- * saved config (`mappingConfig.target`, built via buildDataStructureUrn), which is exactly the
+ * saved config (`mappingConfig.target`, the version's registry pin), which is exactly the
  * soft reference the backend sink stores (FrostConfiguration.element). The flow-shape validation
  * only lets a single linear path deploy, so on a valid graph exactly one final mapping exists; on
  * an invalid multi-branch canvas the pick is arbitrary but the deploy is blocked anyway.

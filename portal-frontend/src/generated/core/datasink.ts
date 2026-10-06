@@ -13,7 +13,10 @@ export const FrostDataSinkSchema = z
     /** Versioned CORE URN of this DataSink. */
     id: z
       .string()
-      .regex(/^urn:core:[^:]+:[^:]+:datasink:[^:]+:[^:]+:[^:]+(:[^:]+)?$/, 'Must be a versioned CORE DataSink URN'),
+      .regex(
+        /^urn:core:[^:]+:[^:]+:datasink:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$/,
+        'Must be a versioned CORE DataSink URN',
+      ),
     /** Human-readable display name. */
     title: z.string().optional(),
     description: z.string().optional(),
@@ -28,7 +31,7 @@ export const FrostDataSinkSchema = z
     element: z
       .string()
       .regex(
-        /^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$/,
+        /^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$/,
         'Must be a versioned CORE DataStructure URN',
       )
       .optional(),
@@ -45,7 +48,10 @@ export const PostgisDataSinkSchema = z
     /** Versioned CORE URN of this DataSink. */
     id: z
       .string()
-      .regex(/^urn:core:[^:]+:[^:]+:datasink:[^:]+:[^:]+:[^:]+(:[^:]+)?$/, 'Must be a versioned CORE DataSink URN'),
+      .regex(
+        /^urn:core:[^:]+:[^:]+:datasink:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$/,
+        'Must be a versioned CORE DataSink URN',
+      ),
     /** Human-readable display name. */
     title: z.string().optional(),
     description: z.string().optional(),
@@ -60,7 +66,7 @@ export const PostgisDataSinkSchema = z
     element: z
       .string()
       .regex(
-        /^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$/,
+        /^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$/,
         'Must be a versioned CORE DataStructure URN',
       ),
   })

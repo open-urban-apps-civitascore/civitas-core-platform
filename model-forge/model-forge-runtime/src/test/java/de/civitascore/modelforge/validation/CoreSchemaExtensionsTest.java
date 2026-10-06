@@ -45,10 +45,10 @@ class CoreSchemaExtensionsTest {
             { "type": "urn:core:type:Element" }
             """)))).isEmpty();
         assertThat(schema.validate(JacksonBridge.toJackson2(wrapper("x-core-ref", """
-            { "type": "urn:core:platform:civitas:element:common:Strasse:u8pwgr2zzg:1.0.0" }
+            { "type": "urn:core:platform:civitas:element:common:4efe004c-2dcb-8c11-b006-ca19ac540baf:1.0.0" }
             """)))).isEmpty();
         assertThat(schema.validate(JacksonBridge.toJackson2(
-                wrapper("x-xsd-source", "\"urn:core:platform:civitas:element:common:AirQuality:wyonmizavr:1.0.0\""))))
+                wrapper("x-xsd-source", "\"urn:core:platform:civitas:element:common:dc4a8bb2-8d68-8d34-9955-a1da973b7eff:1.0.0\""))))
             .isEmpty();
         assertThat(schema.validate(JacksonBridge.toJackson2(wrapper("x-ui-position", "{ \"x\": 120, \"y\": 80 }"))))
             .isEmpty();

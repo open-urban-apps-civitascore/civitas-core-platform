@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { useCreateModel } from '@/app/services/api/models/clientRequests'
 import { BasicDropdownMenu } from '@/components/dropdown-menu/BasicDropdownMenu'
 import { Button } from '@/components/ui/button'
+import { versionOfUrn } from '@/utils/coreUrn'
 
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { downloadJsonSchema, SchemaExportError } from '../../services/jsonSchemaExportService'
@@ -38,17 +39,11 @@ const ImportedStructures: React.FC = () => {
       {t('pinned')}{' '}
       {imported.map(structure => (
         <span key={structure.urn} className="ml-1" title={structure.urn}>
-          {structure.name} {versionOf(structure.urn)}
+          {structure.name} {versionOfUrn(structure.urn)}
         </span>
       ))}
     </span>
   )
-}
-
-/** The version segment of a pinned URN, or nothing when the pin carries none. */
-const versionOf = (urn: string): string => {
-  const segments = urn.split(':')
-  return segments.length > 8 ? segments[8] : ''
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({

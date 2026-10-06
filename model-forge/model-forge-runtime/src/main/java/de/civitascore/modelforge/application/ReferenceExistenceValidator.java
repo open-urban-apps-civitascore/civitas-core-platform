@@ -14,9 +14,9 @@ import java.util.Set;
 /**
  * Registry-aware existence check for strongly-typed {@code x-core-ref} foreign keys.
  *
- * <p>When an Element declares a property as a foreign key with a <em>concrete</em> target
- * (e.g. {@code "x-core-ref": { "type": "urn:core:...:Strasse:1.0.0" }}), the referenced
- * Element must exist in the registry. This is something pure JSON Schema validation cannot
+ * <p>When an Element declares a property as a foreign key with a <em>concrete</em> target (e.g.
+ * {@code "x-core-ref": { "type": "urn:core:platform:civitas:element:common:<uuid>:1.0.0" }}), the
+ * referenced Element must exist in the registry. This is something pure JSON Schema validation cannot
  * express, so it is verified here against the {@link ArtifactRegistry}.
  *
  * <p>Category targets ({@code urn:core:type:<Kind>}, used by the generic CORE-IR meta-schemas)
@@ -76,7 +76,7 @@ public class ReferenceExistenceValidator {
     /**
      * A category marker is exactly {@code urn:core:type:<Kind>} (no further segments). Matched
      * structurally rather than by prefix so a concrete artifact URN whose scope happens to be
-     * {@code type} (e.g. {@code urn:core:type:civitas:element:common:Foo:1.0.0}) is still
+     * {@code type} (e.g. {@code urn:core:type:civitas:element:common:<uuid>:1.0.0}) is still
      * treated as a concrete target and existence-checked.
      */
     private static boolean isCategoryType(String type) {

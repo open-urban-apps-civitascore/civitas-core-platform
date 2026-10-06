@@ -5,10 +5,7 @@ import de.civitascore.portal.frost.PortStructureModel.Field;
 import de.civitascore.portal.frost.PortStructureModel.Member;
 import de.civitascore.portal.frost.PortStructureModel.PortStructure;
 import de.civitascore.portal.frost.PortStructureModel.StaClass;
-import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,15 +34,12 @@ public final class PortStructureGenerator {
 
   /**
    * The identity of a published structure, as a logical CORE URN: {@code
-   * urn:core:<scope>:<owner>:<type>:<domain>:<name>:<disambiguator>}.
+   * urn:core:<scope>:<owner>:<type>:<domain>:<uuid>}.
    *
    * <p>It carries no version. The registry is the version authority and assigns one on store, so a
    * version authored here would only state a guess.
    */
-  private static final String ID_TEMPLATE = "urn:core:platform:civitas:datastructure:frost:%s:%s";
-
-  /** The length of the disambiguator segment, as the portal builds it elsewhere. */
-  private static final int DISAMBIGUATOR_LENGTH = 10;
+  private static final String ID_TEMPLATE = "urn:core:platform:civitas:datastructure:frost:%s";
 
   /** The classpath directory the rendered structures are in. */
   public static final String RESOURCE_DIRECTORY = "frost/port-structure/";
@@ -78,25 +72,12 @@ public final class PortStructureGenerator {
   /**
    * The logical CORE URN a port's structure is stored under.
    *
-   * <p>The disambiguator keeps equal names apart. A modelled structure takes it from its database
-   * identifier; a published one has none, so it is derived from the port label. The derivation is a
-   * function of the label alone, which is what makes the identity survive a reinstallation.
+   * <p>A modelled structure takes its UUID from its database identifier; a published one has none,
+   * so the UUID is derived from the port label. The derivation is a function of the label alone,
+   * which is what makes the identity survive a reinstallation.
    */
   public static String logicalUrn(String port) {
-    return ID_TEMPLATE.formatted(port, disambiguator(port));
-  }
-
-  private static String disambiguator(String port) {
-    byte[] digest;
-    try {
-      digest = MessageDigest.getInstance("SHA-256").digest(port.getBytes(StandardCharsets.UTF_8));
-    } catch (NoSuchAlgorithmException e) {
-      throw new IllegalStateException("SHA-256 unavailable", e);
-    }
-    // The low-order digits carry the spread; the high-order ones of neighbouring digests often
-    // agree. Same reasoning as the portal's own disambiguator.
-    String base36 = new BigInteger(1, digest).toString(36);
-    return base36.substring(Math.max(0, base36.length() - DISAMBIGUATOR_LENGTH));
+    return ID_TEMPLATE.formatted(ModelRegistryGateway.deriveId("frost-port:" + port));
   }
 
   /** The model document of one port, printed the one way this generator prints. */

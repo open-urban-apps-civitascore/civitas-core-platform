@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { DataStructureSchema } from '@/generated/core'
+import { DataStructureDraftSchema } from '@/generated/core'
 
 import type { UMLDiagram } from '../types/diagram'
 import type { UMLClass } from '../types/uml'
@@ -8,7 +8,6 @@ import {
   buildDiagramExport,
   buildDiagramFileName,
   cleanDiagramForExport,
-  DiagramExportError,
   DiagramImportError,
   downloadDiagramFile,
   MAX_IMPORT_FILE_SIZE_BYTES,
@@ -138,22 +137,17 @@ describe('diagramFileService', () => {
   })
 
   describe('buildDiagramExport', () => {
-    it('builds a valid CORE DataStructure document with x-ui-styles', () => {
-      const exported = buildDiagramExport(sampleDiagram, {
-        dataStructureName: 'MyStructure',
-        datastructureId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      })
+    it('builds a CORE DataStructure draft with x-ui-styles', () => {
+      const exported = buildDiagramExport(sampleDiagram)
 
       expect(exported.$schema).toBe('https://json-schema.org/draft/2020-12/schema')
-      expect(exported.$id).toMatch(/^urn:core:platform:civitas:datastructure:common:MyStructure:/)
       expect(exported['x-ui-styles']).toBeDefined()
 
       const styles = exported['x-ui-styles'] as Record<string, unknown>
       expect(styles.id).toBe('diagram-1')
       expect(styles.nodes).toHaveLength(1)
 
-      const validation = DataStructureSchema.safeParse(exported)
-      expect(validation.success).toBe(true)
+      expect(DataStructureDraftSchema.safeParse(exported).success).toBe(true)
     })
 
     it('throws SchemaExportError when root resolution fails', () => {
@@ -215,31 +209,6 @@ describe('diagramFileService', () => {
       }
 
       expect(() => buildDiagramExport(cycleDiagram)).toThrow(SchemaExportError)
-    })
-
-    it('throws DiagramExportError when the name yields no CORE URN segment', () => {
-      // A name without a single alphanumeric character is not empty, so it passes every fallback
-      // and still leaves the URN's name segment empty. Exporting anyway would write a file whose
-      // '$id' the import rejects - so it fails here, the way saving the model does.
-      let caught: unknown
-      try {
-        buildDiagramExport(sampleDiagram, { dataStructureName: '???' })
-      } catch (error) {
-        caught = error
-      }
-
-      expect(caught).toBeInstanceOf(DiagramExportError)
-      expect((caught as DiagramExportError).code).toBe('INVALID_URN')
-    })
-
-    it('always exports an importable CORE URN as $id', () => {
-      const exported = buildDiagramExport(sampleDiagram, {
-        dataStructureName: 'Lärm-Karte (Tag/Nacht)',
-        datastructureId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      })
-
-      expect(DataStructureSchema.safeParse(exported).success).toBe(true)
-      expect(exported.$id).toMatch(/^urn:core:platform:civitas:datastructure:common:LaermKarteTagNacht:/)
     })
   })
 
@@ -340,7 +309,10 @@ describe('diagramFileService', () => {
 
     it('keeps the pins of the published structures through export and import', async () => {
       const pins = [
-        { urn: 'urn:core:platform:civitas:datastructure:frost:ThingTree:0123456789:1.0.0', name: 'ThingTree' },
+        {
+          urn: 'urn:core:platform:civitas:datastructure:frost:9cc6ed95-0f8b-8ace-ab6e-83cdee87b3dd:1.0.0',
+          name: 'ThingTree',
+        },
       ]
       const exportedDoc = buildDiagramExport({ ...sampleDiagram, importedStructures: pins })
       const file = new File([JSON.stringify(exportedDoc)], 'pinned.json', { type: 'application/json' })
@@ -523,10 +495,7 @@ describe('diagramFileService', () => {
         isDirty: false,
       }
 
-      const exported = buildDiagramExport(complexDiagram, {
-        dataStructureName: 'SchoolStructure',
-        datastructureId: 'c1d2e3f4-5678-90ab-cdef-1234567890ab',
-      })
+      const exported = buildDiagramExport(complexDiagram)
 
       const file = new File([JSON.stringify(exported, null, 2)], 'SchoolStructure-1.0.0.json', {
         type: 'application/json',

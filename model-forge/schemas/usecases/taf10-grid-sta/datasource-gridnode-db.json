@@ -1,9 +1,9 @@
 {
   "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSource",
-  "id": "urn:core:platform:civitas:datasource:taf10-grid:gridnode-db:1.0.0",
+  "id": "urn:core:platform:civitas:datasource:taf10-grid:23f1f4f4-4b01-8748-b800-42d4490c614c:1.0.0",
   "title": "Grid Node Master Data PostgreSQL",
   "connectionType": "sql",
-  "element": "urn:core:platform:civitas:element:taf10-grid:GridNodeMasterData:1.0.0",
+  "element": "urn:core:platform:civitas:element:taf10-grid:282aea29-45de-8e68-9361-bd477e45b231:1.0.0",
   "driver": "postgres",
   "dsn": "jdbc:postgresql://postgres:5432/coredata",
   "table": "grid_node_master_data",

@@ -22,5 +22,6 @@ public class DataStructureVersionSummaryDTO extends BaseSummaryDTO {
 
   private String description;
   private String version;
+  private String modelUrn;
   private UUID dataStructureId;
 }

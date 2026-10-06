@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id":     "https://civitasconnect.digital/core/mapping/v1",
   "title":   "CORE Mapping",
-  "description": "A declarative field-to-field mapping between two CORE DataStructures. Each exported Mapping document carries '$schema': 'https://civitasconnect.digital/core/mapping/v1' so it is self-describing.\n\nNote: the 'x-core-ref' annotations on 'source' and 'target' declare that each value is the CORE URN of a DataStructure (an Element URN is also accepted for backward compatibility); existence is checked by registry-aware services.",
+  "description": "A declarative field-to-field mapping between two CORE DataStructures. Each exported Mapping document carries '$schema': 'https://civitasconnect.digital/core/mapping/v1' so it is self-describing.\n\nNote: the 'x-core-ref' annotations on 'source' and 'target' declare that each value is the CORE URN of a DataStructure; existence is checked by registry-aware services.",
   "type": "object",
   "required": ["$schema", "id", "fields"],
   "properties": {
@@ -16,18 +16,18 @@
     "id": {
       "type": "string",
       "description": "Versioned CORE URN of this Mapping.",
-      "pattern": "^urn:core:[^:]+:[^:]+:mapping:[^:]+:[^:]+:[^:]+(:[^:]+)?$"
+      "pattern": "^urn:core:[^:]+:[^:]+:mapping:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$"
     },
     "title":       { "type": "string", "description": "Human-readable display name." },
     "description": { "type": "string" },
     "source": {
       "$ref": "#/$defs/StructureUrn",
-      "description": "Versioned CORE URN of the source DataStructure (the structure being read from). An Element URN is also accepted for backward compatibility.",
+      "description": "Versioned CORE URN of the source DataStructure (the structure being read from).",
       "x-core-ref": { "type": "urn:core:type:DataStructure" }
     },
     "target": {
       "$ref": "#/$defs/StructureUrn",
-      "description": "Versioned CORE URN of the target DataStructure (the structure being written to). An Element URN is also accepted for backward compatibility.",
+      "description": "Versioned CORE URN of the target DataStructure (the structure being written to).",
       "x-core-ref": { "type": "urn:core:type:DataStructure" }
     },
     "fields": {
@@ -38,9 +38,9 @@
   },
   "$defs": {
     "StructureUrn": {
-      "description": "Versioned CORE URN of a DataStructure that a Mapping binds (an Element URN is also accepted for backward compatibility).",
+      "description": "Versioned CORE URN of a DataStructure that a Mapping binds, or the root Element URN of an imported model.",
       "type": "string",
-      "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[^:]+:[^:]+(:[^:]+)?$"
+      "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$"
     },
     "CopyFieldOperation": {
       "description": "Copies a value from an input field path. The path is given as 'sourcePath' (the mapping editor's field name) or 'input' (legacy alias); at least one must be present.",

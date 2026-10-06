@@ -15,6 +15,7 @@ import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.apache.wicket.request.mapper.parameter.PageParameters;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
@@ -27,7 +28,7 @@ import tools.jackson.databind.ObjectMapper;
 class ArtifactViewPageTest extends AbstractWicketPageTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String URN = "urn:core:platform:civitas:element:common:Thing:1.0.0";
+    private static final String URN = "urn:core:platform:civitas:element:common:d9e5d4ce-e872-8435-beb7-2038c6a6866a:1.0.0";
 
     @Test
     void rendersNotFoundForABlankUrn() {
@@ -119,7 +120,7 @@ class ArtifactViewPageTest extends AbstractWicketPageTest {
     }
 
     private static DependencyGraphView oneRelated(String name) {
-        ArtifactId related = new ArtifactId("urn:core:platform:civitas:element:common:" + name + ":1.0.0");
+        ArtifactId related = new ArtifactId("urn:core:platform:civitas:element:common:" + UUID.randomUUID() + ":1.0.0");
         return new DependencyGraphView(List.of(new DependencyGraphView.Node(related, name)), List.of());
     }
 

@@ -33,8 +33,8 @@ class ReadOnlyOperationsDatabaseTest extends AbstractRegistryDatabaseTest {
 
     @BeforeEach
     void storeAFeedAndOpenTheReadSide() {
-        stationPin = registry.storeElement("Station", schema("stationId"), Set.of());
-        readingPin = registry.storeElement("Reading", readingSchema(), Set.of(stationPin));
+        stationPin = registry.storeElement(schema("stationId"), Set.of());
+        readingPin = registry.storeElement(readingSchema(), Set.of(stationPin));
 
         validator = new ModelValidator();
         var graph = new DependencyGraphService(registry);

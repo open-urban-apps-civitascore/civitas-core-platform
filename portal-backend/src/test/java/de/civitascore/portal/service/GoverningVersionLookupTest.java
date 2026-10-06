@@ -13,6 +13,7 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,8 +26,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @DisplayName("which version record governs a pinned model")
 class GoverningVersionLookupTest {
 
-  private static final String LOGICAL =
-      "urn:core:platform:civitas:element:common:Sensor:bbbbbbbbbb";
+  private static final UUID STRUCTURE_ID = UUID.fromString("6ddf8001-3ba6-83db-8d23-b547419c1ff2");
+  private static final String LOGICAL = "urn:core:platform:civitas:element:common:" + STRUCTURE_ID;
 
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;
@@ -43,16 +44,19 @@ class GoverningVersionLookupTest {
               String urn = call.getArgument(0);
               return urn.substring(0, urn.lastIndexOf(':'));
             });
+    lenient()
+        .when(modelRegistryGateway.modelIdOf(anyString()))
+        .thenReturn(Optional.of(STRUCTURE_ID));
   }
 
   private void records(DataStructureVersion... versions) {
-    when(dataStructureVersionRepository.findAllByDataStructure_ModelLogicalUrnIn(any()))
+    when(dataStructureVersionRepository.findAllByDataStructure_IdIn(any()))
         .thenReturn(List.of(versions));
   }
 
   private static DataStructureVersion record(String version, DataStructureVersionStatus status) {
     DataStructure parent = new DataStructure();
-    parent.setId(UUID.randomUUID());
+    parent.setId(STRUCTURE_ID);
     parent.setDataStructureStatus(DataStructureStatus.AVAILABLE);
     parent.setModelLogicalUrn(LOGICAL);
     DataStructureVersion record = new DataStructureVersion();

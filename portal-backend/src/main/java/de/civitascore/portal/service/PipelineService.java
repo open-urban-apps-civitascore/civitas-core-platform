@@ -128,9 +128,17 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
       entity.setDataSources(null);
     }
 
-    storeDefinitionInRegistry(entity, input);
+    if (entity.getId() != null) {
+      storeDefinitionInRegistry(entity, input);
+    }
 
     return super.postConvertToEntity(entity, input);
+  }
+
+  @Override
+  protected Pipeline postCreate(Pipeline saved, PipelineInputDTO input) {
+    storeDefinitionInRegistry(saved, input);
+    return super.postCreate(saved, input);
   }
 
   /**
@@ -176,6 +184,7 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
         modelRegistryGateway.storePayload(
             PayloadKind.PIPELINE,
             Optional.ofNullable(entity.getModelLogicalUrn()),
+            entity.getId(),
             entity.getName(),
             input.getModel(),
             input.getStyles(),

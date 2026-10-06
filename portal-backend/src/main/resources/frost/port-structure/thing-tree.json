@@ -1,5 +1,5 @@
 {
-  "$id": "urn:core:platform:civitas:datastructure:frost:ThingTree:r32e0hmgn1",
+  "$id": "urn:core:platform:civitas:datastructure:frost:d1f142c1-f55e-808b-a287-8a25201fa2d4",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ThingTree",
   "type": "object",

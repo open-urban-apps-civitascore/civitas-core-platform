@@ -35,7 +35,8 @@ class FrontendMappingFixtureTest {
 
     MappingConfig mapping = new MappingConfigParser().parse(root);
     assertEquals(
-        "urn:core:platform:civitas:datastructure:common:Source:ggb6odzea5:1.0.0", mapping.source());
+        "urn:core:platform:civitas:datastructure:common:a49449e3-cf33-8f4a-bd69-1f751e62344a:1.0.0",
+        mapping.source());
 
     List<UpdateRecordProperty> props =
         new RecordPathCompiler().compile(mapping, GeometryEncoding.WKT).properties();

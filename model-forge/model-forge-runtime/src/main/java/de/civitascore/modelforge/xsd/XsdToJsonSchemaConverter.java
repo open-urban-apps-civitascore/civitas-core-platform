@@ -64,7 +64,7 @@ public class XsdToJsonSchemaConverter implements XsdSchemaConverter {
      * pattern already used for cross-format ({@code xs:import}-based) references below.
      *
      * @param xsdContent raw XSD string
-     * @param urnPrefix  CORE URN prefix up to (but not including) the type name,
+     * @param urnPrefix  CORE URN prefix up to (but not including) the type's UUID,
      *                   e.g. {@code urn:core:standard:xoev:element:xmeld}
      * @return one schema per named type; empty only when the XSD genuinely declares no named types
      * @throws XsdSchemaConversionException when the XSD is malformed or cannot be converted —
@@ -84,7 +84,7 @@ public class XsdToJsonSchemaConverter implements XsdSchemaConverter {
             entries.sort(Comparator.comparing(en -> en.getKey().getLocalPart()));
             for (Map.Entry<QName, XmlSchemaType> e : entries) {
                 String name = e.getKey().getLocalPart();
-                String urn  = urnPrefix + ":" + name + ":" + UrnParser.deriveDisambiguator(name);
+                String urn  = typeUrn(urnPrefix, name);
                 ObjectNode json = e.getValue() instanceof XmlSchemaComplexType ct
                         ? complexType(ct, urnPrefix)
                         : simpleType((XmlSchemaSimpleType) e.getValue());
@@ -348,8 +348,12 @@ public class XsdToJsonSchemaConverter implements XsdSchemaConverter {
         if (ns != null && UrnParser.isUrn(ns)) {
             return UrnParser.logicalUrn(ns);
         }
-        String local = typeName.getLocalPart();
-        return urnPrefix + ":" + local + ":" + UrnParser.deriveDisambiguator(local);
+        return typeUrn(urnPrefix, typeName.getLocalPart());
+    }
+
+    /** The URN of the named type {@code name}: its UUID derives from the prefix and the name. */
+    private static String typeUrn(String urnPrefix, String name) {
+        return urnPrefix + ":" + UrnParser.deriveId(urnPrefix + ":" + name);
     }
 
     // ── Type mapping ───────────────────────────────────────────────────────────

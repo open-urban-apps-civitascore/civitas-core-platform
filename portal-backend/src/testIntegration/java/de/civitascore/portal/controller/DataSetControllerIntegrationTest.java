@@ -270,6 +270,17 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should create the dataset's manifest under the dataset's id")
+    void shouldCreateTheManifestUnderTheDataSetId() {
+      ResponseEntity<DataSetOutputDTO> response = performCreate(createValidInput());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      UUID dataSetId = response.getBody().getId();
+      assertThat(dataSetRepository.findById(dataSetId).orElseThrow().getManifestLogicalUrn())
+          .isEqualTo("urn:core:platform:civitas:dataset:common:" + dataSetId);
+    }
+
+    @Test
     @DisplayName("Should fail to create dataset with missing required fields")
     void shouldFailToCreateDataSetWithMissingFields() {
       DataSetInputDTO input = createInvalidInput();

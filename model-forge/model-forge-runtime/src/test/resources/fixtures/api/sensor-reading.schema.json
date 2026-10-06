@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:core:platform:civitas:element:common:SensorReading:d28s38wfmi:1.0.0",
+  "$id": "urn:core:platform:civitas:element:common:0062782c-5353-87ad-b8d4-c1b90ed9b00a:1.0.0",
   "title": "SensorReading",
   "description": "Telemetry emitted by an urban air-quality sensor.",
   "type": "object",
@@ -21,7 +21,7 @@
       "type": "number"
     },
     "location": {
-      "$ref": "urn:core:platform:civitas:element:common:GeoPoint:3ak90vqrog:1.0.0",
+      "$ref": "urn:core:platform:civitas:element:common:da736e5f-bb91-88a6-abaa-761d911af81a:1.0.0",
       "description": "Sensor position."
     }
   }

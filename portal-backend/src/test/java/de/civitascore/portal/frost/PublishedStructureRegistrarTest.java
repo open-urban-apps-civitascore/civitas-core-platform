@@ -43,10 +43,10 @@ class PublishedStructureRegistrarTest {
   }
 
   private void acceptWrites() {
-    when(modelRegistryGateway.storeModel(any(), any(), any(), any(), any(), any()))
+    when(modelRegistryGateway.storeModel(any(), any(), any(), any(), any(), any(), any()))
         .thenAnswer(
             call -> {
-              String port = call.getArgument(1, String.class);
+              String port = call.getArgument(2, String.class);
               String logical = PortStructureGenerator.logicalUrn(port);
               return new ModelPin(logical, logical + ":1.0.0", "1.0.0");
             });
@@ -82,7 +82,7 @@ class PublishedStructureRegistrarTest {
 
     ArgumentCaptor<VersionBump> bump = ArgumentCaptor.forClass(VersionBump.class);
     verify(modelRegistryGateway, org.mockito.Mockito.times(3))
-        .storeModel(any(), any(), any(), eq(null), bump.capture(), eq(null));
+        .storeModel(any(), any(), any(), any(), eq(null), bump.capture(), eq(null));
     assertThat(bump.getAllValues()).containsOnly(VersionBump.MAJOR);
   }
 
@@ -97,7 +97,7 @@ class PublishedStructureRegistrarTest {
     // Three writes in total, from the first run. A restart that minted a version would move every
     // pin and make each Dataset look changed.
     verify(modelRegistryGateway, org.mockito.Mockito.times(3))
-        .storeModel(any(), any(), any(), any(), any(), any());
+        .storeModel(any(), any(), any(), any(), any(), any(), any());
   }
 
   @Test
@@ -117,6 +117,7 @@ class PublishedStructureRegistrarTest {
     verify(modelRegistryGateway)
         .storeModel(
             eq(Optional.of(PortStructureGenerator.logicalUrn("Things"))),
+            any(),
             eq("Things"),
             any(),
             eq(null),
@@ -125,6 +126,6 @@ class PublishedStructureRegistrarTest {
             eq(VersionBump.MINOR),
             eq(null));
     verify(modelRegistryGateway, never())
-        .storeModel(any(), eq("Things"), any(), any(), eq(VersionBump.MAJOR), any());
+        .storeModel(any(), any(), eq("Things"), any(), any(), eq(VersionBump.MAJOR), any());
   }
 }

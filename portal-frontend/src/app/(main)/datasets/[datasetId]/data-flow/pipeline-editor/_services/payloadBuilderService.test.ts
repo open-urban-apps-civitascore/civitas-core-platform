@@ -56,9 +56,9 @@ const frostPayload = (p: Pipeline) =>
 describe('buildDataSinkPayloads — FROST target structure reference', () => {
   // The FROST sink's `element` is validated against the CORE datasink schema before send, so the
   // mapping target must be a real versioned CORE :datastructure: URN (not a placeholder).
-  const DSV_URN = 'urn:core:platform:civitas:datastructure:common:Thing:aa11bb22cc:1.0.0'
-  const DSV_UPSTREAM_URN = 'urn:core:platform:civitas:datastructure:common:Upstream:aa11bb22cc:1.0.0'
-  const DSV_FINAL_URN = 'urn:core:platform:civitas:datastructure:common:Final:aa11bb22cc:1.0.0'
+  const DSV_URN = 'urn:core:platform:civitas:datastructure:common:40d62719-abbf-8678-b20d-76f1ab99a2eb:1.0.0'
+  const DSV_UPSTREAM_URN = 'urn:core:platform:civitas:datastructure:common:88df0945-4249-8fb0-9c7c-42f7a0c37129:1.0.0'
+  const DSV_FINAL_URN = 'urn:core:platform:civitas:datastructure:common:f7147762-78bb-88ee-96b6-4a38421ee03c:1.0.0'
 
   it('references the final mapping target of a mapped pipeline', () => {
     const p = pipeline([mappingNode('map-1', DSV_URN), frostNode], [{ source: 'map-1', target: 'frost-1' }])
@@ -125,9 +125,9 @@ describe('buildDataSinkPayloads — PostGIS configuration', () => {
     },
   }
 
-  const NODE_URN = 'urn:core:platform:civitas:datastructure:common:Roads:aa11bb22cc:1.0.0'
-  const OTHER_NODE_URN = 'urn:core:platform:civitas:datastructure:common:Roads:aa11bb22cc:2.0.0'
-  const MAPPING_TARGET_URN = 'urn:core:platform:civitas:datastructure:common:Target:dd33ee44ff:1.0.0'
+  const NODE_URN = 'urn:core:platform:civitas:datastructure:common:dc29f6f0-2d65-8f3e-9abb-7c5071436148:1.0.0'
+  const OTHER_NODE_URN = 'urn:core:platform:civitas:datastructure:common:dc29f6f0-2d65-8f3e-9abb-7c5071436148:2.0.0'
+  const MAPPING_TARGET_URN = 'urn:core:platform:civitas:datastructure:common:ae5de07c-5ce2-8186-833e-9806abf0dc4b:1.0.0'
 
   const postgisNodeWithUrn = (dataStructureUrn: string): FixtureNode => ({
     ...postgisNode,
@@ -169,11 +169,11 @@ describe('buildDataSinkPayloads — PostGIS configuration', () => {
 // buildPipelinePayload — clean CORE Pipeline document
 // ============================================================================
 
-const DS_URN = 'urn:core:platform:civitas:datasource:common:Mqtt:abcdef1234:1.0.0'
-const SINK_URN = 'urn:core:platform:civitas:datasink:common:Postgis:abcdef1234:1.0.0'
-const MAPPING_URN = 'urn:core:platform:civitas:mapping:common:SrcToTgt:abcdef1234:1.0.0'
-const SRC_STRUCT_URN = 'urn:core:platform:civitas:datastructure:common:Src:abcdef1234:1.0.0'
-const TGT_STRUCT_URN = 'urn:core:platform:civitas:datastructure:common:Tgt:abcdef1234:1.0.0'
+const DS_URN = 'urn:core:platform:civitas:datasource:common:56c71886-6233-8eb0-9033-d69d254841d1:1.0.0'
+const SINK_URN = 'urn:core:platform:civitas:datasink:common:4994500e-ec45-8637-87f5-79a658893245:1.0.0'
+const MAPPING_URN = 'urn:core:platform:civitas:mapping:common:f7628c46-674f-829e-9732-40bd589ed5a6:1.0.0'
+const SRC_STRUCT_URN = 'urn:core:platform:civitas:datastructure:common:18d96956-ef2a-88c1-8dd9-92b256c70a93:1.0.0'
+const TGT_STRUCT_URN = 'urn:core:platform:civitas:datastructure:common:995f411c-3be9-8ec2-8159-55f9d0c50168:1.0.0'
 
 const startNode: FixtureNode = { id: 'start-1', type: 'start', data: { label: 'Start', configured: true } }
 const endNode: FixtureNode = { id: 'end-1', type: 'end', data: { label: 'End', configured: true } }
@@ -331,9 +331,18 @@ describe('buildMappingArtifacts', () => {
 
   it('carries the prior logical URN so an existing mapping is PUT-versioned', () => {
     const artifacts = buildMappingArtifacts(
-      pipeline([configuredMappingNode({ mappingLogicalUrn: 'urn:core:logical:x' })], []),
+      pipeline(
+        [
+          configuredMappingNode({
+            mappingLogicalUrn: 'urn:core:platform:civitas:mapping:common:00000000-0000-4000-8000-000000000045',
+          }),
+        ],
+        [],
+      ),
     )
-    expect(artifacts[0].logicalUrn).toBe('urn:core:logical:x')
+    expect(artifacts[0].logicalUrn).toBe(
+      'urn:core:platform:civitas:mapping:common:00000000-0000-4000-8000-000000000045',
+    )
   })
 
   it('skips unconfigured mapping nodes (no source/target → no mappingRef)', () => {
@@ -405,9 +414,18 @@ describe('createMappingSnapshot / hasMappingChanged', () => {
 
   it('keeps the logical URN so a removed node can still be deleted', () => {
     const snapshot = createMappingSnapshot(
-      pipeline([configuredMappingNode({ mappingLogicalUrn: 'urn:core:logical:x' })], []),
+      pipeline(
+        [
+          configuredMappingNode({
+            mappingLogicalUrn: 'urn:core:platform:civitas:mapping:common:00000000-0000-4000-8000-000000000045',
+          }),
+        ],
+        [],
+      ),
     )
-    expect(snapshot['map-1'].logicalUrn).toBe('urn:core:logical:x')
+    expect(snapshot['map-1'].logicalUrn).toBe(
+      'urn:core:platform:civitas:mapping:common:00000000-0000-4000-8000-000000000045',
+    )
   })
 
   it('records a null URN for a mapping node that was never saved', () => {
@@ -417,11 +435,16 @@ describe('createMappingSnapshot / hasMappingChanged', () => {
 })
 
 describe('getRemovedMappingUrns', () => {
-  const savedMappingNode = () => configuredMappingNode({ mappingLogicalUrn: 'urn:core:logical:x' })
+  const savedMappingNode = () =>
+    configuredMappingNode({
+      mappingLogicalUrn: 'urn:core:platform:civitas:mapping:common:00000000-0000-4000-8000-000000000045',
+    })
 
   it('returns the URN of a mapping whose node was removed', () => {
     const snapshot = createMappingSnapshot(pipeline([savedMappingNode()], []))
-    expect(getRemovedMappingUrns(pipeline([], []), snapshot)).toEqual(['urn:core:logical:x'])
+    expect(getRemovedMappingUrns(pipeline([], []), snapshot)).toEqual([
+      'urn:core:platform:civitas:mapping:common:00000000-0000-4000-8000-000000000045',
+    ])
   })
 
   it('ignores a mapping whose node is still in the pipeline', () => {
@@ -482,7 +505,7 @@ describe('isDestructiveDataSinkChange', () => {
  * deliberately leave them out.
  */
 describe('CORE-IR conformance of the artifacts sent to Model Forge', () => {
-  const PIPELINE_URN = 'urn:core:platform:civitas:pipeline:common:P:abcdef1234:1.0.0'
+  const PIPELINE_URN = 'urn:core:platform:civitas:pipeline:common:87af81dc-2829-8053-a6cc-3f302c48ba6b:1.0.0'
 
   const stamped = (kind: ContractKind, id: string, document: object) => ({
     $schema: CONTRACT_URIS[kind],
@@ -615,8 +638,8 @@ describe('CORE-IR conformance of the artifacts sent to Model Forge', () => {
 // ============================================================================
 
 describe('the Mapping reference the Pipeline carries', () => {
-  const VERSIONED = 'urn:core:platform:civitas:mapping:common:SrcToTgt:abcdef1234:1.0.0'
-  const LOGICAL = 'urn:core:platform:civitas:mapping:common:SrcToTgt:abcdef1234'
+  const VERSIONED = 'urn:core:platform:civitas:mapping:common:f7628c46-674f-829e-9732-40bd589ed5a6:1.0.0'
+  const LOGICAL = 'urn:core:platform:civitas:mapping:common:f7628c46-674f-829e-9732-40bd589ed5a6'
 
   // Mirrors the save step: the mapping response returns both URNs and both are stashed on the node.
   const afterMappingSave = () => {

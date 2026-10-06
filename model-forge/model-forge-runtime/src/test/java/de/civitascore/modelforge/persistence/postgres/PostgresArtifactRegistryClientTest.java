@@ -88,9 +88,9 @@ class PostgresArtifactRegistryClientTest {
         // RegistryUnavailableException rather than letting the raw DataAccessException escape.
         var client = clientWithFailingDb(new QueryTimeoutException("statement timed out"));
         var schema = new ObjectMapper().createObjectNode()
-            .put("$id", "urn:core:platform:civitas:element:common:Outage:kmbccayu3w:1.0.0")
+            .put("$id", "urn:core:platform:civitas:element:common:f51bac76-4d03-87ae-9d36-53de0b058bcc:1.0.0")
             .put("type", "object");
-        assertThatThrownBy(() -> client.storeElement("Outage", schema, Set.of()))
+        assertThatThrownBy(() -> client.storeElement(schema, Set.of()))
             .isInstanceOf(RegistryUnavailableException.class);
     }
 
@@ -102,10 +102,10 @@ class PostgresArtifactRegistryClientTest {
         String rawDbDetail = "duplicate key value violates unique constraint \"artifact_version_pkey\"";
         var client = clientWithFailingDb(new DataIntegrityViolationException(rawDbDetail));
         var schema = new ObjectMapper().createObjectNode()
-            .put("$id", "urn:core:platform:civitas:element:common:Dup:sj4jrj0ynz:1.0.0")
+            .put("$id", "urn:core:platform:civitas:element:common:b3fc14fa-d95e-82ee-a922-927d2aba50c5:1.0.0")
             .put("type", "object");
 
-        assertThatThrownBy(() -> client.storeElement("Dup", schema, Set.of()))
+        assertThatThrownBy(() -> client.storeElement(schema, Set.of()))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("conflicts with existing registry data")
             .hasMessageNotContaining(rawDbDetail)
@@ -121,10 +121,10 @@ class PostgresArtifactRegistryClientTest {
             new SQLException("relation \"artifact_versionn\" does not exist", "42P01"));
         var client = clientWithFailingDb(grammar);
         var schema = new ObjectMapper().createObjectNode()
-            .put("$id", "urn:core:platform:civitas:element:common:Grammar:j1qtfwb6ay:1.0.0")
+            .put("$id", "urn:core:platform:civitas:element:common:722739f8-677f-8c0c-9742-515a644896db:1.0.0")
             .put("type", "object");
 
-        assertThatThrownBy(() -> client.storeElement("Grammar", schema, Set.of()))
+        assertThatThrownBy(() -> client.storeElement(schema, Set.of()))
             .isInstanceOf(IllegalStateException.class);
     }
 
@@ -134,7 +134,7 @@ class PostgresArtifactRegistryClientTest {
         // the same translation: a transient storage failure inside it must become a 502, not escape raw.
         var client = clientWithFailingDb(new QueryTimeoutException("statement timed out"));
         assertThatThrownBy(() -> client.bumpVersion(
-                "urn:core:platform:civitas:datastructure:common:Outage:kmbccayu3w", VersionBump.MINOR))
+                "urn:core:platform:civitas:datastructure:common:f51bac76-4d03-87ae-9d36-53de0b058bcc", VersionBump.MINOR))
             .isInstanceOf(RegistryUnavailableException.class);
     }
 
@@ -146,7 +146,7 @@ class PostgresArtifactRegistryClientTest {
         var client = clientWithFailingDb(new DataIntegrityViolationException(rawDbDetail));
 
         assertThatThrownBy(() -> client.bumpVersion(
-                "urn:core:platform:civitas:datastructure:common:Dup:sj4jrj0ynz", VersionBump.MAJOR))
+                "urn:core:platform:civitas:datastructure:common:b3fc14fa-d95e-82ee-a922-927d2aba50c5", VersionBump.MAJOR))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("conflicts with existing registry data")
             .hasMessageNotContaining(rawDbDetail);

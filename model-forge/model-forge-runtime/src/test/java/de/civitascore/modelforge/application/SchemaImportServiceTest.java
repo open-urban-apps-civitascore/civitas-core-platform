@@ -44,10 +44,9 @@ import static org.mockito.Mockito.when;
  * block is dropped — so the extracted entities reference each other globally and form
  * dependency-graph edges.
  *
- * <p>Name-derived URNs carry a minted disambiguator in its own segment
- * ({@code …:<name>:<disambiguator>:<version>}) so equal titles/def keys can never collide onto
- * the same logical URN; explicitly supplied CORE-URN {@code $id}s are kept verbatim. Assertions
- * therefore match URNs by their (clean) name segment.
+ * <p>URNs carry no name, so equal titles/def keys can never collide onto the same logical URN;
+ * explicitly supplied CORE-URN {@code $id}s are kept verbatim. Assertions therefore find stored
+ * Elements by their {@code title}.
  */
 class SchemaImportServiceTest {
 
@@ -87,28 +86,26 @@ class SchemaImportServiceTest {
 
     /** Every Element stored so far, keyed by its $id (URN). */
     private Map<String, JsonNode> capturedElements() {
-        ArgumentCaptor<String> name = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<JsonNode> body = ArgumentCaptor.forClass(JsonNode.class);
-        verify(registry, atLeastOnce()).storeElement(name.capture(), body.capture(), anySet(), anySet(), nullable(String.class), any(VersionBump.class));
+        verify(registry, atLeastOnce()).storeElement(body.capture(), anySet(), anySet(), nullable(String.class), any(VersionBump.class));
         Map<String, JsonNode> stored = new LinkedHashMap<>();
-        List<String> names = name.getAllValues();
-        List<JsonNode> bodies = body.getAllValues();
-        for (int i = 0; i < names.size(); i++) {
-            stored.put(bodies.get(i).path("$id").asText(names.get(i)), bodies.get(i));
+        for (JsonNode element : body.getAllValues()) {
+            stored.put(element.path("$id").asText(), element);
         }
         return stored;
     }
 
-    /** The unique stored URN whose name segment equals the given base (e.g. "DefProduct"). */
-    private static String urnOf(Map<String, JsonNode> stored, String base) {
-        List<String> hits = stored.keySet().stream()
-            .filter(urn -> base.equals(UrnParser.nameFromUrn(urn)))
+    /** The unique stored URN whose Element carries the given title (e.g. "DefProduct"). */
+    private static String urnOf(Map<String, JsonNode> stored, String title) {
+        List<String> hits = stored.entrySet().stream()
+            .filter(e -> title.equals(e.getValue().path("title").asText(null)))
+            .map(Map.Entry::getKey)
             .toList();
-        assertThat(hits).as("exactly one minted URN with base '%s' in %s", base, stored.keySet()).hasSize(1);
+        assertThat(hits).as("exactly one stored URN titled '%s' in %s", title, stored.keySet()).hasSize(1);
         return hits.getFirst();
     }
 
-    /** The stored Element whose name segment equals the given base. */
+    /** The stored Element carrying the given title. */
     private static JsonNode elementOf(Map<String, JsonNode> stored, String base) {
         return stored.get(urnOf(stored, base));
     }
@@ -123,7 +120,7 @@ class SchemaImportServiceTest {
                   "$defs":{
                     "DefProduct":{"type":"object","properties":{"name":{"type":"string"},"cat":{"$ref":"#/$defs/DefCategory"}}},
                     "DefCategory":{"type":"object","properties":{"label":{"type":"string"}}},
-                    "DefSupplier":{"$id":"urn:core:platform:civitas:element:common:CustomSupplier:w6c7eam3x0:1.0.0","type":"object","properties":{"cat":{"$ref":"#/$defs/DefCategory"}}}
+                    "DefSupplier":{"$id":"urn:core:platform:civitas:element:common:9ce722ec-66ae-8690-a34d-fb3b51f62c58:1.0.0","type":"object","properties":{"cat":{"$ref":"#/$defs/DefCategory"}}}
                   }
                 }
                 """);
@@ -139,9 +136,8 @@ class SchemaImportServiceTest {
         Map<String, JsonNode> stored = importAndCapture(catalog());
         for (String base : List.of("DefCatalog", "DefProduct", "DefCategory")) {
             String urn = urnOf(stored, base);
-            assertThat(UrnParser.nameFromUrn(urn)).isEqualTo(base);
             assertThat(UrnParser.versionFromUrn(urn)).isNull();
-            assertThat(UrnParser.disambiguatorFromUrn(urn)).isNotBlank();
+            assertThat(UrnParser.idFromUrn(urn)).isNotNull();
         }
     }
 
@@ -204,11 +200,11 @@ class SchemaImportServiceTest {
             schema = mapper.readTree("""
                 {
                   "$schema":"https://json-schema.org/draft/2020-12/schema",
-                  "$id":"urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b:1.0.0",
+                  "$id":"urn:core:platform:civitas:datastructure:common:8f00c12e-4873-8f40-85b8-5b74dd19aea2:1.0.0",
                   "title":"People",
                   "$defs": {
                     "Person": {
-                      "$id":"urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.0",
+                      "$id":"urn:core:platform:civitas:element:common:095e0ad1-181c-876b-9725-364d965cb752:1.0.0",
                       "type":"object",
                       "properties":{"name":{"type":"string"}}
                     }
@@ -218,8 +214,8 @@ class SchemaImportServiceTest {
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
-        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
-            .thenReturn("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.0");
+        when(registry.storeElement(any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
+            .thenReturn("urn:core:platform:civitas:element:common:095e0ad1-181c-876b-9725-364d965cb752:1.0.0");
         when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class), nullable(String.class)))
             .thenAnswer(inv -> inv.getArgument(0) + ":1.0.0");
 
@@ -229,10 +225,10 @@ class SchemaImportServiceTest {
         // Root = the DataStructure (its pin → model_urn), not an Element.
         assertThat(UrnParser.artifactTypeFromUrn(result.resourceId())).isEqualTo("datastructure");
 
-        // The member class is split out as a separate Element (keyed by its display name).
-        ArgumentCaptor<String> elName = ArgumentCaptor.forClass(String.class);
-        verify(registry).storeElement(elName.capture(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class));
-        assertThat(elName.getValue()).isEqualTo("Person");
+        // The member class is split out as a separate Element, titled by its def key.
+        ArgumentCaptor<JsonNode> element = ArgumentCaptor.forClass(JsonNode.class);
+        verify(registry).storeElement(element.capture(), anySet(), anySet(), nullable(String.class), any(VersionBump.class));
+        assertThat(element.getValue().path("title").asText()).isEqualTo("Person");
 
         // The stored DataStructure is a $defs library of URN-$refs — no root shape.
         ArgumentCaptor<JsonNode> ds = ArgumentCaptor.forClass(JsonNode.class);
@@ -241,11 +237,11 @@ class SchemaImportServiceTest {
         assertThat(content.path("$schema").asText())
             .isEqualTo("https://json-schema.org/draft/2020-12/schema");
         assertThat(content.path("$id").asText())
-            .startsWith("urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b");
+            .startsWith("urn:core:platform:civitas:datastructure:common:8f00c12e-4873-8f40-85b8-5b74dd19aea2");
         assertThat(content.has("type")).isFalse();
         assertThat(content.has("properties")).isFalse();
         assertThat(content.path("$defs").path("Person").path("$ref").asText())
-            .startsWith("urn:core:platform:civitas:element:common:Person");
+            .startsWith("urn:core:platform:civitas:element:common:095e0ad1-181c-876b-9725-364d965cb752");
     }
 
     /**
@@ -258,8 +254,8 @@ class SchemaImportServiceTest {
     void manifestReferencesTheVersionTheMemberWriteAssigned() {
         JsonNode schema = versionedDataStructureRootSchema();
         // The caller authored 2.0.0 throughout; the write assigns 1.0.1.
-        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
-            .thenReturn("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
+        when(registry.storeElement(any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
+            .thenReturn("urn:core:platform:civitas:element:common:095e0ad1-181c-876b-9725-364d965cb752:1.0.1");
         when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class), nullable(String.class)))
             .thenAnswer(inv -> inv.getArgument(0) + ":1.0.1");
 
@@ -269,10 +265,10 @@ class SchemaImportServiceTest {
         verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class), nullable(String.class));
         JsonNode content = ds.getValue();
         assertThat(content.path("$defs").path("Person").path("$ref").asText())
-            .isEqualTo("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
+            .isEqualTo("urn:core:platform:civitas:element:common:095e0ad1-181c-876b-9725-364d965cb752:1.0.1");
         // The root $ref designating one member as the root shape resolves to that same pin.
         assertThat(content.path("$ref").asText())
-            .isEqualTo("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
+            .isEqualTo("urn:core:platform:civitas:element:common:095e0ad1-181c-876b-9725-364d965cb752:1.0.1");
     }
 
     /**
@@ -283,23 +279,23 @@ class SchemaImportServiceTest {
     @Test
     void memberContentKeepsAVersionFreeId() {
         JsonNode schema = versionedDataStructureRootSchema();
-        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
-            .thenReturn("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
+        when(registry.storeElement(any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
+            .thenReturn("urn:core:platform:civitas:element:common:095e0ad1-181c-876b-9725-364d965cb752:1.0.1");
         when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class), nullable(String.class)))
             .thenAnswer(inv -> inv.getArgument(0) + ":1.0.1");
 
         svc.importSchema(new SchemaImportRequest(schema));
 
         ArgumentCaptor<JsonNode> member = ArgumentCaptor.forClass(JsonNode.class);
-        verify(registry).storeElement(anyString(), member.capture(), anySet(), anySet(),
+        verify(registry).storeElement(member.capture(), anySet(), anySet(),
             nullable(String.class), any(VersionBump.class));
         assertThat(member.getValue().path("$id").asText())
-            .isEqualTo("urn:core:platform:civitas:element:common:Person:pp11abcd12");
+            .isEqualTo("urn:core:platform:civitas:element:common:095e0ad1-181c-876b-9725-364d965cb752");
 
         ArgumentCaptor<JsonNode> ds = ArgumentCaptor.forClass(JsonNode.class);
         verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class), nullable(String.class));
         assertThat(ds.getValue().path("$id").asText())
-            .isEqualTo("urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b");
+            .isEqualTo("urn:core:platform:civitas:datastructure:common:8f00c12e-4873-8f40-85b8-5b74dd19aea2");
     }
 
     /** A datastructure root whose members carry an authored version, and a root $ref to one of them. */
@@ -308,12 +304,12 @@ class SchemaImportServiceTest {
             return mapper.readTree("""
                 {
                   "$schema":"https://json-schema.org/draft/2020-12/schema",
-                  "$id":"urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b:2.0.0",
+                  "$id":"urn:core:platform:civitas:datastructure:common:8f00c12e-4873-8f40-85b8-5b74dd19aea2:2.0.0",
                   "title":"People",
                   "$ref":"#/$defs/Person",
                   "$defs":{
                     "Person":{
-                      "$id":"urn:core:platform:civitas:element:common:Person:pp11abcd12:2.0.0",
+                      "$id":"urn:core:platform:civitas:element:common:095e0ad1-181c-876b-9725-364d965cb752:2.0.0",
                       "type":"object",
                       "properties":{"name":{"type":"string"}}
                     }
@@ -335,32 +331,65 @@ class SchemaImportServiceTest {
     @Test
     void requestedVersionBump_reachesTheGroupingAndItsMembers() {
         JsonNode schema = dataStructureRootSchema();
-        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class),
+        when(registry.storeElement(any(), anySet(), anySet(), nullable(String.class),
             any(VersionBump.class)))
-            .thenReturn("urn:core:platform:civitas:element:common:Person:pp11abcd12:2.0.0");
+            .thenReturn("urn:core:platform:civitas:element:common:095e0ad1-181c-876b-9725-364d965cb752:2.0.0");
         when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class), nullable(String.class)))
             .thenAnswer(inv -> inv.getArgument(0) + ":2.0.0");
 
         svc.importSchema(new SchemaImportRequest(schema, VersionBump.MAJOR));
 
-        verify(registry).storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class),
+        verify(registry).storeElement(any(), anySet(), anySet(), nullable(String.class),
             eq(VersionBump.MAJOR));
         verify(registry).storeDataStructure(anyString(), any(), eq(VersionBump.MAJOR), nullable(String.class));
+    }
+
+    /**
+     * The stored form of a DataStructure names its members by reference. Splitting such a member
+     * out would store a new version of it whose content refers to its own previous version.
+     */
+    @Test
+    void dataStructureMemberThatIsAReference_staysAReference() throws Exception {
+        String referenced = "urn:core:platform:civitas:element:common:095e0ad1-181c-876b-9725-364d965cb752:1.0.0";
+        JsonNode schema = mapper.readTree("""
+            {
+              "$schema":"https://json-schema.org/draft/2020-12/schema",
+              "$id":"urn:core:platform:civitas:datastructure:common:8f00c12e-4873-8f40-85b8-5b74dd19aea2",
+              "title":"People",
+              "$ref":"%s",
+              "$defs":{
+                "Person":{"$ref":"%s"},
+                "Address":{"type":"object","properties":{"street":{"type":"string"}}}
+              }
+            }
+            """.formatted(referenced, referenced));
+        when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class), nullable(String.class)))
+            .thenAnswer(inv -> inv.getArgument(0) + ":1.0.1");
+
+        svc.importSchema(new SchemaImportRequest(schema));
+
+        ArgumentCaptor<JsonNode> element = ArgumentCaptor.forClass(JsonNode.class);
+        verify(registry).storeElement(element.capture(), anySet(), anySet(), nullable(String.class), any(VersionBump.class));
+        assertThat(element.getValue().path("title").asText()).isEqualTo("Address");
+        ArgumentCaptor<JsonNode> ds = ArgumentCaptor.forClass(JsonNode.class);
+        verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class), nullable(String.class));
+        assertThat(ds.getValue().path("$defs").path("Person").path("$ref").asText()).isEqualTo(referenced);
+        assertThat(ds.getValue().path("$ref").asText()).isEqualTo(referenced);
     }
 
     /** An import that asks for nothing keeps Model Forge's existing default. */
     @Test
     void noRequestedBump_defaultsToPatch() {
         JsonNode schema = dataStructureRootSchema();
-        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class),
+        when(registry.storeElement(any(), anySet(), anySet(), nullable(String.class),
             any(VersionBump.class)))
-            .thenReturn("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
+            .thenReturn("urn:core:platform:civitas:element:common:095e0ad1-181c-876b-9725-364d965cb752:1.0.1");
         when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class), nullable(String.class)))
             .thenAnswer(inv -> inv.getArgument(0) + ":1.0.1");
 
         svc.importSchema(new SchemaImportRequest(schema));
 
-        verify(registry).storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class),
+        verify(registry).storeElement(any(), anySet(), anySet(), nullable(String.class),
             eq(VersionBump.PATCH));
         verify(registry).storeDataStructure(anyString(), any(), eq(VersionBump.PATCH), nullable(String.class));
     }
@@ -371,11 +400,11 @@ class SchemaImportServiceTest {
             return mapper.readTree("""
                 {
                   "$schema":"https://json-schema.org/draft/2020-12/schema",
-                  "$id":"urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b",
+                  "$id":"urn:core:platform:civitas:datastructure:common:8f00c12e-4873-8f40-85b8-5b74dd19aea2",
                   "title":"People",
                   "$defs":{
                     "Person":{
-                      "$id":"urn:core:platform:civitas:element:common:Person:pp11abcd12",
+                      "$id":"urn:core:platform:civitas:element:common:095e0ad1-181c-876b-9725-364d965cb752",
                       "type":"object",
                       "properties":{"name":{"type":"string"}}
                     }
@@ -408,32 +437,29 @@ class SchemaImportServiceTest {
             schema = mapper.readTree("""
                 {
                   "$schema":"https://json-schema.org/draft/2020-12/schema",
-                  "$id":"urn:core:platform:civitas:element:common:Sensor:abc123:1.0.0",
+                  "$id":"urn:core:platform:civitas:element:common:a25bf8d4-5366-8d59-813d-b10a2f5bcade:1.0.0",
                   "title":"Sensor","type":"object",
-                  "properties":{"cat":{"$ref":"urn:core:platform:civitas:element:common:Category:def456:1.0.0"}}
+                  "properties":{"cat":{"$ref":"urn:core:platform:civitas:element:common:18f0a9f8-4adf-834f-b2fb-554a54f6d425:1.0.0"}}
                 }
                 """);
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
-        String assignedPin = "urn:core:platform:civitas:element:common:Sensor:abc123:2.0.0";
-        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class))).thenReturn(assignedPin);
+        String assignedPin = "urn:core:platform:civitas:element:common:a25bf8d4-5366-8d59-813d-b10a2f5bcade:2.0.0";
+        when(registry.storeElement(any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class))).thenReturn(assignedPin);
 
         svc.importSchema(new SchemaImportRequest(schema));
 
         assertThat(graph.getDependencies(assignedPin))
-            .contains("urn:core:platform:civitas:element:common:Category:def456:1.0.0");
+            .contains("urn:core:platform:civitas:element:common:18f0a9f8-4adf-834f-b2fb-554a54f6d425:1.0.0");
     }
 
     @Test
     void defWithOwnUrnId_keptUnderThatUrn() {
         Map<String, JsonNode> stored = importAndCapture(catalog());
-        // The def brings its own CORE-URN $id → it is kept verbatim (name "CustomSupplier",
-        // not the def key "DefSupplier"), not re-minted.
-        String supplierUrn = urnOf(stored, "CustomSupplier");
-        assertThat(UrnParser.versionFromUrn(supplierUrn)).isNull();
-        assertThat(stored.keySet())
-            .noneMatch(urn -> "DefSupplier".equals(UrnParser.nameFromUrn(urn)));
+        String supplierUrn = urnOf(stored, "DefSupplier");
+        assertThat(supplierUrn)
+            .isEqualTo("urn:core:platform:civitas:element:common:9ce722ec-66ae-8690-a34d-fb3b51f62c58");
         // and its sibling ref is also rewritten to the Category URN
         assertThat(stored.get(supplierUrn).path("properties").path("cat").path("$ref").asText())
                 .isEqualTo(urnOf(stored, "DefCategory"));
@@ -511,16 +537,14 @@ class SchemaImportServiceTest {
     void import_createsDataStructureGroupingTheImportedStructures() {
         Map<String, JsonNode> stored = importAndCapture(catalog());
         String rootUrn = urnOf(stored, "DefCatalog");
-        String rootName = UrnParser.nameFromUrn(rootUrn);
-        String rootDisc = UrnParser.disambiguatorFromUrn(rootUrn);
-        String dsLogical = "urn:core:platform:civitas:datastructure:common:" + rootName + ":" + rootDisc;
+        String dsLogical = UrnParser.withArtifactType(rootUrn, "datastructure");
 
         ArgumentCaptor<String> urn = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<JsonNode> manifest = ArgumentCaptor.forClass(JsonNode.class);
         verify(registry).storeDataStructure(urn.capture(), manifest.capture(), any(VersionBump.class), nullable(String.class));
 
-        // Stored under the logical datastructure URN that reuses the root Element's name AND
-        // disambiguator segments (so re-imports version the same grouping).
+        // Stored under the logical datastructure URN that reuses the root Element's UUID (so
+        // re-imports version the same grouping).
         assertThat(urn.getValue()).isEqualTo(dsLogical);
         JsonNode m = manifest.getValue();
         assertThat(m.path("$schema").asText()).isEqualTo("https://json-schema.org/draft/2020-12/schema");
@@ -531,7 +555,7 @@ class SchemaImportServiceTest {
             urnOf(stored, "DefCatalog"),
             urnOf(stored, "DefProduct"),
             urnOf(stored, "DefCategory"),
-            urnOf(stored, "CustomSupplier"));
+            urnOf(stored, "DefSupplier"));
     }
 
     // ── Raw-XSD import: version guard (URN-injection hardening) ───────────────────
@@ -540,14 +564,13 @@ class SchemaImportServiceTest {
     void importXsd_acceptsTwoSegmentXoevVersion() {
         // Real XRepository/XÖV standards carry two-segment versions (e.g. 6.0, 5.5). They must
         // import cleanly — the version guard only blocks injection chars, not short versions.
+        String urn = "urn:core:platform:civitas:element:common:b4b1eaaf-8766-827e-b89a-95bf592cc9b2";
         SchemaImportResult r = svc.importXsd(new XsdImportRequest("xplanung", "6.0",
-            "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"/>", null));
+            "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"/>", urn, true));
 
         assertThat(r.diagnostics()).isEmpty();
-        // Name-derived identity → minted with a UUID; the version segment stays the client's.
-        assertThat(UrnParser.nameFromUrn(r.resourceId())).isEqualTo("xplanung");
-        assertThat(UrnParser.versionFromUrn(r.resourceId())).isEqualTo("6.0");
-        assertThat(UrnParser.disambiguatorFromUrn(r.resourceId())).isNotBlank();
+        verify(registry).storeXsdElement(eq(urn), anyString(), anySet(), eq("6.0"));
+        verify(registry).nameArtifact(r.resourceId(), "xplanung");
     }
 
     @Test
@@ -589,7 +612,7 @@ class SchemaImportServiceTest {
     @Test
     void importXsd_keepsAWellFormedCallerSuppliedUrn() {
         // The XRepository kennung-based URN is caller-owned and must still be respected as-is.
-        String urn = "urn:core:platform:civitas:element:common:Station:abc1234567";
+        String urn = "urn:core:platform:civitas:element:common:b4b1eaaf-8766-827e-b89a-95bf592cc9b2";
         SchemaImportResult r = svc.importXsd(new XsdImportRequest("station", null,
             "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"/>", urn));
 
@@ -609,11 +632,11 @@ class SchemaImportServiceTest {
             schema = mapper.readTree("""
                 {
                   "$schema":"https://json-schema.org/draft/2020-12/schema",
-                  "$id":"urn:core:platform:civitas:element:common:Root:wn0maelckn:1.0.0",
+                  "$id":"urn:core:platform:civitas:element:common:5046e841-f6c4-8958-9c09-8fef4615a3ed:1.0.0",
                   "title":"Root","type":"object",
                   "properties":{"x":{"$ref":"#/$defs/Twin"}},
                   "$defs":{
-                    "Twin":{"$id":"urn:core:platform:civitas:element:common:Root:wn0maelckn:9.9.9","type":"object","properties":{"y":{"type":"string"}}}
+                    "Twin":{"$id":"urn:core:platform:civitas:element:common:5046e841-f6c4-8958-9c09-8fef4615a3ed:9.9.9","type":"object","properties":{"y":{"type":"string"}}}
                   }
                 }
                 """);
@@ -624,11 +647,12 @@ class SchemaImportServiceTest {
         Map<String, JsonNode> stored = importAndCapture(schema);
 
         // Root keeps its own URN; the colliding def did NOT overwrite or duplicate the root's logical
-        // model_forge.artifact — it received a distinct, minted URN derived from its def key ("Twin").
+        // model_forge.artifact — it received a distinct URN derived from the root and its def key.
         String rootUrn = urnOf(stored, "Root");
         assertThat(UrnParser.versionFromUrn(rootUrn)).isNull();
-        assertThat(urnOf(stored, "Twin")).isNotEqualTo(rootUrn);
-        assertThat(UrnParser.nameFromUrn(urnOf(stored, "Twin"))).isEqualTo("Twin");
+        assertThat(urnOf(stored, "Twin"))
+            .isEqualTo(new UrnService("platform", "civitas", "common", "1.0.0")
+                .member(UrnParser.idFromUrn(rootUrn), "Twin"));
     }
 
     // ── x-core-ref foreign-key existence: co-import allow-set ─────────────────────
@@ -645,14 +669,14 @@ class SchemaImportServiceTest {
             schema = mapper.readTree("""
                 {
                   "$schema":"https://json-schema.org/draft/2020-12/schema",
-                  "$id":"urn:core:platform:civitas:element:common:Baum:vd1c1ziwlu:1.0.0",
+                  "$id":"urn:core:platform:civitas:element:common:95b28937-69ab-8ee7-814d-46230d8e6fcb:1.0.0",
                   "title":"Baum","type":"object",
                   "properties":{
-                    "stehtAn":{"type":"string","x-core-ref":{"type":"urn:core:platform:civitas:element:common:Strasse:u8pwgr2zzg:1.0.0"}},
-                    "self":{"type":"string","x-core-ref":{"type":"urn:core:platform:civitas:element:common:Baum:vd1c1ziwlu:1.0.0"}}
+                    "stehtAn":{"type":"string","x-core-ref":{"type":"urn:core:platform:civitas:element:common:4efe004c-2dcb-8c11-b006-ca19ac540baf:1.0.0"}},
+                    "self":{"type":"string","x-core-ref":{"type":"urn:core:platform:civitas:element:common:95b28937-69ab-8ee7-814d-46230d8e6fcb:1.0.0"}}
                   },
                   "$defs":{
-                    "Strasse":{"$id":"urn:core:platform:civitas:element:common:Strasse:u8pwgr2zzg:1.0.0","type":"object","properties":{"name":{"type":"string"}}}
+                    "Strasse":{"$id":"urn:core:platform:civitas:element:common:4efe004c-2dcb-8c11-b006-ca19ac540baf:1.0.0","type":"object","properties":{"name":{"type":"string"}}}
                   }
                 }
                 """);
@@ -666,7 +690,7 @@ class SchemaImportServiceTest {
         // The FK targets were satisfied from the co-import allow-set — the existence check never
         // resolved the sibling target against the registry. (The root URN itself is looked up
         // once by the sub-element-reuse matching; that lookup is not the FK existence check.)
-        verify(registry, never()).resolveReference("urn:core:platform:civitas:element:common:Strasse:u8pwgr2zzg:1.0.0");
+        verify(registry, never()).resolveReference("urn:core:platform:civitas:element:common:4efe004c-2dcb-8c11-b006-ca19ac540baf:1.0.0");
     }
 
     @Test
@@ -679,14 +703,14 @@ class SchemaImportServiceTest {
             schema = mapper.readTree("""
                 {
                   "$schema":"https://json-schema.org/draft/2020-12/schema",
-                  "$id":"urn:core:platform:civitas:element:common:Baum:vd1c1ziwlu:1.0.0",
+                  "$id":"urn:core:platform:civitas:element:common:95b28937-69ab-8ee7-814d-46230d8e6fcb:1.0.0",
                   "title":"Baum","type":"object",
                   "properties":{
-                    "stehtAn":{"type":"string","x-core-ref":{"type":"urn:core:platform:civitas:element:common:Strasse:u8pwgr2zzg:1.0.0"}},
-                    "self":{"type":"string","x-core-ref":{"type":"urn:core:platform:civitas:element:common:Baum:vd1c1ziwlu:1.0.0"}}
+                    "stehtAn":{"type":"string","x-core-ref":{"type":"urn:core:platform:civitas:element:common:4efe004c-2dcb-8c11-b006-ca19ac540baf:1.0.0"}},
+                    "self":{"type":"string","x-core-ref":{"type":"urn:core:platform:civitas:element:common:95b28937-69ab-8ee7-814d-46230d8e6fcb:1.0.0"}}
                   },
                   "$defs":{
-                    "Strasse":{"$id":"urn:core:platform:civitas:element:common:Strasse:u8pwgr2zzg:1.0.0","type":"object","properties":{"name":{"type":"string"}}}
+                    "Strasse":{"$id":"urn:core:platform:civitas:element:common:4efe004c-2dcb-8c11-b006-ca19ac540baf:1.0.0","type":"object","properties":{"name":{"type":"string"}}}
                   }
                 }
                 """);
@@ -695,15 +719,15 @@ class SchemaImportServiceTest {
         }
 
         // Graph nodes are keyed by the pin the write assigns, so the write has to report one.
-        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
-            .thenAnswer(inv -> inv.getArgument(1, JsonNode.class).path("$id").asText() + ":1.0.0");
+        when(registry.storeElement(any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
+            .thenAnswer(inv -> inv.getArgument(0, JsonNode.class).path("$id").asText() + ":1.0.0");
 
         svc.importSchema(new SchemaImportRequest(schema));
 
-        String baumUrn = "urn:core:platform:civitas:element:common:Baum:vd1c1ziwlu:1.0.0";
+        String baumUrn = "urn:core:platform:civitas:element:common:95b28937-69ab-8ee7-814d-46230d8e6fcb:1.0.0";
         assertThat(graph.getDependencies(baumUrn)).contains(
-            "urn:core:platform:civitas:element:common:Strasse:u8pwgr2zzg:1.0.0", baumUrn);
-        assertThat(graph.getDependents("urn:core:platform:civitas:element:common:Strasse:u8pwgr2zzg:1.0.0"))
+            "urn:core:platform:civitas:element:common:4efe004c-2dcb-8c11-b006-ca19ac540baf:1.0.0", baumUrn);
+        assertThat(graph.getDependents("urn:core:platform:civitas:element:common:4efe004c-2dcb-8c11-b006-ca19ac540baf:1.0.0"))
             .contains(baumUrn);
     }
 
@@ -732,9 +756,8 @@ class SchemaImportServiceTest {
         Map<String, JsonNode> stored = importAndCapture(schema);
 
         assertThat(stored).hasSize(2);
-        assertThat(stored.keySet()).noneMatch(urn -> "Bundle".equals(UrnParser.nameFromUrn(urn)));
-        assertThat(UrnParser.nameFromUrn(urnOf(stored, "Alpha"))).isEqualTo("Alpha");
-        assertThat(UrnParser.nameFromUrn(urnOf(stored, "Beta"))).isEqualTo("Beta");
+        assertThat(stored.values()).noneMatch(element -> "Bundle".equals(element.path("title").asText(null)));
+        assertThat(urnOf(stored, "Alpha")).isNotEqualTo(urnOf(stored, "Beta"));
 
         // The DataStructure still groups every def (as $defs member $refs), borrowing the first def's identity.
         ArgumentCaptor<JsonNode> manifest = ArgumentCaptor.forClass(JsonNode.class);
@@ -746,7 +769,7 @@ class SchemaImportServiceTest {
     // ── DataStructure contract enforcement ──────────────────────────────────────
 
     private static final String DS_ROOT_URN =
-        "urn:core:platform:civitas:datastructure:sta:AirQuality:abcdefghij:1.0.0";
+        "urn:core:platform:civitas:datastructure:sta:7af031c5-3d49-803f-92a1-ca3285316b50:1.0.0";
 
     @Test
     void dataStructureRoot_withARootRefThatIsNotAnElementUrn_isRejectedAndStoresNothing() {
@@ -768,8 +791,7 @@ class SchemaImportServiceTest {
 
         assertThat(result.diagnostics()).isNotEmpty();
         verify(registry, never()).storeDataStructure(anyString(), any(), any(VersionBump.class), nullable(String.class));
-        verify(registry, never()).storeElement(
-            anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class));
+        verify(registry, never()).storeElement(any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class));
     }
 
     @Test
@@ -804,7 +826,7 @@ class SchemaImportServiceTest {
         String second = importedRootUrn(url, "smart-data-models:Weather/WeatherObserved");
 
         // Same upstream key → same logical URN, so the registry versions the artifact instead of
-        // creating an unrelated duplicate. A random disambiguator could never do this.
+        // creating an unrelated duplicate. A random UUID could never do this.
         assertThat(UrnParser.logicalUrn(second)).isEqualTo(UrnParser.logicalUrn(first));
     }
 
@@ -825,8 +847,8 @@ class SchemaImportServiceTest {
     @Test
     void keyedImport_leavesAnExistingCoreUrnIdentityAlone() {
         String url = "https://raw.githubusercontent.com/x/schema.json";
-        String ownId = "urn:core:platform:civitas:element:common:Given:abcdefghij:1.0.0";
-        String ownLogical = "urn:core:platform:civitas:element:common:Given:abcdefghij";
+        String ownId = "urn:core:platform:civitas:element:common:f1194ef7-8609-860c-ad54-07a0b8ef1eb4:1.0.0";
+        String ownLogical = "urn:core:platform:civitas:element:common:f1194ef7-8609-860c-ad54-07a0b8ef1eb4";
         when(remoteFetcher.fetchJson(url)).thenReturn(mapper.readTree("""
             { "$id": "%s", "title": "Given", "type": "object" }
             """.formatted(ownId)));
@@ -838,8 +860,7 @@ class SchemaImportServiceTest {
     private String importedRootUrn(String url, String stableKey) {
         svc.importFromUrl(url, stableKey);
         ArgumentCaptor<JsonNode> stored = ArgumentCaptor.forClass(JsonNode.class);
-        verify(registry, atLeastOnce()).storeElement(
-            anyString(), stored.capture(), anySet(), anySet(), nullable(String.class), any(VersionBump.class));
+        verify(registry, atLeastOnce()).storeElement(stored.capture(), anySet(), anySet(), nullable(String.class), any(VersionBump.class));
         return stored.getAllValues().getFirst().path("$id").asText(null);
     }
 
@@ -869,8 +890,8 @@ class SchemaImportServiceTest {
             mock(RemoteSchemaRepository.class), new CoreSchemaValidator(mapper));
 
         // First Element stores fine; the second is rejected by the registry mid-import.
-        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
-            .thenReturn("urn:core:platform:civitas:element:common:Alpha:aaaaaaaaaa:1.0.0")
+        when(registry.storeElement(any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
+            .thenReturn("urn:core:platform:civitas:element:common:c121b259-d294-8d60-8066-7442eb3a1910:1.0.0")
             .thenThrow(new IllegalArgumentException("rejected"));
 
         JsonNode schema = mapper.readTree("""
@@ -906,12 +927,12 @@ class SchemaImportServiceTest {
             schema = mapper.readTree("""
                 {
                   "$schema":"https://json-schema.org/draft/2020-12/schema",
-                  "$id":"urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b",
+                  "$id":"urn:core:platform:civitas:datastructure:common:8f00c12e-4873-8f40-85b8-5b74dd19aea2",
                   "title":"People",
-                  "$ref":"urn:core:platform:civitas:element:common:Person:pp11abcd12:2.0.0",
+                  "$ref":"urn:core:platform:civitas:element:common:095e0ad1-181c-876b-9725-364d965cb752:2.0.0",
                   "$defs":{
                     "Person":{
-                      "$id":"urn:core:platform:civitas:element:common:Person:pp11abcd12",
+                      "$id":"urn:core:platform:civitas:element:common:095e0ad1-181c-876b-9725-364d965cb752",
                       "type":"object",
                       "properties":{"name":{"type":"string"}}
                     }
@@ -921,8 +942,8 @@ class SchemaImportServiceTest {
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
-        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
-            .thenReturn("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
+        when(registry.storeElement(any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
+            .thenReturn("urn:core:platform:civitas:element:common:095e0ad1-181c-876b-9725-364d965cb752:1.0.1");
         when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class), nullable(String.class)))
             .thenAnswer(inv -> inv.getArgument(0) + ":1.0.1");
 
@@ -931,7 +952,7 @@ class SchemaImportServiceTest {
         ArgumentCaptor<JsonNode> ds = ArgumentCaptor.forClass(JsonNode.class);
         verify(registry).storeDataStructure(anyString(), ds.capture(), any(VersionBump.class), nullable(String.class));
         assertThat(ds.getValue().path("$ref").asText())
-            .isEqualTo("urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.1");
+            .isEqualTo("urn:core:platform:civitas:element:common:095e0ad1-181c-876b-9725-364d965cb752:1.0.1");
     }
 
     /**
@@ -941,8 +962,8 @@ class SchemaImportServiceTest {
      */
     @Test
     void automaticGroupingReferencesTheVersionsTheMemberWritesAssigned() {
-        when(registry.storeElement(anyString(), any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
-            .thenAnswer(inv -> inv.getArgument(1, JsonNode.class).path("$id").asText() + ":3.1.4");
+        when(registry.storeElement(any(), anySet(), anySet(), nullable(String.class), any(VersionBump.class)))
+            .thenAnswer(inv -> inv.getArgument(0, JsonNode.class).path("$id").asText() + ":3.1.4");
         when(registry.storeDataStructure(anyString(), any(), any(VersionBump.class), nullable(String.class)))
             .thenAnswer(inv -> inv.getArgument(0) + ":3.1.4");
 

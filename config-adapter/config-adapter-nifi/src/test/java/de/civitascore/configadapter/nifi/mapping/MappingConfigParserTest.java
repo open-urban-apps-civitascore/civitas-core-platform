@@ -29,9 +29,9 @@ import org.junit.jupiter.api.Test;
 class MappingConfigParserTest {
 
   private static final String SOURCE_URN =
-      "urn:core:platform:civitas:datastructure:common:Source:2dmtus8w40:1.0.0";
+      "urn:core:platform:civitas:datastructure:common:69805d0e-f2ea-852d-ab06-23fe8283bc59:1.0.0";
   private static final String TARGET_URN =
-      "urn:core:platform:civitas:datastructure:common:Target:abcdefghij:1.0.0";
+      "urn:core:platform:civitas:datastructure:common:625828d3-ecb3-806b-8666-dab644eca1d7:1.0.0";
 
   private final ObjectMapper mapper = new ObjectMapper();
   private final MappingConfigParser parser = new MappingConfigParser();

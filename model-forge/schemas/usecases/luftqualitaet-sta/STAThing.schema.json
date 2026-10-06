@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:core:platform:civitas:element:sta:STAThing:1.0.0",
+  "$id": "urn:core:platform:civitas:element:sta:513c5444-b723-8341-b283-ea96fea99b16:1.0.0",
   "title": "STAThing",
   "description": "OGC SensorThings API v1.1 complete static master-data document for one measurement station. Covers the Thing entity together with its Locations (as STALocation references), Datastreams, Sensors, and ObservedProperties as nested entities — exactly as accepted by a FROST-Server POST /Things deep-insert request.",
   "type": "object",
@@ -46,7 +46,7 @@
       "minItems": 1,
       "description": "Geographic position(s) of this Thing. Items conform to STALocation.",
       "items": {
-        "$ref": "urn:core:platform:civitas:element:sta:STALocation:1.0.0"
+        "$ref": "urn:core:platform:civitas:element:sta:136301c2-0217-8147-aff0-12d08e3724b3:1.0.0"
       }
     },
     "Datastreams": {

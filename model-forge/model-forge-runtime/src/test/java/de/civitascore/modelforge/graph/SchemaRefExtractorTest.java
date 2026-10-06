@@ -18,19 +18,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SchemaRefExtractorTest {
 
     private static final String GEO =
-            "urn:core:platform:civitas:element:common:GeoPoint:3ak90vqrog:1.0.0";
+            "urn:core:platform:civitas:element:common:da736e5f-bb91-88a6-abaa-761d911af81a:1.0.0";
     private static final String ADDRESS =
-            "urn:core:platform:civitas:element:common:Address:enzw5n1szv:1.0.0";
+            "urn:core:platform:civitas:element:common:63e7d4dc-ffab-8076-b7d9-43c0eefd4da7:1.0.0";
     private static final String SENSOR =
-            "urn:core:platform:civitas:element:common:SensorReading:d28s38wfmi:1.0.0";
+            "urn:core:platform:civitas:element:common:0062782c-5353-87ad-b8d4-c1b90ed9b00a:1.0.0";
     private static final String UNIT =
-            "urn:core:platform:civitas:element:common:Unit:6chopb0js2:1.0.0";
+            "urn:core:platform:civitas:element:common:7f7a92b5-0952-88bf-8c67-e7b10b507c88:1.0.0";
     private static final String OBSERVATION =
-            "urn:core:platform:civitas:element:common:Observation:ulhry9fjx6:1.0.0";
+            "urn:core:platform:civitas:element:common:4560fbf9-5824-85f9-b58f-5e1049048f42:1.0.0";
     private static final String STATION =
-            "urn:core:platform:civitas:element:common:Station:hkr6gt1ni1:1.0.0";
+            "urn:core:platform:civitas:element:common:1bac419c-05e7-8ef0-a4b4-b15f803e2151:1.0.0";
     private static final String QUANTITY =
-            "urn:core:platform:civitas:element:common:Quantity:m7rxt8oz70:1.0.0";
+            "urn:core:platform:civitas:element:common:7d52b6a7-f472-8ca3-8653-f25b423705a1:1.0.0";
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final SchemaRefExtractor extractor = new SchemaRefExtractor();

@@ -283,17 +283,29 @@ public class DataSetService
       cleanUpOrphanedOwsLayers(entity);
     }
 
-    // A DataSet is backed by a Model Forge manifest artifact its members are linked into
-    // (pipelines,
-    // and transitively their sources/sinks/mappings/structures). Create it once, on first persist
-    // (when no manifest is pinned yet); its title mirrors the dataset name. Model Forge validates
-    // it.
-    if (entity.getManifestLogicalUrn() == null) {
-      ModelRegistryGateway.ModelPin pin =
-          modelRegistryGateway.createDataSetManifest(entity.getName());
-      entity.setManifestLogicalUrn(pin.logicalUrn());
+    if (entity.getId() != null) {
+      createManifestIfMissing(entity);
     }
     return super.postConvertToEntity(entity, input);
+  }
+
+  @Override
+  protected DataSet postCreate(DataSet saved, DataSetInputDTO input) {
+    createManifestIfMissing(saved);
+    return super.postCreate(saved, input);
+  }
+
+  /**
+   * A DataSet is backed by a Model Forge manifest artifact its members are linked into (pipelines,
+   * and transitively their sources/sinks/mappings/structures). It is created once, when no manifest
+   * is pinned yet; its title mirrors the dataset name. Model Forge validates it.
+   */
+  private void createManifestIfMissing(DataSet entity) {
+    if (entity.getManifestLogicalUrn() == null) {
+      ModelRegistryGateway.ModelPin pin =
+          modelRegistryGateway.createDataSetManifest(entity.getId(), entity.getName());
+      entity.setManifestLogicalUrn(pin.logicalUrn());
+    }
   }
 
   /**

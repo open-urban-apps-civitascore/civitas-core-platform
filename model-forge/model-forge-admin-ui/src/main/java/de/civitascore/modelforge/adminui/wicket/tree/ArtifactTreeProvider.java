@@ -164,7 +164,7 @@ public final class ArtifactTreeProvider implements ITreeProvider<ArtifactTreeNod
         for (ArtifactSummary summary : summaries) {
             String type = summary.type() == null ? "other" : summary.type();
             String urn = summary.artifactId().value();
-            String name = UrnParser.nameFromUrn(urn);
+            String name = summary.title() != null ? summary.title() : urn;
             String version = summary.version() != null ? summary.version() : UrnParser.versionFromUrn(urn);
             byType.computeIfAbsent(type, t -> new ArrayList<>())
                 .add(new Artifact(urn, name, version, type, List.of(), false));
@@ -183,7 +183,7 @@ public final class ArtifactTreeProvider implements ITreeProvider<ArtifactTreeNod
             .map(n -> {
                 String urn = n.artifactId().value();
                 String type = UrnParser.artifactTypeFromUrn(urn);
-                String name = n.label() != null && !n.label().isBlank() ? n.label() : UrnParser.nameFromUrn(urn);
+                String name = n.label();
                 String version = UrnParser.versionFromUrn(urn);
                 return new RelatedRef(urn, name, version, type);
             })

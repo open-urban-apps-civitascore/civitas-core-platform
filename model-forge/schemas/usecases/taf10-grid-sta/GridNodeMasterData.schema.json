@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:core:platform:civitas:element:taf10-grid:GridNodeMasterData:1.0.0",
+  "$id": "urn:core:platform:civitas:element:taf10-grid:282aea29-45de-8e68-9361-bd477e45b231:1.0.0",
   "title": "GridNodeMasterData",
   "description": "Reference data for a low-voltage grid node, feeder, or transformer area. Looked up at runtime by gridNodeId to enrich TAF10GridReading messages with operational thresholds and controllable assets.",
   "type": "object",
@@ -64,7 +64,7 @@
       }
     },
     "location": {
-      "$ref": "urn:core:platform:civitas:element:common:GeoPoint:1.0.0",
+      "$ref": "urn:core:platform:civitas:element:common:f1ebc343-33a2-8681-8e4a-aecfaeaa8e1e:1.0.0",
       "description": "Fixed installation coordinates of the grid node."
     },
     "frostThingId": {

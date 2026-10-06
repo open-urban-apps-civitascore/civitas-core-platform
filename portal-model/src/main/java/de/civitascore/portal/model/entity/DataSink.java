@@ -52,8 +52,8 @@ public class DataSink extends DataSetOwnedEntity {
   @NotNull private DataSinkType dataSinkType;
 
   /**
-   * Stable logical CORE URN of this sink's configuration artifact in Model Forge, minted once on
-   * the first store and reused for every following version. Null until a configuration is stored.
+   * Logical CORE URN of this sink's configuration artifact in Model Forge. Null until a
+   * configuration is stored.
    */
   @Column(name = "configuration_logical_urn")
   private String configurationLogicalUrn;

@@ -9,23 +9,19 @@
  */
 package de.civitascore.configadapter.model.dataset;
 
-import java.math.BigInteger;
 import java.util.List;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * The CORE URN identifying a platform artifact, and its validation.
  *
- * <p>Layout: {@code
- * urn:core:<scope>:<owner>:<artifact-type>:<domain>:<name>:<disambiguator>:<version>}.
+ * <p>Layout: {@code urn:core:<scope>:<owner>:<artifact-type>:<domain>:<uuid>:<version>}. The UUID
+ * is the artifact's identity; the URN carries no display name, so a rename never changes it.
  *
- * <p>Lives in {@code config-adapter-api} as the single source of truth so both trust boundaries
- * validate the same shape: the portal-backend guards the DataStructure model {@code $id} it
- * persists, and the config-adapter guards the {@code source}/{@code target} URNs a tenant ships on
- * a mapping. Producers reference {@link #PATTERN} on {@code @Pattern}; consumers call {@link
- * #isValid(String)} as the runtime guard.
+ * <p>Lives in {@code config-adapter-api} so every module validates the same shape. The
+ * config-adapter calls {@link #isValid(String)} on the {@code source}/{@code target} URNs a tenant
+ * ships on a mapping.
  *
  * <p>Unlike a generic {@code urn:core:} parser that only enforces the prefix and positional layout,
  * these are the CORE platform's own conventions: {@code scope} and {@code artifact-type} are drawn
@@ -44,39 +40,26 @@ public final class CoreUrn {
       List.of(
           "element", "datastructure", "mapping", "pipeline", "datasource", "datasink", "dataset");
 
-  /** Length of the base36 disambiguator; must mirror {@code toDisambiguator} in the frontend. */
-  public static final int DISAMBIGUATOR_LENGTH = 10;
-
   private static final String SCOPE = group(SCOPES);
   private static final String ARTIFACT_TYPE = group(ARTIFACT_TYPES);
 
   private static final String SLUG = "[a-z0-9]+(?:-[a-z0-9]+)*";
   private static final String DOMAIN = SLUG + "(?:\\." + SLUG + ")*";
-  // The registry derives this segment from a schema title and keeps dots, underscores and
-  // hyphens (XOEV identifiers such as Lokation.0002_Bundesland rely on them), so the segment
-  // has to accept them here too; identity is carried by the disambiguator, not the name.
-  private static final String NAME = "[A-Za-z0-9._-]+";
-  private static final String DISAMBIGUATOR = "[0-9a-z]{" + DISAMBIGUATOR_LENGTH + "}";
+  private static final String ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   private static final String VERSION = "\\d+\\.\\d+\\.\\d+";
 
-  /**
-   * Regex matching a full CORE URN, with named {@code scope}, {@code artifactType} and {@code
-   * disambiguator} groups. Anchored so {@code @Pattern} and {@link #COMPILED_PATTERN} agree —
-   * {@code @Pattern} matches the whole value, {@code Matcher#matches} likewise.
-   */
+  /** Regex matching a full CORE URN, with named {@code id} and {@code version} groups. */
   public static final String PATTERN =
-      "urn:core:(?<scope>"
+      "urn:core:"
           + SCOPE
-          + "):"
-          + SLUG
-          + ":(?<artifactType>"
-          + ARTIFACT_TYPE
-          + "):"
-          + DOMAIN
           + ":"
-          + NAME
-          + ":(?<disambiguator>"
-          + DISAMBIGUATOR
+          + SLUG
+          + ":"
+          + ARTIFACT_TYPE
+          + ":"
+          + DOMAIN
+          + ":(?<id>"
+          + ID
           + "):(?<version>"
           + VERSION
           + ")";
@@ -123,49 +106,13 @@ public final class CoreUrn {
     if (a == null || b == null) {
       return false;
     }
-    return a.equals(b) || logicalUrn(a).equals(logicalUrn(b));
-  }
-
-  /**
-   * The base36 disambiguator derived from a DataStructure id: the UUID's 128 bits read as one
-   * integer, encoded in base36, then the least-significant {@link #DISAMBIGUATOR_LENGTH} characters
-   * (left-padded). Must stay bit-for-bit identical to {@code toDisambiguator} in the frontend's
-   * {@code urn.ts}, so the URN built there round-trips here.
-   */
-  public static String disambiguatorFor(UUID id) {
-    String base36 = new BigInteger(1, toBytes(id)).toString(36);
-    String tail =
-        base36.length() > DISAMBIGUATOR_LENGTH
-            ? base36.substring(base36.length() - DISAMBIGUATOR_LENGTH)
-            : base36;
-    return "0".repeat(DISAMBIGUATOR_LENGTH - tail.length()) + tail;
-  }
-
-  /**
-   * Whether {@code urn} is a well-formed platform-scoped {@code datastructure} URN whose
-   * disambiguator was in fact derived from {@code id}. Guards against a URN whose disambiguator was
-   * hand-forged or copied from another DataStructure — the disambiguator only disambiguates if it
-   * provably belongs to this id. Scope and artifact-type are pinned because the disambiguator is a
-   * pure function of the UUID: a {@code mapping} or tenant-scoped URN reusing the same token would
-   * otherwise pass as this DataStructure's identity.
-   */
-  public static boolean matchesId(String urn, UUID id) {
-    if (urn == null || id == null) {
-      return false;
-    }
-    Matcher matcher = COMPILED_PATTERN.matcher(urn);
-    return matcher.matches()
-        && "platform".equals(matcher.group("scope"))
-        && "datastructure".equals(matcher.group("artifactType"))
-        && matcher.group("disambiguator").equals(disambiguatorFor(id));
+    return logicalUrn(a).equals(logicalUrn(b));
   }
 
   /**
    * Whether two URNs name the same DataStructure at the same version, and therefore the same shape.
-   * Only the disambiguator and the version are compared: the disambiguator is derived from the
-   * DataStructure id and the version is the shape, while the name segment is a display name that a
-   * rename changes without touching the structure. Comparing the URNs verbatim would reject a chain
-   * whose shape never changed.
+   * The artifact type is not compared: a DataStructure and the root Element built from it share
+   * their UUID and version.
    *
    * @return false if either URN is null or malformed — an unverifiable pair is not a matching one
    */
@@ -177,22 +124,11 @@ public final class CoreUrn {
     Matcher second = COMPILED_PATTERN.matcher(other);
     return first.matches()
         && second.matches()
-        && first.group("disambiguator").equals(second.group("disambiguator"))
+        && first.group("id").equals(second.group("id"))
         && first.group("version").equals(second.group("version"));
   }
 
   private CoreUrn() {}
-
-  private static byte[] toBytes(UUID id) {
-    byte[] bytes = new byte[16];
-    long msb = id.getMostSignificantBits();
-    long lsb = id.getLeastSignificantBits();
-    for (int i = 0; i < 8; i++) {
-      bytes[i] = (byte) (msb >>> (8 * (7 - i)));
-      bytes[8 + i] = (byte) (lsb >>> (8 * (7 - i)));
-    }
-    return bytes;
-  }
 
   private static String group(List<String> alternatives) {
     return "(?:" + String.join("|", alternatives) + ")";

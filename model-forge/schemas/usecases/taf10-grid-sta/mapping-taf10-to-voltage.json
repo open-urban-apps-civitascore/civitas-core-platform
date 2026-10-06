@@ -1,9 +1,9 @@
 {
   "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
-  "id": "urn:core:platform:civitas:mapping:taf10-grid:taf10-to-voltage:1.0.0",
+  "id": "urn:core:platform:civitas:mapping:taf10-grid:3d3265c8-024e-8efa-b048-5ed624611591:1.0.0",
   "title": "TAF10 Voltage -> STA Observation",
-  "source": "urn:core:platform:civitas:element:taf10-grid:TAF10GridReading:1.0.0",
-  "target": "urn:core:platform:civitas:element:sta:STAObservation:1.0.0",
+  "source": "urn:core:platform:civitas:element:taf10-grid:fb8586b6-92ea-8bca-a3a7-a8e99a377b83:1.0.0",
+  "target": "urn:core:platform:civitas:element:sta:61296fa8-8cca-8d83-af42-51e12c991cd8:1.0.0",
   "fields": {
     "phenomenonTime": { "op": "copy", "input": "$.timestamp" },
     "resultTime": { "op": "copy", "input": "$.timestamp" },

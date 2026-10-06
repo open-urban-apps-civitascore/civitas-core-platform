@@ -147,9 +147,17 @@ public class DataSourceService
     // The input's configuration was already normalized + encrypted by the pre-process hooks;
     // store it in the registry and mirror the pin. An absent configuration on a full update
     // clears the pin (the artifact history stays in the registry).
-    storeConfigurationInRegistry(entity, input.getConfiguration(), input.getConnectorType());
+    if (entity.getId() != null) {
+      storeConfigurationInRegistry(entity, input.getConfiguration(), input.getConnectorType());
+    }
 
     return super.postConvertToEntity(entity, input);
+  }
+
+  @Override
+  protected DataSource postCreate(DataSource saved, DataSourceInputDTO input) {
+    storeConfigurationInRegistry(saved, input.getConfiguration(), input.getConnectorType());
+    return super.postCreate(saved, input);
   }
 
   /**
@@ -189,6 +197,7 @@ public class DataSourceService
         modelRegistryGateway.storePayload(
             PayloadKind.DATA_SOURCE,
             Optional.ofNullable(entity.getConfigurationLogicalUrn()),
+            entity.getId(),
             entity.getName() != null ? entity.getName() : "datasource",
             payload,
             null);

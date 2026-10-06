@@ -245,7 +245,7 @@ class RemoteRefResolverTest {
 
     @Test
     void aCoreUrnReferenceIsLeftUntouchedAndNothingIsFetched() {
-        String urn = "urn:core:platform:civitas:element:sta:Location:l2p8y4efpu:1.0.0";
+        String urn = "urn:core:platform:civitas:element:sta:d8a52fda-326d-8b95-8244-c1ff8975dab2:1.0.0";
         String entity = """
             {
               "$schema": "https://json-schema.org/draft/2020-12/schema",

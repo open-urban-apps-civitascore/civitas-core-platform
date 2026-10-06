@@ -24,11 +24,11 @@ import static org.mockito.Mockito.when;
 class GraphPageTest extends AbstractWicketPageTest {
 
     private static final String LISTED =
-        "urn:core:platform:civitas:element:common:Listed:aaaaaaaaaa:1.0.0";
+        "urn:core:platform:civitas:element:common:7d5f4617-b65b-80e6-b3d2-8caab5d34715:1.0.0";
     private static final String UNLISTED_STRUCTURE =
-        "urn:core:platform:civitas:datastructure:common:Unlisted:bbbbbbbbbb:1.0.0";
+        "urn:core:platform:civitas:datastructure:common:b8e0b641-f4e0-8e8b-b7d2-8d0bb35915f8:1.0.0";
     private static final String GHOST =
-        "urn:core:platform:civitas:element:common:Ghost:cccccccccc:1.0.0";
+        "urn:core:platform:civitas:element:common:158a41e4-f47b-8e87-bc6f-d6573a02ab99:1.0.0";
 
     /** The search page lists only {@code LISTED}, standing in for its row limit. */
     private void searchListsOnlyTheOneArtifact() {

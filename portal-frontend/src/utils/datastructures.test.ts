@@ -2,7 +2,7 @@ import { assert, describe, expect, it } from 'vitest'
 
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
-import { datastructureFixtures, DS_URN } from '@/test-support/datastructureFixtures'
+import { datastructureFixtures } from '@/test-support/datastructureFixtures'
 import type {
   Datastructure,
   DatastructuresListData,
@@ -308,8 +308,14 @@ describe('mapDatastructureVersionFormToApiData', () => {
   it('records the published structures the diagram was built from', () => {
     const formData = createVersionFormData()
     const imported = [
-      { urn: 'urn:core:platform:civitas:datastructure:frost:ThingTree:0123456789:1.0.0', name: 'ThingTree' },
-      { urn: 'urn:core:platform:civitas:datastructure:frost:Things:9876543210:2.1.0', name: 'Things' },
+      {
+        urn: 'urn:core:platform:civitas:datastructure:frost:9cc6ed95-0f8b-8ace-ab6e-83cdee87b3dd:1.0.0',
+        name: 'ThingTree',
+      },
+      {
+        urn: 'urn:core:platform:civitas:datastructure:frost:c415dee9-6cad-8a43-9ad3-1e8b3903c57a:2.1.0',
+        name: 'Things',
+      },
     ]
     const diagram = { ...createVersionDetail().styles!, importedStructures: imported }
 
@@ -321,7 +327,7 @@ describe('mapDatastructureVersionFormToApiData', () => {
   })
 
   it('keeps the stored pins when the save carries no diagram', () => {
-    const pinned = ['urn:core:platform:civitas:datastructure:frost:ThingTree:0123456789:1.0.0']
+    const pinned = ['urn:core:platform:civitas:datastructure:frost:9cc6ed95-0f8b-8ace-ab6e-83cdee87b3dd:1.0.0']
 
     const result = mapDatastructureVersionFormToApiData(createVersionFormData(), null, null, pinned)
 
@@ -668,10 +674,10 @@ describe('the exported model survives a save/rehydrate round-trip', () => {
   const noEdit = (diagram: UMLDiagram) => diagram
 
   const roundTrip = (diagram: UMLDiagram, edit: (diagram: UMLDiagram) => UMLDiagram = noEdit) => {
-    const before = buildUMLModelPayload(diagram, DS_URN).model
+    const before = buildUMLModelPayload(diagram).model
     const persisted = JSON.parse(JSON.stringify(mapDatastructureVersionFormToApiData(formOf(), diagram, before)))
     const rehydrated = buildSessionFromVersion(persisted as DatastructureVersion).diagram
-    return { before, after: buildUMLModelPayload(edit(rehydrated), DS_URN).model }
+    return { before, after: buildUMLModelPayload(edit(rehydrated)).model }
   }
 
   it.each(datastructureFixtures)('$label exports an equivalent model after rehydration', ({ diagram }) => {
@@ -704,19 +710,24 @@ describe('the exported model survives a save/rehydrate round-trip', () => {
     expect(after.$ref).toBe(before.$ref)
   })
 
-  it('names every member and cross-reference by its Element URN', () => {
+  it('names every member by its key and every cross-reference by a local pointer', () => {
     const { before } = roundTrip(fixtureNamed('four cross-referencing elements under one root'))
-    const urn = (name: string) => `urn:core:platform:civitas:element:common:${name}:abc1234567:1.0.0`
+    const pointer = (name: string) => `#/$defs/${name}`
 
     expect(idsOf(before)).toEqual([
-      ['Station', urn('Station')],
-      ['Measurement', urn('Measurement')],
-      ['Reading', urn('Reading')],
-      ['Alert', urn('Alert')],
+      ['Station', undefined],
+      ['Measurement', undefined],
+      ['Reading', undefined],
+      ['Alert', undefined],
     ])
     // Measurement appears twice: both Reading and Alert inherit it.
-    expect(refsOf(before)).toEqual([urn('Alert'), urn('Measurement'), urn('Measurement'), urn('Reading')])
-    expect(before.$ref).toBe(urn('Station'))
+    expect(refsOf(before)).toEqual([
+      pointer('Alert'),
+      pointer('Measurement'),
+      pointer('Measurement'),
+      pointer('Reading'),
+    ])
+    expect(before.$ref).toBe(pointer('Station'))
   })
 
   const fixtureNamed = (label: string) => {
