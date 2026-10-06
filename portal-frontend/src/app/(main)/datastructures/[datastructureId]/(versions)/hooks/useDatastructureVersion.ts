@@ -90,7 +90,6 @@ export const useDatastructureVersion = ({ version, isCreateMode, onCreateVersion
   const nodes = modelSessionManager.activeSession?.diagram.nodes
   const edges = modelSessionManager.activeSession?.diagram.edges
   const modelName = modelSessionManager.activeSession?.diagram.name
-  const hasInvalidModelNames = hasInvalidNamesInDiagram(nodes ?? [])
   const activeSession = modelSessionManager.activeSession
   const activeSessionId = modelSessionManager.activeSessionId
   const shouldMarkModelFieldsDirty = !!activeSession?.isDirty
@@ -110,6 +109,10 @@ export const useDatastructureVersion = ({ version, isCreateMode, onCreateVersion
   const nodesWatch = form.watch('nodes')
 
   const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
+  const isUnreleasing =
+    initialFormValues.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && isDraftMode
+  // Available versions are read-only, so invalid names can only be fixed after the unrelease.
+  const isSaveBlockedByInvalidNames = !isUnreleasing && hasInvalidNamesInDiagram(nodes ?? [])
 
   useEffect(() => {
     form.setValue('modelName', modelName || null, { shouldDirty: shouldMarkModelFieldsDirty })
@@ -275,7 +278,7 @@ export const useDatastructureVersion = ({ version, isCreateMode, onCreateVersion
       handleFormValidationError(parsed.error)
       return false
     }
-    if (hasInvalidModelNames) {
+    if (isSaveBlockedByInvalidNames) {
       toast.error(t('errors.saveInvalidModel', { reason: tUmlModeler('nameValidation.invalidNames') }))
       return false
     }
