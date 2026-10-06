@@ -1667,7 +1667,7 @@
       "duplicateElement": "Another element in the diagram already has this name.",
       "duplicateAttribute": "Another attribute of this class already has this name.",
       "duplicateEnumValue": "Several values have the same name.",
-      "invalidNames": "At least one name in the diagram is not valid or is used more than once."
+      "invalidNames": "At least one name of an element, attribute or enumeration value is not valid or is used more than once."
     },
     "rootValidation": {
       "noRoot": "No root class can be determined in the diagram — every class is embedded in another one (cyclic structure).",

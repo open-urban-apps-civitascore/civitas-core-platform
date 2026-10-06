@@ -349,7 +349,6 @@ export const useDatastructureVersion = ({ version, isCreateMode, onCreateVersion
     handleStatusChange,
     resetToInitialState,
     hasUserChanges,
-    hasInvalidModelNames,
     resetSession,
     resetFormAndSession,
   }

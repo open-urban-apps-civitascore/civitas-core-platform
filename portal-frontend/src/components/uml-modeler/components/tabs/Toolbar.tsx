@@ -57,11 +57,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const { diagram } = useActiveDiagram()
   const createModel = useCreateModel()
   const isSaving = createModel.isPending
-  const hasInvalidModelNames = hasInvalidNamesInDiagram(diagram.nodes)
   const t = useTranslations('umlModeler')
 
   const handleSave = useCallback(() => {
     if (isSaving) return
+    if (hasInvalidNamesInDiagram(diagram.nodes)) {
+      toast.error(t('nameValidation.invalidNames'))
+      return
+    }
 
     let payload
     try {
@@ -116,7 +119,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             variant="ghost"
             size="sm"
             onClick={handleSave}
-            disabled={isSaving || hasInvalidModelNames}
+            disabled={isSaving}
             className={`h-8 px-2 ${hasUnsavedChanges ? 'text-blue-600' : ''}`}
             title={isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save changes' : 'Save'}
           >

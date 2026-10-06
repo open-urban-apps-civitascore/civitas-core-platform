@@ -359,7 +359,6 @@ describe('useDatastructureVersion — class names', () => {
       saved = await hook.result.current.saveDatastructureVersion(DS_ID)
     })
 
-    expect(hook.result.current.hasInvalidModelNames).toBe(true)
     expect(saved).toBe(false)
     expect(toast.error).toHaveBeenCalledWith(
       'datastructureVersions.errors.saveInvalidModel|umlModeler.nameValidation.invalidNames',

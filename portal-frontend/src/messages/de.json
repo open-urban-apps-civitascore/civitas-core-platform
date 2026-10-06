@@ -1654,7 +1654,7 @@
       "duplicateElement": "Ein anderes Element im Diagramm hat bereits diesen Namen.",
       "duplicateAttribute": "Ein anderes Attribut dieser Klasse hat bereits diesen Namen.",
       "duplicateEnumValue": "Mehrere Werte haben denselben Namen.",
-      "invalidNames": "Mindestens ein Name im Diagramm ist ungültig oder wird mehrfach verwendet."
+      "invalidNames": "Mindestens ein Name eines Elements, Attributs oder Enum-Werts ist ungültig oder wird mehrfach verwendet."
     },
     "rootValidation": {
       "noRoot": "Im Diagramm lässt sich keine Wurzelklasse bestimmen — jede Klasse ist in eine andere eingebettet (zyklische Struktur).",

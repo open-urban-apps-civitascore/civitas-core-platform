@@ -115,7 +115,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     saveDatastructureVersion,
     handleStatusChange,
     hasUserChanges,
-    hasInvalidModelNames,
   } = useDatastructureVersion({
     version,
     isCreateMode,
@@ -224,7 +223,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   // isValid must be read on every render, otherwise RHF's validation does not run
   const { isValid } = form.formState
-  const isConfirmButtonDisabled = !hasUserChanges || !isValid || isLoading || hasInvalidModelNames
+  const isConfirmButtonDisabled = !hasUserChanges || !isValid || isLoading
 
   const renderTabContent = () => {
     switch (subTabValue) {
