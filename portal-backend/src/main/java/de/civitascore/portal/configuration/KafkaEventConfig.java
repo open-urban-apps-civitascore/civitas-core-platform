@@ -83,12 +83,7 @@ public class KafkaEventConfig {
     return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(props));
   }
 
-  /**
-   * Kafka listener container factory for the saga result and pipeline status listeners. A failed
-   * record is retried 3 times, 1 second apart, then published to {@code <original-topic>-dlt}. An
-   * {@link InvalidSagaResultException} skips the retries. If the publish fails, the record is
-   * discarded.
-   */
+  /** A record that the listener cannot process goes to {@code <original-topic>-dlt}. */
   @Bean
   public ConcurrentKafkaListenerContainerFactory<String, String> sagaKafkaListenerContainerFactory(
       KafkaTemplate<String, String> eventKafkaTemplate) {
@@ -111,7 +106,7 @@ public class KafkaEventConfig {
     return factory;
   }
 
-  static DefaultErrorHandler sagaErrorHandler(ConsumerRecordRecoverer deadLetterRecoverer) {
+  private static DefaultErrorHandler sagaErrorHandler(ConsumerRecordRecoverer deadLetterRecoverer) {
     DefaultErrorHandler errorHandler =
         new DefaultErrorHandler(
             discardIfRecoveryFails(deadLetterRecoverer),
