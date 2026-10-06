@@ -61,7 +61,7 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("Deleting a Data Structure removes the Elements of every version")
     void deletingADataStructureRemovesTheElementsOfEveryVersion() {
-        // Version 1 has Reading compose Station; version 2 drops Reading.
+        // Version 1 has a member compose Station; version 2 drops it.
         String composing = registry.storeElement(schema("temperature"), Set.of(logical(stationPin)));
         String structureUrn = urns.urn("datastructure", UUID.randomUUID());
         registry.storeDataStructure(structureUrn, dataStructureOf(stationPin, composing), VersionBump.PATCH, null);
@@ -94,16 +94,20 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @Test
     @DisplayName("A member something else references keeps the Elements it references")
     void aMemberSomethingElseReferencesKeepsTheElementsItReferences() {
-        String visit = registry.storeElement(schema("name"), Set.of(logical(stationPin)));
+        // Sorted by URN the referenced member comes first, while its referrer still holds it.
+        String place = registry.storeElement(
+            schemaWithId("street", "00000000-0000-4000-8000-000000000003"), Set.of());
+        String visit = registry.storeElement(
+            schemaWithId("name", "00000000-0000-4000-8000-000000000004"), Set.of(logical(place)));
         String structurePin = registry.storeDataStructure(
-            urns.urn("datastructure", UUID.randomUUID()), dataStructureOf(stationPin, visit), VersionBump.PATCH, null);
+            urns.urn("datastructure", UUID.randomUUID()), dataStructureOf(place, visit), VersionBump.PATCH, null);
         registry.storeElement(schema("stop"), Set.of(logical(visit)));
 
         deletes.delete(structurePin, true);
 
         assertThat(registry.fetch(structurePin)).isEmpty();
         assertThat(registry.fetch(visit)).isPresent();
-        assertThat(registry.fetch(stationPin))
+        assertThat(registry.fetch(place))
             .as("the kept member still references it")
             .isPresent();
     }
@@ -405,14 +409,15 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
     @DisplayName("The members of every version belong to the Data Structure")
     void theMembersOfEveryVersionBelongToTheDataStructure() {
         String structureUrn = urns.urn("datastructure", UUID.randomUUID());
-        String v1 = registry.storeDataStructure(structureUrn, dataStructureOf(stationPin), VersionBump.PATCH, null);
-        registry.storeDataStructure(structureUrn, dataStructureOf(stationPin, readingPin), VersionBump.MAJOR, null);
+        String v1 = registry.storeDataStructure(structureUrn, dataStructureOf(stationPin, readingPin), VersionBump.PATCH, null);
+        String v2 = registry.storeDataStructure(structureUrn, dataStructureOf(stationPin), VersionBump.MAJOR, null);
 
-        assertThat(registry.dataStructureMembersOfAnyVersion(v1))
+        assertThat(registry.dataStructureMembersOfAnyVersion(v2))
+            .as("a member only the superseded version holds belongs to it too")
             .containsExactlyInAnyOrder(logical(stationPin), logical(readingPin));
         assertThat(registry.ownedMemberUrns(v1, "1.0.0"))
             .as("what one version owns is unchanged")
-            .containsExactly(stationPin);
+            .containsExactlyInAnyOrder(stationPin, readingPin);
     }
 
     @Test

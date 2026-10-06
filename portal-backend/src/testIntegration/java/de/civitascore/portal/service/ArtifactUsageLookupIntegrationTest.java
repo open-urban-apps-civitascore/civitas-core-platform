@@ -340,6 +340,20 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
     }
 
     @Test
+    @DisplayName("a class an earlier version had does not use the later version")
+    void classOfAnEarlierVersion_doesNotUseTheLaterVersion() {
+      DataStructure structure =
+          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion first =
+          releasedVersionOf(structure, modeledAs("NeueKlasse", "NeueKlasse2"));
+      DataStructureVersion second = releasedVersionOf(structure, modeledAs("NeueKlasse"));
+
+      assertThat(usageOf(second).inUse()).isFalse();
+      assertThat(modelRegistryGateway.referencesTo(second.getModelUrn())).isEmpty();
+      assertThat(usageOf(first).inUse()).isFalse();
+    }
+
+    @Test
     @DisplayName("a class of another structure still uses the version it references")
     void classOfAnotherStructure_usesTheVersion() {
       DataStructure structure =
