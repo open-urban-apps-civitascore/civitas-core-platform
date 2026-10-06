@@ -1592,7 +1592,7 @@
           }
         },
         "concat": {
-          "description": "Concatenate two or more scalars into text.",
+          "description": "Combines strings into one.",
           "fields": {
             "separator": {
               "label": "Separator"

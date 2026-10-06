@@ -1579,7 +1579,7 @@
           }
         },
         "concat": {
-          "description": "Zwei oder mehr Skalare zu Text verketten.",
+          "description": "Kombiniert Zeichenketten.",
           "fields": {
             "separator": {
               "label": "Trennzeichen"

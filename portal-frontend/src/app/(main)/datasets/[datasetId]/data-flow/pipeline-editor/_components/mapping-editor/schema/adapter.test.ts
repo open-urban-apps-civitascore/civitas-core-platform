@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
+import { UML_PRIMITIVE_TYPES } from '@/components/uml-modeler/constants/umlTypes'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 
-import { umlDiagramToSchemaTree } from './adapter'
+import { PRIMITIVE, umlDiagramToSchemaTree } from './adapter'
 import { requiredFieldPaths } from './fieldTree'
 
 const treeOf = (diagram: UMLDiagram | null, fallbackName: string) => umlDiagramToSchemaTree(diagram, fallbackName).tree
@@ -356,5 +357,25 @@ describe('umlDiagramToSchemaTree', () => {
     } as unknown as UMLDiagram
 
     expect(treeOf(diagram, 'Thing').fields.map(f => f.type)).toEqual(['date', 'datetime'])
+  })
+})
+
+describe('PRIMITIVE', () => {
+  // Regression: UML_PRIMITIVE_TYPES gained 'Json' in another commit without a matching PRIMITIVE
+  // entry here, so scalarType()'s `PRIMITIVE[type] ?? 'str'` fallback silently mistyped it as a
+  // plain string everywhere PRIMITIVE is consulted (schema trees, the Literal node's output port).
+  it('has an explicit engine subtype for every UML primitive type', () => {
+    for (const type of UML_PRIMITIVE_TYPES) {
+      expect(Object.hasOwn(PRIMITIVE, type), `PRIMITIVE is missing an entry for '${type}'`).toBe(true)
+    }
+  })
+
+  it('maps a Json attribute to the json subtype, not the str fallback', () => {
+    const diagram = {
+      nodes: [classNode('thing', 'Thing', [{ name: 'payload', type: 'Json' }])],
+      edges: [],
+    } as unknown as UMLDiagram
+
+    expect(treeOf(diagram, 'Thing').fields.map(f => f.type)).toEqual(['json'])
   })
 })

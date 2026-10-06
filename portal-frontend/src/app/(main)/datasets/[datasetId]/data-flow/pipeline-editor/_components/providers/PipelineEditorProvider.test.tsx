@@ -799,6 +799,34 @@ describe('PipelineEditorProviderComponent', () => {
 
       expect(contextRef.current?.validationResult).toBeNull()
     })
+
+    it('deselects all nodes and edges, so a still-selected element can be clicked again', () => {
+      // React Flow treats a click on an already-selected element as a no-op (no selection-change
+      // event), so a node/edge Validate leaves selected can't be re-clicked to open its config
+      // until something else is clicked first. Validate must clear the stale selection itself.
+      const pipeline = {
+        ...createEmptyPipeline('Test'),
+        nodes: [{ ...makeNode('node-a'), selected: true }, makeNode('node-b', PIPELINE_NODE_TYPES.End)],
+        edges: [
+          { id: 'edge-1', source: 'node-a', target: 'node-b', type: 'smoothstep', data: { label: '' }, selected: true },
+        ],
+      }
+      renderProvider(makeSession({ pipeline }))
+
+      act(() => {
+        contextRef.current?.runValidation()
+      })
+
+      expect(contextRef.current?.pipeline?.nodes.every(n => !n.selected)).toBe(true)
+      expect(contextRef.current?.pipeline?.edges.every(e => !e.selected)).toBe(true)
+      // Clearing the stale selection must not come at the cost of the validation panel itself:
+      // the inspector shows it precisely when shouldShowValidationPanel && validationResult, so
+      // both must still be set in the same pass that clears selectedNode/selectedEdge.
+      expect(contextRef.current?.shouldShowValidationPanel).toBe(true)
+      expect(contextRef.current?.validationResult).not.toBeNull()
+      expect(contextRef.current?.selectedNode).toBeNull()
+      expect(contextRef.current?.selectedEdge).toBeNull()
+    })
   })
 
   describe('canSave', () => {

@@ -4,7 +4,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { useCallback } from 'react'
 
 import { BasicSelect } from '@/components/select/basicSelect/BasicSelect'
-import { GroupedOption, GroupedSelect } from '@/components/select/grouped-select/GroupedSelect'
+import { GroupedSelect } from '@/components/select/grouped-select/GroupedSelect'
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 
@@ -13,7 +13,7 @@ import {
   cardinalityForStorage,
   PROPERTY_CARDINALITY_VALUES,
   UML_GEOMETRY_TYPES,
-  UML_PRIMITIVE_TYPES,
+  UML_TYPE_GROUPED_OPTIONS,
 } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
@@ -87,11 +87,6 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
     }
     return options
   }
-
-  const typeOptions: GroupedOption[] = [
-    { label: 'Primitive Types', options: UML_PRIMITIVE_TYPES.map(type => ({ label: type, value: type })) },
-    { label: 'Geometry Types', options: UML_GEOMETRY_TYPES.map(type => ({ label: type, value: type })) },
-  ]
 
   const crsOptions = [
     {
@@ -198,7 +193,7 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
               <GroupedSelect
-                groupedOptions={typeOptions}
+                groupedOptions={UML_TYPE_GROUPED_OPTIONS}
                 onValueChange={e => handleTypeChange(e, attribute)}
                 disabled={isReadOnly}
                 value={typeof attribute.type === 'string' ? attribute.type : attribute.type.name}

@@ -29,13 +29,20 @@ export interface VersionSchemaTree {
  * the fallback; walker bugs propagate.
  */
 export const versionToSchemaTree = (
-  version: Pick<DatastructureVersion, 'model' | 'styles'> | undefined,
+  version:
+    | (Pick<DatastructureVersion, 'model' | 'styles'> & Partial<Pick<DatastructureVersion, 'version'>>)
+    | undefined,
   fallbackName: string,
 ): VersionSchemaTree => {
+  const treeVersion = version?.version ?? null
   let isModelBroken = false
   if (version?.model) {
     try {
-      return { tree: modelToSchemaTree(version.model, fallbackName), isModelBroken: false, diagramFailure: null }
+      return {
+        tree: { ...modelToSchemaTree(version.model, fallbackName), version: treeVersion },
+        isModelBroken: false,
+        diagramFailure: null,
+      }
     } catch (error) {
       if (!(error instanceof ModelResolutionError)) throw error
       isModelBroken = true
@@ -43,5 +50,5 @@ export const versionToSchemaTree = (
     }
   }
   const { tree, failure } = umlDiagramToSchemaTree(version?.styles ?? null, fallbackName)
-  return { tree, isModelBroken, diagramFailure: failure }
+  return { tree: { ...tree, version: treeVersion }, isModelBroken, diagramFailure: failure }
 }
