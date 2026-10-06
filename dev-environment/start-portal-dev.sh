@@ -1425,7 +1425,6 @@ echo "  APISIX Admin API: http://localhost:9180"
 echo "  Apache NiFi:      https://localhost:8443/nifi (login via Keycloak / OIDC)"
 echo "  OPA:              http://localhost:8181"
 echo "  AuthZ Repository: http://localhost:8091"
-echo "  Apicurio Registry UI: http://localhost:8888"
 echo
 echo "======================================================"
 echo "Default Development User"
