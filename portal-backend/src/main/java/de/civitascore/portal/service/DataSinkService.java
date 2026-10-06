@@ -116,22 +116,20 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
       throw new InvalidInputException(
           getEntityName(), existingEntity.getId(), "dataSinkType cannot be changed after creation");
     }
-    requireDataLossConfirmation(guarded, existingEntity);
+    guardProvisionedStorageChange(guarded, existingEntity);
     return guarded;
   }
 
   /**
-   * A change to {@code tableName} or the referenced {@code element} rebuilds the sink's backing
-   * storage on the next release, discarding all stored data — for POSTGIS a table drop+recreate (no
-   * ALTER TABLE), for FROST a re-provisioning of the target entities. If this sink has been
-   * provisioned (its storage actually exists), such a change requires explicit {@code
-   * confirmDataLoss=true}; otherwise the update is rejected with 409. The current configuration is
-   * read back from the Model Forge registry (the sink no longer stores it on the entity). Comparing
-   * the {@code element} URN alone is sufficient because it is a versioned CORE URN whose content is
-   * immutable — a different model always yields a different URN.
+   * A release only creates a sink's storage and never replaces it. A changed {@code tableName} or
+   * {@code element} on a provisioned POSTGIS sink would therefore leave its table behind, so such a
+   * change is refused outright. On a provisioned FROST sink it requires {@code
+   * confirmDataLoss=true}. The current configuration is read back from the Model Forge registry;
+   * comparing the versioned {@code element} URN is enough because its content is immutable.
    */
-  private void requireDataLossConfirmation(DataSinkInputDTO input, DataSink existingEntity) {
-    if (input.isConfirmDataLoss() || !existingEntity.isProvisioned()) {
+  private void guardProvisionedStorageChange(DataSinkInputDTO input, DataSink existingEntity) {
+    boolean postgis = existingEntity.getDataSinkType() == DataSinkType.POSTGIS;
+    if (!existingEntity.isProvisioned() || (!postgis && input.isConfirmDataLoss())) {
       return;
     }
 
@@ -147,15 +145,23 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
                 .map(ModelRegistryGateway.RegistryDocument::content)
                 .orElse(null);
 
-    boolean destructiveChange =
+    boolean storageChange =
         fieldChanged(incoming, current, "tableName") || fieldChanged(incoming, current, "element");
-    if (destructiveChange) {
+    if (!storageChange) {
+      return;
+    }
+    if (postgis) {
       throw new ResourceInUseException(
           getEntityName(),
           existingEntity.getId(),
-          "This change rebuilds the sink's table and discards all stored data;"
-              + " set confirmDataLoss=true to proceed");
+          "DataSink is provisioned; its table name and data structure can no longer change."
+              + " Create a new DataSink and attach it to the Pipeline instead");
     }
+    throw new ResourceInUseException(
+        getEntityName(),
+        existingEntity.getId(),
+        "This change rebuilds the sink's table and discards all stored data;"
+            + " set confirmDataLoss=true to proceed");
   }
 
   private static boolean fieldChanged(

@@ -825,9 +825,9 @@ public class DataSetService
    * released, one onto a pipeline the dataset delete cascades away; removing the sinks first clears
    * both before that cascade runs.
    *
-   * <p>Going through the repository bypasses the layer guard on a standalone sink delete, which
-   * protects a sink whose dataset lives on. Flushing keeps a constraint violation inside this call
-   * rather than at commit.
+   * <p>Going through the repository bypasses the layer and provisioned guards on a standalone sink
+   * delete, which protect a sink whose dataset lives on; the teardown has removed its storage.
+   * Flushing keeps a constraint violation inside this call rather than at commit.
    *
    * <p>The only place a dataset row is removed — a provisioned dataset keeps its row until its
    * teardown saga reports back — so the registry cleanup belongs here, not in {@code postDelete}.

@@ -18,9 +18,8 @@ params:path {
 tests {
   test("Provisioned FROST DataSink refused", function() {
     const status = res.getStatus();
-    // 409=provisioned by the release in step 8, 204=never provisioned (release saga failed),
-    // 404=already gone, 400=sagaDataSinkId never set (aborted run)
-    expect(status === 409 || status === 204 || status === 404 || status === 400).to.be.true;
+    // 409=provisioned by the release in step 8, 404=already gone, 400=sagaDataSinkId never set (aborted run)
+    expect(status === 409 || status === 404 || status === 400).to.be.true;
     if (status === 409) {
       expect(res.getBody().type).to.equal("urn:civitas:error:RESOURCE_IN_USE");
     }
@@ -32,7 +31,7 @@ docs {
 
   The release in step 8 provisioned the DataSink created in step 4c. A provisioned DataSink keeps its storage after an unrelease, and only the DataSet teardown removes that storage, so a standalone delete is refused with `409` even though the DataSet is a draft again. The DataSink goes together with the DataSet in step 13.
 
-  **Expected Response:** 409 Conflict (`RESOURCE_IN_USE`). 204 if the release saga failed and nothing was provisioned. 404 if already deleted. 400 if `sagaDataSinkId` is not set (first run / aborted earlier).
+  **Expected Response:** 409 Conflict (`RESOURCE_IN_USE`). 404 if already deleted. 400 if `sagaDataSinkId` is not set (first run / aborted earlier).
 
   **System Impact:**
 

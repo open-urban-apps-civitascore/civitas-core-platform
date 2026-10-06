@@ -149,7 +149,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
    * Helper methods to create test data with relationships
    *************/
 
-  private SagaResultPayload deleteResultFor(UUID datasetId) {
+  private SagaResultPayload sagaResultFor(UUID datasetId) {
     return new SagaResultPayload(
         datasetId.toString(), null, null, null, null, null, null, null, null, null, null);
   }
@@ -344,7 +344,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       dataSet.setPendingSagaType(PendingSagaType.DELETE);
       dataSetRepository.save(dataSet);
 
-      dataSetService.handleSagaCompleted(dataSet.getId(), deleteResultFor(dataSet.getId()));
+      dataSetService.handleSagaCompleted(dataSet.getId(), sagaResultFor(dataSet.getId()));
 
       assertThat(layerRepository.findById(layer.getId())).isEmpty();
       assertThat(dataSinkRepository.findById(sink.getId())).isEmpty();
@@ -370,10 +370,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   @DisplayName("Delete With Provisioned Sinks Tests")
   class DeleteWithProvisionedSinksTests {
 
-    /**
-     * An unreleased dataset is a draft again, but its provisioned sink can no longer be deleted on
-     * its own. The teardown of the dataset is then the only way the sink goes.
-     */
+    /** A teardown that skips provisioned sinks leaves a table that nothing can delete. */
     @Test
     @DisplayName(
         "Should remove a provisioned sink that refuses a standalone delete when its dataset is"
@@ -381,21 +378,31 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     void shouldRemoveProvisionedSinkOnSagaDeleteCompleted() {
       DataSet dataSet = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.DRAFT));
       Pipeline pipeline = portalData.pipeline(dataSet);
-      DataSink sink = portalData.dataSink(dataSet, pipeline, s -> s.setProvisioned(true));
-      dataSet.setProvisioned(true);
-      dataSetRepository.save(dataSet);
+      DataSink sink = portalData.dataSink(dataSet, pipeline);
+      UUID id = dataSet.getId();
+
+      completeSaga(id, DataSetStatus.AVAILABLE, PendingSagaType.CREATE);
+      completeSaga(id, DataSetStatus.READY, PendingSagaType.UNRELEASE);
+      dataSetService.unstage(id);
 
       assertThatThrownBy(() -> dataSinkService.deleteById(sink.getId()))
           .isInstanceOf(ResourceInUseException.class);
       assertThat(dataSinkRepository.findById(sink.getId())).isPresent();
 
-      dataSet.setPendingSagaType(PendingSagaType.DELETE);
-      dataSetRepository.save(dataSet);
-      dataSetService.handleSagaCompleted(dataSet.getId(), deleteResultFor(dataSet.getId()));
+      completeSaga(id, DataSetStatus.DRAFT, PendingSagaType.DELETE);
 
       assertThat(dataSinkRepository.findById(sink.getId())).isEmpty();
       assertThat(pipelineRepository.findById(pipeline.getId())).isEmpty();
-      assertThat(dataSetRepository.findById(dataSet.getId())).isEmpty();
+      assertThat(dataSetRepository.findById(id)).isEmpty();
+    }
+
+    /** Stands in for the saga trigger, which needs a message broker this context does not run. */
+    private void completeSaga(UUID id, DataSetStatus status, PendingSagaType type) {
+      DataSet dataSet = dataSetRepository.findById(id).orElseThrow();
+      dataSet.setDataSetStatus(status);
+      dataSet.setPendingSagaType(type);
+      dataSetRepository.save(dataSet);
+      dataSetService.handleSagaCompleted(id, sagaResultFor(id));
     }
   }
 }

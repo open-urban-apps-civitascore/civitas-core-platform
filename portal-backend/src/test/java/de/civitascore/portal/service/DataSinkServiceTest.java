@@ -808,7 +808,7 @@ class DataSinkServiceTest {
   }
 
   @Nested
-  @DisplayName("data-loss confirmation on update")
+  @DisplayName("storage change of a provisioned sink on update")
   class DataLossConfirmation {
 
     private DataSink existingPostgisSink(boolean provisioned) {
@@ -871,17 +871,32 @@ class DataSinkServiceTest {
           .hasMessageContaining("confirmDataLoss");
     }
 
-    @Test
-    @DisplayName("rejects a destructive change on a provisioned sink without confirmDataLoss")
-    void rejectsDestructiveChangeWithoutConfirmation() {
+    @ParameterizedTest(name = "confirmDataLoss={0}")
+    @ValueSource(booleans = {false, true})
+    @DisplayName("refuses a table change on a provisioned POSTGIS sink, confirmed or not")
+    void refusesPostgisTableChange(boolean confirmDataLoss) {
       DataSink sink = existingPostgisSink(true);
       when(dataSinkRepository.findByIdWithRelations(sink.getId())).thenReturn(Optional.of(sink));
 
-      DataSinkInputDTO input = updateInput("new_table", "v1", false);
+      DataSinkInputDTO input = updateInput("new_table", "v1", confirmDataLoss);
 
       assertThatThrownBy(() -> dataSinkService.update(sink.getId(), input))
           .isInstanceOf(ResourceInUseException.class)
-          .hasMessageContaining("confirmDataLoss");
+          .hasMessageContaining("provisioned")
+          .hasMessageNotContaining("confirmDataLoss");
+    }
+
+    @Test
+    @DisplayName("refuses a data structure change on a provisioned POSTGIS sink")
+    void refusesPostgisElementChange() {
+      DataSink sink = existingPostgisSink(true);
+      when(dataSinkRepository.findByIdWithRelations(sink.getId())).thenReturn(Optional.of(sink));
+
+      DataSinkInputDTO input = updateInput("old_table", "v2", true);
+
+      assertThatThrownBy(() -> dataSinkService.update(sink.getId(), input))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("provisioned");
     }
 
     // The "allows" cases assert only that the data-loss GUARD does not reject: update() continues
@@ -889,13 +904,17 @@ class DataSinkServiceTest {
     // mocked collaborators for unrelated reasons — that later failure must never be the
     // confirmDataLoss 409.
 
+    /** The FROST adapter keeps no per-sink table, so the confirmed change stays possible. */
     @Test
-    @DisplayName("does not raise the data-loss guard when confirmDataLoss is set")
-    void allowsDestructiveChangeWhenConfirmed() {
-      DataSink sink = existingPostgisSink(true);
+    @DisplayName("does not raise the guard for a confirmed FROST element change")
+    void allowsFrostElementChangeWhenConfirmed() {
+      DataSink sink = existingFrostSink(true, "v1");
       when(dataSinkRepository.findByIdWithRelations(sink.getId())).thenReturn(Optional.of(sink));
 
-      DataSinkInputDTO input = updateInput("new_table", "v1", true);
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSinkType(DataSinkType.FROST);
+      input.setConfiguration(Map.of("element", "v2"));
+      input.setConfirmDataLoss(true);
 
       assertThatThrownBy(() -> dataSinkService.update(sink.getId(), input))
           .isNotInstanceOf(ResourceInUseException.class);

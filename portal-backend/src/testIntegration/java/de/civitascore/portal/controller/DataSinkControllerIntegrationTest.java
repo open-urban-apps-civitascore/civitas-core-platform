@@ -724,6 +724,40 @@ class DataSinkControllerIntegrationTest
       assertThat(storedTableName(created.getBody().getId())).isEqualTo("t_two");
     }
 
+    /** A release never replaces a table, so a confirmed rename would leave the old one behind. */
+    @Test
+    @DisplayName(
+        "PUT returns 409 when renaming a provisioned POSTGIS sink, even with confirmDataLoss")
+    void putRejectsRenameOfProvisionedPostgisSink() {
+      ensureTestData();
+      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructureVersion dsv =
+          portalData.dataStructureVersion(
+              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+      dsv = portalData.attachModel(dsv, portalData.dataStructureVersionModel("ProvisionedRename"));
+
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSinkType(DataSinkType.POSTGIS);
+      input.setConfiguration(Map.of("tableName", "measurements", "element", dsv.getModelUrn()));
+      ResponseEntity<DataSinkOutputDTO> created = performCreate(input);
+      assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      UUID id = created.getBody().getId();
+      DataSink sink = dataSinkRepository.findById(id).orElseThrow();
+      sink.setProvisioned(true);
+      dataSinkRepository.save(sink);
+
+      input.setConfiguration(
+          Map.of("tableName", "measurements_renamed", "element", dsv.getModelUrn()));
+      input.setConfirmDataLoss(true);
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id, HttpMethod.PUT, createAuthHeaders(), input);
+
+      assertRejected(response, HttpStatus.CONFLICT, "urn:civitas:error:RESOURCE_IN_USE");
+      assertThat(response.getBody().getDetail()).doesNotContain("confirmDataLoss");
+      assertThat(storedTableName(id)).isEqualTo("measurements");
+    }
+
     @Test
     @DisplayName("PATCH returns 400 when changing the immutable dataSinkType")
     void patchRejectsTypeChange() {
