@@ -2,6 +2,7 @@ package de.civitascore.modelforge.spring.boot;
 
 import tools.jackson.databind.ObjectMapper;
 import de.civitascore.modelforge.contract.ArtifactId;
+import de.civitascore.modelforge.contract.RootCheck;
 import de.civitascore.modelforge.contract.ArtifactSearchQuery;
 import de.civitascore.modelforge.contract.ArtifactSummary;
 import de.civitascore.modelforge.contract.ArtifactView;
@@ -81,6 +82,11 @@ class EmbeddedModelForgeTest {
                 @Override
                 public ValidationResult validateInstance(ValidateInstanceCommand command) {
                     return new ValidationResult(true, List.of());
+                }
+
+                @Override
+                public RootCheck checkRoot(ArtifactId artifactId) {
+                    return new RootCheck.Rooted();
                 }
 
                 @Override

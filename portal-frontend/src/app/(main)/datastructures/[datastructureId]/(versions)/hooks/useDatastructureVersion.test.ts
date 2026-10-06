@@ -445,6 +445,42 @@ describe('useDatastructureVersion — a version still in use', () => {
   })
 })
 
+describe('useDatastructureVersion — a stored model the backend refuses to release', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('names the missing root when the backend refuses the release', async () => {
+    const { hook, updateStatus } = setup(version({ styles: validDiagram() }))
+    updateStatus.mutateAsync.mockRejectedValue(
+      mockApiError(400, 'The model has no single root', 'urn:civitas:error:MODEL_ROOT_MISSING'),
+    )
+
+    act(() => hook.result.current.handleStatusChange(DATASTRUCTURE_STATUS_TYPES.AVAILABLE))
+    await act(async () => {
+      await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(toast.error).toHaveBeenCalledWith('datastructureVersions.errors.modelRootMissingError')
+  })
+
+  it('names the members the root does not reach when the backend refuses the release', async () => {
+    const { hook, updateStatus } = setup(version({ styles: validDiagram() }))
+    updateStatus.mutateAsync.mockRejectedValue(
+      mockApiError(400, 'Unreachable: Orphan', 'urn:civitas:error:MODEL_MEMBER_UNREACHABLE', {
+        memberNames: ['Orphan'],
+      }),
+    )
+
+    act(() => hook.result.current.handleStatusChange(DATASTRUCTURE_STATUS_TYPES.AVAILABLE))
+    await act(async () => {
+      await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(toast.error).toHaveBeenCalledWith('datastructureVersions.errors.modelMemberUnreachableError')
+  })
+})
+
 describe('useDatastructureVersion — a stored model reaches the surfaces outside the form', () => {
   beforeEach(() => {
     vi.clearAllMocks()

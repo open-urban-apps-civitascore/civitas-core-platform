@@ -1238,6 +1238,8 @@
     "errors": {
       "creationError": "Beim Anlegen der Version der Datenstruktur ist ein Fehler aufgetreten.",
       "saveInvalidModel": "Die Version kann nicht gespeichert werden: {reason}",
+      "modelRootMissingError": "Die Version kann nicht auf \"Verfügbar\" gesetzt werden, weil ihr gespeichertes Modell keine Wurzelklasse hat. Markieren Sie die Wurzelklasse im Diagramm, speichern Sie die Version und setzen Sie sie dann auf \"Verfügbar\".",
+      "modelMemberUnreachableError": "Die Version kann nicht auf \"Verfügbar\" gesetzt werden, weil diese Klassen nicht mit der Wurzelklasse verbunden sind: {names}. Verbinden Sie sie mit der Wurzelklasse oder entfernen Sie sie, speichern Sie die Version und setzen Sie sie dann auf \"Verfügbar\".",
       "inUseError": "Diese Version wird noch von einer Datenquelle oder einem Datenspeicher verwendet."
     }
   },

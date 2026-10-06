@@ -15,6 +15,7 @@ import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.ImportSmartDataModelCommand;
 import de.civitascore.modelforge.contract.ImportXRepositoryCommand;
+import de.civitascore.modelforge.contract.RootCheck;
 import de.civitascore.modelforge.contract.SaveArtifactCommand;
 import de.civitascore.modelforge.contract.SchemaViewQuery;
 import de.civitascore.modelforge.contract.ValidateInstanceCommand;
@@ -125,6 +126,20 @@ public interface ModelForge {
     ValidationResult validateSchema(ValidateSchemaCommand command);
 
     ValidationResult validateInstance(ValidateInstanceCommand command);
+
+    /**
+     * Whether the model has the single root that publication needs. An Element is its own root. A
+     * DataStructure has one when its top-level {@code $ref} names one of its own {@code $defs}
+     * members and every other member is reachable from that root through {@code $ref}, directly or
+     * through other members. A member that references the root back does not break the rule.
+     *
+     * <p>Writes accept a DataStructure that fails this check, so that modelling is not interrupted.
+     * A caller whose step needs a root, such as publication, asks here.
+     *
+     * @throws IllegalArgumentException when the registry holds no such artifact, or it is neither an
+     *     Element nor a DataStructure
+     */
+    RootCheck checkRoot(ArtifactId artifactId);
 
     // ── Dependency graph ─────────────────────────────────────────────────────
 

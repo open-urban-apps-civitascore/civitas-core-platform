@@ -6,6 +6,9 @@ import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.ExternalSystemTimeoutException;
 import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ModelMemberUnreachableException;
+import de.civitascore.portal.util.ModelMissingException;
+import de.civitascore.portal.util.ModelRootMissingException;
 import de.civitascore.portal.util.PipelineClosureValidationException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -91,6 +94,38 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     // TR-03187 W-18/W-19: the detail is a fixed constant with no runtime data interpolated.
     return createProblemDetail(
         HttpStatus.BAD_REQUEST, "DATASET_NOT_EDITABLE", ex.getMessage(), request);
+  }
+
+  @ExceptionHandler(ModelRootMissingException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public ProblemDetail handleModelRootMissing(
+      ModelRootMissingException ex, HttpServletRequest request) {
+    log.warn("Model root missing: {}", Encode.forJava(ex.getMessage()));
+    // TR-03187 W-18/W-19: the detail is a fixed constant with no runtime data interpolated.
+    return createProblemDetail(
+        HttpStatus.BAD_REQUEST, "MODEL_ROOT_MISSING", ex.getMessage(), request);
+  }
+
+  @ExceptionHandler(ModelMemberUnreachableException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public ProblemDetail handleModelMemberUnreachable(
+      ModelMemberUnreachableException ex, HttpServletRequest request) {
+    log.warn("Model member unreachable: {}", Encode.forJava(ex.getMessage()));
+    // TR-03187 W-18/W-19: the member names come from the model of the version the caller releases,
+    // which the caller can already read.
+    ProblemDetail problemDetail =
+        createProblemDetail(
+            HttpStatus.BAD_REQUEST, "MODEL_MEMBER_UNREACHABLE", ex.getMessage(), request);
+    problemDetail.setProperty("memberNames", ex.getMemberNames());
+    return problemDetail;
+  }
+
+  @ExceptionHandler(ModelMissingException.class)
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public ProblemDetail handleModelMissing(ModelMissingException ex, HttpServletRequest request) {
+    log.warn("Model missing: {}", Encode.forJava(ex.getMessage()));
+    // TR-03187 W-18/W-19: the detail is a fixed constant with no runtime data interpolated.
+    return createProblemDetail(HttpStatus.CONFLICT, "MODEL_MISSING", ex.getMessage(), request);
   }
 
   /**

@@ -242,15 +242,21 @@ public class DataStructureVersionController
       summary = "Release a data structure version",
       description =
           "Releases a data structure version by setting status to AVAILABLE. Requires a model"
-              + " (JSON schema) to be present.")
+              + " (JSON schema) with exactly one root Element that reaches every other member.")
   @ApiResponse(responseCode = "200", description = "Data structure version released successfully")
   @ApiResponse(
       responseCode = "400",
-      description = "Invalid input (e.g. already released or missing model)",
+      description =
+          "Invalid input (e.g. already released, missing model, no root Element, or members the"
+              + " root Element does not reach)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @ApiResponse(
       responseCode = "404",
       description = "Data structure version not found",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "The version's model is missing from the model registry",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataStructureVersionOutputDTO> releaseDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
