@@ -67,6 +67,7 @@ import {
   getPipelineStats,
   getSelectedEdges,
   getSelectedNodes,
+  isSemanticPipelineChange,
   type PipelineReducerAction,
   pipelineReducerWithReactFlow,
   validateConnection,
@@ -254,10 +255,10 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Helper to update pipeline in session =====
   const updatePipeline = useCallback(
-    (updater: (pipeline: Pipeline) => Pipeline, shouldPreserveDirty?: boolean) => {
+    (updater: (pipeline: Pipeline) => Pipeline) => {
       if (!activeSession) return
       const updatedPipeline = updater(activeSession.pipeline)
-      sessionManager.updateSessionPipeline(activeSession.id, updatedPipeline, shouldPreserveDirty)
+      sessionManager.updateSessionPipeline(activeSession.id, updatedPipeline)
     },
     [activeSession, sessionManager],
   )
@@ -273,10 +274,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       // node-removal change, and both must build on each other instead of overwriting.
       sessionManager.updateSessionPipeline(activeSession.id, previous => pipelineReducerWithReactFlow(previous, action))
 
-      // Mark as dirty for most actions
-      if (action.type !== 'MARK_CLEAN') {
+      if (isSemanticPipelineChange(action)) {
         sessionManager.markSessionDirty(activeSession.id)
-      } else {
+      } else if (action.type === 'MARK_CLEAN') {
         sessionManager.markSessionClean(activeSession.id)
       }
     },
@@ -428,14 +428,11 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     // Show validation panel in inspector
     setShouldShowValidationPanel(true)
     // Deselect all so the next click fires a selection change and hides the validation panel
-    updatePipeline(
-      p => ({
-        ...p,
-        nodes: p.nodes.map(node => ({ ...node, selected: false })),
-        edges: p.edges.map(edge => ({ ...edge, selected: false })),
-      }),
-      true,
-    )
+    updatePipeline(p => ({
+      ...p,
+      nodes: p.nodes.map(node => ({ ...node, selected: false })),
+      edges: p.edges.map(edge => ({ ...edge, selected: false })),
+    }))
     return result
   }, [pipeline, activeSession, validationContextFor, updatePipeline])
 

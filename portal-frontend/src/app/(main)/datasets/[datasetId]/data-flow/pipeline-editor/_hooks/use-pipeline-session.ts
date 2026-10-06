@@ -77,10 +77,10 @@ export const usePipelineSession = (initialSession?: PipelineSession): UsePipelin
   )
 
   const updateSessionPipeline = useCallback(
-    (sessionId: string, pipeline: Pipeline | PipelineUpdater, shouldPreserveDirty?: boolean): void => {
+    (sessionId: string, pipeline: Pipeline | PipelineUpdater): void => {
       dispatch({
         type: 'UPDATE_SESSION_PIPELINE',
-        payload: { sessionId, pipeline, shouldPreserveDirty },
+        payload: { sessionId, pipeline },
       })
     },
     [dispatch],
