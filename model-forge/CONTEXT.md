@@ -73,6 +73,6 @@ _Avoid_: dangling reference, broken link, orphan
 **Data Set membership**:
 The one kind of reference that does not by itself prevent its target from being deleted. It is
 counted instead, so a member that belongs to a single Data Set can still be removed, while one
-belonging to several cannot. A Data Structure's memberships are not counted: a Pipeline lists it
-there, and the Mapping or Data Sink that reaches it already holds the version it uses.
+belonging to several cannot. A Data Structure's memberships are not counted: a Data Set only
+groups it, and the Mapping or Data Sink that uses it holds the version it uses.
 _Avoid_: dataset link, containment

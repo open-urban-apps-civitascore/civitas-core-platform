@@ -147,11 +147,19 @@ public class ElementCommandService {
      * the caller's transaction where there is one, so several removals commit or roll back together.
      */
     public void delete(String urn, boolean cascade, boolean force) {
+        delete(urn, cascade, force, Set.of());
+    }
+
+    /**
+     * Like {@link #delete(String, boolean, boolean)}, where a reference held by an artifact in
+     * {@code removedTogether} does not count: the same delete removes it.
+     */
+    private void delete(String urn, boolean cascade, boolean force, Set<String> removedTogether) {
         String logical = UrnParser.logicalUrn(urn);
         // DataSet memberships are read before the delete removes the target's incoming edges.
         List<String> memberships = registry.dataSetMemberships(urn);
         if (!force) {
-            List<String> blockers = registry.nonDataSetBlockingDependents(urn);
+            List<String> blockers = outsideReferrers(urn, removedTogether);
             if (!blockers.isEmpty()) {
                 throw new ArtifactInUseException(logical, blockers);
             }
@@ -160,12 +168,12 @@ public class ElementCommandService {
                 throw new ArtifactInUseException(logical, memberships);
             }
         }
-        // Snapshot the members before the artifact — and with it its outgoing edges — are gone.
-        List<String> members = cascade ? registry.ownedMemberUrns(urn) : List.of();
-        // Counted before this container's own edge goes, or a member of two would read one.
-        Set<String> heldByAnotherDataSet = members.stream()
-            .filter(member -> registry.dataSetMemberships(member).size() >= 2)
-            .collect(Collectors.toSet());
+        // Snapshot the members before the artifact — and with it its outgoing edges — are gone. The
+        // delete removes every version, so a Data Structure takes the Elements of each one.
+        List<String> members = !cascade ? List.of()
+            : isDataStructure(urn) ? registry.dataStructureMembersOfAnyVersion(urn)
+            : registry.ownedMemberUrns(urn);
+        Set<String> freed = freedMembers(logical, members, removedTogether);
         registry.deleteArtifact(urn);
         graph.remove(urn);
         // Keep every DataSet manifest that listed this member consistent (the |D|=1 rule, and — with
@@ -173,20 +181,49 @@ public class ElementCommandService {
         for (String dataSet : memberships) {
             unlinkFromDataSet(dataSet, logical);
         }
-        for (String member : members) {
+        Set<String> removed = new LinkedHashSet<>(removedTogether);
+        removed.add(logical);
+        removed.addAll(freed);
+        for (String member : freed) {
             // Recursing collects a member's own orphans; its one Data Set is unlinked with it.
-            if (registry.fetch(member).isPresent()
-                && registry.nonDataSetBlockingDependents(member).isEmpty()
-                && !heldByAnotherDataSet.contains(member)) {
-                delete(member, true, force);
+            if (registry.fetch(member).isPresent()) {
+                delete(member, true, force, removed);
             }
         }
     }
 
     /**
-     * Whether the artifact is a Data Structure, whose Data Set memberships are not counted: a
-     * Pipeline lists it there, and the Mapping or Data Sink that reaches it already holds the version
-     * it uses.
+     * The members the cascade removes, by logical URN: those only the container and the other
+     * removed members reference. A member something else references stays, and so does every member
+     * only it references, so the cascade dangles nothing and the order of the members decides nothing.
+     */
+    private Set<String> freedMembers(String containerLogical, List<String> members, Set<String> removedTogether) {
+        // Counted before this container's own edge goes, or a member of two would read one.
+        Set<String> freed = members.stream()
+            .filter(member -> registry.dataSetMemberships(member).size() < 2)
+            .map(UrnParser::logicalUrn)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<String> removed = new LinkedHashSet<>(removedTogether);
+        removed.add(containerLogical);
+        boolean shrunk = true;
+        while (shrunk) {
+            shrunk = freed.removeIf(member -> registry.nonDataSetBlockingDependents(member).stream()
+                .map(UrnParser::logicalUrn)
+                .anyMatch(referrer -> !removed.contains(referrer) && !freed.contains(referrer)));
+        }
+        return freed;
+    }
+
+    /** The referrers of {@code urn} that the delete does not remove with it. */
+    private List<String> outsideReferrers(String urn, Set<String> removedTogether) {
+        return registry.nonDataSetBlockingDependents(urn).stream()
+            .filter(referrer -> !removedTogether.contains(UrnParser.logicalUrn(referrer)))
+            .toList();
+    }
+
+    /**
+     * Whether the artifact is a Data Structure, whose Data Set memberships are not counted: a Data
+     * Set only groups it, and the Mapping or Data Sink that uses it holds the version it uses.
      */
     static boolean isDataStructure(String urn) {
         return "datastructure".equals(UrnParser.artifactTypeFromUrn(urn));

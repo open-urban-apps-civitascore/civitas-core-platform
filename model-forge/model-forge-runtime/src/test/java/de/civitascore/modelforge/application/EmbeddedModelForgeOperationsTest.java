@@ -292,7 +292,7 @@ class EmbeddedModelForgeOperationsTest {
         String sharedLogical = UrnParser.logicalUrn(shared);
 
         when(registry.nonDataSetBlockingDependents(container.value())).thenReturn(List.of());
-        when(registry.ownedMemberUrns(container.value())).thenReturn(List.of(orphanLogical, sharedLogical));
+        when(registry.dataStructureMembersOfAnyVersion(container.value())).thenReturn(List.of(orphanLogical, sharedLogical));
         // Once the container is gone, A is orphaned but B is still grouped by another DataStructure.
         when(registry.nonDataSetBlockingDependents(orphanLogical)).thenReturn(List.of());
         when(registry.nonDataSetBlockingDependents(sharedLogical))

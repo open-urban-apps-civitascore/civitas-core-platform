@@ -249,18 +249,18 @@ public interface ModelForge {
      * <p>Non-DataSet references block unconditionally (referential integrity). DataSet membership is
      * count-based: 0 → delete; 1 → delete and auto-unlink from that DataSet's manifest; ≥2 → blocked
      * (remove from the other DataSets first). A DataStructure's memberships are not counted: a
-     * pipeline lists it there, and the mapping or sink that reaches it already holds the version it
-     * uses.
+     * DataSet only groups it, and the mapping or sink that uses it holds the version it uses.
      *
      * <p>With {@code cascade}, the artifacts the target <em>owns</em> go too — a grouping's
-     * Elements, a pipeline's Mapping, a DataSet's pipelines and mappings — each only while nothing
-     * else holds it, under the same two rules. Ownership is read off the reference, so what a
+     * Elements of every version, a pipeline's Mapping, a DataSet's pipelines and mappings — each
+     * only while nothing else holds it, under the same two rules. Ownership is read off the reference, so what a
      * DataSet merely groups (its data structures, sources and sinks) stays. {@code force} overrides
      * both blocks and unlinks from every DataSet; it may dangle references, so administrative
      * repair only.
      *
      * @throws de.civitascore.modelforge.contract.ArtifactInUseException when a non-DataSet artifact
-     *     still references the target, or it is a member of ≥2 DataSets, and {@code force} is false.
+     *     still references the target, or it is a member of ≥2 DataSets (never for a DataStructure),
+     *     and {@code force} is false.
      */
     void deleteArtifact(ArtifactId artifactId, boolean cascade, boolean force);
 

@@ -211,7 +211,7 @@ public class DataStructureService
           "Cannot modify DataStructure because a DataSource is pinned to one of its versions.");
     }
     // The registry answers for every reference it holds onto a version's model — a sink's or
-    // source's element, a mapping endpoint, another model, a second data set.
+    // source's element, a mapping endpoint, another model.
     List<String> blockers =
         versions.stream()
             .map(DataStructureVersion::getModelUrn)

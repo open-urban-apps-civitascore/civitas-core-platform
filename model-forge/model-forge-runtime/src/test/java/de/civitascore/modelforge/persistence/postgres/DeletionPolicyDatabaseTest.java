@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.util.List;
 import java.util.Set;
@@ -55,6 +56,56 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
         assertThat(registry.fetch(structurePin)).isEmpty();
         assertThat(registry.fetch(stationPin)).isEmpty();
         assertThat(registry.fetch(readingPin)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Deleting a Data Structure removes the Elements of every version")
+    void deletingADataStructureRemovesTheElementsOfEveryVersion() {
+        // Version 1 has Reading compose Station; version 2 drops Reading.
+        String composing = registry.storeElement(schema("temperature"), Set.of(logical(stationPin)));
+        String structureUrn = urns.urn("datastructure", UUID.randomUUID());
+        registry.storeDataStructure(structureUrn, dataStructureOf(stationPin, composing), VersionBump.PATCH, null);
+        registry.storeDataStructure(structureUrn, dataStructureOf(stationPin), VersionBump.MAJOR, null);
+
+        deletes.delete(logical(structureUrn), true);
+
+        assertThat(registry.fetch(logical(structureUrn))).isEmpty();
+        assertThat(registry.fetch(composing)).isEmpty();
+        assertThat(registry.fetch(stationPin)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Deleting a Data Structure removes an Element its other member references")
+    void deletingADataStructureRemovesAnElementItsOtherMemberReferences() {
+        // Sorted by URN the referenced member comes first, while its referrer still holds it.
+        String place = registry.storeElement(
+            schemaWithId("street", "00000000-0000-4000-8000-000000000001"), Set.of());
+        String visit = registry.storeElement(
+            schemaWithId("name", "00000000-0000-4000-8000-000000000002"), Set.of(logical(place)));
+        String structurePin = registry.storeDataStructure(
+            urns.urn("datastructure", UUID.randomUUID()), dataStructureOf(place, visit), VersionBump.PATCH, null);
+
+        deletes.delete(structurePin, true);
+
+        assertThat(registry.fetch(visit)).isEmpty();
+        assertThat(registry.fetch(place)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("A member something else references keeps the Elements it references")
+    void aMemberSomethingElseReferencesKeepsTheElementsItReferences() {
+        String visit = registry.storeElement(schema("name"), Set.of(logical(stationPin)));
+        String structurePin = registry.storeDataStructure(
+            urns.urn("datastructure", UUID.randomUUID()), dataStructureOf(stationPin, visit), VersionBump.PATCH, null);
+        registry.storeElement(schema("stop"), Set.of(logical(visit)));
+
+        deletes.delete(structurePin, true);
+
+        assertThat(registry.fetch(structurePin)).isEmpty();
+        assertThat(registry.fetch(visit)).isPresent();
+        assertThat(registry.fetch(stationPin))
+            .as("the kept member still references it")
+            .isPresent();
     }
 
     @Test
@@ -395,6 +446,12 @@ class DeletionPolicyDatabaseTest extends AbstractRegistryDatabaseTest {
               "properties": { "%s": { "type": "number" } }
             }
             """.formatted(property));
+    }
+
+    private JsonNode schemaWithId(String property, String id) {
+        ObjectNode schema = (ObjectNode) schema(property);
+        schema.put("$id", urns.urn("element", UUID.fromString(id)));
+        return schema;
     }
 
     private JsonNode mapping() {
