@@ -16,6 +16,7 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
+import { useError } from '@/hooks/use-error'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
 
@@ -27,6 +28,7 @@ export const DatastructureCreateForm = () => {
 
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { handleFormValidationError } = useError()
 
   const { form, isLoading, saveDatastructure } = useDatastructureCreation()
 
@@ -41,9 +43,15 @@ export const DatastructureCreateForm = () => {
   const handleSave = async (): Promise<boolean> => {
     let isSaved = false
 
-    await form.handleSubmit(async () => {
-      isSaved = await handleCreateDatastructure()
-    })()
+    await form.handleSubmit(
+      async () => {
+        isSaved = await handleCreateDatastructure()
+      },
+      errors => {
+        handleFormValidationError(errors)
+        isSaved = false
+      },
+    )()
 
     return isSaved
   }
