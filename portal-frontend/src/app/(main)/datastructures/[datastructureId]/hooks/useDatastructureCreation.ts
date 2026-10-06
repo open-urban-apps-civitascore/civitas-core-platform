@@ -41,9 +41,8 @@ export const useDatastructureCreation = () => {
       const response = await createDatastructure.mutateAsync(parsed.data)
       toast.success(tCommon('messages.createSuccess', { item: tCommon('items.datastructure') }))
       return response.data
-    } catch (error) {
+    } catch {
       toast.error(t('errors.creationError'))
-      throw error
     }
   }
 
