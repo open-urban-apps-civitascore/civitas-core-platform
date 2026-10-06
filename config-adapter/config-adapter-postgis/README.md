@@ -29,7 +29,7 @@ the incoming metadata, with CloudEvent type `de.civitascore.data.sql.processing.
 | `CREATE_TABLE` | `tableConfig` | `DROP_TABLE` | `{schema?, table}` |
 | `CREATE_SCHEMA` | `schemaConfig` | `DROP_SCHEMA` | `{schema, cascade?}` |
 | `CREATE_ROLE` | `roleConfig` | `DROP_ROLE` | `{role}` |
-| `PROVISION_SINK` | `datasinks`, `datasetId` | `DEPROVISION_SINK` | `datasinks`, `datasetId` |
+| `PROVISION_SINK` | `datasinks`, `datasetId` | `DEPROVISION_SINK` | `datasinks`, `datasetId`, `createdTables`, `createdSchema` |
 
 Each nested config map carries its `resourceType` discriminator, exactly as the config travels inside
 CloudEvents. Every `CREATE_*` returns its identifiers as compensation data, which the orchestrator flattens
@@ -43,8 +43,9 @@ compensation.
   wrapped in a savepoint, because PostgreSQL aborts the whole transaction on any statement error — the
   savepoint lets an absorbed duplicate or missing object be skipped while the remaining statements of a
   multi-statement plan (schema → table → index, or role → grants) commit.
-- **Idempotency without pre-checks.** No existence check and no `IF NOT EXISTS`: the database fails naturally
-  and the adapter absorbs the conflict, so idempotency is a property of the adapter, not of external state.
+- **Idempotency without pre-checks.** No `IF NOT EXISTS`: the database fails naturally and the adapter absorbs
+  the conflict, so idempotency is a property of the adapter, not of external state. The existence checks of
+  `PROVISION_SINK` only record what it created; they do not decide which statements run.
 - **Grant reconciliation.** On a role UPDATE the payload's grants are the desired state: the adapter reads the
   role's current schema privileges and grant-option state from the database, `GRANT`s those newly present and
   `REVOKE`s those the payload omits. A held privilege is re-granted `WITH GRANT OPTION` when the payload asks
@@ -105,9 +106,11 @@ that entry's `configuration` (`tableName`, `columns`, `geometryColumns`, `primar
 - **Read role** — optional. It receives the listed schema privileges, defaulting to `USAGE`, plus `SELECT` on
   the sink table. Its password follows the same `ENC(...)` handling as any role password.
 - **Teardown** — `DEPROVISION_SINK` drops the role, then the table, then the per-dataset schema with
-  `RESTRICT`, skipping `public`. A schema left non-empty fails the step; nothing is force-dropped. Forward
-  delete and compensation re-derive their targets from `datasinks` and `datasetId`, so both paths resolve
-  identical identifiers. A delete trigger may omit `columns` and `dataStructure`.
+  `RESTRICT`, skipping `public`. A schema left non-empty fails the step; nothing is force-dropped. A forward
+  delete and a compensation both re-derive their targets from `datasinks` and `datasetId`. A forward delete
+  drops all of them. A compensation drops only the tables in `createdTables`, and the schema only when
+  `createdSchema` is set: `PROVISION_SINK` records the objects it created, not the ones it found, so a failed
+  re-release keeps the tables, roles and data of an earlier release. A delete trigger may omit `columns` and `dataStructure`.
 
 Column derivation reads the root `properties`, or the property-carrying definition under
 `$defs`/`definitions`; `required` properties become `NOT NULL`.
