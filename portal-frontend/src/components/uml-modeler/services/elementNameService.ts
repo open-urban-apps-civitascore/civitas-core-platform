@@ -52,6 +52,19 @@ export const hasInvalidNamesInNode = (node: UMLNode, nodes: UMLNode[]): boolean 
 export const hasInvalidNamesInDiagram = (nodes: UMLNode[]): boolean =>
   nodes.some(node => hasInvalidNamesInNode(node, nodes))
 
+export const getInvalidNodeIds = (nodes: UMLNode[]): Set<string> =>
+  new Set(nodes.filter(node => hasInvalidNamesInNode(node, nodes)).map(node => node.id))
+
+const getMemberNames = (node: UMLNode): string[] => {
+  const element = node.data.element
+  if (hasAttributes(element)) return element.attributes.map(attribute => attribute.name)
+  if (element.type === 'enumeration') return element.literals.map(literal => literal.name)
+  return []
+}
+
+export const getNameSignature = (nodes: UMLNode[]): string =>
+  JSON.stringify(nodes.map(node => [node.id, node.data.element.name, getMemberNames(node)]))
+
 const getNextFreeName = (baseName: string, takenNames: string[]): string => {
   if (!takenNames.includes(baseName)) return baseName
   let suffix = FIRST_NAME_SUFFIX

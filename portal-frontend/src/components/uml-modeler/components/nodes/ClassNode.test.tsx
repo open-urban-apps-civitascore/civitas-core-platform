@@ -5,6 +5,7 @@ import { ReactFlowProvider } from '@xyflow/react'
 import { cls } from '@/test-support/datastructureFixtures'
 import { MARKUP_NAME } from '@/test-support/markup'
 
+import { InvalidNodeIdsProvider } from '../../hooks/use-invalid-node-ids'
 import type { UMLNode } from '../../types/diagram'
 import { ClassNode } from './ClassNode'
 
@@ -16,14 +17,12 @@ vi.mock('@xyflow/react', async importOriginal => ({
   useNodeId: () => nodeId,
 }))
 
-vi.mock('../../hooks/use-active-diagram', () => ({
-  useActiveDiagram: () => ({ diagram: { nodes: diagramNodes } }),
-}))
-
 const renderNode = (node: ReturnType<typeof cls>, isSelected = false) =>
   render(
     <ReactFlowProvider>
-      <ClassNode {...({ id: node.id, data: node.data, selected: isSelected } as unknown as NodeProps)} />
+      <InvalidNodeIdsProvider nodes={diagramNodes}>
+        <ClassNode {...({ id: node.id, data: node.data, selected: isSelected } as unknown as NodeProps)} />
+      </InvalidNodeIdsProvider>
     </ReactFlowProvider>,
   )
 

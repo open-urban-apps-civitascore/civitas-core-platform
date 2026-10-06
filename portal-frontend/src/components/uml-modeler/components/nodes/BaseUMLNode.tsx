@@ -4,8 +4,7 @@ import { Handle, Position, useNodeId } from '@xyflow/react'
 import type { CSSProperties, ReactNode } from 'react'
 
 import { NODE_DIMENSIONS, UML_COLORS } from '../../constants/umlTypes'
-import { useActiveDiagram } from '../../hooks/use-active-diagram'
-import { hasInvalidNamesInNode } from '../../services/elementNameService'
+import { useInvalidNodeIds } from '../../hooks/use-invalid-node-ids'
 import type { UMLElementType } from '../../types/uml'
 
 interface BaseUMLNodeProps {
@@ -59,9 +58,8 @@ export const BaseUMLNode: React.FC<BaseUMLNodeProps> = ({
   className = '',
 }) => {
   const nodeId = useNodeId()
-  const { diagram } = useActiveDiagram()
-  const node = diagram.nodes.find(diagramNode => diagramNode.id === nodeId)
-  const isInvalid = node !== undefined && hasInvalidNamesInNode(node, diagram.nodes)
+  const invalidNodeIds = useInvalidNodeIds()
+  const isInvalid = nodeId !== null && invalidNodeIds.has(nodeId)
 
   return (
     <div className={`uml-node ${className}`} style={getNodeStyle(elementType, isSelected, isInvalid)}>

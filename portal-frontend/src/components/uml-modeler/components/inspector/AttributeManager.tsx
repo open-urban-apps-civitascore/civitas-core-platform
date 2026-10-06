@@ -154,6 +154,12 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
     updateNode(nodeId, { attributes: updatedAttributes })
   }
 
+  const duplicateAttributeIds = new Set(
+    element.attributes
+      .filter(attribute => getAttributeNameError(attribute.name, getOtherMemberNames(element.attributes, attribute.id)))
+      .map(attribute => attribute.id),
+  )
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -170,136 +176,135 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
       </div>
 
       <div className="space-y-3">
-        {element.attributes.map((attribute, index) => {
-          const nameError = getAttributeNameError(attribute.name, getOtherMemberNames(element.attributes, attribute.id))
-          return (
-            <div key={attribute.id} className="p-3 border border-gray-200 rounded-lg space-y-2">
-              {!isReadOnly && (
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-gray-500">Attribute {index + 1}</span>
-                  <button
-                    onClick={() => removeAttribute(attribute.id)}
-                    className="text-red-500 hover:text-red-700"
-                    title="Remove attribute"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              )}
-
-              {/* Name */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
-                <input
-                  type="text"
-                  value={attribute.name}
-                  onChange={e => updateAttribute(attribute.id, { name: e.target.value })}
-                  className={cn(
-                    'w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500',
-                    nameError ? 'border-destructive' : 'border-gray-300',
-                  )}
-                  placeholder="attributeName"
-                  disabled={isReadOnly}
-                  aria-invalid={nameError !== undefined}
-                />
-                {nameError && <p className="mt-1 text-xs text-destructive">{t(nameError)}</p>}
+        {element.attributes.map((attribute, index) => (
+          <div key={attribute.id} className="p-3 border border-gray-200 rounded-lg space-y-2">
+            {!isReadOnly && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-500">Attribute {index + 1}</span>
+                <button
+                  onClick={() => removeAttribute(attribute.id)}
+                  className="text-red-500 hover:text-red-700"
+                  title="Remove attribute"
+                >
+                  <Trash2 size={12} />
+                </button>
               </div>
+            )}
 
-              {/* Type */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
-                <GroupedSelect
-                  groupedOptions={typeOptions}
-                  onValueChange={e => handleTypeChange(e, attribute)}
-                  disabled={isReadOnly}
-                  value={typeof attribute.type === 'string' ? attribute.type : attribute.type.name}
-                  size="sm"
-                  triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Cardinality / multiplicity */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Cardinality</label>
-                <BasicSelect
-                  options={getMultiplicityOptions(attribute.multiplicity)}
-                  onValueChange={e => {
-                    const multiplicity = cardinalityForStorage(e)
-                    updateAttribute(attribute.id, {
-                      multiplicity,
-                      ...(canMultiplicityBePrimaryKey(multiplicity) ? {} : { isId: false }),
-                    })
-                  }}
-                  value={cardinalityForDisplay(attribute.multiplicity)}
-                  triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  size="sm"
-                  disabled={isReadOnly}
-                />
-              </div>
-
-              {/* meta info - CRS */}
-              <div className={cn(!isGeometryType(attribute.type as string) && 'hidden')}>
-                <label className="block text-xs font-medium text-gray-600 mb-1">CRS</label>
-                <BasicSelect
-                  options={crsOptions}
-                  onValueChange={e => handleCrsChange(e, attribute.id)}
-                  value={attribute.meta?.gisInfo?.crs}
-                  disabled={!isFirstGeomAttr(attribute.id)}
-                  size="sm"
-                  triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Default Value */}
-              {isDefaultValueVisible && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Default Value</label>
-                  <input
-                    type="text"
-                    value={attribute.defaultValue || ''}
-                    onChange={e => updateAttribute(attribute.id, { defaultValue: e.target.value || undefined })}
-                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="Optional default value"
-                    disabled={isReadOnly}
-                  />
-                </div>
-              )}
-
-              {/* Static checkbox */}
-              {isStaticVisible && (
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id={`static-${attribute.id}`}
-                    checked={attribute.isStatic || false}
-                    onChange={e => updateAttribute(attribute.id, { isStatic: e.target.checked })}
-                    className="mr-2"
-                    disabled={isReadOnly}
-                  />
-                  <label htmlFor={`static-${attribute.id}`} className="text-xs text-gray-600">
-                    Static (underlined)
-                  </label>
-                </div>
-              )}
-
-              {canMultiplicityBePrimaryKey(attribute.multiplicity) && (
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id={`primary-key-${attribute.id}`}
-                    checked={attribute.isId || false}
-                    onChange={e => updateAttribute(attribute.id, { isId: e.target.checked })}
-                    className="mr-2"
-                    disabled={isReadOnly}
-                  />
-                  <label htmlFor={`primary-key-${attribute.id}`} className="text-xs text-gray-600">
-                    Primary Key {'{id}'}
-                  </label>
-                </div>
+            {/* Name */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
+              <input
+                type="text"
+                value={attribute.name}
+                onChange={e => updateAttribute(attribute.id, { name: e.target.value })}
+                className={cn(
+                  'w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500',
+                  duplicateAttributeIds.has(attribute.id) ? 'border-destructive' : 'border-gray-300',
+                )}
+                placeholder="attributeName"
+                disabled={isReadOnly}
+                aria-invalid={duplicateAttributeIds.has(attribute.id)}
+              />
+              {duplicateAttributeIds.has(attribute.id) && (
+                <p className="mt-1 text-xs text-destructive">{t('duplicateAttribute')}</p>
               )}
             </div>
-          )
-        })}
+
+            {/* Type */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+              <GroupedSelect
+                groupedOptions={typeOptions}
+                onValueChange={e => handleTypeChange(e, attribute)}
+                disabled={isReadOnly}
+                value={typeof attribute.type === 'string' ? attribute.type : attribute.type.name}
+                size="sm"
+                triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Cardinality / multiplicity */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Cardinality</label>
+              <BasicSelect
+                options={getMultiplicityOptions(attribute.multiplicity)}
+                onValueChange={e => {
+                  const multiplicity = cardinalityForStorage(e)
+                  updateAttribute(attribute.id, {
+                    multiplicity,
+                    ...(canMultiplicityBePrimaryKey(multiplicity) ? {} : { isId: false }),
+                  })
+                }}
+                value={cardinalityForDisplay(attribute.multiplicity)}
+                triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                size="sm"
+                disabled={isReadOnly}
+              />
+            </div>
+
+            {/* meta info - CRS */}
+            <div className={cn(!isGeometryType(attribute.type as string) && 'hidden')}>
+              <label className="block text-xs font-medium text-gray-600 mb-1">CRS</label>
+              <BasicSelect
+                options={crsOptions}
+                onValueChange={e => handleCrsChange(e, attribute.id)}
+                value={attribute.meta?.gisInfo?.crs}
+                disabled={!isFirstGeomAttr(attribute.id)}
+                size="sm"
+                triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Default Value */}
+            {isDefaultValueVisible && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Default Value</label>
+                <input
+                  type="text"
+                  value={attribute.defaultValue || ''}
+                  onChange={e => updateAttribute(attribute.id, { defaultValue: e.target.value || undefined })}
+                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="Optional default value"
+                  disabled={isReadOnly}
+                />
+              </div>
+            )}
+
+            {/* Static checkbox */}
+            {isStaticVisible && (
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id={`static-${attribute.id}`}
+                  checked={attribute.isStatic || false}
+                  onChange={e => updateAttribute(attribute.id, { isStatic: e.target.checked })}
+                  className="mr-2"
+                  disabled={isReadOnly}
+                />
+                <label htmlFor={`static-${attribute.id}`} className="text-xs text-gray-600">
+                  Static (underlined)
+                </label>
+              </div>
+            )}
+
+            {canMultiplicityBePrimaryKey(attribute.multiplicity) && (
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id={`primary-key-${attribute.id}`}
+                  checked={attribute.isId || false}
+                  onChange={e => updateAttribute(attribute.id, { isId: e.target.checked })}
+                  className="mr-2"
+                  disabled={isReadOnly}
+                />
+                <label htmlFor={`primary-key-${attribute.id}`} className="text-xs text-gray-600">
+                  Primary Key {'{id}'}
+                </label>
+              </div>
+            )}
+          </div>
+        ))}
 
         {element.attributes.length === 0 && (
           <p className="text-sm text-gray-500 text-center py-4">No attributes defined</p>

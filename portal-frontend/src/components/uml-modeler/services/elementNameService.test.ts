@@ -5,6 +5,8 @@ import {
   getAttributeNameError,
   getElementNameError,
   getEnumValueNameError,
+  getInvalidNodeIds,
+  getNameSignature,
   getNextAttributeName,
   getNextElementName,
   getNextEnumValueName,
@@ -106,6 +108,34 @@ describe('hasInvalidNamesInDiagram', () => {
   it('is false for the same value name in two enumerations', () => {
     expect(hasInvalidNamesInDiagram([enumNode('a', 'Status', ['ACTIVE']), enumNode('b', 'Mode', ['ACTIVE'])])).toBe(
       false,
+    )
+  })
+})
+
+describe('getInvalidNodeIds', () => {
+  it('contains only the nodes with an invalid name', () => {
+    const nodes = [node('a', 'Sensor'), node('b', 'Sensor'), node('c', 'Station')]
+
+    expect(getInvalidNodeIds(nodes)).toEqual(new Set(['a', 'b']))
+  })
+})
+
+describe('getNameSignature', () => {
+  it('does not change when only a position changes', () => {
+    const moved = { ...node('a', 'Sensor', ['value']), position: { x: 100, y: 50 } }
+
+    expect(getNameSignature([moved])).toBe(getNameSignature([node('a', 'Sensor', ['value'])]))
+  })
+
+  it('changes when an attribute name changes', () => {
+    expect(getNameSignature([node('a', 'Sensor', ['value'])])).not.toBe(
+      getNameSignature([node('a', 'Sensor', ['level'])]),
+    )
+  })
+
+  it('changes when an enumeration value name changes', () => {
+    expect(getNameSignature([enumNode('a', 'Status', ['ACTIVE'])])).not.toBe(
+      getNameSignature([enumNode('a', 'Status', ['INACTIVE'])]),
     )
   })
 })

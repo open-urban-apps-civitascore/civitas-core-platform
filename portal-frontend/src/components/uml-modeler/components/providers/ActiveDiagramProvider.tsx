@@ -5,6 +5,7 @@ import { type ReactNode, useCallback, useMemo, useState } from 'react'
 
 import { createUMLNode } from '../../constants/elementTemplates'
 import { ActiveDiagramProvider } from '../../hooks/use-active-diagram'
+import { InvalidNodeIdsProvider } from '../../hooks/use-invalid-node-ids'
 import {
   createEmptyDiagram,
   diagramReducer,
@@ -292,5 +293,9 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
     ],
   )
 
-  return <ActiveDiagramProvider value={contextValue}>{children}</ActiveDiagramProvider>
+  return (
+    <ActiveDiagramProvider value={contextValue}>
+      <InvalidNodeIdsProvider nodes={diagram.nodes}>{children}</InvalidNodeIdsProvider>
+    </ActiveDiagramProvider>
+  )
 }
