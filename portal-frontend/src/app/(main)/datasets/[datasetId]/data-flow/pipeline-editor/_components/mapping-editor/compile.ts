@@ -102,7 +102,7 @@ const megaNode = (
   type: 'mega',
   position,
   deletable: false,
-  data: { role, schemaName: tree.name, fields: tree.fields } as MegaNodeData,
+  data: { role, schemaName: tree.name, version: tree.version, fields: tree.fields } as MegaNodeData,
 })
 
 export const decompileConfig = (
@@ -157,7 +157,8 @@ export const decompileConfig = (
     // concat keeps a spare trailing port so users can add inputs without replacing wires
     const inputs = vn.op === 'concat' ? concatInputPorts(childVns.length + 1) : (def?.inputs ?? [])
     // For literal (const) nodes: restore the typed output port from the saved valueType (UML name)
-    const outputs = vn.op === 'const' ? [literalOutputPort(vn.valueType ?? LITERAL_DEFAULT_TYPE)] : (def?.outputs ?? [])
+    const outputs =
+      vn.op === 'const' ? [literalOutputPort(vn.valueType ?? LITERAL_DEFAULT_TYPE, vn.value)] : (def?.outputs ?? [])
 
     nodes.push({
       id: derivedId,

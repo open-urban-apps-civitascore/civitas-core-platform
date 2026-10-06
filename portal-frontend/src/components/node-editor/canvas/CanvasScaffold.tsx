@@ -19,10 +19,51 @@ import type {
   OnSelectionChangeParams,
   Viewport,
 } from '@xyflow/react'
-import { Background, BackgroundVariant, Controls, ReactFlow, ReactFlowProvider, useReactFlow } from '@xyflow/react'
+import {
+  Background,
+  BackgroundVariant,
+  Controls,
+  ReactFlow,
+  ReactFlowProvider,
+  useConnection,
+  useReactFlow,
+} from '@xyflow/react'
 import type { DragEvent, KeyboardEvent, ReactNode } from 'react'
+import { useEffect } from 'react'
 
 import { PALETTE_DND_TYPE } from '../palette/PaletteItem'
+
+/** The handle a connection drag started from, identifying it for potential-target highlighting. */
+export interface ConnectionDragOrigin {
+  nodeId: string
+  handleId: string
+  handleType: 'source' | 'target'
+}
+
+/**
+ * Renders nothing; exists to read the live in-progress connection from React Flow's internal
+ * store (only available inside `ReactFlowProvider`, i.e. below `CanvasInner`) and report the
+ * drag's origin handle up to the caller. The origin handle doesn't change while dragging — only
+ * the pointer position does — so gating the effect on the derived `key` (rather than firing on
+ * every pointer-move re-render) keeps this to one update at drag start and one at drag end.
+ */
+const ConnectionDragWatcher = ({ onChange }: { onChange: (origin: ConnectionDragOrigin | null) => void }) => {
+  const connection = useConnection()
+  const origin: ConnectionDragOrigin | null =
+    connection.inProgress && connection.fromHandle
+      ? {
+          nodeId: connection.fromHandle.nodeId,
+          handleId: connection.fromHandle.id ?? '',
+          handleType: connection.fromHandle.type,
+        }
+      : null
+  const key = origin ? `${origin.nodeId}::${origin.handleId}::${origin.handleType}` : null
+  useEffect(() => {
+    onChange(origin)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire only when the drag origin identity (`key`) changes
+  }, [key])
+  return null
+}
 
 export interface CanvasScaffoldProps {
   nodes: Node[]
@@ -35,6 +76,8 @@ export interface CanvasScaffoldProps {
   onConnect?: OnConnect
   onConnectStart?: OnConnectStart
   onConnectEnd?: OnConnectEnd
+  /** Fires whenever a connection drag starts or ends, for potential-target highlighting. */
+  onConnectionDragChange?: (origin: ConnectionDragOrigin | null) => void
   isValidConnection?: IsValidConnection
   onBeforeDelete?: OnBeforeDelete
   onDropNode?: (type: string, position: { x: number; y: number }) => void
@@ -143,6 +186,7 @@ const CanvasInner = (props: CanvasScaffoldProps) => {
       >
         <Background variant={BackgroundVariant.Dots} gap={props.backgroundGap} size={1} color="hsl(var(--border))" />
         <Controls showInteractive={canEdit} />
+        {props.onConnectionDragChange && <ConnectionDragWatcher onChange={props.onConnectionDragChange} />}
         {props.children}
       </ReactFlow>
     </div>

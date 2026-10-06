@@ -1,5 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 
+import type { GroupedOption } from '@/components/select/grouped-select/GroupedSelect'
+
 import type { PortStatus } from './PortHandle'
 
 export type PortType = 'scalar' | 'geometry' | 'array' | 'object'
@@ -18,7 +20,7 @@ export interface PortDef {
   accepts?: readonly string[]
 }
 
-export type ConfigControl = 'text' | 'number' | 'select'
+export type ConfigControl = 'text' | 'number' | 'select' | 'textarea'
 
 export interface ConfigOption {
   label: string
@@ -32,6 +34,8 @@ export interface ConfigField {
   default?: string | number
   placeholder?: string
   options?: ConfigOption[]
+  /** Same shape as the datastructure editor's attribute-type dropdown; renders with group headings. */
+  groupedOptions?: GroupedOption[]
 }
 
 /** A single, definition-driven node type. Renders its own node, inspector and palette item. */

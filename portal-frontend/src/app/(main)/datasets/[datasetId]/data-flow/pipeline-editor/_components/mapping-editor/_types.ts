@@ -32,6 +32,7 @@ export type FieldType =
   | 'date'
   | 'datetime'
   | 'uuid'
+  | 'json'
   | GeometryType
   | 'array'
   | 'object'
@@ -99,6 +100,8 @@ export const field = (
 
 export interface SchemaTree {
   name: string
+  /** data structure version, e.g. "4.0.0"; null for a draft. */
+  version?: string | null
   fields: FieldNode[]
 }
 

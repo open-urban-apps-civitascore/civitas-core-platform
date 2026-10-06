@@ -1,3 +1,5 @@
+import type { GroupedOption } from '@/components/select/grouped-select/GroupedSelect'
+
 import type { UMLGeometryType, UMLPrimitiveType, UMLTypeReference } from '../types/uml'
 
 // Selectable UML primitive and geometry types. The `UMLPrimitiveType` /
@@ -22,6 +24,13 @@ export const UML_GEOMETRY_TYPES: readonly UMLGeometryType[] = [
   'MultiLineString',
   'MultiPolygon',
   'GeometryCollection',
+]
+
+// Shared grouped options for any UML type dropdown (attribute editor, literal node, ...),
+// so every picker groups and orders types the same way.
+export const UML_TYPE_GROUPED_OPTIONS: GroupedOption[] = [
+  { label: 'Primitive Types', options: UML_PRIMITIVE_TYPES.map(type => ({ label: type, value: type })) },
+  { label: 'Geometry Types', options: UML_GEOMETRY_TYPES.map(type => ({ label: type, value: type })) },
 ]
 
 // Categorized primitive types for UI dropdowns

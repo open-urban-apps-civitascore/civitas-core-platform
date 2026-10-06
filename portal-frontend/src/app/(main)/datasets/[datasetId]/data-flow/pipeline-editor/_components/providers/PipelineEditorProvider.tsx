@@ -242,10 +242,10 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Helper to update pipeline in session =====
   const updatePipeline = useCallback(
-    (updater: (pipeline: Pipeline) => Pipeline) => {
+    (updater: (pipeline: Pipeline) => Pipeline, shouldPreserveDirty?: boolean) => {
       if (!activeSession) return
       const updatedPipeline = updater(activeSession.pipeline)
-      sessionManager.updateSessionPipeline(activeSession.id, updatedPipeline)
+      sessionManager.updateSessionPipeline(activeSession.id, updatedPipeline, shouldPreserveDirty)
     },
     [activeSession, sessionManager],
   )
@@ -415,8 +415,17 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     setIsValidationRequired(false)
     // Show validation panel in inspector
     setShouldShowValidationPanel(true)
+    // Deselect all so the next click fires a selection change and hides the validation panel
+    updatePipeline(
+      p => ({
+        ...p,
+        nodes: p.nodes.map(node => ({ ...node, selected: false })),
+        edges: p.edges.map(edge => ({ ...edge, selected: false })),
+      }),
+      true,
+    )
     return result
-  }, [pipeline, activeSession, validationContextFor])
+  }, [pipeline, activeSession, validationContextFor, updatePipeline])
 
   const clearValidation = useCallback(() => {
     setValidationResult(null)

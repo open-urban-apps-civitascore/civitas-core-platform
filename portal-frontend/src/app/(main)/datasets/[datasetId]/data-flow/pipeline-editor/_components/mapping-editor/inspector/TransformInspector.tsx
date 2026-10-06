@@ -5,7 +5,16 @@ import { useTranslations } from 'next-intl'
 import type { ConfigField } from '@/components/node-editor/types'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 
 import type { MappingTransformDef } from '../transforms'
 
@@ -23,13 +32,35 @@ const FieldControl = ({ field, value, onChange }: FieldControlProps) => {
           <SelectValue placeholder={field.placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {field.options?.map(option => (
-            <SelectItem key={option.label} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
+          {field.groupedOptions
+            ? field.groupedOptions.map(group => (
+                <SelectGroup key={group.label}>
+                  <SelectLabel>{group.label}</SelectLabel>
+                  {group.options.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))
+            : field.options?.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
         </SelectContent>
       </Select>
+    )
+  }
+
+  if (field.control === 'textarea') {
+    return (
+      <Textarea
+        value={value}
+        placeholder={field.placeholder}
+        className="w-full font-mono text-xs"
+        onChange={e => onChange(e.target.value)}
+      />
     )
   }
 
@@ -58,6 +89,9 @@ export const TransformInspector = ({ def, config, onChange, errors }: TransformI
 
   if (!def) return null
 
+  const placeholders = def.placeholders?.(config)
+  const controls = def.controls?.(config)
+
   return (
     <div className="space-y-4 p-4">
       <div className="space-y-1">
@@ -69,7 +103,11 @@ export const TransformInspector = ({ def, config, onChange, errors }: TransformI
         <div key={field.key} className="space-y-1.5">
           <Label>{field.label}</Label>
           <FieldControl
-            field={field}
+            field={{
+              ...field,
+              control: controls?.[field.key] ?? field.control,
+              placeholder: placeholders?.[field.key] ?? field.placeholder,
+            }}
             value={String(config[field.key] ?? field.default ?? '')}
             onChange={value => onChange(field.key, value)}
           />
