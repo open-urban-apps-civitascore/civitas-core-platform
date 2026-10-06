@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 
 import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
+import type { ConnectionDragOrigin, PortStatus } from '@/components/node-editor'
 import {
   CanvasScaffold,
   createTransformNodeType,
@@ -229,6 +230,43 @@ export const MappingEditorModal = ({
     [nodes, sourceFields, targetFields],
   )
 
+  /** The handle a connection drag currently started from, or null when no drag is in progress. */
+  const [dragOrigin, setDragOrigin] = useState<ConnectionDragOrigin | null>(null)
+
+  /**
+   * Per-node candidate/incompatible port overrides for the in-progress drag (§ potential-target
+   * highlighting). Reuses `isValidConnection` against a synthetic connection for each opposite-
+   * direction port, so this stays in lockstep with the rules that actually gate a drop — object/
+   * array structural compatibility included. Same-direction ports (never a valid drop target in
+   * the canvas's strict connection mode) and the origin port itself are left untouched.
+   */
+  const dragHighlight = useMemo(() => {
+    if (!dragOrigin) return null
+    const statusByNode = new Map<string, Record<string, PortStatus>>()
+    const evaluate = (nodeId: string, handleId: string, handleType: 'source' | 'target') => {
+      if (handleType === dragOrigin.handleType) return
+      const connection =
+        dragOrigin.handleType === 'source'
+          ? { source: dragOrigin.nodeId, sourceHandle: dragOrigin.handleId, target: nodeId, targetHandle: handleId }
+          : { source: nodeId, sourceHandle: handleId, target: dragOrigin.nodeId, targetHandle: dragOrigin.handleId }
+      const forNode = statusByNode.get(nodeId) ?? {}
+      forNode[handleId] = isValidConnection(connection) ? 'candidate' : 'incompatible'
+      statusByNode.set(nodeId, forNode)
+    }
+
+    sourceFields.forEach((_field, path) => evaluate(SOURCE_NODE_ID, path, 'source'))
+    targetFields.forEach((_field, path) => evaluate(TARGET_NODE_ID, path, 'target'))
+    nodes.forEach(node => {
+      if (node.type !== 'transform') return
+      const data = node.data as TransformNodeData
+      const def = mappingRegistry.byType[data.defType]
+      ;(data.inputs ?? def?.inputs ?? []).forEach(port => evaluate(node.id, port.id, 'target'))
+      ;(data.outputs ?? def?.outputs ?? []).forEach(port => evaluate(node.id, port.id, 'source'))
+    })
+
+    return statusByNode
+  }, [dragOrigin, isValidConnection, sourceFields, targetFields, nodes])
+
   /** Tracks the source endpoint of an in-progress drag so we can show a toast on failure. */
   const pendingConnection = useRef<{ nodeId: string; handleId: string } | null>(null)
 
@@ -324,10 +362,11 @@ export const MappingEditorModal = ({
         if (node.id !== selectedId) return node
         const data = node.data as TransformNodeData
         const newConfig = { ...data.config, [key]: value }
-        // When the literal node's type changes, update the output port's dataType so
-        // connection validation reflects the chosen type.
-        if (data.defType === 'const' && key === 'type') {
-          const newOutputs = [literalOutputPort(value || LITERAL_DEFAULT_TYPE)]
+        // Rebuild the literal node's output port so its dataType follows the chosen type
+        // (for connection validation) and its label follows the entered value.
+        if (data.defType === 'const' && (key === 'type' || key === 'value')) {
+          const type = String(newConfig.type || LITERAL_DEFAULT_TYPE)
+          const newOutputs = [literalOutputPort(type, newConfig.value)]
           return { ...node, data: { ...data, config: newConfig, outputs: newOutputs } }
         }
         return { ...node, data: { ...data, config: newConfig } }
@@ -347,25 +386,29 @@ export const MappingEditorModal = ({
   // state, so compileCanvas keeps seeing the persisted node data.
   const displayNodes = useMemo(
     () =>
-      nodes.map(node =>
-        node.type === 'mega'
-          ? {
-              ...node,
-              data: {
-                ...node.data,
-                portStatus: node.data.role === 'source' ? status.sourcePortStatus : status.targetPortStatus,
-              },
-            }
-          : {
-              ...node,
-              data: {
-                ...node.data,
-                portStatus: status.transformPortStatus[node.id],
-                hasError: !!configErrors.byNode[node.id],
-              },
+      nodes.map(node => {
+        const dragOverride = dragHighlight?.get(node.id)
+        if (node.type === 'mega') {
+          const baseStatus = node.data.role === 'source' ? status.sourcePortStatus : status.targetPortStatus
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              portStatus: dragOverride ? { ...baseStatus, ...dragOverride } : baseStatus,
             },
-      ),
-    [nodes, status, configErrors],
+          }
+        }
+        const baseStatus = status.transformPortStatus[node.id]
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            portStatus: dragOverride ? { ...baseStatus, ...dragOverride } : baseStatus,
+            hasError: !!configErrors.byNode[node.id],
+          },
+        }
+      }),
+    [nodes, status, configErrors, dragHighlight],
   )
 
   const displayEdges = useMemo(() => {
@@ -492,6 +535,7 @@ export const MappingEditorModal = ({
               onConnect={onConnect}
               onConnectStart={onConnectStart}
               onConnectEnd={onConnectEnd}
+              onConnectionDragChange={setDragOrigin}
               isValidConnection={isValidConnection}
               onDropNode={onDropNode}
               onSelectionChange={setSelectedId}

@@ -1,9 +1,9 @@
 import type { LucideIcon } from 'lucide-react'
 import { Binary, Calendar, CalendarClock, Clock, Combine, Fingerprint, Hash, MapPin, Type } from 'lucide-react'
 
-import type { ConfigField, PortDef, TransformDef } from '@/components/node-editor/types'
+import type { ConfigControl, ConfigField, PortDef, TransformDef } from '@/components/node-editor/types'
 import { buildRegistry } from '@/components/node-editor/types'
-import { UML_GEOMETRY_TYPES, UML_PRIMITIVE_TYPES } from '@/components/uml-modeler/constants/umlTypes'
+import { UML_TYPE_GROUPED_OPTIONS } from '@/components/uml-modeler/constants/umlTypes'
 
 import type { ConversionOp, OpNode, TransformOp, ValueNode } from '../_types'
 import { NUMERIC_SUBTYPES } from '../_types'
@@ -18,6 +18,12 @@ export interface MappingTransformDef extends TransformDef {
   opConfig: (op: OpNode) => Record<string, unknown>
   /** Per-field config errors as i18n keys, relative to `pipelineEditor.mappingEditor`. */
   validate?: (config: Record<string, unknown>) => Record<string, string> | undefined
+  /** Per-field placeholder overrides driven by the current config, e.g. a format hint that
+   *  depends on another field's value (the Literal node's value hint depends on its type). */
+  placeholders?: (config: Record<string, unknown>) => Record<string, string> | undefined
+  /** Per-field control overrides driven by the current config, e.g. the Literal node's value
+   *  field switches to a textarea when its type is Json. */
+  controls?: (config: Record<string, unknown>) => Record<string, ConfigControl> | undefined
 }
 
 const scalar = (id: string, label: string, dataType?: string): PortDef => ({ id, label, type: 'scalar', dataType })
@@ -74,16 +80,6 @@ const conversion = (
   opConfig: op => ('pattern' in op && op.pattern != null ? { pattern: op.pattern } : {}),
 })
 
-/**
- * Dropdown options for the Literal node — derived directly from the UML modeler's
- * type constants so the two stay in sync automatically.
- * Each option uses the UML type name as its unique value.
- */
-export const LITERAL_TYPE_OPTIONS = [...UML_PRIMITIVE_TYPES, ...UML_GEOMETRY_TYPES].map(name => ({
-  label: name,
-  value: name,
-}))
-
 /** Default UML type name for a freshly-dropped Literal node. */
 export const LITERAL_DEFAULT_TYPE = 'String'
 
@@ -93,12 +89,43 @@ export const LITERAL_DEFAULT_TYPE = 'String'
  * Geometries are first-class typed ports: their `dataType` is the concrete
  * geometry name (e.g. 'Point') so Point vs Polygon is matched by exact type;
  * other primitives → scalar port with the matching subtype.
- * The port label shows that same subtype, matching the conversion nodes.
+ * The port label shows the configured value; while the value is empty it falls back to
+ * the subtype, matching the conversion nodes.
  */
-export const literalOutputPort = (umlType: string): PortDef => {
+export const literalOutputPort = (umlType: string, value?: unknown): PortDef => {
   const isGeom = (GEOMETRY as Set<string>).has(umlType)
   const dataType = isGeom ? umlType : (PRIMITIVE[umlType] ?? 'str')
-  return { id: 'out', label: dataType, type: isGeom ? 'geometry' : 'scalar', dataType }
+  const label = value == null || value === '' ? dataType : String(value)
+  return { id: 'out', label, type: isGeom ? 'geometry' : 'scalar', dataType }
+}
+
+/**
+ * Example WKT value shown as the Literal node's value field placeholder for each geometry type.
+ * Coordinates are `lon lat`, like geoPoint.
+ */
+const LITERAL_GEOMETRY_EXAMPLES: Partial<Record<string, string>> = {
+  Point: 'POINT(7.641 51.952)',
+  LineString: 'LINESTRING(7.646 51.951, 7.64 51.952)',
+  Polygon: 'POLYGON((7.641 51.952, 7.646 51.952, 7.646 51.951, 7.641 51.951, 7.641 51.952))',
+  MultiPoint: 'MULTIPOINT((7.641 51.952), (7.646 51.951))',
+  MultiLineString: 'MULTILINESTRING((7.646 51.951, 7.64 51.952))',
+  MultiPolygon: 'MULTIPOLYGON(((7.641 51.952, 7.646 51.952, 7.646 51.951, 7.641 51.951, 7.641 51.952)))',
+  GeometryCollection: 'GEOMETRYCOLLECTION(POINT(7.641 51.952))',
+}
+
+/**
+ * Example value shown as the Literal node's value field placeholder
+ */
+const LITERAL_VALUE_HINTS: Partial<Record<string, string>> = {
+  String: 'Münster',
+  Integer: '42',
+  Number: '3.14',
+  Boolean: 'true',
+  Date: '2024-01-31',
+  DateTime: '2024-01-31T14:30:00+01:00',
+  Uuid: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+  Json: '{"key": "value"}',
+  ...LITERAL_GEOMETRY_EXAMPLES,
 }
 
 const literal: MappingTransformDef = {
@@ -118,7 +145,7 @@ const literal: MappingTransformDef = {
       control: 'select',
       default: LITERAL_DEFAULT_TYPE,
       placeholder: 'transforms.literal.fields.type.placeholder',
-      options: LITERAL_TYPE_OPTIONS,
+      groupedOptions: UML_TYPE_GROUPED_OPTIONS,
     },
     { key: 'value', label: 'transforms.literal.fields.value.label', control: 'text', default: '' },
   ],
@@ -132,6 +159,11 @@ const literal: MappingTransformDef = {
   opConfig: op => (op.op === 'const' ? { value: op.value, type: op.valueType ?? LITERAL_DEFAULT_TYPE } : {}),
   validate: cfg =>
     String(cfg.value ?? '').trim() === '' ? { value: 'transforms.literal.fields.value.required' } : undefined,
+  placeholders: cfg => {
+    const hint = LITERAL_VALUE_HINTS[String(cfg.type ?? LITERAL_DEFAULT_TYPE)]
+    return hint ? { value: hint } : undefined
+  },
+  controls: cfg => (cfg.type === 'Json' ? { value: 'textarea' } : undefined),
 }
 
 const concat: MappingTransformDef = {

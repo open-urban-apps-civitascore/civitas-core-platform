@@ -787,6 +787,158 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .as("Should return UNAUTHORIZED status")
           .isEqualTo(HttpStatus.UNAUTHORIZED);
     }
+
+    @Test
+    @DisplayName("Should release a Data structure model whose root names its one Element")
+    void shouldReleaseDataStructureModelWithRootElement() {
+      DataStructureVersion version = draftWithDataStructureModel(true);
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              releasePath(version),
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName("Should fail to release a Data structure model without a root Element")
+    void shouldFailToReleaseDataStructureModelWithoutRootElement() {
+      DataStructureVersion version = draftWithDataStructureModel(false);
+
+      ResponseEntity<ProblemDetail> response =
+          restTemplate.exchange(
+              releasePath(version),
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<ProblemDetail>() {});
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:MODEL_ROOT_MISSING");
+      assertThat(
+              dataStructureVersionRepository
+                  .findById(version.getId())
+                  .orElseThrow()
+                  .getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("Should release a Data structure model whose root reaches every member")
+    void shouldReleaseDataStructureModelWhoseRootReachesEveryMember() {
+      DataStructureVersion version =
+          draftWithDataStructureModel(
+              true, List.of("Person", "Address"), Map.of("Person", "Address"));
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              releasePath(version),
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    @DisplayName(
+        "Should fail to release a Data structure model with a member its root does not reach")
+    void shouldFailToReleaseDataStructureModelWithUnreachableMember() {
+      DataStructureVersion version =
+          draftWithDataStructureModel(true, List.of("Person", "Orphan"), Map.of());
+
+      ResponseEntity<ProblemDetail> response =
+          restTemplate.exchange(
+              releasePath(version),
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<ProblemDetail>() {});
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getType())
+          .hasToString("urn:civitas:error:MODEL_MEMBER_UNREACHABLE");
+      assertThat(response.getBody().getProperties())
+          .containsEntry("memberNames", List.of("Orphan"));
+      assertThat(
+              dataStructureVersionRepository
+                  .findById(version.getId())
+                  .orElseThrow()
+                  .getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("Should fail to release a version whose model is missing from the registry")
+    void shouldFailToReleaseVersionWhoseModelIsMissing() {
+      DataStructureVersion version = draftWithDataStructureModel(true);
+      version.setModelUrn(
+          "urn:core:platform:civitas:datastructure:common:Gone:"
+              + UUID.randomUUID().toString().replace("-", "").substring(0, 10)
+              + ":1.0.0");
+      dataStructureVersionRepository.save(version);
+
+      ResponseEntity<ProblemDetail> response =
+          restTemplate.exchange(
+              releasePath(version),
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<ProblemDetail>() {});
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:MODEL_MISSING");
+    }
+
+    private String releasePath(DataStructureVersion version) {
+      return "/datastructures/"
+          + version.getDataStructure().getId()
+          + "/versions/"
+          + version.getId()
+          + "/release";
+    }
+
+    private DataStructureVersion draftWithDataStructureModel(boolean designateRoot) {
+      return draftWithDataStructureModel(designateRoot, List.of("Person"), Map.of());
+    }
+
+    /**
+     * A draft version whose model is a Data structure document with Person as its root candidate,
+     * as the UML editor stores it: each member embeds the member {@code embeds} maps it to.
+     */
+    private DataStructureVersion draftWithDataStructureModel(
+        boolean designateRoot, List<String> members, Map<String, String> embeds) {
+      String disambiguator = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+      Map<String, Object> defs = new HashMap<>();
+      for (String member : members) {
+        Map<String, Object> properties = new HashMap<>();
+        properties.put("name", Map.of("type", "string"));
+        if (embeds.containsKey(member)) {
+          properties.put("part", Map.of("$ref", "#/$defs/" + embeds.get(member)));
+        }
+        defs.put(member, Map.of("type", "object", "properties", properties));
+      }
+      Map<String, Object> model = new HashMap<>();
+      model.put("$schema", "https://json-schema.org/draft/2020-12/schema");
+      model.put("title", "People");
+      model.put("$defs", defs);
+      if (designateRoot) {
+        model.put("$ref", "#/$defs/Person");
+      }
+      DataStructure dataStructure =
+          portalData.dataStructure(
+              b ->
+                  b.name("People " + disambiguator).dataStructureStatus(DataStructureStatus.DRAFT));
+      DataStructureVersion version =
+          portalData.dataStructureVersion(
+              dataStructure,
+              b ->
+                  b.dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
+                      .modelName("People"));
+      return portalData.attachModel(version, model);
+    }
   }
 
   @Nested

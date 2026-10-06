@@ -13,6 +13,9 @@ import de.civitascore.portal.modelregistry.VersionBump;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ModelMemberUnreachableException;
+import de.civitascore.portal.util.ModelMissingException;
+import de.civitascore.portal.util.ModelRootMissingException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.List;
@@ -233,12 +236,16 @@ public class DataStructureVersionService
   }
 
   /**
-   * Releases a data structure version by validating it has a model (JSON schema) and setting status
-   * to AVAILABLE.
+   * Releases a data structure version by validating it has a model (JSON schema) with exactly one
+   * root Element and setting status to AVAILABLE.
    *
    * @param id the version ID
    * @return the released version
-   * @throws InvalidInputException if the version has no model or is already released
+   * @throws InvalidInputException if the version is already released or has no model
+   * @throws ModelRootMissingException if the version's model has no root Element
+   * @throws ModelMemberUnreachableException if members of the version's model are not reachable
+   *     from its root Element
+   * @throws ModelMissingException if the model registry no longer holds the version's model
    */
   @Transactional
   public DataStructureVersion release(UUID id) {
@@ -256,6 +263,8 @@ public class DataStructureVersionService
       throw new InvalidInputException(
           "model", id, "DataStructureVersion must contain a model before releasing");
     }
+
+    modelRegistryGateway.requireSingleRoot(version.getModelUrn());
 
     version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
     return dataStructureVersionRepository.save(version);

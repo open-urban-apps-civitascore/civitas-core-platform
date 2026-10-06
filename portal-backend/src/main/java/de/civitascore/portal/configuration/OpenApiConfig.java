@@ -537,7 +537,23 @@ public class OpenApiConfig {
                       "DATASET_NOT_EDITABLE",
                       "A dataset and its sub-entities can only be changed while the dataset is "
                           + "DRAFT. Unstage or unrelease the dataset first.",
-                      path)));
+                      path),
+                  "model_root_missing",
+                  problemExample(
+                      400,
+                      "MODEL_ROOT_MISSING",
+                      "DataStructureVersion model must designate exactly one root Element before"
+                          + " releasing",
+                      path),
+                  "model_member_unreachable",
+                  problemExample(
+                      400,
+                      "MODEL_MEMBER_UNREACHABLE",
+                      "DataStructureVersion model has members that its root Element does not"
+                          + " reach: Orphan",
+                      path,
+                      "memberNames",
+                      List.of("Orphan"))));
       case "404" ->
           problemExamples(
               orderedMap(
@@ -570,6 +586,12 @@ public class OpenApiConfig {
                       path,
                       "pendingSagaType",
                       "CREATE"),
+                  "model_missing",
+                  problemExample(
+                      409,
+                      "MODEL_MISSING",
+                      "DataStructureVersion model is missing from the model registry",
+                      path),
                   "foreign_key_violation",
                   problemExample(
                       409, "FOREIGN_KEY_VIOLATION", "Referenced entity does not exist", path)));

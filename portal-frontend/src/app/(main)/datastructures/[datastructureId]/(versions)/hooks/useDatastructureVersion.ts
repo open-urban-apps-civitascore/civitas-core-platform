@@ -37,7 +37,7 @@ import {
   mapDatastructureVersionFormToApiData,
   parseDatastructureVersionFormData,
 } from '@/utils/datastructures'
-import { isResourceInUseError } from '@/utils/errors'
+import { isModelRootMissingError, isResourceInUseError, unreachableModelMembers } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
 const draftResolver: Resolver<DatastructureVersionFormData> = zodResolver(DatastructureVersionFormDraftSchema)
@@ -150,6 +150,14 @@ export const useDatastructureVersion = ({ version, isCreateMode, onCreateVersion
     form.setValue('dataStructureVersionStatus', newStatus, { shouldDirty: true })
   }
 
+  const statusChangeErrorMessage = (error: unknown) => {
+    if (isResourceInUseError(error)) return t('errors.inUseError')
+    if (isModelRootMissingError(error)) return t('errors.modelRootMissingError')
+    const unreachableMembers = unreachableModelMembers(error)
+    if (unreachableMembers) return t('errors.modelMemberUnreachableError', { names: unreachableMembers.join(', ') })
+    return tCommon('errors.statusChangeError')
+  }
+
   const handleStatusUpdate = async (
     versionId: string,
     endpoint: 'release' | 'unrelease',
@@ -164,7 +172,7 @@ export const useDatastructureVersion = ({ version, isCreateMode, onCreateVersion
       router.refresh()
       return response.data
     } catch (error) {
-      toast.error(isResourceInUseError(error) ? t('errors.inUseError') : tCommon('errors.statusChangeError'))
+      toast.error(statusChangeErrorMessage(error))
       throw error
     }
   }

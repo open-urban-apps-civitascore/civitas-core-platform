@@ -66,6 +66,26 @@ describe('modelToSchemaTree', () => {
     expect(tree.fields[0].children?.map(f => f.type)).toEqual(['date', 'datetime', 'uuid', 'number', 'bool'])
   })
 
+  it('reads an inline object with no properties and no $ref as json, not an opaque object leaf', () => {
+    const tree = modelToSchemaTree(
+      wrapperModel({
+        Thing: {
+          type: 'object',
+          properties: {
+            payload: { type: 'object' },
+            empty: { type: 'object', properties: {} },
+          },
+        },
+      }),
+      'fallback',
+    )
+
+    expect(tree.fields[0].children).toEqual([
+      { path: '$.payload', name: 'payload', type: 'json', portType: 'scalar' },
+      { path: '$.empty', name: 'empty', type: 'json', portType: 'scalar' },
+    ])
+  })
+
   it('maps geojson $refs to concrete geometry types', () => {
     const tree = modelToSchemaTree(
       wrapperModel({

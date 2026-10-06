@@ -8,6 +8,9 @@ import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ModelMemberUnreachableException;
+import de.civitascore.portal.util.ModelMissingException;
+import de.civitascore.portal.util.ModelRootMissingException;
 import de.civitascore.portal.util.PipelineClosureValidationException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -99,6 +102,45 @@ class GlobalExceptionHandlerTest {
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:DATASET_NOT_EDITABLE");
       assertThat(problemDetail.getDetail()).isEqualTo("Dataset must be DRAFT");
+      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+    }
+
+    @Test
+    @DisplayName("Should return 400 with its own type for ModelRootMissingException")
+    void shouldReturn400ForModelRootMissing() {
+      ModelRootMissingException ex = new ModelRootMissingException();
+
+      ProblemDetail problemDetail = handler.handleModelRootMissing(ex, mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:MODEL_ROOT_MISSING");
+      assertThat(problemDetail.getDetail()).isEqualTo(ex.getMessage());
+      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+    }
+
+    @Test
+    @DisplayName(
+        "Should return 400 naming the unreachable members for ModelMemberUnreachableException")
+    void shouldReturn400ForModelMemberUnreachable() {
+      ModelMemberUnreachableException ex = new ModelMemberUnreachableException(List.of("Orphan"));
+
+      ProblemDetail problemDetail = handler.handleModelMemberUnreachable(ex, mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:MODEL_MEMBER_UNREACHABLE");
+      assertThat(problemDetail.getProperties()).containsEntry("memberNames", List.of("Orphan"));
+    }
+
+    @Test
+    @DisplayName("Should return 409 with its own type for ModelMissingException")
+    void shouldReturn409ForModelMissing() {
+      ModelMissingException ex = new ModelMissingException();
+
+      ProblemDetail problemDetail = handler.handleModelMissing(ex, mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:MODEL_MISSING");
+      assertThat(problemDetail.getDetail()).isEqualTo(ex.getMessage());
       assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 

@@ -288,6 +288,9 @@ const fieldFor = (
 
   if (asString(node.type) === 'object' || asNode(node.properties)) {
     const children = childrenOf(node, defs, path, visited)
+    if (!children || children.length === 0) {
+      return field(path, name, 'json', required)
+    }
     return field(path, name, 'object', required, children)
   }
 
