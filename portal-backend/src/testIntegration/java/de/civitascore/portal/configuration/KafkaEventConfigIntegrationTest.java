@@ -3,6 +3,10 @@ package de.civitascore.portal.configuration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.civitascore.portal.messaging.saga.InvalidSagaResultException;
 import java.time.Duration;
 import java.util.List;
@@ -24,6 +28,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
@@ -56,16 +61,35 @@ class KafkaEventConfigIntegrationTest {
   private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
   @Test
-  void sagaErrorHandler_whenDeadLetterPublishFails_commitsPastTheRecord(EmbeddedKafkaBroker broker)
-      throws Exception {
-    List<String> deliveries =
-        consume(
-            broker,
-            RETRYABLE_TOPIC,
-            () -> new IllegalStateException("dataset service unavailable"));
+  void sagaErrorHandler_whenDeadLetterPublishFails_logsAndDiscardsTheRecord(
+      EmbeddedKafkaBroker broker) throws Exception {
+    Logger configLogger = (Logger) LoggerFactory.getLogger(KafkaEventConfig.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    configLogger.addAppender(appender);
+    List<String> deliveries;
+    try {
+      deliveries =
+          consume(
+              broker,
+              RETRYABLE_TOPIC,
+              () -> new IllegalStateException("dataset service unavailable"));
+    } finally {
+      configLogger.detachAppender(appender);
+    }
 
     assertThat(deliveries)
         .containsExactly(UNPROCESSABLE, UNPROCESSABLE, UNPROCESSABLE, UNPROCESSABLE, NEXT);
+    assertThat(appender.list)
+        .filteredOn(event -> event.getLevel() == Level.ERROR)
+        .singleElement()
+        .satisfies(
+            event -> {
+              assertThat(event.getFormattedMessage())
+                  .contains("Discarded")
+                  .contains(RETRYABLE_TOPIC);
+              assertThat(event.getThrowableProxy().getSuppressed()).isNotEmpty();
+            });
   }
 
   @Test
