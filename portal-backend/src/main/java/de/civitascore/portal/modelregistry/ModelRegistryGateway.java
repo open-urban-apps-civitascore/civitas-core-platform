@@ -9,11 +9,14 @@ import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
+import de.civitascore.modelforge.contract.RootCheck;
 import de.civitascore.modelforge.contract.SaveArtifactCommand;
 import de.civitascore.modelforge.contract.SchemaViewQuery;
 import de.civitascore.modelforge.facade.ModelForge;
 import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ModelMemberUnreachableException;
+import de.civitascore.portal.util.ModelRootMissingException;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -228,13 +231,21 @@ public class ModelRegistryGateway {
   }
 
   /**
-   * Whether the model has a single root, as {@link ModelForge#hasSingleRoot} defines it.
+   * Refuses a model without the single root that publication needs, as {@link ModelForge#checkRoot}
+   * defines it.
    *
    * @param modelUrn CORE URN of a stored Element or Data structure model
    * @throws IllegalArgumentException when the registry holds no such model
+   * @throws ModelRootMissingException when no member of the model is its root
+   * @throws ModelMemberUnreachableException when members are not reachable from the root
    */
-  public boolean hasSingleRoot(String modelUrn) {
-    return modelForge.hasSingleRoot(new ArtifactId(modelUrn));
+  public void requireSingleRoot(String modelUrn) {
+    switch (modelForge.checkRoot(new ArtifactId(modelUrn))) {
+      case RootCheck.Rooted _ -> {}
+      case RootCheck.NoRoot _ -> throw new ModelRootMissingException();
+      case RootCheck.UnreachableMembers unreachable ->
+          throw new ModelMemberUnreachableException(unreachable.memberNames());
+    }
   }
 
   /**

@@ -544,7 +544,16 @@ public class OpenApiConfig {
                       "MODEL_ROOT_MISSING",
                       "DataStructureVersion model must designate exactly one root Element before"
                           + " releasing",
-                      path)));
+                      path),
+                  "model_member_unreachable",
+                  problemExample(
+                      400,
+                      "MODEL_MEMBER_UNREACHABLE",
+                      "DataStructureVersion model has members that its root Element does not"
+                          + " reach: Orphan",
+                      path,
+                      "memberNames",
+                      List.of("Orphan"))));
       case "404" ->
           problemExamples(
               orderedMap(

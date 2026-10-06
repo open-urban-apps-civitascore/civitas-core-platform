@@ -8,6 +8,7 @@ import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ModelMemberUnreachableException;
 import de.civitascore.portal.util.ModelRootMissingException;
 import de.civitascore.portal.util.PipelineClosureValidationException;
 import de.civitascore.portal.util.ResourceInUseException;
@@ -114,6 +115,19 @@ class GlobalExceptionHandlerTest {
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:MODEL_ROOT_MISSING");
       assertThat(problemDetail.getDetail()).isEqualTo(ex.getMessage());
       assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+    }
+
+    @Test
+    @DisplayName(
+        "Should return 400 naming the unreachable members for ModelMemberUnreachableException")
+    void shouldReturn400ForModelMemberUnreachable() {
+      ModelMemberUnreachableException ex = new ModelMemberUnreachableException(List.of("Orphan"));
+
+      ProblemDetail problemDetail = handler.handleModelMemberUnreachable(ex, mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:MODEL_MEMBER_UNREACHABLE");
+      assertThat(problemDetail.getProperties()).containsEntry("memberNames", List.of("Orphan"));
     }
 
     @Test

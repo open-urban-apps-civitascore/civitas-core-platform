@@ -827,6 +827,50 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .isEqualTo(DataStructureVersionStatus.DRAFT);
     }
 
+    @Test
+    @DisplayName("Should release a Data structure model whose root reaches every member")
+    void shouldReleaseDataStructureModelWhoseRootReachesEveryMember() {
+      DataStructureVersion version =
+          draftWithDataStructureModel(
+              true, List.of("Person", "Address"), Map.of("Person", "Address"));
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              releasePath(version),
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    @DisplayName(
+        "Should fail to release a Data structure model with a member its root does not reach")
+    void shouldFailToReleaseDataStructureModelWithUnreachableMember() {
+      DataStructureVersion version =
+          draftWithDataStructureModel(true, List.of("Person", "Orphan"), Map.of());
+
+      ResponseEntity<ProblemDetail> response =
+          restTemplate.exchange(
+              releasePath(version),
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<ProblemDetail>() {});
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getType())
+          .hasToString("urn:civitas:error:MODEL_MEMBER_UNREACHABLE");
+      assertThat(response.getBody().getProperties())
+          .containsEntry("memberNames", List.of("Orphan"));
+      assertThat(
+              dataStructureVersionRepository
+                  .findById(version.getId())
+                  .orElseThrow()
+                  .getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.DRAFT);
+    }
+
     private String releasePath(DataStructureVersion version) {
       return "/datastructures/"
           + version.getDataStructure().getId()
@@ -835,24 +879,46 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           + "/release";
     }
 
-    /** A draft version whose model is a Data structure document, as the UML editor stores it. */
     private DataStructureVersion draftWithDataStructureModel(boolean designateRoot) {
+      return draftWithDataStructureModel(designateRoot, List.of("Person"), Map.of());
+    }
+
+    /**
+     * A draft version whose model is a Data structure document with Person as its root candidate,
+     * as the UML editor stores it: each member embeds the member {@code embeds} maps it to.
+     */
+    private DataStructureVersion draftWithDataStructureModel(
+        boolean designateRoot, List<String> members, Map<String, String> embeds) {
       String disambiguator = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+      Map<String, Object> defs = new HashMap<>();
+      for (String member : members) {
+        Map<String, Object> properties = new HashMap<>();
+        properties.put("name", Map.of("type", "string"));
+        if (embeds.containsKey(member)) {
+          properties.put(
+              "part",
+              Map.of(
+                  "$ref",
+                  "urn:core:platform:civitas:element:common:"
+                      + embeds.get(member)
+                      + ":"
+                      + disambiguator));
+        }
+        defs.put(
+            member,
+            Map.of(
+                "$id",
+                "urn:core:platform:civitas:element:common:" + member + ":" + disambiguator,
+                "type",
+                "object",
+                "properties",
+                properties));
+      }
       Map<String, Object> model = new HashMap<>();
       model.put("$schema", "https://json-schema.org/draft/2020-12/schema");
       model.put("$id", "urn:core:platform:civitas:datastructure:common:People:" + disambiguator);
       model.put("title", "People");
-      model.put(
-          "$defs",
-          Map.of(
-              "Person",
-              Map.of(
-                  "$id",
-                  "urn:core:platform:civitas:element:common:Person:" + disambiguator,
-                  "type",
-                  "object",
-                  "properties",
-                  Map.of("name", Map.of("type", "string")))));
+      model.put("$defs", defs);
       if (designateRoot) {
         model.put("$ref", "#/$defs/Person");
       }

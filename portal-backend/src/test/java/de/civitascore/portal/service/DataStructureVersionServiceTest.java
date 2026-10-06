@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -320,7 +321,6 @@ class DataStructureVersionServiceTest {
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.save(version)).thenReturn(version);
-      when(modelRegistryGateway.hasSingleRoot(version.getModelUrn())).thenReturn(true);
 
       DataStructureVersion result = dataStructureVersionService.release(versionId);
 
@@ -330,7 +330,7 @@ class DataStructureVersionServiceTest {
 
       // Releasing only reads the root from the registry. Asserted rather than assumed, so adding a
       // registry write here fails the test instead of silently changing what a release does.
-      verify(modelRegistryGateway).hasSingleRoot(version.getModelUrn());
+      verify(modelRegistryGateway).requireSingleRoot(version.getModelUrn());
       verifyNoMoreInteractions(modelRegistryGateway);
     }
 
@@ -344,7 +344,9 @@ class DataStructureVersionServiceTest {
       version.setModelUrn("urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b:1.0.0");
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(modelRegistryGateway.hasSingleRoot(version.getModelUrn())).thenReturn(false);
+      doThrow(new ModelRootMissingException())
+          .when(modelRegistryGateway)
+          .requireSingleRoot(version.getModelUrn());
 
       assertThatThrownBy(() -> dataStructureVersionService.release(versionId))
           .isInstanceOf(ModelRootMissingException.class);
