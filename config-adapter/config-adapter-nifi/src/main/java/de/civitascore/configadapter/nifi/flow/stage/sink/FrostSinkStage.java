@@ -389,13 +389,14 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
           || "array".equals(attributeSpec.get("type"))) {
         // A geometry or an array is embedded verbatim as raw JSON.
         bag.add(new FreeAttribute(name, StaJsonType.RAW_JSON));
+      } else if (modelled.isClassAt(propertiesPath, name)) {
+        // A class inside the bag: its attributes are targets of their own, nested under it. Asked
+        // before the scalar check, which takes an inline class without 'type' for a value.
+        modelled.field(propertiesPath, name, entity, StaTargetCatalog.keyPath(entity, name));
       } else if (DataStructureSchema.isScalar(attributeSpec) || isFreeObject(attributeSpec)) {
         // A scalar renders type-inferred (a mapped number stays a JSON number). A free object has
         // no type of its own any more; the editor shows it as text, and so it is written.
         bag.add(new FreeAttribute(name, StaJsonType.ANY));
-      } else {
-        // A class inside the bag: its attributes are targets of their own, nested under it.
-        modelled.field(propertiesPath, name, entity, StaTargetCatalog.keyPath(entity, name));
       }
     }
     return bag;

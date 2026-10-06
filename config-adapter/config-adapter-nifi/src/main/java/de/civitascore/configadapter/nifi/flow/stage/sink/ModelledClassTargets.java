@@ -64,8 +64,37 @@ final class ModelledClassTargets {
     }
     if (DataStructureSchema.isGeometry(spec)) {
       add(path, entity, StaJsonType.RAW_JSON);
-    } else if (isClass(spec)) {
+    } else if (isClassAt(classPath, field)) {
       expand(append(classPath, field), entity, path, new HashSet<>(Set.of(referenceOf(spec))));
+    }
+  }
+
+  /**
+   * Whether a field holds a class: a local reference, or an inline object whose own {@code
+   * properties} or {@code allOf} branches declare attributes. The scalar check alone does not tell:
+   * an inline class needs no {@code type: object}, and an {@code allOf} of plain values declares no
+   * attribute at all.
+   */
+  boolean isClassAt(List<String> classPath, String field) {
+    Map<String, Object> spec = specOf(classPath, field);
+    if (spec == null || DataStructureSchema.isGeometry(spec)) {
+      return false;
+    }
+    if (referenceOf(spec).startsWith(LOCAL_REFERENCE)) {
+      return true;
+    }
+    if (spec.get("properties") instanceof Map<?, ?> attributes && !attributes.isEmpty()) {
+      return true;
+    }
+    if (!(spec.get("allOf") instanceof List<?>)) {
+      return false;
+    }
+    try {
+      return !DataStructureSchema.resolveDefinitionAt(schema, append(classPath, field))
+          .properties()
+          .isEmpty();
+    } catch (IllegalArgumentException noAttributes) {
+      return false;
     }
   }
 
@@ -81,7 +110,7 @@ final class ModelledClassTargets {
       String attributePath = path + "." + name;
       if (DataStructureSchema.isGeometry(spec) || "array".equals(spec.get("type"))) {
         add(attributePath, entity, StaJsonType.RAW_JSON);
-      } else if (isClass(spec)) {
+      } else if (isClassAt(classPath, name)) {
         String reference = referenceOf(spec);
         // A class already on the path is not followed again: a cycle would answer endless paths,
         // and the editor stops there too.
@@ -106,16 +135,6 @@ final class ModelledClassTargets {
     Object spec =
         DataStructureSchema.resolveDefinitionAt(schema, classPath).properties().get(field);
     return spec instanceof Map<?, ?> map ? (Map<String, Object>) map : null;
-  }
-
-  /** A class of the structure: a local reference, or an inline object that declares attributes. */
-  private static boolean isClass(Map<String, Object> spec) {
-    if (referenceOf(spec).startsWith(LOCAL_REFERENCE)) {
-      return true;
-    }
-    boolean declaresAttributes =
-        spec.get("properties") instanceof Map<?, ?> attributes && !attributes.isEmpty();
-    return declaresAttributes || spec.get("allOf") instanceof List<?>;
   }
 
   private static String referenceOf(Map<String, Object> spec) {

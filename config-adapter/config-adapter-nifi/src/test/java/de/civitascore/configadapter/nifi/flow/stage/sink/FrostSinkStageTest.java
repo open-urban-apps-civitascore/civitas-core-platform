@@ -518,6 +518,63 @@ class FrostSinkStageTest {
   }
 
   @Test
+  void parseSpec_withClassesThatDeclareNoType_expandsThemInsteadOfTakingThemForValues()
+      throws Exception {
+    // An inline class needs no 'type: object', and an allOf class has no 'properties' of its own.
+    // Both are classes; an allOf of plain values is not. The editor reads them the same way.
+    Map<String, Object> datasink =
+        json(
+            """
+            { "configuration": { "port": "ThingTree" },
+              "dataStructure": {
+                "title": "Thing",
+                "$ref": "#/$defs/Thing",
+                "$defs": {
+                  "Base": { "type": "object", "properties": { "code": { "type": "string" } } },
+                  "Thing": { "type": "object", "properties": {
+                      "properties": { "type": "object", "properties": {
+                          "reference": { "type": "string" },
+                          "site": { "properties": { "floor": { "type": "integer" } } },
+                          "area": { "allOf": [ { "$ref": "#/$defs/Base" } ] },
+                          "label": { "allOf": [ { "type": "string" }, { "maxLength": 5 } ] } } } } } } } }
+            """);
+
+    FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
+
+    assertEquals(
+        List.of(new KeyAttribute("reference"), new FreeAttribute("label", StaJsonType.ANY)),
+        spec.staProperties().thing());
+    assertEquals(
+        List.of(
+            optional("$.properties.site.floor", StaEntity.THING, StaJsonType.ANY),
+            optional("$.properties.area.code", StaEntity.THING, StaJsonType.ANY)),
+        spec.staProperties().modelled());
+  }
+
+  @Test
+  void parseSpec_withAFreeFieldThatIsAnAllOfOfValues_addsNoTargetAndDoesNotFail() throws Exception {
+    Map<String, Object> datasink =
+        json(
+            """
+            { "configuration": { "port": "Observations" },
+              "dataStructure": {
+                "title": "Observation",
+                "$ref": "#/$defs/Observation",
+                "$defs": {
+                  "Observation": { "type": "object", "properties": {
+                      "result": {},
+                      "resultQuality": { "allOf": [ { "type": "string" } ] },
+                      "parameters": { "type": "object", "properties": {
+                          "thingReference": { "type": "string" },
+                          "datastreamReference": { "type": "string" } } } } } } } }
+            """);
+
+    FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
+
+    assertTrue(spec.staProperties().modelled().isEmpty());
+  }
+
+  @Test
   void parseSpec_withAClassThatContainsItself_stopsAtTheCycle() throws Exception {
     Map<String, Object> datasink =
         json(
