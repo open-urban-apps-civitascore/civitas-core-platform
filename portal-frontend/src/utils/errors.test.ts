@@ -5,6 +5,7 @@ import { mockApiError } from '@/__mocks__/errors/apiError.mock'
 import {
   isDatapoolScopeViolationError,
   isDatastructureNotAvailableError,
+  isModelRootMissingError,
   isNameConflictError,
   isNotDraftError,
   isPermissionsError,
@@ -13,6 +14,7 @@ import {
   isSagaInFlightError,
   isTableNameConflictError,
   isUnconfirmedDataLossError,
+  unreachableModelMembers,
 } from './errors'
 
 describe('isNameConflictError', () => {
@@ -337,5 +339,31 @@ describe('isPipelineClosureInvalidError', () => {
   it('returns false for another status carrying the same type', () => {
     const error = mockApiError(409, 'Pipeline closure validation failed', PIPELINE_CLOSURE_INVALID)
     expect(isPipelineClosureInvalidError(error)).toBe(false)
+  })
+})
+
+describe('isModelRootMissingError', () => {
+  it('returns true for a 400 release refusal for a model without a root', () => {
+    const error = mockApiError(400, 'The model has no single root', 'urn:civitas:error:MODEL_ROOT_MISSING')
+    expect(isModelRootMissingError(error)).toBe(true)
+  })
+
+  it('returns false for a 400 error with a different type', () => {
+    const error = mockApiError(400, 'Invalid input', 'urn:civitas:error:INVALID_INPUT')
+    expect(isModelRootMissingError(error)).toBe(false)
+  })
+})
+
+describe('unreachableModelMembers', () => {
+  it('returns the member names of a 400 refusal for unreachable members', () => {
+    const error = mockApiError(400, 'Unreachable: Orphan', 'urn:civitas:error:MODEL_MEMBER_UNREACHABLE', {
+      memberNames: ['Orphan'],
+    })
+    expect(unreachableModelMembers(error)).toEqual(['Orphan'])
+  })
+
+  it('returns null for a 400 error with a different type', () => {
+    const error = mockApiError(400, 'No root', 'urn:civitas:error:MODEL_ROOT_MISSING')
+    expect(unreachableModelMembers(error)).toBeNull()
   })
 })

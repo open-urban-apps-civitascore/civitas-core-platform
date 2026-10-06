@@ -48,6 +48,19 @@ export const isNotDraftError = (error: unknown) => {
   return !!problem && hasErrorType(problem, 'DATASET_NOT_EDITABLE')
 }
 
+export const isModelRootMissingError = (error: unknown) => {
+  const problem = problemWithStatus(error, 400)
+  return !!problem && hasErrorType(problem, 'MODEL_ROOT_MISSING')
+}
+
+/** The members a release refusal names as not reachable from the model's root, or null for any other error. */
+export const unreachableModelMembers = (error: unknown): string[] | null => {
+  const problem = problemWithStatus(error, 400)
+  if (!problem || !hasErrorType(problem, 'MODEL_MEMBER_UNREACHABLE') || !isAxiosError(error)) return null
+  const memberNames: unknown = (error.response?.data as { memberNames?: unknown } | undefined)?.memberNames
+  return Array.isArray(memberNames) ? memberNames.filter((name): name is string => typeof name === 'string') : []
+}
+
 export const isDatastructureNotAvailableError = (error: unknown) => {
   const problem = problemWithStatus(error, 400)
   return (

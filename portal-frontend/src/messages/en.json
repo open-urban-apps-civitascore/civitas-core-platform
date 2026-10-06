@@ -1245,7 +1245,9 @@
     "errors": {
       "creationError": "An error occurred while creating the Data structure version.",
       "inUseError": "This version is still used by a Data source or data storage.",
-      "saveInvalidModel": "The version cannot be saved: {reason}"
+      "saveInvalidModel": "The version cannot be saved: {reason}",
+      "modelRootMissingError": "The version cannot be set to \"Available\" because its saved model has no root class. Mark the root class in the diagram, save the version, then set it to \"Available\".",
+      "modelMemberUnreachableError": "The version cannot be set to \"Available\" because these classes are not connected to the root class: {names}. Connect them to the root class or remove them, save the version, then set it to \"Available\"."
     }
   },
   "pipelineEditor": {
