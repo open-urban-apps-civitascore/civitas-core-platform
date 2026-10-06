@@ -292,7 +292,7 @@ class EmbeddedModelForgeOperationsTest {
         String sharedLogical = UrnParser.logicalUrn(shared);
 
         when(registry.nonDataSetBlockingDependents(container.value())).thenReturn(List.of());
-        when(registry.ownedMemberUrns(container.value())).thenReturn(List.of(orphanLogical, sharedLogical));
+        when(registry.dataStructureMembersOfAnyVersion(container.value())).thenReturn(List.of(orphanLogical, sharedLogical));
         // Once the container is gone, A is orphaned but B is still grouped by another DataStructure.
         when(registry.nonDataSetBlockingDependents(orphanLogical)).thenReturn(List.of());
         when(registry.nonDataSetBlockingDependents(sharedLogical))
@@ -401,6 +401,43 @@ class EmbeddedModelForgeOperationsTest {
             .thenReturn(List.of(grouping.value(), mapping));
 
         assertThat(operations.deletionBlockers(grouping)).containsExactly(mapping);
+    }
+
+    @Test
+    void deletionBlockersIgnoresAnElementAnotherVersionOfTheDataStructureContains() {
+        var v1 = new ArtifactId("urn:core:platform:civitas:datastructure:common:0fead377-9422-5e34-b968-ef8b36991ccc:1.0.0");
+        String station = "urn:core:platform:civitas:element:common:982fa60c-313a-5023-957f-f17674de2606:1.0.0";
+        // Only version 2 contains Reading.
+        String reading = "urn:core:platform:civitas:element:common:c1f003f4-0473-58e1-b503-c8dbda69a376";
+        when(registry.ownedMemberUrns(v1.value(), "1.0.0")).thenReturn(List.of(station));
+        when(registry.nonDataSetBlockingDependents(station, "1.0.0")).thenReturn(List.of(reading));
+        when(registry.dataStructureMembersOfAnyVersion(v1.value()))
+            .thenReturn(List.of(UrnParser.logicalUrn(station), reading));
+
+        assertThat(operations.deletionBlockers(v1)).isEmpty();
+    }
+
+    @Test
+    void deletionBlockersNamesAnElementNoVersionOfTheDataStructureContains() {
+        var v1 = new ArtifactId("urn:core:platform:civitas:datastructure:common:0fead377-9422-5e34-b968-ef8b36991ccc:1.0.0");
+        String station = "urn:core:platform:civitas:element:common:982fa60c-313a-5023-957f-f17674de2606:1.0.0";
+        String foreign = "urn:core:platform:civitas:element:common:d7a69ec4-2eba-5441-a19c-ebc1eac53e08";
+        when(registry.ownedMemberUrns(v1.value(), "1.0.0")).thenReturn(List.of(station));
+        when(registry.nonDataSetBlockingDependents(station, "1.0.0")).thenReturn(List.of(foreign));
+        when(registry.dataStructureMembersOfAnyVersion(v1.value()))
+            .thenReturn(List.of(UrnParser.logicalUrn(station)));
+
+        assertThat(operations.deletionBlockers(v1)).containsExactly(foreign);
+    }
+
+    @Test
+    void deletionBlockersDoesNotCountTheDataSetsADataStructureIsListedIn() {
+        var grouping = new ArtifactId("urn:core:platform:civitas:datastructure:common:0fead377-9422-5e34-b968-ef8b36991ccc:1.0.0");
+        when(registry.dataSetMemberships(grouping.value())).thenReturn(List.of(
+            "urn:core:platform:civitas:dataset:common:11111111-1111-4111-8111-111111111111",
+            "urn:core:platform:civitas:dataset:common:22222222-2222-4222-8222-222222222222"));
+
+        assertThat(operations.deletionBlockers(grouping)).isEmpty();
     }
 
     @Test

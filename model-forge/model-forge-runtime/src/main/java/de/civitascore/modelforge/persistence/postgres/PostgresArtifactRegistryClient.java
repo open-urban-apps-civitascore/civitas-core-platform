@@ -299,6 +299,17 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         }
     }
 
+    @Override
+    public List<String> dataStructureMembersOfAnyVersion(String urn) {
+        UrnParser.requireNoControlChars(urn);
+        String logical = UrnParser.logicalUrn(urn);
+        try {
+            return references.dataStructureMembersOfAnyVersion(logical);
+        } catch (DataAccessException e) {
+            throw translate(e, "Could not read the members of " + logical);
+        }
+    }
+
     // ── Read ──────────────────────────────────────────────────────────────────
 
     @Override

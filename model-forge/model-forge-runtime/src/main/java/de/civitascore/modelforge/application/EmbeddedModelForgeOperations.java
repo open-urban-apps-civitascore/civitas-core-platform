@@ -44,6 +44,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -740,8 +741,15 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         // Every artifact this one would take with it, each kept as the owner pinned it so a member's
         // version is known. A caller naming one version asks about that version alone.
         Set<String> removedTogether = deleteClosure(root);
-        Set<String> logicalOfSet =
-            removedTogether.stream().map(UrnParser::logicalUrn).collect(Collectors.toSet());
+        Set<String> logicalOfSet = removedTogether.stream()
+            .map(UrnParser::logicalUrn)
+            .collect(Collectors.toCollection(HashSet::new));
+        boolean dataStructure = ElementCommandService.isDataStructure(root);
+        // An Element another version contains is part of the same Data Structure, not a user of it:
+        // its $ref names no version, so it holds this version's member as much as its own.
+        if (dataStructure) {
+            logicalOfSet.addAll(registry.dataStructureMembersOfAnyVersion(root));
+        }
         // A reference held from inside the set is removed by the same delete, so only a referrer
         // outside it stands in the way — a grouping does not block the Elements it owns.
         List<String> blockers = removedTogether.stream()
@@ -750,7 +758,8 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             .filter(blocker -> !logicalOfSet.contains(UrnParser.logicalUrn(blocker)))
             .distinct()
             .toList();
-        if (!blockers.isEmpty()) {
+        // A Data Structure's Data Set memberships are not counted, see ElementCommandService#delete.
+        if (!blockers.isEmpty() || dataStructure) {
             return blockers;
         }
         List<String> memberships = registry.dataSetMemberships(root);

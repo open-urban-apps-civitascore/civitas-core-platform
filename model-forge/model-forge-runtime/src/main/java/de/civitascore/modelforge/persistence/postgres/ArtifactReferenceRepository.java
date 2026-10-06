@@ -190,6 +190,26 @@ class ArtifactReferenceRepository {
             .list();
     }
 
+    /**
+     * Logical URNs of the Elements that any version of the Data Structure lists as a member,
+     * superseded versions included. Unresolved members contribute nothing.
+     */
+    List<String> dataStructureMembersOfAnyVersion(String dataStructureLogicalUrn) {
+        return jdbc.sql("""
+                select distinct ta.logical_urn
+                  from model_forge.artifact_reference r
+                  join model_forge.artifact_version fv on fv.id = r.from_version_id
+                  join model_forge.artifact a          on a.id = fv.artifact_id
+                  join model_forge.artifact ta         on ta.id = r.target_artifact_id
+                 where a.logical_urn = :logical
+                   and r.reference_type = 'datastructure-ref'
+                 order by ta.logical_urn
+                """)
+            .param("logical", dataStructureLogicalUrn)
+            .query(String.class)
+            .list();
+    }
+
     /** Full reference rows of a version, in stored order — used to copy edges onto a renamed version. */
     List<ReferenceRow> rowsForVersion(UUID fromVersionId) {
         return jdbc.sql("""

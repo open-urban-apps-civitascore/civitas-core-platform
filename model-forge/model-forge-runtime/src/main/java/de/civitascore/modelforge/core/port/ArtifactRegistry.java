@@ -181,6 +181,9 @@ public interface ArtifactRegistry {
      */
     List<String> ownedMemberUrns(String urn, String ownerVersion);
 
+    /** Logical URNs of the Elements any version of the Data Structure contains. */
+    List<String> dataStructureMembersOfAnyVersion(String urn);
+
     Optional<JsonNode> fetch(String urn);
 
     List<String> fetchArtifactRefUrns(String urn);
