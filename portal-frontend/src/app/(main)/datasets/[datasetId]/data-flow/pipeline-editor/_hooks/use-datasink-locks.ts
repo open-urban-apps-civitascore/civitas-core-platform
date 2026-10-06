@@ -5,10 +5,20 @@
 import { useParams } from 'next/navigation'
 import { useCallback, useMemo } from 'react'
 
+import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientRequests'
+import { DATASINK_TYPES, DataSinkType } from '@/types/datasinks'
+import { API_STANDARDS } from '@/types/namedApis'
+import { hasApiType } from '@/utils/namedApis'
+import {
+  getPipelineDeleteBlockReason,
+  getSavedSinkChecks,
+  type PipelineDeleteBlockReason,
+} from '@/utils/pipelineDeleteGuard'
 
-import { isFrostNodeData, isGeoPersistenceNodeData } from '../_types/nodes'
+import { isFrostNodeData, isGeoPersistenceNodeData, type PipelineNodeData } from '../_types/nodes'
 import type { PipelineNode } from '../_types/pipeline'
+import type { PipelineSession } from '../_types/session'
 
 export interface DataSinkLocks {
   provisioned: boolean
@@ -17,8 +27,30 @@ export interface DataSinkLocks {
 
 const UNLOCKED: DataSinkLocks = { provisioned: false, inUseByLayer: false }
 
+/** The last sink of its type that an API of the dataset reads from. */
+export type ApiSinkLockReason = 'inUseBySta' | 'inUseByOws'
+
 /** Why a sink node must not be deleted. */
-export type SinkLockReason = 'provisioned' | 'inUseByLayer'
+export type SinkLockReason = 'provisioned' | 'inUseByLayer' | ApiSinkLockReason
+
+const getNodeIdsOfType = (nodes: PipelineNode[], isOfType: (data: PipelineNodeData) => boolean): string[] => {
+  const nodeIds: string[] = []
+  for (const node of nodes) {
+    if (isOfType(node.data)) nodeIds.push(node.id)
+  }
+  return nodeIds
+}
+
+const isEveryNodeDeleted = (nodeIds: string[], nodeIdsToDelete: string[]) =>
+  nodeIds.length > 0 && nodeIds.every(nodeId => nodeIdsToDelete.includes(nodeId))
+
+const IS_SINK_NODE_OF_TYPE: Record<DataSinkType, (data: PipelineNodeData) => boolean> = {
+  [DATASINK_TYPES.FROST]: isFrostNodeData,
+  [DATASINK_TYPES.POSTGIS]: isGeoPersistenceNodeData,
+}
+
+const hasSinkNodeOfType = (dataSinkType: DataSinkType, nodes: PipelineNode[]): boolean =>
+  nodes.some(node => IS_SINK_NODE_OF_TYPE[dataSinkType](node.data))
 
 export interface DataSinkLocksLookup {
   /** Locks of the sink with this backend id; everything false when the id is unknown. */
@@ -26,13 +58,22 @@ export interface DataSinkLocksLookup {
   getSinkLockReason: (node: PipelineNode) => SinkLockReason | null
   /** Lock reason of the first locked node among the selected ones. */
   getSelectionLockReason: (nodes: PipelineNode[]) => SinkLockReason | null
-  /** True while the sinks are still being loaded, so no lock is known yet. */
+  /** The API that deleting these nodes leaves without a sink, or null when there is none. */
+  getLastApiSinkLockReason: (nodeIdsToDelete: string[]) => ApiSinkLockReason | null
+  /** Why the active pipeline must not be deleted; null when it can be deleted. */
+  pipelineDeleteBlockReason: PipelineDeleteBlockReason | null
+  /** True while the sinks or the dataset are still being loaded, so no lock is known yet. */
   isLoading: boolean
 }
 
-export const useDataSinkLocks = (): DataSinkLocksLookup => {
+export const useDataSinkLocks = (
+  pipelineId?: string,
+  nodes: PipelineNode[] = [],
+  otherSessions: readonly PipelineSession[] = [],
+): DataSinkLocksLookup => {
   const { datasetId } = useParams<{ datasetId: string }>()
-  const { data, isLoading } = useGetDataSinks(datasetId, { isEnabled: !!datasetId })
+  const { data, isLoading: isLoadingDataSinks } = useGetDataSinks(datasetId, { isEnabled: !!datasetId })
+  const { data: datasetData, isLoading: isLoadingDataset } = useGetDataset({ id: datasetId, isEnabled: !!datasetId })
 
   const locksById = useMemo(() => {
     const map = new Map<string, DataSinkLocks>()
@@ -41,6 +82,38 @@ export const useDataSinkLocks = (): DataSinkLocksLookup => {
     }
     return map
   }, [data?.data])
+
+  const namedApis = useMemo(() => datasetData?.data?.namedApis ?? [], [datasetData?.data?.namedApis])
+
+  // Unsaved sink nodes count too.
+  const hasSinkInOtherPipeline = useCallback(
+    (dataSinkType: DataSinkType) =>
+      otherSessions.some(session => hasSinkNodeOfType(dataSinkType, session.pipeline.nodes)),
+    [otherSessions],
+  )
+
+  const { isStaWithoutOtherFrostSink, isOwsWithoutOtherPostgisSink } = useMemo(
+    () => ({
+      isStaWithoutOtherFrostSink:
+        hasApiType(namedApis, API_STANDARDS.STA) && !hasSinkInOtherPipeline(DATASINK_TYPES.FROST),
+      isOwsWithoutOtherPostgisSink:
+        hasApiType(namedApis, API_STANDARDS.OWS) && !hasSinkInOtherPipeline(DATASINK_TYPES.POSTGIS),
+    }),
+    [namedApis, hasSinkInOtherPipeline],
+  )
+
+  const pipelineDeleteBlockReason = useMemo(() => {
+    const dataSinks = data?.data ?? []
+    const savedSinkChecks = getSavedSinkChecks(pipelineId, dataSinks)
+    return getPipelineDeleteBlockReason(pipelineId, dataSinks, namedApis, {
+      hasSinkInPipeline: dataSinkType =>
+        savedSinkChecks.hasSinkInPipeline(dataSinkType) || hasSinkNodeOfType(dataSinkType, nodes),
+      hasSinkInOtherPipeline,
+    })
+  }, [pipelineId, data?.data, namedApis, nodes, hasSinkInOtherPipeline])
+
+  const frostNodeIds = useMemo(() => getNodeIdsOfType(nodes, isFrostNodeData), [nodes])
+  const geoNodeIds = useMemo(() => getNodeIdsOfType(nodes, isGeoPersistenceNodeData), [nodes])
 
   const getSinkLocks = useCallback(
     (entityId: string | undefined): DataSinkLocks => (entityId ? (locksById.get(entityId) ?? UNLOCKED) : UNLOCKED),
@@ -54,9 +127,13 @@ export const useDataSinkLocks = (): DataSinkLocksLookup => {
       const locks = getSinkLocks(node.data.entityId)
       if (locks.provisioned) return 'provisioned'
       if (locks.inUseByLayer) return 'inUseByLayer'
+      const isOnlyFrostNode = isFrostNodeData(node.data) && frostNodeIds.length === 1
+      if (isOnlyFrostNode && isStaWithoutOtherFrostSink) return 'inUseBySta'
+      const isOnlyGeoNode = isGeoPersistenceNodeData(node.data) && geoNodeIds.length === 1
+      if (isOnlyGeoNode && isOwsWithoutOtherPostgisSink) return 'inUseByOws'
       return null
     },
-    [getSinkLocks],
+    [getSinkLocks, frostNodeIds, geoNodeIds, isStaWithoutOtherFrostSink, isOwsWithoutOtherPostgisSink],
   )
 
   const getSelectionLockReason = useCallback(
@@ -68,5 +145,22 @@ export const useDataSinkLocks = (): DataSinkLocksLookup => {
     [getSinkLockReason],
   )
 
-  return { getSinkLocks, getSinkLockReason, getSelectionLockReason, isLoading }
+  // Blocks a delete that removes every sink node of one type at once.
+  const getLastApiSinkLockReason = useCallback(
+    (nodeIdsToDelete: string[]): ApiSinkLockReason | null => {
+      if (isStaWithoutOtherFrostSink && isEveryNodeDeleted(frostNodeIds, nodeIdsToDelete)) return 'inUseBySta'
+      if (isOwsWithoutOtherPostgisSink && isEveryNodeDeleted(geoNodeIds, nodeIdsToDelete)) return 'inUseByOws'
+      return null
+    },
+    [frostNodeIds, geoNodeIds, isStaWithoutOtherFrostSink, isOwsWithoutOtherPostgisSink],
+  )
+
+  return {
+    getSinkLocks,
+    getSinkLockReason,
+    getSelectionLockReason,
+    getLastApiSinkLockReason,
+    pipelineDeleteBlockReason,
+    isLoading: isLoadingDataSinks || isLoadingDataset,
+  }
 }

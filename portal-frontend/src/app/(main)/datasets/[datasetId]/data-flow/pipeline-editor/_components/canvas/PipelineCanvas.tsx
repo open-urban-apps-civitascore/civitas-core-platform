@@ -59,6 +59,7 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
     hideValidationPanel,
     getSinkLockReason,
     getSelectionLockReason,
+    getLastApiSinkLockReason,
   } = useActivePipeline()
   const { isReadOnly } = useReadOnly()
   const canEdit = !isReadOnly
@@ -100,11 +101,16 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
   // React Flow hides locked nodes from onBeforeDelete, so the reason comes from the selection.
   const onBeforeDelete: OnBeforeDelete = useCallback(
     async ({ nodes, edges }) => {
+      const lastApiSinkLockReason = getLastApiSinkLockReason(nodes.map(node => node.id))
+      if (lastApiSinkLockReason) {
+        toast.error(t(`sink.notRemovable.${lastApiSinkLockReason}`))
+        return false
+      }
       const lockReason = getSelectionLockReason(pipeline?.nodes ?? [])
       if (lockReason) toast.error(t(`sink.notRemovable.${lockReason}`))
       return { nodes, edges }
     },
-    [getSelectionLockReason, pipeline?.nodes, t],
+    [getLastApiSinkLockReason, getSelectionLockReason, pipeline?.nodes, t],
   )
 
   // Hide validation panel when the user makes a selection (latest action wins).

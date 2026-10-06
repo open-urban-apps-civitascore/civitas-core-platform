@@ -1,9 +1,10 @@
 import { redirect } from 'next/navigation'
 
+import { getDataSinks } from '@/app/services/api/datasets/datasinks/serverRequests'
 import { getDataset } from '@/app/services/api/datasets/serverRequests'
 import { DATASET_STATUS_TYPES } from '@/types/datasets'
-import { API_STANDARDS, API_TYPE_QUERY, isApiTypeQuery } from '@/types/namedApis'
-import { hasApiType } from '@/utils/namedApis'
+import { API_TYPE_QUERY, isApiTypeQuery } from '@/types/namedApis'
+import { canCreateOwsApi, canCreateStaApi } from '@/utils/namedApis'
 
 import { ApiConfigPage } from './components/ApiConfigPage'
 
@@ -26,7 +27,14 @@ const ApisPage = async (props: ApisPageProps) => {
     redirect(`/datasets/${datasetId}`)
   }
 
-  if (type === API_TYPE_QUERY.OWS && hasApiType(dataset.namedApis ?? [], API_STANDARDS.OWS)) {
+  const { data: dataSinks } = await getDataSinks(datasetId)
+  const apis = dataset.namedApis ?? []
+
+  if (type === API_TYPE_QUERY.OWS && !canCreateOwsApi(apis, dataSinks)) {
+    redirect(`/datasets/${datasetId}`)
+  }
+
+  if (type === API_TYPE_QUERY.SENSORTHINGS && !canCreateStaApi(apis, dataSinks)) {
     redirect(`/datasets/${datasetId}`)
   }
 

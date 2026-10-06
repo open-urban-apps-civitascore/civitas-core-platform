@@ -135,7 +135,19 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   const { canDeletePipeline: canDelete } = useDatasetPermissions(datasetQuery.data?.data)
 
-  const { getSinkLocks, getSinkLockReason, getSelectionLockReason, isLoading: isLoadingSinkLocks } = useDataSinkLocks()
+  const otherSessions = useMemo(
+    () => sessionManager.sessions.filter(session => session.id !== activeSession?.id),
+    [sessionManager.sessions, activeSession?.id],
+  )
+
+  const {
+    getSinkLocks,
+    getSinkLockReason,
+    getSelectionLockReason,
+    getLastApiSinkLockReason,
+    pipelineDeleteBlockReason,
+    isLoading: isLoadingSinkLocks,
+  } = useDataSinkLocks(pipeline.id, pipeline.nodes, otherSessions)
 
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
@@ -444,7 +456,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Pipeline Operations: Delete =====
   const deletePipeline = useCallback(() => {
-    if (!activeSession) return
+    if (!activeSession || isReadOnly) return
 
     const pipelineId = activeSession.pipeline.id
 
@@ -475,7 +487,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         }
       },
     })
-  }, [activeSession, sessionManager, deletePipelineMutation, canDelete, t])
+  }, [activeSession, isReadOnly, sessionManager, deletePipelineMutation, canDelete, t])
 
   const isDeleting = deletePipelineMutation.isPending
 
@@ -826,6 +838,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       renamePipeline,
       deletePipeline,
       isDeleting,
+      pipelineDeleteBlockReason,
       isLoadingEditor,
 
       // Cross-session operations
@@ -837,6 +850,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       getSinkLocks,
       getSinkLockReason,
       getSelectionLockReason,
+      getLastApiSinkLockReason,
 
       // Session info
       activeSessionId: activeSession?.id || null,
@@ -872,6 +886,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       renamePipeline,
       deletePipeline,
       isDeleting,
+      pipelineDeleteBlockReason,
       isLoadingEditor,
       saveAllPipelines,
       isSavingAll,
@@ -879,6 +894,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       getSinkLocks,
       getSinkLockReason,
       getSelectionLockReason,
+      getLastApiSinkLockReason,
     ],
   )
 

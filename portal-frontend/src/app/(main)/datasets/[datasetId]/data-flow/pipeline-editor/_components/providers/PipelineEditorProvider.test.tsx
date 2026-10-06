@@ -2195,6 +2195,31 @@ describe('PipelineEditorProviderComponent', () => {
     })
   })
 
+  describe('pipelineDeleteBlockReason', () => {
+    beforeEach(() => {
+      vi.mocked(useGetDataSinks).mockReturnValue({
+        data: { data: [{ id: 'sink-1', pipelineId: 'pipeline-1', dataSinkType: 'FROST' }] },
+        isLoading: false,
+      } as unknown as ReturnType<typeof useGetDataSinks>)
+      vi.mocked(useGetDataset).mockReturnValue({
+        data: { data: { provisioned: false, namedApis: [{ name: 'STA', slug: 'sta', standard: 'STA' }] } },
+        isLoading: false,
+      } as unknown as ReturnType<typeof useGetDataset>)
+    })
+
+    it('returns the block reason of the active saved pipeline', () => {
+      renderProvider(makeSession({ pipeline: { ...createEmptyPipeline('Test'), id: 'pipeline-1' } }))
+
+      expect(contextRef.current?.pipelineDeleteBlockReason).toBe('lastFrostWithSta')
+    })
+
+    it('returns null for a never-saved pipeline without sink nodes', () => {
+      renderProvider(makeSession({ pipeline: { ...createEmptyPipeline('Test'), id: undefined } }))
+
+      expect(contextRef.current?.pipelineDeleteBlockReason).toBeNull()
+    })
+  })
+
   describe('deletePipeline', () => {
     it('calls the delete mutation when pipeline has an id', () => {
       const session = makeSession({

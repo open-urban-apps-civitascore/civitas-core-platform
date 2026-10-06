@@ -331,6 +331,12 @@
               "description": "Do you really want to delete the pipeline \"{name}\"? This action cannot be undone.",
               "confirm": "Delete"
             },
+            "deleteBlocked": {
+              "title": "Pipeline cannot be deleted",
+              "inUseByLayer": "This Pipeline contains a Geospatial Data storage that is used by a Layer in the WFS/WMS API. Delete the Layer first.",
+              "lastPostgisWithOws": "This Pipeline contains a Geospatial Data storage that is used by the WFS/WMS API. Delete the API first.",
+              "lastFrostWithSta": "This Pipeline contains a Sensor Data storage that is used by the SensorThings API. Delete the API first."
+            },
             "messages": {
               "deleteSuccess": "Pipeline has been successfully deleted.",
               "deleteError": "An error occurred while deleting the pipeline. Please try again."
@@ -1338,11 +1344,21 @@
         "inUseByLayer": {
           "title": "In use",
           "tooltip": "This Data storage is used by API layers. To edit or remove it, the layer assignments must be removed first."
+        },
+        "inUseBySta": {
+          "title": "In use",
+          "tooltip": "This Data storage is used by a SensorThings API. Delete the API first to delete the Data storage."
+        },
+        "inUseByOws": {
+          "title": "In use",
+          "tooltip": "This Data storage is used by the WFS/WMS API. Delete the API first to delete the Data storage."
         }
       },
       "notRemovable": {
         "provisioned": "Data storage can not be removed. This Data storage has been provisioned and can no longer be removed.",
-        "inUseByLayer": "Data storage can not be removed. This Data storage is used by API layers. Remove the layer assignments first."
+        "inUseByLayer": "Data storage can not be removed. This Data storage is used by API layers. Remove the layer assignments first.",
+        "inUseBySta": "Data storage cannot be deleted. This Data storage is used by a SensorThings API. Delete the API first.",
+        "inUseByOws": "Data storage cannot be deleted. This Data storage is used by the WFS/WMS API. Delete the API first."
       }
     },
     "frostPanel": {
@@ -1493,6 +1509,7 @@
       "confirm": "Discard stored data"
     },
     "header": {
+      "loadFailed": "Not all data could be loaded. Therefore, the pipelines cannot be edited. Please try again later.",
       "saveAll": "Save All",
       "savingAll": "Saving...",
       "exit": "Exit",

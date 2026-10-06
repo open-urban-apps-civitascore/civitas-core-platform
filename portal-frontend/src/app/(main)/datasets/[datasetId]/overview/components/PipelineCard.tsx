@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { useDeletePipeline } from '@/app/services/api/pipelines/clientRequests'
 import { ActivityBadge } from '@/components/activity-badge/ActivityBadge'
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
+import { InfoModal } from '@/components/modals/info-modal/InfoModal'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { BasicTooltip } from '@/components/tooltip/Tooltip'
 import { Badge } from '@/components/ui/badge'
@@ -16,20 +17,31 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { PipelineBasicInfo } from '@/types/datasets'
 import { formatDate } from '@/utils/formatDate'
+import { PipelineDeleteBlockReason } from '@/utils/pipelineDeleteGuard'
 
 interface PipelineCardProps {
   datasetId: string
   pipeline: PipelineBasicInfo
   badges: string[]
   canDelete: boolean
+  deleteBlockReason: PipelineDeleteBlockReason | null
+  isDeleteDisabled: boolean
 }
 
-export const PipelineCard = ({ datasetId, pipeline, badges, canDelete }: PipelineCardProps) => {
+export const PipelineCard = ({
+  datasetId,
+  pipeline,
+  badges,
+  canDelete,
+  deleteBlockReason,
+  isDeleteDisabled,
+}: PipelineCardProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.pipelines')
   const locale = useLocale()
   const router = useRouter()
   const deletePipeline = useDeletePipeline(datasetId)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [isDeleteBlockedOpen, setIsDeleteBlockedOpen] = useState(false)
 
   const hasError = pipeline.runtimeStatus?.state === 'ERROR'
   const isActive = pipeline.runtimeStatus?.state === 'OK'
@@ -87,8 +99,13 @@ export const PipelineCard = ({ datasetId, pipeline, badges, canDelete }: Pipelin
               {canDelete && (
                 <DropdownMenuItem
                   variant="destructive"
+                  disabled={isDeleteDisabled}
                   onClick={e => {
                     e.stopPropagation()
+                    if (deleteBlockReason) {
+                      setIsDeleteBlockedOpen(true)
+                      return
+                    }
                     setIsDeleteOpen(true)
                   }}
                   data-testid={`pipelineCardMenuDelete-${pipeline.id}`}
@@ -158,6 +175,16 @@ export const PipelineCard = ({ datasetId, pipeline, badges, canDelete }: Pipelin
         onConfirm={handleConfirmDelete}
         isLoading={deletePipeline.isPending}
       />
+
+      {deleteBlockReason && (
+        <InfoModal
+          open={isDeleteBlockedOpen}
+          onOpenChange={setIsDeleteBlockedOpen}
+          title={t('deleteBlocked.title')}
+          description={t(`deleteBlocked.${deleteBlockReason}`)}
+          onClose={() => setIsDeleteBlockedOpen(false)}
+        />
+      )}
     </>
   )
 }

@@ -13,6 +13,7 @@ import { useParams } from 'next/navigation'
 
 import { useDatasetPermissionsById } from '@/hooks/use-dataset-permissions'
 
+import { useEditorLoadError } from '../../_hooks/use-editor-load-error'
 import { ReadOnlyProvider } from '../../_hooks/use-pipeline-read-only'
 import { PipelineEditorLayout } from './PipelineEditorLayout'
 
@@ -36,10 +37,11 @@ export const PipelineEditorWrapper: React.FC<PipelineEditorWrapperProps> = ({ cl
   const params = useParams<{ datasetId: string }>()
 
   const { canEditPipeline: canEdit, canCreatePipeline: canCreate } = useDatasetPermissionsById(params.datasetId)
+  const hasLoadError = useEditorLoadError(params.datasetId)
 
   return (
     <ReactFlowProvider>
-      <ReadOnlyProvider isReadOnly={!canEdit && !canCreate}>
+      <ReadOnlyProvider isReadOnly={(!canEdit && !canCreate) || hasLoadError}>
         <PipelineEditorLayout className={className} />
       </ReadOnlyProvider>
     </ReactFlowProvider>

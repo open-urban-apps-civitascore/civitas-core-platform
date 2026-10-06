@@ -330,6 +330,12 @@
               "description": "Möchtest du die Pipeline „{name}“ wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
               "confirm": "Löschen"
             },
+            "deleteBlocked": {
+              "title": "Pipeline kann nicht gelöscht werden",
+              "inUseByLayer": "Ein Geodaten-Speicher der Pipeline wird von einem Layer der WFS/WMS API verwendet. Zuerst muss der Layer gelöscht werden.",
+              "lastPostgisWithOws": "Ein Geodaten-Speicher der Pipeline wird von der WFS/WMS API verwendet. Zuerst muss die API gelöscht werden.",
+              "lastFrostWithSta": "Ein Sensordaten-Speicher der Pipeline wird von der SensorThings API verwendet. Zuerst muss die API gelöscht werden."
+            },
             "messages": {
               "deleteSuccess": "Pipeline wurde erfolgreich gelöscht.",
               "deleteError": "Beim Löschen der Pipeline ist ein Fehler aufgetreten. Bitte versuche es erneut."
@@ -1325,11 +1331,21 @@
         "inUseByLayer": {
           "title": "In Verwendung",
           "tooltip": "Dieser Datenspeicher wird von API-Layern verwendet. Zum Bearbeiten oder Entfernen müssen zuerst die Layer-Zuordnungen aufgehoben werden."
+        },
+        "inUseBySta": {
+          "title": "In Verwendung",
+          "tooltip": "Dieser Datenspeicher wird von einer SensorThings API verwendet. Zum Löschen des Datenspeichers muss zuerst die API gelöscht werden."
+        },
+        "inUseByOws": {
+          "title": "In Verwendung",
+          "tooltip": "Dieser Datenspeicher wird von der WFS/WMS API verwendet. Zum Löschen des Datenspeichers muss zuerst die API gelöscht werden."
         }
       },
       "notRemovable": {
         "provisioned": "Datenspeicher kann nicht entfernt werden. Dieser Datenspeicher wurde bereitgestellt und kann nicht mehr entfernt werden.",
-        "inUseByLayer": "Datenspeicher kann nicht entfernt werden. Dieser Datenspeicher wird von API-Layern verwendet. Heben Sie zuerst die Layer-Zuordnungen auf."
+        "inUseByLayer": "Datenspeicher kann nicht entfernt werden. Dieser Datenspeicher wird von API-Layern verwendet. Heben Sie zuerst die Layer-Zuordnungen auf.",
+        "inUseBySta": "Datenspeicher kann nicht gelöscht werden. Dieser Datenspeicher wird von einer SensorThings API verwendet. Zuerst muss die API gelöscht werden.",
+        "inUseByOws": "Datenspeicher kann nicht gelöscht werden. Dieser Datenspeicher wird von der WFS/WMS API verwendet. Zuerst muss die API gelöscht werden."
       }
     },
     "frostPanel": {
@@ -1480,6 +1496,7 @@
       "confirm": "Gespeicherte Daten verwerfen"
     },
     "header": {
+      "loadFailed": "Es konnten nicht alle Daten geladen werden. Das Bearbeiten der Pipelines ist daher nicht möglich. Bitte versuchen Sie es später erneut.",
       "saveAll": "Alle speichern",
       "savingAll": "Speichert...",
       "exit": "Beenden",

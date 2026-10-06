@@ -141,7 +141,7 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
               activeSessionId={sessionManager.activeSessionId}
               onSelectSession={handleSelectSession}
               onCreateSession={handleCreateSession}
-              canCreate={canCreate}
+              canCreate={canCreate && !isReadOnly}
             />
           </div>
 

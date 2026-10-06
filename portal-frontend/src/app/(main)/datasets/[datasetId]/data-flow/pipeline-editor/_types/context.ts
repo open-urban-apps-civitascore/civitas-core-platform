@@ -7,7 +7,9 @@
 
 import type { Connection } from '@xyflow/react'
 
-import type { DataSinkLocks, SinkLockReason } from '../_hooks/use-datasink-locks'
+import type { PipelineDeleteBlockReason } from '@/utils/pipelineDeleteGuard'
+
+import type { ApiSinkLockReason, DataSinkLocks, SinkLockReason } from '../_hooks/use-datasink-locks'
 import type { PipelineReducerAction } from '../_services/pipelineService'
 import type { ValidationResultWithNodeStatus } from '../_services/validationService'
 import type { PipelineNodeData } from './nodes'
@@ -109,6 +111,8 @@ export interface ActivePipelineContextValue {
   deletePipeline: () => void
   /** Whether a delete operation is currently in progress */
   isDeleting: boolean
+  /** Why the active pipeline must not be deleted; null when it can be deleted */
+  pipelineDeleteBlockReason: PipelineDeleteBlockReason | null
   /** Whether the pipelines and the data sink locks are being loaded from the backend */
   isLoadingEditor: boolean
   /** Save all dirty pipelines across all tabs. Returns true if all saves succeeded. */
@@ -125,6 +129,8 @@ export interface ActivePipelineContextValue {
   getSinkLockReason: (node: PipelineNode) => SinkLockReason | null
   /** Lock reason of the first locked node among the selected ones */
   getSelectionLockReason: (nodes: PipelineNode[]) => SinkLockReason | null
+  /** The API that deleting these nodes leaves without a sink, or null when there is none */
+  getLastApiSinkLockReason: (nodeIdsToDelete: string[]) => ApiSinkLockReason | null
 
   // ===== Session Info =====
   /** ID of the active session */

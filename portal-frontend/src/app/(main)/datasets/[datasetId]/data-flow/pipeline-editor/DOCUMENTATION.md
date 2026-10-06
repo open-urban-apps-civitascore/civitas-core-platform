@@ -645,7 +645,7 @@ If a step throws, the partial progress is written back to the session — still 
 
 ### Locked Data Sinks
 
-`GET /datasets/{datasetId}/datasinks` reports two flags per sink, `provisioned` and `inUseByLayer`. `useDataSinkLocks()` reads the flags once and tells the canvas and the inspector which lock a node has. It finds the sink through the node's `entityId`, so a node without one is new and never locked.
+`GET /datasets/{datasetId}/datasinks` reports two flags per sink, `provisioned` and `inUseByLayer`. `useDataSinkLocks()` reads the flags once and tells the canvas and the inspector which lock a node has. It finds the sink through the node's `entityId`, so a node without one is new and never has these two locks.
 
 | Flag           | Delete | Data structure       | Table name |
 | -------------- | ------ | -------------------- | ---------- |
@@ -654,9 +654,51 @@ If a step throws, the partial progress is written back to the session — still 
 
 `provisioned` wins when both apply.
 
-`PipelineCanvas` sets `deletable: false` on a locked node. `onBeforeDelete` shows an error toast with the reason.
+Two more locks protect the last sink that an API of the dataset reads from:
+
+| Lock         | API | Sink node                   |
+| ------------ | --- | --------------------------- |
+| `inUseBySta` | STA | FROST                       |
+| `inUseByOws` | OWS | Geo persistence (`POSTGIS`) |
+
+A lock applies to a sink node when all of these are true:
+
+- The dataset has the API.
+- No other pipeline has a sink node of this type. Unsaved nodes count too. This includes the nodes of a new pipeline without an id.
+- The graph of the active pipeline has only this one node of this type. This includes a new node without `entityId`.
+
+`provisioned` and `inUseByLayer` win over both.
+
+`PipelineCanvas` sets `deletable: false` on a locked node. `onBeforeDelete` shows an error toast with the reason. It also cancels a delete that removes all nodes of one type at once, when `inUseBySta` or `inUseByOws` would apply to the last of them (`getLastApiSinkLockReason`).
 
 The `PipelineInspector` shows a notice with the lock reason. In read-only mode, only the `inUseByLayer` hint is shown.
+
+`useDataSinkLocks()` also returns `pipelineDeleteBlockReason` for the active pipeline. It uses `getPipelineDeleteBlockReason` (`src/utils/pipelineDeleteGuard.ts`):
+
+| Reason               | Condition                                                                |
+| -------------------- | ------------------------------------------------------------------------ |
+| `inUseByLayer`       | A saved sink of the pipeline is used by a layer.                         |
+| `lastPostgisWithOws` | The dataset has an OWS API, and no other pipeline has a Geo sink node.   |
+| `lastFrostWithSta`   | The dataset has an STA API, and no other pipeline has a FROST sink node. |
+
+For the two last reasons, the active pipeline must have a sink of this type, saved or as a node in its graph. A new pipeline without an id is checked too. Other pipelines count the same as for the sink locks above.
+
+`PipelineToolbar` shows an info modal with the reason instead of the delete confirmation.
+
+### Read-only Mode
+
+`PipelineEditorWrapper` sets the editor to read-only (`ReadOnlyProvider`) in two cases:
+
+- The user has neither edit nor create permission for pipelines.
+- The first load of the pipelines, the data sinks or the dataset fails (`useEditorLoadError`). Without this data, the locks above are incomplete. The editor then shows one error toast (`header.loadFailed`).
+
+In read-only mode:
+
+- Nodes cannot be added, moved, connected or deleted. Changes in the inspector are ignored.
+- "Save all", the "New pipeline" tab button and the pipeline menu (rename, delete) are hidden. `deletePipeline` also returns early.
+- "Validate" stays available.
+
+A failed refetch after a successful first load does not change the mode. The editor keeps the data of the first load.
 
 ### Save Button States
 

@@ -81,11 +81,11 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
             description={t('sink.locked.provisioned.description')}
           />
         )}
-        {lockReason === 'inUseByLayer' && (
+        {lockReason && lockReason !== 'provisioned' && (
           <InspectorNotice
             icon={Link}
-            title={t('sink.locked.inUseByLayer.title')}
-            tooltip={t('sink.locked.inUseByLayer.tooltip')}
+            title={t(`sink.locked.${lockReason}.title`)}
+            tooltip={t(`sink.locked.${lockReason}.tooltip`)}
           />
         )}
         {isLocked ? (

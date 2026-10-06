@@ -2,14 +2,18 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { PipelineDeleteBlockReason } from '@/utils/pipelineDeleteGuard'
+
 import { PipelineToolbar } from './PipelineToolbar'
 
 const mocks = vi.hoisted(() => ({
+  readOnly: { isReadOnly: false },
   permissions: { canDeletePipeline: true, canEditPipeline: true },
   activePipeline: {
     pipeline: { name: 'Test Pipeline' } as { id?: string; name: string } | undefined,
     isDirty: false,
     isDeleting: false,
+    pipelineDeleteBlockReason: null as PipelineDeleteBlockReason | null,
     activeSessionId: 'session-1',
     deletePipeline: vi.fn(),
     renamePipeline: vi.fn(),
@@ -33,6 +37,10 @@ vi.mock('../../_hooks/use-active-pipeline', () => ({
   useActivePipeline: () => mocks.activePipeline,
 }))
 
+vi.mock('../../_hooks/use-pipeline-read-only', () => ({
+  useReadOnly: () => mocks.readOnly,
+}))
+
 const savedPipeline = { id: 'pipeline-1', name: 'Test Pipeline' }
 const neverSavedPipeline = { name: 'Test Pipeline' }
 
@@ -40,10 +48,12 @@ const openMenu = () => userEvent.click(screen.getByTitle('toolbar.pipelineSettin
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.readOnly.isReadOnly = false
   mocks.permissions.canDeletePipeline = true
   mocks.permissions.canEditPipeline = true
   mocks.activePipeline.pipeline = savedPipeline
   mocks.activePipeline.isDeleting = false
+  mocks.activePipeline.pipelineDeleteBlockReason = null
 })
 
 describe('PipelineToolbar — delete and discard', () => {
@@ -93,6 +103,14 @@ describe('PipelineToolbar — delete and discard', () => {
     expect(screen.queryByTitle('toolbar.pipelineSettings')).not.toBeInTheDocument()
   })
 
+  it('hides the menu in a read-only editor', () => {
+    mocks.readOnly.isReadOnly = true
+
+    render(<PipelineToolbar />)
+
+    expect(screen.queryByTitle('toolbar.pipelineSettings')).not.toBeInTheDocument()
+  })
+
   it('words the confirmation as a delete for a saved pipeline', async () => {
     render(<PipelineToolbar />)
     await openMenu()
@@ -124,6 +142,33 @@ describe('PipelineToolbar — delete and discard', () => {
     await userEvent.click(screen.getByTestId('confirmButton'))
 
     expect(mocks.activePipeline.deletePipeline).toHaveBeenCalledOnce()
+  })
+})
+
+describe('PipelineToolbar — blocked delete', () => {
+  it('shows the info modal instead of the confirmation when the delete is blocked', async () => {
+    mocks.activePipeline.pipelineDeleteBlockReason = 'lastPostgisWithOws'
+
+    render(<PipelineToolbar />)
+    await openMenu()
+    await userEvent.click(screen.getByText('toolbar.deletePipeline'))
+
+    expect(screen.getByTestId('infoModal')).toBeInTheDocument()
+    expect(screen.getByText('title')).toBeInTheDocument()
+    expect(screen.getByText('lastPostgisWithOws')).toBeInTheDocument()
+    expect(screen.queryByText('toolbar.deleteConfirmTitle')).not.toBeInTheDocument()
+  })
+
+  it('closes the info modal without deleting the pipeline', async () => {
+    mocks.activePipeline.pipelineDeleteBlockReason = 'inUseByLayer'
+
+    render(<PipelineToolbar />)
+    await openMenu()
+    await userEvent.click(screen.getByText('toolbar.deletePipeline'))
+    await userEvent.click(screen.getByTestId('closeButton'))
+
+    expect(screen.queryByTestId('infoModal')).not.toBeInTheDocument()
+    expect(mocks.activePipeline.deletePipeline).not.toHaveBeenCalled()
   })
 })
 

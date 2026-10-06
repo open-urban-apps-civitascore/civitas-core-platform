@@ -1,14 +1,21 @@
 import { renderHook } from '@testing-library/react'
 
+import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientRequests'
-import type { DataSink } from '@/types/datasinks'
+import { type DataSink, DATASINK_TYPES } from '@/types/datasinks'
+import { API_STANDARDS, type NamedApi } from '@/types/namedApis'
 
-import type { GeoPersistenceNodeData } from '../_types/nodes'
+import type { FrostNodeData, GeoPersistenceNodeData } from '../_types/nodes'
 import type { PipelineNode } from '../_types/pipeline'
+import type { PipelineSession } from '../_types/session'
 import { useDataSinkLocks } from './use-datasink-locks'
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ datasetId: 'dataset-1' }),
+}))
+
+vi.mock('@/app/services/api/datasets/clientRequests', () => ({
+  useGetDataset: vi.fn(),
 }))
 
 vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
@@ -18,6 +25,22 @@ vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
 const mockDataSinks = (sinks: Partial<DataSink>[]) => {
   vi.mocked(useGetDataSinks).mockReturnValue({ data: { data: sinks } } as unknown as ReturnType<typeof useGetDataSinks>)
 }
+
+const mockNamedApis = (namedApis: NamedApi[]) => {
+  vi.mocked(useGetDataset).mockReturnValue({ data: { data: { namedApis } } } as unknown as ReturnType<
+    typeof useGetDataset
+  >)
+}
+
+const STA_API: NamedApi = { name: 'STA', slug: 'sta', standard: API_STANDARDS.STA }
+
+const makeFrostNode = (id: string, entityId?: string): PipelineNode =>
+  ({
+    id,
+    type: 'frost',
+    position: { x: 0, y: 0 },
+    data: { label: 'FROST', configured: true, entityType: 'frost', entityId } as FrostNodeData,
+  }) as PipelineNode
 
 const makeSinkNode = (entityId?: string): PipelineNode =>
   ({
@@ -43,9 +66,16 @@ const makeSourceNode = (): PipelineNode =>
 
 const select = (node: PipelineNode): PipelineNode => ({ ...node, selected: true })
 
+const makeSession = (pipelineId: string | undefined, nodes: PipelineNode[]): PipelineSession =>
+  ({
+    id: `session-${pipelineId ?? 'new'}`,
+    pipeline: { id: pipelineId, nodes, edges: [] },
+  }) as unknown as PipelineSession
+
 describe('useDataSinkLocks', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockNamedApis([])
   })
 
   it('reads the locks of a saved sink', () => {
@@ -147,5 +177,206 @@ describe('useDataSinkLocks', () => {
     const { result } = renderHook(() => useDataSinkLocks())
 
     expect(result.current.getSelectionLockReason([select(makeSinkNode('sink-1'))])).toBeNull()
+  })
+
+  it('stays loading while the dataset is loading', () => {
+    vi.mocked(useGetDataSinks).mockReturnValue({ data: { data: [] }, isLoading: false } as unknown as ReturnType<
+      typeof useGetDataSinks
+    >)
+    vi.mocked(useGetDataset).mockReturnValue({ data: undefined, isLoading: true } as unknown as ReturnType<
+      typeof useGetDataset
+    >)
+
+    const { result } = renderHook(() => useDataSinkLocks())
+
+    expect(result.current.isLoading).toBe(true)
+  })
+
+  describe('last FROST sink of an STA API', () => {
+    const frostNode = makeFrostNode('frost-1', 'sink-1')
+
+    beforeEach(() => {
+      mockNamedApis([STA_API])
+    })
+
+    it('locks the only FROST node when no other pipeline has a FROST sink', () => {
+      mockDataSinks([{ id: 'sink-1', pipelineId: 'pipeline-1', dataSinkType: DATASINK_TYPES.FROST }])
+
+      const { result } = renderHook(() => useDataSinkLocks('pipeline-1', [frostNode]))
+
+      expect(result.current.getSinkLockReason(frostNode)).toBe('inUseBySta')
+    })
+
+    it('ignores the FROST sink of a deleted pipeline', () => {
+      mockDataSinks([{ id: 'sink-2', pipelineId: null as unknown as string, dataSinkType: DATASINK_TYPES.FROST }])
+
+      const { result } = renderHook(() => useDataSinkLocks('pipeline-1', [frostNode]))
+
+      expect(result.current.getSinkLockReason(frostNode)).toBe('inUseBySta')
+    })
+
+    it('ignores the FROST sink of a pipeline without an open tab', () => {
+      mockDataSinks([{ id: 'sink-2', pipelineId: 'pipeline-2', dataSinkType: DATASINK_TYPES.FROST }])
+
+      const { result } = renderHook(() => useDataSinkLocks('pipeline-1', [frostNode]))
+
+      expect(result.current.getSinkLockReason(frostNode)).toBe('inUseBySta')
+    })
+
+    it('leaves the FROST nodes unlocked when the graph has a second one', () => {
+      mockDataSinks([])
+      const secondFrostNode = makeFrostNode('frost-2')
+
+      const { result } = renderHook(() => useDataSinkLocks('pipeline-1', [frostNode, secondFrostNode]))
+
+      expect(result.current.getSinkLockReason(frostNode)).toBeNull()
+    })
+
+    it('leaves the FROST node unlocked without an STA API', () => {
+      mockNamedApis([])
+      mockDataSinks([])
+
+      const { result } = renderHook(() => useDataSinkLocks('pipeline-1', [frostNode]))
+
+      expect(result.current.getSinkLockReason(frostNode)).toBeNull()
+    })
+
+    it('reports the provisioned lock before the STA lock', () => {
+      mockDataSinks([{ id: 'sink-1', pipelineId: 'pipeline-1', dataSinkType: DATASINK_TYPES.FROST, provisioned: true }])
+
+      const { result } = renderHook(() => useDataSinkLocks('pipeline-1', [frostNode]))
+
+      expect(result.current.getSinkLockReason(frostNode)).toBe('provisioned')
+    })
+
+    describe('with another pipeline open in a tab', () => {
+      const otherSink: Partial<DataSink> = {
+        id: 'sink-2',
+        pipelineId: 'pipeline-2',
+        dataSinkType: DATASINK_TYPES.FROST,
+      }
+      const activeSink: Partial<DataSink> = {
+        id: 'sink-1',
+        pipelineId: 'pipeline-1',
+        dataSinkType: DATASINK_TYPES.FROST,
+      }
+
+      const renderWithOtherTab = (otherNodes: PipelineNode[]) =>
+        renderHook(() => useDataSinkLocks('pipeline-1', [frostNode], [makeSession('pipeline-2', otherNodes)]))
+
+      it('leaves the FROST node unlocked while the other graph still has its FROST node', () => {
+        mockDataSinks([activeSink, otherSink])
+
+        const { result } = renderWithOtherTab([makeFrostNode('frost-2', 'sink-2')])
+
+        expect(result.current.getSinkLockReason(frostNode)).toBeNull()
+        expect(result.current.pipelineDeleteBlockReason).toBeNull()
+      })
+
+      it('locks the FROST node when the other tab removed its FROST node without saving', () => {
+        mockDataSinks([activeSink, otherSink])
+
+        const { result } = renderWithOtherTab([])
+
+        expect(result.current.getSinkLockReason(frostNode)).toBe('inUseBySta')
+        expect(result.current.pipelineDeleteBlockReason).toBe('lastFrostWithSta')
+      })
+
+      it('leaves the FROST node unlocked when the other tab replaced its FROST node without saving', () => {
+        mockDataSinks([activeSink, otherSink])
+
+        const { result } = renderWithOtherTab([makeFrostNode('frost-3')])
+
+        expect(result.current.getSinkLockReason(frostNode)).toBeNull()
+        expect(result.current.pipelineDeleteBlockReason).toBeNull()
+      })
+
+      it('blocks the pipeline delete when its only FROST node is unsaved', () => {
+        mockDataSinks([otherSink])
+        const unsavedFrostNode = makeFrostNode('frost-1')
+
+        const { result } = renderHook(() =>
+          useDataSinkLocks('pipeline-1', [unsavedFrostNode], [makeSession('pipeline-2', [])]),
+        )
+
+        expect(result.current.pipelineDeleteBlockReason).toBe('lastFrostWithSta')
+      })
+
+      it('blocks the delete of a new pipeline that has the last FROST node', () => {
+        mockDataSinks([otherSink])
+
+        const { result } = renderHook(() =>
+          useDataSinkLocks(undefined, [makeFrostNode('frost-1')], [makeSession('pipeline-2', [])]),
+        )
+
+        expect(result.current.pipelineDeleteBlockReason).toBe('lastFrostWithSta')
+      })
+
+      it('counts the FROST node of a new pipeline tab', () => {
+        mockDataSinks([activeSink])
+
+        const { result } = renderHook(() =>
+          useDataSinkLocks('pipeline-1', [frostNode], [makeSession(undefined, [makeFrostNode('frost-2')])]),
+        )
+
+        expect(result.current.getSinkLockReason(frostNode)).toBeNull()
+      })
+    })
+
+    it('detects a delete that removes every FROST node', () => {
+      mockDataSinks([])
+      const secondFrostNode = makeFrostNode('frost-2')
+
+      const { result } = renderHook(() => useDataSinkLocks('pipeline-1', [frostNode, secondFrostNode]))
+
+      expect(result.current.getLastApiSinkLockReason(['frost-1', 'frost-2'])).toBe('inUseBySta')
+      expect(result.current.getLastApiSinkLockReason(['frost-1'])).toBeNull()
+    })
+  })
+
+  describe('last Geo sink of an OWS API', () => {
+    const geoNode = makeSinkNode('sink-1')
+    const OWS_API: NamedApi = { name: 'OWS', slug: 'ows', standard: API_STANDARDS.OWS }
+
+    beforeEach(() => {
+      mockNamedApis([OWS_API])
+    })
+
+    it('locks the only Geo sink node when no other pipeline has a POSTGIS sink', () => {
+      mockDataSinks([{ id: 'sink-1', pipelineId: 'pipeline-1', dataSinkType: DATASINK_TYPES.POSTGIS }])
+
+      const { result } = renderHook(() => useDataSinkLocks('pipeline-1', [geoNode]))
+
+      expect(result.current.getSinkLockReason(geoNode)).toBe('inUseByOws')
+    })
+
+    it('leaves the Geo sink node unlocked when another tab has a Geo sink node', () => {
+      mockDataSinks([{ id: 'sink-2', pipelineId: 'pipeline-2', dataSinkType: DATASINK_TYPES.POSTGIS }])
+
+      const { result } = renderHook(() =>
+        useDataSinkLocks('pipeline-1', [geoNode], [makeSession('pipeline-2', [makeSinkNode('sink-2')])]),
+      )
+
+      expect(result.current.getSinkLockReason(geoNode)).toBeNull()
+    })
+
+    it('reports the layer lock before the OWS lock', () => {
+      mockDataSinks([
+        { id: 'sink-1', pipelineId: 'pipeline-1', dataSinkType: DATASINK_TYPES.POSTGIS, inUseByLayer: true },
+      ])
+
+      const { result } = renderHook(() => useDataSinkLocks('pipeline-1', [geoNode]))
+
+      expect(result.current.getSinkLockReason(geoNode)).toBe('inUseByLayer')
+    })
+
+    it('does not lock a FROST node for an OWS API', () => {
+      mockDataSinks([])
+      const frostNode = makeFrostNode('frost-1')
+
+      const { result } = renderHook(() => useDataSinkLocks('pipeline-1', [frostNode]))
+
+      expect(result.current.getSinkLockReason(frostNode)).toBeNull()
+    })
   })
 })
