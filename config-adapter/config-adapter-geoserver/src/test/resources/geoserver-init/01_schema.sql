@@ -22,6 +22,18 @@ INSERT INTO dataset_test_uuid_001.sensor_locations VALUES
     ('sensor-004', 'Spandau',            6.2, 14.7, 20.0, ST_SetSRID(ST_MakePoint(13.2000, 52.5353), 4326)),
     ('sensor-005', 'Marzahn',           14.9, 31.8, 17.2, ST_SetSRID(ST_MakePoint(13.5435, 52.5456), 4326));
 
+-- Table with two geometry columns, to test which one a layer publishes
+CREATE TABLE dataset_test_uuid_001.sites (
+    site_id   TEXT PRIMARY KEY,
+    name      TEXT,
+    location  geometry(Point, 4326),
+    area      geometry(Polygon, 4326)
+);
+
+INSERT INTO dataset_test_uuid_001.sites VALUES
+    ('site-001', 'Tiergarten', ST_SetSRID(ST_MakePoint(13.35, 52.51), 4326),
+     ST_MakeEnvelope(13.33, 52.50, 13.37, 52.52, 4326));
+
 -- Second table to test multi-DataSink scenario (Polygon geometry)
 CREATE TABLE dataset_test_uuid_001.districts (
     district_id   TEXT PRIMARY KEY,

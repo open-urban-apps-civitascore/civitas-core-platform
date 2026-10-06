@@ -48,7 +48,7 @@ publication and pruning; `datasinks` only resolves native table names and the na
 
 | Operation | Effect | Compensation |
 |---|---|---|
-| `CREATE_WORKSPACE` | Isolated workspace; on fresh creation enables and titles the workspace-local WMS service | `DELETE_WORKSPACE` |
+| `CREATE_WORKSPACE` | Isolated workspace; enables, titles and describes the workspace-local WMS service | `DELETE_WORKSPACE` |
 | `CREATE_DATASTORE` | PostGIS datastore inside the workspace | `DELETE_WORKSPACE` |
 | `PROVISION_LAYERS` | Uploads `styles`, publishes a feature type per `layers` entry, assigns styles | `DELETE_WORKSPACE` |
 | `PROVISION_WORKSPACE` | The three create steps in one call; no saga process dispatches it | — |
@@ -61,9 +61,10 @@ publication and pruning; `datasinks` only resolves native table names and the na
 |---|---|
 | `datasetId` | Required. Source of the workspace name. |
 | `workspaceName` | Used verbatim when present and matching `a-z0-9_`; otherwise derived from `datasetId`. |
-| `datasetName` | Title of the workspace-local WMS service. Falls back to the workspace name. |
+| `datasetName` | Title of the workspace-local WMS service when the OWS API has no name. Falls back to the workspace name. |
+| `namedApis[]` | The `OWS` entry's `name` and `description` title and describe the workspace-local WMS service. |
 | `datasinks[]` | `POSTGIS` entries only: `configuration.tableName` is the native-table candidate, `dataStructure` supplies the geometry's native CRS. |
-| `layers[]` | One published feature type each: `layerName` (required), `nativeName`, `crs`, `geometryColumnRef`, `nativeBoundingBox`, `defaultStyle`, `alternativeStyles`. |
+| `layers[]` | One published feature type each: `layerName` (required), `nativeName`, `crs`, `geometryColumnRef`, `nativeBoundingBox`, `defaultStyle`, `alternativeStyles`, `title`, `description`, `attribute`, `cqlFilter`. |
 | `styles[]` | `{name, sldContent}`, uploaded before feature types are published. |
 
 ## Behaviour
@@ -73,13 +74,22 @@ publication and pruning; `datasinks` only resolves native table names and the na
   MUST NOT start with a digit). Datastore name appends `_postgis`; its schema *is* the workspace name, so GeoServer
   reads exactly the schema the PostGIS sink created. The mapping is lossy, so dataset ids MUST be unique under it.
 - **Workspaces are isolated**, each with its own namespace, otherwise the WMS layer-by-name lookup fails and
-  same-named layers across datasets collide. The workspace-local WMS service is enabled and titled with
-  `datasetName`; failure to set it is logged, not fatal. WFS stays global — a workspace-local WFS created over REST
-  has no service level, breaking its `GetCapabilities`.
+  same-named layers across datasets collide. `CREATE_WORKSPACE`, `PROVISION_WORKSPACE` and `UPDATE_WORKSPACE` enable
+  the workspace-local WMS service, titled with the OWS API name (else `datasetName`) and described with its
+  description (field `abstrct`); failure is logged, not fatal. WFS stays global — a workspace-local WFS created over REST has no service level, breaking
+  its `GetCapabilities`.
 - **"Already exists" converges.** GeoServer signals it on POST as HTTP 409, or as HTTP 500 whose body contains
-  `already exists`; both are absorbed. Workspace and feature-type creation treat it as success; datastore creation
-  and `UPDATE_WORKSPACE` feature types fall through to a `PUT`, so stale connection parameters and definitions
-  converge instead of a re-POST reporting an unapplied success.
+  `already exists`; both are absorbed. Workspace creation treats it as success; datastores and feature types fall
+  through to a `PUT` on every path, so stale connection parameters and definitions converge instead of a re-POST
+  reporting an unapplied success.
+- **Layer fields are always sent**, empty when cleared, because a feature-type `PUT` keeps omitted fields: `title`
+  (blank → `layerName`), `abstract` (from `description`), `cqlFilter`, and `attributes` = the geometry column, then
+  the `attribute` selection. GeoServer draws the first geometry attribute; no selection publishes every column and
+  draws the table's first geometry. An unknown geometry column with a selection, or
+  an attribute the table lacks, fails the step. GeoServer validates `cqlFilter` only when it computes the native
+  bounding box: with a supplied `nativeBoundingBox` an invalid filter is stored, and WFS `GetFeature` on the layer
+  answers an exception report. `RESTORE_WORKSPACE` restores which feature types exist, not their definitions or the
+  WMS service settings.
 - **Styles.** A style POST for an existing name answers HTTP 403, not 409; the upsert branches on 403 and refreshes
   the SLD by `PUT`, and a genuine authorization 403 surfaces on that same `PUT`. Assignment to a layer is verified
   by read-back: a `PUT` with an unresolvable style reference answers HTTP 200 while keeping the previous style, so

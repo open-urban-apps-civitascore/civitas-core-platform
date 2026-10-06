@@ -53,7 +53,6 @@ export const mapApiLayerToFormData = (
     crs: layer.crs,
     nativeBoundingBox: toBoundingBoxFormData(layer.nativeBoundingBox),
     latLonBoundingBox: toBoundingBoxFormData(layer.latLonBoundingBox),
-    keywords: layer.keywords,
     defaultStyleId: layer.defaultStyleId || '',
     alternativeStyleIds: layer.alternativeStyleIds,
   }))

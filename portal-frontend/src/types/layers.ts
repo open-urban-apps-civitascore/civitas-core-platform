@@ -26,7 +26,6 @@ const LayerBaseSchema = z.object({
   layerName: z.string(),
   title: z.string(),
   description: z.string().optional(),
-  keywords: z.array(z.string()),
   attribute: z.array(z.string()),
   geometryColumnRef: z.string(),
   cqlFilter: z.string().nullable(),
@@ -87,7 +86,6 @@ export const LayerFormSchema = z
       .max(LAYER_DESCRIPTION_MAX_LENGTH, 'datasets.overview.completion.apis.config.errors.description.tooLong')
       .optional()
       .or(z.literal('')),
-    keywords: z.array(z.string()),
     dataSinkId: z.string().min(1, 'common.errors.required'),
     attribute: z.array(z.string()).min(1, 'common.errors.required'),
     cqlFilter: z.string().trim(),
