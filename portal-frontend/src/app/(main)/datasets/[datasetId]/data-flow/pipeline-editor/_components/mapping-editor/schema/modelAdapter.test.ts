@@ -86,6 +86,41 @@ describe('modelToSchemaTree', () => {
     ])
   })
 
+  it('expands an inline object that declares its fields through allOf alone', () => {
+    // The engine reads such an object as a class with the merged fields; the editor must offer the
+    // same fields instead of a single text value.
+    const tree = modelToSchemaTree(
+      wrapperModel({
+        Base: { type: 'object', properties: { code: { type: 'string' } } },
+        Thing: {
+          type: 'object',
+          properties: {
+            typed: { type: 'object', allOf: [{ $ref: '#/$defs/Base' }] },
+            untyped: { allOf: [{ $ref: '#/$defs/Base' }, { properties: { label: { type: 'string' } } }] },
+          },
+        },
+      }),
+      'fallback',
+    )
+
+    const [typed, untyped] = tree.fields[0].children ?? []
+    expect(typed.type).toBe('object')
+    expect(typed.children?.map(child => child.path)).toEqual(['$.typed.code'])
+    expect(untyped.type).toBe('object')
+    expect(untyped.children?.map(child => child.path)).toEqual(['$.untyped.code', '$.untyped.label'])
+  })
+
+  it('reads an allOf of plain values as str: it declares no field', () => {
+    const tree = modelToSchemaTree(
+      wrapperModel({
+        Thing: { type: 'object', properties: { code: { allOf: [{ type: 'string' }, { maxLength: 5 }] } } },
+      }),
+      'fallback',
+    )
+
+    expect(tree.fields[0].children).toEqual([{ path: '$.code', name: 'code', type: 'str', portType: 'scalar' }])
+  })
+
   it('maps geojson $refs to concrete geometry types', () => {
     const tree = modelToSchemaTree(
       wrapperModel({
