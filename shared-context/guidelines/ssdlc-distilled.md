@@ -1,27 +1,29 @@
-<!-- VENDORED from agent-context@37494c39 — DO NOT EDIT HERE.
+<!-- VENDORED from agent-context@82657266 — DO NOT EDIT HERE.
      Change it in civitas-connect/civitas-core/civitas-core-v2/agent-context, then run ./sync-to-targets.sh -->
 
 <!-- COPY — DO NOT EDIT HERE. Refresh with ./sync-guidelines.sh
-     Source: documentation@e2f8a6fc · version 2.0-rc2 · Development/Development Process/SSDLC_Distilled.md
-     Web:    https://docs.core.civitasconnect.digital/docs_v2/Development/Development Process/SSDLC_Distilled -->
+     Source: documentation@9ba48deb · version next · Development/security/ssdlc-distilled.md
+     Web:    https://docs.core.civitasconnect.digital/docs_v2/next/Development/security/ssdlc-distilled -->
+
+---
+sidebar_position: 3
+---
 
 # Secure Development Guide
-
-**Version 0.9**
 
 > This is our practical SSDLC guide for everyday development.
 > The goal is to make secure-by-default changes without having to read the full SSDLC for each ticket.
 
-This is a distilled view of our SSDLC and the underlying TR-03187 requirements. It does **not** replace the full document; it focuses on what we need to do in our daily dev work. The full document lives [here](https://docs.core.civitasconnect.digital/docs_v2/Development/Development%20Process/SSDLC).
+This is a distilled view of our SSDLC and the underlying TR-03187 requirements. It does **not** replace the full document; it focuses on what we need to do in our daily dev work. The full document lives [here](https://docs.core.civitasconnect.digital/docs_v2/next/Development/security/ssdlc).
 
 This document itself includes only information and prescriptions for the entire CIVITAS/CORE team.
 
 This document is meant to be used in conjunction with the following team specific guidelines:
 * [Security Architecture Principles](./security-architecture-principles.md): This document needs to be followed by everyone creating a ticket. It includes architecture-wide/overarching design principles that need to be incorporated into requirements and designs; they affect the coding phase only via the specifications from the ticket.
-* [Backend-Style Guide](./backend-style-guide.md): This document is intended for Team 1 and the backend developers of Team 2
+* [Java Style Guide](https://docs.core.civitasconnect.digital/docs_v2/next/Development/backend-development/java-development/java-style-guide): This document is intended for Team 1 and the backend developers of Team 2
 * [Frontend-Style Guide](./frontend-style-guide.md): This document is intended for the Frontend developers of Team 2
 * [DevOps Deployment Standards](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-deployment/-/blob/main/docs/deplyoment-standards.md): This document contains prescriptions for Team 3.
-* [Open Source Standards](https://docs.core.civitasconnect.digital/docs_v2/Architecture/Architecture_General/Open_Source_Standards): This policy is to followed whenever new open source components are selected
+* [Open Source Standards](https://docs.core.civitasconnect.digital/docs_v2/next/Architecture/platform-architecture/open-source-standards): This policy is to followed whenever new open source components are selected
 
 ## 1. Scope & Roles (developer view)
 
@@ -80,7 +82,7 @@ For each **externally reachable interface**:
 - When adding a new dependency:
   - Ensure it is pinned in the lockfile
   - Add a short rationale to the MR (why did you choose this particular library over others? Why do you think this component is secure enough?)
-  - For high risk/widely used components, note the risk as calculated from the scheme in the [Open Source Standards](https://docs.core.civitasconnect.digital/docs_v2/Architecture/Architecture_General/Open_Source_Standards). For these components, the MR reviewer must also comment on the reasoning.
+  - For high risk/widely used components, note the risk as calculated from the scheme in the [Open Source Standards](https://docs.core.civitasconnect.digital/docs_v2/next/Architecture/platform-architecture/open-source-standards). For these components, the MR reviewer must also comment on the reasoning.
   - Make reasonable effort to minimize dependencies/shipped binaries
 
 Dependency analysis and SBOM generation are handled in CI, but you are responsible for choosing appropriate dependencies. If you need help choosing, ping your team mates or the security team.
@@ -137,7 +139,7 @@ A short summary and a tag in the PR description is sufficient; the aim is early,
 
 ## 5. Further references
 
-- [**SSDLC document** – full process, TR-03187 mapping, and artefact descriptions](https://docs.core.civitasconnect.digital/docs_v2/Development/Development%20Process/SSDLC).
+- [**SSDLC document** – full process, TR-03187 mapping, and artefact descriptions](https://docs.core.civitasconnect.digital/docs_v2/next/Development/security/ssdlc).
 - [**Threat landscape** – documentation of who might be potential attackers](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/wikis/home/Information-Security/Threat-Landscape).
 - TODO: **Hardening and operations documentation** – what operators are expected to configure.
 
