@@ -1509,6 +1509,7 @@
       "confirm": "Discard stored data"
     },
     "header": {
+      "loadFailed": "Not all data could be loaded. Therefore, the pipelines cannot be edited. Please try again later.",
       "saveAll": "Save All",
       "savingAll": "Saving...",
       "exit": "Exit",

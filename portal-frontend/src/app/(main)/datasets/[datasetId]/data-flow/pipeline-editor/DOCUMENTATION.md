@@ -685,6 +685,21 @@ For the two last reasons, the active pipeline must have a sink of this type, sav
 
 `PipelineToolbar` shows an info modal with the reason instead of the delete confirmation.
 
+### Read-only Mode
+
+`PipelineEditorWrapper` sets the editor to read-only (`ReadOnlyProvider`) in two cases:
+
+- The user has neither edit nor create permission for pipelines.
+- The first load of the pipelines, the data sinks or the dataset fails (`useEditorLoadError`). Without this data, the locks above are incomplete. The editor then shows one error toast (`header.loadFailed`).
+
+In read-only mode:
+
+- Nodes cannot be added, moved, connected or deleted. Changes in the inspector are ignored.
+- "Save all", the "New pipeline" tab button and the pipeline menu (rename, delete) are hidden. `deletePipeline` also returns early.
+- "Validate" stays available.
+
+A failed refetch after a successful first load does not change the mode. The editor keeps the data of the first load.
+
 ### Save Button States
 
 - `isSavingAll` is exposed via `useActivePipeline()` context

@@ -22,6 +22,7 @@ import { useDatasetPermissionsById } from '@/hooks/use-dataset-permissions'
 
 import { LAYOUT_DIMENSIONS } from '../../_constants/pipelineStyles'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
+import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
 
 // ============================================================================
 // Props
@@ -55,6 +56,7 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
   } = useActivePipeline()
   const { datasetId } = useParams<{ datasetId: string }>()
   const { canDeletePipeline: canDelete, canEditPipeline: canEdit } = useDatasetPermissionsById(datasetId)
+  const { isReadOnly } = useReadOnly()
 
   const [shouldShowDeleteConfirm, setShouldShowDeleteConfirm] = useState(false)
   const [shouldShowDeleteBlocked, setShouldShowDeleteBlocked] = useState(false)
@@ -64,7 +66,7 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
 
   const isUnsaved = !pipeline?.id
   const canDiscard = canDelete || isUnsaved
-  const canShowMenu = canDiscard || canEdit
+  const canShowMenu = !isReadOnly && (canDiscard || canEdit)
   const pipelineRemovalLabel = isUnsaved ? t('toolbar.discardPipeline') : t('toolbar.deletePipeline')
   const pipelineRemovalConfirmTitle = isUnsaved ? t('toolbar.discardConfirmTitle') : t('toolbar.deleteConfirmTitle')
   const pipelineRemovalConfirmDescription = isUnsaved

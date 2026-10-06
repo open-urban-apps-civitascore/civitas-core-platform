@@ -224,3 +224,21 @@ describe('saving from the Pipeline editor', () => {
     expect(data.dataSinkIds).toEqual(['created-sink-guid'])
   })
 })
+
+describe('Pipeline editor after a failed request', () => {
+  it('is read-only when the data sinks cannot be loaded', async () => {
+    vi.mocked(useGetDataSinks).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isLoadingError: true,
+    } as unknown as ReturnType<typeof useGetDataSinks>)
+
+    loadPipeline(frostNode())
+
+    await screen.findByDisplayValue('0 0 * * * ?')
+
+    expect(screen.queryByRole('button', { name: 'Alle speichern' })).not.toBeInTheDocument()
+    expect(screen.queryByTitle('Neue Pipeline')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('Pipeline-Einstellungen')).not.toBeInTheDocument()
+  })
+})

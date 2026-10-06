@@ -1496,6 +1496,7 @@
       "confirm": "Gespeicherte Daten verwerfen"
     },
     "header": {
+      "loadFailed": "Es konnten nicht alle Daten geladen werden. Das Bearbeiten der Pipelines ist daher nicht möglich. Bitte versuchen Sie es später erneut.",
       "saveAll": "Alle speichern",
       "savingAll": "Speichert...",
       "exit": "Beenden",

@@ -7,6 +7,7 @@ import type { PipelineDeleteBlockReason } from '@/utils/pipelineDeleteGuard'
 import { PipelineToolbar } from './PipelineToolbar'
 
 const mocks = vi.hoisted(() => ({
+  readOnly: { isReadOnly: false },
   permissions: { canDeletePipeline: true, canEditPipeline: true },
   activePipeline: {
     pipeline: { name: 'Test Pipeline' } as { id?: string; name: string } | undefined,
@@ -36,6 +37,10 @@ vi.mock('../../_hooks/use-active-pipeline', () => ({
   useActivePipeline: () => mocks.activePipeline,
 }))
 
+vi.mock('../../_hooks/use-pipeline-read-only', () => ({
+  useReadOnly: () => mocks.readOnly,
+}))
+
 const savedPipeline = { id: 'pipeline-1', name: 'Test Pipeline' }
 const neverSavedPipeline = { name: 'Test Pipeline' }
 
@@ -43,6 +48,7 @@ const openMenu = () => userEvent.click(screen.getByTitle('toolbar.pipelineSettin
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.readOnly.isReadOnly = false
   mocks.permissions.canDeletePipeline = true
   mocks.permissions.canEditPipeline = true
   mocks.activePipeline.pipeline = savedPipeline
@@ -91,6 +97,14 @@ describe('PipelineToolbar — delete and discard', () => {
   it('hides the menu for a saved pipeline without edit or delete permission', () => {
     mocks.permissions.canDeletePipeline = false
     mocks.permissions.canEditPipeline = false
+
+    render(<PipelineToolbar />)
+
+    expect(screen.queryByTitle('toolbar.pipelineSettings')).not.toBeInTheDocument()
+  })
+
+  it('hides the menu in a read-only editor', () => {
+    mocks.readOnly.isReadOnly = true
 
     render(<PipelineToolbar />)
 

@@ -456,7 +456,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Pipeline Operations: Delete =====
   const deletePipeline = useCallback(() => {
-    if (!activeSession) return
+    if (!activeSession || isReadOnly) return
 
     const pipelineId = activeSession.pipeline.id
 
@@ -487,7 +487,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         }
       },
     })
-  }, [activeSession, sessionManager, deletePipelineMutation, canDelete, t])
+  }, [activeSession, isReadOnly, sessionManager, deletePipelineMutation, canDelete, t])
 
   const isDeleting = deletePipelineMutation.isPending
 
