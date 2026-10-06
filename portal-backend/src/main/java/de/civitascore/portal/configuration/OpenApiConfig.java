@@ -586,6 +586,12 @@ public class OpenApiConfig {
                       path,
                       "pendingSagaType",
                       "CREATE"),
+                  "model_missing",
+                  problemExample(
+                      409,
+                      "MODEL_MISSING",
+                      "DataStructureVersion model is missing from the model registry",
+                      path),
                   "foreign_key_violation",
                   problemExample(
                       409, "FOREIGN_KEY_VIOLATION", "Referenced entity does not exist", path)));

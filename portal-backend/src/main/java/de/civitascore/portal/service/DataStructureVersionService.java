@@ -14,6 +14,7 @@ import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ModelMemberUnreachableException;
+import de.civitascore.portal.util.ModelMissingException;
 import de.civitascore.portal.util.ModelRootMissingException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
@@ -244,6 +245,7 @@ public class DataStructureVersionService
    * @throws ModelRootMissingException if the version's model has no root Element
    * @throws ModelMemberUnreachableException if members of the version's model are not reachable
    *     from its root Element
+   * @throws ModelMissingException if the model registry no longer holds the version's model
    */
   @Transactional
   public DataStructureVersion release(UUID id) {

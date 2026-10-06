@@ -254,6 +254,10 @@ public class DataStructureVersionController
       responseCode = "404",
       description = "Data structure version not found",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "The version's model is missing from the model registry",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataStructureVersionOutputDTO> releaseDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
     requireOwnedByDataStructure(dataStructureId, versionId);

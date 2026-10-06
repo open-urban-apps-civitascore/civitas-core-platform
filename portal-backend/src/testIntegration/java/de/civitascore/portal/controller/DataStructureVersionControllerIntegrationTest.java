@@ -871,6 +871,27 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .isEqualTo(DataStructureVersionStatus.DRAFT);
     }
 
+    @Test
+    @DisplayName("Should fail to release a version whose model is missing from the registry")
+    void shouldFailToReleaseVersionWhoseModelIsMissing() {
+      DataStructureVersion version = draftWithDataStructureModel(true);
+      version.setModelUrn(
+          "urn:core:platform:civitas:datastructure:common:Gone:"
+              + UUID.randomUUID().toString().replace("-", "").substring(0, 10)
+              + ":1.0.0");
+      dataStructureVersionRepository.save(version);
+
+      ResponseEntity<ProblemDetail> response =
+          restTemplate.exchange(
+              releasePath(version),
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<ProblemDetail>() {});
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:MODEL_MISSING");
+    }
+
     private String releasePath(DataStructureVersion version) {
       return "/datastructures/"
           + version.getDataStructure().getId()
