@@ -25,7 +25,9 @@ import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
+import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -48,7 +50,9 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private PortalTestDataFactory portalData;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataSinkRepository dataSinkRepository;
+  @Autowired private DataSinkService dataSinkService;
   @Autowired private LayerRepository layerRepository;
+  @Autowired private PipelineRepository pipelineRepository;
 
   @AfterEach
   void cleanup() {
@@ -144,6 +148,11 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   /**************
    * Helper methods to create test data with relationships
    *************/
+
+  private SagaResultPayload sagaResultFor(UUID datasetId) {
+    return new SagaResultPayload(
+        datasetId.toString(), null, null, null, null, null, null, null, null, null, null);
+  }
 
   private DataSet createInitialDataSet() {
     return portalData.dataSet(b -> b.description("Test dataset for relationship testing"));
@@ -335,7 +344,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       dataSet.setPendingSagaType(PendingSagaType.DELETE);
       dataSetRepository.save(dataSet);
 
-      dataSetService.handleSagaCompleted(dataSet.getId(), deleteResultFor(dataSet.getId()));
+      dataSetService.handleSagaCompleted(dataSet.getId(), sagaResultFor(dataSet.getId()));
 
       assertThat(layerRepository.findById(layer.getId())).isEmpty();
       assertThat(dataSinkRepository.findById(sink.getId())).isEmpty();
@@ -355,10 +364,45 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(dataSinkRepository.findById(sink.getId())).isEmpty();
       assertThat(dataSetRepository.findById(dataSet.getId())).isEmpty();
     }
+  }
 
-    private SagaResultPayload deleteResultFor(UUID datasetId) {
-      return new SagaResultPayload(
-          datasetId.toString(), null, null, null, null, null, null, null, null, null, null);
+  @Nested
+  @DisplayName("Delete With Provisioned Sinks Tests")
+  class DeleteWithProvisionedSinksTests {
+
+    /** A teardown that skips provisioned sinks leaves a table that nothing can delete. */
+    @Test
+    @DisplayName(
+        "Should remove a provisioned sink that refuses a standalone delete when its dataset is"
+            + " torn down")
+    void shouldRemoveProvisionedSinkOnSagaDeleteCompleted() {
+      DataSet dataSet = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.DRAFT));
+      Pipeline pipeline = portalData.pipeline(dataSet);
+      DataSink sink = portalData.dataSink(dataSet, pipeline);
+      UUID id = dataSet.getId();
+
+      completeSaga(id, DataSetStatus.AVAILABLE, PendingSagaType.CREATE);
+      completeSaga(id, DataSetStatus.READY, PendingSagaType.UNRELEASE);
+      dataSetService.unstage(id);
+
+      assertThatThrownBy(() -> dataSinkService.deleteById(sink.getId()))
+          .isInstanceOf(ResourceInUseException.class);
+      assertThat(dataSinkRepository.findById(sink.getId())).isPresent();
+
+      completeSaga(id, DataSetStatus.DRAFT, PendingSagaType.DELETE);
+
+      assertThat(dataSinkRepository.findById(sink.getId())).isEmpty();
+      assertThat(pipelineRepository.findById(pipeline.getId())).isEmpty();
+      assertThat(dataSetRepository.findById(id)).isEmpty();
+    }
+
+    /** Stands in for the saga trigger, which needs a message broker this context does not run. */
+    private void completeSaga(UUID id, DataSetStatus status, PendingSagaType type) {
+      DataSet dataSet = dataSetRepository.findById(id).orElseThrow();
+      dataSet.setDataSetStatus(status);
+      dataSet.setPendingSagaType(type);
+      dataSetRepository.save(dataSet);
+      dataSetService.handleSagaCompleted(id, sagaResultFor(id));
     }
   }
 }
