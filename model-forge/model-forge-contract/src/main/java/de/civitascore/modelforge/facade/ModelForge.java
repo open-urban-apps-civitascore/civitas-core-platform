@@ -248,8 +248,7 @@ public interface ModelForge {
      *
      * <p>Non-DataSet references block unconditionally (referential integrity). DataSet membership is
      * count-based: 0 → delete; 1 → delete and auto-unlink from that DataSet's manifest; ≥2 → blocked
-     * (remove from the other DataSets first). A DataStructure's memberships are not counted: a
-     * DataSet only groups it, and the mapping or sink that uses it holds the version it uses.
+     * (remove from the other DataSets first). A DataStructure's memberships are not counted.
      *
      * <p>With {@code cascade}, the artifacts the target <em>owns</em> go too — a grouping's
      * Elements of every version, a pipeline's Mapping, a DataSet's pipelines and mappings — each
@@ -271,7 +270,7 @@ public interface ModelForge {
      *
      * <p>Memberships count for the named artifact only, from the second onwards, and never for a
      * DataStructure. Neither does a reference from an Element that another version of the same
-     * DataStructure contains: a reference between Elements names no version.
+     * DataStructure contains.
      *
      * <p>A versioned URN asks about that version alone; a logical URN about the artifact as a whole,
      * which is the question a delete asks. Answered from the stored references, not the in-memory

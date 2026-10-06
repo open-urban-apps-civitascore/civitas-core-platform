@@ -221,10 +221,6 @@ public class ElementCommandService {
             .toList();
     }
 
-    /**
-     * Whether the artifact is a Data Structure, whose Data Set memberships are not counted: a Data
-     * Set only groups it, and the Mapping or Data Sink that uses it holds the version it uses.
-     */
     static boolean isDataStructure(String urn) {
         return "datastructure".equals(UrnParser.artifactTypeFromUrn(urn));
     }

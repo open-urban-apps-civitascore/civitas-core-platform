@@ -407,7 +407,7 @@ class EmbeddedModelForgeOperationsTest {
     void deletionBlockersIgnoresAnElementAnotherVersionOfTheDataStructureContains() {
         var v1 = new ArtifactId("urn:core:platform:civitas:datastructure:common:0fead377-9422-5e34-b968-ef8b36991ccc:1.0.0");
         String station = "urn:core:platform:civitas:element:common:982fa60c-313a-5023-957f-f17674de2606:1.0.0";
-        // Only version 2 contains Reading; its $ref to Station names no version, so it holds v1's pin.
+        // Only version 2 contains Reading.
         String reading = "urn:core:platform:civitas:element:common:c1f003f4-0473-58e1-b503-c8dbda69a376";
         when(registry.ownedMemberUrns(v1.value(), "1.0.0")).thenReturn(List.of(station));
         when(registry.nonDataSetBlockingDependents(station, "1.0.0")).thenReturn(List.of(reading));
