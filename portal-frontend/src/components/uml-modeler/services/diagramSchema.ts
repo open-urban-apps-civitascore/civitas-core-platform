@@ -2,16 +2,13 @@ import { z } from 'zod'
 
 import { PINNED_DATASTRUCTURE_URN } from '@/utils/coreUrn'
 
-export const UMLPrimitiveTypeSchema = z.enum([
-  'String',
-  'Integer',
-  'Boolean',
-  'Number',
-  'Date',
-  'DateTime',
-  'Uuid',
-  'Json',
-])
+import { readStoredType } from './legacyTypes'
+
+// A diagram saved before a type was retired still names it; it reads as the type that replaced it.
+export const UMLPrimitiveTypeSchema = z.preprocess(
+  readStoredType,
+  z.enum(['String', 'Integer', 'Boolean', 'Number', 'Date', 'DateTime', 'Uuid']),
+)
 
 export const UMLGeometryTypeSchema = z.enum([
   'Point',

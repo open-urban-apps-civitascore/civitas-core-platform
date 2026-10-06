@@ -271,18 +271,11 @@ const typeOf = (schema: JsonSchemaObject, propertyName: string): UMLType => {
   }
 
   const type = asString(schema.type)
-  if (!type) {
-    // An empty schema says "any value". UML has no such type, so it reads as text — the same
-    // degradation the mapping editor applies to it.
-    return 'String'
-  }
-  if (type === 'object') {
-    // An object that declares properties was lifted into the library before the walk, so anything
-    // still inline here is a free JSON value — a geometry, a measurement's quality, an entity's
-    // own bag. The export writes Json as exactly this, so a re-export gives the document it came
-    // from.
-    return 'Json'
-  }
+  // An empty schema says "any value". An inline object is a free value too: an object that declares
+  // properties was lifted into the library before the walk. UML has no type for either, so both
+  // read as text — the same degradation the mapping editor applies to them. A re-export writes a
+  // string in their place.
+  if (!type || type === 'object') return 'String'
   const primitive = primitiveFor(type, asString(schema.format))
   if (!primitive) {
     throw new SchemaImportError(`the property '${propertyName}' has the unsupported type '${type}'`, type)

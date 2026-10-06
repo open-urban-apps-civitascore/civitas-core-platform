@@ -22,7 +22,10 @@ import de.civitascore.configadapter.nifi.flow.SinkResolutionContext;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.FreeAttribute;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.KeyAttribute;
 import de.civitascore.configadapter.nifi.mapping.SinkPort;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaEntity;
 import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaJsonType;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaTarget;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.TargetKind;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -208,8 +211,9 @@ class FrostSinkStageTest {
 
   @Test
   void derivesFreeBagAttributesWithTypesAndTheMatchKeyFlag() throws Exception {
-    // A bag with the match key + a free scalar + a free object: scalar → ANY, object → RAW_JSON,
-    // only the marked attribute is the key. Declaration order is preserved.
+    // A bag with the match key + a free scalar + a free object: both render type-inferred — a free
+    // object has no type of its own and the editor shows it as text. Only the marked attribute is
+    // the key. Declaration order is preserved.
     Map<String, Object> datasink =
         json(
             """
@@ -240,16 +244,16 @@ class FrostSinkStageTest {
         List.of(
             new KeyAttribute("reference"),
             new FreeAttribute("owner", StaJsonType.ANY),
-            new FreeAttribute("meta", StaJsonType.RAW_JSON)),
+            new FreeAttribute("meta", StaJsonType.ANY)),
         spec.staProperties().thing());
   }
 
   @Test
   void aNonScalarMarkedAttributeIsNotTheKeyAndStaysRawJson() throws Exception {
     // A {id} marker on a non-scalar (array/$ref) cannot back a match key — it must fall through to
-    // the scalar 'reference' fallback for the key, while the marked non-scalar stays a free
-    // RAW_JSON attribute (a marked object never quietly becomes a STRING key). array and $ref
-    // attributes both render RAW_JSON.
+    // the scalar 'reference' fallback for the key, while the marked array stays a free RAW_JSON
+    // attribute (a marked object never quietly becomes a STRING key). A class inside the bag is no
+    // attribute of its own: its attributes become modelled targets nested under it.
     Map<String, Object> datasink =
         json(
             """
@@ -278,11 +282,13 @@ class FrostSinkStageTest {
     FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
 
     assertEquals(
-        List.of(
-            new FreeAttribute("tags", StaJsonType.RAW_JSON),
-            new KeyAttribute("reference"),
-            new FreeAttribute("region", StaJsonType.RAW_JSON)),
+        List.of(new FreeAttribute("tags", StaJsonType.RAW_JSON), new KeyAttribute("reference")),
         spec.staProperties().thing());
+    assertEquals(
+        List.of(
+            new StaTarget(
+                "$.properties.region.lat", StaEntity.THING, StaJsonType.ANY, TargetKind.OPTIONAL)),
+        spec.staProperties().modelled());
   }
 
   @Test
@@ -394,6 +400,169 @@ class FrostSinkStageTest {
     FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
 
     assertTrue(spec.staProperties().location().isEmpty());
+  }
+
+  /** A ThingTree structure that models classes under every free field of SensorThings. */
+  private static Map<String, Object> modelledThingTree() {
+    return json(
+        """
+        { "configuration": { "port": "ThingTree" },
+          "dataStructure": {
+            "title": "Thing",
+            "$ref": "#/$defs/Thing",
+            "$defs": {
+              "Thing": { "type": "object", "properties": {
+                  "properties": { "$ref": "#/$defs/ThingProperties" },
+                  "Datastreams": { "type": "array", "items": { "$ref": "#/$defs/Datastream" } } } },
+              "ThingProperties": { "type": "object", "properties": {
+                  "reference": { "type": "string", "x-core-primaryKey": true } } },
+              "Datastream": { "type": "object", "properties": {
+                  "properties": { "type": "object", "properties": {
+                      "reference": { "type": "string" } } },
+                  "Sensor": { "$ref": "#/$defs/Sensor" },
+                  "ObservedProperty": { "$ref": "#/$defs/ObservedProperty" },
+                  "Observations": { "type": "array", "items": { "$ref": "#/$defs/Observation" } } } },
+              "Sensor": { "type": "object", "properties": {
+                  "name": { "type": "string" },
+                  "properties": { "$ref": "#/$defs/SensorProperties" } } },
+              "SensorProperties": { "type": "object", "properties": {
+                  "vendor": { "type": "string" },
+                  "calibration": { "$ref": "#/$defs/Calibration" } } },
+              "Calibration": { "type": "object", "properties": {
+                  "date": { "type": "string", "format": "date" } } },
+              "ObservedProperty": { "type": "object", "properties": {
+                  "properties": { "type": "object" } } },
+              "Observation": { "type": "object", "properties": {
+                  "result": {},
+                  "resultQuality": { "$ref": "#/$defs/Quality" },
+                  "FeatureOfInterest": { "$ref": "#/$defs/FeatureOfInterest" } } },
+              "Quality": { "type": "object", "properties": {
+                  "accuracy": { "type": "number" } } },
+              "FeatureOfInterest": { "type": "object", "properties": {
+                  "name": { "type": "string" },
+                  "feature": { "$ref": "https://geojson.org/schema/Point.json" },
+                  "properties": { "$ref": "#/$defs/FeatureProperties" } } },
+              "FeatureProperties": { "type": "object", "properties": {
+                  "river": { "type": "string" } } } } } }
+        """);
+  }
+
+  private static StaTarget optional(String path, StaEntity entity, StaJsonType type) {
+    return new StaTarget(path, entity, type, TargetKind.OPTIONAL);
+  }
+
+  @Test
+  void parseSpec_withClassesUnderTheFreeFields_derivesATargetPerAttribute() throws Exception {
+    FrostSinkSpec spec = stage.parseSpec(modelledThingTree(), ctx);
+
+    // The ObservedProperty declares its properties as a free object: no class, no target.
+    String observation = "$.Datastreams[].Observations[]";
+    assertEquals(
+        List.of(
+            optional(
+                "$.Datastreams[].Sensor.properties.vendor", StaEntity.DATASTREAM, StaJsonType.ANY),
+            optional(
+                "$.Datastreams[].Sensor.properties.calibration.date",
+                StaEntity.DATASTREAM,
+                StaJsonType.ANY),
+            optional(
+                observation + ".resultQuality.accuracy", StaEntity.OBSERVATION, StaJsonType.ANY),
+            optional(
+                observation + ".FeatureOfInterest.properties.river",
+                StaEntity.FEATURE_OF_INTEREST,
+                StaJsonType.ANY),
+            optional(
+                observation + ".FeatureOfInterest.feature",
+                StaEntity.FEATURE_OF_INTEREST,
+                StaJsonType.RAW_JSON)),
+        spec.staProperties().modelled());
+  }
+
+  @Test
+  void parseSpec_intoTheObservationsPort_derivesTheFreeFieldsOfTheMeasurement() throws Exception {
+    Map<String, Object> datasink =
+        json(
+            """
+            { "configuration": { "port": "Observations" },
+              "dataStructure": {
+                "title": "Observation",
+                "$ref": "#/$defs/Observation",
+                "$defs": {
+                  "Observation": { "type": "object", "properties": {
+                      "result": {},
+                      "resultQuality": { "$ref": "#/$defs/Quality" },
+                      "parameters": { "type": "object", "properties": {
+                          "thingReference": { "type": "string" },
+                          "datastreamReference": { "type": "string" } } },
+                      "FeatureOfInterest": { "$ref": "#/$defs/FeatureOfInterest" } } },
+                  "Quality": { "type": "object", "properties": {
+                      "accuracy": { "type": "number" } } },
+                  "FeatureOfInterest": { "type": "object", "properties": {
+                      "feature": { "$ref": "#/$defs/Site" } } },
+                  "Site": { "type": "object", "properties": {
+                      "station": { "type": "string" } } } } } }
+            """);
+
+    FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
+
+    String observation = "$.Datastreams[].Observations[]";
+    assertEquals(
+        List.of(
+            optional(
+                observation + ".resultQuality.accuracy", StaEntity.OBSERVATION, StaJsonType.ANY),
+            optional(
+                observation + ".FeatureOfInterest.feature.station",
+                StaEntity.FEATURE_OF_INTEREST,
+                StaJsonType.ANY)),
+        spec.staProperties().modelled());
+  }
+
+  @Test
+  void parseSpec_withAClassThatContainsItself_stopsAtTheCycle() throws Exception {
+    Map<String, Object> datasink =
+        json(
+            """
+            { "configuration": { "port": "ThingTree" },
+              "dataStructure": {
+                "title": "Thing",
+                "$ref": "#/$defs/Thing",
+                "$defs": {
+                  "Thing": { "type": "object", "properties": {
+                      "properties": { "type": "object", "properties": {
+                          "reference": { "type": "string" },
+                          "part": { "$ref": "#/$defs/Part" } } } } },
+                  "Part": { "type": "object", "properties": {
+                      "code": { "type": "string" },
+                      "parent": { "$ref": "#/$defs/Part" } } } } } }
+            """);
+
+    FrostSinkSpec spec = stage.parseSpec(datasink, ctx);
+
+    assertEquals(
+        List.of(optional("$.properties.part.code", StaEntity.THING, StaJsonType.ANY)),
+        spec.staProperties().modelled());
+  }
+
+  @Test
+  void parseSpec_withAnUnsafeAttributeNameInAModelledClass_isRejected() {
+    Map<String, Object> datasink =
+        json(
+            """
+            { "configuration": { "port": "ThingTree" },
+              "dataStructure": {
+                "title": "Thing",
+                "$ref": "#/$defs/Thing",
+                "$defs": {
+                  "Thing": { "type": "object", "properties": {
+                      "properties": { "type": "object", "properties": {
+                          "reference": { "type": "string" },
+                          "site": { "$ref": "#/$defs/Site" } } } } },
+                  "Site": { "type": "object", "properties": {
+                      "room no": { "type": "string" } } } } } }
+            """);
+
+    // The name would become a key of the generated body template.
+    assertThrows(FatalAdapterException.class, () -> stage.parseSpec(datasink, ctx));
   }
 
   @Test

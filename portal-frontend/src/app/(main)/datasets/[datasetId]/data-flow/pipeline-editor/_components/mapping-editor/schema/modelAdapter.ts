@@ -288,8 +288,10 @@ const fieldFor = (
 
   if (asString(node.type) === 'object' || asNode(node.properties)) {
     const children = childrenOf(node, defs, path, visited)
+    // An object that names no fields is a free value. It reads as text, as the structure editor
+    // reads it.
     if (!children || children.length === 0) {
-      return field(path, name, 'json', required)
+      return field(path, name, 'str', required)
     }
     return field(path, name, 'object', required, children)
   }

@@ -361,21 +361,21 @@ describe('umlDiagramToSchemaTree', () => {
 })
 
 describe('PRIMITIVE', () => {
-  // Regression: UML_PRIMITIVE_TYPES gained 'Json' in another commit without a matching PRIMITIVE
-  // entry here, so scalarType()'s `PRIMITIVE[type] ?? 'str'` fallback silently mistyped it as a
-  // plain string everywhere PRIMITIVE is consulted (schema trees, the Literal node's output port).
+  // A primitive added to UML_PRIMITIVE_TYPES without a PRIMITIVE entry would fall through
+  // scalarType()'s `PRIMITIVE[type] ?? 'str'` and be silently mistyped as a plain string everywhere
+  // PRIMITIVE is consulted (schema trees, the Literal node's output port).
   it('has an explicit engine subtype for every UML primitive type', () => {
     for (const type of UML_PRIMITIVE_TYPES) {
       expect(Object.hasOwn(PRIMITIVE, type), `PRIMITIVE is missing an entry for '${type}'`).toBe(true)
     }
   })
 
-  it('maps a Json attribute to the json subtype, not the str fallback', () => {
+  it('reads an attribute stored with the retired Json type as str', () => {
     const diagram = {
       nodes: [classNode('thing', 'Thing', [{ name: 'payload', type: 'Json' }])],
       edges: [],
     } as unknown as UMLDiagram
 
-    expect(treeOf(diagram, 'Thing').fields.map(f => f.type)).toEqual(['json'])
+    expect(treeOf(diagram, 'Thing').fields.map(f => f.type)).toEqual(['str'])
   })
 })

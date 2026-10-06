@@ -21,9 +21,6 @@
           "type": "string",
           "format": "date-time"
         },
-        "resultQuality": {
-          "type": "object"
-        },
         "validTime": {
           "type": "string"
         },
@@ -71,19 +68,12 @@
         },
         "encodingType": {
           "type": "string"
-        },
-        "feature": {
-          "type": "object"
-        },
-        "properties": {
-          "type": "object"
         }
       },
       "required": [
         "name",
         "description",
-        "encodingType",
-        "feature"
+        "encodingType"
       ]
     }
   }

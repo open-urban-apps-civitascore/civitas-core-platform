@@ -355,37 +355,37 @@ describe('importFromJsonSchema — designated root and inherited shapes', () => 
   })
 })
 
-describe('the Json attribute type', () => {
-  const station = (): UMLDiagram =>
-    diagram([
-      {
-        id: 'e1',
-        name: 'Station',
-        type: 'class',
-        isRoot: true,
-        attributes: [
-          { id: 'a1', name: 'reference', type: 'String', isId: true, multiplicity: '1..1' },
-          { id: 'a2', name: 'quality', type: 'Json', multiplicity: '0..1' },
-          { id: 'a3', name: 'history', type: 'Json', multiplicity: '0..*' },
-        ],
-        operations: [],
+describe('a free value', () => {
+  const station: JsonSchemaObject = {
+    $ref: '#/$defs/Station',
+    $defs: {
+      Station: {
+        type: 'object',
+        title: 'Station',
+        properties: {
+          quality: { type: 'object' },
+          history: { type: 'array', items: { type: 'object' } },
+          anything: {},
+        },
       },
-    ])
+    },
+  }
 
-  it('is written as an object the structure does not describe', () => {
-    const defs = exportToJsonSchema(station()).$defs as Record<string, JsonSchemaObject>
-    const properties = defs.Station.properties as Record<string, JsonSchemaObject>
+  const typesByName = () => {
+    const element = importFromJsonSchema(station).nodes[0].data.element
+    const attributes = element.type === 'class' ? element.attributes : []
+    return Object.fromEntries(attributes.map(attribute => [attribute.name, attribute.type]))
+  }
 
-    expect(properties.quality).toEqual({ type: 'object' })
-    expect(properties.history).toMatchObject({ type: 'array', items: { type: 'object' } })
+  it('reads an inline object without properties as String, like an empty schema', () => {
+    expect(typesByName()).toEqual({ quality: 'String', history: 'String', anything: 'String' })
   })
 
-  it('reads an inline object back as Json, and survives the round trip', () => {
-    const imported = importFromJsonSchema(exportToJsonSchema(station()))
-    const element = imported.nodes[0].data.element
-    const attributes = element.type === 'class' ? element.attributes : []
+  it('is written back as a string', () => {
+    const defs = exportToJsonSchema(diagramFromJsonSchema(station, 'Station')).$defs as Record<string, JsonSchemaObject>
+    const properties = defs.Station.properties as Record<string, JsonSchemaObject>
 
-    expect(attributes.find(attribute => attribute.name === 'quality')?.type).toBe('Json')
-    expectRoundTrip(station())
+    expect(properties.quality).toEqual({ type: 'string' })
+    expect(properties.history).toMatchObject({ type: 'array', items: { type: 'string' } })
   })
 })

@@ -306,7 +306,7 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
         ),
       ),
     )
-    expect(result.errors).toEqual([])
+    expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
   })
 
   it('rejects the Location reference on a snapshot without the Location bag', () => {
@@ -317,21 +317,17 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
     expect(errors.map(error => error.messageParams?.path)).toEqual(['$.Locations[].properties.reference'])
   })
 
-  it('rejects the whole Location properties beside an attribute of it', () => {
+  it('rejects the whole Location properties: a free object is no target', () => {
     const result = validatePipeline(
       wiredToFrost(
         staMapping(
-          {
-            ...creatableThingFields,
-            ...creatableLocationFields,
-            '$.Locations[].properties': '$.siteProps',
-            '$.Locations[].properties.reference': '$.siteRef',
-          },
+          { ...creatableThingFields, ...creatableLocationFields, '$.Locations[].properties': '$.siteProps' },
           WITH_LOCATION_BAG,
         ),
       ),
     )
-    expect(result.errors.some(e => e.messageKey === 'validation.messages.frostMappingNestedTargets')).toBe(true)
+    const errors = result.errors.filter(e => e.messageKey === UNKNOWN_KEY)
+    expect(errors.map(error => error.messageParams?.path)).toEqual(['$.Locations[].properties'])
   })
 
   it('accepts a full creatable chain including optional observation paths', () => {
@@ -362,40 +358,56 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
     expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
   })
 
-  it('accepts the optional properties bags and extra observation fields', () => {
+  it('accepts the attributes of modelled classes and extra observation fields', () => {
+    const modelled = {
+      ...MATCH_KEYS,
+      modelledPaths: [
+        '$.Datastreams[].Sensor.properties.vendor',
+        '$.Datastreams[].Observations[].resultQuality.accuracy',
+      ],
+    }
     const result = validatePipeline(
       wiredToFrost(
-        staMapping({
-          ...creatableThingFields,
-          '$.Locations[].name': '$.loc',
-          '$.Locations[].description': '$.d',
-          '$.Locations[].encodingType': '$.e',
-          '$.Locations[].location': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
-          '$.Locations[].properties': '$.meta',
-          '$.Datastreams[].properties.reference': '$.ref',
-          '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
-          '$.Datastreams[].Observations[].resultQuality': '$.q',
-          '$.Datastreams[].Observations[].validTime': '$.valid',
-        }),
+        staMapping(
+          {
+            ...creatableThingFields,
+            ...creatableLocationFields,
+            '$.Datastreams[].properties.reference': '$.ref',
+            '$.Datastreams[].Sensor.properties.vendor': '$.vendor',
+            '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
+            '$.Datastreams[].Observations[].resultQuality.accuracy': '$.q',
+            '$.Datastreams[].Observations[].validTime': '$.valid',
+          },
+          modelled,
+        ),
       ),
     )
     expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
   })
 
   const FEATURE_OF_INTEREST_KEY = 'validation.messages.frostMappingFeatureOfInterestNeedsObservation'
+  const FEATURE_KEY = 'validation.messages.frostMappingFeatureOfInterestNeedsFeature'
+  const WITH_FEATURE = { ...MATCH_KEYS, modelledPaths: ['$.Datastreams[].Observations[].FeatureOfInterest.feature'] }
 
   it('rejects a FeatureOfInterest without a mapped Observation', () => {
     expect(
       has(
         wiredToFrost(
-          staMapping({
-            '$.properties.reference': '$.ref',
-            '$.Datastreams[].properties.reference': '$.ref',
-            '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
-            '$.Datastreams[].Observations[].FeatureOfInterest.description': '$.d',
-            '$.Datastreams[].Observations[].FeatureOfInterest.encodingType': '$.e',
-            '$.Datastreams[].Observations[].FeatureOfInterest.feature': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
-          }),
+          staMapping(
+            {
+              '$.properties.reference': '$.ref',
+              '$.Datastreams[].properties.reference': '$.ref',
+              '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
+              '$.Datastreams[].Observations[].FeatureOfInterest.description': '$.d',
+              '$.Datastreams[].Observations[].FeatureOfInterest.encodingType': '$.e',
+              '$.Datastreams[].Observations[].FeatureOfInterest.feature': {
+                op: 'geoPoint',
+                lon: '$.lon',
+                lat: '$.lat',
+              },
+            },
+            WITH_FEATURE,
+          ),
         ),
         FEATURE_OF_INTEREST_KEY,
       ),
@@ -418,21 +430,43 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
     ).toBe(true)
   })
 
-  it('accepts an Observation with a fully mapped FeatureOfInterest', () => {
+  it('accepts an Observation with a fully mapped FeatureOfInterest and its modelled feature', () => {
     const result = validatePipeline(
       wiredToFrost(
-        staMapping({
-          '$.properties.reference': '$.ref',
-          '$.Datastreams[].properties.reference': '$.ref',
-          '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
-          '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
-          '$.Datastreams[].Observations[].FeatureOfInterest.description': '$.d',
-          '$.Datastreams[].Observations[].FeatureOfInterest.encodingType': '$.e',
-          '$.Datastreams[].Observations[].FeatureOfInterest.feature': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
-        }),
+        staMapping(
+          {
+            '$.properties.reference': '$.ref',
+            '$.Datastreams[].properties.reference': '$.ref',
+            '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
+            '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
+            '$.Datastreams[].Observations[].FeatureOfInterest.description': '$.d',
+            '$.Datastreams[].Observations[].FeatureOfInterest.encodingType': '$.e',
+            '$.Datastreams[].Observations[].FeatureOfInterest.feature': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
+          },
+          WITH_FEATURE,
+        ),
       ),
     )
     expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
+  })
+
+  it('rejects a FeatureOfInterest without its feature', () => {
+    // FROST refuses a FeatureOfInterest without one.
+    expect(
+      has(
+        wiredToFrost(
+          staMapping({
+            '$.properties.reference': '$.ref',
+            '$.Datastreams[].properties.reference': '$.ref',
+            '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
+            '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
+            '$.Datastreams[].Observations[].FeatureOfInterest.description': '$.d',
+            '$.Datastreams[].Observations[].FeatureOfInterest.encodingType': '$.e',
+          }),
+        ),
+        FEATURE_KEY,
+      ),
+    ).toBe(true)
   })
 
   it('exempts the FROST-final mapping from the unconditional required-fields rule', () => {

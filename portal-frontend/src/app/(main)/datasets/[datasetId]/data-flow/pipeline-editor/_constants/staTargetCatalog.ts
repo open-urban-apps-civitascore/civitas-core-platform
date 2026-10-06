@@ -41,7 +41,7 @@ export const STA_ENTITIES: readonly StaEntity[] = [
       '$.Locations[].encodingType',
       '$.Locations[].location',
     ],
-    optionalPaths: ['$.Locations[].properties'],
+    optionalPaths: [],
   },
   {
     key: 'datastream',
@@ -61,7 +61,7 @@ export const STA_ENTITIES: readonly StaEntity[] = [
       '$.Datastreams[].ObservedProperty.definition',
       '$.Datastreams[].ObservedProperty.description',
     ],
-    optionalPaths: ['$.Datastreams[].Sensor.properties', '$.Datastreams[].ObservedProperty.properties'],
+    optionalPaths: [],
   },
   {
     key: 'observation',
@@ -70,7 +70,6 @@ export const STA_ENTITIES: readonly StaEntity[] = [
     optionalPaths: [
       '$.Datastreams[].Observations[].phenomenonTime',
       '$.Datastreams[].Observations[].resultTime',
-      '$.Datastreams[].Observations[].resultQuality',
       '$.Datastreams[].Observations[].validTime',
     ],
   },
@@ -81,9 +80,8 @@ export const STA_ENTITIES: readonly StaEntity[] = [
       '$.Datastreams[].Observations[].FeatureOfInterest.name',
       '$.Datastreams[].Observations[].FeatureOfInterest.description',
       '$.Datastreams[].Observations[].FeatureOfInterest.encodingType',
-      '$.Datastreams[].Observations[].FeatureOfInterest.feature',
     ],
-    optionalPaths: ['$.Datastreams[].Observations[].FeatureOfInterest.properties'],
+    optionalPaths: [],
   },
 ]
 
@@ -116,18 +114,13 @@ export const STA_OBSERVATION_PORT_ENTITIES: readonly StaEntity[] = [
     key: 'observation',
     pathPrefix: '$.',
     createPaths: ['$.result'],
-    optionalPaths: ['$.phenomenonTime', '$.resultTime', '$.resultQuality', '$.validTime'],
+    optionalPaths: ['$.phenomenonTime', '$.resultTime', '$.validTime'],
   },
   {
     key: 'featureOfInterest',
     pathPrefix: '$.FeatureOfInterest',
-    createPaths: [
-      '$.FeatureOfInterest.name',
-      '$.FeatureOfInterest.description',
-      '$.FeatureOfInterest.encodingType',
-      '$.FeatureOfInterest.feature',
-    ],
-    optionalPaths: ['$.FeatureOfInterest.properties'],
+    createPaths: ['$.FeatureOfInterest.name', '$.FeatureOfInterest.description', '$.FeatureOfInterest.encodingType'],
+    optionalPaths: [],
   },
 ]
 
@@ -180,7 +173,20 @@ export interface StaTargetVocabulary {
   readonly observation: readonly string[]
   /** All record paths the measurement's `parameters` bag declares. */
   readonly observationBag: readonly string[]
+  /**
+   * The attribute paths of the classes the structure models under the free SensorThings fields —
+   * `properties` of every entity, `feature`, `resultQuality`, a class inside a bag. None of these
+   * fields is a target as a whole object. Absent on a snapshot saved before they were derived;
+   * re-saving the mapping derives them.
+   */
+  readonly modelledPaths?: readonly string[]
 }
+
+/** The free field a FeatureOfInterest needs, wherever the structure roots the measurement. */
+export const FEATURE_PATHS: readonly string[] = [
+  '$.Datastreams[].Observations[].FeatureOfInterest.feature',
+  '$.FeatureOfInterest.feature',
+]
 
 /**
  * Derives the match keys the engine will use: the `{id}`-marked scalar attributes of the entity's
@@ -191,8 +197,8 @@ export interface StaTargetVocabulary {
  */
 export const deriveStaMatchKeys = (targetTree: SchemaTree): StaTargetVocabulary => {
   const record = recordFields(targetTree)
-  const locations = record.find(child => child.name === 'Locations')?.children ?? []
-  const datastreams = record.find(child => child.name === 'Datastreams')?.children ?? []
+  const locations = childrenOf(record, 'Locations')
+  const datastreams = childrenOf(record, 'Datastreams')
 
   const thingProperties = bagFields(record, 'properties')
   const locationProperties = bagFields(locations, 'properties')
@@ -214,12 +220,66 @@ export const deriveStaMatchKeys = (targetTree: SchemaTree): StaTargetVocabulary 
     // an explicit {id} marker, not only the Thing's.
     isFallback:
       (thingMarked.length === 0 && thing.length > 0) || (datastreamMarked.length === 0 && datastream.length > 0),
-    thingBag: thingProperties.map(node => node.path),
-    datastreamBag: datastreamProperties.map(node => node.path),
-    locationBag: locationProperties.map(node => node.path),
+    thingBag: bagPaths(thingProperties),
+    datastreamBag: bagPaths(datastreamProperties),
+    locationBag: bagPaths(locationProperties),
     observation: observationMarked.length > 0 ? observationMarked : fallbackReference(observationParameters),
-    observationBag: observationParameters.map(node => node.path),
+    observationBag: bagPaths(observationParameters),
+    modelledPaths: modelledPathsOf(record),
   }
+}
+
+const childrenOf = (fields: FieldNode[], name: string): FieldNode[] =>
+  fields.find(child => child.name === name)?.children ?? []
+
+/** The bag attributes that are values; a class inside the bag counts among the modelled paths. */
+const bagPaths = (fields: FieldNode[]): string[] => {
+  const values = fields.filter(node => !node.children)
+  return values.map(node => node.path)
+}
+
+/** Every value below a class, through the classes it holds. */
+const leavesOf = (node: FieldNode): string[] => {
+  if (!node.children) return [node.path]
+  return node.children.flatMap(leavesOf)
+}
+
+/**
+ * A free field as the engine reads it: a modelled class gives its values, a geometry is a target of
+ * its own, and anything else — a value, a free object shown as text — gives nothing.
+ */
+const freeFieldPaths = (fields: FieldNode[], name: string): string[] => {
+  const field = fields.find(child => child.name === name)
+  if (!field) return []
+  if (field.children) return leavesOf(field)
+  return field.portType === 'geometry' ? [field.path] : []
+}
+
+/** The classes inside a bag. */
+const bagClassPaths = (fields: FieldNode[]): string[] => {
+  const classes = fields.filter(node => node.children)
+  return classes.flatMap(leavesOf)
+}
+
+/** Mirrors the engine's `FrostSinkStage` walk over the free fields of a Thing or a measurement. */
+const modelledPathsOf = (record: FieldNode[]): string[] => {
+  const locations = childrenOf(record, 'Locations')
+  const datastreams = childrenOf(record, 'Datastreams')
+  const observations = childrenOf(datastreams, 'Observations')
+  // A structure shaped like the Observations port carries the measurement at the record root.
+  const measurement = observations.length > 0 ? observations : record
+  const feature = childrenOf(measurement, 'FeatureOfInterest')
+  return [
+    ...bagClassPaths(childrenOf(record, 'properties')),
+    ...bagClassPaths(childrenOf(record, 'parameters')),
+    ...bagClassPaths(childrenOf(locations, 'properties')),
+    ...bagClassPaths(childrenOf(datastreams, 'properties')),
+    ...freeFieldPaths(childrenOf(datastreams, 'Sensor'), 'properties'),
+    ...freeFieldPaths(childrenOf(datastreams, 'ObservedProperty'), 'properties'),
+    ...freeFieldPaths(measurement, 'resultQuality'),
+    ...freeFieldPaths(feature, 'properties'),
+    ...freeFieldPaths(feature, 'feature'),
+  ]
 }
 
 /** The children of an entity's bag attribute, or empty if it has none. */

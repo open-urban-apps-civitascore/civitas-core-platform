@@ -13,7 +13,6 @@ export const UML_PRIMITIVE_TYPES: readonly UMLPrimitiveType[] = [
   'Date',
   'DateTime',
   'Uuid',
-  'Json',
 ]
 
 export const UML_GEOMETRY_TYPES: readonly UMLGeometryType[] = [
@@ -37,7 +36,7 @@ export const UML_TYPE_GROUPED_OPTIONS: GroupedOption[] = [
 export const PRIMITIVE_TYPE_CATEGORIES = {
   Text: ['String', 'Uuid'] as UMLPrimitiveType[],
   Numbers: ['Integer', 'Number'] as UMLPrimitiveType[],
-  Other: ['Boolean', 'Date', 'DateTime', 'Json'] as UMLPrimitiveType[],
+  Other: ['Boolean', 'Date', 'DateTime'] as UMLPrimitiveType[],
 }
 
 // Common external type references (Java, C#, etc.)

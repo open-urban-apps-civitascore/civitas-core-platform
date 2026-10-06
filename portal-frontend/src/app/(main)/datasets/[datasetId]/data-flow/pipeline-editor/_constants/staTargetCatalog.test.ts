@@ -36,7 +36,7 @@ describe('STA target catalog mirrors the adapter catalog', () => {
           '$.Locations[].encodingType',
           '$.Locations[].location',
         ],
-        optionalPaths: ['$.Locations[].properties'],
+        optionalPaths: [],
       },
       {
         key: 'datastream',
@@ -55,7 +55,7 @@ describe('STA target catalog mirrors the adapter catalog', () => {
           '$.Datastreams[].ObservedProperty.definition',
           '$.Datastreams[].ObservedProperty.description',
         ],
-        optionalPaths: ['$.Datastreams[].Sensor.properties', '$.Datastreams[].ObservedProperty.properties'],
+        optionalPaths: [],
       },
       {
         key: 'observation',
@@ -63,7 +63,6 @@ describe('STA target catalog mirrors the adapter catalog', () => {
         optionalPaths: [
           '$.Datastreams[].Observations[].phenomenonTime',
           '$.Datastreams[].Observations[].resultTime',
-          '$.Datastreams[].Observations[].resultQuality',
           '$.Datastreams[].Observations[].validTime',
         ],
       },
@@ -73,9 +72,8 @@ describe('STA target catalog mirrors the adapter catalog', () => {
           '$.Datastreams[].Observations[].FeatureOfInterest.name',
           '$.Datastreams[].Observations[].FeatureOfInterest.description',
           '$.Datastreams[].Observations[].FeatureOfInterest.encodingType',
-          '$.Datastreams[].Observations[].FeatureOfInterest.feature',
         ],
-        optionalPaths: ['$.Datastreams[].Observations[].FeatureOfInterest.properties'],
+        optionalPaths: [],
       },
     ])
   })
@@ -112,7 +110,7 @@ describe('deriveStaMatchKeys', () => {
       {
         key: 'observation',
         createPaths: ['$.result'],
-        optionalPaths: ['$.phenomenonTime', '$.resultTime', '$.resultQuality', '$.validTime'],
+        optionalPaths: ['$.phenomenonTime', '$.resultTime', '$.validTime'],
       },
       {
         key: 'featureOfInterest',
@@ -120,9 +118,8 @@ describe('deriveStaMatchKeys', () => {
           '$.FeatureOfInterest.name',
           '$.FeatureOfInterest.description',
           '$.FeatureOfInterest.encodingType',
-          '$.FeatureOfInterest.feature',
         ],
-        optionalPaths: ['$.FeatureOfInterest.properties'],
+        optionalPaths: [],
       },
     ])
     expect([...STA_OBSERVATION_REQUIRED_PATHS]).toEqual([
@@ -181,6 +178,7 @@ describe('deriveStaMatchKeys', () => {
       locationBag: [],
       observation: [],
       observationBag: [],
+      modelledPaths: [],
     })
   })
 
@@ -201,6 +199,7 @@ describe('deriveStaMatchKeys', () => {
       locationBag: [],
       observation: [],
       observationBag: [],
+      modelledPaths: [],
     })
   })
 
@@ -223,6 +222,62 @@ describe('deriveStaMatchKeys', () => {
     expect(keys.locationBag).toEqual(['$.Locations[].properties.reference', '$.Locations[].properties.floor'])
     expect(keys.thing).toEqual(['$.properties.reference'])
     expect(keys.thingBag).toEqual(['$.properties.reference'])
+  })
+
+  it('collects the values of the classes modelled under the free fields', () => {
+    const tree = thingTree([
+      thingProperties([
+        field('$.properties.reference', 'reference', 'str', true),
+        field('$.properties.site', 'site', 'object', false, [field('$.properties.site.floor', 'floor', 'int', false)]),
+      ]),
+      field('$.Datastreams', 'Datastreams', 'array', false, [
+        field('$.Datastreams[].Sensor', 'Sensor', 'object', false, [
+          field('$.Datastreams[].Sensor.properties', 'properties', 'object', false, [
+            field('$.Datastreams[].Sensor.properties.vendor', 'vendor', 'str', false),
+          ]),
+        ]),
+        // A free object shown as text is no target: it has no attribute to write.
+        field('$.Datastreams[].ObservedProperty', 'ObservedProperty', 'object', false, [
+          field('$.Datastreams[].ObservedProperty.properties', 'properties', 'str', false),
+        ]),
+        field('$.Datastreams[].Observations', 'Observations', 'array', false, [
+          field('$.Datastreams[].Observations[].resultQuality', 'resultQuality', 'object', false, [
+            field('$.Datastreams[].Observations[].resultQuality.accuracy', 'accuracy', 'number', false),
+          ]),
+          field('$.Datastreams[].Observations[].FeatureOfInterest', 'FeatureOfInterest', 'object', false, [
+            field('$.Datastreams[].Observations[].FeatureOfInterest.feature', 'feature', 'Point', true),
+          ]),
+        ]),
+      ]),
+    ])
+
+    const keys = deriveStaMatchKeys(tree)
+
+    expect(keys.thingBag).toEqual(['$.properties.reference'])
+    expect(keys.modelledPaths).toEqual([
+      '$.properties.site.floor',
+      '$.Datastreams[].Sensor.properties.vendor',
+      '$.Datastreams[].Observations[].resultQuality.accuracy',
+      '$.Datastreams[].Observations[].FeatureOfInterest.feature',
+    ])
+  })
+
+  it('reads the free fields of a measurement at the record root', () => {
+    const tree: SchemaTree = {
+      name: 'Observations',
+      fields: [
+        field('$', 'Observation', 'object', false, [
+          field('$.result', 'result', 'str', true),
+          field('$.FeatureOfInterest', 'FeatureOfInterest', 'object', false, [
+            field('$.FeatureOfInterest.feature', 'feature', 'object', false, [
+              field('$.FeatureOfInterest.feature.station', 'station', 'str', false),
+            ]),
+          ]),
+        ]),
+      ],
+    }
+
+    expect(deriveStaMatchKeys(tree).modelledPaths).toEqual(['$.FeatureOfInterest.feature.station'])
   })
 
   it('yields an empty Location bag when the Location has no properties class', () => {

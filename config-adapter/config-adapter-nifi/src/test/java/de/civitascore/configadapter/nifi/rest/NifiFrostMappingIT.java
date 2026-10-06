@@ -28,8 +28,13 @@ import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.KeyAttribute;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
 import de.civitascore.configadapter.nifi.mapping.SinkPort;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaEntity;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaJsonType;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaTarget;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.TargetKind;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
 import java.io.File;
 import java.net.URI;
@@ -320,7 +325,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     // toString needs NiFi's two-arg form; a single-arg call fails RecordPath compile at deploy and
     // the flow never produces this observation. resultQuality arriving as the quoted temp proves
     // the emitted toString(subject, charset) parses and runs against a real NiFi.
-    JsonNode resultQuality = observation.path("resultQuality");
+    JsonNode resultQuality = observation.path("resultQuality").path("reading");
     assertTrue(resultQuality.isTextual(), "toString must serialize the numeric temp as a string");
     assertEquals("21.5", resultQuality.asText());
     assertTrue(
@@ -450,7 +455,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         "Point",
         observation.path("FeatureOfInterest").path("feature").path("type").asText(),
         "the FeatureOfInterest feature must be the geoPoint-rendered GeoJSON object");
-    JsonNode foiResultQuality = observation.path("resultQuality");
+    JsonNode foiResultQuality = observation.path("resultQuality").path("reading");
     assertTrue(
         foiResultQuality.isTextual(), "toString must serialize the numeric temp as a string");
     assertEquals(
@@ -715,7 +720,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
           "$.Datastreams[].Observations[].result": { "op": "toFloat", "input": "$.temp" },
           "$.Datastreams[].Observations[].phenomenonTime": "$.ts",
           "$.Datastreams[].Observations[].validTime": { "op": "concat", "separator": "/", "inputs": ["$.ts", "$.ts"] },
-          "$.Datastreams[].Observations[].resultQuality": { "op": "toString", "input": "$.temp" },
+          "$.Datastreams[].Observations[].resultQuality.reading": { "op": "toString", "input": "$.temp" },
           "$.Datastreams[].Observations[].FeatureOfInterest.name": { "op": "const", "value": "Sampling point" },
           "$.Datastreams[].Observations[].FeatureOfInterest.description": { "op": "const", "value": "Where the reading was taken" },
           "$.Datastreams[].Observations[].FeatureOfInterest.encodingType": { "op": "const", "value": "application/geo+json" },
@@ -957,13 +962,33 @@ class NifiFrostMappingIT extends AbstractNifiIT {
                   graph,
                   source,
                   new FrostSinkSpec(
-                      String.valueOf(projectId),
-                      SinkPort.THING_TREE,
-                      StaProperties.ofKeys(List.of("reference"), List.of("reference"))),
+                      String.valueOf(projectId), SinkPort.THING_TREE, TARGET_STRUCTURE),
                   mappings));
       client.deployFlow(plan);
     }
   }
+
+  /**
+   * The target structure of every pipeline here: the references of Thing and Datastream, and the
+   * two free fields the mappings write, modelled as a class and as a geometry.
+   */
+  private static final StaProperties TARGET_STRUCTURE =
+      new StaProperties(
+          List.of(new KeyAttribute("reference")),
+          List.of(),
+          List.of(new KeyAttribute("reference")),
+          List.of(),
+          List.of(
+              new StaTarget(
+                  "$.Datastreams[].Observations[].resultQuality.reading",
+                  StaEntity.OBSERVATION,
+                  StaJsonType.ANY,
+                  TargetKind.OPTIONAL),
+              new StaTarget(
+                  "$.Datastreams[].Observations[].FeatureOfInterest.feature",
+                  StaEntity.FEATURE_OF_INTEREST,
+                  StaJsonType.RAW_JSON,
+                  TargetKind.OPTIONAL)));
 
   /** A single-entry mappings catalog keyed by {@code map-1} (the graphs' mappingRef). */
   private static Map<String, Object> frostMapping(String fieldsJson) throws Exception {

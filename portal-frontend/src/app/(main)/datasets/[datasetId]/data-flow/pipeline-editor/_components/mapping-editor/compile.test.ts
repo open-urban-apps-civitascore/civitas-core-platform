@@ -262,6 +262,25 @@ describe('mapping editor compile', () => {
     expect(targetEdges.map(e => e.targetHandle).sort()).toEqual(['$.fullCode', '$.title'])
   })
 
+  it('reads a Literal saved with the retired Json type as String, and saves it as String', () => {
+    const config: MappingConfig = {
+      $schema: 'https://civitasconnect.digital/core/mapping/v1',
+      source: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000041:1.0.0',
+      target: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000042:1.0.0',
+      fields: { '$.title': { op: 'const', value: '{"key": "value"}', valueType: 'Json' } },
+      positions: {},
+    }
+    const built = decompileConfig(config, sourceTree, targetTree)
+    const literal = built.nodes.find(n => n.type === 'transform')
+    expect(literal?.data).toMatchObject({
+      config: { type: 'String', value: '{"key": "value"}' },
+      outputs: [{ type: 'scalar', dataType: 'str' }],
+    })
+
+    const recompiled = compileCanvas(built.nodes, built.edges)
+    expect(recompiled.fields['$.title']).toEqual({ op: 'const', value: '{"key": "value"}', valueType: 'String' })
+  })
+
   it('flags a transform whose output is not wired to the target', () => {
     // 'i' (toString) only has its input connected; 'c' (concat) reaches the target.
     const partialEdges: Edge[] = [

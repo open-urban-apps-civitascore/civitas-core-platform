@@ -104,7 +104,7 @@ describe('the ThingTree structure', () => {
     expect(exportToJsonSchema(merged).$ref).toBe('#/$defs/Reading')
   })
 
-  it('reads a free JSON value as an opaque type, not as text', () => {
+  it('reads the location as a point geometry, not as text', () => {
     const imported = importFromJsonSchema(publishedStructure('thing-tree'))
     const location = imported.nodes
       .map(node => node.data.element)
@@ -112,6 +112,6 @@ describe('the ThingTree structure', () => {
       .find(attribute => attribute.name === 'location')
 
     // A geometry is not a string: reading it as one would change the document on the next save.
-    expect(location?.type).toBe('Json')
+    expect(location?.type).toBe('Point')
   })
 })

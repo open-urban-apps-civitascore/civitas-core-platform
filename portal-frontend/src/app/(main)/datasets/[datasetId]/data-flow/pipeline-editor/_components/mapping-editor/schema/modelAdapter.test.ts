@@ -66,7 +66,7 @@ describe('modelToSchemaTree', () => {
     expect(tree.fields[0].children?.map(f => f.type)).toEqual(['date', 'datetime', 'uuid', 'number', 'bool'])
   })
 
-  it('reads an inline object with no properties and no $ref as json, not an opaque object leaf', () => {
+  it('reads an inline object with no properties and no $ref as str, not an opaque object leaf', () => {
     const tree = modelToSchemaTree(
       wrapperModel({
         Thing: {
@@ -81,8 +81,8 @@ describe('modelToSchemaTree', () => {
     )
 
     expect(tree.fields[0].children).toEqual([
-      { path: '$.payload', name: 'payload', type: 'json', portType: 'scalar' },
-      { path: '$.empty', name: 'empty', type: 'json', portType: 'scalar' },
+      { path: '$.payload', name: 'payload', type: 'str', portType: 'scalar' },
+      { path: '$.empty', name: 'empty', type: 'str', portType: 'scalar' },
     ])
   })
 
@@ -537,6 +537,7 @@ describe('x-core-primaryKey marker', () => {
       // the model carries no Observation parameters
       observation: [],
       observationBag: [],
+      modelledPaths: [],
     })
   })
 })

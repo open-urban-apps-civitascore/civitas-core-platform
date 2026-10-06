@@ -14,7 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 
 import type { MappingTransformDef } from '../transforms'
 
@@ -53,17 +52,6 @@ const FieldControl = ({ field, value, onChange }: FieldControlProps) => {
     )
   }
 
-  if (field.control === 'textarea') {
-    return (
-      <Textarea
-        value={value}
-        placeholder={field.placeholder}
-        className="w-full font-mono text-xs"
-        onChange={e => onChange(e.target.value)}
-      />
-    )
-  }
-
   return (
     <Input
       type={field.control === 'number' ? 'number' : 'text'}
@@ -90,7 +78,6 @@ export const TransformInspector = ({ def, config, onChange, errors }: TransformI
   if (!def) return null
 
   const placeholders = def.placeholders?.(config)
-  const controls = def.controls?.(config)
 
   return (
     <div className="space-y-4 p-4">
@@ -103,11 +90,7 @@ export const TransformInspector = ({ def, config, onChange, errors }: TransformI
         <div key={field.key} className="space-y-1.5">
           <Label>{field.label}</Label>
           <FieldControl
-            field={{
-              ...field,
-              control: controls?.[field.key] ?? field.control,
-              placeholder: placeholders?.[field.key] ?? field.placeholder,
-            }}
+            field={{ ...field, placeholder: placeholders?.[field.key] ?? field.placeholder }}
             value={String(config[field.key] ?? field.default ?? '')}
             onChange={value => onChange(field.key, value)}
           />

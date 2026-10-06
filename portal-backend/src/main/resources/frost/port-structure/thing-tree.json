@@ -68,7 +68,7 @@
           "type": "string"
         },
         "location": {
-          "type": "object"
+          "$ref": "https://geojson.org/schema/Point.json"
         },
         "properties": {
           "$ref": "#/$defs/LocationProperties"
@@ -179,9 +179,6 @@
         },
         "metadata": {
           "type": "string"
-        },
-        "properties": {
-          "type": "object"
         }
       },
       "required": [
@@ -203,9 +200,6 @@
         },
         "description": {
           "type": "string"
-        },
-        "properties": {
-          "type": "object"
         }
       },
       "required": [
@@ -225,9 +219,6 @@
         "resultTime": {
           "type": "string",
           "format": "date-time"
-        },
-        "resultQuality": {
-          "type": "object"
         },
         "validTime": {
           "type": "string"
@@ -252,19 +243,12 @@
         },
         "encodingType": {
           "type": "string"
-        },
-        "feature": {
-          "type": "object"
-        },
-        "properties": {
-          "type": "object"
         }
       },
       "required": [
         "name",
         "description",
-        "encodingType",
-        "feature"
+        "encodingType"
       ]
     }
   }

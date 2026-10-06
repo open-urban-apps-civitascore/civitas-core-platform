@@ -15,8 +15,8 @@ import tools.jackson.databind.JsonNode;
  * offers, and a path it does not answer cannot be mapped. That is what lets a test compare the
  * published structures against the paths a Pipeline maps today.
  *
- * <p>Both the container and its fields are answered. A Mapping may assign a whole object, which is
- * how the free bag of a Sensor is written.
+ * <p>Both the container and its fields are answered, so a path that names a class is in the set
+ * beside the paths of its fields.
  */
 public final class PortStructurePaths {
 

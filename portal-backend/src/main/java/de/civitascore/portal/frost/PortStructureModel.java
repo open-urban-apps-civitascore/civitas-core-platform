@@ -44,9 +44,9 @@ public final class PortStructureModel {
       return new Field(name, Type.TIMESTAMP, false, false);
     }
 
-    /** A free JSON value the platform passes through, for example a GeoJSON geometry. */
-    public static Field json(String name, boolean required) {
-      return new Field(name, Type.JSON, required, false);
+    /** A GeoJSON point, which the editor offers as a geometry port that {@code geoPoint} fills. */
+    public static Field point(String name, boolean required) {
+      return new Field(name, Type.POINT, required, false);
     }
 
     /** A value of no fixed type, for example a measurement that is a number or a text. */
@@ -95,8 +95,11 @@ public final class PortStructureModel {
     TEXT,
     /** A text holding a point in time, which the editor offers as a date-time port. */
     TIMESTAMP,
-    /** A JSON object the platform passes through without reading it. */
-    JSON,
+    /**
+     * A GeoJSON point. A free JSON object has no type here: the editor offers no way to fill one,
+     * and an object a user needs is modelled as a class of its own.
+     */
+    POINT,
     /**
      * No fixed type. SensorThings lets a measurement result be a number, a text, a boolean or an
      * object, and a declared type here would refuse valid data at edit time.
