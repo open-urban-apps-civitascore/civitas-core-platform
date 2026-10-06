@@ -916,28 +916,12 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
         Map<String, Object> properties = new HashMap<>();
         properties.put("name", Map.of("type", "string"));
         if (embeds.containsKey(member)) {
-          properties.put(
-              "part",
-              Map.of(
-                  "$ref",
-                  "urn:core:platform:civitas:element:common:"
-                      + embeds.get(member)
-                      + ":"
-                      + disambiguator));
+          properties.put("part", Map.of("$ref", "#/$defs/" + embeds.get(member)));
         }
-        defs.put(
-            member,
-            Map.of(
-                "$id",
-                "urn:core:platform:civitas:element:common:" + member + ":" + disambiguator,
-                "type",
-                "object",
-                "properties",
-                properties));
+        defs.put(member, Map.of("type", "object", "properties", properties));
       }
       Map<String, Object> model = new HashMap<>();
       model.put("$schema", "https://json-schema.org/draft/2020-12/schema");
-      model.put("$id", "urn:core:platform:civitas:datastructure:common:People:" + disambiguator);
       model.put("title", "People");
       model.put("$defs", defs);
       if (designateRoot) {

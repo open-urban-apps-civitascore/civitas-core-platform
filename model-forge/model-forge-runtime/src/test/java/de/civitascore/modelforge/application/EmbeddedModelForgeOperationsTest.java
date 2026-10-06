@@ -490,13 +490,13 @@ class EmbeddedModelForgeOperationsTest {
     // ── checkRoot ────────────────────────────────────────────────────────────────
 
     private static final String STRUCTURE =
-        "urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b:1.0.0";
+        "urn:core:platform:civitas:datastructure:common:6f1c2a3e-8d4b-4c5a-9e7f-1a2b3c4d5e6f:1.0.0";
     private static final String PERSON =
-        "urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.0";
+        "urn:core:platform:civitas:element:common:0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d:1.0.0";
     private static final String ADDRESS =
-        "urn:core:platform:civitas:element:common:Address:aa22abcd34:1.0.0";
+        "urn:core:platform:civitas:element:common:1b2c3d4e-5f6a-4b7c-9d8e-0f1a2b3c4d5e:1.0.0";
     private static final String COUNTRY =
-        "urn:core:platform:civitas:element:common:Country:cc55abcd90:1.0.0";
+        "urn:core:platform:civitas:element:common:2c3d4e5f-6a7b-4c8d-ae9f-1a2b3c4d5e6f:1.0.0";
 
     private void storedStructure(String rootRef, Map<String, String> membersByName) {
         ObjectNode content = mapper.createObjectNode().put("$id", STRUCTURE);
@@ -543,7 +543,7 @@ class EmbeddedModelForgeOperationsTest {
     void checkRoot_memberReachedThroughAnotherMember_isRooted() {
         storedStructure(PERSON, orderedMembers("Person", PERSON, "Address", ADDRESS, "Country", COUNTRY));
         storedElement(PERSON, ADDRESS);
-        storedElement(ADDRESS, "urn:core:platform:civitas:element:common:Country:cc55abcd90:latest");
+        storedElement(ADDRESS, "urn:core:platform:civitas:element:common:2c3d4e5f-6a7b-4c8d-ae9f-1a2b3c4d5e6f:latest");
         storedElement(COUNTRY);
 
         assertThat(operations.checkRoot(new ArtifactId(STRUCTURE))).isEqualTo(new RootCheck.Rooted());
@@ -571,7 +571,7 @@ class EmbeddedModelForgeOperationsTest {
 
     @Test
     void checkRoot_rootRefPinsAnotherVersionOfAMember_isRooted() {
-        storedStructure("urn:core:platform:civitas:element:common:Person:pp11abcd12:2.0.0");
+        storedStructure("urn:core:platform:civitas:element:common:0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d:2.0.0");
         storedElement(PERSON, ADDRESS);
         storedElement(ADDRESS);
 
@@ -587,7 +587,7 @@ class EmbeddedModelForgeOperationsTest {
 
     @Test
     void checkRoot_rootRefNamesAnElementOutsideTheMembers_isNoRoot() {
-        storedStructure("urn:core:platform:civitas:element:common:Stranger:ss33abcd56:1.0.0");
+        storedStructure("urn:core:platform:civitas:element:common:3d4e5f6a-7b8c-4d9e-bf0a-2b3c4d5e6f7a:1.0.0");
 
         assertThat(operations.checkRoot(new ArtifactId(STRUCTURE))).isEqualTo(new RootCheck.NoRoot());
     }
@@ -612,7 +612,7 @@ class EmbeddedModelForgeOperationsTest {
 
     @Test
     void checkRoot_artifactOfAnotherKind_isRefused() {
-        String mapping = "urn:core:platform:civitas:mapping:common:M:mm44abcd78:1.0.0";
+        String mapping = "urn:core:platform:civitas:mapping:common:4e5f6a7b-8c9d-4eaf-8a1b-3c4d5e6f7a8b:1.0.0";
         when(registry.fetch(mapping)).thenReturn(Optional.of(mapper.createObjectNode().put("$id", mapping)));
         when(registry.heldUrns(List.of(mapping))).thenReturn(Set.of(mapping));
 

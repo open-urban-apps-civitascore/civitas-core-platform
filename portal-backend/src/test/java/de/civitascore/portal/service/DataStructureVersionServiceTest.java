@@ -341,7 +341,8 @@ class DataStructureVersionServiceTest {
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setModelUrn("urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b:1.0.0");
+      version.setModelUrn(
+          "urn:core:platform:civitas:datastructure:common:6f1c2a3e-8d4b-4c5a-9e7f-1a2b3c4d5e6f:1.0.0");
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       doThrow(new ModelRootMissingException())
