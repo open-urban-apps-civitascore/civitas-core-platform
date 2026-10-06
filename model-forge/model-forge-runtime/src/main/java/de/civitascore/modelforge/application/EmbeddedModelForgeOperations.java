@@ -21,6 +21,7 @@ import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.ImportSmartDataModelCommand;
 import de.civitascore.modelforge.contract.ImportXRepositoryCommand;
 import de.civitascore.modelforge.contract.NonConformingArtifact;
+import de.civitascore.modelforge.contract.RootCheck;
 import de.civitascore.modelforge.contract.SaveArtifactCommand;
 import de.civitascore.modelforge.contract.SchemaViewQuery;
 import de.civitascore.modelforge.contract.ValidateInstanceCommand;
@@ -31,6 +32,7 @@ import de.civitascore.modelforge.contract.VersionBump;
 import de.civitascore.modelforge.contract.XRepositoryHit;
 import de.civitascore.modelforge.contract.XRepositorySearchQuery;
 import de.civitascore.modelforge.graph.DependencyGraphService;
+import de.civitascore.modelforge.graph.SchemaRefExtractor;
 import de.civitascore.modelforge.core.port.ArtifactRegistry;
 import de.civitascore.modelforge.util.JsonSchema;
 import de.civitascore.modelforge.core.port.ArtifactSearchCriteria;
@@ -42,6 +44,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +58,8 @@ public class EmbeddedModelForgeOperations implements ModelForge {
 
     private static final org.slf4j.Logger LOG =
         org.slf4j.LoggerFactory.getLogger(EmbeddedModelForgeOperations.class);
+
+    private static final SchemaRefExtractor REF_EXTRACTOR = new SchemaRefExtractor();
 
     private final SchemaImportService schemaImportService;
     private final ElementQueryService elementQueryService;
@@ -239,14 +244,14 @@ public class EmbeddedModelForgeOperations implements ModelForge {
     }
 
     @Override
-    public boolean hasSingleRoot(ArtifactId artifactId) {
+    public RootCheck checkRoot(ArtifactId artifactId) {
         String urn = artifactId.value();
         String type = UrnParser.artifactTypeFromUrn(urn);
         if ("element".equals(type)) {
             if (!registry.heldUrns(List.of(urn)).contains(urn)) {
                 throw new IllegalArgumentException("No Element " + urn + " in the registry");
             }
-            return true;
+            return new RootCheck.Rooted();
         }
         if (!"datastructure".equals(type)) {
             throw new IllegalArgumentException(
@@ -254,19 +259,47 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         }
         JsonNode dataStructure = elementQueryService.rawJsonSchema(urn)
             .orElseThrow(() -> new IllegalArgumentException("No DataStructure " + urn + " in the registry"));
-        return designatesMemberAsRoot(dataStructure);
+        return rootCheckOf(dataStructure);
     }
 
-    private static boolean designatesMemberAsRoot(JsonNode dataStructure) {
+    private RootCheck rootCheckOf(JsonNode dataStructure) {
+        Map<String, Member> membersByLogicalUrn = new LinkedHashMap<>();
+        dataStructure.path("$defs").properties().forEach(def -> {
+            String member = def.getValue().path("$ref").asText(null);
+            if (UrnParser.isUrn(member)) {
+                membersByLogicalUrn.put(UrnParser.logicalUrn(member), new Member(def.getKey(), member));
+            }
+        });
         String root = dataStructure.path("$ref").asText(null);
-        if (!UrnParser.isUrn(root)) {
-            return false;
+        if (!UrnParser.isUrn(root) || !membersByLogicalUrn.containsKey(UrnParser.logicalUrn(root))) {
+            return new RootCheck.NoRoot();
         }
-        String rootLogical = UrnParser.logicalUrn(root);
-        return dataStructure.path("$defs").properties().stream()
-            .map(member -> member.getValue().path("$ref").asText(null))
-            .anyMatch(member -> UrnParser.isUrn(member) && rootLogical.equals(UrnParser.logicalUrn(member)));
+        Set<String> reached = membersReachedFrom(UrnParser.logicalUrn(root), membersByLogicalUrn);
+        List<String> unreachable = membersByLogicalUrn.entrySet().stream()
+            .filter(member -> !reached.contains(member.getKey()))
+            .map(member -> member.getValue().name())
+            .toList();
+        return unreachable.isEmpty() ? new RootCheck.Rooted() : new RootCheck.UnreachableMembers(unreachable);
     }
+
+    private Set<String> membersReachedFrom(String rootLogicalUrn, Map<String, Member> membersByLogicalUrn) {
+        Set<String> reached = new LinkedHashSet<>(List.of(rootLogicalUrn));
+        Deque<String> pending = new ArrayDeque<>(reached);
+        while (!pending.isEmpty()) {
+            Member member = membersByLogicalUrn.get(pending.pop());
+            elementQueryService.rawJsonSchema(member.urn()).ifPresent(content -> {
+                for (String ref : REF_EXTRACTOR.extractRefs(content)) {
+                    String target = UrnParser.logicalUrn(ref);
+                    if (membersByLogicalUrn.containsKey(target) && reached.add(target)) {
+                        pending.push(target);
+                    }
+                }
+            });
+        }
+        return reached;
+    }
+
+    private record Member(String name, String urn) {}
 
     @Override
     public DependencyGraphView dependencies(DependencyQuery query) {

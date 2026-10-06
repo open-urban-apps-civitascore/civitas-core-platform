@@ -5,6 +5,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 import tools.jackson.databind.node.StringNode;
 import de.civitascore.modelforge.contract.ArtifactId;
+import de.civitascore.modelforge.contract.RootCheck;
 import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.contract.ArtifactKind;
@@ -486,7 +487,7 @@ class EmbeddedModelForgeOperationsTest {
         verify(registry).fetch(versioned);
     }
 
-    // ── hasSingleRoot ────────────────────────────────────────────────────────────
+    // ── checkRoot ────────────────────────────────────────────────────────────────
 
     private static final String STRUCTURE =
         "urn:core:platform:civitas:datastructure:common:People:k4k6zhkb5b:1.0.0";
@@ -494,71 +495,128 @@ class EmbeddedModelForgeOperationsTest {
         "urn:core:platform:civitas:element:common:Person:pp11abcd12:1.0.0";
     private static final String ADDRESS =
         "urn:core:platform:civitas:element:common:Address:aa22abcd34:1.0.0";
+    private static final String COUNTRY =
+        "urn:core:platform:civitas:element:common:Country:cc55abcd90:1.0.0";
 
-    private void storedStructure(String rootRef) {
+    private void storedStructure(String rootRef, Map<String, String> membersByName) {
         ObjectNode content = mapper.createObjectNode().put("$id", STRUCTURE);
         ObjectNode defs = content.putObject("$defs");
-        defs.putObject("Person").put("$ref", PERSON);
-        defs.putObject("Address").put("$ref", ADDRESS);
+        membersByName.forEach((name, urn) -> defs.putObject(name).put("$ref", urn));
         if (rootRef != null) {
             content.put("$ref", rootRef);
         }
         when(registry.fetch(STRUCTURE)).thenReturn(Optional.of(content));
     }
 
+    private void storedStructure(String rootRef) {
+        storedStructure(rootRef, orderedMembers("Person", PERSON, "Address", ADDRESS));
+    }
+
+    private static Map<String, String> orderedMembers(String... nameUrnPairs) {
+        Map<String, String> members = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < nameUrnPairs.length; i += 2) {
+            members.put(nameUrnPairs[i], nameUrnPairs[i + 1]);
+        }
+        return members;
+    }
+
+    /** Stores an Element whose properties embed each of {@code embedded} by {@code $ref}. */
+    private void storedElement(String urn, String... embedded) {
+        ObjectNode content = mapper.createObjectNode().put("$id", urn).put("type", "object");
+        ObjectNode properties = content.putObject("properties");
+        for (int i = 0; i < embedded.length; i++) {
+            properties.putObject("part" + i).put("$ref", embedded[i]);
+        }
+        when(registry.fetch(urn)).thenReturn(Optional.of(content));
+    }
+
     @Test
-    void hasSingleRoot_rootRefNamesAMember_isTrue() {
+    void checkRoot_rootEmbedsEveryMember_isRooted() {
         storedStructure(PERSON);
+        storedElement(PERSON, ADDRESS);
+        storedElement(ADDRESS);
 
-        assertThat(operations.hasSingleRoot(new ArtifactId(STRUCTURE))).isTrue();
+        assertThat(operations.checkRoot(new ArtifactId(STRUCTURE))).isEqualTo(new RootCheck.Rooted());
     }
 
     @Test
-    void hasSingleRoot_rootRefPinsAnotherVersionOfAMember_isTrue() {
+    void checkRoot_memberReachedThroughAnotherMember_isRooted() {
+        storedStructure(PERSON, orderedMembers("Person", PERSON, "Address", ADDRESS, "Country", COUNTRY));
+        storedElement(PERSON, ADDRESS);
+        storedElement(ADDRESS, "urn:core:platform:civitas:element:common:Country:cc55abcd90:latest");
+        storedElement(COUNTRY);
+
+        assertThat(operations.checkRoot(new ArtifactId(STRUCTURE))).isEqualTo(new RootCheck.Rooted());
+    }
+
+    @Test
+    void checkRoot_memberReferencingTheRootBack_isRooted() {
+        storedStructure(PERSON);
+        storedElement(PERSON, ADDRESS);
+        storedElement(ADDRESS, PERSON);
+
+        assertThat(operations.checkRoot(new ArtifactId(STRUCTURE))).isEqualTo(new RootCheck.Rooted());
+    }
+
+    @Test
+    void checkRoot_memberTheRootDoesNotReach_namesIt() {
+        storedStructure(PERSON, orderedMembers("Person", PERSON, "Address", ADDRESS, "Country", COUNTRY));
+        storedElement(PERSON, ADDRESS);
+        storedElement(ADDRESS);
+        storedElement(COUNTRY, PERSON);
+
+        assertThat(operations.checkRoot(new ArtifactId(STRUCTURE)))
+            .isEqualTo(new RootCheck.UnreachableMembers(List.of("Country")));
+    }
+
+    @Test
+    void checkRoot_rootRefPinsAnotherVersionOfAMember_isRooted() {
         storedStructure("urn:core:platform:civitas:element:common:Person:pp11abcd12:2.0.0");
+        storedElement(PERSON, ADDRESS);
+        storedElement(ADDRESS);
 
-        assertThat(operations.hasSingleRoot(new ArtifactId(STRUCTURE))).isTrue();
+        assertThat(operations.checkRoot(new ArtifactId(STRUCTURE))).isEqualTo(new RootCheck.Rooted());
     }
 
     @Test
-    void hasSingleRoot_noRootRef_isFalse() {
+    void checkRoot_noRootRef_isNoRoot() {
         storedStructure(null);
 
-        assertThat(operations.hasSingleRoot(new ArtifactId(STRUCTURE))).isFalse();
+        assertThat(operations.checkRoot(new ArtifactId(STRUCTURE))).isEqualTo(new RootCheck.NoRoot());
     }
 
     @Test
-    void hasSingleRoot_rootRefNamesAnElementOutsideTheMembers_isFalse() {
+    void checkRoot_rootRefNamesAnElementOutsideTheMembers_isNoRoot() {
         storedStructure("urn:core:platform:civitas:element:common:Stranger:ss33abcd56:1.0.0");
 
-        assertThat(operations.hasSingleRoot(new ArtifactId(STRUCTURE))).isFalse();
+        assertThat(operations.checkRoot(new ArtifactId(STRUCTURE))).isEqualTo(new RootCheck.NoRoot());
     }
 
     @Test
-    void hasSingleRoot_storedElement_isTrue() {
+    void checkRoot_storedElement_isRooted() {
         when(registry.heldUrns(List.of(PERSON))).thenReturn(Set.of(PERSON));
 
-        assertThat(operations.hasSingleRoot(new ArtifactId(PERSON))).isTrue();
+        assertThat(operations.checkRoot(new ArtifactId(PERSON))).isEqualTo(new RootCheck.Rooted());
     }
 
     @Test
-    void hasSingleRoot_unknownArtifact_isRefused() {
+    void checkRoot_unknownArtifact_isRefused() {
         when(registry.fetch(STRUCTURE)).thenReturn(Optional.empty());
         when(registry.heldUrns(List.of(PERSON))).thenReturn(Set.of());
 
-        assertThatThrownBy(() -> operations.hasSingleRoot(new ArtifactId(STRUCTURE)))
+        assertThatThrownBy(() -> operations.checkRoot(new ArtifactId(STRUCTURE)))
             .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> operations.hasSingleRoot(new ArtifactId(PERSON)))
+        assertThatThrownBy(() -> operations.checkRoot(new ArtifactId(PERSON)))
             .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    void hasSingleRoot_artifactOfAnotherKind_isRefused() {
+    void checkRoot_artifactOfAnotherKind_isRefused() {
         String mapping = "urn:core:platform:civitas:mapping:common:M:mm44abcd78:1.0.0";
         when(registry.fetch(mapping)).thenReturn(Optional.of(mapper.createObjectNode().put("$id", mapping)));
         when(registry.heldUrns(List.of(mapping))).thenReturn(Set.of(mapping));
 
-        assertThatThrownBy(() -> operations.hasSingleRoot(new ArtifactId(mapping)))
+        assertThatThrownBy(() -> operations.checkRoot(new ArtifactId(mapping)))
             .isInstanceOf(IllegalArgumentException.class);
     }
 
