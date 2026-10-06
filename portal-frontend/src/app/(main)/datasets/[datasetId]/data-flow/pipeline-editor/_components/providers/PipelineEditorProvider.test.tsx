@@ -423,6 +423,92 @@ describe('PipelineEditorProviderComponent', () => {
 
       expect(contextRef.current?.isDirty).toBe(false)
     })
+
+    it('keeps session clean for node select and dimensions changes', () => {
+      const pipeline = { ...createEmptyPipeline('Test'), nodes: [makeNode('node-a')] }
+      renderProvider(makeSession({ pipeline }))
+
+      act(() => {
+        contextRef.current?.dispatch({
+          type: 'NODE_CHANGES',
+          payload: [
+            { type: 'dimensions', id: 'node-a', dimensions: { width: 100, height: 50 } },
+            { type: 'select', id: 'node-a', selected: true },
+          ],
+        })
+      })
+
+      expect(contextRef.current?.pipeline?.nodes[0].selected).toBe(true)
+      expect(contextRef.current?.isDirty).toBe(false)
+    })
+
+    it('keeps session clean for edge select changes', () => {
+      const pipeline = {
+        ...createEmptyPipeline('Test'),
+        nodes: [makeNode('node-a'), makeNode('node-b', PIPELINE_NODE_TYPES.End)],
+        edges: [{ id: 'edge-1', source: 'node-a', target: 'node-b', type: 'smoothstep', data: { label: '' } }],
+      }
+      renderProvider(makeSession({ pipeline }))
+
+      act(() => {
+        contextRef.current?.dispatch({
+          type: 'EDGE_CHANGES',
+          payload: [{ type: 'select', id: 'edge-1', selected: true }],
+        })
+      })
+
+      expect(contextRef.current?.isDirty).toBe(false)
+    })
+
+    it('marks session dirty for node position changes', () => {
+      const pipeline = { ...createEmptyPipeline('Test'), nodes: [makeNode('node-a')] }
+      renderProvider(makeSession({ pipeline }))
+
+      act(() => {
+        contextRef.current?.dispatch({
+          type: 'NODE_CHANGES',
+          payload: [{ type: 'position', id: 'node-a', position: { x: 10, y: 20 } }],
+        })
+      })
+
+      expect(contextRef.current?.isDirty).toBe(true)
+    })
+
+    it('keeps session dirty for select changes after an edit', () => {
+      const pipeline = { ...createEmptyPipeline('Test'), nodes: [makeNode('node-a')] }
+      renderProvider(makeSession({ pipeline, isDirty: true }))
+
+      act(() => {
+        contextRef.current?.dispatch({
+          type: 'NODE_CHANGES',
+          payload: [{ type: 'select', id: 'node-a', selected: true }],
+        })
+      })
+
+      expect(contextRef.current?.isDirty).toBe(true)
+    })
+  })
+
+  describe('renamePipeline', () => {
+    it('keeps session clean when the name does not change', () => {
+      renderProvider(makeSession())
+
+      act(() => {
+        contextRef.current?.renamePipeline('Test Pipeline')
+      })
+
+      expect(contextRef.current?.isDirty).toBe(false)
+    })
+
+    it('marks session dirty when the name changes', () => {
+      renderProvider(makeSession())
+
+      act(() => {
+        contextRef.current?.renamePipeline('Renamed Pipeline')
+      })
+
+      expect(contextRef.current?.isDirty).toBe(true)
+    })
   })
 
   describe('addNode', () => {
@@ -661,6 +747,17 @@ describe('PipelineEditorProviderComponent', () => {
       const nodes = contextRef.current?.pipeline?.nodes
       expect(nodes?.find(n => n.id === 'node-a')?.selected).toBe(true)
       expect(nodes?.find(n => n.id === 'node-b')?.selected).toBe(false)
+    })
+
+    it('keeps session clean', () => {
+      const pipeline = { ...createEmptyPipeline('Test'), nodes: [makeNode('node-a')] }
+      renderProvider(makeSession({ pipeline }))
+
+      act(() => {
+        contextRef.current?.selectNode('node-a')
+      })
+
+      expect(contextRef.current?.isDirty).toBe(false)
     })
 
     it('deselects all edges in single-select mode', () => {

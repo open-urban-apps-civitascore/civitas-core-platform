@@ -67,6 +67,7 @@ import {
   getPipelineStats,
   getSelectedEdges,
   getSelectedNodes,
+  isSemanticPipelineChange,
   type PipelineReducerAction,
   pipelineReducerWithReactFlow,
   validateConnection,
@@ -273,10 +274,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       // node-removal change, and both must build on each other instead of overwriting.
       sessionManager.updateSessionPipeline(activeSession.id, previous => pipelineReducerWithReactFlow(previous, action))
 
-      // Mark as dirty for most actions
-      if (action.type !== 'MARK_CLEAN') {
+      if (isSemanticPipelineChange(action)) {
         sessionManager.markSessionDirty(activeSession.id)
-      } else {
+      } else if (action.type === 'MARK_CLEAN') {
         sessionManager.markSessionClean(activeSession.id)
       }
     },
