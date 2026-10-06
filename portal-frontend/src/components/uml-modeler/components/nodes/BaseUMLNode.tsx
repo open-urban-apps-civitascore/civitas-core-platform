@@ -5,7 +5,7 @@ import type { CSSProperties, ReactNode } from 'react'
 
 import { NODE_DIMENSIONS, UML_COLORS } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
-import { getElementNameError, getOtherElementNames } from '../../services/elementNameService'
+import { hasInvalidNamesInNode } from '../../services/elementNameService'
 import type { UMLElementType } from '../../types/uml'
 
 interface BaseUMLNodeProps {
@@ -60,11 +60,11 @@ export const BaseUMLNode: React.FC<BaseUMLNodeProps> = ({
 }) => {
   const nodeId = useNodeId()
   const { diagram } = useActiveDiagram()
-  const hasInvalidName =
-    nodeId !== null && getElementNameError(name, getOtherElementNames(diagram.nodes, nodeId)) !== undefined
+  const node = diagram.nodes.find(diagramNode => diagramNode.id === nodeId)
+  const isInvalid = node !== undefined && hasInvalidNamesInNode(node, diagram.nodes)
 
   return (
-    <div className={`uml-node ${className}`} style={getNodeStyle(elementType, isSelected, hasInvalidName)}>
+    <div className={`uml-node ${className}`} style={getNodeStyle(elementType, isSelected, isInvalid)}>
       {/* Universal connection handles - invisible for clean UML appearance */}
 
       <Handle type="source" position={Position.Top} id="universal" />

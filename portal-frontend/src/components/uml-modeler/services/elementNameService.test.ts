@@ -1,22 +1,51 @@
 import { describe, expect, it } from 'vitest'
 
 import type { UMLNode } from '../types/diagram'
-import { getElementNameError, getNextElementName, hasInvalidNames } from './elementNameService'
+import {
+  getAttributeNameError,
+  getElementNameError,
+  getEnumValueNameError,
+  getNextAttributeName,
+  getNextElementName,
+  getNextEnumValueName,
+  hasInvalidNamesInDiagram,
+} from './elementNameService'
 
-const node = (id: string, name: string): UMLNode =>
+const node = (id: string, name: string, attributeNames: string[] = []): UMLNode =>
   ({
     id,
     type: 'class',
     position: { x: 0, y: 0 },
-    data: { element: { id, name, type: 'class', attributes: [], operations: [] }, label: name },
+    data: {
+      element: {
+        id,
+        name,
+        type: 'class',
+        attributes: attributeNames.map((attributeName, index) => ({
+          id: `${id}-${index}`,
+          name: attributeName,
+          type: 'String',
+        })),
+        operations: [],
+      },
+      label: name,
+    },
   }) as unknown as UMLNode
 
-const enumNode = (id: string, name: string): UMLNode =>
+const enumNode = (id: string, name: string, valueNames: string[] = []): UMLNode =>
   ({
     id,
     type: 'enumeration',
     position: { x: 0, y: 0 },
-    data: { element: { id, name, type: 'enumeration', literals: [] }, label: name },
+    data: {
+      element: {
+        id,
+        name,
+        type: 'enumeration',
+        literals: valueNames.map((valueName, index) => ({ id: `${id}-${index}`, name: valueName })),
+      },
+      label: name,
+    },
   }) as unknown as UMLNode
 
 describe('getElementNameError', () => {
@@ -41,25 +70,79 @@ describe('getElementNameError', () => {
   })
 })
 
-describe('hasInvalidNames', () => {
+describe('hasInvalidNamesInDiagram', () => {
   it('is false for unique valid names', () => {
-    expect(hasInvalidNames([node('a', 'Sensor'), node('b', 'Station')])).toBe(false)
+    expect(hasInvalidNamesInDiagram([node('a', 'Sensor'), node('b', 'Station')])).toBe(false)
   })
 
   it('is true for two classes with the same name', () => {
-    expect(hasInvalidNames([node('a', 'Sensor'), node('b', 'Sensor')])).toBe(true)
+    expect(hasInvalidNamesInDiagram([node('a', 'Sensor'), node('b', 'Sensor')])).toBe(true)
   })
 
   it('is true for one class with invalid characters', () => {
-    expect(hasInvalidNames([node('a', 'Foo Bar')])).toBe(true)
+    expect(hasInvalidNamesInDiagram([node('a', 'Foo Bar')])).toBe(true)
   })
 
   it('is true for an enumeration and a class with the same name', () => {
-    expect(hasInvalidNames([node('a', 'Status'), enumNode('b', 'Status')])).toBe(true)
+    expect(hasInvalidNamesInDiagram([node('a', 'Status'), enumNode('b', 'Status')])).toBe(true)
   })
 
   it('is true for an enumeration with invalid characters', () => {
-    expect(hasInvalidNames([enumNode('a', 'Neue Aufzählung')])).toBe(true)
+    expect(hasInvalidNamesInDiagram([enumNode('a', 'Neue Aufzählung')])).toBe(true)
+  })
+
+  it('is true for two attributes of one class with the same name', () => {
+    expect(hasInvalidNamesInDiagram([node('a', 'Sensor', ['value', 'value'])])).toBe(true)
+  })
+
+  it('is false for the same attribute name in two classes', () => {
+    expect(hasInvalidNamesInDiagram([node('a', 'Sensor', ['value']), node('b', 'Station', ['value'])])).toBe(false)
+  })
+
+  it('is true for two values of one enumeration with the same name', () => {
+    expect(hasInvalidNamesInDiagram([enumNode('a', 'Status', ['ACTIVE', 'ACTIVE'])])).toBe(true)
+  })
+
+  it('is false for the same value name in two enumerations', () => {
+    expect(hasInvalidNamesInDiagram([enumNode('a', 'Status', ['ACTIVE']), enumNode('b', 'Mode', ['ACTIVE'])])).toBe(
+      false,
+    )
+  })
+})
+
+describe('getEnumValueNameError', () => {
+  it('rejects a name another value already has', () => {
+    expect(getEnumValueNameError('ACTIVE', ['ACTIVE'])).toBe('duplicateEnumValue')
+  })
+
+  it('accepts a unique name', () => {
+    expect(getEnumValueNameError('ACTIVE', ['INACTIVE'])).toBeUndefined()
+  })
+})
+
+describe('getNextEnumValueName', () => {
+  it('takes the lowest free number', () => {
+    expect(getNextEnumValueName(['WERT2', 'WERT3'])).toBe('WERT1')
+  })
+
+  it('does not repeat the name of the last value after a delete', () => {
+    expect(getNextEnumValueName(['WERT1', 'WERT3'])).toBe('WERT2')
+  })
+})
+
+describe('getAttributeNameError', () => {
+  it('rejects a name another attribute already has', () => {
+    expect(getAttributeNameError('value', ['value'])).toBe('duplicateAttribute')
+  })
+
+  it('accepts a unique name', () => {
+    expect(getAttributeNameError('value', ['unit'])).toBeUndefined()
+  })
+})
+
+describe('getNextAttributeName', () => {
+  it('takes the lowest free number', () => {
+    expect(getNextAttributeName(['neuesAttribut'])).toBe('neuesAttribut2')
   })
 })
 

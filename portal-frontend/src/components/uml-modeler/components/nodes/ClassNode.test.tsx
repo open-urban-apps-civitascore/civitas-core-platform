@@ -65,6 +65,19 @@ describe('ClassNode', () => {
     expect(nodeBorder(container)).toContain('var(--destructive)')
   })
 
+  it('has a red border when two attributes have the same name', () => {
+    const node = cls('c1', 'Sensor', [
+      { id: 'a1', name: 'value' },
+      { id: 'a2', name: 'value' },
+    ])
+    nodeId = node.id
+    diagramNodes = [node as unknown as UMLNode]
+
+    const { container } = renderNode(node)
+
+    expect(nodeBorder(container)).toContain('var(--destructive)')
+  })
+
   it('keeps a visible selection shadow next to the red border', () => {
     const node = cls('c1', 'Foo Bar', [])
     nodeId = node.id

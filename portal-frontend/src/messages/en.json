@@ -1665,7 +1665,9 @@
       "required": "Enter a name.",
       "invalidCharacters": "Only letters (a–z, A–Z), digits and underscores are allowed. The first character must be a letter or an underscore.",
       "duplicateElement": "Another element in the diagram already has this name.",
-      "invalidNames": "At least one element name is empty, contains characters that are not allowed, or is already in use."
+      "duplicateAttribute": "Another attribute of this class already has this name.",
+      "duplicateEnumValue": "Several values have the same name.",
+      "invalidNames": "At least one name in the diagram is not valid or is used more than once."
     },
     "rootValidation": {
       "noRoot": "No root class can be determined in the diagram — every class is embedded in another one (cyclic structure).",

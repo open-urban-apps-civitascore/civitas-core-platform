@@ -1652,7 +1652,9 @@
       "required": "Geben Sie einen Namen ein.",
       "invalidCharacters": "Erlaubt sind nur Buchstaben (a–z, A–Z), Ziffern und Unterstriche. Das erste Zeichen muss ein Buchstabe oder ein Unterstrich sein.",
       "duplicateElement": "Ein anderes Element im Diagramm hat bereits diesen Namen.",
-      "invalidNames": "Mindestens ein Elementname ist leer, enthält unerlaubte Zeichen oder ist bereits vergeben."
+      "duplicateAttribute": "Ein anderes Attribut dieser Klasse hat bereits diesen Namen.",
+      "duplicateEnumValue": "Mehrere Werte haben denselben Namen.",
+      "invalidNames": "Mindestens ein Name im Diagramm ist ungültig oder wird mehrfach verwendet."
     },
     "rootValidation": {
       "noRoot": "Im Diagramm lässt sich keine Wurzelklasse bestimmen — jede Klasse ist in eine andere eingebettet (zyklische Struktur).",

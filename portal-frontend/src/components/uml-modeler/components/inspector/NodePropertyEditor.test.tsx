@@ -113,3 +113,50 @@ describe('NodePropertyEditor name validation', () => {
     expect(screen.getByText('required')).toBeInTheDocument()
   })
 })
+
+describe('NodePropertyEditor enumeration values', () => {
+  const enumerationWith = (valueNames: string[]) =>
+    node({
+      type: 'enumeration',
+      name: 'Status',
+      literals: valueNames.map((name, index) => ({ id: `l${index}`, name })),
+    } as Partial<UMLElement>)
+
+  const openValues = () => fireEvent.click(screen.getByRole('button', { name: 'Values' }))
+
+  beforeEach(() => {
+    updateNode.mockClear()
+    isReadOnly = false
+    diagramNodes = []
+  })
+
+  it('shows one duplicate error below the values and marks both fields', () => {
+    render(<NodePropertyEditor node={enumerationWith(['ACTIVE', 'ACTIVE', 'INACTIVE'])} />)
+    openValues()
+    expect(screen.getAllByText('duplicateEnumValue')).toHaveLength(1)
+    const invalidFields = screen
+      .getAllByPlaceholderText('VALUE_NAME')
+      .filter(field => field.getAttribute('aria-invalid') === 'true')
+    expect(invalidFields).toHaveLength(2)
+  })
+
+  it('shows no error for unique value names', () => {
+    render(<NodePropertyEditor node={enumerationWith(['ACTIVE', 'INACTIVE'])} />)
+    openValues()
+    expect(screen.queryByText('duplicateEnumValue')).not.toBeInTheDocument()
+  })
+
+  it('gives a new value the first free default name after a delete', () => {
+    render(<NodePropertyEditor node={enumerationWith(['WERT2', 'WERT3'])} />)
+    openValues()
+    fireEvent.click(screen.getByRole('button', { name: /Add Value/ }))
+
+    expect(updateNode).toHaveBeenCalledWith('node-1', {
+      literals: [
+        expect.objectContaining({ name: 'WERT2' }),
+        expect.objectContaining({ name: 'WERT3' }),
+        expect.objectContaining({ name: 'WERT1' }),
+      ],
+    })
+  })
+})
