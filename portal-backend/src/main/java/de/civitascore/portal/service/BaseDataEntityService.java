@@ -28,11 +28,6 @@ public abstract class BaseDataEntityService<
    */
   protected abstract AssignmentFactory getAssignmentFactory();
 
-  /**
-   * Returns the authorizer that checks which assignments the caller may add or remove.
-   *
-   * @return the assignment change authorizer
-   */
   protected abstract AssignmentChangeAuthorizer getAssignmentChangeAuthorizer();
 
   /**

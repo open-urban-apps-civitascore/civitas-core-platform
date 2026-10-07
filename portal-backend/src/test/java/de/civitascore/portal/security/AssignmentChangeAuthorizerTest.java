@@ -1,18 +1,26 @@
 package de.civitascore.portal.security;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.civitascore.portal.model.embedded.PermissionName;
+import de.civitascore.portal.model.embedded.PermissionType;
 import de.civitascore.portal.model.embedded.RoleDefault;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Permission;
 import de.civitascore.portal.model.entity.Role;
@@ -24,13 +32,17 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -386,6 +398,60 @@ class AssignmentChangeAuthorizerTest {
                         requested(otherGroup, role(PermissionName.DATASOURCE_RELEASE)),
                         requested(callerGroup, role()))))
         .doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("Logs an authorized change as info and a refused one as a warning, with the user")
+  void logsEveryDecision() {
+    authenticateAs(userId);
+    DataSet dataSet = dataSet(null);
+    callerHolds(onEntity(steward, dataSet));
+    Logger logger = (Logger) LoggerFactory.getLogger(AssignmentChangeAuthorizer.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      authorizer.authorizeReplacement(dataSet, List.of(requested(otherGroup, consumer)));
+      assertThatThrownBy(
+              () ->
+                  authorizer.authorizeReplacement(dataSet, List.of(requested(callerGroup, owner))))
+          .isInstanceOf(AccessDeniedException.class);
+    } finally {
+      logger.detachAppender(appender);
+    }
+
+    assertThat(appender.list)
+        .extracting(
+            ILoggingEvent::getLevel,
+            event -> event.getFormattedMessage().contains(userId.toString()))
+        .containsExactly(tuple(Level.INFO, true), tuple(Level.WARN, true));
+  }
+
+  @ParameterizedTest
+  @MethodSource("dataPermissions")
+  @DisplayName("Checks every data permission on at least one entity type")
+  void everyDataPermissionIsChecked(PermissionName permission) {
+    authenticateAs(userId);
+    callerHolds();
+    DataSource dataSource = new DataSource();
+    dataSource.setId(UUID.randomUUID());
+    DataStructure dataStructure = new DataStructure();
+    dataStructure.setId(UUID.randomUUID());
+    Role role = role(permission);
+
+    assertThat(List.<BaseDataEntity>of(dataSet(null), dataSource, dataStructure, dataPool()))
+        .anySatisfy(
+            target ->
+                assertThatThrownBy(
+                        () ->
+                            authorizer.authorizeReplacement(
+                                target, List.of(requested(otherGroup, role))))
+                    .isInstanceOf(AccessDeniedException.class));
+  }
+
+  static Stream<PermissionName> dataPermissions() {
+    return Arrays.stream(PermissionName.values())
+        .filter(permission -> permission.getPermissionType() == PermissionType.DATA);
   }
 
   // --- fixtures ---

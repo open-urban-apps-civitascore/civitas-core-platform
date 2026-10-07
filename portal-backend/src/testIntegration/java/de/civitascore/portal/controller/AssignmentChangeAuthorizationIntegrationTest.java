@@ -25,6 +25,7 @@ import de.civitascore.portal.security.AllowedScopesFilter;
 import de.civitascore.portal.service.AssignmentService;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -42,11 +43,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
-/**
- * Assignments sent in a data entity body may only grant or remove roles whose permissions the
- * caller holds on that entity, unless the caller holds ASSIGNMENT_CREATE (to grant) or
- * ASSIGNMENT_DELETE (to remove) tenant-wide.
- */
 @DisplayName("Assignment changes in data entity bodies")
 class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrationTest {
 
@@ -77,6 +73,20 @@ class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrati
     Route(ScopeType scopeType, String pathTemplate) {
       this.scopeType = scopeType;
       this.pathTemplate = pathTemplate;
+    }
+  }
+
+  /** A create endpoint that accepts {@code assignments} in its body, beside the dataset one. */
+  enum CreateRoute {
+    DATAPOOL(ScopeType.DATAPOOL, "/datapools"),
+    DATASTRUCTURE(ScopeType.DATASTRUCTURE, "/datastructures");
+
+    private final ScopeType scopeType;
+    private final String path;
+
+    CreateRoute(ScopeType scopeType, String path) {
+      this.scopeType = scopeType;
+      this.path = path;
     }
   }
 
@@ -280,6 +290,53 @@ class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrati
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     DataSet created = dataSetRepository.findByName("delegated").orElseThrow();
     assertThat(stored(ScopeType.DATASET, created)).containsExactly(steward);
+  }
+
+  @ParameterizedTest
+  @EnumSource(CreateRoute.class)
+  @DisplayName("Should reject a tenant-wide Data Steward creating an entity with a Data Owner")
+  void stewardCreatingWithOwner_isForbidden(CreateRoute route) {
+    Group caller = portalData.groupOf(callerExternalId);
+    portalData.assignment(caller, portalData.role(RoleDefault.DATA_STEWARD));
+    GroupRole owner = new GroupRole(caller, portalData.role(RoleDefault.DATA_OWNER));
+
+    ResponseEntity<String> response = create(route, "escalated", Set.of(owner));
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    assertThat(createdNamed(route, "escalated")).isEmpty();
+  }
+
+  @ParameterizedTest
+  @EnumSource(CreateRoute.class)
+  @DisplayName("Should let a tenant-wide Data Owner create an entity with a Data Steward")
+  void ownerCreatingWithSteward_isAllowed(CreateRoute route) {
+    Group caller = portalData.groupOf(callerExternalId);
+    portalData.assignment(caller, portalData.role(RoleDefault.DATA_OWNER));
+    GroupRole steward =
+        new GroupRole(portalData.group(), portalData.role(RoleDefault.DATA_STEWARD));
+
+    ResponseEntity<String> response = create(route, "delegated", Set.of(steward));
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    BaseDataEntity created = createdNamed(route, "delegated").orElseThrow();
+    assertThat(stored(route.scopeType, created)).containsExactly(steward);
+  }
+
+  private ResponseEntity<String> create(
+      CreateRoute route, String name, Set<GroupRole> assignments) {
+    Map<String, Object> body = new HashMap<>();
+    body.put("name", name);
+    body.put("description", "created in test");
+    body.put("assignments", assignments);
+    return restTemplate.exchange(
+        route.path, HttpMethod.POST, new HttpEntity<>(body, headers()), String.class);
+  }
+
+  private Optional<? extends BaseDataEntity> createdNamed(CreateRoute route, String name) {
+    return switch (route) {
+      case DATAPOOL -> dataPoolRepository.findByName(name);
+      case DATASTRUCTURE -> dataStructureRepository.findByName(name);
+    };
   }
 
   private BaseDataEntity target(Route route) {
