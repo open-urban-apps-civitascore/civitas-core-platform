@@ -10,6 +10,7 @@
 package de.civitascore.nifi.frost.port;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -34,6 +35,38 @@ class ThingsPortTest {
   @Test
   void plan_withAThing_buildsTheUpsertOfOneThing() {
     BatchDocuments.assertMatches("things-port.json", BatchDocuments.of(SinkPort.THINGS, THING));
+  }
+
+  @Test
+  void plan_withADeepInsert_assignsWhatItCreatesToTheProject() {
+    String withTree =
+        """
+        {
+          "properties": { "reference": "A7" },
+          "Locations": [ { "name": "A7 site" } ],
+          "Datastreams": [
+            {
+              "name": "Air temperature",
+              "Sensor": { "name": "DS18B20" },
+              "ObservedProperty": { "name": "Temperature" }
+            },
+            { "name": "Humidity", "Sensor": { "@iot.id": 9 } }
+          ]
+        }
+        """;
+    JsonNode create = BatchDocuments.of(SinkPort.THINGS, withTree).get("requests").get(2);
+    JsonNode body = create.get("body");
+
+    // The project URL assigns the Thing alone. The Dataset's API serves its project, so a Location
+    // or Sensor outside it is written but never listed.
+    assertEquals(5, body.at("/Locations/0/Projects/0/@iot.id").asLong());
+    assertEquals(5, body.at("/Datastreams/0/Sensor/Projects/0/@iot.id").asLong());
+    // A Datastream and an ObservedProperty no project can hold, and an entity named by its
+    // identifier is linked rather than created, so it is left as it is.
+    assertFalse(body.at("/Datastreams/0").has("Projects"));
+    assertFalse(body.at("/Datastreams/0/ObservedProperty").has("Projects"));
+    assertFalse(body.at("/Datastreams/1/Sensor").has("Projects"));
+    assertFalse(body.has("Projects"));
   }
 
   @Test

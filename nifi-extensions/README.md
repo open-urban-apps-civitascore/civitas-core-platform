@@ -112,11 +112,17 @@ entity, and patches it a second time.
 Every lookup is **scoped to the Dataset**. A reference is local to its Dataset, and two Datasets
 may model the same device under the same one. Things are looked up inside the Dataset's FROST
 project (`Projects(5)/Things`), Datastreams through their Thing's project
-(`Thing/Projects/id eq 5`). Locations belong to no project, so their lookup runs through the Thing
-just resolved: `$r0-thing/Locations?$filter=properties/reference eq 'A7'`. A direct query on
-`/Locations` would find the Location another Dataset wrote, patch it, and leave this Thing without
-one — and FROST then refuses every measurement of that Thing, because it has no position to derive
-a FeatureOfInterest from.
+(`Thing/Projects/id eq 5`). Locations are looked up through the Thing just resolved:
+`$r0-thing/Locations?$filter=properties/reference eq 'A7'`. A direct query on `/Locations` would
+find the Location another Dataset wrote, patch it, and leave this Thing without one — and FROST
+then refuses every measurement of that Thing, because it has no position to derive a
+FeatureOfInterest from. A query on the project's Locations would miss a Location written before
+the sink assigned Locations to the project, and create a second one.
+
+The sink assigns every Location, Sensor and FeatureOfInterest it writes to the Dataset's project,
+because the Dataset's STA API serves the project and lists only what the project holds. An update
+assigns too: FROST adds the project to the ones the entity has. Datastreams, Observations and
+ObservedProperties stay outside the project; the Projects plugin has no navigation to them.
 
 A back-reference in a URL stands at the **start**, where FROST replaces it with the self link of
 the entity: `$r0-thing` becomes `/Things(5)`, and `$r0-ds/Sensor` becomes `/Datastreams(7)/Sensor`.

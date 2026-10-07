@@ -51,7 +51,7 @@ public final class ThingTreePort implements PortPlanner {
 
     ObjectNode location = StaEntities.firstOf(record, "Locations", StaEntities.LOCATION);
     if (location != null) {
-      planLocation(location, plan, thingReference);
+      planLocation(location, plan, projectId, thingReference);
     }
 
     ObjectNode datastream = StaEntities.firstOf(record, "Datastreams", StaEntities.DATASTREAM);
@@ -63,7 +63,7 @@ public final class ThingTreePort implements PortPlanner {
     ObjectNode observation =
         StaEntities.firstOf(datastream, "Observations", StaEntities.OBSERVATION);
     if (observation != null) {
-      planObservation(observation, plan);
+      planObservation(observation, plan, projectId);
     }
   }
 
@@ -91,11 +91,13 @@ public final class ThingTreePort implements PortPlanner {
         true);
   }
 
-  private void planLocation(ObjectNode location, RecordPlan plan, String thingReference) {
+  private void planLocation(
+      ObjectNode location, RecordPlan plan, String projectId, String thingReference) {
     // A Thing has one current Location, and the mapped shape carries one. Without a reference of
     // its own the Location takes the Thing's. The lookup runs through the Thing just resolved or
-    // created — the Location collection belongs to no project, so a direct query would find the
-    // Location another Dataset wrote for the same device.
+    // created — a direct query on the Location collection would find the Location another Dataset
+    // wrote for the same device, and one on the project's Locations would miss a Location written
+    // before the port assigned it.
     String reference =
         ReferenceBlock.read(location, ReferenceBlock.PROPERTIES, ReferenceBlock.REFERENCE)
             .orElse(thingReference);
@@ -103,6 +105,7 @@ public final class ThingTreePort implements PortPlanner {
     ReferenceBlock.write(body, ReferenceBlock.PROPERTIES, ReferenceBlock.REFERENCE, reference);
     ReferenceBlock.write(
         body, ReferenceBlock.PROPERTIES, ReferenceBlock.THING_REFERENCE, thingReference);
+    StaEntities.assignToProject(body, projectId);
 
     plan.ownLookup(
         StaEntities.LOCATION,
@@ -155,13 +158,15 @@ public final class ThingTreePort implements PortPlanner {
         body,
         true);
 
-    planNestedUpdate(datastream, plan, StaEntities.SENSOR, SENSOR, SENSOR_UPDATE);
+    planNestedUpdate(datastream, plan, StaEntities.SENSOR, SENSOR, SENSOR_UPDATE, projectId);
+    // An ObservedProperty belongs to no project: the Projects plugin has no navigation to it.
     planNestedUpdate(
         datastream,
         plan,
         StaEntities.OBSERVED_PROPERTY,
         OBSERVED_PROPERTY,
-        OBSERVED_PROPERTY_UPDATE);
+        OBSERVED_PROPERTY_UPDATE,
+        null);
 
     // The create stands last because it shares the lookup identifier: every request that must see
     // the lookup result alone has to run before it.
@@ -169,6 +174,7 @@ public final class ThingTreePort implements PortPlanner {
     StaEntities.link(created, StaEntities.THING, SubRequest.reference(plan.id(THING)));
     copyNested(datastream, created, StaEntities.SENSOR);
     copyNested(datastream, created, StaEntities.OBSERVED_PROPERTY);
+    StaEntities.assignNestedToProject(created, projectId);
     plan.write(
         StaEntities.DATASTREAM,
         DATASTREAM,
@@ -183,15 +189,23 @@ public final class ThingTreePort implements PortPlanner {
    * Resolves a single-valued navigation of an existing Datastream and patches the entity behind it.
    * Runs only when the Datastream was found; on the other branch the create deep-inserts the same
    * entity, which is why neither write is required for the record to count as written.
+   *
+   * <p>With a project the update also assigns the entity to it, null for an entity no project can
+   * hold.
    */
   private void planNestedUpdate(
       ObjectNode datastream,
       RecordPlan plan,
       String navigation,
       String lookupSuffix,
-      String updateSuffix) {
+      String updateSuffix,
+      String projectId) {
     if (!(datastream.get(navigation) instanceof ObjectNode nested)) {
       return;
+    }
+    ObjectNode body = StaEntities.withoutNavigation(nested);
+    if (projectId != null) {
+      StaEntities.assignToProject(body, projectId);
     }
     plan.ownLookup(
         navigation,
@@ -204,7 +218,7 @@ public final class ThingTreePort implements PortPlanner {
         BatchMethod.PATCH,
         SubRequest.reference(plan.id(lookupSuffix)),
         SubRequest.ifResolved(plan.id(lookupSuffix)),
-        StaEntities.withoutNavigation(nested),
+        body,
         false);
   }
 
@@ -214,10 +228,11 @@ public final class ThingTreePort implements PortPlanner {
     }
   }
 
-  private void planObservation(ObjectNode observation, RecordPlan plan) {
+  private void planObservation(ObjectNode observation, RecordPlan plan, String projectId) {
     // The tree appends: the mapped flow it replaces posts every measurement, and a measurement of
     // the tree carries no reference of its own.
     ObjectNode body = observation.deepCopy();
+    StaEntities.assignNestedToProject(body, projectId);
     StaEntities.link(body, StaEntities.DATASTREAM, SubRequest.reference(plan.id(DATASTREAM)));
     plan.write(
         StaEntities.OBSERVATION, OBSERVATION, BatchMethod.POST, "Observations", null, body, true);

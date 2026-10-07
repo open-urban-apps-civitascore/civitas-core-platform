@@ -81,7 +81,7 @@ public final class ObservationsPort implements PortPlanner {
           // The upsert below cannot: 'if' names one request, and there the condition has to be the
           // Observation lookup.
           SubRequest.ifResolved(plan.id(gate)),
-          observation(record, plan),
+          observation(record, plan, projectId),
           true);
       return;
     }
@@ -108,16 +108,21 @@ public final class ObservationsPort implements PortPlanner {
         BatchMethod.POST,
         "Observations",
         SubRequest.ifMissing(plan.id(LOOKUP)),
-        observation(record, plan),
+        observation(record, plan, projectId),
         true);
   }
 
-  /** The Observation as delivered, linked to the Datastream the lookup resolved. */
-  private ObjectNode observation(ObjectNode record, RecordPlan plan) {
+  /**
+   * The Observation as delivered, linked to the Datastream the lookup resolved. A FeatureOfInterest
+   * the measurement brings is assigned to the project here; one FROST generates takes the projects
+   * of the Location it is generated from.
+   */
+  private ObjectNode observation(ObjectNode record, RecordPlan plan, String projectId) {
     ObjectNode body = record.deepCopy();
     if (!body.path(FEATURE_OF_INTEREST).isObject()) {
       body.remove(FEATURE_OF_INTEREST);
     }
+    StaEntities.assignNestedToProject(body, projectId);
     StaEntities.link(body, StaEntities.DATASTREAM, SubRequest.reference(plan.id(PARENT)));
     return body;
   }
