@@ -48,7 +48,11 @@ class MappingSchemaContractTest {
     for (JsonNode ref : defs.get("MappingOperation").get("oneOf")) {
       String defName = ref.get("$ref").asText().substring("#/$defs/".length());
       JsonNode operation = defs.get(defName);
-      schemaOperationsByOp.put(operation.at("/properties/op/const").asText(), operation);
+      String op =
+          operation.has("oneOf")
+              ? operation.at("/oneOf/0/properties/op/const").asText()
+              : operation.at("/properties/op/const").asText();
+      schemaOperationsByOp.put(op, operation);
     }
   }
 
@@ -68,6 +72,24 @@ class MappingSchemaContractTest {
   void schemaRequiresAPatternExactlyWhenTheParserDoes(ConversionOp op) {
     JsonNode operation = schemaOperationsByOp.get(op.rawOp());
     assertNotNull(operation, "mapping schema has no operation for " + op.rawOp());
+    if (op == ConversionOp.TO_DATE_TIME) {
+      assertEquals(2, operation.get("oneOf").size());
+      for (JsonNode variant : operation.get("oneOf")) {
+        String inputType = variant.at("/properties/inputType/const").asText();
+        Set<String> required =
+            StreamSupport.stream(variant.get("required").spliterator(), false)
+                .map(JsonNode::asText)
+                .collect(Collectors.toSet());
+        Set<String> expected =
+            switch (inputType) {
+              case "string" -> Set.of("op", "input", "pattern");
+              case "epoch" -> Set.of("op", "input", "inputType", "unit");
+              default -> throw new AssertionError("Unexpected input type: " + inputType);
+            };
+        assertEquals(expected, required);
+      }
+      return;
+    }
     Set<String> required =
         StreamSupport.stream(operation.get("required").spliterator(), false)
             .map(JsonNode::asText)

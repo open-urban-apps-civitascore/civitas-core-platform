@@ -613,6 +613,7 @@ describe('CORE-IR conformance of the artifacts sent to Model Forge', () => {
     ['format', { op: 'format', input: '$.source', pattern: '%.2f' }],
     ['toUuid', { op: 'toUuid', input: '$.source' }],
     ['toDateTime', { op: 'toDateTime', input: '$.source', pattern: "yyyy-MM-dd'T'HH:mm:ssXXX" }],
+    ['toDateTime epoch', { op: 'toDateTime', input: '$.source', inputType: 'epoch', unit: 'seconds' }],
   ]
 
   it.each(mappingOperations)('a Mapping using %s satisfies the published mapping contract', (_label, operation) => {

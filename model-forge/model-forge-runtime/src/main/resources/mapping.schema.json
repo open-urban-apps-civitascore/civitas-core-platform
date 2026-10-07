@@ -120,15 +120,31 @@
       "additionalProperties": false
     },
     "ToDateTimeFieldOperation": {
-      "description": "Parses the input string into a date-time value using a date pattern.",
-      "type": "object",
-      "required": ["op", "input", "pattern"],
-      "properties": {
-        "op":      { "type": "string", "const": "toDateTime" },
-        "input":   { "$ref": "#/$defs/MappingField", "description": "String value to parse — a JSONPath string or a nested operation." },
-        "pattern": { "type": "string", "description": "Date pattern used to parse the input, e.g. \"yyyy-MM-dd'T'HH:mm:ssXXX\"." }
-      },
-      "additionalProperties": false
+      "description": "Converts a formatted string or an epoch timestamp to a date-time value.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["op", "input", "pattern"],
+          "properties": {
+            "op":        { "type": "string", "const": "toDateTime" },
+            "input":     { "$ref": "#/$defs/MappingField" },
+            "inputType": { "type": "string", "const": "string" },
+            "pattern":   { "type": "string", "minLength": 1, "description": "Pattern used to parse the input string." }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["op", "input", "inputType", "unit"],
+          "properties": {
+            "op":        { "type": "string", "const": "toDateTime" },
+            "input":     { "$ref": "#/$defs/MappingField" },
+            "inputType": { "type": "string", "const": "epoch" },
+            "unit":      { "type": "string", "enum": ["seconds", "milliseconds"], "description": "Unit of the epoch value." }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "ToDateFieldOperation": {
       "description": "Parses the input string into a date/time value using a date pattern.",

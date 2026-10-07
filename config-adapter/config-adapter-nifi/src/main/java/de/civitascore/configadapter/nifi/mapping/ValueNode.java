@@ -65,14 +65,27 @@ public sealed interface ValueNode
    *
    * @param op the conversion operation
    * @param input the value to convert
-   * @param pattern the format/parse pattern (required for {@code toDate}/{@code format}, else null)
+   * @param pattern the format/parse pattern (required for date parsing except epoch input)
+   * @param unit epoch unit for {@code toDateTime}, otherwise null
    */
-  record ConvertNode(ConversionOp op, ValueNode input, String pattern) implements ValueNode {
+  record ConvertNode(ConversionOp op, ValueNode input, String pattern, String unit)
+      implements ValueNode {
+    public ConvertNode(ConversionOp op, ValueNode input, String pattern) {
+      this(op, input, pattern, null);
+    }
+
     public ConvertNode {
       Objects.requireNonNull(op, "op");
       Objects.requireNonNull(input, "input");
-      if (op.requiresPattern() && (pattern == null || pattern.isBlank())) {
+      if (op.requiresPattern() && unit == null && (pattern == null || pattern.isBlank())) {
         throw new IllegalArgumentException(op.rawOp() + " requires a non-blank pattern");
+      }
+      if (unit != null && (op != ConversionOp.TO_DATE_TIME || pattern != null)) {
+        throw new IllegalArgumentException(
+            "epoch unit is only valid for toDateTime without pattern");
+      }
+      if (unit != null && !"seconds".equals(unit) && !"milliseconds".equals(unit)) {
+        throw new IllegalArgumentException("unsupported epoch unit: " + unit);
       }
     }
   }

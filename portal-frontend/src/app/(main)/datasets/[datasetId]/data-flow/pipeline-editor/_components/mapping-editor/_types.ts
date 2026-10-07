@@ -116,7 +116,7 @@ export interface SchemaTree {
  *  toFloat   → NiFi type coercion to FLOAT      — str/int → number
  *  toUuid    → no RecordPath call; the sink parses               — str → uuid
  *  toDate    → NiFi format(toDate(field, format), 'yyyy-MM-dd')  — str / date → date
- *  toDateTime→ NiFi toDate(field, format)                        — str / datetime → datetime
+ *  toDateTime→ NiFi toDate(field, format) or epoch formatting     — str / datetime / int / number → datetime
  *  format    → NiFi format(field, format)                        — date / datetime → str
  */
 export type ConversionOp = 'toString' | 'toInt' | 'toFloat' | 'toUuid' | 'toDate' | 'toDateTime' | 'format'
@@ -125,7 +125,13 @@ export type OpNode =
   | { op: 'copy'; sourcePath: string }
   | { op: 'const'; value: unknown; valueType?: string }
   | { op: 'concat'; separator?: string; inputs: ValueNode[] }
-  | { op: ConversionOp; input: ValueNode; pattern?: string }
+  | {
+      op: ConversionOp
+      input: ValueNode
+      pattern?: string
+      inputType?: 'string' | 'epoch'
+      unit?: 'seconds' | 'milliseconds'
+    }
   | { op: 'geoPoint'; lon: ValueNode; lat: ValueNode }
 
 /** A path string is shorthand for a copy. */

@@ -42,7 +42,13 @@ import { versionToSchemaTree } from './schema/versionTree'
 import type { PortInfo } from './status'
 import { computeStatus, findNodeConfigErrors, portsCompatible } from './status'
 import type { MappingTransformDef } from './transforms'
-import { concatInputPorts, LITERAL_DEFAULT_TYPE, literalOutputPort, mappingRegistry } from './transforms'
+import {
+  concatInputPorts,
+  LITERAL_DEFAULT_TYPE,
+  literalOutputPort,
+  mappingRegistry,
+  toDateTimeInputPorts,
+} from './transforms'
 
 export interface SchemaRef {
   datastructureId: string
@@ -100,6 +106,9 @@ export const MappingEditorModal = ({
         ...field,
         label: t(field.label as Parameters<typeof t>[0]),
         ...(field.placeholder ? { placeholder: t(field.placeholder as Parameters<typeof t>[0]) } : {}),
+        ...(field.options && def.type === 'toDateTime'
+          ? { options: field.options.map(option => ({ ...option, label: t(option.label as Parameters<typeof t>[0]) })) }
+          : {}),
       })),
     }))
     return buildRegistry<MappingTransformDef>(translatedDefs)
@@ -345,6 +354,19 @@ export const MappingEditorModal = ({
         !portsCompatible({ type: port.type, sub: port.dataType }, endpointInfo(e.target, e.targetHandle ?? '')),
     )
 
+  /** Incoming edges of `nodeId` that the rewritten input port no longer accepts. */
+  const incomingEdgesBrokenBy = (nodeId: string, port: PortDef): Edge[] =>
+    edges.filter(
+      e =>
+        e.target === nodeId &&
+        (e.targetHandle ?? '') === port.id &&
+        !portsCompatible(endpointInfo(e.source, e.sourceHandle ?? ''), {
+          type: port.type,
+          sub: port.dataType,
+          accepts: port.accepts,
+        }),
+    )
+
   const updateConfig = (key: string, value: string) => {
     if (!selectedId) return
 
@@ -354,6 +376,13 @@ export const MappingEditorModal = ({
       const broken = edgesBrokenBy(selectedId, newPort)
       if (broken.length > 0) {
         toast.error(t('errors.connectionsBroken', { count: broken.length, type: newPort.dataType ?? '' }))
+      }
+    }
+    if (key === 'inputType' && selectedDefType === 'toDateTime') {
+      const newPort = toDateTimeInputPorts(value)[0]
+      const broken = incomingEdgesBrokenBy(selectedId, newPort)
+      if (broken.length > 0) {
+        toast.error(t('errors.connectionsBroken', { count: broken.length, type: newPort.accepts?.join(' / ') ?? '' }))
       }
     }
 
@@ -368,6 +397,9 @@ export const MappingEditorModal = ({
           const type = String(newConfig.type || LITERAL_DEFAULT_TYPE)
           const newOutputs = [literalOutputPort(type, newConfig.value)]
           return { ...node, data: { ...data, config: newConfig, outputs: newOutputs } }
+        }
+        if (data.defType === 'toDateTime' && key === 'inputType') {
+          return { ...node, data: { ...data, config: newConfig, inputs: toDateTimeInputPorts(value) } }
         }
         return { ...node, data: { ...data, config: newConfig } }
       }),

@@ -49,6 +49,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.StreamSupport;
 import okhttp3.Request;
 import okhttp3.Response;
 import org.awaitility.core.ConditionTimeoutException;
@@ -100,6 +101,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static final String CRON_EVERY_SECOND = "* * * * * ?";
 
   private static final String TOPIC = "civitas/it/frost-mapping";
+  private static final String EPOCH_TOPIC = "civitas/it/frost-epoch";
   private static final String FANOUT_TOPIC = "civitas/it/frost-fanout";
   private static final String REF_FANOUT = "REF-FANOUT-1";
   private static final String DS_FANOUT = "DS-FANOUT-1";
@@ -133,6 +135,8 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static final String DS_FOI = "DS-FOI-1";
   private static final String REF_SQL = "REF-SQL-1";
   private static final String DS_SQL = "DS-SQL-1";
+  private static final String REF_SQL_EPOCH = "REF-SQL-EPOCH-1";
+  private static final String DS_SQL_EPOCH = "DS-SQL-EPOCH-1";
 
   private static final String SRC_DB = "frost_src";
   private static final String SRC_USER = "reader";
@@ -149,6 +153,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static long dsBadTsId;
   private static long dsDateOnlyId;
   private static long dsSqlId;
+  private static long dsSqlEpochId;
   private static long dsFoiId;
   private static long dsFanoutId;
   private static long dsPartialId;
@@ -241,6 +246,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     dsBadTsId = createDatastream(DS_BADTS, REF_BADTS);
     dsDateOnlyId = createDatastream(DS_DATEONLY, REF_DATEONLY);
     dsSqlId = createDatastream(DS_SQL, REF_SQL);
+    dsSqlEpochId = createDatastream(DS_SQL_EPOCH, REF_SQL_EPOCH);
     dsFoiId = createDatastream(DS_FOI, REF_FOI);
     dsFanoutId = createDatastream(DS_FANOUT, REF_FANOUT);
     dsPartialId = createDatastream(DS_PARTIAL, REF_PARTIAL);
@@ -326,6 +332,27 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     assertTrue(
         observation.path("phenomenonTime").asText().startsWith("2026-01-01T00:00:00"),
         "phenomenonTime must survive as the mapped ISO instant");
+  }
+
+  @Test
+  void epochSecondsAndMillisecondsBecomeFrostDateTimes() throws Exception {
+    deployEpochPipeline();
+    String payload =
+        "{\"station\":\"Epoch station\",\"ref\":\""
+            + REF_MAP
+            + "\",\"temp\":77.5,\"seconds\":\"1776931200\",\"millis\":1776931200000}";
+
+    publishOnceIntoTheFlow(
+        "civitas-it-epoch", EPOCH_TOPIC, payload, () -> resultValues(dsMapId).contains(77.5));
+
+    JsonNode observation =
+        StreamSupport.stream(observations(dsMapId).spliterator(), false)
+            .filter(item -> item.path("result").asDouble() == 77.5)
+            .findFirst()
+            .orElseThrow();
+    assertTrue(observation.path("resultTime").asText().startsWith("2026-04-23T08:00:00"));
+    assertTrue(observation.path("phenomenonTime").asText().startsWith("2026-04-23T08:00:00"));
+    assertEquals("23.04.2026 08:00", observation.path("resultQuality").asText());
   }
 
   @Test
@@ -697,6 +724,36 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         "a same-reference row must reuse the existing Thing instead of minting another");
   }
 
+  @Test
+  void sqlTimestampAndTimestamptzBecomeFrostPhenomenonTimes() throws Exception {
+    deploySqlEpochPipeline("plain", "$.ts_plain", 91.0);
+    deploySqlEpochPipeline("zoned", "$.ts_zoned", 92.0);
+
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(3))
+        .ignoreExceptions()
+        .until(
+            () ->
+                resultValues(dsSqlEpochId).contains(91.0)
+                    && resultValues(dsSqlEpochId).contains(92.0));
+
+    List<JsonNode> observations =
+        StreamSupport.stream(observations(dsSqlEpochId).spliterator(), false).toList();
+    JsonNode plain =
+        observations.stream()
+            .filter(item -> item.path("result").asDouble() == 91.0)
+            .findFirst()
+            .orElseThrow();
+    JsonNode zoned =
+        observations.stream()
+            .filter(item -> item.path("result").asDouble() == 92.0)
+            .findFirst()
+            .orElseThrow();
+    assertTrue(plain.path("phenomenonTime").asText().startsWith("2026-04-23T08:00:00"));
+    assertTrue(zoned.path("phenomenonTime").asText().startsWith("2026-04-23T06:00:00"));
+  }
+
   // ─── Deployment ─────────────────────────────────────────────────────────────
 
   /**
@@ -750,6 +807,48 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     source.handleUnknownProperty("qos", 1);
 
     deploy("pipeline-frost-map-mqtt-it", graph, source, frostMapping(mappingFields()));
+  }
+
+  private static void deployEpochPipeline() throws Exception {
+    Map<String, Object> graph =
+        json(
+            """
+            { "nodes": [
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
+              "edges": [
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
+            """);
+    Datasource source = new Datasource();
+    source.setId("mqtt-frost-epoch");
+    source.setType("MQTT");
+    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
+    source.handleUnknownProperty("topics", List.of(EPOCH_TOPIC));
+    source.handleUnknownProperty("qos", 1);
+    String fields =
+        """
+        {
+          "$.name": "$.station",
+          "$.description": { "op": "const", "value": "Epoch station" },
+          "$.properties.reference": "$.ref",
+          "$.Datastreams[].properties.reference": "$.ref",
+          "$.Datastreams[].Observations[].result": { "op": "toFloat", "input": "$.temp" },
+          "$.Datastreams[].Observations[].resultTime":
+              { "op": "toDateTime", "input": "$.seconds", "inputType": "epoch", "unit": "seconds" },
+          "$.Datastreams[].Observations[].phenomenonTime":
+              { "op": "toDateTime", "input": "$.millis", "inputType": "epoch", "unit": "milliseconds" },
+          "$.Datastreams[].Observations[].resultQuality":
+              { "op": "format", "pattern": "dd.MM.yyyy HH:mm",
+                "input": { "op": "toDateTime", "input": "$.seconds", "inputType": "epoch", "unit": "seconds" } }
+        }
+        """;
+    deploy("pipeline-frost-epoch-it", graph, source, frostMapping(fields));
   }
 
   /**
@@ -850,6 +949,58 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     source.handleUnknownProperty("columns", List.of("*"));
 
     deploy("pipeline-frost-map-sql-it", graph, source, frostMapping(mappingFields()));
+  }
+
+  private static void deploySqlEpochPipeline(String suffix, String timestampPath, double result)
+      throws Exception {
+    Map<String, Object> graph =
+        json(
+            """
+            { "nodes": [
+                { "id": "s", "kind": "start" },
+                { "id": "c", "kind": "cron", "cronExpression": "%s" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
+              "edges": [
+                { "id": "e1", "source": "s", "target": "c" },
+                { "id": "e2", "source": "c", "target": "src" },
+                { "id": "e3", "source": "src", "target": "m" },
+                { "id": "e4", "source": "m", "target": "k" },
+                { "id": "e5", "source": "k", "target": "e" } ] }
+            """
+                .formatted(CRON_EVERY_SECOND));
+    byte[] key = CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
+    String encryptedPassword =
+        "ENC("
+            + CredentialEncryptor.encrypt(
+                SRC_PASSWORD, key, CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT)
+            + ")";
+    Datasource source = new Datasource();
+    source.setId("sql-frost-epoch-" + suffix);
+    source.setType("SQL");
+    source.handleUnknownProperty("driver", "postgres");
+    source.handleUnknownProperty("dsn", "postgres://srcdb:5432/" + SRC_DB);
+    source.handleUnknownProperty("user", SRC_USER);
+    source.handleUnknownProperty("password", encryptedPassword);
+    source.handleUnknownProperty("table", "frost_epoch_input");
+    source.handleUnknownProperty("columns", List.of("*"));
+
+    String fields =
+        """
+        {
+          "$.name": "$.station",
+          "$.description": { "op": "const", "value": "SQL epoch station" },
+          "$.properties.reference": "$.ref",
+          "$.Datastreams[].properties.reference": "$.ref",
+          "$.Datastreams[].Observations[].result": { "op": "const", "value": %s },
+          "$.Datastreams[].Observations[].phenomenonTime":
+              { "op": "toDateTime", "input": "%s", "inputType": "epoch", "unit": "milliseconds" }
+        }
+        """
+            .formatted(result, timestampPath);
+    deploy("pipeline-frost-sql-epoch-" + suffix, graph, source, frostMapping(fields));
   }
 
   /**
@@ -1224,6 +1375,14 @@ class NifiFrostMappingIT extends AbstractNifiIT {
               + "', '"
               + DS_SQL
               + "', 30.5, '2026-01-02T00:00:00Z')");
+      st.execute(
+          "CREATE TABLE frost_epoch_input (station text, ref text, ts_plain timestamp,"
+              + " ts_zoned timestamptz)");
+      st.execute(
+          "INSERT INTO frost_epoch_input (station, ref, ts_plain, ts_zoned) VALUES"
+              + " ('SQL Epoch Station', '"
+              + REF_SQL_EPOCH
+              + "', '2026-04-23 08:00:00', '2026-04-23 08:00:00+02')");
     }
   }
 

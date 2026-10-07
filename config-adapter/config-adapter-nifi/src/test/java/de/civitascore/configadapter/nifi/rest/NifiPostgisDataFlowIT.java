@@ -364,7 +364,9 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                                      "$.day": { "op": "toDate", "input": "$.day",
                                                 "pattern": "dd.MM.yyyy" },
                                      "$.observed": { "op": "toDateTime", "input": "$.observed",
-                                                     "pattern": "dd.MM.yyyy HH:mm:ss" } } } }
+                                                     "pattern": "dd.MM.yyyy HH:mm:ss" },
+                                     "$.epoch_observed": { "op": "toDateTime", "input": "$.epoch",
+                                                           "inputType": "epoch", "unit": "seconds" } } } }
             """);
 
     Datasource source = new Datasource();
@@ -401,7 +403,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                 publisher.publish(
                     CONVERTED_TOPIC,
                     "{\"stationid\":\"S7\",\"day\":\"29.07.2026\","
-                        + "\"observed\":\"29.07.2026 14:30:00\"}");
+                        + "\"observed\":\"29.07.2026 14:30:00\",\"epoch\":\"1785335400\"}");
                 return convertedRowLanded();
               });
     }
@@ -1078,7 +1080,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
         Statement st = c.createStatement();
         ResultSet rs =
             st.executeQuery(
-                "SELECT day, observed FROM converted_observation WHERE stationid = 'S7'")) {
+                "SELECT day, observed, epoch_observed FROM converted_observation WHERE stationid = 'S7'")) {
       if (!rs.next()) {
         return false;
       }
@@ -1086,6 +1088,9 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
       assertEquals(
           OffsetDateTime.parse("2026-07-29T14:30:00Z").toInstant(),
           rs.getObject("observed", OffsetDateTime.class).toInstant());
+      assertEquals(
+          OffsetDateTime.parse("2026-07-29T14:30:00Z").toInstant(),
+          rs.getObject("epoch_observed", OffsetDateTime.class).toInstant());
       return true;
     }
   }
@@ -1157,7 +1162,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
               + " observed timestamptz)");
       st.execute(
           "CREATE TABLE converted_observation (stationid text, day date,"
-              + " observed timestamptz)");
+              + " observed timestamptz, epoch_observed timestamptz)");
       st.execute("CREATE TABLE geo_observation (stationid text, geom geometry(Point,4326))");
       st.execute("CREATE TABLE geo_observation_25832 (stationid text, geom geometry(Point,25832))");
     }
