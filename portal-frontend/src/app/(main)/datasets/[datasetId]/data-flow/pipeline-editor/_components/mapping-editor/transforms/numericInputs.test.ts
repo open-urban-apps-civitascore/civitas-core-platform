@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import messages from '@/messages/de.json'
 
 import { NUMERIC_SUBTYPES } from '../_types'
-import { mappingRegistry } from './index'
+import { mappingRegistry, toDateTimeInputPorts } from './index'
 
 describe('numeric conversion inputs', () => {
   it('NUMERIC_SUBTYPES lists only numerically-parseable scalars', () => {
@@ -30,9 +30,13 @@ describe('date conversion inputs', () => {
     expect(mappingRegistry.byType['toDateTime'].outputs[0].dataType).toBe('datetime')
   })
 
-  it('toDate accepts str and date sources; toDateTime accepts str and datetime', () => {
+  it('toDate accepts str and date sources; toDateTime string input accepts str and datetime', () => {
     expect(mappingRegistry.byType['toDate'].inputs[0].accepts).toEqual(['str', 'date'])
     expect(mappingRegistry.byType['toDateTime'].inputs[0].accepts).toEqual(['str', 'datetime'])
+  })
+
+  it('toDateTime epoch input also accepts numeric sources', () => {
+    expect(toDateTimeInputPorts('epoch')[0].accepts).toEqual(['str', 'int', 'number', 'datetime'])
   })
 
   it('format accepts both date and datetime sources', () => {
@@ -57,11 +61,18 @@ describe('displayed input types match the accepted subtypes', () => {
     }
   })
 
-  it('each palette description starts with the accepted subtypes', () => {
+  it('each fixed-input palette description starts with the accepted subtypes', () => {
     for (const { type, port } of restricted) {
+      if (type === 'toDateTime') continue
       const description = transformMessages[type as keyof typeof transformMessages].description
       expect(description, `description of ${type}`).toMatch(`${port.accepts?.join(' / ')} →`)
     }
+  })
+
+  it('toDateTime describes both selectable input modes', () => {
+    const dateTimeMessages = transformMessages.toDateTime
+    expect(dateTimeMessages.description).toContain(dateTimeMessages.fields.inputType.string)
+    expect(dateTimeMessages.description).toContain(dateTimeMessages.fields.inputType.epoch)
   })
 
   it('toInt and toNumber show the same label, because both take the same subtypes', () => {

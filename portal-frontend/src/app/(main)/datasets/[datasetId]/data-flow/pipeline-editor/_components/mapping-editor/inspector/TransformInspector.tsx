@@ -99,21 +99,23 @@ export const TransformInspector = ({ def, config, onChange, errors }: TransformI
         {def.description && <p className="text-xs text-muted-foreground">{def.description}</p>}
       </div>
 
-      {def.config.map(field => (
-        <div key={field.key} className="space-y-1.5">
-          <Label>{field.label}</Label>
-          <FieldControl
-            field={{
-              ...field,
-              control: controls?.[field.key] ?? field.control,
-              placeholder: placeholders?.[field.key] ?? field.placeholder,
-            }}
-            value={String(config[field.key] ?? field.default ?? '')}
-            onChange={value => onChange(field.key, value)}
-          />
-          {errors?.[field.key] && <p className="text-xs text-destructive">{errors[field.key]}</p>}
-        </div>
-      ))}
+      {def.config
+        .filter(field => !def.visibleFields || def.visibleFields(config).includes(field.key))
+        .map(field => (
+          <div key={field.key} className="space-y-1.5">
+            <Label>{field.label}</Label>
+            <FieldControl
+              field={{
+                ...field,
+                control: controls?.[field.key] ?? field.control,
+                placeholder: placeholders?.[field.key] ?? field.placeholder,
+              }}
+              value={String(config[field.key] ?? field.default ?? '')}
+              onChange={value => onChange(field.key, value)}
+            />
+            {errors?.[field.key] && <p className="text-xs text-destructive">{errors[field.key]}</p>}
+          </div>
+        ))}
 
       {def.config.length === 0 && <p className="text-xs text-muted-foreground">{t('noConfig')}</p>}
     </div>

@@ -24,6 +24,7 @@ export interface MappingTransformDef extends TransformDef {
   /** Per-field control overrides driven by the current config, e.g. the Literal node's value
    *  field switches to a textarea when its type is Json. */
   controls?: (config: Record<string, unknown>) => Record<string, ConfigControl> | undefined
+  visibleFields?: (config: Record<string, unknown>) => readonly string[]
 }
 
 const scalar = (id: string, label: string, dataType?: string): PortDef => ({ id, label, type: 'scalar', dataType })
@@ -42,6 +43,12 @@ const patternField: ConfigField = {
   label: 'transforms.toDate.fields.pattern.label',
   control: 'text',
   default: 'yyyy-MM-dd',
+}
+
+export const toDateTimeInputPorts = (inputType: unknown): PortDef[] => {
+  // A PostgreSQL timestamp can be declared DateTime but arrive from NiFi as epoch text.
+  const accepts = inputType === 'epoch' ? ['str', 'int', 'number', 'datetime'] : ['str', 'datetime']
+  return [{ ...scalar('in', inputLabel(undefined, accepts)), accepts }]
 }
 
 /**
@@ -224,21 +231,59 @@ const conversions: MappingTransformDef[] = [
   // A uuid source needs no transform; it matches a uuid target directly.
   conversion('toUuid', 'str', 'uuid', Fingerprint),
   conversion('toDate', undefined, 'date', Calendar, [patternField], 'toDate', ['str', 'date']),
-  conversion(
-    'toDateTime',
-    undefined,
-    'datetime',
-    Clock,
-    [
+  {
+    ...conversion('toDateTime', undefined, 'datetime', Clock, [], 'toDateTime', ['str', 'datetime']),
+    config: [
       {
-        ...patternField,
-        label: 'transforms.toDateTime.fields.pattern.label',
-        default: "yyyy-MM-dd'T'HH:mm:ssXXX",
+        key: 'inputType',
+        label: 'transforms.toDateTime.fields.inputType.label',
+        control: 'select',
+        default: 'string',
+        options: [
+          { value: 'string', label: 'transforms.toDateTime.fields.inputType.string' },
+          { value: 'epoch', label: 'transforms.toDateTime.fields.inputType.epoch' },
+        ],
+      },
+      { ...patternField, label: 'transforms.toDateTime.fields.pattern.label', default: "yyyy-MM-dd'T'HH:mm:ssXXX" },
+      {
+        key: 'unit',
+        label: 'transforms.toDateTime.fields.unit.label',
+        control: 'select',
+        default: 'milliseconds',
+        options: [
+          { value: 'seconds', label: 'transforms.toDateTime.fields.unit.seconds' },
+          { value: 'milliseconds', label: 'transforms.toDateTime.fields.unit.milliseconds' },
+        ],
       },
     ],
-    'toDateTime',
-    ['str', 'datetime'],
-  ),
+    inputs: toDateTimeInputPorts('string'),
+    visibleFields: cfg => (cfg.inputType === 'epoch' ? ['inputType', 'unit'] : ['inputType', 'pattern']),
+    toValueNode: (inputs, cfg) =>
+      cfg.inputType === 'epoch'
+        ? {
+            op: 'toDateTime',
+            input: inputs[0] ?? '',
+            inputType: 'epoch',
+            unit: cfg.unit === 'seconds' ? 'seconds' : 'milliseconds',
+          }
+        : { op: 'toDateTime', input: inputs[0] ?? '', pattern: String(cfg.pattern ?? "yyyy-MM-dd'T'HH:mm:ssXXX") },
+    opConfig: op =>
+      op.op === 'toDateTime'
+        ? {
+            inputType: op.inputType ?? 'string',
+            pattern: op.pattern ?? "yyyy-MM-dd'T'HH:mm:ssXXX",
+            unit: op.unit ?? 'milliseconds',
+          }
+        : {},
+    validate: (cfg): Record<string, string> | undefined => {
+      if (cfg.inputType === 'epoch') {
+        return cfg.unit === 'seconds' || cfg.unit === 'milliseconds'
+          ? undefined
+          : { unit: 'transforms.toDateTime.fields.unit.required' }
+      }
+      return String(cfg.pattern ?? '').trim() ? undefined : { pattern: 'transforms.toDateTime.fields.pattern.required' }
+    },
+  },
   conversion(
     'format',
     undefined,

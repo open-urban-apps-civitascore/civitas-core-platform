@@ -42,6 +42,7 @@ public class RecordPathCompiler {
   private static final String TO_STRING_CHARSET = "UTF-8";
 
   private static final String ISO_DATE_PATTERN = "yyyy-MM-dd";
+  private static final String ISO_DATE_TIME_PATTERN = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX";
 
   /**
    * The NiFi {@code UpdateRecord} "Replacement Value Strategy" for a property. A {@code const} uses
@@ -240,9 +241,18 @@ public class RecordPathCompiler {
       throws FatalAdapterException {
     String inner = render(convert.input(), geometryEncoding, target, fork);
     return switch (convert.op()) {
-      // RecordPath has one parse function and it always yields a time component, so the timestamp
-      // op is the bare call and the date-only op is the one that needs extra work.
-      case TO_DATE_TIME -> "toDate(" + inner + ", " + quote(convert.pattern()) + ")";
+      // RecordPath has one date parse function. The string input uses that function directly;
+      // epoch input is formatted as an ISO timestamp with a fixed UTC offset.
+      case TO_DATE_TIME ->
+          convert.unit() == null
+              ? "toDate(" + inner + ", " + quote(convert.pattern()) + ")"
+              // concat creates a STRING RecordField. format() alone retains the numeric input's
+              // field metadata, so JsonRecordSetWriter would try to parse the ISO text as LONG.
+              : "concat(format("
+                  + epochMillis(inner, convert.unit())
+                  + ", "
+                  + quote(ISO_DATE_TIME_PATTERN)
+                  + ", 'UTC'))";
       // That time component reaches a DATE column as epoch millis and is rejected there, while the
       // row vanishes without a deployment error. Re-formatting yields a plain string the server
       // parses into the column's own type (see PostgisSinkStage#withStringtypeUnspecified).
@@ -254,12 +264,31 @@ public class RecordPathCompiler {
               + "), "
               + quote(ISO_DATE_PATTERN)
               + ")";
-      case FORMAT -> "format(" + inner + ", " + quote(convert.pattern()) + ")";
+      case FORMAT -> {
+        if (convert.input() instanceof ConvertNode dateTime
+            && dateTime.op() == ConversionOp.TO_DATE_TIME
+            && dateTime.unit() != null) {
+          // An epoch toDateTime yields ISO text. NiFi's format() leaves text unchanged, so
+          // format the epoch value directly and force STRING metadata for the writer.
+          String epoch = render(dateTime.input(), geometryEncoding, target, fork);
+          yield "concat(format("
+              + epochMillis(epoch, dateTime.unit())
+              + ", "
+              + quote(convert.pattern())
+              + ", 'UTC'))";
+        }
+        yield "format(" + inner + ", " + quote(convert.pattern()) + ")";
+      }
       case TO_STRING -> "toString(" + inner + ", " + quote(TO_STRING_CHARSET) + ")";
       // RecordPath's only UUID function, uuid5(), mints a new identifier rather than converting
       // one.
       case TO_INT, TO_FLOAT, TO_UUID -> inner;
     };
+  }
+
+  private static String epochMillis(String input, String unit) {
+    String number = "toNumber(" + input + ")";
+    return "seconds".equals(unit) ? "multiply(" + number + ", 1000)" : number;
   }
 
   /**

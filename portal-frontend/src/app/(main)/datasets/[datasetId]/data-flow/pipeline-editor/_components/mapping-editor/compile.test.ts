@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
 
+import type { TransformNodeData } from '@/components/node-editor/types'
 import { CONTRACT_URIS, contractErrors, readContract } from '@/test-support/coreContracts'
 import type { ContractOperation } from '@/test-support/mappingFixtures'
 import { mappingFixtures, nestedFixtures, sourceTree as fixtureSourceTree } from '@/test-support/mappingFixtures'
@@ -326,6 +327,28 @@ describe('mapping editor compile', () => {
     expect(compileCanvas(built.nodes, built.edges).fields).toEqual(compiled.fields)
   })
 
+  it.each(['milliseconds', 'seconds'] as const)('round-trips an epoch toDateTime node with %s unit', unit => {
+    const source: SchemaTree = {
+      name: 'src',
+      fields: [{ path: '$.timestamp', name: 'timestamp', type: 'int', portType: 'scalar' }],
+    }
+    const target: SchemaTree = {
+      name: 'tgt',
+      fields: [{ path: '$.observedAt', name: 'observedAt', type: 'datetime', portType: 'scalar' }],
+    }
+    const config: MappingConfig = {
+      fields: {
+        '$.observedAt': { op: 'toDateTime', input: '$.timestamp', inputType: 'epoch', unit },
+      },
+      positions: {},
+    }
+
+    const built = decompileConfig(config, source, target)
+    const transform = built.nodes.find(node => node.type === 'transform')
+    expect((transform?.data as TransformNodeData).inputs?.[0].accepts).toContain('int')
+    expect(compileCanvas(built.nodes, built.edges).fields).toEqual(config.fields)
+  })
+
   it('round-trips: compile → decompile → compile is stable', () => {
     const compiled = compileCanvas(nodes, edges)
 
@@ -389,9 +412,12 @@ describe('The operation the Mapping editor offers', () => {
   })
 
   it('offers the same operations the mapping contract defines', () => {
-    const defs = readContract('mapping').$defs as Record<string, { properties?: { op?: { const?: string } } }>
+    const defs = readContract('mapping').$defs as Record<
+      string,
+      { properties?: { op?: { const?: string } }; oneOf?: { properties?: { op?: { const?: string } } }[] }
+    >
     const defined = Object.values(defs)
-      .map(def => def.properties?.op?.const)
+      .map(def => def.properties?.op?.const ?? def.oneOf?.[0]?.properties?.op?.const)
       .filter(Boolean)
       .sort()
 
@@ -399,7 +425,7 @@ describe('The operation the Mapping editor offers', () => {
     expect([...Object.keys(mappingRegistry.byType), 'copy'].sort()).toEqual(defined)
   })
 
-  it('offers no free-text field beyond a date pattern, a literal value and a separator', () => {
+  it('offers typed controls for the date-time input type and epoch unit', () => {
     const configFields = Object.fromEntries(
       mappingRegistry.list.map(def => [
         def.type,
@@ -416,7 +442,7 @@ describe('The operation the Mapping editor offers', () => {
       toFloat: {},
       toUuid: {},
       toDate: { pattern: 'text' },
-      toDateTime: { pattern: 'text' },
+      toDateTime: { inputType: 'select', pattern: 'text', unit: 'select' },
       format: { pattern: 'text' },
     })
   })

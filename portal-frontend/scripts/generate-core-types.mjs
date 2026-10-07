@@ -256,7 +256,25 @@ class ModuleGenerator {
         : new Set([...candidates].filter(k => keys.has(k)));
       if (candidates.size === 0) return null;
     }
-    return candidates ? [...candidates][0] : null;
+    if (!candidates) return null;
+    // A shared const key is not a discriminator when variants use the same value.
+    return [...candidates].find(key => {
+      const values = schemas.map(schema => this._constValueOf(schema, key));
+      return values.every(value => value !== undefined) && new Set(values).size === values.length;
+    }) ?? null;
+  }
+
+  _constValueOf(schema, key) {
+    if (schema.properties?.[key]?.const !== undefined) return schema.properties[key].const;
+    if (schema.$ref) {
+      const name = schema.$ref.replace(/^#\/\$defs\//, "");
+      if (this.defs[name]) return this._constValueOf(this.defs[name], key);
+    }
+    for (const part of schema.allOf ?? []) {
+      const value = this._constValueOf(part, key);
+      if (value !== undefined) return value;
+    }
+    return undefined;
   }
 
   _constKeysOf(schema) {
