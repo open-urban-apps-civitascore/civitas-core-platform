@@ -96,7 +96,7 @@ class AssignmentChangeAuthorizerTest {
   }
 
   @Test
-  @DisplayName("Denies a change on an entity type it cannot place")
+  @DisplayName("Denies a change on an unsupported entity type")
   void deniesUnknownTargetType() {
     authenticateAs(userId);
     BaseDataEntity unknown = mock(BaseDataEntity.class);

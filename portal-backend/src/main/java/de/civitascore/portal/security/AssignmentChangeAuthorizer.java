@@ -45,7 +45,10 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class AssignmentChangeAuthorizer {
 
-  /** Permission name prefixes that take effect on an entity of each scope type. */
+  /**
+   * Permission name prefixes that take effect on an entity of each scope type; a data pool's also
+   * include those it passes on to its data sets.
+   */
   private static final Map<ScopeType, List<String>> APPLICABLE_PREFIXES =
       Map.of(
           ScopeType.DATASET, List.of("DATASET_"),
@@ -103,8 +106,8 @@ public class AssignmentChangeAuthorizer {
    *
    * @param entity the data entity whose assignments are replaced
    * @param desired the assignments the entity holds afterwards
-   * @throws AccessDeniedException if the caller is unauthenticated or may not add or remove one of
-   *     the changed roles
+   * @throws AccessDeniedException if the caller is unauthenticated, the entity type is unsupported,
+   *     or the caller may not add or remove one of the changed roles
    */
   public void authorizeReplacement(BaseDataEntity entity, Collection<Assignment> desired) {
     Map<AssignmentKey, Role> current = rolesByKey(entity.getAssignments());
@@ -126,7 +129,7 @@ public class AssignmentChangeAuthorizer {
         authorize(removed, PermissionName.ASSIGNMENT_DELETE, "remove", target, caller);
 
     log.info(
-        "Assignment change granted for user {} on {}: added={} ({}) removed={} ({})",
+        "Assignment change authorized for user {} on {}: added={} ({}) removed={} ({})",
         Encode.forJava(externalId),
         target,
         added.keySet(),

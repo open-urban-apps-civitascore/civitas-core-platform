@@ -44,7 +44,8 @@ import org.springframework.http.ResponseEntity;
 
 /**
  * Assignments sent in a data entity body may only grant or remove roles whose permissions the
- * caller holds on that entity, unless the caller holds the tenant-wide assignment permissions.
+ * caller holds on that entity, unless the caller holds ASSIGNMENT_CREATE (to grant) or
+ * ASSIGNMENT_DELETE (to remove) tenant-wide.
  */
 @DisplayName("Assignment changes in data entity bodies")
 class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrationTest {
@@ -65,7 +66,9 @@ class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrati
     DATASET_READY_META(ScopeType.DATASET, "/datasets/%s/ready/meta"),
     DATASET_RELEASED_META(ScopeType.DATASET, "/datasets/%s/released/meta"),
     DATAPOOL_PATCH(ScopeType.DATAPOOL, "/datapools/%s"),
+    DATASOURCE_PATCH(ScopeType.DATASOURCE, "/datasources/%s"),
     DATASOURCE_RELEASED_META(ScopeType.DATASOURCE, "/datasources/%s/released/meta"),
+    DATASTRUCTURE_PATCH(ScopeType.DATASTRUCTURE, "/datastructures/%s"),
     DATASTRUCTURE_RELEASED_META(ScopeType.DATASTRUCTURE, "/datastructures/%s/released/meta");
 
     private final ScopeType scopeType;
@@ -110,7 +113,7 @@ class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrati
         patch(route, target, "renamed", Set.of(own, new GroupRole(caller, owner)));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-    assertThat(stored(route, target)).containsExactly(own);
+    assertThat(stored(route.scopeType, target)).containsExactly(own);
     assertThat(storedName(target)).isEqualTo(target.getName());
   }
 
@@ -130,8 +133,9 @@ class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrati
     ResponseEntity<String> response = patch(route, target, "renamed", Set.of(own));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-    assertThat(stored(route, target))
+    assertThat(stored(route.scopeType, target))
         .containsExactlyInAnyOrder(own, new GroupRole(ownerGroup, owner));
+    assertThat(storedName(target)).isEqualTo(target.getName());
   }
 
   @ParameterizedTest
@@ -151,7 +155,7 @@ class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrati
         patch(route, target, "renamed", Set.of(own, new GroupRole(caller, owner)));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-    assertThat(stored(route, target))
+    assertThat(stored(route.scopeType, target))
         .containsExactlyInAnyOrder(own, new GroupRole(ownerGroup, owner));
     assertThat(storedName(target)).isEqualTo(target.getName());
   }
@@ -170,7 +174,7 @@ class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrati
     ResponseEntity<String> response = patch(route, target, "renamed", Set.of(own));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(stored(route, target)).containsExactly(own);
+    assertThat(stored(route.scopeType, target)).containsExactly(own);
   }
 
   @ParameterizedTest
@@ -188,7 +192,7 @@ class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrati
     ResponseEntity<String> response = patch(route, target, "renamed", Set.of(own, granted));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(stored(route, target)).containsExactlyInAnyOrder(own, granted);
+    assertThat(stored(route.scopeType, target)).containsExactlyInAnyOrder(own, granted);
   }
 
   @ParameterizedTest
@@ -205,7 +209,7 @@ class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrati
     ResponseEntity<String> response = patch(route, target, "renamed", Set.of(replacement));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(stored(route, target)).containsExactly(replacement);
+    assertThat(stored(route.scopeType, target)).containsExactly(replacement);
   }
 
   @ParameterizedTest
@@ -221,7 +225,7 @@ class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrati
     ResponseEntity<String> response = patch(route, target, "renamed", Set.of(existing));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(stored(route, target)).containsExactly(existing);
+    assertThat(stored(route.scopeType, target)).containsExactly(existing);
     assertThat(storedName(target)).isEqualTo("renamed");
   }
 
@@ -237,7 +241,7 @@ class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrati
     ResponseEntity<String> response = patch(route, target, "renamed", null);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(stored(route, target)).containsExactly(new GroupRole(ownerGroup, owner));
+    assertThat(stored(route.scopeType, target)).containsExactly(new GroupRole(ownerGroup, owner));
   }
 
   @Test
@@ -275,7 +279,7 @@ class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrati
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     DataSet created = dataSetRepository.findByName("delegated").orElseThrow();
-    assertThat(stored(Route.DATASET_PATCH, created)).containsExactly(steward);
+    assertThat(stored(ScopeType.DATASET, created)).containsExactly(steward);
   }
 
   private BaseDataEntity target(Route route) {
@@ -285,8 +289,10 @@ class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrati
       case DATASET_RELEASED_META ->
           portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.AVAILABLE));
       case DATAPOOL_PATCH -> portalData.dataPool(b -> b.description("test datapool"));
+      case DATASOURCE_PATCH -> portalData.dataSource();
       case DATASOURCE_RELEASED_META ->
           portalData.dataSource(b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE));
+      case DATASTRUCTURE_PATCH -> portalData.dataStructure();
       case DATASTRUCTURE_RELEASED_META ->
           portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
     };
@@ -302,8 +308,8 @@ class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrati
     }
   }
 
-  private Set<GroupRole> stored(Route route, BaseDataEntity target) {
-    return assignmentService.findAllByScopeTypeAndScopeId(route.scopeType, target.getId()).stream()
+  private Set<GroupRole> stored(ScopeType scopeType, BaseDataEntity target) {
+    return assignmentService.findAllByScopeTypeAndScopeId(scopeType, target.getId()).stream()
         .map(a -> new GroupRole(a.getGroup(), a.getRole()))
         .collect(Collectors.toSet());
   }

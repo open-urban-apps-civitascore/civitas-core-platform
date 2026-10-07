@@ -51,7 +51,8 @@ public abstract class BaseDataEntityService<
 
   /**
    * Replaces the entity's assignments with the requested ones, once the caller is authorized for
-   * every assignment added or removed. The only path by which a request body changes assignments.
+   * every assignment added or removed. The only path by which a data entity's request body changes
+   * its assignments.
    *
    * @param entity the data entity
    * @param requested the requested assignments; {@code null} leaves them untouched
