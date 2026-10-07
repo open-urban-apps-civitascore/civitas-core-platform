@@ -127,13 +127,13 @@
     },
     "/v1/datasets/{id}/pipelines": {
       "GET": "DATASET_READ",
-      "POST": "DATASET_CREATE"
+      "POST": "DATASET_UPDATE"
     },
     "/v1/datasets/{id}/pipelines/{id}": {
       "GET": "DATASET_READ",
       "PUT": "DATASET_UPDATE",
       "PATCH": "DATASET_UPDATE",
-      "DELETE": "DATASET_DELETE"
+      "DELETE": "DATASET_UPDATE"
     },
     "/v1/datasources": {
       "_collection": true,

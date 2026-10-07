@@ -36,9 +36,7 @@ export const useDatasetPermissions = (dataset: DatasetPermissionSubject | undefi
     hasScopedPermission(permission, ASSIGNMENT_SCOPE_TYPES.DATASET, dataset.id, dataset.datapool?.id ?? undefined)
 
   const canRead = scoped(PERMISSION_NAMES.DATASET_READ)
-  const canCreate = scoped(PERMISSION_NAMES.DATASET_CREATE)
   const canUpdate = scoped(PERMISSION_NAMES.DATASET_UPDATE)
-  const canDelete = scoped(PERMISSION_NAMES.DATASET_DELETE)
   const canRelease = scoped(PERMISSION_NAMES.DATASET_RELEASE)
   const canReadDatasources = hasPermission(PERMISSION_NAMES.DATASOURCE_READ)
   const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
@@ -52,8 +50,8 @@ export const useDatasetPermissions = (dataset: DatasetPermissionSubject | undefi
 
   // Editing a pipeline additionally requires data structures and datasources permissions
   const canEditPipeline = canRead && canUpdate && isDraft && canReadDatasources && canReadDatastructures
-  const canCreatePipeline = canEditPipeline && canCreate
-  const canDeletePipeline = canDelete && isDraft
+  const canCreatePipeline = canEditPipeline
+  const canDeletePipeline = canUpdate && isDraft
 
   return {
     isDraft,

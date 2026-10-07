@@ -283,30 +283,24 @@ describe('useDatasetPermissions', () => {
       expect(renderPermissions().canEditPipeline).toBe(false)
     })
 
-    it('denies creating without DATASET_CREATE, even when editing is allowed', () => {
+    it('allows creating and deleting with DATASET_UPDATE, without DATASET_CREATE or DATASET_DELETE', () => {
       mockTenantPermissions(PIPELINE_PERMISSIONS)
-      const { canEditPipeline, canCreatePipeline } = renderPermissions()
-      expect({ canEditPipeline, canCreatePipeline }).toEqual({ canEditPipeline: true, canCreatePipeline: false })
+      const { canCreatePipeline, canDeletePipeline } = renderPermissions()
+      expect({ canCreatePipeline, canDeletePipeline }).toEqual({ canCreatePipeline: true, canDeletePipeline: true })
     })
 
-    it('allows creating with DATASET_CREATE on top', () => {
-      mockTenantPermissions([...PIPELINE_PERMISSIONS, PERMISSION_NAMES.DATASET_CREATE])
-      expect(renderPermissions().canCreatePipeline).toBe(true)
+    it('denies creating and deleting with DATASET_CREATE and DATASET_DELETE but without DATASET_UPDATE', () => {
+      mockTenantPermissions([
+        ...PIPELINE_PERMISSIONS.filter(permission => permission !== PERMISSION_NAMES.DATASET_UPDATE),
+        PERMISSION_NAMES.DATASET_CREATE,
+        PERMISSION_NAMES.DATASET_DELETE,
+      ])
+      const { canCreatePipeline, canDeletePipeline } = renderPermissions()
+      expect({ canCreatePipeline, canDeletePipeline }).toEqual({ canCreatePipeline: false, canDeletePipeline: false })
     })
 
-    it('denies creating with DATASET_CREATE alone', () => {
-      mockTenantPermissions([PERMISSION_NAMES.DATASET_CREATE])
-      expect(renderPermissions().canCreatePipeline).toBe(false)
-    })
-
-    it('denies deleting without DATASET_DELETE, even when editing is allowed', () => {
-      mockTenantPermissions(PIPELINE_PERMISSIONS)
-      const { canEditPipeline, canDeletePipeline } = renderPermissions()
-      expect({ canEditPipeline, canDeletePipeline }).toEqual({ canEditPipeline: true, canDeletePipeline: false })
-    })
-
-    it('needs DATASET_DELETE only, not the rest of the pipeline permission set', () => {
-      mockTenantPermissions([PERMISSION_NAMES.DATASET_DELETE])
+    it('needs DATASET_UPDATE only for deleting, not the rest of the pipeline permission set', () => {
+      mockTenantPermissions([PERMISSION_NAMES.DATASET_UPDATE])
       expect(renderPermissions().canDeletePipeline).toBe(true)
     })
   })
