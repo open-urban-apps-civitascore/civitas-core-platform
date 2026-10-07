@@ -1469,20 +1469,19 @@ class GeoServerSagaHandlerTest {
     }
 
     @Test
-    void reportsFeatureTypesItCouldNotUnpublishAndPrunesTheRest() {
+    void failsNamingTheFeatureTypesItCouldNotUnpublishAfterPruningTheRest() {
       try (GeoServerSagaHandler handler = createHandler()) {
-        // Failing the step would report an applied update as failed; staying silent would leave the
-        // layer served with nothing in the portal able to see it.
         server.enqueue(snapshotResponse("t1", "stuck", "removable"));
-        server.enqueue(new MockResponse.Builder().code(500).build());
+        server.enqueue(new MockResponse.Builder().code(503).build());
         server.enqueue(ok());
 
         SagaCommandResult result =
             handler.handle(
                 createCommand("EXECUTE_STEP", "PRUNE_FEATURE_TYPES", updatePayload("t1")));
 
-        assertEquals("STEP_COMPLETED", result.type());
-        assertEquals(List.of("stuck"), result.resultData().get("staleFeatureTypes"));
+        assertEquals("STEP_FAILED", result.type());
+        assertTrue(result.error().contains("stuck"), result.error());
+        assertFalse(result.error().contains("removable"), result.error());
         assertEquals(3, server.getRequestCount());
       }
     }
