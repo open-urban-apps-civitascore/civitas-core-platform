@@ -151,7 +151,7 @@ has_permission if {
 # Scope matching rules:
 #   - Resource endpoints: assignment.scopeId must match resource ID from path
 #   - TENANT-scoped resources: assignment.scopeType must be TENANT (no scopeId check)
-#   - Collection endpoints: TENANT scope, or matching scope type for reads only (Q-006: fail-secure)
+#   - Collection endpoints: TENANT scope; matching scope type for reads only; a DATAPOOL grant also for the dataset collection (Q-006: fail-secure)
 #
 # SCOPE INHERITANCE (Q-005 resolved): TENANT scope cascades to all resource
 # endpoints per ADM spec. DATASPACE → child resource inheritance is deferred
