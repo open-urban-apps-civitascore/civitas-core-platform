@@ -27,28 +27,20 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 /**
- * Authorizes a change to the assignments a data entity's request body carries.
+ * Authorizes changes to the assignments a data entity's request body carries.
  *
- * <p>OPA authorizes the endpoint, e.g. {@code DATASET_UPDATE}, but never sees the body, so the
- * backend checks the assignments it adds or removes. A caller may add or remove a role only if they
- * hold every permission of that role which applies to the entity — or hold {@code
- * ASSIGNMENT_CREATE} (adding) or {@code ASSIGNMENT_DELETE} (removing) tenant-wide, as the
- * assignments API requires.
+ * <p>OPA never sees the body, so the backend checks each added or removed role: the caller must
+ * hold every permission of the role that applies to the entity, or hold {@code ASSIGNMENT_CREATE}
+ * (adding) or {@code ASSIGNMENT_DELETE} (removing) tenant-wide.
  *
- * <p>The caller's permissions on the entity come from their tenant-wide assignments, their
- * assignments on the entity itself and, for a data set, their assignments on its data pool — the
- * inheritance the authorization policy applies.
- *
- * <p>Every decision — grant and deny — is logged for audit.
+ * <p>The caller's permissions on the entity come from tenant-wide assignments, assignments on the
+ * entity and, for a data set, assignments on its data pool. Every decision is logged for audit.
  */
 @Component
 @Slf4j
 public class AssignmentChangeAuthorizer {
 
-  /**
-   * Permission name prefixes that take effect on an entity of each scope type; a data pool's also
-   * include those it passes on to its data sets.
-   */
+  /** Permission prefixes that take effect per scope type; a data pool passes on data set ones. */
   private static final Map<ScopeType, List<String>> APPLICABLE_PREFIXES =
       Map.of(
           ScopeType.DATASET, List.of("DATASET_"),

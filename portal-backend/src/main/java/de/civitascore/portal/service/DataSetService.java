@@ -295,7 +295,7 @@ public class DataSetService
     if (entity.getId() != null) {
       createManifestIfMissing(entity);
     }
-    // After the pool is resolved: the assignment check inherits permissions through it.
+    // Last, so the assignment check sees the resolved pool it inherits permissions through.
     return super.postConvertToEntity(entity, input);
   }
 
