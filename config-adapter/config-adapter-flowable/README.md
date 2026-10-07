@@ -11,7 +11,7 @@ One BPMN process per saga type; the trigger's `sagaType` selects it.
 
 | `sagaType` | Process | Step order | On step failure |
 |---|---|---|---|
-| `DATASET_CREATE` | `dataset-create` | FROST branch → APISIX `CREATE_ROUTE` → geo branch → pipeline branch → GeoServer `PRUNE_FEATURE_TYPES` when `hasGeoSink` | reverse-order compensation; a failing prune is absorbed and the saga still succeeds |
+| `DATASET_CREATE` | `dataset-create` | FROST branch → APISIX `CREATE_ROUTE` → geo branch → pipeline branch → GeoServer `PRUNE_FEATURE_TYPES` when `hasGeoSink` | reverse-order compensation, a failing prune included |
 | `DATASET_UPDATE` | `dataset-update` | FROST branch → APISIX `UPDATE_ROUTE` → geo branch → pipeline branch → GeoServer `PRUNE_FEATURE_TYPES` when `hasGeoSink` | reverse-order compensation; a failing prune is absorbed and the saga still succeeds |
 | `DATASET_DELETE` | `dataset-delete` | pipeline branch → APISIX `DELETE_ROUTE` → geo teardown → FROST `DELETE_PROJECT` | best-effort: the chain continues, no compensation |
 | `DATASET_UNRELEASE` | `dataset-unrelease` | pipeline branch → APISIX `DELETE_ROUTE` | best-effort: the chain continues, no compensation |
@@ -28,7 +28,9 @@ feature type cannot be restored, so it MUST follow the last failable step — se
 [../config-adapter-geoserver/README.md](../config-adapter-geoserver/README.md). `DATASET_UNRELEASE` tears down ingest
 and consumer access only; the data-holding sink — the PostGIS table and the FROST project — and the GeoServer
 workspace are kept so a later re-release reuses them. The create saga therefore prunes too: `PROVISION_LAYERS` never
-removes a layer, so without the prune a layer deleted between unrelease and re-release stays served.
+removes a layer, so without the prune a layer deleted between unrelease and re-release stays served. A failed
+prune fails the release and compensates it, which deletes the workspace: a successful release has to serve exactly the
+Dataset's layers, and a released Dataset cannot be edited to retry the prune.
 
 Compensation chains run in full reverse order:
 

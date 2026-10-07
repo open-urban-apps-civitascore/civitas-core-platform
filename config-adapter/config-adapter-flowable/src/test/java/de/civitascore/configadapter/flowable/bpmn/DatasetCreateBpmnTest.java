@@ -330,23 +330,51 @@ class DatasetCreateBpmnTest {
   }
 
   @Test
-  void shouldReportSuccessWhenOnlyTheFeatureTypePruneFails() {
+  void shouldFailAndDeleteTheWorkspaceWhenTheFeatureTypePruneFails() {
     stubFrostSuccess();
     stubApisixSuccess();
-    when(geoserverHandler.handle(
-            argThat(cmd -> cmd != null && "PRUNE_FEATURE_TYPES".equals(cmd.operation()))))
-        .thenReturn(
-            SagaCommandResult.failure("saga-test-123", "prune-featuretypes", "GeoServer 503"));
+    stubApisixCompensationSuccess();
+    stubFrostCompensationSuccess();
+    stubPruneFailure();
 
     ProcessInstance instance = startProcessWithGeo(false, true, true);
     executeAllJobs();
 
-    assertProcessCompleted(instance.getId());
+    assertProcessFinished(instance.getId());
     assertEquals(
-        List.of("publish-success"),
+        List.of("publish-failure"),
         FlowableTestSupport.getPublishedResultTaskIds(historyService, instance.getId()));
-    verify(geoserverHandler, never())
-        .handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type())));
+    verify(geoserverHandler)
+        .handle(
+            argThat(
+                cmd ->
+                    cmd != null
+                        && "COMPENSATE_STEP".equals(cmd.type())
+                        && "DELETE_WORKSPACE".equals(cmd.operation())));
+    verify(pipelineHandler, never()).handle(any());
+  }
+
+  @Test
+  void shouldCompensatePipelinesFirstWhenTheFeatureTypePruneFails() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+    stubApisixCompensationSuccess();
+    stubFrostCompensationSuccess();
+    stubPipelineSuccess();
+    stubPipelineCompensationSuccess();
+    stubPruneFailure();
+
+    ProcessInstance instance = startProcessWithGeo(true, true, true);
+    executeAllJobs();
+
+    assertProcessFinished(instance.getId());
+    var inOrder = inOrder(pipelineHandler, geoserverHandler);
+    inOrder
+        .verify(pipelineHandler)
+        .handle(argThat(cmd -> cmd != null && "DELETE_PIPELINES".equals(cmd.operation())));
+    inOrder
+        .verify(geoserverHandler)
+        .handle(argThat(cmd -> cmd != null && "DELETE_WORKSPACE".equals(cmd.operation())));
   }
 
   @Test
@@ -547,6 +575,13 @@ class DatasetCreateBpmnTest {
   private void stubPipelineFailure(String error) {
     when(pipelineHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(SagaCommandResult.failure("saga-test-123", "deploy-pipelines", error));
+  }
+
+  private void stubPruneFailure() {
+    when(geoserverHandler.handle(
+            argThat(cmd -> cmd != null && "PRUNE_FEATURE_TYPES".equals(cmd.operation()))))
+        .thenReturn(
+            SagaCommandResult.failure("saga-test-123", "prune-featuretypes", "GeoServer 503"));
   }
 
   private void stubFrostCompensationSuccess() {

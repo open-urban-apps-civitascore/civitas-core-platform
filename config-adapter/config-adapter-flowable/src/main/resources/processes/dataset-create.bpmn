@@ -127,6 +127,7 @@
         <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="deploy-pipelines"/>
       </extensionElements>
       <incoming>flow-pipeline-error</incoming>
+      <incoming>flow-prune-comp-pipelines</incoming>
       <outgoing>flow-comp-pipelines-gateway</outgoing>
     </serviceTask>
     <exclusiveGateway id="pipeline-comp-gateway" name="Compensate GeoServer?" default="flow-pipeline-comp-apisix">
@@ -144,6 +145,7 @@
       <incoming>flow-datastore-error</incoming>
       <incoming>flow-layers-error</incoming>
       <incoming>flow-pipeline-comp-geo</incoming>
+      <incoming>flow-prune-comp-geo</incoming>
       <outgoing>flow-comp-geoserver-sink</outgoing>
     </serviceTask>
     <serviceTask id="compensate-sink" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate" name="Compensate: Deprovision PostGIS Sink">
@@ -200,13 +202,17 @@
       <outgoing>flow-prune-error</outgoing>
       <errorEventDefinition id="ErrorEventDefinition_8" errorRef="stepFailedError"/>
     </boundaryEvent>
+    <exclusiveGateway id="prune-comp-gateway" name="Compensate Pipelines?" default="flow-prune-comp-geo">
+      <incoming>flow-prune-error</incoming>
+      <outgoing>flow-prune-comp-pipelines</outgoing>
+      <outgoing>flow-prune-comp-geo</outgoing>
+    </exclusiveGateway>
     <serviceTask id="publish-success" flowable:async="true" flowable:class="de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate" name="Publish Success Result">
       <extensionElements>
         <flowable:field xsi:type="xs:anyType" name="resultType" stringValue="success"/>
       </extensionElements>
       <incoming>flow-prune-skip</incoming>
       <incoming>flow-prune-success</incoming>
-      <incoming>flow-prune-error</incoming>
       <outgoing>flow-publish-success-end</outgoing>
     </serviceTask>
     <serviceTask id="publish-failure" flowable:async="true" flowable:class="de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate" name="Publish Failure Result">
@@ -253,7 +259,11 @@
     </sequenceFlow>
     <sequenceFlow id="flow-prune-skip" name="no" sourceRef="prune-gateway" targetRef="publish-success"/>
     <sequenceFlow id="flow-prune-success" sourceRef="prune-featuretypes" targetRef="publish-success"/>
-    <sequenceFlow id="flow-prune-error" sourceRef="prune-error" targetRef="publish-success"/>
+    <sequenceFlow id="flow-prune-error" sourceRef="prune-error" targetRef="prune-comp-gateway"/>
+    <sequenceFlow id="flow-prune-comp-pipelines" name="yes" sourceRef="prune-comp-gateway" targetRef="compensate-pipelines">
+      <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_8">${hasPipelines == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-prune-comp-geo" name="no" sourceRef="prune-comp-gateway" targetRef="compensate-geoserver"/>
     <sequenceFlow id="flow-publish-success-end" sourceRef="publish-success" targetRef="end"/>
     <sequenceFlow id="flow-frost-error" sourceRef="frost-error" targetRef="publish-failure"/>
     <sequenceFlow id="flow-apisix-error" sourceRef="apisix-error" targetRef="frost-comp-gateway"/>
@@ -469,6 +479,12 @@
         <dc:Bounds height="50.0" width="110.0" x="1723.0" y="400.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_66" labelStyle="BPMNLabelStyle_1">
           <dc:Bounds height="28.0" width="99.0" x="1728.0" y="411.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_ExclusiveGateway_8" bpmnElement="prune-comp-gateway" isMarkerVisible="true">
+        <dc:Bounds height="50.0" width="50.0" x="1753.0" y="663.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_72" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="28.0" width="60.0" x="1813.0" y="674.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_7" bpmnElement="prune-error">
@@ -733,12 +749,30 @@
         <di:waypoint xsi:type="dc:Point" x="1903.0" y="425.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_70"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_38" bpmnElement="flow-prune-error" sourceElement="BPMNShape_BoundaryEvent_7" targetElement="BPMNShape_ServiceTask_10">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_38" bpmnElement="flow-prune-error" sourceElement="BPMNShape_BoundaryEvent_7" targetElement="BPMNShape_ExclusiveGateway_8">
         <di:waypoint xsi:type="dc:Point" x="1778.0" y="468.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1778.0" y="495.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1930.0" y="495.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1930.0" y="450.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1778.0" y="565.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1778.0" y="663.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_71"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_39" bpmnElement="flow-prune-comp-pipelines" sourceElement="BPMNShape_ExclusiveGateway_8" targetElement="BPMNShape_compensate_pipelines">
+        <di:waypoint xsi:type="dc:Point" x="1753.0" y="688.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1650.0" y="688.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1650.0" y="700.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1270.0" y="700.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_73">
+          <dc:Bounds height="14.0" width="19.0" x="1700.0" y="689.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_40" bpmnElement="flow-prune-comp-geo" sourceElement="BPMNShape_ExclusiveGateway_8" targetElement="BPMNShape_ServiceTask_7">
+        <di:waypoint xsi:type="dc:Point" x="1778.0" y="713.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1778.0" y="740.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1030.0" y="740.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1030.0" y="595.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1000.0" y="595.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_74">
+          <dc:Bounds height="14.0" width="14.0" x="1785.0" y="720.0"/>
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
     <bpmndi:BPMNLabelStyle id="BPMNLabelStyle_1">
