@@ -40,9 +40,12 @@ import org.springframework.core.annotation.Order;
 public class OpenApiConfig {
 
   private final KeycloakProperties keycloakProperties;
+  private final OpenApiProperties openApiProperties;
 
-  public OpenApiConfig(final KeycloakProperties keycloakProperties) {
+  public OpenApiConfig(
+      final KeycloakProperties keycloakProperties, final OpenApiProperties openApiProperties) {
     this.keycloakProperties = keycloakProperties;
+    this.openApiProperties = openApiProperties;
   }
 
   private static final String APPLICATION_JSON = "application/json";
@@ -51,7 +54,9 @@ public class OpenApiConfig {
 
   /**
    * Creates the base OpenAPI definition with info metadata, license, contact, external docs, and
-   * OAuth2 security scheme derived from Keycloak configuration.
+   * OAuth2 security scheme derived from Keycloak configuration. The scheme uses {@code
+   * openapi.oauth-server-url} as the Keycloak base URL when it is set, else {@code
+   * keycloak.auth-server-url}.
    *
    * @return the configured OpenAPI specification object
    */
@@ -78,7 +83,10 @@ public class OpenApiConfig {
                     .description("CIVITAS/CORE Developer Documentation")
                     .url("https://docs.core.civitasconnect.digital/docs_v2/Development/intro"));
 
-    String authServerUrl = keycloakProperties.authServerUrl();
+    String authServerUrl =
+        openApiProperties.oauthServerUrl() != null && !openApiProperties.oauthServerUrl().isBlank()
+            ? openApiProperties.oauthServerUrl()
+            : keycloakProperties.authServerUrl();
     String realm = keycloakProperties.realm();
     if (authServerUrl != null && !authServerUrl.isBlank() && realm != null && !realm.isBlank()) {
       String authUrl = authServerUrl + "/realms/" + realm + "/protocol/openid-connect/auth";

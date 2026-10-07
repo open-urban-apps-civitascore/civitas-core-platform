@@ -132,9 +132,20 @@ management:
       probes:
         enabled: true
 
+# OpenAPI description
+openapi:
+  # Keycloak base URL that the OAuth2 security scheme of the description shows. Empty: the
+  # description uses keycloak.auth-server-url. The export-openapi-spec CI job sets an example.org
+  # URL, so the committed spec shows no internal host.
+  oauth-server-url:
+
 springdoc:
   default-produces-media-type: application/json
   override-with-generic-response: false
+  # Sort all keys alphabetically. Without this, the field order of schemas that springdoc reads
+  # through reflection (e.g. Spring Data's PageableObject, SortObject) can change between starts,
+  # and update-openapi-spec opens bot merge requests that only reorder lines.
+  writer-with-order-by-keys: true
   api-docs:
     path: /api-docs
     version: openapi-3-1
