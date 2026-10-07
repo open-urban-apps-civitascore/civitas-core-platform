@@ -184,8 +184,9 @@ publish-nifi-extensions:
 # would put the whole Apache distribution into our registry and into our container scanning for a
 # file of two megabytes. The deployment copies them out of an init container.
 #
-# The image carries the NAR version, not the version of the repository: a flow names the bundle
-# version of the processor it uses, and NiFi resolves a component by that coordinate.
+# The image carries the NAR version, because a flow names the bundle version of the processor it
+# uses, and NiFi resolves a component by that coordinate. It also carries the version of the
+# repository, so that a release pins all platform images with one tag.
 build-nifi-extensions-image:
   extends:
     - .only-nifi-extensions-changes
@@ -253,6 +254,8 @@ deploy-nifi-extensions-image:
   image: docker:27-dind
   stage: deploy
   needs:
+    - job: setup-version
+      artifacts: true
     - job: setup-version-nifi-extensions
     - job: container-scan-nifi-extensions
   services:
@@ -265,11 +268,16 @@ deploy-nifi-extensions-image:
     - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
   script:
     - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/nifi-extensions:${CI_COMMIT_REF_SLUG}-scan
-    - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/nifi-extensions:$NIFI_EXTENSIONS_VERSION
+    - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/nifi-extensions:$NIFI_EXTENSIONS_VERSION --tag $CI_REGISTRY_IMAGE/nifi-extensions:$REVISION
     - docker buildx imagetools rm $SCAN_IMAGE_TAG || true
     - |
       if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "staging" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
-        docker buildx imagetools create $CI_REGISTRY_IMAGE/nifi-extensions:$NIFI_EXTENSIONS_VERSION --tag $CI_REGISTRY_IMAGE/nifi-extensions:$CI_COMMIT_BRANCH
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/nifi-extensions:$REVISION --tag $CI_REGISTRY_IMAGE/nifi-extensions:$CI_COMMIT_BRANCH
+      fi
+    # Nightly build: additionally tag with <branch>-nightly-<YYYYMMDD>
+    - |
+      if [ "$IS_NIGHTLY" = "true" ] && [ -n "$NIGHTLY_IMAGE_TAG" ]; then
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/nifi-extensions:$REVISION --tag $CI_REGISTRY_IMAGE/nifi-extensions:$NIGHTLY_IMAGE_TAG
       fi
 
 sbom-nifi-extensions-image:
