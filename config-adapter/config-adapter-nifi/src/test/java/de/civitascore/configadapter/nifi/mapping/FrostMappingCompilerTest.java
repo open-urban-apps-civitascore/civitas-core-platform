@@ -22,11 +22,15 @@ import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.FrostCompi
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.KeyAttribute;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaEntity;
 import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaJsonType;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaTarget;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.TargetKind;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConstNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConvertNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.CopyNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.GeoPointNode;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -542,35 +546,21 @@ class FrostMappingCompilerTest {
   }
 
   @Test
-  void compile_withTheWholeLocationPropertiesAndAnAttributeOfIt_isRejected() {
-    // The body holds the properties object once; rendering both would drop one without an error.
+  void compile_withTheWholeLocationProperties_isRejected() {
+    // A free object is no target: a structure models the bag as a class, attribute by attribute.
     FatalAdapterException ex =
         assertThrows(
             FatalAdapterException.class,
             () ->
                 compiler.compile(
-                    locationMapping(
-                        "$.Locations[].properties", new CopyNode("$.siteProps"),
-                        "$.Locations[].properties.reference", new CopyNode("$.siteRef")),
+                    locationMapping("$.Locations[].properties", new CopyNode("$.siteProps")),
                     WITH_LOCATION_BAG,
                     SinkPort.THING_TREE));
 
-    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
-    assertTrue(ex.getMessage().contains("map either the whole object"), ex.getMessage());
-  }
-
-  @Test
-  void compile_withTheWholeLocationPropertiesAlone_isStillAccepted() throws Exception {
-    String body =
-        compiler
-            .compile(
-                locationMapping("$.Locations[].properties", new CopyNode("$.siteProps")),
-                WITH_LOCATION_BAG,
-                SinkPort.THING_TREE)
-            .plan()
-            .body();
-
-    assertTrue(locationOf(body).contains("\"properties\":${sta_7_properties}"), body);
+    assertTrue(
+        ex.getMessage()
+            .contains("unsupported FROST mapping target path: '$.Locations[].properties'"),
+        ex.getMessage());
   }
 
   @Test
@@ -624,6 +614,270 @@ class FrostMappingCompilerTest {
                     List.of(),
                     List.of()));
     assertTrue(ex.getMessage().contains("location"), ex.getMessage());
+  }
+
+  // ─── Classes modelled under free fields ──────────────────────────────────────
+
+  private static final String OBSERVATION = "$.Datastreams[].Observations[]";
+  private static final String FEATURE = OBSERVATION + ".FeatureOfInterest";
+
+  private static StaTarget modelled(String path, StaEntity entity, StaJsonType type) {
+    return new StaTarget(path, entity, type, TargetKind.OPTIONAL);
+  }
+
+  private static StaProperties withModelled(StaTarget... targets) {
+    return new StaProperties(
+        List.of(new KeyAttribute("reference")),
+        List.of(),
+        List.of(new KeyAttribute("reference")),
+        List.of(),
+        List.of(targets));
+  }
+
+  /** A structure that models the feature of its FeatureOfInterest as a GeoJSON point. */
+  private static final StaProperties WITH_FEATURE_POINT =
+      withModelled(
+          modelled(FEATURE + ".feature", StaEntity.FEATURE_OF_INTEREST, StaJsonType.RAW_JSON));
+
+  /** A measurement with its Thing and Datastream looked up, extended by the given paths. */
+  private static MappingConfig measurementWith(Object... extraPathsAndValues) {
+    Map<String, ValueNode> fields = new LinkedHashMap<>();
+    fields.put("$.properties.reference", new CopyNode("$.ref"));
+    fields.put("$.Datastreams[].properties.reference", new CopyNode("$.dsRef"));
+    fields.put(OBSERVATION + ".result", new CopyNode("$.temp"));
+    for (int i = 0; i < extraPathsAndValues.length; i += 2) {
+      fields.put((String) extraPathsAndValues[i], (ValueNode) extraPathsAndValues[i + 1]);
+    }
+    return new MappingConfig(null, null, fields);
+  }
+
+  private static Object[] creatableFeature() {
+    return new Object[] {
+      FEATURE + ".name", new ConstNode("Pegel", null),
+      FEATURE + ".description", new ConstNode("d", null),
+      FEATURE + ".encodingType", new ConstNode("application/geo+json", null)
+    };
+  }
+
+  private static Object[] concat(Object[] first, Object... second) {
+    Object[] joined = Arrays.copyOf(first, first.length + second.length);
+    System.arraycopy(second, 0, joined, first.length, second.length);
+    return joined;
+  }
+
+  @Test
+  void compile_withAModelledSensorPropertiesClass_writesItsAttributesIntoTheSensor()
+      throws Exception {
+    StaProperties properties =
+        withModelled(
+            modelled(
+                "$.Datastreams[].Sensor.properties.vendor", StaEntity.DATASTREAM, StaJsonType.ANY));
+
+    String body =
+        compiler
+            .compile(
+                measurementWith(
+                    "$.Datastreams[].Sensor.properties.vendor", new ConstNode("acme", null)),
+                properties,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"Sensor\":{\"properties\":{\"vendor\":"), body);
+  }
+
+  @Test
+  void compile_withTheWholeSensorProperties_isRejected() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compiler.compile(
+                    measurementWith("$.Datastreams[].Sensor.properties", new CopyNode("$.props")),
+                    KEYS,
+                    SinkPort.THING_TREE));
+
+    assertTrue(ex.getMessage().contains("'$.Datastreams[].Sensor.properties'"), ex.getMessage());
+  }
+
+  @Test
+  void compile_withAClassInsideTheBag_nestsItBesideTheReference() throws Exception {
+    StaProperties properties =
+        withModelled(modelled("$.properties.site.floor", StaEntity.THING, StaJsonType.ANY));
+
+    String body =
+        compiler
+            .compile(
+                mapping(
+                    "$.properties.reference", new CopyNode("$.ref"),
+                    "$.properties.site.floor", new CopyNode("$.floor")),
+                properties,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    // One bag, holding the class and the reference: neither may overwrite the other.
+    assertTrue(body.contains("\"properties\":{\"site\":{\"floor\":"), body);
+    assertTrue(body.contains("\"reference\":"), body);
+    assertEquals(body.indexOf("\"properties\""), body.lastIndexOf("\"properties\""), body);
+  }
+
+  @Test
+  void compile_withAModelledResultQuality_writesItIntoTheMeasurement() throws Exception {
+    StaProperties properties =
+        withModelled(
+            modelled(
+                OBSERVATION + ".resultQuality.accuracy", StaEntity.OBSERVATION, StaJsonType.ANY));
+
+    String body =
+        compiler
+            .compile(
+                measurementWith(
+                    OBSERVATION + ".resultQuality.accuracy",
+                    new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.acc"), null)),
+                properties,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"resultQuality\":{\"accuracy\":${"), body);
+  }
+
+  @Test
+  void compile_withTheWholeResultQuality_isRejected() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compiler.compile(
+                    measurementWith(OBSERVATION + ".resultQuality", new CopyNode("$.q")),
+                    KEYS,
+                    SinkPort.THING_TREE));
+
+    assertTrue(ex.getMessage().contains("resultQuality'"), ex.getMessage());
+  }
+
+  @Test
+  void compile_withAFeatureOfInterestAndItsModelledPoint_rendersTheFeature() throws Exception {
+    String body =
+        compiler
+            .compile(
+                measurementWith(
+                    concat(
+                        creatableFeature(),
+                        FEATURE + ".feature",
+                        new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")))),
+                WITH_FEATURE_POINT,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"FeatureOfInterest\":{"), body);
+    assertTrue(body.contains("\"feature\":${"), body);
+  }
+
+  @Test
+  void compile_withAFeatureOfInterestAndAModelledFeatureClass_nestsTheClass() throws Exception {
+    StaProperties properties =
+        withModelled(
+            modelled(FEATURE + ".feature.station", StaEntity.FEATURE_OF_INTEREST, StaJsonType.ANY),
+            modelled(FEATURE + ".feature.river", StaEntity.FEATURE_OF_INTEREST, StaJsonType.ANY));
+
+    String body =
+        compiler
+            .compile(
+                measurementWith(
+                    concat(
+                        creatableFeature(),
+                        FEATURE + ".feature.station",
+                        new CopyNode("$.station"),
+                        FEATURE + ".feature.river",
+                        new CopyNode("$.river"))),
+                properties,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"feature\":{\"station\":"), body);
+    assertTrue(body.contains("\"river\":"), body);
+  }
+
+  @Test
+  void compile_withAFeatureOfInterestWithoutItsFeature_isRejected() {
+    // FROST refuses a FeatureOfInterest without its feature; refusing it here names the reason.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compiler.compile(
+                    measurementWith(creatableFeature()), WITH_FEATURE_POINT, SinkPort.THING_TREE));
+
+    assertTrue(ex.getMessage().contains("must map its feature"), ex.getMessage());
+  }
+
+  @Test
+  void compile_withAFeatureOfInterestCreatableWithoutFeature_needsNoFeatureInItsCreateSet() {
+    // The create set is name, description and encodingType; the feature rule reports itself.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(measurementWith(creatableFeature()), KEYS, SinkPort.THING_TREE));
+
+    assertFalse(ex.getMessage().contains("partially mapped"), ex.getMessage());
+  }
+
+  @Test
+  void compile_intoTheObservationsPort_withAModelledFeature_rendersItUnderTheMeasurement()
+      throws Exception {
+    StaProperties properties =
+        new StaProperties(
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(
+                new FreeAttribute("thingReference", StaJsonType.ANY),
+                new FreeAttribute("datastreamReference", StaJsonType.ANY)),
+            List.of(
+                modelled(FEATURE + ".feature", StaEntity.FEATURE_OF_INTEREST, StaJsonType.RAW_JSON),
+                modelled(
+                    OBSERVATION + ".resultQuality.accuracy",
+                    StaEntity.OBSERVATION,
+                    StaJsonType.ANY)));
+    Map<String, ValueNode> fields = new LinkedHashMap<>(measurementMapping().fields());
+    fields.put("$.resultQuality.accuracy", new CopyNode("$.acc"));
+    fields.put("$.FeatureOfInterest.name", new ConstNode("Pegel", null));
+    fields.put("$.FeatureOfInterest.description", new ConstNode("d", null));
+    fields.put("$.FeatureOfInterest.encodingType", new ConstNode("application/geo+json", null));
+    fields.put(
+        "$.FeatureOfInterest.feature",
+        new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")));
+
+    String body =
+        compiler
+            .compile(new MappingConfig(null, null, fields), properties, SinkPort.OBSERVATIONS)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"resultQuality\":{\"accuracy\":"), body);
+    assertTrue(body.contains("\"FeatureOfInterest\":{"), body);
+    assertTrue(body.contains("\"feature\":${"), body);
+  }
+
+  @Test
+  void compile_withADatastreamReferenceAlone_rendersTheDatastream() throws Exception {
+    // A bag attribute counts as writing the entity, like any other of its paths.
+    String body =
+        compiler
+            .compile(
+                mapping(
+                    "$.properties.reference", new CopyNode("$.ref"),
+                    "$.Datastreams[].properties.reference", new CopyNode("$.dsRef")),
+                KEYS,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"Datastreams\":[{\"properties\":{\"reference\":"), body);
   }
 
   // ─── Body templates ─────────────────────────────────────────────────────────
@@ -708,8 +962,11 @@ class FrostMappingCompilerTest {
             "$.Datastreams[].Observations[].FeatureOfInterest.feature",
                 new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")));
 
-    assertThrows(
-        FatalAdapterException.class, () -> compiler.compile(mapping, KEYS, SinkPort.THING_TREE));
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(mapping, WITH_FEATURE_POINT, SinkPort.THING_TREE));
+    assertTrue(ex.getMessage().contains("requires a mapped Observation"), ex.getMessage());
   }
 
   @Test

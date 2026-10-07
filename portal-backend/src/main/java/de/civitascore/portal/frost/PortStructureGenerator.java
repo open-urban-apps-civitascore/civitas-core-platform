@@ -46,6 +46,9 @@ public final class PortStructureGenerator {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
+  /** The GeoJSON schema a point refers to, the one the structure editor writes for its Point. */
+  private static final String GEOJSON_POINT = "https://geojson.org/schema/Point.json";
+
   private PortStructureGenerator() {}
 
   /** The model document of one port, as the map the registry and the editor read. */
@@ -146,7 +149,7 @@ public final class PortStructureGenerator {
         property.put("type", "string");
         property.put("format", "date-time");
       }
-      case JSON -> property.put("type", "object");
+      case POINT -> property.put("$ref", GEOJSON_POINT);
       // An empty schema is how JSON Schema says "any value". A declared type here would refuse
       // valid data: a measurement result may be a number, a text, a boolean or an object.
       case ANY -> {

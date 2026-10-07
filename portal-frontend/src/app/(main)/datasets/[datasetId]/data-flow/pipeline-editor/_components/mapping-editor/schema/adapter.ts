@@ -23,7 +23,6 @@ export const PRIMITIVE: Record<string, FieldType> = {
   Boolean: 'bool',
   Date: 'date',
   DateTime: 'datetime',
-  Json: 'json',
 }
 
 const lowerFirst = (value: string): string => value.charAt(0).toLowerCase() + value.slice(1)

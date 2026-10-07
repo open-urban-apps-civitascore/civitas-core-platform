@@ -235,8 +235,7 @@ public final class DataStructureSchema {
     LinkedHashMap<String, String> geometryCrs = new LinkedHashMap<>();
     for (Map.Entry<String, Object> entry : properties.entrySet()) {
       Map<String, Object> spec = mapValue(entry.getValue());
-      String ref = stringValue(spec.get("$ref"));
-      if (ref != null && ref.contains(GEOJSON_SCHEMA_MARKER)) {
+      if (isGeometry(spec)) {
         geometryCrs.put(entry.getKey(), stringValue(spec.get("crs")));
       }
     }
@@ -262,6 +261,12 @@ public final class DataStructureSchema {
       keys.add(entry.getKey());
     }
     return List.copyOf(keys);
+  }
+
+  /** Whether a property spec is a GeoJSON geometry, a reference to a schema of geojson.org. */
+  public static boolean isGeometry(Map<String, Object> spec) {
+    String ref = stringValue(spec.get("$ref"));
+    return ref != null && ref.contains(GEOJSON_SCHEMA_MARKER);
   }
 
   /**

@@ -17,11 +17,14 @@ import java.util.regex.Pattern;
  * structure is a normal, tenant-modelled Thing-shaped class (one record = one Thing with its
  * Locations, Datastreams and their Observations), so the paths here are exactly what the mapping
  * editor emits against that structure. The fixed vocabulary below is a reviewable constant — every
- * generated JSON key and FROST path of an entity body comes from here — with one schema-derived
- * extension: each entity's match key (its {@code properties.<key>} attribute marked {@code
+ * generated JSON key and FROST path of an entity body comes from here — with two schema-derived
+ * extensions: each entity's match key (its {@code properties.<key>} attribute marked {@code
  * x-core-primaryKey}, fallback a {@code properties.reference} attribute) contributes {@code
- * $.properties.<key>} / {@code $.Datastreams[].properties.<key>} paths whose names pass {@link
- * #isSafeKeyName(String)} before they may appear in a {@code $filter} or template.
+ * $.properties.<key>} / {@code $.Datastreams[].properties.<key>} paths, and the attributes of a
+ * class the structure models under a free field ({@code properties}, {@code feature}, {@code
+ * resultQuality}) contribute paths below that field. Their names pass {@link
+ * #isSafeKeyName(String)} before they may appear in a {@code $filter} or template. A free field is
+ * not a target of its own: the platform has no type for a free object.
  */
 public final class StaTargetCatalog {
 
@@ -53,11 +56,6 @@ public final class StaTargetCatalog {
               StaEntity.LOCATION,
               StaJsonType.RAW_JSON,
               TargetKind.CREATE),
-          new StaTarget(
-              "$.Locations[].properties",
-              StaEntity.LOCATION,
-              StaJsonType.RAW_JSON,
-              TargetKind.OPTIONAL),
           new StaTarget(
               "$.Datastreams[].name", StaEntity.DATASTREAM, StaJsonType.STRING, TargetKind.CREATE),
           new StaTarget(
@@ -106,11 +104,6 @@ public final class StaTargetCatalog {
               StaJsonType.STRING,
               TargetKind.CREATE),
           new StaTarget(
-              "$.Datastreams[].Sensor.properties",
-              StaEntity.DATASTREAM,
-              StaJsonType.RAW_JSON,
-              TargetKind.OPTIONAL),
-          new StaTarget(
               "$.Datastreams[].ObservedProperty.name",
               StaEntity.DATASTREAM,
               StaJsonType.STRING,
@@ -126,11 +119,6 @@ public final class StaTargetCatalog {
               StaJsonType.STRING,
               TargetKind.CREATE),
           new StaTarget(
-              "$.Datastreams[].ObservedProperty.properties",
-              StaEntity.DATASTREAM,
-              StaJsonType.RAW_JSON,
-              TargetKind.OPTIONAL),
-          new StaTarget(
               "$.Datastreams[].Observations[].result",
               StaEntity.OBSERVATION,
               StaJsonType.ANY,
@@ -144,11 +132,6 @@ public final class StaTargetCatalog {
               "$.Datastreams[].Observations[].resultTime",
               StaEntity.OBSERVATION,
               StaJsonType.STRING,
-              TargetKind.OPTIONAL),
-          new StaTarget(
-              "$.Datastreams[].Observations[].resultQuality",
-              StaEntity.OBSERVATION,
-              StaJsonType.ANY,
               TargetKind.OPTIONAL),
           new StaTarget(
               "$.Datastreams[].Observations[].validTime",
@@ -169,17 +152,7 @@ public final class StaTargetCatalog {
               "$.Datastreams[].Observations[].FeatureOfInterest.encodingType",
               StaEntity.FEATURE_OF_INTEREST,
               StaJsonType.STRING,
-              TargetKind.CREATE),
-          new StaTarget(
-              "$.Datastreams[].Observations[].FeatureOfInterest.feature",
-              StaEntity.FEATURE_OF_INTEREST,
-              StaJsonType.RAW_JSON,
-              TargetKind.CREATE),
-          new StaTarget(
-              "$.Datastreams[].Observations[].FeatureOfInterest.properties",
-              StaEntity.FEATURE_OF_INTEREST,
-              StaJsonType.RAW_JSON,
-              TargetKind.OPTIONAL));
+              TargetKind.CREATE));
 
   /**
    * The entities of the Thing-shaped record. Declaration order is the find-or-create order of the

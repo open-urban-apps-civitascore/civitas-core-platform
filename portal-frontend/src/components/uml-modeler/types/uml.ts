@@ -1,8 +1,6 @@
 export type Visibility = 'public' | 'private' | 'protected' | 'package'
 
-// Json is any JSON value the structure does not describe: a geometry without a GeoJSON type, the
-// quality of a measurement, a free parameter bag.
-export type UMLPrimitiveType = 'String' | 'Integer' | 'Boolean' | 'Number' | 'Date' | 'DateTime' | 'Uuid' | 'Json'
+export type UMLPrimitiveType = 'String' | 'Integer' | 'Boolean' | 'Number' | 'Date' | 'DateTime' | 'Uuid'
 
 export type UMLGeometryType =
   | 'Point'

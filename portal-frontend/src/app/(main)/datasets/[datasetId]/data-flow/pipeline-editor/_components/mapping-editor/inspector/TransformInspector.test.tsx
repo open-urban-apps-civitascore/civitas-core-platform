@@ -20,7 +20,7 @@ describe('TransformInspector', () => {
     expect(screen.getByPlaceholderText('42')).toBeInTheDocument()
   })
 
-  it('keeps the value field a plain text input when the type has no textarea override', () => {
+  it('renders the value field as a plain text input', () => {
     render(
       <TransformInspector
         def={mappingRegistry.byType.const}
@@ -32,14 +32,6 @@ describe('TransformInspector', () => {
     const valueField = screen.getByDisplayValue('')
     expect(valueField.tagName).toBe('INPUT')
     expect(valueField).toHaveAttribute('type', 'text')
-  })
-
-  it('switches the value field to a textarea when the type overrides the control', () => {
-    render(
-      <TransformInspector def={mappingRegistry.byType.const} config={{ type: 'Json', value: '' }} onChange={vi.fn()} />,
-    )
-
-    expect(screen.getByDisplayValue('').tagName).toBe('TEXTAREA')
   })
 
   it('shows the format for string input and the unit for epoch input', () => {

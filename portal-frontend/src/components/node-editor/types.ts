@@ -20,7 +20,7 @@ export interface PortDef {
   accepts?: readonly string[]
 }
 
-export type ConfigControl = 'text' | 'number' | 'select' | 'textarea'
+export type ConfigControl = 'text' | 'number' | 'select'
 
 export interface ConfigOption {
   label: string

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { UML_GEOMETRY_TYPES } from '@/components/uml-modeler/constants/umlTypes'
 
-import { literalOutputPort, mappingRegistry } from './index'
+import { literalOutputPort, literalTypeOf, mappingRegistry } from './index'
 
 describe('output ports', () => {
   it('label every output port with the subtype it produces', () => {
@@ -20,10 +20,6 @@ describe('literalOutputPort', () => {
     expect(literalOutputPort('Integer')).toEqual({ id: 'out', label: 'int', type: 'scalar', dataType: 'int' })
     expect(literalOutputPort('Boolean')).toEqual({ id: 'out', label: 'bool', type: 'scalar', dataType: 'bool' })
     expect(literalOutputPort('Date')).toEqual({ id: 'out', label: 'date', type: 'scalar', dataType: 'date' })
-  })
-
-  it('labels a Json port with the json engine subtype', () => {
-    expect(literalOutputPort('Json')).toEqual({ id: 'out', label: 'json', type: 'scalar', dataType: 'json' })
   })
 
   it('labels a geometry port with the concrete geometry name', () => {
@@ -54,21 +50,16 @@ describe('literal value placeholder', () => {
       expect(placeholders?.value.startsWith(type.toUpperCase()), `${type} WKT`).toBe(true)
     }
   })
-
-  it('shows a JSON example as the placeholder for the Json type', () => {
-    const placeholders = mappingRegistry.byType.const.placeholders?.({ type: 'Json', value: '' })
-    expect(placeholders?.value && JSON.parse(placeholders.value)).toEqual({ key: 'value' })
-  })
 })
 
-describe('literal value control', () => {
-  it('switches the value field to a textarea for the Json type', () => {
-    const controls = mappingRegistry.byType.const.controls?.({ type: 'Json', value: '' })
-    expect(controls).toEqual({ value: 'textarea' })
+describe('literalTypeOf', () => {
+  it('reads a Literal saved with the retired Json type as String', () => {
+    expect(literalTypeOf('Json')).toBe('String')
   })
 
-  it('keeps the default text control for other types', () => {
-    const controls = mappingRegistry.byType.const.controls?.({ type: 'String', value: '' })
-    expect(controls).toBeUndefined()
+  it('keeps every other type, and defaults a missing one to String', () => {
+    expect(literalTypeOf('Integer')).toBe('Integer')
+    expect(literalTypeOf('Point')).toBe('Point')
+    expect(literalTypeOf(undefined)).toBe('String')
   })
 })

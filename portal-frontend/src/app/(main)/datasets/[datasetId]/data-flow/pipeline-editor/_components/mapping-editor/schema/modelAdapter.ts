@@ -286,10 +286,12 @@ const fieldFor = (
     return field(path, name, 'object', required, children)
   }
 
-  if (asString(node.type) === 'object' || asNode(node.properties)) {
+  if (asString(node.type) === 'object' || asNode(node.properties) || Array.isArray(node.allOf)) {
     const children = childrenOf(node, defs, path, visited)
+    // An object that names no fields is a free value. It reads as text, as the structure editor
+    // reads it.
     if (!children || children.length === 0) {
-      return field(path, name, 'json', required)
+      return field(path, name, 'str', required)
     }
     return field(path, name, 'object', required, children)
   }
@@ -325,7 +327,8 @@ const childrenOf = (
   }
   if (ref) return undefined
   if ('enum' in node) return undefined
-  if (!asNode(node.properties)) return undefined
+  // An inline object may declare its fields through allOf alone, the way an inherited class does.
+  if (!asNode(node.properties) && !Array.isArray(node.allOf)) return undefined
   return buildFields(mergeDefinition(node, defs), defs, base, visited)
 }
 

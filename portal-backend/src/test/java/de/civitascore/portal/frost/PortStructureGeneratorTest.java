@@ -126,6 +126,35 @@ class PortStructureGeneratorTest {
   }
 
   @Test
+  @DisplayName("Declares the Location as a GeoJSON point, which geoPoint fills")
+  void declaresTheLocationAsAPoint() throws Exception {
+    JsonNode location =
+        model("ThingTree").path("$defs").path("Location").path("properties").path("location");
+
+    assertThat(location.path("$ref").asText()).isEqualTo("https://geojson.org/schema/Point.json");
+  }
+
+  @Test
+  @DisplayName("Declares no free object, which no Mapping can fill")
+  void declaresNoFreeObject() throws Exception {
+    for (PortStructure structure : PortStructureCatalog.all()) {
+      JsonNode defs = model(structure.port()).path("$defs");
+      defs.properties()
+          .forEach(
+              declared ->
+                  declared
+                      .getValue()
+                      .path("properties")
+                      .properties()
+                      .forEach(
+                          member ->
+                              assertThat(member.getValue().path("type").asText())
+                                  .as("%s.%s", declared.getKey(), member.getKey())
+                                  .isNotEqualTo("object")));
+    }
+  }
+
+  @Test
   @DisplayName("Covers every target path the deploy engine accepts today")
   void coversTheTargetPathsOfToday() throws Exception {
     // The paths of StaTargetCatalog, which both catalogues hold today. A path missing here would
@@ -138,7 +167,6 @@ class PortStructureGeneratorTest {
             "$.Locations[].description",
             "$.Locations[].encodingType",
             "$.Locations[].location",
-            "$.Locations[].properties",
             "$.Datastreams[].name",
             "$.Datastreams[].description",
             "$.Datastreams[].observationType",
@@ -149,21 +177,16 @@ class PortStructureGeneratorTest {
             "$.Datastreams[].Sensor.description",
             "$.Datastreams[].Sensor.encodingType",
             "$.Datastreams[].Sensor.metadata",
-            "$.Datastreams[].Sensor.properties",
             "$.Datastreams[].ObservedProperty.name",
             "$.Datastreams[].ObservedProperty.definition",
             "$.Datastreams[].ObservedProperty.description",
-            "$.Datastreams[].ObservedProperty.properties",
             "$.Datastreams[].Observations[].result",
             "$.Datastreams[].Observations[].phenomenonTime",
             "$.Datastreams[].Observations[].resultTime",
-            "$.Datastreams[].Observations[].resultQuality",
             "$.Datastreams[].Observations[].validTime",
             "$.Datastreams[].Observations[].FeatureOfInterest.name",
             "$.Datastreams[].Observations[].FeatureOfInterest.description",
-            "$.Datastreams[].Observations[].FeatureOfInterest.encodingType",
-            "$.Datastreams[].Observations[].FeatureOfInterest.feature",
-            "$.Datastreams[].Observations[].FeatureOfInterest.properties");
+            "$.Datastreams[].Observations[].FeatureOfInterest.encodingType");
 
     assertThat(PortStructurePaths.of(model("ThingTree"))).containsAll(paths);
   }

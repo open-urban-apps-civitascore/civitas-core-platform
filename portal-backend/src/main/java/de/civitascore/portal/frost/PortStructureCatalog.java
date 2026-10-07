@@ -3,7 +3,7 @@ package de.civitascore.portal.frost;
 import static de.civitascore.portal.frost.PortStructureModel.Child.many;
 import static de.civitascore.portal.frost.PortStructureModel.Child.one;
 import static de.civitascore.portal.frost.PortStructureModel.Field.any;
-import static de.civitascore.portal.frost.PortStructureModel.Field.json;
+import static de.civitascore.portal.frost.PortStructureModel.Field.point;
 import static de.civitascore.portal.frost.PortStructureModel.Field.reference;
 import static de.civitascore.portal.frost.PortStructureModel.Field.text;
 import static de.civitascore.portal.frost.PortStructureModel.Field.timestamp;
@@ -61,14 +61,18 @@ public final class PortStructureCatalog {
       StaClass.of(
           "UnitOfMeasurement", text("name", true), text("symbol", true), text("definition", true));
 
+  // SensorThings gives these entities free objects as well: the feature of a FeatureOfInterest,
+  // the properties of a Sensor, an ObservedProperty and a FeatureOfInterest, the result quality of
+  // a
+  // measurement. A free object is no type a Mapping can fill, so none of them is declared here. A
+  // user who needs one models it as a class of its own, and the deploy engine writes its
+  // attributes into the field of that name.
   private static final StaClass FEATURE_OF_INTEREST =
       StaClass.of(
           "FeatureOfInterest",
           text("name", true),
           text("description", true),
-          text("encodingType", true),
-          json("feature", true),
-          json("properties", false));
+          text("encodingType", true));
 
   private static final StaClass SENSOR =
       StaClass.of(
@@ -76,16 +80,14 @@ public final class PortStructureCatalog {
           text("name", true),
           text("description", true),
           text("encodingType", true),
-          text("metadata", true),
-          json("properties", false));
+          text("metadata", true));
 
   private static final StaClass OBSERVED_PROPERTY =
       StaClass.of(
           "ObservedProperty",
           text("name", true),
           text("definition", true),
-          text("description", true),
-          json("properties", false));
+          text("description", true));
 
   /**
    * The measurement inside the chain. It carries no reference of its own: the tree appends every
@@ -101,7 +103,6 @@ public final class PortStructureCatalog {
           any("result", true),
           text("phenomenonTime", false),
           timestamp("resultTime"),
-          json("resultQuality", false),
           text("validTime", false),
           one("FeatureOfInterest", "FeatureOfInterest", false));
 
@@ -140,7 +141,6 @@ public final class PortStructureCatalog {
                   any("result", true),
                   text("phenomenonTime", false),
                   timestamp("resultTime"),
-                  json("resultQuality", false),
                   text("validTime", false),
                   one("parameters", "ObservationParameters", true),
                   one("FeatureOfInterest", "FeatureOfInterest", false)),
@@ -165,7 +165,7 @@ public final class PortStructureCatalog {
                   text("name", true),
                   text("description", true),
                   text("encodingType", true),
-                  json("location", true),
+                  point("location", true),
                   one("properties", "LocationProperties", false)),
               LOCATION_PROPERTIES,
               StaClass.of(

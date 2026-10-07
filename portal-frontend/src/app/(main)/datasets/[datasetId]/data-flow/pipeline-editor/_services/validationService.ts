@@ -9,6 +9,7 @@
 import { isFormAccepted, NODE_FLOW_DECLARATIONS, type NodeFlowDeclaration } from '../_config/nodeFlow'
 import type { FrostSinkPort } from '../_constants/frostPorts'
 import {
+  FEATURE_PATHS,
   isReservedStaKeyName,
   isSafeStaKeyName,
   STA_ENTITIES,
@@ -534,9 +535,16 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
         return
       }
       const locationBag = keys.locationBag ?? []
+      const modelledPaths = keys.modelledPaths ?? []
       const allowed = isMeasurementPort
-        ? new Set([...STA_OBSERVATION_FIXED_TARGET_PATHS, ...keys.observationBag])
-        : new Set([...STA_FIXED_TARGET_PATHS, ...keys.thingBag, ...locationBag, ...keys.datastreamBag])
+        ? new Set([...STA_OBSERVATION_FIXED_TARGET_PATHS, ...keys.observationBag, ...modelledPaths])
+        : new Set([
+            ...STA_FIXED_TARGET_PATHS,
+            ...keys.thingBag,
+            ...locationBag,
+            ...keys.datastreamBag,
+            ...modelledPaths,
+          ])
       const entity = (key: StaEntity['key']): StaEntity =>
         (isMeasurementPort ? STA_OBSERVATION_PORT_ENTITIES : STA_ENTITIES).find(
           candidate => candidate.key === key,
@@ -547,15 +555,6 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
       for (const path of assigned) {
         if (!allowed.has(path)) {
           errors.push(errorAt(node, 'validation.messages.frostMappingUnknownStaTarget', { label, path }))
-        }
-      }
-
-      // The body holds an object once, so the engine refuses a mapping that writes it whole and
-      // attribute by attribute (the Location's properties once its bag is modelled).
-      for (const outer of assigned) {
-        const inner = [...assigned].find(path => path.startsWith(`${outer}.`))
-        if (inner) {
-          errors.push(errorAt(node, 'validation.messages.frostMappingNestedTargets', { label, outer, inner }))
         }
       }
 
@@ -572,6 +571,17 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
               fields: missingOf(candidate.createPaths),
             }),
           )
+        }
+      }
+
+      // FROST refuses a FeatureOfInterest without its feature, and the field is free in SensorThings:
+      // it is mappable only where the structure models it, as a class or a geometry.
+      const requireFeature = () => {
+        const hasFeature = [...assigned].some(path =>
+          FEATURE_PATHS.some(feature => path === feature || path.startsWith(`${feature}.`)),
+        )
+        if (!hasFeature) {
+          errors.push(errorAt(node, 'validation.messages.frostMappingFeatureOfInterestNeedsFeature', { label }))
         }
       }
 
@@ -608,6 +618,7 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
         const feature = entity('featureOfInterest')
         if (anyAssigned([...feature.createPaths, ...feature.optionalPaths])) {
           requireCompleteCreateSet(feature)
+          requireFeature()
         }
         return
       }
@@ -672,6 +683,7 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
           errors.push(errorAt(node, 'validation.messages.frostMappingFeatureOfInterestNeedsObservation', { label }))
         }
         requireCompleteCreateSet(featureOfInterest)
+        requireFeature()
       }
 
       if (keys.isFallback && keys.thing.length > 0) {

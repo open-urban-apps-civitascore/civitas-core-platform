@@ -48,7 +48,7 @@ describe('diagramSchema', () => {
     expect(result.success).toBe(true)
   })
 
-  it('keeps a Json attribute and the pins of the structures the diagram was built from', () => {
+  it('keeps the pins of the structures the diagram was built from', () => {
     const pins = [
       {
         urn: 'urn:core:platform:civitas:datastructure:frost:9cc6ed95-0f8b-8ace-ab6e-83cdee87b3dd:1.0.0',
@@ -68,7 +68,7 @@ describe('diagramSchema', () => {
               id: 'node-1',
               name: 'Observation',
               type: 'class',
-              attributes: [{ id: 'a1', name: 'resultQuality', type: 'Json', multiplicity: '0..1' }],
+              attributes: [{ id: 'a1', name: 'resultQuality', type: 'String', multiplicity: '0..1' }],
               operations: [],
             },
             label: 'Observation',
@@ -83,6 +83,74 @@ describe('diagramSchema', () => {
     expect(result.success).toBe(true)
     if (!result.success) return
     expect(result.data.importedStructures).toEqual(pins)
+  })
+
+  it('reads the retired Json type of a stored diagram as String', () => {
+    const diagram = {
+      id: 'diagram-1',
+      name: 'Stored',
+      nodes: [
+        {
+          id: 'node-1',
+          type: 'class',
+          position: { x: 0, y: 0 },
+          data: {
+            element: {
+              id: 'node-1',
+              name: 'Observation',
+              type: 'class',
+              attributes: [{ id: 'a1', name: 'resultQuality', type: 'Json', multiplicity: '0..1' }],
+              operations: [
+                {
+                  id: 'o1',
+                  name: 'quality',
+                  returnType: 'Json',
+                  parameters: [{ id: 'p1', name: 'raw', type: 'Json' }],
+                },
+              ],
+            },
+            label: 'Observation',
+          },
+        },
+      ],
+      edges: [],
+    }
+
+    const result = UMLDiagramSchema.safeParse(diagram)
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    const element = result.data.nodes[0].data.element
+    if (element.type !== 'class') throw new Error('expected a class')
+    expect(element.attributes[0].type).toBe('String')
+    expect(element.operations[0].returnType).toBe('String')
+    expect(element.operations[0].parameters[0].type).toBe('String')
+  })
+
+  it('still refuses a primitive type it does not know', () => {
+    const diagram = {
+      id: 'diagram-1',
+      name: 'Stored',
+      nodes: [
+        {
+          id: 'node-1',
+          type: 'class',
+          position: { x: 0, y: 0 },
+          data: {
+            element: {
+              id: 'node-1',
+              name: 'Observation',
+              type: 'class',
+              attributes: [{ id: 'a1', name: 'when', type: 'Timestamp' }],
+              operations: [],
+            },
+            label: 'Observation',
+          },
+        },
+      ],
+      edges: [],
+    }
+
+    expect(UMLDiagramSchema.safeParse(diagram).success).toBe(false)
   })
 
   it.each([

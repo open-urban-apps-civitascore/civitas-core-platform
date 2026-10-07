@@ -35,6 +35,8 @@ import de.civitascore.configadapter.nifi.mapping.FrostPortPlan;
 import de.civitascore.configadapter.nifi.mapping.GeometryEncoding;
 import de.civitascore.configadapter.nifi.mapping.SinkPort;
 import de.civitascore.configadapter.nifi.mapping.SinkPreRegionPlan;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaEntity;
 import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaJsonType;
 import java.util.ArrayList;
 import java.util.List;
@@ -232,6 +234,10 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
    * IllegalArgumentException} instead of degrading to "no keys" — the caller turns it into a
    * payload error; a legitimately absent {@code Locations}, {@code Datastreams} or {@code
    * properties} class yields empty attributes.
+   *
+   * <p>The classes a structure models under the free fields of SensorThings — {@code properties} of
+   * every entity, {@code feature}, {@code resultQuality}, a class inside a bag — become the
+   * modelled targets of the result (see {@link ModelledClassTargets}).
    */
   @SuppressWarnings("unchecked")
   private static StaProperties resolveStaProperties(Map<String, Object> datasink, SinkPort port) {
@@ -239,27 +245,83 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
       return null;
     }
     Map<String, Object> schema = (Map<String, Object>) ds;
+    ModelledClassTargets modelled = new ModelledClassTargets(schema);
     if (port == SinkPort.OBSERVATIONS) {
       // The record of this port is the measurement itself, so its bag sits at the root — and a
       // measurement keeps its references in 'parameters', the one entity SensorThings gives no
       // 'properties'.
-      return StaProperties.ofObservation(entityBag(schema, List.of(), "parameters"));
+      List<StaBagAttribute> parameters =
+          entityBag(schema, List.of(), "parameters", StaEntity.OBSERVATION, modelled);
+      observationFields(schema, List.of(), modelled);
+      return new StaProperties(List.of(), List.of(), List.of(), parameters, modelled.targets());
     }
     ResolvedDefinition thing = DataStructureSchema.resolveDefinitionAt(schema, List.of());
-    return new StaProperties(
-        entityBag(schema, List.of(), "properties"),
-        collectionBag(schema, thing, "Locations"),
-        collectionBag(schema, thing, "Datastreams"),
-        List.of());
+    List<StaBagAttribute> thingBag =
+        entityBag(schema, List.of(), "properties", StaEntity.THING, modelled);
+    String locations = entityPropertyName(thing.properties(), "Locations");
+    List<StaBagAttribute> locationBag =
+        locations != null
+            ? entityBag(schema, List.of(locations), "properties", StaEntity.LOCATION, modelled)
+            : List.of();
+    String datastreams = entityPropertyName(thing.properties(), "Datastreams");
+    List<StaBagAttribute> datastreamBag = List.of();
+    if (datastreams != null) {
+      datastreamBag =
+          entityBag(schema, List.of(datastreams), "properties", StaEntity.DATASTREAM, modelled);
+      datastreamFields(schema, datastreams, modelled);
+    }
+    return new StaProperties(thingBag, locationBag, datastreamBag, List.of(), modelled.targets());
   }
 
   /**
-   * The bag of an entity collection of the Thing, or empty when the structure does not model it.
+   * The free fields under a Datastream: the {@code properties} of its Sensor and its
+   * ObservedProperty, and the free fields of its measurement.
    */
-  private static List<StaBagAttribute> collectionBag(
-      Map<String, Object> schema, ResolvedDefinition thing, String collection) {
-    String property = entityPropertyName(thing.properties(), collection);
-    return property != null ? entityBag(schema, List.of(property), "properties") : List.of();
+  private static void datastreamFields(
+      Map<String, Object> schema, String datastreams, ModelledClassTargets modelled) {
+    ResolvedDefinition datastream =
+        DataStructureSchema.resolveDefinitionAt(schema, List.of(datastreams));
+    for (String navigation : List.of("Sensor", "ObservedProperty")) {
+      String property = entityPropertyName(datastream.properties(), navigation);
+      if (property != null) {
+        modelled.field(
+            List.of(datastreams, property),
+            "properties",
+            StaEntity.DATASTREAM,
+            StaEntity.DATASTREAM.pathOf(navigation + ".properties"));
+      }
+    }
+    String observations = entityPropertyName(datastream.properties(), "Observations");
+    if (observations != null) {
+      observationFields(schema, List.of(datastreams, observations), modelled);
+    }
+  }
+
+  /**
+   * The free fields of a measurement: its {@code resultQuality}, and the {@code properties} and the
+   * {@code feature} of its FeatureOfInterest.
+   */
+  private static void observationFields(
+      Map<String, Object> schema, List<String> observation, ModelledClassTargets modelled) {
+    modelled.field(
+        observation,
+        "resultQuality",
+        StaEntity.OBSERVATION,
+        StaEntity.OBSERVATION.pathOf("resultQuality"));
+    ResolvedDefinition measurement = DataStructureSchema.resolveDefinitionAt(schema, observation);
+    String feature = entityPropertyName(measurement.properties(), "FeatureOfInterest");
+    if (feature == null) {
+      return;
+    }
+    List<String> featurePath = new ArrayList<>(observation);
+    featurePath.add(feature);
+    for (String field : List.of("properties", "feature")) {
+      modelled.field(
+          featurePath,
+          field,
+          StaEntity.FEATURE_OF_INTEREST,
+          StaEntity.FEATURE_OF_INTEREST.pathOf(field));
+    }
   }
 
   /** Finds an entity collection exported from a labelled or an unlabelled UML relationship. */
@@ -284,7 +346,11 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
 
   @SuppressWarnings("unchecked")
   private static List<StaBagAttribute> entityBag(
-      Map<String, Object> schema, List<String> path, String bagName) {
+      Map<String, Object> schema,
+      List<String> path,
+      String bagName,
+      StaEntity entity,
+      ModelledClassTargets modelled) {
     // SensorThings keeps identifiers (and any free attributes) in the entity's 'properties' bag
     // rather than top-level, so the bag is read from the 'properties' class, not the entity class
     // itself. A structurally broken entity class throws here (resolveDefinitionAt is unguarded) and
@@ -315,12 +381,23 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
         bag.add(new KeyAttribute(name));
         continue;
       }
-      boolean scalar =
+      Map<String, Object> attributeSpec =
           attribute.getValue() instanceof Map<?, ?> attrSpec
-              && DataStructureSchema.isScalar((Map<String, Object>) attrSpec);
-      // A free scalar renders type-inferred (a mapped number stays a JSON number); a non-scalar
-      // (object/array/$ref) is embedded verbatim as raw JSON.
-      bag.add(new FreeAttribute(name, scalar ? StaJsonType.ANY : StaJsonType.RAW_JSON));
+              ? (Map<String, Object>) attrSpec
+              : Map.of();
+      if (DataStructureSchema.isGeometry(attributeSpec)
+          || "array".equals(attributeSpec.get("type"))) {
+        // A geometry or an array is embedded verbatim as raw JSON.
+        bag.add(new FreeAttribute(name, StaJsonType.RAW_JSON));
+      } else if (modelled.isClassAt(propertiesPath, name)) {
+        // A class inside the bag: its attributes are targets of their own, nested under it. Asked
+        // before the scalar check, which takes an inline class without 'type' for a value.
+        modelled.field(propertiesPath, name, entity, StaTargetCatalog.keyPath(entity, name));
+      } else if (DataStructureSchema.isScalar(attributeSpec) || isFreeObject(attributeSpec)) {
+        // A scalar renders type-inferred (a mapped number stays a JSON number). A free object has
+        // no type of its own any more; the editor shows it as text, and so it is written.
+        bag.add(new FreeAttribute(name, StaJsonType.ANY));
+      }
     }
     return bag;
   }
@@ -345,6 +422,10 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
    * attributes; a bag that does declare content is resolved by the caller so a broken reference in
    * it surfaces as an error instead of degrading to "no attributes".
    */
+  private static boolean isFreeObject(Map<String, Object> spec) {
+    return !spec.containsKey("$ref") && isEmptyBagSpec(spec);
+  }
+
   private static boolean isEmptyBagSpec(Map<String, Object> spec) {
     if (spec.containsKey("$ref") || spec.containsKey("allOf")) {
       return false;

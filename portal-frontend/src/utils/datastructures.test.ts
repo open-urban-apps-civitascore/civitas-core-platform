@@ -450,6 +450,37 @@ describe('buildSessionFromVersion', () => {
     expect(buildSessionFromVersion(version).diagram.nodes).toHaveLength(1)
   })
 
+  it('reads the retired Json type of a stored drawing as String, in the session and in the form', () => {
+    const element = {
+      id: 'n1',
+      name: 'Observation',
+      type: 'class',
+      attributes: [{ id: 'a1', name: 'resultQuality', type: 'Json' }],
+      operations: [
+        { id: 'o1', name: 'quality', returnType: 'Json', parameters: [{ id: 'p1', name: 'raw', type: 'Json' }] },
+      ],
+    }
+    const drawn = {
+      id: 'diagram-id',
+      name: 'Drawn',
+      nodes: [{ id: 'n1', type: 'class', position: { x: 5, y: 5 }, data: { element, label: 'Observation' } }],
+      edges: [],
+    }
+    const version = createVersionDetail({ styles: drawn as never })
+
+    for (const node of [
+      buildSessionFromVersion(version).diagram.nodes[0],
+      mapDatastructureVersionApiToFormData(version).nodes[0],
+    ]) {
+      expect(node.data.element).toMatchObject({
+        attributes: [{ name: 'resultQuality', type: 'String' }],
+        operations: [{ returnType: 'String', parameters: [{ type: 'String' }] }],
+      })
+    }
+    // The stored data changes on the next save, not on reading it.
+    expect(element.attributes[0].type).toBe('Json')
+  })
+
   it('leaves the canvas empty for a model it cannot read', () => {
     const version = createVersionDetail({
       modelName: 'Alien',

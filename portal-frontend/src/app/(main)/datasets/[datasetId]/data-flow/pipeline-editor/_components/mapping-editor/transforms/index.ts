@@ -1,9 +1,10 @@
 import type { LucideIcon } from 'lucide-react'
 import { Binary, Calendar, CalendarClock, Clock, Combine, Fingerprint, Hash, MapPin, Type } from 'lucide-react'
 
-import type { ConfigControl, ConfigField, PortDef, TransformDef } from '@/components/node-editor/types'
+import type { ConfigField, PortDef, TransformDef } from '@/components/node-editor/types'
 import { buildRegistry } from '@/components/node-editor/types'
 import { UML_TYPE_GROUPED_OPTIONS } from '@/components/uml-modeler/constants/umlTypes'
+import { readStoredType } from '@/components/uml-modeler/services/legacyTypes'
 
 import type { ConversionOp, OpNode, TransformOp, ValueNode } from '../_types'
 import { NUMERIC_SUBTYPES } from '../_types'
@@ -21,9 +22,6 @@ export interface MappingTransformDef extends TransformDef {
   /** Per-field placeholder overrides driven by the current config, e.g. a format hint that
    *  depends on another field's value (the Literal node's value hint depends on its type). */
   placeholders?: (config: Record<string, unknown>) => Record<string, string> | undefined
-  /** Per-field control overrides driven by the current config, e.g. the Literal node's value
-   *  field switches to a textarea when its type is Json. */
-  controls?: (config: Record<string, unknown>) => Record<string, ConfigControl> | undefined
   visibleFields?: (config: Record<string, unknown>) => readonly string[]
 }
 
@@ -91,6 +89,12 @@ const conversion = (
 export const LITERAL_DEFAULT_TYPE = 'String'
 
 /**
+ * The UML type of a saved Literal node. A mapping saved before a type was retired still names it,
+ * and the node reads it as the type that replaced it, as the structure editor does.
+ */
+export const literalTypeOf = (valueType?: string): string => readStoredType(valueType ?? LITERAL_DEFAULT_TYPE)
+
+/**
  * Given a UML type name, returns the output PortDef for a literal node.
  * Reuses adapter.ts's GEOMETRY set and PRIMITIVE map — single source of truth.
  * Geometries are first-class typed ports: their `dataType` is the concrete
@@ -131,7 +135,6 @@ const LITERAL_VALUE_HINTS: Partial<Record<string, string>> = {
   Date: '2024-01-31',
   DateTime: '2024-01-31T14:30:00+01:00',
   Uuid: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-  Json: '{"key": "value"}',
   ...LITERAL_GEOMETRY_EXAMPLES,
 }
 
@@ -163,14 +166,13 @@ const literal: MappingTransformDef = {
     ...(cfg.type ? { valueType: String(cfg.type) } : {}),
   }),
   opInputs: () => [],
-  opConfig: op => (op.op === 'const' ? { value: op.value, type: op.valueType ?? LITERAL_DEFAULT_TYPE } : {}),
+  opConfig: op => (op.op === 'const' ? { value: op.value, type: literalTypeOf(op.valueType) } : {}),
   validate: cfg =>
     String(cfg.value ?? '').trim() === '' ? { value: 'transforms.literal.fields.value.required' } : undefined,
   placeholders: cfg => {
     const hint = LITERAL_VALUE_HINTS[String(cfg.type ?? LITERAL_DEFAULT_TYPE)]
     return hint ? { value: hint } : undefined
   },
-  controls: cfg => (cfg.type === 'Json' ? { value: 'textarea' } : undefined),
 }
 
 const concat: MappingTransformDef = {

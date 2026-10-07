@@ -1,5 +1,6 @@
 import { versionToSchemaTree } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_components/mapping-editor/schema/versionTree'
 import { diagramFromJsonSchema, SchemaImportError } from '@/components/uml-modeler/services/jsonSchemaImportService'
+import { withCurrentTypes } from '@/components/uml-modeler/services/legacyTypes'
 import { createEmptySession } from '@/components/uml-modeler/services/sessionService'
 import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import { DirtyField } from '@/components/uml-modeler/types/session'
@@ -80,7 +81,8 @@ export const mapDatastructureVersionApiToFormData = (version: DatastructureVersi
   dataStructureVersionStatus: version.dataStructureVersionStatus,
   dataStructureVersionSource: version.dataStructureVersionSource,
   modelName: version.modelName,
-  nodes: version.styles?.nodes || [],
+  // The nodes the editor opens, so a type retired since the save does not set the form apart from them.
+  nodes: (version.styles && withCurrentTypes(version.styles).nodes) || [],
   edges: version.styles?.edges || [],
 })
 
@@ -134,7 +136,7 @@ const diagramOfVersion = (versionData: DatastructureVersion | null): UMLDiagram 
   // A saved diagram carries a node array, even an empty one: a modeller may save a blank canvas,
   // and that is a drawing too. What a document-born version carries instead is no array at all.
   const drawn = versionData?.styles
-  if (drawn && Array.isArray(drawn.nodes)) return drawn
+  if (drawn && Array.isArray(drawn.nodes)) return withCurrentTypes(drawn)
 
   const model = versionData?.model
   if (!model) return null

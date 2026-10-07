@@ -32,7 +32,6 @@ export type FieldType =
   | 'date'
   | 'datetime'
   | 'uuid'
-  | 'json'
   | GeometryType
   | 'array'
   | 'object'
