@@ -11,6 +11,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Level;
@@ -26,6 +27,7 @@ import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
+import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
@@ -35,12 +37,14 @@ import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.DataSetMetaInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
+import de.civitascore.portal.model.input.assignment.AssignmentScopedInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.AllowedScopes;
+import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.service.validation.PipelineClosureValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
@@ -79,6 +83,7 @@ class DataSetServiceTest {
   @Mock private DataSetMapper dataSetMapper;
   @Mock private DataPoolRepository dataPoolRepository;
   @Mock private AssignmentFactory assignmentFactory;
+  @Mock private AssignmentChangeAuthorizer assignmentChangeAuthorizer;
   @Mock private DataSetSagaPublisher sagaPublisher;
   @Mock private PipelineRuntimeStatusService pipelineRuntimeStatusService;
   @Mock private ObjectProvider<AllowedScopes> allowedScopesProvider;
@@ -109,6 +114,7 @@ class DataSetServiceTest {
         dataSetMapper,
         dataPoolRepository,
         assignmentFactory,
+        assignmentChangeAuthorizer,
         sagaPublisher,
         pipelineRuntimeStatusService,
         allowedScopesProvider,
@@ -631,6 +637,53 @@ class DataSetServiceTest {
       assertThat(result.getProjectId()).isEqualTo("proj-1");
       assertThat(result.getServiceId()).isEqualTo("svc-1");
       verify(sagaPublisher).publishUnreleaseRequested(result);
+    }
+  }
+
+  @Nested
+  @DisplayName("assignment changes")
+  class AssignmentChangeTests {
+
+    @Test
+    @DisplayName("stores nothing and publishes no update when the change is denied")
+    void deniedChangeStoresNothing() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      AssignmentScopedInputDTO requested = new AssignmentScopedInputDTO();
+      requested.setGroupId(UUID.randomUUID());
+      requested.setRoleId(UUID.randomUUID());
+      when(assignmentFactory.build(requested)).thenReturn(new Assignment());
+      doThrow(new AccessDeniedException("denied"))
+          .when(assignmentChangeAuthorizer)
+          .authorizeReplacement(eq(ds), any());
+
+      DataSetMetaInputDTO input = new DataSetMetaInputDTO();
+      input.setName("updated name");
+      input.setAssignments(Set.of(requested));
+
+      assertThatThrownBy(() -> createService().updateReleasedMeta(id, input))
+          .isInstanceOf(AccessDeniedException.class);
+      assertThat(ds.getAssignments()).isEmpty();
+      assertThat(ds.getPendingSagaType()).isNull();
+      verify(dataSetRepository, never()).save(any());
+      verify(sagaPublisher, never()).publishUpdateRequested(any(), any());
+    }
+
+    @Test
+    @DisplayName("skips the check when the input omits assignments")
+    void omittedAssignmentsSkipTheCheck() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = readyDataSet(id);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSetMetaInputDTO input = new DataSetMetaInputDTO();
+      input.setName("updated name");
+
+      createService().updateReadyMeta(id, input);
+
+      verifyNoInteractions(assignmentChangeAuthorizer);
     }
   }
 
