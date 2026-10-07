@@ -298,21 +298,99 @@ class DatasetCreateBpmnTest {
     inOrder.verify(frostHandler).handle(any());
     inOrder.verify(apisixHandler).handle(any());
     inOrder.verify(postgisHandler).handle(any());
-    inOrder.verify(geoserverHandler, times(3)).handle(any());
+    inOrder.verify(geoserverHandler, times(4)).handle(any());
 
     ArgumentCaptor<SagaCommandMessage> sink = ArgumentCaptor.forClass(SagaCommandMessage.class);
     verify(postgisHandler).handle(sink.capture());
     assertEquals("PROVISION_SINK", sink.getValue().operation());
 
     ArgumentCaptor<SagaCommandMessage> geo = ArgumentCaptor.forClass(SagaCommandMessage.class);
-    verify(geoserverHandler, times(3)).handle(geo.capture());
+    verify(geoserverHandler, times(4)).handle(geo.capture());
     assertEquals(
-        List.of("CREATE_WORKSPACE", "CREATE_DATASTORE", "PROVISION_LAYERS"),
+        List.of("CREATE_WORKSPACE", "CREATE_DATASTORE", "PROVISION_LAYERS", "PRUNE_FEATURE_TYPES"),
         geo.getAllValues().stream().map(SagaCommandMessage::operation).toList());
   }
 
   @Test
-  void shouldSkipLayerProvisioningWhenNoLayers() {
+  void shouldPruneFeatureTypesAfterTheLastFailableStep() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+    stubPipelineSuccess();
+
+    ProcessInstance instance = startProcessWithGeo(true, true, true);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+
+    var inOrder = inOrder(pipelineHandler, geoserverHandler);
+    inOrder.verify(pipelineHandler).handle(any());
+    inOrder
+        .verify(geoserverHandler)
+        .handle(argThat(cmd -> cmd != null && "PRUNE_FEATURE_TYPES".equals(cmd.operation())));
+  }
+
+  @Test
+  void shouldFailAndDeleteTheWorkspaceWhenTheFeatureTypePruneFails() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+    stubApisixCompensationSuccess();
+    stubFrostCompensationSuccess();
+    stubPruneFailure();
+
+    ProcessInstance instance = startProcessWithGeo(false, true, true);
+    executeAllJobs();
+
+    assertProcessFinished(instance.getId());
+    assertEquals(
+        List.of("publish-failure"),
+        FlowableTestSupport.getPublishedResultTaskIds(historyService, instance.getId()));
+    verify(geoserverHandler)
+        .handle(
+            argThat(
+                cmd ->
+                    cmd != null
+                        && "COMPENSATE_STEP".equals(cmd.type())
+                        && "DELETE_WORKSPACE".equals(cmd.operation())));
+    verify(pipelineHandler, never()).handle(any());
+  }
+
+  @Test
+  void shouldCompensatePipelinesFirstWhenTheFeatureTypePruneFails() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+    stubApisixCompensationSuccess();
+    stubFrostCompensationSuccess();
+    stubPipelineSuccess();
+    stubPipelineCompensationSuccess();
+    stubPruneFailure();
+
+    ProcessInstance instance = startProcessWithGeo(true, true, true);
+    executeAllJobs();
+
+    assertProcessFinished(instance.getId());
+    var inOrder = inOrder(pipelineHandler, geoserverHandler);
+    inOrder
+        .verify(pipelineHandler)
+        .handle(argThat(cmd -> cmd != null && "DELETE_PIPELINES".equals(cmd.operation())));
+    inOrder
+        .verify(geoserverHandler)
+        .handle(argThat(cmd -> cmd != null && "DELETE_WORKSPACE".equals(cmd.operation())));
+  }
+
+  @Test
+  void shouldNotCallGeoServerWhenDatasetHasNoGeoSink() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+
+    ProcessInstance instance = startProcess(false);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+    verify(geoserverHandler, never()).handle(any());
+  }
+
+  @Test
+  void shouldPruneEveryFeatureTypeWhenReleasedWithoutLayers() {
     stubFrostSuccess();
     stubApisixSuccess();
 
@@ -326,12 +404,11 @@ class DatasetCreateBpmnTest {
     inOrder.verify(apisixHandler).handle(any());
     inOrder.verify(postgisHandler).handle(any());
 
-    // Only workspace + datastore run; provision-layers is skipped — so exactly 2 geoserver calls,
-    // in invocation order (deterministic, unlike a HistoricActivityInstance start-time sort).
+    // Guards against layers deleted before a re-release staying served.
     ArgumentCaptor<SagaCommandMessage> geo = ArgumentCaptor.forClass(SagaCommandMessage.class);
-    verify(geoserverHandler, times(2)).handle(geo.capture());
+    verify(geoserverHandler, times(3)).handle(geo.capture());
     assertEquals(
-        List.of("CREATE_WORKSPACE", "CREATE_DATASTORE"),
+        List.of("CREATE_WORKSPACE", "CREATE_DATASTORE", "PRUNE_FEATURE_TYPES"),
         geo.getAllValues().stream().map(SagaCommandMessage::operation).toList());
   }
 
@@ -498,6 +575,13 @@ class DatasetCreateBpmnTest {
   private void stubPipelineFailure(String error) {
     when(pipelineHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
         .thenReturn(SagaCommandResult.failure("saga-test-123", "deploy-pipelines", error));
+  }
+
+  private void stubPruneFailure() {
+    when(geoserverHandler.handle(
+            argThat(cmd -> cmd != null && "PRUNE_FEATURE_TYPES".equals(cmd.operation()))))
+        .thenReturn(
+            SagaCommandResult.failure("saga-test-123", "prune-featuretypes", "GeoServer 503"));
   }
 
   private void stubFrostCompensationSuccess() {

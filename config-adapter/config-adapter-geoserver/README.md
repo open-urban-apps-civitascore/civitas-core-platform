@@ -104,8 +104,8 @@ publication and pruning; `datasinks` only resolves native table names and the na
   `Location` header, an absorbed 409 — which has none — from the request body.
 - **`PRUNE_FEATURE_TYPES` is terminal and uncompensatable**: the `UPDATE_WORKSPACE` snapshot lists names without
   definitions, so a deleted feature type cannot be restored and the prune MUST run after the last failable step. An
-  absent `layers` field means no layers remain, not "unknown", so an empty desired set prunes everything. An
-  undeletable feature type is reported as `staleFeatureTypes` and the step still succeeds.
+  absent `layers` field means no layers remain, not "unknown", so an empty desired set prunes everything. A feature
+  type that cannot be deleted fails the step after the others were tried, naming it in the error.
 - **`RESTORE_WORKSPACE` skips rather than guesses**: with no snapshot it does nothing, rather than read the absence
   as an empty workspace and delete pre-existing feature types. Styles are not snapshotted; only a recursive
   `DELETE_WORKSPACE` removes them.

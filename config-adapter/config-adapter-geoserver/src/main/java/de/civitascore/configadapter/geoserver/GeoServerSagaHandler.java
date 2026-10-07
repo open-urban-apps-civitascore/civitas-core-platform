@@ -589,9 +589,8 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
    * portal builds the field from the dataset's full layer set — so an empty desired set
    * legitimately prunes everything the workspace still serves.
    *
-   * <p>A feature type that cannot be deleted is reported as {@code staleFeatureTypes} rather than
-   * failing the step: it keeps being served, which the portal must be able to see, but the update
-   * it follows did apply.
+   * <p>A feature type that cannot be deleted fails the step, but only after every other one was
+   * tried: the step cannot succeed while a deleted layer is still served.
    */
   private SagaCommandResult handlePruneFeatureTypes(SagaCommandMessage command) {
     String workspaceName = resolveWorkspaceName(command);
@@ -627,12 +626,14 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       }
     }
 
-    Map<String, Object> resultData = new LinkedHashMap<>();
-    resultData.put("workspaceName", workspaceName);
     if (!stale.isEmpty()) {
-      resultData.put("staleFeatureTypes", stale);
+      return SagaCommandResult.failure(
+          command.sagaId(),
+          command.stepId(),
+          "PRUNE_FEATURE_TYPES left feature types served: " + String.join(", ", stale));
     }
-    return SagaCommandResult.success(command.sagaId(), command.stepId(), resultData, Map.of());
+    return SagaCommandResult.success(
+        command.sagaId(), command.stepId(), Map.of("workspaceName", workspaceName), Map.of());
   }
 
   /**
