@@ -44,7 +44,7 @@ mock_send_external_id_only(_) := {"status_code": 200, "body": {"externalId": "ex
 mock_send_empty(_) := {"status_code": 200, "body": {}}
 mock_send_multiple_groups(_) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
 	{"perms": ["DATASET_READ"], "scope_type": "DATASET", "scope_id": "dataset-1"},
-	{"perms": ["DATASET_CREATE"], "scope_type": "DATASET", "scope_id": "dataset-2"},
+	{"perms": ["DATASET_CREATE"], "scope_type": "TENANT", "scope_id": null},
 ])}
 
 mock_send_multi_role(_) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
@@ -336,6 +336,45 @@ test_tenant_allows_datapool_collection_create if {
 		with data.config as mock_http.mock_config
 		with input as portal_request("POST", "/v1/datapools")
 	result == true
+}
+
+scoped_user(perms, scope_type, scope_id) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(perms, scope_type, scope_id)}
+
+test_dataset_scoped_create_denies_dataset_collection_create if {
+	not permission_eval.has_permission with http.send as scoped_user(["DATASET_CREATE"], "DATASET", "dataset-1")
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/datasets")
+}
+
+test_datasource_scoped_create_denies_datasource_collection_create if {
+	not permission_eval.has_permission with http.send as scoped_user(["DATASOURCE_CREATE"], "DATASOURCE", "source-1")
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/datasources")
+}
+
+test_datastructure_scoped_create_denies_datastructure_collection_create if {
+	not permission_eval.has_permission with http.send as scoped_user(["DATASTRUCTURE_CREATE"], "DATASTRUCTURE", "structure-1")
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/datastructures")
+}
+
+test_datapool_scoped_create_denies_datapool_collection_create if {
+	not permission_eval.has_permission with http.send as scoped_user(["DATAPOOL_CREATE"], "DATAPOOL", "pool-1")
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/datapools")
+}
+
+test_dataset_scoped_read_allows_dataset_collection_read if {
+	permission_eval.has_permission with http.send as scoped_user(["DATASET_READ"], "DATASET", "dataset-1")
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datasets")
+}
+
+# Without this grant a pool editor could not create Datasets in their own pool; DataSetService confines the target pool.
+test_datapool_scoped_dataset_create_allows_dataset_collection_create if {
+	permission_eval.has_permission with http.send as scoped_user(["DATASET_CREATE"], "DATAPOOL", "pool-1")
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/datasets")
 }
 
 # A DATAPOOL/TENANT user with DATAPOOL_UPDATE

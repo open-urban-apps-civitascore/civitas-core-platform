@@ -114,6 +114,21 @@ public class DataSetService
   }
 
   /**
+   * Rejects a dataset create without a target datapool unless the caller holds tenant-wide
+   * (wildcard) access. OPA grants the create to a pool-scoped caller; such a caller may create only
+   * inside one of their pools, never outside every pool.
+   *
+   * @throws AccessDeniedException if a non-wildcard caller omits {@code datapoolId}
+   */
+  @Override
+  protected DataSetInputDTO preProcessCreateInput(DataSetInputDTO input) {
+    if (input.getDatapoolId() == null && !allowedScopesProvider.getObject().isWildcard()) {
+      throw new AccessDeniedException("Not authorized to create a dataset outside a datapool");
+    }
+    return super.preProcessCreateInput(input);
+  }
+
+  /**
    * Authorizes placing a dataset into the given target datapool (F4). OPA grants the dataset write
    * but cannot authorize the TARGET pool — it never sees the request body — so the backend enforces
    * it here using the per-request {@link AllowedScopes}: a TENANT (wildcard) caller may use any

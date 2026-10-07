@@ -1823,8 +1823,21 @@ class DataSetServiceTest {
     }
 
     @Test
+    @DisplayName("create without datapoolId is rejected for a pool-scoped caller")
+    void createWithoutDatapoolIdRejectsPoolScopedCaller() {
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setName("ds");
+
+      DataSetService service = createService();
+      when(allowedScopesProvider.getObject()).thenReturn(poolScopes(UUID.randomUUID()));
+
+      assertThatThrownBy(() -> service.create(input)).isInstanceOf(AccessDeniedException.class);
+      verify(dataSetRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName(
-        "create with null datapoolId creates dataset without pool (datapoolId is optional)")
+        "create with null datapoolId creates dataset without pool for a tenant-wide caller")
     void createWithNullDatapoolIdLeavesDataPoolNull() {
       DataSetInputDTO input = new DataSetInputDTO();
       input.setName("ds");
