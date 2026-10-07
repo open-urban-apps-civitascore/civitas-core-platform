@@ -53,7 +53,10 @@
       "properties" : {
         "reference" : "A7",
         "thingReference" : "A7"
-      }
+      },
+      "Projects" : [ {
+        "@iot.id" : 5
+      } ]
     }
   }, {
     "id" : "r0-loc",
@@ -72,6 +75,9 @@
         "reference" : "A7",
         "thingReference" : "A7"
       },
+      "Projects" : [ {
+        "@iot.id" : 5
+      } ],
       "Things" : [ {
         "@iot.id" : "$r0-thing"
       } ]
@@ -117,7 +123,10 @@
       "name" : "DS18B20",
       "description" : "Air temperature sensor",
       "encodingType" : "application/pdf",
-      "metadata" : "http://example.org/ds18b20.pdf"
+      "metadata" : "http://example.org/ds18b20.pdf",
+      "Projects" : [ {
+        "@iot.id" : 5
+      } ]
     }
   }, {
     "id" : "r0-ds-op",
@@ -162,7 +171,10 @@
         "name" : "DS18B20",
         "description" : "Air temperature sensor",
         "encodingType" : "application/pdf",
-        "metadata" : "http://example.org/ds18b20.pdf"
+        "metadata" : "http://example.org/ds18b20.pdf",
+        "Projects" : [ {
+          "@iot.id" : 5
+        } ]
       },
       "ObservedProperty" : {
         "name" : "Temperature",

@@ -140,6 +140,39 @@ class ThingTreePortTest {
   }
 
   @Test
+  void plan_withAFeatureOfInterestInTheMeasurement_assignsItToTheProject() {
+    String withFeature =
+        """
+        {
+          "properties": { "reference": "A7" },
+          "Datastreams": [
+            {
+              "name": "Air temperature",
+              "properties": { "reference": "temp" },
+              "Observations": [
+                {
+                  "result": 21.5,
+                  "FeatureOfInterest": {
+                    "name": "Garden",
+                    "encodingType": "application/geo+json",
+                    "feature": { "type": "Point", "coordinates": [8.4, 49.0] }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+        """;
+    JsonNode observationCreate =
+        requestWithUrl(
+            BatchDocuments.of(SinkPort.THING_TREE, withFeature).get("requests"), "Observations");
+
+    // The Dataset's API serves its project: a feature outside it is written but never listed.
+    assertEquals(5, observationCreate.at("/body/FeatureOfInterest/Projects/0/@iot.id").asLong());
+    assertFalse(observationCreate.get("body").has("Projects"));
+  }
+
+  @Test
   void plan_withoutADatastream_endsAfterTheMetadata() {
     String metadataOnly =
         """

@@ -134,6 +134,26 @@ class ObservationsPortTest {
   }
 
   @Test
+  void plan_withAFeatureOfInterest_assignsItToTheProject() {
+    String withFeature =
+        """
+        {
+          "result": 21.5,
+          "parameters": { "thingReference": "A7", "datastreamReference": "temp" },
+          "FeatureOfInterest": {
+            "name": "Garden", "description": "The garden", "encodingType": "application/geo+json",
+            "feature": { "type": "Point", "coordinates": [8.4, 49.0] }
+          }
+        }
+        """;
+    JsonNode append = BatchDocuments.of(SinkPort.OBSERVATIONS, withFeature).get("requests").get(1);
+
+    // The Dataset's API serves its project: a feature outside it is written but never listed.
+    JsonNode projects = append.get("body").get("FeatureOfInterest").get("Projects");
+    assertEquals(5, projects.get(0).get("@iot.id").asLong());
+  }
+
+  @Test
   void plan_withoutTheParentReferences_rejectsTheRecord() {
     RecordRejectedException rejected =
         assertThrows(

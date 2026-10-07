@@ -13,6 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.charset.StandardCharsets;
 import org.apache.nifi.reporting.InitializationException;
 import org.apache.nifi.util.MockFlowFile;
@@ -38,6 +40,7 @@ import org.testcontainers.DockerClientFactory;
 class PutFrostRecordIT {
 
   private static final String WEB_CLIENT = "web-client";
+  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   private static FrostStack frost;
   private static String projectId;
@@ -105,6 +108,75 @@ class PutFrostRecordIT {
         "S",
         frost.get("/Datastreams(" + datastreamId + ")/Sensor").path("name").asText(),
         "the Sensor must be deep-inserted with the Datastream");
+    // The Dataset's API serves the project: what lies outside it is written but never listed.
+    assertEquals(
+        1, frost.count(projectLocations(reference)), "the Location must be in the project");
+    assertEquals(1, frost.count(projectSensors(datastreamId)), "the Sensor must be in the project");
+    // The measurement brings no FeatureOfInterest. FROST generates one from the Location and gives
+    // it the Location's projects, which is why the port does not assign it itself.
+    assertEquals(
+        1,
+        frost.count(
+            "/Projects("
+                + projectId
+                + ")/FeaturesOfInterest"
+                + FrostStack.filter("Observations/Datastream/id eq " + datastreamId)),
+        "the generated FeatureOfInterest must be in the project");
+  }
+
+  @Test
+  void thingTreePort_assignsALocationAndASensorWrittenWithoutTheProject() throws Exception {
+    String reference = "IT-TREE-3";
+    // The tree as the port wrote it before it assigned anything but the Thing.
+    ObjectNode unassigned = (ObjectNode) MAPPER.readTree(tree(reference, "Tree station", 1.0));
+    ((ObjectNode) unassigned.at("/Locations/0"))
+        .putObject("properties")
+        .put("reference", reference)
+        .put("thingReference", reference);
+    ((ObjectNode) unassigned.at("/Datastreams/0/properties")).put("thingReference", reference);
+    frost.post("/Projects(" + projectId + ")/Things", unassigned.toString());
+    long datastreamId =
+        frost.query(datastreams(reference + "-DS", reference)).get(0).path("@iot.id").asLong();
+    assertEquals(0, frost.count(projectLocations(reference)));
+    assertEquals(0, frost.count(projectSensors(datastreamId)));
+
+    TestRunner runner = runner("ThingTree");
+    runner.enqueue(tree(reference, "Tree station", 2.0).getBytes(StandardCharsets.UTF_8));
+    runner.run();
+    runner.assertTransferCount(PutFrostRecord.SUCCESS, 1);
+
+    // The update assigns the entities it finds, so the next delivery repairs the older ones.
+    assertEquals(
+        1, frost.count(projectLocations(reference)), "the Location must be in the project");
+    assertEquals(1, frost.count(projectSensors(datastreamId)), "the Sensor must be in the project");
+    assertEquals(
+        1,
+        frost.count(
+            "/Locations" + FrostStack.filter("properties/reference eq '" + reference + "'")),
+        "the update must not create a second Location");
+  }
+
+  @Test
+  void thingsPort_assignsWhatTheRecordDeepInsertsToTheProject() throws Exception {
+    String reference = "IT-THINGS-2";
+    TestRunner runner = runner("Things");
+
+    runner.enqueue(tree(reference, "Deep station", 1.0).getBytes(StandardCharsets.UTF_8));
+    runner.run();
+    runner.assertTransferCount(PutFrostRecord.SUCCESS, 1);
+
+    long thingId = frost.query(things(reference)).get(0).path("@iot.id").asLong();
+    long datastreamId =
+        frost.query("/Things(" + thingId + ")/Datastreams").get(0).path("@iot.id").asLong();
+    assertEquals(
+        1,
+        frost.count(
+            "/Projects("
+                + projectId
+                + ")/Locations"
+                + FrostStack.filter("Things/id eq " + thingId)),
+        "the Location must be in the project");
+    assertEquals(1, frost.count(projectSensors(datastreamId)), "the Sensor must be in the project");
   }
 
   @Test
@@ -175,6 +247,35 @@ class PutFrostRecordIT {
     JsonNode observations = frost.query("/Datastreams(" + datastreamId + ")/Observations");
     assertEquals(1, observations.size(), "a corrected measurement must not be a second one");
     assertEquals(2.0, observations.get(0).path("result").asDouble());
+  }
+
+  @Test
+  void observationsPort_assignsTheFeatureOfInterestOfTheMeasurementToTheProject() throws Exception {
+    String thingReference = "IT-OBS-THING-3";
+    String datastreamReference = "IT-OBS-DS-3";
+    long datastreamId = provisionDatastream(thingReference, datastreamReference);
+    TestRunner runner = runner("Observations");
+    ObjectNode measurement =
+        (ObjectNode) MAPPER.readTree(observation(thingReference, datastreamReference, null, 4.0));
+    measurement
+        .putObject("FeatureOfInterest")
+        .put("name", "Garden")
+        .put("description", "The garden")
+        .put("encodingType", "application/geo+json")
+        .set("feature", MAPPER.readTree("{\"type\":\"Point\",\"coordinates\":[8.4,49.0]}"));
+
+    runner.enqueue(measurement.toString().getBytes(StandardCharsets.UTF_8));
+    runner.run();
+    runner.assertTransferCount(PutFrostRecord.SUCCESS, 1);
+
+    assertEquals(
+        1,
+        frost.count(
+            "/Projects("
+                + projectId
+                + ")/FeaturesOfInterest"
+                + FrostStack.filter("Observations/Datastream/id eq " + datastreamId)),
+        "the FeatureOfInterest must be in the project");
   }
 
   @Test
@@ -254,6 +355,22 @@ class PutFrostRecordIT {
         + projectId
         + ")/Things"
         + FrostStack.filter("properties/reference eq '" + reference + "'");
+  }
+
+  /** The Locations of the project carrying a reference. */
+  private static String projectLocations(String reference) {
+    return "/Projects("
+        + projectId
+        + ")/Locations"
+        + FrostStack.filter("properties/reference eq '" + reference + "'");
+  }
+
+  /** The Sensor of a Datastream, if it is in the project. */
+  private static String projectSensors(long datastreamId) {
+    return "/Projects("
+        + projectId
+        + ")/Sensors"
+        + FrostStack.filter("Datastreams/id eq " + datastreamId);
   }
 
   /** The Datastreams carrying a reference, scoped to their Thing. */

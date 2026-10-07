@@ -51,6 +51,23 @@ public final class StaEntities {
           "FeatureOfInterest",
           "FeaturesOfInterest");
 
+  private static final String PROJECTS = "Projects";
+
+  /**
+   * The navigation members whose entities a FROST project can hold. Datastreams, Observations and
+   * ObservedProperties it cannot: the Projects plugin reaches them through the Thing only.
+   */
+  private static final Set<String> PROJECT_MEMBERS =
+      Set.of(
+          "Thing",
+          "Things",
+          "Location",
+          "Locations",
+          "Sensor",
+          "Sensors",
+          "FeatureOfInterest",
+          "FeaturesOfInterest");
+
   private StaEntities() {}
 
   /** A copy of the entity without its navigation members, ready for a PATCH or a plain create. */
@@ -69,6 +86,44 @@ public final class StaEntities {
   public static void linkMany(ObjectNode body, String navigation, String reference) {
     ArrayNode entities = body.putArray(navigation);
     entities.addObject().put("@iot.id", reference);
+  }
+
+  /**
+   * Assigns an entity to the Dataset's project. A Dataset's API serves the project, so a Location,
+   * Sensor or FeatureOfInterest without the assignment is written but missing from its lists.
+   *
+   * <p>The member is allowed in a PATCH, unlike the navigation members above: FROST adds the
+   * project to the ones the entity already has, so an update also assigns an entity written before.
+   */
+  public static void assignToProject(ObjectNode body, String projectId) {
+    body.putArray(PROJECTS).addObject().put("@iot.id", Long.parseLong(projectId));
+  }
+
+  /**
+   * Assigns every Thing, Location, Sensor and FeatureOfInterest a deep insert creates below the
+   * body to the project, at any depth. The walk passes through Datastreams, Observations and
+   * ObservedProperties without assigning them, because a project cannot hold them. A member that
+   * names an existing entity by its identifier is a link rather than a create, and stays as it is.
+   */
+  public static void assignNestedToProject(ObjectNode body, String projectId) {
+    body.properties()
+        .forEach(
+            member -> {
+              if (!NAVIGATION.contains(member.getKey())) {
+                return;
+              }
+              JsonNode value = member.getValue();
+              List<JsonNode> nested = value.isArray() ? toList((ArrayNode) value) : List.of(value);
+              for (JsonNode entity : nested) {
+                if (!(entity instanceof ObjectNode object) || object.has("@iot.id")) {
+                  continue;
+                }
+                if (PROJECT_MEMBERS.contains(member.getKey())) {
+                  assignToProject(object, projectId);
+                }
+                assignNestedToProject(object, projectId);
+              }
+            });
   }
 
   /**

@@ -55,9 +55,10 @@ public final class FrostUrls {
    * back-reference of its own lookup, so the query cannot reach beyond it.
    *
    * <p>A query on the {@code Locations} collection with {@code thingReference} would not be scoped
-   * at all: Locations belong to no project, and a reference is local to its Dataset, so two
-   * Datasets that model the same device share it. The second one would find the first one's
-   * Location, patch it, and leave its own Thing without one.
+   * at all: a reference is local to its Dataset, so two Datasets that model the same device share
+   * it. The second one would find the first one's Location, patch it, and leave its own Thing
+   * without one. A query on the project's Locations would miss a Location written before the sink
+   * assigned Locations to the project, and create a second one.
    */
   public static String locationLookup(String thingBackReference, String reference) {
     return thingBackReference

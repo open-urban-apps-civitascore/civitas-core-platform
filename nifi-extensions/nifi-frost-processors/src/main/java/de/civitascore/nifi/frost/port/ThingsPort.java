@@ -46,13 +46,17 @@ public final class ThingsPort implements PortPlanner {
         StaEntities.withoutNavigation(record),
         true);
 
+    // The project URL assigns the Thing alone; whatever the record deep-inserts below it needs the
+    // assignment written into its own body.
+    ObjectNode created = record.deepCopy();
+    StaEntities.assignNestedToProject(created, projectId);
     plan.write(
         StaEntities.THING,
         LOOKUP,
         BatchMethod.POST,
         FrostUrls.things(projectId),
         SubRequest.ifMissing(plan.id(LOOKUP)),
-        record.deepCopy(),
+        created,
         true);
   }
 }
