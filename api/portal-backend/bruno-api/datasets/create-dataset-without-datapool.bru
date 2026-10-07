@@ -20,7 +20,7 @@ body:json {
 }
 
 tests {
-  test("Status code is 201 — datapoolId is optional", function() {
+  test("Status code is 201 — datapoolId is optional for a tenant-wide caller", function() {
     expect(res.getStatus()).to.equal(201);
   });
   test("Has id", function() {
@@ -32,7 +32,7 @@ tests {
 }
 
 docs {
-  **Purpose:** Verifies that `datapoolId` is optional. A dataset created without it is accepted (201) and has `datapool: null` — there is no implicit assignment to a default datapool.
+  **Purpose:** Verifies that `datapoolId` is optional for a tenant-wide caller. A dataset created without it is accepted (201) and has `datapool: null` — there is no implicit assignment to a default datapool. A caller without a tenant-wide grant gets 403 instead.
 
   **Expected Response:** 201 Created, `datapool` field is null.
 }

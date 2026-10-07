@@ -272,11 +272,23 @@ class DataSetPoolScopeFilteringIntegrationTest
     }
 
     @Test
-    @DisplayName("A pool-less create needs no target-pool authorization")
-    void poolLessCreateNeedsNoPoolAuthorization() {
-      ResponseEntity<String> response = createDatasetWithHeaders("ds-poolless", null, "", null);
+    @DisplayName("A pool-less create by a tenant-wide caller is allowed")
+    void poolLessCreateByTenantWideCallerAllowed() {
+      ResponseEntity<String> response = createDatasetWithHeaders("ds-poolless", null, "*", null);
 
       assertThat(response.getStatusCode().value()).isEqualTo(201);
+    }
+
+    @Test
+    @DisplayName("A pool-less create by a pool-scoped caller is rejected")
+    void poolLessCreateByPoolScopedCallerForbidden() {
+      UUID pool1 = createDataPool("Pool-1");
+
+      ResponseEntity<String> response =
+          createDatasetWithHeaders("ds-poolless", null, "", pool1.toString());
+
+      assertThat(response.getStatusCode().value()).isEqualTo(403);
+      assertThat(dataSetRepository.findAll()).isEmpty();
     }
 
     @Test
@@ -319,8 +331,7 @@ class DataSetPoolScopeFilteringIntegrationTest
       UUID pool1 = createDataPool("Pool-1");
       UUID pool2 = createDataPool("Pool-2");
 
-      // Pool-less create needs no pool authorization.
-      ResponseEntity<String> created = createDatasetWithHeaders("ds-move", null, "", null);
+      ResponseEntity<String> created = createDatasetWithHeaders("ds-move", null, "*", null);
       assertThat(created.getStatusCode().value()).isEqualTo(201);
       UUID datasetId = dataSetRepository.findAll().get(0).getId();
 

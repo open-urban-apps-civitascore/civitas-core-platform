@@ -151,7 +151,7 @@ has_permission if {
 # Scope matching rules:
 #   - Resource endpoints: assignment.scopeId must match resource ID from path
 #   - TENANT-scoped resources: assignment.scopeType must be TENANT (no scopeId check)
-#   - Collection endpoints: TENANT scope or matching scope type required (Q-006: fail-secure)
+#   - Collection endpoints: TENANT scope; matching scope type for reads only; a DATAPOOL grant also for the dataset collection (Q-006: fail-secure)
 #
 # SCOPE INHERITANCE (Q-005 resolved): TENANT scope cascades to all resource
 # endpoints per ADM spec. DATASPACE → child resource inheritance is deferred
@@ -175,10 +175,12 @@ user_has_permission(permission) if {
 	is_unscoped(assignment)
 }
 
-# For collection endpoints with matching scope type: allowed
-# (User has permission via scope type matching the resource's expected scope type)
+# For collection reads with matching scope type: allowed, the backend narrows the list via
+# X-Allowed-Scope-Ids. A collection write (POST) creates a new object outside that scope, so
+# a grant on one existing object must not authorize it.
 user_has_permission(permission) if {
 	resource_mapping.is_collection_endpoint
+	resource_mapping.request_method == "GET"
 	some group in user_context_fetcher.user_context.groups
 	some assignment in group.assignments
 	permission in assignment.permissions
@@ -261,14 +263,9 @@ user_has_permission(permission) if {
 # outage is indistinguishable from a real lack of grant in the decision (see the
 # observability note in main.rego).
 #
-# SCOPE NOTE (Epic-faithful, see Epics 1+2): collection classification is
-# path-based and therefore method-agnostic, so the collection rule below also
-# grants writes (e.g. POST /v1/datasets) to a qualifying pool grant. Per Epic 2,
-# dataset create/edit follows "existing product rules" and the target datapool is
-# an editable field — there is currently NO target-pool authorization on writes.
-# This mirrors the pre-existing DATASET-scoped collection-create behavior. If
-# stricter write semantics are desired, that is a deliberate decision beyond the
-# current Epic spec.
+# SCOPE NOTE: the collection rule below also grants POST /v1/datasets to a qualifying
+# pool grant, because a pool editor creates Datasets inside their pool. OPA cannot see
+# the target pool in the body; DataSetService confines it to X-Allowed-Pool-Ids.
 
 # Resource endpoint: access to a single dataset is granted if the user holds the
 # permission on the dataset's pool.

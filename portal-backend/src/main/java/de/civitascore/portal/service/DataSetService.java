@@ -117,6 +117,14 @@ public class DataSetService
     this.pipelineClosureValidator = pipelineClosureValidator;
   }
 
+  @Override
+  protected DataSetInputDTO preProcessCreateInput(DataSetInputDTO input) {
+    if (input.getDatapoolId() == null && !allowedScopesProvider.getObject().isWildcard()) {
+      throw new AccessDeniedException("Not authorized to create a dataset outside a datapool");
+    }
+    return super.preProcessCreateInput(input);
+  }
+
   /**
    * Authorizes placing a dataset into the given target datapool (F4). OPA grants the dataset write
    * but cannot authorize the TARGET pool — it never sees the request body — so the backend enforces
