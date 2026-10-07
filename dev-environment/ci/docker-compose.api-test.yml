@@ -484,6 +484,9 @@ services:
       KEYCLOAK_TARGET_REALM: civitas-core
       SERVER_PORT: 8089
       SPRING_PROFILES_ACTIVE: local,postgres,init
+      # Keycloak base URL the OpenAPI description shows. Empty here, so the description uses the
+      # real Keycloak URL; the export-openapi-spec job sets an example.org URL instead.
+      OPENAPI_OAUTH_SERVER_URL: ${OPENAPI_OAUTH_SERVER_URL:-}
     depends_on:
       postgres-portal:
         condition: service_healthy

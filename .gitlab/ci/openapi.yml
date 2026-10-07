@@ -22,6 +22,9 @@ export-openapi-spec:
     DOCKER_DRIVER: overlay2
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ''
+    # The spec is hosted as documentation, where the CI-internal Keycloak host points nowhere.
+    # example.org is reserved for examples (RFC 2606), so these URLs are obviously not real.
+    OPENAPI_OAUTH_SERVER_URL: https://auth.example.org
   script:
     - export COMPOSE_FILES="-f dev-environment/ci/docker-compose.api-test.yml"
     - |
@@ -41,6 +44,8 @@ export-openapi-spec:
       }
     # The `local` profile of the stack permits /api-docs.yaml without a token
     - docker compose -p openapi-export $COMPOSE_FILES exec -T portal-backend curl -sf http://localhost:8089/v1/api-docs.yaml > openapi.generated.yaml
+    # Fail when the override did not reach the backend, instead of committing the internal host
+    - grep -q "$OPENAPI_OAUTH_SERVER_URL/realms/" openapi.generated.yaml
   artifacts:
     when: on_success
     paths:

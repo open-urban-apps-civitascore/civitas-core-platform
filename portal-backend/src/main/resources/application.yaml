@@ -132,6 +132,13 @@ management:
       probes:
         enabled: true
 
+# OpenAPI description
+openapi:
+  # Keycloak base URL that the OAuth2 security scheme of the description shows. Empty: the
+  # description uses keycloak.auth-server-url. The export-openapi-spec CI job sets an example.org
+  # URL, so the committed spec shows no internal host.
+  oauth-server-url:
+
 springdoc:
   default-produces-media-type: application/json
   override-with-generic-response: false
