@@ -113,13 +113,6 @@ public class DataSetService
     this.pipelineClosureValidator = pipelineClosureValidator;
   }
 
-  /**
-   * Rejects a dataset create without a target datapool unless the caller holds tenant-wide
-   * (wildcard) access. OPA grants the create to a pool-scoped caller; such a caller may create only
-   * inside one of their pools, never outside every pool.
-   *
-   * @throws AccessDeniedException if a non-wildcard caller omits {@code datapoolId}
-   */
   @Override
   protected DataSetInputDTO preProcessCreateInput(DataSetInputDTO input) {
     if (input.getDatapoolId() == null && !allowedScopesProvider.getObject().isWildcard()) {

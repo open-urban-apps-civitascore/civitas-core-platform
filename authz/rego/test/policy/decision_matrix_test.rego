@@ -75,6 +75,11 @@ allow_cases := [
 		"ctx": mock_http.user_with_unscoped_permissions(["DATASET_READ"]),
 		"method": "GET", "path": "/v1/datasets", "scope": "*",
 	},
+	{
+		"name": "dataset collection create, DATAPOOL scope",
+		"ctx": mock_http.user_with_scoped_permissions(["DATASET_CREATE"], "DATAPOOL", "pool-1"),
+		"method": "POST", "path": "/v1/datasets", "scope": "", "pool": "pool-1",
+	},
 ]
 
 test_matrix_allow if {
@@ -86,6 +91,7 @@ test_matrix_allow if {
 		result.allow == true
 		result.reason == "permission_granted"
 		result.headers["X-Allowed-Scope-Ids"] == case.scope
+		object.get(result.headers, "X-Allowed-Pool-Ids", "") == object.get(case, "pool", "")
 	}
 }
 
@@ -121,6 +127,26 @@ deny_cases := [
 		"name": "datasource collection, scope-type mismatch",
 		"ctx": mock_http.user_with_scoped_permissions(["DATASOURCE_READ"], "DATASET", "dataset-1"),
 		"method": "GET", "path": "/v1/datasources",
+	},
+	{
+		"name": "dataset collection create, DATASET scope",
+		"ctx": mock_http.user_with_scoped_permissions(["DATASET_CREATE"], "DATASET", "dataset-1"),
+		"method": "POST", "path": "/v1/datasets",
+	},
+	{
+		"name": "datasource collection create, DATASOURCE scope",
+		"ctx": mock_http.user_with_scoped_permissions(["DATASOURCE_CREATE"], "DATASOURCE", "ds-1"),
+		"method": "POST", "path": "/v1/datasources",
+	},
+	{
+		"name": "datastructure collection create, DATASTRUCTURE scope",
+		"ctx": mock_http.user_with_scoped_permissions(["DATASTRUCTURE_CREATE"], "DATASTRUCTURE", "dst-1"),
+		"method": "POST", "path": "/v1/datastructures",
+	},
+	{
+		"name": "datapool collection create, DATAPOOL scope",
+		"ctx": mock_http.user_with_scoped_permissions(["DATAPOOL_CREATE"], "DATAPOOL", "pool-1"),
+		"method": "POST", "path": "/v1/datapools",
 	},
 ]
 

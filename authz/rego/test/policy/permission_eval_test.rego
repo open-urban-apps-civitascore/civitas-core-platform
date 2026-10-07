@@ -370,7 +370,7 @@ test_dataset_scoped_read_allows_dataset_collection_read if {
 		with input as portal_request("GET", "/v1/datasets")
 }
 
-# Without this grant a pool editor could not create Datasets in their own pool; DataSetService confines the target pool.
+# Without this grant pool editors would lose Dataset create in their own pool.
 test_datapool_scoped_dataset_create_allows_dataset_collection_create if {
 	permission_eval.has_permission with http.send as scoped_user(["DATASET_CREATE"], "DATAPOOL", "pool-1")
 		with data.config as mock_http.mock_config
