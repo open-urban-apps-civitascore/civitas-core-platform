@@ -43,3 +43,8 @@ springdoc annotations on the controllers.
 from the branch `ci/openapi-spec-update` whenever the export differs from the committed file
 (`.gitlab/ci/openapi.yml`). To change the spec, change the backend — the next `develop`
 pipeline refreshes the merge request.
+
+`update-openapi-spec` needs the masked and protected CI/CD variable `OPENAPI_BOT_TOKEN`: a
+Project Access Token used only by this job, with the scopes `api` and `write_repository` and
+the role Developer. The bot commits and merge requests show this token's bot user as author.
+If the variable is not set, the job fails.

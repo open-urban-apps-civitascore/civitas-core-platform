@@ -51,8 +51,10 @@ export-openapi-spec:
 # works the way Renovate does: on a difference it pushes the new file to a bot branch and opens
 # a merge request against develop, or refreshes the one already open.
 #
-# Requires OPENAPI_BOT_TOKEN (falls back to RENOVATE_TOKEN): a Project Access Token with the
-# api and write_repository scopes and the Developer role, stored as a masked CI/CD variable.
+# Requires OPENAPI_BOT_TOKEN: a Project Access Token of its own with the api and write_repository
+# scopes and the Developer role, stored as a masked and protected CI/CD variable. The job fails
+# when the variable is not set, also when the spec has not changed, so a missing token shows up
+# on the first develop pipeline and not only on the next API change.
 update-openapi-spec:
   image: alpine:3
   stage: report
@@ -69,6 +71,11 @@ update-openapi-spec:
     - apk add --no-cache git curl jq >/dev/null
   script:
     - |
+      if [ -z "$OPENAPI_BOT_TOKEN" ]; then
+        echo "OPENAPI_BOT_TOKEN is not set — cannot push the bot branch or open a merge request."
+        exit 1
+      fi
+      TOKEN="$OPENAPI_BOT_TOKEN"
       if [ ! -s openapi.generated.yaml ]; then
         echo "openapi.generated.yaml is missing or empty — export-openapi-spec did not export the spec."
         exit 1
@@ -76,11 +83,6 @@ update-openapi-spec:
       if [ -f "$SPEC_PATH" ] && cmp -s "$SPEC_PATH" openapi.generated.yaml; then
         echo "$SPEC_PATH matches the running backend — nothing to do."
         exit 0
-      fi
-      TOKEN="${OPENAPI_BOT_TOKEN:-$RENOVATE_TOKEN}"
-      if [ -z "$TOKEN" ]; then
-        echo "OPENAPI_BOT_TOKEN (or RENOVATE_TOKEN) is not set — cannot push the bot branch or open a merge request."
-        exit 1
       fi
       REPO_URL="https://oauth2:${TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
       MR_API="$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests"
