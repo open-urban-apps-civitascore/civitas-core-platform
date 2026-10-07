@@ -376,8 +376,7 @@ class DatasetCreateBpmnTest {
     inOrder.verify(apisixHandler).handle(any());
     inOrder.verify(postgisHandler).handle(any());
 
-    // A re-release reuses the workspace an earlier release filled, so skipping provision-layers
-    // alone would keep serving every layer the owner deleted in the meantime.
+    // Guards against layers deleted before a re-release staying served.
     ArgumentCaptor<SagaCommandMessage> geo = ArgumentCaptor.forClass(SagaCommandMessage.class);
     verify(geoserverHandler, times(3)).handle(geo.capture());
     assertEquals(

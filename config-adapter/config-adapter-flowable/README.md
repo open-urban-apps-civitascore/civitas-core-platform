@@ -27,8 +27,8 @@ The create and update sagas run the prune behind its own `hasGeoSink` gateway af
 feature type cannot be restored, so it MUST follow the last failable step — see
 [../config-adapter-geoserver/README.md](../config-adapter-geoserver/README.md). `DATASET_UNRELEASE` tears down ingest
 and consumer access only; the data-holding sink — the PostGIS table and the FROST project — and the GeoServer
-workspace are kept so a later re-release reuses them. The create saga therefore prunes too: `PROVISION_LAYERS` only
-adds, so without the prune a layer deleted between unrelease and re-release stays served.
+workspace are kept so a later re-release reuses them. The create saga therefore prunes too: `PROVISION_LAYERS` never
+removes a layer, so without the prune a layer deleted between unrelease and re-release stays served.
 
 Compensation chains run in full reverse order:
 
