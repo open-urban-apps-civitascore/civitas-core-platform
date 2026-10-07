@@ -142,9 +142,9 @@
     },
     "/v1/datasets/{id}/mappings": {
       "GET": "DATASET_READ",
-      "POST": "DATASET_CREATE",
+      "POST": "DATASET_UPDATE",
       "PUT": "DATASET_UPDATE",
-      "DELETE": "DATASET_DELETE"
+      "DELETE": "DATASET_UPDATE"
     },
     "/v1/datasources/{id}": {
       "GET": "DATASOURCE_READ",

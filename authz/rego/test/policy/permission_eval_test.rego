@@ -84,9 +84,8 @@ test_required_permissions_delete_group if {
 	result == {"GROUP_DELETE"}
 }
 
-# Test: a Mapping is addressed under its dataset, so its permissions are the dataset's. Each verb
-# must require exactly the permission its effect implies — PUT versions an existing artifact and
-# POST creates one, so PUT must not carry create rights.
+# Test: a Mapping is part of its dataset, so every write to it changes the dataset and requires
+# DATASET_UPDATE, never DATASET_CREATE or DATASET_DELETE.
 test_required_permissions_read_dataset_mapping if {
 	result := permission_eval.required_permissions with input as portal_request_no_auth("GET", "/v1/datasets/dataset-1/mappings")
 	result == {"DATASET_READ"}
@@ -94,7 +93,7 @@ test_required_permissions_read_dataset_mapping if {
 
 test_required_permissions_create_dataset_mapping if {
 	result := permission_eval.required_permissions with input as portal_request_no_auth("POST", "/v1/datasets/dataset-1/mappings")
-	result == {"DATASET_CREATE"}
+	result == {"DATASET_UPDATE"}
 }
 
 test_required_permissions_version_dataset_mapping if {
@@ -104,7 +103,7 @@ test_required_permissions_version_dataset_mapping if {
 
 test_required_permissions_delete_dataset_mapping if {
 	result := permission_eval.required_permissions with input as portal_request_no_auth("DELETE", "/v1/datasets/dataset-1/mappings")
-	result == {"DATASET_DELETE"}
+	result == {"DATASET_UPDATE"}
 }
 
 # Test: Permission lookup from mappings - PATCH resource
