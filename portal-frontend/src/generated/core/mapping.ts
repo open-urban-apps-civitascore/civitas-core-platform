@@ -3,9 +3,33 @@ import { z } from 'zod'
 
 // ── $defs ──────────────────────────────────────────────────────────────────
 
+/** Converts a formatted string or an epoch timestamp to a date-time value. */
+export const ToDateTimeFieldOperationSchema: z.ZodType = z.lazy(() =>
+  z.discriminatedUnion('inputType', [
+    z
+      .object({
+        op: z.literal('toDateTime'),
+        input: MappingFieldSchema,
+        inputType: z.literal('string').optional(),
+        /** Pattern used to parse the input string. */
+        pattern: z.string().min(1),
+      })
+      .strict(),
+    z
+      .object({
+        op: z.literal('toDateTime'),
+        input: MappingFieldSchema,
+        inputType: z.literal('epoch'),
+        /** Unit of the epoch value. */
+        unit: z.enum(['seconds', 'milliseconds']),
+      })
+      .strict(),
+  ]),
+)
+
 /** A single field mapping rule. */
 export const MappingOperationSchema: z.ZodType = z.lazy(() =>
-  z.discriminatedUnion('op', [
+  z.union([
     CopyFieldOperationSchema,
     ConcatFieldOperationSchema,
     ConstFieldOperationSchema,
@@ -89,17 +113,6 @@ export const ToUuidFieldOperationSchema = z
   })
   .strict()
 
-/** Parses the input string into a date-time value using a date pattern. */
-export const ToDateTimeFieldOperationSchema = z
-  .object({
-    op: z.literal('toDateTime'),
-    /** String value to parse — a JSONPath string or a nested operation. */
-    input: MappingFieldSchema,
-    /** Date pattern used to parse the input, e.g. "yyyy-MM-dd'T'HH:mm:ssXXX". */
-    pattern: z.string(),
-  })
-  .strict()
-
 /** Parses the input string into a date/time value using a date pattern. */
 export const ToDateFieldOperationSchema = z
   .object({
@@ -177,6 +190,7 @@ export const MappingSchema = z.object({
 
 // ── Inferred TypeScript types ──────────────────────────────────────────────
 
+export type ToDateTimeFieldOperation = z.infer<typeof ToDateTimeFieldOperationSchema>
 export type MappingOperation = z.infer<typeof MappingOperationSchema>
 export type MappingField = z.infer<typeof MappingFieldSchema>
 export type StructureUrn = z.infer<typeof StructureUrnSchema>
@@ -186,7 +200,6 @@ export type ToStringFieldOperation = z.infer<typeof ToStringFieldOperationSchema
 export type ToIntFieldOperation = z.infer<typeof ToIntFieldOperationSchema>
 export type ToFloatFieldOperation = z.infer<typeof ToFloatFieldOperationSchema>
 export type ToUuidFieldOperation = z.infer<typeof ToUuidFieldOperationSchema>
-export type ToDateTimeFieldOperation = z.infer<typeof ToDateTimeFieldOperationSchema>
 export type ToDateFieldOperation = z.infer<typeof ToDateFieldOperationSchema>
 export type FormatFieldOperation = z.infer<typeof FormatFieldOperationSchema>
 export type GeoPointFieldOperation = z.infer<typeof GeoPointFieldOperationSchema>

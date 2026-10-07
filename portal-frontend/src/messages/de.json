@@ -1607,10 +1607,22 @@
           }
         },
         "toDateTime": {
-          "description": "str / datetime → datetime",
+          "description": "String oder Epoch-Timestamp → DateTime",
           "fields": {
+            "inputType": {
+              "label": "Eingabetyp",
+              "string": "String",
+              "epoch": "Epoch-Timestamp"
+            },
             "pattern": {
-              "label": "Eingabeformat"
+              "label": "Eingabeformat",
+              "required": "Ein Eingabeformat ist erforderlich."
+            },
+            "unit": {
+              "label": "Einheit",
+              "seconds": "Sekunden",
+              "milliseconds": "Millisekunden",
+              "required": "Wähle eine Epoch-Einheit."
             }
           }
         },

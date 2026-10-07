@@ -33,4 +33,17 @@ describe('TransformInspector', () => {
     expect(valueField.tagName).toBe('INPUT')
     expect(valueField).toHaveAttribute('type', 'text')
   })
+
+  it('shows the format for string input and the unit for epoch input', () => {
+    const def = mappingRegistry.byType.toDateTime
+    const { rerender } = render(
+      <TransformInspector def={def} config={{ inputType: 'string', pattern: 'yyyy-MM-dd' }} onChange={vi.fn()} />,
+    )
+    expect(screen.getByDisplayValue('yyyy-MM-dd')).toBeInTheDocument()
+    expect(screen.queryByText('transforms.toDateTime.fields.unit.label')).not.toBeInTheDocument()
+
+    rerender(<TransformInspector def={def} config={{ inputType: 'epoch', unit: 'milliseconds' }} onChange={vi.fn()} />)
+    expect(screen.getByText('transforms.toDateTime.fields.unit.label')).toBeInTheDocument()
+    expect(screen.queryByText('transforms.toDateTime.fields.pattern.label')).not.toBeInTheDocument()
+  })
 })

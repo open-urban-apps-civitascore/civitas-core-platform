@@ -384,6 +384,42 @@ class RecordPathCompilerTest {
   }
 
   @Test
+  void epochDateTimeUsesDeclaredUnitAndUtc() throws Exception {
+    var props =
+        byPath(
+            compile(
+                """
+                { "$.milliseconds": { "op": "toDateTime", "input": "$.ts", "inputType": "epoch", "unit": "milliseconds" },
+                  "$.seconds": { "op": "toDateTime", "input": "$.ts", "inputType": "epoch", "unit": "seconds" } }
+                """));
+
+    assertEquals(
+        "concat(format(toNumber(/ts), 'yyyy-MM-dd\\'T\\'HH:mm:ss.SSSXXX', 'UTC'))",
+        props.get("/milliseconds").value());
+    assertEquals(
+        "concat(format(multiply(toNumber(/ts), 1000), 'yyyy-MM-dd\\'T\\'HH:mm:ss.SSSXXX', 'UTC'))",
+        props.get("/seconds").value());
+    RecordPath.compile(props.get("/milliseconds").value());
+    RecordPath.compile(props.get("/seconds").value());
+  }
+
+  @Test
+  void formatAfterEpochDateTimeUsesRequestedPattern() throws Exception {
+    var props =
+        byPath(
+            compile(
+                """
+                { "$.formatted": { "op": "format", "pattern": "dd.MM.yyyy HH:mm",
+                    "input": { "op": "toDateTime", "input": "$.ts", "inputType": "epoch", "unit": "seconds" } } }
+                """));
+
+    assertEquals(
+        "concat(format(multiply(toNumber(/ts), 1000), 'dd.MM.yyyy HH:mm', 'UTC'))",
+        props.get("/formatted").value());
+    RecordPath.compile(props.get("/formatted").value());
+  }
+
+  @Test
   void toDateDropsTheTimeTheParseProduces() throws Exception {
     // The pattern describes the input, never the result.
     var props =

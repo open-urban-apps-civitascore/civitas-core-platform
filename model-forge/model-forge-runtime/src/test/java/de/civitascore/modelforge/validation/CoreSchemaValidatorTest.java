@@ -117,6 +117,21 @@ class CoreSchemaValidatorTest {
             """)).isNotEmpty();
     }
 
+    @Test
+    @DisplayName("An epoch Mapping requires a valid unit and no string pattern")
+    void epochToDateTimeRequiresUnit() {
+        String valid = """
+            {
+              "$schema": "https://civitasconnect.digital/core/mapping/v1",
+              "id": "urn:core:platform:civitas:mapping:common:29d58c4c-50a7-8477-b001-ba6abdcc0164:1.0.0",
+              "fields": { "$.observedAt": { "op": "toDateTime", "input": "$.timestamp", "inputType": "epoch", "unit": "milliseconds" } }
+            }
+            """;
+        assertThat(validate(ArtifactKind.MAPPING, valid)).isEmpty();
+        assertThat(validate(ArtifactKind.MAPPING, valid.replace("\"unit\": \"milliseconds\"", "\"unit\": \"minutes\""))).isNotEmpty();
+        assertThat(validate(ArtifactKind.MAPPING, valid.replace(", \"unit\": \"milliseconds\"", ""))).isNotEmpty();
+    }
+
     // ── Pipeline ────────────────────────────────────────────────────────────────
 
     @Test

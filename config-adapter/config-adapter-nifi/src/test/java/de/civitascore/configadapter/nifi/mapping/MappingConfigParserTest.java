@@ -177,6 +177,41 @@ class MappingConfigParserTest {
   }
 
   @Test
+  void toDateTimeWithEpochMilliseconds() throws Exception {
+    MappingConfig mc =
+        parse(
+            """
+        { "fields": { "$.observed_at": { "op": "toDateTime", "input": "$.ts", "inputType": "epoch", "unit": "milliseconds" } } }
+        """);
+
+    ConvertNode conv = assertInstanceOf(ConvertNode.class, mc.fields().get("$.observed_at"));
+    assertEquals(ConversionOp.TO_DATE_TIME, conv.op());
+    assertEquals("milliseconds", conv.unit());
+  }
+
+  @Test
+  void toDateTimeEpochWithoutUnitIsRejected() {
+    assertThrows(
+        FatalAdapterException.class,
+        () ->
+            parse(
+                """
+            { "fields": { "$.ts": { "op": "toDateTime", "input": "$.raw", "inputType": "epoch" } } }
+            """));
+  }
+
+  @Test
+  void toDateTimeEpochWithPatternIsRejected() {
+    assertThrows(
+        FatalAdapterException.class,
+        () ->
+            parse(
+                """
+            { "fields": { "$.ts": { "op": "toDateTime", "input": "$.raw", "inputType": "epoch", "unit": "seconds", "pattern": "yyyy" } } }
+            """));
+  }
+
+  @Test
   void toStringWrapsNestedNode() throws Exception {
     MappingConfig mc =
         parse(

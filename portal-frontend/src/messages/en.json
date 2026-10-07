@@ -1620,10 +1620,22 @@
           }
         },
         "toDateTime": {
-          "description": "str / datetime → datetime",
+          "description": "string or epoch timestamp → datetime",
           "fields": {
+            "inputType": {
+              "label": "Input type",
+              "string": "String",
+              "epoch": "Epoch-Timestamp"
+            },
             "pattern": {
-              "label": "Input format"
+              "label": "Input format",
+              "required": "An input format is required."
+            },
+            "unit": {
+              "label": "Unit",
+              "seconds": "Seconds",
+              "milliseconds": "Milliseconds",
+              "required": "Select an epoch unit."
             }
           }
         },
