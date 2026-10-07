@@ -23,6 +23,7 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.AllowedScopes;
+import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.service.validation.PipelineClosureValidator;
 import de.civitascore.portal.util.DataSetNotEditableException;
@@ -71,6 +72,7 @@ public class DataSetService
   private final DataPoolRepository dataPoolRepository;
 
   private final AssignmentFactory assignmentFactory;
+  private final AssignmentChangeAuthorizer assignmentChangeAuthorizer;
 
   private final DataSetSagaPublisher sagaPublisher;
 
@@ -91,6 +93,7 @@ public class DataSetService
       DataSetMapper dataSetMapper,
       DataPoolRepository dataPoolRepository,
       AssignmentFactory assignmentFactory,
+      AssignmentChangeAuthorizer assignmentChangeAuthorizer,
       DataSetSagaPublisher sagaPublisher,
       PipelineRuntimeStatusService pipelineRuntimeStatusService,
       ObjectProvider<AllowedScopes> allowedScopesProvider,
@@ -104,6 +107,7 @@ public class DataSetService
     this.dataSetMapper = dataSetMapper;
     this.dataPoolRepository = dataPoolRepository;
     this.assignmentFactory = assignmentFactory;
+    this.assignmentChangeAuthorizer = assignmentChangeAuthorizer;
     this.sagaPublisher = sagaPublisher;
     this.pipelineRuntimeStatusService = pipelineRuntimeStatusService;
     this.allowedScopesProvider = allowedScopesProvider;
@@ -172,6 +176,11 @@ public class DataSetService
   @Override
   protected AssignmentFactory getAssignmentFactory() {
     return assignmentFactory;
+  }
+
+  @Override
+  protected AssignmentChangeAuthorizer getAssignmentChangeAuthorizer() {
+    return assignmentChangeAuthorizer;
   }
 
   @Override
@@ -286,6 +295,7 @@ public class DataSetService
     if (entity.getId() != null) {
       createManifestIfMissing(entity);
     }
+    // After the pool is resolved: the assignment check inherits permissions through it.
     return super.postConvertToEntity(entity, input);
   }
 

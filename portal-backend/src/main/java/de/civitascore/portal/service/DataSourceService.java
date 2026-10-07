@@ -9,7 +9,6 @@ import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.embedded.ScopeType;
-import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
@@ -21,6 +20,7 @@ import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
@@ -60,6 +60,7 @@ public class DataSourceService
   private final DataSourceMapper dataSourceMapper;
   private final ConnectorHandlerRegistry connectorHandlerRegistry;
   private final AssignmentFactory assignmentFactory;
+  private final AssignmentChangeAuthorizer assignmentChangeAuthorizer;
   private final DataStructureVersionService dataStructureVersionService;
   private final PipelineRepository pipelineRepository;
   private final DataPoolRepository dataPoolRepository;
@@ -86,6 +87,11 @@ public class DataSourceService
   @Override
   protected AssignmentFactory getAssignmentFactory() {
     return assignmentFactory;
+  }
+
+  @Override
+  protected AssignmentChangeAuthorizer getAssignmentChangeAuthorizer() {
+    return assignmentChangeAuthorizer;
   }
 
   @Override
@@ -426,14 +432,7 @@ public class DataSourceService
 
     entity.setName(input.getName());
     entity.setDescription(input.getDescription());
-    if (input.getAssignments() != null) {
-      Set<Assignment> assignments =
-          input.getAssignments().stream()
-              .distinct()
-              .map(dto -> getAssignmentFactory().build(dto))
-              .collect(Collectors.toSet());
-      entity.setAssignments(assignments);
-    }
+    replaceAssignments(entity, input.getAssignments());
     if (input.getDatapoolScope() != null) {
       applyDatapoolScope(entity, input.getDatapoolScope());
     }

@@ -26,6 +26,7 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.security.dto.PrincipalUserDetails;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import java.util.HashMap;
@@ -36,10 +37,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
@@ -188,6 +192,20 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     @Autowired private DataSetAssembler dataSetAssembler;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private AssignmentRepository assignmentRepository;
+
+    /** An assignment change needs a caller; the roles here carry no permissions to check. */
+    @BeforeEach
+    void authenticateCaller() {
+      PrincipalUserDetails caller =
+          PrincipalUserDetails.builder().userId(UUID.randomUUID()).build();
+      SecurityContextHolder.getContext()
+          .setAuthentication(new UsernamePasswordAuthenticationToken(caller, null, List.of()));
+    }
+
+    @AfterEach
+    void clearCaller() {
+      SecurityContextHolder.clearContext();
+    }
 
     /**
      * Faithfully reproduces the controller PATCH path: load current entity, map to input DTO, apply

@@ -9,6 +9,7 @@ import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.UserRepository;
+import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.UUID;
@@ -29,6 +30,7 @@ public class DataPoolService
   private final DataSourceRepository dataSourceRepository;
   private final UserRepository userRepository;
   private final AssignmentFactory assignmentFactory;
+  private final AssignmentChangeAuthorizer assignmentChangeAuthorizer;
 
   public DataPoolService(
       DataPoolRepository dataPoolRepository,
@@ -36,13 +38,15 @@ public class DataPoolService
       DataSetRepository dataSetRepository,
       DataSourceRepository dataSourceRepository,
       UserRepository userRepository,
-      AssignmentFactory assignmentFactory) {
+      AssignmentFactory assignmentFactory,
+      AssignmentChangeAuthorizer assignmentChangeAuthorizer) {
     this.dataPoolRepository = dataPoolRepository;
     this.dataPoolMapper = dataPoolMapper;
     this.dataSetRepository = dataSetRepository;
     this.dataSourceRepository = dataSourceRepository;
     this.userRepository = userRepository;
     this.assignmentFactory = assignmentFactory;
+    this.assignmentChangeAuthorizer = assignmentChangeAuthorizer;
   }
 
   @Override
@@ -63,6 +67,11 @@ public class DataPoolService
   @Override
   protected AssignmentFactory getAssignmentFactory() {
     return assignmentFactory;
+  }
+
+  @Override
+  protected AssignmentChangeAuthorizer getAssignmentChangeAuthorizer() {
+    return assignmentChangeAuthorizer;
   }
 
   @Override

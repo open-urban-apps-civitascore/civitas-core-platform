@@ -5,6 +5,7 @@ import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.embedded.RoleDefault;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
@@ -16,6 +17,7 @@ import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Layer;
+import de.civitascore.portal.model.entity.Permission;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.entity.Style;
@@ -32,17 +34,21 @@ import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.LayerRepository;
+import de.civitascore.portal.repository.PermissionRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.StyleRepository;
 import de.civitascore.portal.repository.UserRepository;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestComponent;
 
@@ -64,6 +70,7 @@ public class PortalTestDataFactory {
   @Autowired private UserRepository userRepository;
   @Autowired private GroupRepository groupRepository;
   @Autowired private RoleRepository roleRepository;
+  @Autowired private PermissionRepository permissionRepository;
   @Autowired private AssignmentRepository assignmentRepository;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataSinkRepository dataSinkRepository;
@@ -227,6 +234,15 @@ public class PortalTestDataFactory {
     return groupRepository.save(builder.build());
   }
 
+  /** Creates a group whose member is the user with the given external id, created if missing. */
+  public Group groupOf(String externalId) {
+    User member =
+        userRepository
+            .findByExternalId(externalId)
+            .orElseGet(() -> user(b -> b.externalId(externalId)));
+    return group(b -> b.members(new HashSet<>(Set.of(member))));
+  }
+
   // ---------------------------------------------------------------------------
   // Role
   // ---------------------------------------------------------------------------
@@ -241,6 +257,18 @@ public class PortalTestDataFactory {
     return roleRepository.save(builder.build());
   }
 
+  /**
+   * Creates a role with the type and permissions of a default role. A fresh copy, because {@link
+   * #cleanAll()} deletes the seeded roles.
+   */
+  public Role role(RoleDefault template) {
+    Set<Permission> permissions =
+        template.getPermissions().stream()
+            .map(name -> permissionRepository.findByName(name.name()).orElseThrow())
+            .collect(Collectors.toSet());
+    return role(b -> b.roleType(template.getRoleType()).permissions(permissions));
+  }
+
   // ---------------------------------------------------------------------------
   // Assignment
   // ---------------------------------------------------------------------------
@@ -249,6 +277,11 @@ public class PortalTestDataFactory {
   public Assignment assignment(Group group, Role role) {
     Assignment a = Assignment.builder().group(group).role(role).scopeType(ScopeType.TENANT).build();
     return assignmentRepository.save(a);
+  }
+
+  /** Creates an unscoped assignment, the only kind a SYSTEM role may have. */
+  public Assignment unscopedAssignment(Group group, Role role) {
+    return assignmentRepository.save(Assignment.builder().group(group).role(role).build());
   }
 
   public Assignment assignment(Group group, Role role, DataSet scope) {

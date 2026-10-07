@@ -17,6 +17,7 @@ import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.ScopeType;
+import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
@@ -26,10 +27,12 @@ import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataSourceMetaInputDTO;
 import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
+import de.civitascore.portal.model.input.assignment.AssignmentScopedInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
@@ -75,6 +78,8 @@ class DataSourceServiceTest {
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private ScopeAccessAuthorizer scopeAccessAuthorizer;
   @Mock private ArtifactUsageLookup artifactUsageLookup;
+  @Mock private AssignmentFactory assignmentFactory;
+  @Mock private AssignmentChangeAuthorizer assignmentChangeAuthorizer;
 
   @Spy private DataSourceDatapoolScopeValidator datapoolScopeValidator;
 
@@ -547,6 +552,34 @@ class DataSourceServiceTest {
       DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
       assertThat(result.getAssignments()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should store nothing when the assignment change is denied")
+    void shouldStoreNothingWhenAssignmentChangeDenied() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setName("source");
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      AssignmentScopedInputDTO requested = new AssignmentScopedInputDTO();
+      requested.setGroupId(UUID.randomUUID());
+      requested.setRoleId(UUID.randomUUID());
+
+      DataSourceMetaInputDTO input = new DataSourceMetaInputDTO();
+      input.setName("renamed");
+      input.setAssignments(Set.of(requested));
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(assignmentFactory.build(requested)).thenReturn(new Assignment());
+      doThrow(new AccessDeniedException("denied"))
+          .when(assignmentChangeAuthorizer)
+          .authorizeReplacement(eq(entity), any());
+
+      assertThatThrownBy(() -> dataSourceService.updateReleasedMeta(id, input))
+          .isInstanceOf(AccessDeniedException.class);
+      assertThat(entity.getAssignments()).isEmpty();
+      verify(dataSourceRepository, never()).save(any());
     }
 
     @Test

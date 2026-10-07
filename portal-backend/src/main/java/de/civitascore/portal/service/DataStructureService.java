@@ -11,6 +11,7 @@ import de.civitascore.portal.model.input.DataStructureMetaInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
+import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import java.util.List;
@@ -35,6 +36,7 @@ public class DataStructureService
   private final DataStructureRepository dataStructureRepository;
   private final DataStructureMapper dataStructureMapper;
   private final AssignmentFactory assignmentFactory;
+  private final AssignmentChangeAuthorizer assignmentChangeAuthorizer;
   private final DataSourceRepository dataSourceRepository;
   private final ModelRegistryGateway modelRegistryGateway;
   private final ArtifactUsageLookup artifactUsageLookup;
@@ -57,6 +59,11 @@ public class DataStructureService
   @Override
   protected AssignmentFactory getAssignmentFactory() {
     return assignmentFactory;
+  }
+
+  @Override
+  protected AssignmentChangeAuthorizer getAssignmentChangeAuthorizer() {
+    return assignmentChangeAuthorizer;
   }
 
   @Override
