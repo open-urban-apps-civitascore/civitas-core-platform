@@ -58,6 +58,8 @@ export-openapi-spec:
 update-openapi-spec:
   image: alpine:3
   stage: report
+  # Two develop pipelines must not force-push the bot branch at the same time
+  resource_group: openapi-spec-update
   needs:
     - job: export-openapi-spec
       artifacts: true
