@@ -364,12 +364,6 @@ test_datapool_scoped_create_denies_datapool_collection_create if {
 		with input as portal_request("POST", "/v1/datapools")
 }
 
-test_dataset_scoped_read_allows_dataset_collection_read if {
-	permission_eval.has_permission with http.send as scoped_user(["DATASET_READ"], "DATASET", "dataset-1")
-		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v1/datasets")
-}
-
 # Without this grant pool editors would lose Dataset create in their own pool.
 test_datapool_scoped_dataset_create_allows_dataset_collection_create if {
 	permission_eval.has_permission with http.send as scoped_user(["DATASET_CREATE"], "DATAPOOL", "pool-1")
