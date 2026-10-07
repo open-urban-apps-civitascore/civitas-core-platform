@@ -91,6 +91,33 @@ test_dataset_subresource_write_allowed_with_update if {
 	result.required_permissions == {"DATASET_UPDATE"}
 }
 
+mock_send_dataset_abc_creator_deleter(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_READ", "DATASET_CREATE", "DATASET_DELETE"], "DATASET", "dataset-abc")}
+
+pipeline_write_requests := {
+	"POST": "/v1/datasets/dataset-abc/pipelines",
+	"DELETE": "/v1/datasets/dataset-abc/pipelines/pipe-1",
+}
+
+test_pipeline_create_and_delete_allowed_with_update if {
+	every method, path in pipeline_write_requests {
+		result := authz.decision with http.send as mock_send_dataset_abc_editor
+			with data.config as mock_http.mock_config
+			with input as portal_request(method, path)
+		result.allow == true
+		result.required_permissions == {"DATASET_UPDATE"}
+	}
+}
+
+test_pipeline_create_and_delete_denied_without_update if {
+	every method, path in pipeline_write_requests {
+		result := authz.decision with http.send as mock_send_dataset_abc_creator_deleter
+			with data.config as mock_http.mock_config
+			with input as portal_request(method, path)
+		result.allow == false
+		result.reason == "permission_denied"
+	}
+}
+
 # =============================================================================
 # GROUP-ASSIGNMENTS AND-PERMISSION ENDPOINT
 # =============================================================================
