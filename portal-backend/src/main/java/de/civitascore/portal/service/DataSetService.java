@@ -650,8 +650,6 @@ public class DataSetService
       return;
     }
 
-    warnAboutStaleFeatureTypes(datasetId, result);
-
     switch (pendingType) {
       case CREATE -> {
         applyInfrastructureResult(dataSet, result);
@@ -762,21 +760,6 @@ public class DataSetService
 
     dataSet.setPendingSagaType(null);
     dataSetRepository.save(dataSet);
-  }
-
-  /**
-   * A saga reports feature types it could not unpublish. They keep being served for layers the
-   * dataset no longer has, and no portal query can find them — the layer table is already correct.
-   */
-  private void warnAboutStaleFeatureTypes(UUID datasetId, SagaResultPayload result) {
-    if (result.staleFeatureTypes() == null || result.staleFeatureTypes().isEmpty()) {
-      return;
-    }
-    log.warn(
-        "Dataset {} still serves {} feature type(s) for removed layers: {}",
-        datasetId,
-        result.staleFeatureTypes().size(),
-        Encode.forJava(String.join(", ", result.staleFeatureTypes())));
   }
 
   /**
