@@ -42,9 +42,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onImportFromDatastructure, con
   return (
     <div className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">
       {content && <div className="mr-3">{content}</div>}
-      {/* File Operations */}
-      <div className="flex items-center gap-1 mr-3">
-        {onImportFromDatastructure && (
+      <div className="flex-1" />
+      <div className="text-xs text-gray-500">
+        <ImportedStructures />
+      </div>
+
+      {onImportFromDatastructure && (
+        <div className="ml-3">
           <BasicDropdownMenu
             title={t('import.title')}
             menuItems={[
@@ -54,16 +58,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onImportFromDatastructure, con
               },
             ]}
           />
-        )}
-      </div>
-
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Status/Info Area */}
-      <div className="text-xs text-gray-500">
-        <ImportedStructures />
-      </div>
+        </div>
+      )}
     </div>
   )
 }
