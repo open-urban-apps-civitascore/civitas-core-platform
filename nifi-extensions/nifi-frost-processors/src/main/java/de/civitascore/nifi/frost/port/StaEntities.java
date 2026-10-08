@@ -127,29 +127,24 @@ public final class StaEntities {
   }
 
   /**
-   * The first member of a collection-valued navigation of the record, or null when the record has
-   * none. A port writes one entity per collection in this stage; a record carrying more is a
-   * contract defect rather than a shape to guess at.
+   * The members of a collection-valued navigation of the record, in record order, or an empty list
+   * when the record has none. A single object stands for a collection of one.
    */
-  public static ObjectNode firstOf(JsonNode entity, String navigation, String entityName) {
+  public static List<ObjectNode> membersOf(JsonNode entity, String navigation, String entityName) {
     JsonNode collection = entity.get(navigation);
     if (collection == null || collection.isNull()) {
-      return null;
+      return List.of();
     }
     List<JsonNode> members =
         collection.isArray() ? toList((ArrayNode) collection) : List.of(collection);
-    if (members.isEmpty()) {
-      return null;
+    List<ObjectNode> objects = new ArrayList<>(members.size());
+    for (JsonNode member : members) {
+      if (!(member instanceof ObjectNode object)) {
+        throw new RecordRejectedException(entityName, navigation + " is not an object");
+      }
+      objects.add(object);
     }
-    if (members.size() > 1) {
-      throw new RecordRejectedException(
-          entityName, "the record carries " + members.size() + " " + navigation + ", expected one");
-    }
-    JsonNode member = members.get(0);
-    if (!(member instanceof ObjectNode object)) {
-      throw new RecordRejectedException(entityName, navigation + " is not an object");
-    }
-    return object;
+    return objects;
   }
 
   private static List<JsonNode> toList(ArrayNode array) {

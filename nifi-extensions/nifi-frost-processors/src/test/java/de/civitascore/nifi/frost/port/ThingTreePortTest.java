@@ -11,9 +11,12 @@ package de.civitascore.nifi.frost.port;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ThingTreePortTest {
@@ -181,6 +184,163 @@ class ThingTreePortTest {
     JsonNode requests = BatchDocuments.of(SinkPort.THING_TREE, metadataOnly).get("requests");
 
     assertEquals(3, requests.size());
+  }
+
+  private static final String TWO_DATASTREAMS =
+      """
+      {
+        "properties": { "reference": "A7" },
+        "Locations": [
+          {
+            "name": "A7 site",
+            "encodingType": "application/geo+json",
+            "location": { "type": "Point", "coordinates": [9.18, 48.78] }
+          }
+        ],
+        "Datastreams": [
+          {
+            "name": "Air temperature",
+            "properties": { "reference": "temp" },
+            "Sensor": { "name": "DS18B20" },
+            "Observations": [ { "result": 21.5 } ]
+          },
+          {
+            "name": "Humidity",
+            "properties": { "reference": "hum" },
+            "Sensor": { "name": "SHT31" },
+            "ObservedProperty": { "name": "Relative humidity" },
+            "Observations": [ { "result": 40 }, { "result": 41 } ]
+          }
+        ]
+      }
+      """;
+
+  @Test
+  void plan_withTwoDatastreams_upsertsEachOnItsOwnReference() {
+    JsonNode requests = BatchDocuments.of(SinkPort.THING_TREE, TWO_DATASTREAMS).get("requests");
+
+    JsonNode first = requestWith(requests, "not $r0-ds");
+    assertEquals("temp", first.at("/body/properties/reference").asText());
+    assertEquals("DS18B20", first.at("/body/Sensor/name").asText());
+    JsonNode second = requestWith(requests, "not $r0-ds1");
+    assertEquals("hum", second.at("/body/properties/reference").asText());
+    assertEquals("SHT31", second.at("/body/Sensor/name").asText());
+    assertEquals("A7", second.at("/body/properties/thingReference").asText());
+    assertEquals("$r0-thing", second.at("/body/Thing/@iot.id").asText());
+
+    // The nested update of the second Datastream reads through its own back-reference.
+    JsonNode sensorLookup = requestWithUrl(requests, "$r0-ds1/Sensor?$select=id");
+    assertEquals("r0-ds1-sensor", sensorLookup.get("id").asText());
+    assertEquals("$r0-ds1", sensorLookup.get("if").asText());
+    requestWithUrl(requests, "$r0-ds1/ObservedProperty?$select=id");
+  }
+
+  @Test
+  void plan_withTwoDatastreams_linksEveryMeasurementToItsOwnDatastream() {
+    JsonNode requests = BatchDocuments.of(SinkPort.THING_TREE, TWO_DATASTREAMS).get("requests");
+
+    List<String> links = new ArrayList<>();
+    List<String> ids = new ArrayList<>();
+    for (JsonNode request : requests) {
+      if ("Observations".equals(request.path("url").asText())) {
+        links.add(request.at("/body/Datastream/@iot.id").asText());
+        ids.add(request.get("id").asText());
+      }
+    }
+    assertEquals(List.of("$r0-ds", "$r0-ds1", "$r0-ds1"), links);
+    assertEquals(List.of("r0-obs", "r0-ds1-obs", "r0-ds1-obs1"), ids);
+  }
+
+  @Test
+  void plan_withTwoDatastreams_postsEachMeasurementAfterTheCreateOfItsDatastream() {
+    // A back-reference resolves to the latest request carrying the identifier, so a measurement
+    // must follow the create it links to.
+    JsonNode requests = BatchDocuments.of(SinkPort.THING_TREE, TWO_DATASTREAMS).get("requests");
+
+    int secondCreate = indexOfCondition(requests, "not $r0-ds1", "post");
+    for (int index = 0; index < requests.size(); index++) {
+      JsonNode request = requests.get(index);
+      if ("$r0-ds1".equals(request.at("/body/Datastream/@iot.id").asText())) {
+        assertTrue(index > secondCreate, request.toString());
+      }
+    }
+  }
+
+  @Test
+  void plan_withTwoDatastreamsOfOneReference_rejectsTheRecord() {
+    String twice =
+        """
+        {
+          "properties": { "reference": "A7" },
+          "Datastreams": [
+            { "properties": { "reference": "temp" } },
+            { "properties": { "reference": "temp" } }
+          ]
+        }
+        """;
+
+    // The second upsert would find the first Datastream and patch it, and one of them would be
+    // lost without a trace.
+    RecordRejectedException rejected =
+        assertThrows(
+            RecordRejectedException.class, () -> BatchDocuments.of(SinkPort.THING_TREE, twice));
+    assertEquals("Datastream[1]", rejected.entity());
+  }
+
+  @Test
+  void plan_withADatastreamWithoutReference_namesItsPosition() {
+    String keyless =
+        """
+        {
+          "properties": { "reference": "A7" },
+          "Datastreams": [ { "properties": { "reference": "temp" } }, { "name": "Humidity" } ]
+        }
+        """;
+
+    RecordRejectedException rejected =
+        assertThrows(
+            RecordRejectedException.class, () -> BatchDocuments.of(SinkPort.THING_TREE, keyless));
+    assertEquals("Datastream[1]", rejected.entity());
+  }
+
+  @Test
+  void plan_withTwoLocationsOfTheirOwnReference_upsertsBoth() {
+    String twoSites =
+        """
+        {
+          "properties": { "reference": "A7" },
+          "Locations": [
+            { "name": "Mast", "properties": { "reference": "mast" } },
+            { "name": "Cabinet", "properties": { "reference": "cabinet" } }
+          ]
+        }
+        """;
+    JsonNode requests = BatchDocuments.of(SinkPort.THING_TREE, twoSites).get("requests");
+
+    assertEquals(
+        "mast", requestWith(requests, "not $r0-loc").at("/body/properties/reference").asText());
+    assertEquals(
+        "cabinet", requestWith(requests, "not $r0-loc1").at("/body/properties/reference").asText());
+    requestWithUrl(
+        requests,
+        "$r0-thing/Locations?$select=id&$top=1&$filter=properties/reference eq 'cabinet'");
+  }
+
+  @Test
+  void plan_withTwoLocationsWithoutReference_rejectsTheRecord() {
+    // Each would fall back to the reference of the Thing, and the second would overwrite the first.
+    String twoSites =
+        """
+        {
+          "properties": { "reference": "A7" },
+          "Locations": [ { "name": "Mast" }, { "name": "Cabinet" } ]
+        }
+        """;
+
+    RecordRejectedException rejected =
+        assertThrows(
+            RecordRejectedException.class, () -> BatchDocuments.of(SinkPort.THING_TREE, twoSites));
+    assertEquals("Location[0]", rejected.entity());
   }
 
   private static JsonNode requestWithUrl(JsonNode requests, String url) {

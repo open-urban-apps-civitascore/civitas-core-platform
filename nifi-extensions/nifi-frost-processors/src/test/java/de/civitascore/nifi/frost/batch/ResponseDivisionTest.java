@@ -201,6 +201,41 @@ class ResponseDivisionTest {
   }
 
   @Test
+  void divide_whenOneOfTwoDatastreamsSawNoWrite_failsTheRecordWithThatDatastream() {
+    String tree =
+        """
+        {
+          "properties": { "reference": "A7" },
+          "Datastreams": [
+            { "name": "Air temperature", "properties": { "reference": "temp" } },
+            { "name": "Humidity", "properties": { "reference": "hum" } }
+          ]
+        }
+        """;
+    BatchDocument document = document(SinkPort.THING_TREE, tree);
+
+    // The first Datastream was written. Counting that write for the second one as well would
+    // report the record as written while the second Datastream is missing.
+    Map<Integer, RecordOutcome> outcomes =
+        ResponseDivision.divide(
+            document,
+            response(
+                answer("r0-thing", 200, "{\"value\":[{\"@iot.id\":7}]}"),
+                answer("r0-thing-update", 200, null),
+                answer("r0-thing", 200, "\"Skipped due to if.\""),
+                answer("r0-ds", 200, "{\"value\":[{\"@iot.id\":19}]}"),
+                answer("r0-ds-update", 200, null),
+                answer("r0-ds", 200, "\"Skipped due to if.\""),
+                answer("r0-ds1", 200, "{\"value\":[{\"@iot.id\":20}]}"),
+                answer("r0-ds1-update", 200, "\"Skipped due to if.\""),
+                answer("r0-ds1", 200, "\"Skipped due to if.\"")));
+
+    RecordOutcome outcome = outcomes.get(0);
+    assertFalse(outcome.successful());
+    assertEquals("Datastream[1]", outcome.entity());
+  }
+
+  @Test
   void divide_whenTheUpdateRanAndTheCreateWasSkipped_writesTheRecord() {
     BatchDocument document = document(SinkPort.THINGS, THING);
 
