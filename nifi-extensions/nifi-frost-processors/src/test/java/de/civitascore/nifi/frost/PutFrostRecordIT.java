@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.charset.StandardCharsets;
 import org.apache.nifi.reporting.InitializationException;
@@ -122,6 +123,43 @@ class PutFrostRecordIT {
                 + ")/FeaturesOfInterest"
                 + FrostStack.filter("Observations/Datastream/id eq " + datastreamId)),
         "the generated FeatureOfInterest must be in the project");
+  }
+
+  @Test
+  void thingTreePort_writesEveryDatastreamOfTheTreeAndReusesThemOnTheSecondDelivery()
+      throws Exception {
+    String reference = "IT-TREE-MANY";
+    ObjectNode record = (ObjectNode) MAPPER.readTree(tree(reference, "Many streams", 21.5));
+    ObjectNode humidity = ((ObjectNode) record.at("/Datastreams/0")).deepCopy();
+    humidity.put("name", "Humidity");
+    ((ObjectNode) humidity.get("properties")).put("reference", reference + "-HUM");
+    ((ObjectNode) humidity.get("Sensor")).put("name", "S2");
+    ((ArrayNode) humidity.get("Observations")).add(humidity.at("/Observations/0").deepCopy());
+    ((ArrayNode) record.get("Datastreams")).add(humidity);
+    TestRunner runner = runner("ThingTree");
+
+    for (int delivery = 0; delivery < 2; delivery++) {
+      runner.clearTransferState();
+      runner.enqueue(MAPPER.writeValueAsBytes(record));
+      runner.run();
+      runner.assertTransferCount(PutFrostRecord.SUCCESS, 1);
+    }
+
+    assertEquals(1, frost.count(things(reference)), "a second delivery must reuse the Thing");
+    long thingId = frost.query(things(reference)).get(0).path("@iot.id").asLong();
+    assertEquals(2, frost.count("/Things(" + thingId + ")/Datastreams"));
+    JsonNode temperature = frost.query(datastreams(reference + "-DS", reference));
+    JsonNode humidities = frost.query(datastreams(reference + "-HUM", reference));
+    assertEquals(1, temperature.size(), "a second delivery must reuse the first Datastream");
+    assertEquals(1, humidities.size(), "a second delivery must reuse the second Datastream");
+    long temperatureId = temperature.get(0).path("@iot.id").asLong();
+    long humidityId = humidities.get(0).path("@iot.id").asLong();
+    assertEquals(2, frost.count("/Datastreams(" + temperatureId + ")/Observations"));
+    assertEquals(4, frost.count("/Datastreams(" + humidityId + ")/Observations"));
+    // Each Datastream keeps its own Sensor: the nested update read through its own back-reference.
+    assertEquals(
+        "S", frost.get("/Datastreams(" + temperatureId + ")/Sensor").path("name").asText());
+    assertEquals("S2", frost.get("/Datastreams(" + humidityId + ")/Sensor").path("name").asText());
   }
 
   @Test

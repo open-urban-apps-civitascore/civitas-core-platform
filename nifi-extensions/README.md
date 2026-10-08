@@ -81,10 +81,15 @@ settings on the relationship decide the backoff.
 |---|---|---|
 | `Things` | One Thing, upserted on its `reference` | — |
 | `Observations` | One measurement | `thingReference` and `datastreamReference`; a miss is a data error |
-| `ThingTree` | Thing, Location, Datastream, Sensor, ObservedProperty and one measurement | In an internal chain |
+| `ThingTree` | A Thing with its Locations, its Datastreams with their Sensor and ObservedProperty, and their measurements | In an internal chain |
 
 The reference block lives in the entity's `properties` bag, and in `parameters` on an Observation:
 SensorThings gives the Observation that bag instead and rejects the other one.
+
+The `ThingTree` port writes every member of a collection, upserted on its own `reference`. A
+single Location without one takes the Thing's; several Locations each need their own. A reference
+that stands twice in one collection rejects the record, because the second upsert would overwrite
+the first.
 
 An Observation with a `reference` of its own is upserted, so a second delivery of the same message
 updates the measurement. Without one every delivery appends a new measurement.
