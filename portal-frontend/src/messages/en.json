@@ -1686,10 +1686,6 @@
         "UNREADABLE_MODEL": "The model in the file cannot be read."
       }
     },
-    "save": {
-      "success": "Model saved successfully",
-      "error": "Failed to save model. Please try again."
-    },
     "export": {
       "title": "Export",
       "file": "Export diagram",

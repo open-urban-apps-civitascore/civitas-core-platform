@@ -108,7 +108,6 @@ export const DatastructureTab = (props: DatastructureTabProps) => {
         isReadOnly={true}
         modelSessionManager={modelSessionManager}
         isMultiSessionMode={false}
-        canExportModel={false}
         placeHolder={UmlCanvasPlaceholder}
         toolbarContent={datastructureVersion && <DatastructureVersionInfo version={datastructureVersion} />}
         onImportFromDatastructure={canImport ? handleImportFromDatastructure : undefined}

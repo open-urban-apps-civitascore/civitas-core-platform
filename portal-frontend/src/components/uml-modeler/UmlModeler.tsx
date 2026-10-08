@@ -14,7 +14,6 @@ interface UmlModelerProps {
   isReadOnly?: boolean
   isMultiSessionMode?: boolean
   modelSessionManager?: UseMultiSessionReturn
-  canExportModel?: boolean
   placeHolder?: JSX.Element
   toolbarContent?: ReactNode
   onImportFromDatastructure?: () => void
@@ -30,7 +29,6 @@ export const UmlModeler = (props: UmlModelerProps) => {
     isReadOnly = false,
     isMultiSessionMode = true,
     modelSessionManager,
-    canExportModel = true,
     placeHolder,
     toolbarContent,
     onImportFromDatastructure,
@@ -47,7 +45,6 @@ export const UmlModeler = (props: UmlModelerProps) => {
             className="rounded-xl"
             externalSessionManager={modelSessionManager}
             isMultiSessionMode={isMultiSessionMode}
-            canExportModel={canExportModel}
             canExportDiagram={canExportDiagram}
             placeHolder={placeHolder}
             toolbarContent={toolbarContent}

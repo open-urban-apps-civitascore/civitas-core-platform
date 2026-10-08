@@ -101,9 +101,8 @@ describe('MultiSessionLayout Import & Export', () => {
     isReadOnly = false,
     canExportDiagram?: boolean,
     hasDatastructureId = true,
-    options: { canExportModel?: boolean; toolbarContent?: ReactNode } = {},
+    toolbarContent?: ReactNode,
   ) => {
-    const { canExportModel = true, toolbarContent } = options
     const session = createMockSession(diagram)
     let currentSession = session
     const mockSessionManager = {
@@ -133,7 +132,6 @@ describe('MultiSessionLayout Import & Export', () => {
           <MultiSessionLayout
             externalSessionManager={mockSessionManager as unknown as UseMultiSessionReturn}
             isMultiSessionMode={false}
-            canExportModel={canExportModel}
             toolbarContent={toolbarContent}
             canExportDiagram={canExportDiagram}
             dataStructureName="School"
@@ -313,14 +311,11 @@ describe('MultiSessionLayout Import & Export', () => {
   })
 
   it('shows the toolbar when only toolbar content is given', () => {
-    const { unmount } = renderLayout(createMockDiagram(), true, undefined, true, { canExportModel: false })
+    const { unmount } = renderLayout(createMockDiagram(), true)
     expect(screen.queryByTestId('toolbar')).not.toBeInTheDocument()
     unmount()
 
-    renderLayout(createMockDiagram(), true, undefined, true, {
-      canExportModel: false,
-      toolbarContent: <span>Test info</span>,
-    })
+    renderLayout(createMockDiagram(), true, undefined, true, <span>Test info</span>)
     expect(screen.getByTestId('toolbar')).toBeInTheDocument()
   })
 
