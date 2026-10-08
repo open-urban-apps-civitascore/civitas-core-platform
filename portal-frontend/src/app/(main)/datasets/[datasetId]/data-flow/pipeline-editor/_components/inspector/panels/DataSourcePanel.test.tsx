@@ -15,11 +15,17 @@ vi.mock('next-intl', () => ({
 }))
 
 vi.mock('@/hooks/use-permissions', () => ({
-  usePermissions: () => ({ hasPermission: () => true }),
+  usePermissions: () => ({ hasPermission: () => true, hasScopedPermission: () => false }),
 }))
 
 vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   useGetDataset: () => ({ data: undefined, isLoading: false, isError: false }),
+}))
+
+vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
+  useGetDatastructureVersion: () => ({
+    data: { data: { dataStructure: { name: 'Air Quality' }, version: '1.2.0', dataStructureVersionStatus: 'DRAFT' } },
+  }),
 }))
 
 const mockUseGetDatasources = vi.fn()
@@ -35,7 +41,15 @@ beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn()
 })
 
-const datasource = (id: string, name: string, connector: Record<string, unknown>): Datasource =>
+const DATASTRUCTURE_ID = 'structure-1'
+const VERSION_ID = 'version-1'
+
+const datasource = (
+  id: string,
+  name: string,
+  connector: Record<string, unknown>,
+  dataStructureVersion: Record<string, unknown> | null = null,
+): Datasource =>
   ({
     id,
     name,
@@ -43,6 +57,7 @@ const datasource = (id: string, name: string, connector: Record<string, unknown>
     dataSourceStatus: 'AVAILABLE',
     connector,
     configurationUrn: `urn:test:${id}`,
+    dataStructureVersion,
   }) as unknown as Datasource
 
 const apiCall = (name: string, method: string | null = 'GET') => ({ name, method, path: '/items' })
@@ -56,15 +71,21 @@ const HTTP_TWO_CALLS = datasource('http-2', 'Test HTTP Source 2', {
   apiCalls: [apiCall('Test Call 1'), apiCall('Test Call 2')],
 })
 const SQL_SOURCE = datasource('sql-1', 'Test SQL Source', { connectorType: 'SQL' })
+const MQTT_SOURCE = datasource(
+  'mqtt-1',
+  'Test MQTT Source',
+  { connectorType: 'MQTT' },
+  { id: VERSION_ID, version: '1.2.0', dataStructureVersionStatus: 'DRAFT', dataStructureId: DATASTRUCTURE_ID },
+)
 
 const nodeData: DataSourceNodeData = {
-  label: 'Data Source',
+  label: 'Data source',
   configured: false,
   entityType: 'datasource',
 }
 
-const renderPanel = (overrides: Partial<DataSourceNodeData> = {}, onUpdate = vi.fn()) => {
-  render(<DataSourcePanel data={{ ...nodeData, ...overrides }} onUpdate={onUpdate} />)
+const renderPanel = (overrides: Partial<DataSourceNodeData> = {}, onUpdate = vi.fn(), isLocked = false) => {
+  render(<DataSourcePanel data={{ ...nodeData, ...overrides }} onUpdate={onUpdate} isLocked={isLocked} />)
   return onUpdate
 }
 
@@ -82,7 +103,7 @@ const chooseOption = async (comboboxIndex: number, optionName: string | RegExp) 
 
 beforeEach(() => {
   mockUseGetDatasources.mockReturnValue({
-    data: { data: [HTTP_ONE_CALL, HTTP_TWO_CALLS, SQL_SOURCE] },
+    data: { data: [HTTP_ONE_CALL, HTTP_TWO_CALLS, SQL_SOURCE, MQTT_SOURCE] },
     isLoading: false,
     isError: false,
     error: null,
@@ -197,5 +218,30 @@ describe('DataSourcePanel', () => {
     renderPanel(selectedNode(httpNoCalls))
 
     expect(screen.getAllByRole('combobox')[1]).toHaveTextContent('dataSourcePanel.noApiCalls')
+  })
+
+  it('shows the Data structure, its version and status in the details', () => {
+    renderPanel(selectedNode(MQTT_SOURCE))
+
+    expect(screen.getByText('Air Quality')).toBeInTheDocument()
+    expect(screen.getByText('1.2.0')).toBeInTheDocument()
+    expect(screen.getByText('DRAFT')).toBeInTheDocument()
+  })
+
+  it('opens the Data structure version used by the Data source', async () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    renderPanel(selectedNode(MQTT_SOURCE))
+
+    await userEvent.click(screen.getByRole('button', { name: 'dataSourcePanel.showDataStructure' }))
+
+    expect(open).toHaveBeenCalledWith(`/datastructures/${DATASTRUCTURE_ID}/${VERSION_ID}`, '_blank')
+    open.mockRestore()
+  })
+
+  it('disables the Data source selection but keeps Show Data structure in a locked panel', () => {
+    renderPanel(selectedNode(MQTT_SOURCE), vi.fn(), true)
+
+    expect(screen.getByRole('combobox')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'dataSourcePanel.showDataStructure' })).toBeEnabled()
   })
 })

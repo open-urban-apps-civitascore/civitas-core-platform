@@ -1351,7 +1351,6 @@
   },
   "pipelineEditor": {
     "title": "Pipeline Editor",
-    "subtitle": "Definiert, wie Daten aufgenommen, transformiert und gespeichert werden",
     "canvas": {
       "noPipeline": "Keine Pipeline verfügbar"
     },
@@ -1420,11 +1419,14 @@
     "dataSourcePanel": {
       "label": "Datenquelle",
       "placeholder": "Datenquelle auswählen...",
-      "details": "Datenquellen-Details",
+      "details": "Details",
       "connector": "Konnektor",
       "connection": "Verbindung",
       "status": "Status",
       "description": "Beschreibung",
+      "dataStructure": "Datenstruktur",
+      "dataStructureVersion": "Datenstruktur-Version",
+      "dataStructureVersionStatus": "Status der Datenstruktur-Version",
       "tags": "Tags",
       "showDataStructure": "Datenstruktur anzeigen",
       "noPermission": "Keine Berechtigung zum Lesen von Datenquellen",
@@ -1461,14 +1463,14 @@
       }
     },
     "frostPanel": {
-      "details": "Sensordaten-Speicher Details",
+      "details": "Details",
       "serverName": "Servername",
       "serverUrl": "Server-URL",
       "internalServer": "Interner Server",
       "version": "Version",
       "port": "Port",
-      "portPlaceholder": "Wählen Sie, was diese Senke schreibt",
-      "portHelp": "Der Port entscheidet, was die Senke schreibt. Es gibt keine Vorgabe: ohne ihn veröffentlicht das Dataset nicht.",
+      "portPlaceholder": "Wählen Sie einen Port",
+      "portHelp": "Der Port bestimmt, ob die eingehenden Daten als Things, Observations oder ThingTrees gespeichert werden.",
       "expects": "Erwartet:",
       "logic": {
         "ownKey": "Upsert mit eigenem Schlüssel",
@@ -1505,7 +1507,7 @@
       "dataStructureVersion": "Datenstruktur-Version",
       "importDataStructure": "Datenstruktur importieren",
       "changeDataStructure": "Datenstruktur ändern",
-      "details": "Datenstruktur-Details",
+      "details": "Details",
       "dataStructureName": "Datenstruktur",
       "versionNumber": "Version",
       "anonymousDataStructure": "Anonyme Datenstruktur",
@@ -1525,7 +1527,9 @@
       "outputDatastructure": "Ausgangs-Datenstruktur",
       "openMappingEditor": "Mapping-Editor öffnen",
       "details": "Referenzierte Datenstrukturen",
+      "inputVersion": "Version Eingangs-Datenstruktur",
       "inputStatus": "Status Eingangs-Datenstruktur",
+      "outputVersion": "Version Ausgangs-Datenstruktur",
       "outputStatus": "Status Ausgangs-Datenstruktur"
     },
     "entitySelector": {
@@ -1579,7 +1583,7 @@
         "multipleSinkNodes": "{label} ist ein zusätzlicher Datenspeicher-Knoten; eine Pipeline unterstützt genau einen",
         "nodeUnsupportedPosition": "{label} ist an einer nicht unterstützten Position verdrahtet",
         "unknownNodeInFlow": "{label} hat einen nicht unterstützten Knotentyp und kann nicht in den Datenfluss verdrahtet werden",
-        "flowBranches": "Der Datenfluss verzweigt bei {label}; ein linearer Fluss von Quelle zu Senke ist erforderlich",
+        "flowBranches": "Der Datenfluss verzweigt bei {label}; ein linearer Fluss von Datenquelle zu Datenspeicher ist erforderlich",
         "flowCycle": "Der Datenfluss enthält einen Zyklus bei {label}",
         "noDataPath": "Es gibt keinen Datenfluss-Pfad von der Datenquelle zum Datenspeicher",
         "mappingNotOnPath": "{label} liegt nicht auf dem Datenfluss-Pfad zwischen Datenquelle und Datenspeicher",

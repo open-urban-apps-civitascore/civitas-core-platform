@@ -9,6 +9,7 @@
  */
 
 import type { NodeProps } from '@xyflow/react'
+import { useTranslations } from 'next-intl'
 
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { useNodeValidationSeverity } from '../../_hooks/use-node-validation-severity'
@@ -24,8 +25,10 @@ export const createActivityNode = (type: PipelineNodeType) => {
 
   const ActivityNode: React.FC<NodeProps> = ({ id, data, selected: isSelected = false }) => {
     const validationSeverity = useNodeValidationSeverity(id)
+    const t = useTranslations('pipelineEditor')
     const nodeData = data as PipelineNodeData
     const isConfigured = Boolean(nodeData.configured)
+    const label = def && !def.hasEditableLabel ? t(`nodeTypes.${def.inspectorKey}`) : nodeData.label || type
 
     // UML-style circular control nodes (start / end) render their own shape.
     if (def?.shape === 'controlStart' || def?.shape === 'controlEnd') {
@@ -47,7 +50,7 @@ export const createActivityNode = (type: PipelineNodeType) => {
         category={def?.category ?? 'general'}
         isConfigured={isConfigured}
         isSelected={isSelected}
-        label={nodeData.label || (def?.type ?? '')}
+        label={label}
         sublabel={sublabel}
         icon={def?.icon}
         hasLeftHandle={def?.handles.left ?? true}

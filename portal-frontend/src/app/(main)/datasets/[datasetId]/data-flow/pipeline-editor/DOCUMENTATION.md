@@ -703,6 +703,7 @@ In read-only mode:
 - Nodes cannot be added, moved, connected or deleted. Changes in the inspector are ignored.
 - "Save all", the "New pipeline" tab button and the pipeline menu (rename, delete) are hidden. `deletePipeline` also returns early.
 - "Validate" stays available.
+- The inspector panels disable their edit fields (`isLocked`). "Show Data structure" and "Open Mapping Editor" stay available. The Mapping Editor opens without "Apply".
 
 A failed refetch after a successful first load does not change the mode. The editor keeps the data of the first load.
 

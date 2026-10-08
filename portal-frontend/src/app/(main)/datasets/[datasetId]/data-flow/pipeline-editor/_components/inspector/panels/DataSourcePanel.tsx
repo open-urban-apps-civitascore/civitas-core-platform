@@ -7,10 +7,14 @@
  * Allows selecting a datasource entity and displays its metadata.
  *
  */
+import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 
+import { Button } from '@/components/ui/button'
 import { CONNECTOR_TYPES } from '@/const/connectors'
+import { useDatasetPermissionsById } from '@/hooks/use-dataset-permissions'
 
+import { useDatastructureVersionInfo } from '../../../_hooks/use-datastructure-version-info'
 import { usePipelineDatasources } from '../../../_hooks/use-pipeline-datasources'
 import {
   apiCallNamesOf,
@@ -24,14 +28,22 @@ import { EntitySelector } from '../components/EntitySelector'
 interface DataSourcePanelProps {
   data: DataSourceNodeData
   onUpdate: (data: Partial<DataSourceNodeData>) => void
+  isLocked: boolean
 }
 
-export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate }) => {
+export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate, isLocked }) => {
   const t = useTranslations('pipelineEditor')
   const tStatus = useTranslations('common.status')
   const { entities, isLoading, isError, canReadDatasources, getEntityById, getName } = usePipelineDatasources()
 
+  const { datasetId } = useParams<{ datasetId: string }>()
+  const { canReadDatastructures } = useDatasetPermissionsById(datasetId)
+
   const selectedEntity = data.entityId !== undefined ? getEntityById(data.entityId) : undefined
+  const dataStructureVersion = selectedEntity?.dataStructureVersion ?? undefined
+  const { name: dataStructureName } = useDatastructureVersionInfo(
+    dataStructureVersion ? `${dataStructureVersion.dataStructureId}/${dataStructureVersion.id}` : undefined,
+  )
 
   const handleEntityChange = (entity: { id: string; name: string } | undefined) => {
     if (entity) {
@@ -88,6 +100,7 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
         isError={isError}
         onChange={handleEntityChange}
         fallbackName={getName(data.entityId)}
+        isDisabled={isLocked}
       />
 
       {isHttpSource && (
@@ -115,14 +128,28 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
               { label: t('dataSourcePanel.connector'), value: selectedEntity.connector?.connectorType },
               { label: t('dataSourcePanel.status'), value: tStatus(selectedEntity.dataSourceStatus) },
               { label: t('dataSourcePanel.description'), value: selectedEntity.description ?? undefined },
+              { label: t('dataSourcePanel.dataStructure'), value: dataStructureName },
+              { label: t('dataSourcePanel.dataStructureVersion'), value: dataStructureVersion?.version ?? undefined },
+              {
+                label: t('dataSourcePanel.dataStructureVersionStatus'),
+                value: dataStructureVersion ? tStatus(dataStructureVersion.dataStructureVersionStatus) : undefined,
+              },
             ]}
           />
-          <button
-            onClick={() => window.open(`/datasources/${data.entityId}`, '_blank')}
-            className="w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            {t('dataSourcePanel.showDataStructure')}
-          </button>
+          {canReadDatastructures && dataStructureVersion && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                window.open(
+                  `/datastructures/${dataStructureVersion.dataStructureId}/${dataStructureVersion.id}`,
+                  '_blank',
+                )
+              }
+            >
+              {t('dataSourcePanel.showDataStructure')}
+            </Button>
+          )}
         </>
       )}
     </div>

@@ -67,7 +67,7 @@ export const InspectorHeader: React.FC<InspectorHeaderProps> = ({ nodeType, labe
       {/* Label & Type */}
       <div className="flex flex-1 flex-col overflow-hidden">
         <span className="truncate text-sm font-medium text-foreground">{label}</span>
-        <span className="text-xs text-muted-foreground">{typeLabel}</span>
+        {label !== typeLabel && <span className="text-xs text-muted-foreground">{typeLabel}</span>}
       </div>
 
       {/* Configuration Status Badge */}

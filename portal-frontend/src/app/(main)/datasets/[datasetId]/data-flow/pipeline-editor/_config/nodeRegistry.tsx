@@ -63,6 +63,7 @@ FilledCircle.displayName = 'FilledCircle'
 export interface NodeInspectorPanelProps<D extends PipelineNodeData = PipelineNodeData> {
   data: D
   onUpdate: (updates: Partial<D>) => void
+  isLocked: boolean
 }
 
 // ============================================================================
@@ -92,6 +93,8 @@ export interface PipelineNodeDef<D extends PipelineNodeData = PipelineNodeData> 
   inspectorKey: string
   /** When true, only one instance per pipeline is allowed. */
   singleUse?: boolean
+  /** When true, the user names the node and its label is shown instead of the translated type name. */
+  hasEditableLabel?: boolean
   /** Activity-node connection handles. */
   handles: { left: boolean; right: boolean }
   /** Creates the default node data used when dropping from the palette. */
@@ -176,7 +179,7 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
     inspectorKey: 'dataSource',
     handles: { left: true, right: true },
     createDefaultData: (): DataSourceNodeData => ({
-      label: 'DataSource',
+      label: 'Data source',
       configured: false,
       entityType: ENTITY_TYPES.Datasource,
     }),
@@ -254,6 +257,7 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
     icon: Workflow,
     paletteKey: 'mapping',
     inspectorKey: 'mapping',
+    hasEditableLabel: true,
     handles: { left: true, right: true },
     createDefaultData: (): MappingNodeData => ({
       label: 'Mapping',

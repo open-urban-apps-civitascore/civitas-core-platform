@@ -91,7 +91,7 @@ const mappingNode = (mappingConfig: MappingConfig): MappingNodeData => ({
 
 const openEditorAndApply = async (data: MappingNodeData) => {
   const onUpdate = vi.fn()
-  render(<MappingPanel data={data} onUpdate={onUpdate} />)
+  render(<MappingPanel data={data} onUpdate={onUpdate} isLocked={false} />)
   await userEvent.click(screen.getByRole('button', { name: 'openMappingEditor' }))
   await userEvent.click(await screen.findByRole('button', { name: 'actions.apply' }))
   return onUpdate.mock.calls[0][0].mappingConfig as MappingConfig
@@ -114,5 +114,34 @@ describe('opening the Mapping editor from the Mapping node', () => {
     const fields = { '$.result': '$.reading' }
     const saved = await openEditorAndApply(mappingNode({ fields, positions: {} }))
     expect(saved.fields).toEqual(fields)
+  })
+})
+
+describe('Mapping node in a locked panel', () => {
+  it('disables editing but keeps the Mapping editor available', () => {
+    render(<MappingPanel data={mappingNode(emptyMappingConfig())} onUpdate={vi.fn()} isLocked />)
+
+    expect(screen.getByLabelText('name')).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Sensor Reading/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Observation/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'openMappingEditor' })).toBeEnabled()
+  })
+
+  it('opens the Mapping editor without Apply', async () => {
+    render(<MappingPanel data={mappingNode(emptyMappingConfig())} onUpdate={vi.fn()} isLocked />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'openMappingEditor' }))
+
+    expect(await screen.findByRole('button', { name: 'actions.close' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'actions.apply' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Data structure selection of the Mapping node', () => {
+  it('shows the version of the selected Data structure', () => {
+    render(<MappingPanel data={mappingNode(emptyMappingConfig())} onUpdate={vi.fn()} isLocked={false} />)
+
+    expect(screen.getByRole('button', { name: /Sensor Reading/ })).toHaveTextContent(SOURCE.versionNumber)
+    expect(screen.getByRole('button', { name: /Observation/ })).toHaveTextContent(TARGET.versionNumber)
   })
 })

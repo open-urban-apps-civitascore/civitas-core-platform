@@ -21,12 +21,13 @@ interface FieldControlProps {
   field: ConfigField
   value: string
   onChange: (value: string) => void
+  isDisabled: boolean
 }
 
-const FieldControl = ({ field, value, onChange }: FieldControlProps) => {
+const FieldControl = ({ field, value, onChange, isDisabled }: FieldControlProps) => {
   if (field.control === 'select') {
     return (
-      <Select value={value} onValueChange={onChange}>
+      <Select value={value} onValueChange={onChange} disabled={isDisabled}>
         <SelectTrigger>
           <SelectValue placeholder={field.placeholder} />
         </SelectTrigger>
@@ -58,6 +59,7 @@ const FieldControl = ({ field, value, onChange }: FieldControlProps) => {
       value={value}
       placeholder={field.placeholder}
       className="w-full"
+      disabled={isDisabled}
       onChange={e => onChange(e.target.value)}
     />
   )
@@ -69,10 +71,11 @@ interface TransformInspectorProps {
   onChange: (key: string, value: string) => void
   /** fieldKey → already-translated message. */
   errors?: Record<string, string>
+  isReadOnly?: boolean
 }
 
 /** Inspector body rendered entirely from the selected node's registry entry. */
-export const TransformInspector = ({ def, config, onChange, errors }: TransformInspectorProps) => {
+export const TransformInspector = ({ def, config, onChange, errors, isReadOnly = false }: TransformInspectorProps) => {
   const t = useTranslations('pipelineEditor.mappingEditor.inspector')
 
   if (!def) return null
@@ -95,6 +98,7 @@ export const TransformInspector = ({ def, config, onChange, errors }: TransformI
               field={{ ...field, placeholder: placeholders?.[field.key] ?? field.placeholder }}
               value={String(config[field.key] ?? field.default ?? '')}
               onChange={value => onChange(field.key, value)}
+              isDisabled={isReadOnly}
             />
             {errors?.[field.key] && <p className="text-xs text-destructive">{errors[field.key]}</p>}
           </div>

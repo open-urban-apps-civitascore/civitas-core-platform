@@ -30,9 +30,10 @@ import { EntityMetadata } from '../components/EntityMetadata'
 interface GeoPersistencePanelProps {
   data: GeoPersistenceNodeData
   onUpdate: (data: Partial<GeoPersistenceNodeData>) => void
+  isLocked: boolean
 }
 
-export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, onUpdate }) => {
+export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, onUpdate, isLocked }) => {
   const t = useTranslations('pipelineEditor')
   const tStatus = useTranslations('common.status')
   const { datasetId } = useParams<{ datasetId: string }>()
@@ -45,6 +46,7 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
   const conflictingPipeline = selectedNode ? pipelineUsingTableName(selectedNode.id, data.tableName) : null
   const hasInvalidCharacters = data.tableName !== '' && !isValidTableName(data.tableName)
 
+  const dataStructureVersionKey = data.dataStructureVersionId ? parseCompositeKey(data.dataStructureVersionId) : null
   const {
     name: dataStructureName,
     versionNumber,
@@ -87,6 +89,7 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
           onChange={handleTableNameChange}
           placeholder={t('geoPersistencePanel.tableNamePlaceholder')}
           maxLength={MAX_TABLE_NAME_LENGTH}
+          disabled={isLocked}
           aria-invalid={hasInvalidCharacters || conflictingPipeline !== null}
         />
         {hasInvalidCharacters && (
@@ -108,8 +111,7 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
           <Button
             variant="outline"
             size="sm"
-            className="w-full"
-            disabled={isUsedByLayer}
+            disabled={isUsedByLayer || isLocked}
             onClick={() => setIsImportModalOpen(true)}
           >
             {data.dataStructureVersionId
@@ -132,18 +134,19 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
               },
             ]}
           />
-          {canReadDatastructures && parseCompositeKey(data.dataStructureVersionId) && (
-            <button
+          {canReadDatastructures && dataStructureVersionKey && (
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() =>
                 window.open(
-                  `/datastructures/${parseCompositeKey(data.dataStructureVersionId!)!.datastructureId}`,
+                  `/datastructures/${dataStructureVersionKey.datastructureId}/${dataStructureVersionKey.versionId}`,
                   '_blank',
                 )
               }
-              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
               {t('dataSourcePanel.showDataStructure')}
-            </button>
+            </Button>
           )}
         </>
       )}
