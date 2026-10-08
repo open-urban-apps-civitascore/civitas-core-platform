@@ -14,6 +14,7 @@ import { DatastructureVersion } from '@/types/datastructures'
 import { mapDatastructureVersionApiToFormData } from '@/utils/datastructures'
 
 import { DataModelImportModal } from './DataModelImportModal'
+import { DatastructureVersionInfo } from './DatastructureVersionInfo'
 
 interface DatastructureTabProps {
   datasourceTitle: string
@@ -109,6 +110,7 @@ export const DatastructureTab = (props: DatastructureTabProps) => {
         isMultiSessionMode={false}
         canExportModel={false}
         placeHolder={UmlCanvasPlaceholder}
+        toolbarContent={datastructureVersion && <DatastructureVersionInfo version={datastructureVersion} />}
         onImportFromDatastructure={canImport ? handleImportFromDatastructure : undefined}
       />
       <DataModelImportModal

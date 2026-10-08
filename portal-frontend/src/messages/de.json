@@ -1111,6 +1111,10 @@
         "title": "Datenmodell importieren",
         "to": "in {name}"
       },
+      "versionInfo": {
+        "version": "Version {version}",
+        "noVersion": "Keine Versionsnummer"
+      },
       "availableInfo": "Diese Datenquelle hat den Status \"Verfügbar\". Um die Datenstruktur zu ändern, setzen Sie den Status zuerst auf \"Entwurf\"."
     },
     "accessManagementTab": {

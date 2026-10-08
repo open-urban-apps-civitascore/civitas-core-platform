@@ -1124,6 +1124,10 @@
         "title": "Import Data Model",
         "to": "into {name}"
       },
+      "versionInfo": {
+        "version": "Version {version}",
+        "noVersion": "No version number"
+      },
       "availableInfo": "This Data source has the status \"Available\". To change the Data structure, set it to \"Draft\" first."
     },
     "accessManagementTab": {

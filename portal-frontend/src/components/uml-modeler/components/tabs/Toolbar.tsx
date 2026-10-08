@@ -2,7 +2,7 @@
 
 import { FileDown, Loader2, Save } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useCallback } from 'react'
+import { ReactNode, useCallback } from 'react'
 import { toast } from 'sonner'
 
 import { useCreateModel } from '@/app/services/api/models/clientRequests'
@@ -22,6 +22,7 @@ interface ToolbarProps {
   sessionName?: string
   canExportModel: boolean
   onImportFromDatastructure?: () => void
+  content?: ReactNode
 }
 
 /**
@@ -53,6 +54,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   sessionName,
   canExportModel,
   onImportFromDatastructure,
+  content,
 }) => {
   const { diagram } = useActiveDiagram()
   const createModel = useCreateModel()
@@ -112,6 +114,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
   return (
     <div className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">
+      {content && <div className="mr-3">{content}</div>}
       {/* File Operations */}
       <div className="flex items-center gap-1 mr-3">
         {onSave && (

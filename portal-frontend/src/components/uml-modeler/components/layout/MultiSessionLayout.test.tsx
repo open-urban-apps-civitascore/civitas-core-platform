@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -100,7 +101,9 @@ describe('MultiSessionLayout Import & Export', () => {
     isReadOnly = false,
     canExportDiagram?: boolean,
     hasDatastructureId = true,
+    options: { canExportModel?: boolean; toolbarContent?: ReactNode } = {},
   ) => {
+    const { canExportModel = true, toolbarContent } = options
     const session = createMockSession(diagram)
     let currentSession = session
     const mockSessionManager = {
@@ -130,7 +133,8 @@ describe('MultiSessionLayout Import & Export', () => {
           <MultiSessionLayout
             externalSessionManager={mockSessionManager as unknown as UseMultiSessionReturn}
             isMultiSessionMode={false}
-            canExportModel={true}
+            canExportModel={canExportModel}
+            toolbarContent={toolbarContent}
             canExportDiagram={canExportDiagram}
             dataStructureName="School"
             versionName="v1"
@@ -306,6 +310,18 @@ describe('MultiSessionLayout Import & Export', () => {
     expect(updated.diagram.importedStructures).toEqual(pins)
     expect(updated.dirtyFields.has('model')).toBe(true)
     expect(toast.success).toHaveBeenCalledWith('import.added')
+  })
+
+  it('shows the toolbar when only toolbar content is given', () => {
+    const { unmount } = renderLayout(createMockDiagram(), true, undefined, true, { canExportModel: false })
+    expect(screen.queryByTestId('toolbar')).not.toBeInTheDocument()
+    unmount()
+
+    renderLayout(createMockDiagram(), true, undefined, true, {
+      canExportModel: false,
+      toolbarContent: <span>Test info</span>,
+    })
+    expect(screen.getByTestId('toolbar')).toBeInTheDocument()
   })
 
   it('hides the export button when datastructureId is missing or canExportDiagram is false', () => {

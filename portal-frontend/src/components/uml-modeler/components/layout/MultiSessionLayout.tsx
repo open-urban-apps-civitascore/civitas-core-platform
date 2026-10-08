@@ -2,7 +2,7 @@
 
 import { ReactFlowProvider } from '@xyflow/react'
 import { useTranslations } from 'next-intl'
-import { JSX, useCallback, useMemo, useRef, useState } from 'react'
+import { JSX, ReactNode, useCallback, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
@@ -37,6 +37,7 @@ interface MultiSessionLayoutProps {
   isMultiSessionMode: boolean
   canExportModel: boolean
   placeHolder?: JSX.Element
+  toolbarContent?: ReactNode
   onImportFromDatastructure?: () => void
   dataStructureName?: string
   versionName?: string | null
@@ -58,6 +59,7 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
     isMultiSessionMode,
     canExportModel,
     placeHolder,
+    toolbarContent,
     onImportFromDatastructure,
     dataStructureName,
     versionName,
@@ -123,7 +125,11 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
   // shows it even when it owns nothing else.
   const hasImportedStructures = (activeSession?.diagram.importedStructures?.length ?? 0) > 0
   const shouldShowToolBar =
-    !isControlledExternally || canExportModel || !!onImportFromDatastructure || hasImportedStructures
+    !isControlledExternally ||
+    canExportModel ||
+    !!onImportFromDatastructure ||
+    hasImportedStructures ||
+    !!toolbarContent
 
   const applyImportedDiagram = useCallback(
     (importedDiagram: UMLDiagram) => {
@@ -282,6 +288,7 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
                 hasUnsavedChanges={activeSession?.isDirty || false}
                 canExportModel={canExportModel}
                 onImportFromDatastructure={onImportFromDatastructure}
+                content={toolbarContent}
               />
             )}
 
