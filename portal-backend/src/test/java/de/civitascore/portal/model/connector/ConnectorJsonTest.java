@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.media.DiscriminatorMapping;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.RecordComponent;
 import java.lang.reflect.Type;
@@ -400,53 +401,129 @@ class ConnectorJsonTest {
    */
   @Test
   void registeredConfigurations_reachEverySecret() {
-    List<String> violations = new ArrayList<>();
-    Deque<Class<?>> pending = new ArrayDeque<>();
+    List<Class<?>> roots = new ArrayList<>();
     Arrays.stream(ConnectorConfiguration.class.getAnnotation(JsonSubTypes.class).value())
-        .forEach(type -> pending.add(type.value()));
-    pending.add(NestedSecretsConnector.class);
+        .forEach(type -> roots.add(type.value()));
+    roots.add(NestedSecretsConnector.class);
+
+    assertThat(secretReachViolations(roots)).isEmpty();
+  }
+
+  /** A connector with secrets in the shapes that the masking and the resolution do not walk. */
+  record UnreachedSecretsConnector(
+      Map<String, Secret> headers, Variant auth, Secret[] keys, Opaque opaque)
+      implements ConnectorConfiguration {
+
+    sealed interface Variant permits Basic {}
+
+    record Basic(String password) implements Variant {}
+
+    interface Opaque {}
+
+    @Override
+    public ConnectorType connectorType() {
+      return ConnectorType.SQL;
+    }
+  }
+
+  @Test
+  void secretReachViolations_reportsSecretsOutsideRecordsAndLists() {
+    assertThat(secretReachViolations(List.of(UnreachedSecretsConnector.class)))
+        .containsExactlyInAnyOrder(
+            "UnreachedSecretsConnector.headers holds secrets in a Map",
+            "UnreachedSecretsConnector.keys holds secrets in an array",
+            "UnreachedSecretsConnector.opaque has an interface type that is not sealed",
+            "Basic.password holds a secret as text");
+  }
+
+  private static List<String> secretReachViolations(List<Class<?>> roots) {
+    List<String> violations = new ArrayList<>();
+    Deque<Class<?>> pending = new ArrayDeque<>(roots);
     Set<Class<?>> seen = new HashSet<>();
     while (!pending.isEmpty()) {
       Class<?> type = pending.pop();
       if (!seen.add(type)) {
         continue;
       }
+      if (type.isSealed()) {
+        pending.addAll(Arrays.asList(type.getPermittedSubclasses()));
+        continue;
+      }
       assertThat(type.isRecord()).as("%s is a record", type.getName()).isTrue();
       for (RecordComponent component : type.getRecordComponents()) {
         String name = type.getSimpleName() + "." + component.getName();
-        Class<?> valueType = valueType(component.getGenericType());
+        Type generic = component.getGenericType();
+        Class<?> valueType = listElementType(generic);
         if (SECRET_NAME.matcher(component.getName()).matches() && valueType != Secret.class) {
           violations.add(name + " holds a secret as text");
         }
-        if (component.getGenericType() instanceof ParameterizedType
+        if (valueType == null) {
+          if (carriesSecret(generic, new HashSet<>())) {
+            violations.add(
+                name
+                    + (component.getType().isArray()
+                        ? " holds secrets in an array"
+                        : " holds secrets in a " + component.getType().getSimpleName()));
+          }
+          continue;
+        }
+        if (generic instanceof ParameterizedType
             && carriesSecret(valueType, new HashSet<>())
             && !IdentifiedElement.class.isAssignableFrom(valueType)) {
           violations.add(name + " lists elements with secrets but without identity");
         }
-        if (valueType.isRecord()) {
+        if (valueType.isInterface()
+            && !valueType.isSealed()
+            && valueType.getPackageName().startsWith("de.civitascore")) {
+          violations.add(name + " has an interface type that is not sealed");
+        }
+        if (valueType.isRecord() || valueType.isSealed()) {
           pending.add(valueType);
         }
       }
     }
-
-    assertThat(violations).isEmpty();
+    return violations;
   }
 
-  private static boolean carriesSecret(Class<?> type, Set<Class<?>> seen) {
+  /**
+   * The type of a plain component or the element type of a {@code List}, or null for any other
+   * container, because the masking and the placeholder resolution walk only records and lists.
+   */
+  private static Class<?> listElementType(Type type) {
+    if (type instanceof ParameterizedType parameterized) {
+      return parameterized.getRawType() == List.class
+          ? listElementType(parameterized.getActualTypeArguments()[0])
+          : null;
+    }
+    return type instanceof Class<?> plain && !plain.isArray() ? plain : null;
+  }
+
+  private static boolean carriesSecret(Type type, Set<Type> seen) {
     if (type == Secret.class) {
       return true;
     }
-    if (!type.isRecord() || !seen.add(type)) {
+    if (!seen.add(type)) {
       return false;
     }
-    return Arrays.stream(type.getRecordComponents())
-        .anyMatch(c -> carriesSecret(valueType(c.getGenericType()), seen));
-  }
-
-  private static Class<?> valueType(Type type) {
     if (type instanceof ParameterizedType parameterized) {
-      return valueType(parameterized.getActualTypeArguments()[0]);
+      return Arrays.stream(parameterized.getActualTypeArguments())
+          .anyMatch(argument -> carriesSecret(argument, seen));
     }
-    return (Class<?>) type;
+    if (type instanceof GenericArrayType array) {
+      return carriesSecret(array.getGenericComponentType(), seen);
+    }
+    if (!(type instanceof Class<?> plain)) {
+      return false;
+    }
+    if (plain.isArray()) {
+      return carriesSecret(plain.getComponentType(), seen);
+    }
+    if (plain.isSealed()) {
+      return Arrays.stream(plain.getPermittedSubclasses())
+          .anyMatch(variant -> carriesSecret(variant, seen));
+    }
+    return plain.isRecord()
+        && Arrays.stream(plain.getRecordComponents())
+            .anyMatch(c -> carriesSecret(c.getGenericType(), seen));
   }
 }
