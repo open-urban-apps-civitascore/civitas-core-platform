@@ -129,7 +129,7 @@ public class ConnectorValidator {
     }
   }
 
-  private static String jsonKey(Class<?> type, String member) {
+  static String jsonKey(Class<?> type, String member) {
     try {
       JsonProperty property = type.getDeclaredField(member).getAnnotation(JsonProperty.class);
       return property == null || property.value().isEmpty() ? member : property.value();

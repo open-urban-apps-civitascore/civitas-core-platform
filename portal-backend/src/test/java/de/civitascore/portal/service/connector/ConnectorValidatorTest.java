@@ -3,6 +3,7 @@ package de.civitascore.portal.service.connector;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
 import de.civitascore.portal.model.connector.ConnectorConfiguration;
 import de.civitascore.portal.model.connector.IdentifiedElement;
 import de.civitascore.portal.model.connector.OnRelease;
@@ -11,9 +12,23 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.lang.reflect.RecordComponent;
+import java.util.ArrayDeque;
+import java.util.Arrays;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import tools.jackson.databind.DeserializationConfig;
+import tools.jackson.databind.JavaType;
+import tools.jackson.databind.introspect.BeanPropertyDefinition;
+import tools.jackson.databind.introspect.ClassIntrospector;
+import tools.jackson.databind.json.JsonMapper;
 
 class ConnectorValidatorTest {
 
@@ -85,6 +100,47 @@ class ConnectorValidatorTest {
   @Test
   void validate_withoutConnector_returnsNoViolations() {
     assertThat(validator.validate(null, ConnectorValidator.Stage.RELEASE)).isEmpty();
+  }
+
+  /**
+   * Without this test, a connector record named by other Jackson means than {@code @JsonProperty}
+   * would get field errors under a key that the client never sent.
+   */
+  @Test
+  void jsonKey_ofEveryConnectorRecordComponent_isTheKeyThatJacksonReads() {
+    DeserializationConfig config = new JsonMapper().deserializationConfig();
+    ClassIntrospector introspector = config.classIntrospectorInstance().forOperation(config);
+    Deque<Class<?>> pending = new ArrayDeque<>();
+    Arrays.stream(ConnectorConfiguration.class.getAnnotation(JsonSubTypes.class).value())
+        .forEach(type -> pending.add(type.value()));
+    Set<Class<?>> seen = new HashSet<>();
+    SoftAssertions softly = new SoftAssertions();
+    while (!pending.isEmpty()) {
+      Class<?> type = pending.pop();
+      if (!seen.add(type)) {
+        continue;
+      }
+      JavaType javaType = config.constructType(type);
+      Map<String, String> jacksonKeys =
+          introspector
+              .introspectForDeserialization(
+                  javaType, introspector.introspectClassAnnotations(javaType))
+              .findProperties()
+              .stream()
+              .collect(
+                  Collectors.toMap(
+                      BeanPropertyDefinition::getInternalName, BeanPropertyDefinition::getName));
+      for (RecordComponent component : type.getRecordComponents()) {
+        softly
+            .assertThat(ConnectorValidator.jsonKey(type, component.getName()))
+            .as("%s.%s", type.getSimpleName(), component.getName())
+            .isEqualTo(jacksonKeys.get(component.getName()));
+        if (component.getType().isRecord()) {
+          pending.add(component.getType());
+        }
+      }
+    }
+    softly.assertAll();
   }
 
   private static TestConnector validConnector() {
