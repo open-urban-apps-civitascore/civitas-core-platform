@@ -24,8 +24,9 @@ It holds `connectorType` (`MQTT` or `SQL`) and the fields of that type:
 - **PATCH:** `connector` is a JSON merge patch (RFC 7386) of the stored
   connector. An omitted key keeps its value; `null` or a blank string
   clears it. A `connectorType` different from the stored one replaces the
-  connector. `"connector": null` removes it; an omitted `connector` keeps
-  it.
+  connector. The same holds at every depth: a nested object whose `type`
+  differs from the stored one is replaced, not merged.
+  `"connector": null` removes it; an omitted `connector` keeps it.
 - **Password placeholder:** `"password": "********"` in a write keeps the
   stored password. With no stored password, none is stored.
 

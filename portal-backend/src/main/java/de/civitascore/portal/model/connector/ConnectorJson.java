@@ -143,9 +143,9 @@ public final class ConnectorJson {
   }
 
   /**
-   * Applies a JSON merge patch (RFC 7386) to the response form of {@code current}. A patch that
-   * names another {@code connectorType} replaces the connector instead, so that no key of the
-   * previous type remains.
+   * Applies a JSON merge patch (RFC 7386) to the response form of {@code current}. At every depth,
+   * an object whose type the patch changes is replaced instead of merged, as {@code JsonMergePatch}
+   * defines it.
    *
    * @param current the connector before the patch, or null if there is none
    * @param patch the {@code connector} member of the request; a missing node keeps {@code current}
@@ -159,32 +159,10 @@ public final class ConnectorJson {
     if (!patch.isMissingNode() && !patch.isObject()) {
       throw new InvalidConnectorException("Invalid value: " + ROOT);
     }
-    ObjectNode base =
-        current == null || changesType(current, patch)
-            ? JsonNodeFactory.instance.objectNode()
-            : toMaskedTree(current);
-    return read(mergePatch(base, patch));
-  }
-
-  private static boolean changesType(ConnectorConfiguration current, JsonNode patch) {
-    JsonNode type = patch.path(TYPE_PROPERTY);
-    return !type.isMissingNode() && !current.connectorType().name().equals(type.asString(""));
-  }
-
-  private static JsonNode mergePatch(JsonNode target, JsonNode patch) {
-    if (!patch.isObject()) {
-      return patch.isMissingNode() ? target : patch;
-    }
-    ObjectNode result =
-        target.isObject() ? (ObjectNode) target.deepCopy() : JsonNodeFactory.instance.objectNode();
-    for (Map.Entry<String, JsonNode> member : patch.properties()) {
-      if (member.getValue().isNull()) {
-        result.remove(member.getKey());
-      } else {
-        result.set(member.getKey(), mergePatch(result.path(member.getKey()), member.getValue()));
-      }
-    }
-    return result;
+    return read(
+        JsonMergePatch.apply(
+            current == null ? JsonNodeFactory.instance.objectNode() : toMaskedTree(current),
+            patch));
   }
 
   /**
