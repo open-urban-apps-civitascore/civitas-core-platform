@@ -38,6 +38,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
@@ -427,12 +428,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       HttpStatusCode status,
       WebRequest request) {
     log.warn("Malformed request body: {}", Encode.forJava(ex.getMessage()));
-    String detail =
-        invalidConnectorIn(ex)
-            .map(InvalidConnectorException::getMessage)
-            .orElse("Request body is missing or malformed");
+    Optional<InvalidConnectorException> invalidConnector = invalidConnectorIn(ex);
+    if (invalidConnector.isPresent() && request instanceof ServletWebRequest servletRequest) {
+      return ResponseEntity.badRequest()
+          .body(handleInvalidConnector(invalidConnector.get(), servletRequest.getRequest()));
+    }
     ProblemDetail problemDetail =
-        createProblemDetail(HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", detail);
+        createProblemDetail(
+            HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", "Request body is missing or malformed");
     return ResponseEntity.badRequest().body(problemDetail);
   }
 

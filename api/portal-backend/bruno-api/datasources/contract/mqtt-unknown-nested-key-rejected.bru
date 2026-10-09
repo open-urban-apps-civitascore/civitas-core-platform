@@ -34,6 +34,7 @@ tests {
     expect(res.body.type).to.equal("urn:civitas:error:MALFORMED_REQUEST");
     expect(res.body.title).to.equal("Bad Request");
     expect(res.body.status).to.equal(400);
+    expect(res.body.instance).to.match(/\/datasources$/);
     expect(res.body.detail).to.equal("Unknown key: connector.tls.verify");
   });
 }

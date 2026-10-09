@@ -411,6 +411,7 @@ class DataSourceControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
       assertThat(response.getBody().getType()).hasToString("urn:civitas:error:MALFORMED_REQUEST");
       assertThat(response.getBody().getDetail()).isEqualTo(detail);
+      assertThat(response.getBody().getInstance()).asString().contains(DATASOURCES_ENDPOINT);
     }
 
     @Test
