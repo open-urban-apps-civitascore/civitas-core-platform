@@ -96,7 +96,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   public ProblemDetail handleInvalidConnector(
       InvalidConnectorException ex, HttpServletRequest request) {
     log.warn("Invalid connector: {}", Encode.forJava(ex.getMessage()));
-    // TR-03187 W-18/W-19: the detail names only a key path or the connectorType the client sent.
     return createProblemDetail(
         HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", ex.getMessage(), request);
   }

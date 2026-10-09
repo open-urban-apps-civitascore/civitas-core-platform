@@ -170,15 +170,7 @@ public class DataSourceService
     return input;
   }
 
-  /**
-   * The connector after a JSON merge patch of the stored connector.
-   *
-   * @param existing the data source before the patch
-   * @param connectorPatch the {@code connector} member of the patch, or a missing node
-   * @return the patched connector, or null if the data source has none afterwards
-   * @throws de.civitascore.portal.model.connector.InvalidConnectorException if the patched
-   *     connector cannot be read
-   */
+  /** {@link DataSourceConnectorStore#patch}, in the transaction of this service. */
   public ConnectorConfiguration patchConnector(DataSource existing, JsonNode connectorPatch) {
     return connectorStore.patch(existing, connectorPatch);
   }
