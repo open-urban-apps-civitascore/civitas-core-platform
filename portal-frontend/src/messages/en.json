@@ -1382,8 +1382,8 @@
       "end": "End",
       "dataSource": "Data source",
       "cronTrigger": "Scheduled Trigger",
-      "frostStorage": "Sensor Data Storage",
-      "geoPersistence": "Geospatial Data Storage",
+      "frostStorage": "Sensor Data storage",
+      "geoPersistence": "Geospatial Data storage",
       "mapping": "Mapping"
     },
     "palette": {
@@ -1405,9 +1405,9 @@
       "dataSourceDesc": "Select Data source.",
       "cron": "Scheduled Trigger",
       "cronDesc": "Run pipeline on schedule",
-      "frostServer": "Sensor Data Storage",
+      "frostServer": "Sensor Data storage",
       "frostServerDesc": "For SensorThings API",
-      "geoPersistence": "Geospatial Data Storage",
+      "geoPersistence": "Geospatial Data storage",
       "geoPersistenceDesc": "For WFS/WMS API",
       "mapping": "Mapping",
       "mappingDesc": "Map Data structures"
@@ -1441,13 +1441,19 @@
       "dataStructureVersion": "Data structure version",
       "dataStructureVersionStatus": "Data structure version status",
       "tags": "Tags",
+      "showDataSource": "Show Data source",
       "showDataStructure": "Show Data structure",
       "noPermission": "No permission to read Data sources",
       "anonymousName": "Anonymous Data source",
       "apiCall": "API call",
       "apiCallPlaceholder": "Select an API call...",
       "noApiCalls": "No API calls",
-      "apiCallNotFound": "This API call does not exist in the Data source. Select another API call."
+      "apiCallNotFound": "This API call does not exist in the Data source. Select another API call.",
+      "selectDialog": {
+        "title": "Select Data source",
+        "description": "Select the Data source this Pipeline reads from.",
+        "confirm": "Select"
+      }
     },
     "sink": {
       "locked": {
@@ -1513,7 +1519,7 @@
       "reference": "Reference"
     },
     "geoPersistencePanel": {
-      "title": "Geospatial Data Storage",
+      "title": "Geospatial Data storage",
       "tableName": "Table Name",
       "tableNamePlaceholder": "Enter table name...",
       "tableNameInvalid": "Only letters (a–z, A–Z), digits and underscores are allowed. The first character must be a letter or an underscore.",
@@ -1546,9 +1552,7 @@
       "outputStatus": "Output Data structure status"
     },
     "entitySelector": {
-      "selectEntity": "Select an entity...",
-      "errorLoading": "Error loading entities",
-      "clearSelection": "Clear selection"
+      "errorLoading": "Error loading entities"
     },
     "validation": {
       "results": "Validation Results",

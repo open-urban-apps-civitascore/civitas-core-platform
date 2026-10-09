@@ -215,12 +215,12 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
     inspectorKey: 'frostStorage',
     handles: { left: true, right: true },
     createDefaultData: (): FrostNodeData => ({
-      label: 'Sensor Data Storage',
+      label: 'Sensor Data storage',
       // A new sink carries no port, so it is not configured. The platform must not decide what a
       // Pipeline writes, and an unconfigured node is what stops the Dataset from publishing.
       configured: false,
       entityType: ENTITY_TYPES.Frost,
-      serverName: 'Sensor Data Storage',
+      serverName: 'Sensor Data storage',
       serverUrl: '',
       version: '1.1',
     }),
@@ -239,7 +239,7 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
     inspectorKey: 'geoPersistence',
     handles: { left: true, right: true },
     createDefaultData: (): GeoPersistenceNodeData => ({
-      label: 'Geospatial Data Storage',
+      label: 'Geospatial Data storage',
       configured: false,
       entityType: ENTITY_TYPES.Persistence,
       tableName: '',

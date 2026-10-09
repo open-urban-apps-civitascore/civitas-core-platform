@@ -1036,6 +1036,21 @@ describe('validateCronAndMappingWired', () => {
     )
     expect(validatePipeline(pipeline).errors.some(error => error.messageKey === NOT_WIRED_KEY)).toBe(false)
   })
+
+  it('names the node with the name from the context', () => {
+    const pipeline = wire(
+      [
+        { id: 's', type: 'start', data: {} },
+        { id: 'c', type: 'cron', data: { label: 'Scheduled Trigger' } },
+      ],
+      [{ id: 'e1', source: 's', target: 'c' }],
+    )
+    const context: PipelineValidationContext = { nodeName: node => `name of ${node.id}` }
+
+    const error = validatePipeline(pipeline, context).errors.find(issue => issue.messageKey === NOT_WIRED_KEY)
+
+    expect(error?.messageParams).toEqual({ label: 'name of c' })
+  })
 })
 
 describe('validateUniqueGeoPersistenceTableNames', () => {

@@ -146,6 +146,8 @@ export interface PipelineValidationContext {
   tableNameOwners?: TableNameOwners
   /** API call names of each HTTP data source, by data source id. A missing entry is not checked. */
   apiCallNamesByDatasourceId?: ReadonlyMap<string, readonly string[]>
+  /** Name of a node as the UI shows it, in the UI language. */
+  nodeName?: (node: PipelineNode) => string
 }
 
 /**
@@ -235,14 +237,14 @@ const validateNodeConfiguration: ValidationRule = {
   id: 'node-configuration',
   name: 'Node Configuration',
   description: 'All entity-referencing nodes must be configured',
-  validate: (pipeline: Pipeline) => {
+  validate: (pipeline: Pipeline, context: PipelineValidationContext) => {
     const errors: PipelineValidationError[] = []
 
     const entityNodeTypes = ['dataSource', 'frost', 'cron', 'mapping', 'geoPersistence']
 
     pipeline.nodes.forEach(node => {
       if (entityNodeTypes.includes(node.type) && !node.data.configured) {
-        const label = node.data.label || node.type
+        const label = nodeLabel(node, context)
         errors.push({
           id: crypto.randomUUID(),
           type: 'node',
@@ -265,14 +267,14 @@ const validateCronExpression: ValidationRule = {
   id: 'cron-expression-valid',
   name: 'Valid Cron Expression',
   description: 'CRON nodes must have a valid 6-field NiFi cron expression',
-  validate: (pipeline: Pipeline) => {
+  validate: (pipeline: Pipeline, context: PipelineValidationContext) => {
     const errors: PipelineValidationError[] = []
 
     pipeline.nodes.forEach(node => {
       if (node.type === PIPELINE_NODE_TYPES.Cron && isCronNodeData(node.data)) {
         const expression = node.data.cronExpression?.trim()
         if (expression && !isValidNifiCron(expression)) {
-          const label = node.data.label || 'Scheduled Trigger'
+          const label = nodeLabel(node, context)
           errors.push({
             id: crypto.randomUUID(),
             type: 'node',
@@ -324,7 +326,7 @@ const validateOrphanNodes: ValidationRule = {
   id: 'orphan-nodes',
   name: 'Orphan Nodes',
   description: 'All nodes must be connected to the pipeline flow',
-  validate: (pipeline: Pipeline) => {
+  validate: (pipeline: Pipeline, context: PipelineValidationContext) => {
     const errors: PipelineValidationError[] = []
 
     // Get all node IDs that have at least one connection
@@ -338,7 +340,7 @@ const validateOrphanNodes: ValidationRule = {
     if (pipeline.nodes.length > 1) {
       pipeline.nodes.forEach(node => {
         if (!connectedNodeIds.has(node.id)) {
-          const label = node.data.label || node.type
+          const label = nodeLabel(node, context)
           errors.push({
             id: crypto.randomUUID(),
             type: 'node',
@@ -417,13 +419,14 @@ const validateSqlSourceHasExplicitSchedule: ValidationRule = {
   },
 }
 
-const nodeLabel = (node: PipelineNode): string => node.data.label || node.type
+const nodeLabel = (node: PipelineNode, context: PipelineValidationContext): string =>
+  context.nodeName?.(node) ?? (node.data.label || node.type)
 
 const validateSourceHasRequiredSchedule: ValidationRule = {
   id: 'source-required-schedule',
   name: 'Source Required Schedule',
   description: 'A source that only runs on a schedule needs a CRON node wired to it',
-  validate: (pipeline: Pipeline) => {
+  validate: (pipeline: Pipeline, context: PipelineValidationContext) => {
     const errors: PipelineValidationError[] = []
     const cronNodes = pipeline.nodes.filter(node => node.type === PIPELINE_NODE_TYPES.Cron)
     const cronIds = new Set(cronNodes.map(node => node.id))
@@ -432,7 +435,8 @@ const validateSourceHasRequiredSchedule: ValidationRule = {
       const decl = flowDeclOf(node)
       if (decl?.role !== 'source' || !decl.requiresSchedule(node.data)) return
       const hasCron = pipeline.edges.some(edge => edge.target === node.id && cronIds.has(edge.source))
-      if (!hasCron) errors.push(errorAt(node, 'validation.messages.sourceRequiresCron', { label: nodeLabel(node) }))
+      if (!hasCron)
+        errors.push(errorAt(node, 'validation.messages.sourceRequiresCron', { label: nodeLabel(node, context) }))
     })
 
     return { errors, warnings: [] }
@@ -450,7 +454,7 @@ const validateHttpSourceApiCall: ValidationRule = {
       if (!isDataSourceNodeData(node.data)) return
       const { entityId, apiCallName, entityMetadata } = node.data
       if (entityMetadata?.connector !== CONNECTOR_TYPES.HTTP || !entityId) return
-      const label = nodeLabel(node)
+      const label = nodeLabel(node, context)
       if (!apiCallName) {
         errors.push(errorAt(node, 'validation.messages.apiCallMissing', { label }))
         return
@@ -551,7 +555,7 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
   id: 'frost-mapping-sta-group-coverage',
   name: 'FROST Mapping Covers STA Entities',
   description: 'The last mapping before a FROST sink must satisfy the FROST catalog rules',
-  validate: (pipeline: Pipeline) => {
+  validate: (pipeline: Pipeline, context: PipelineValidationContext) => {
     const errors: PipelineValidationError[] = []
     const warnings: PipelineValidationWarning[] = []
     const staMappingIds = lastMappingsBeforeFrostSinks(pipeline)
@@ -561,7 +565,7 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
       // a not-yet-configured node is reported by validateNodeConfiguration; avoid a double error
       if (!node.data.configured) return
       if (!staMappingIds.has(node.id)) return
-      const label = node.data.label || node.type
+      const label = nodeLabel(node, context)
 
       const keys = node.data.staMatchKeys
       if (node.data.targetRequiredFields === undefined || keys === undefined) {
@@ -764,7 +768,7 @@ const validateCronAndMappingWired: ValidationRule = {
   id: 'cron-mapping-wired',
   name: 'CRON and Mapping Nodes Wired',
   description: 'CRON and mapping nodes need both an incoming and an outgoing edge',
-  validate: (pipeline: Pipeline) => {
+  validate: (pipeline: Pipeline, context: PipelineValidationContext) => {
     const errors: PipelineValidationError[] = []
     const withIncoming = new Set(pipeline.edges.map(edge => edge.target))
     const withOutgoing = new Set(pipeline.edges.map(edge => edge.source))
@@ -772,7 +776,7 @@ const validateCronAndMappingWired: ValidationRule = {
     pipeline.nodes.forEach(node => {
       if (node.type !== PIPELINE_NODE_TYPES.Cron && node.type !== PIPELINE_NODE_TYPES.Mapping) return
       if (withIncoming.has(node.id) && withOutgoing.has(node.id)) return
-      errors.push(errorAt(node, 'validation.messages.nodeNotWired', { label: nodeLabel(node) }))
+      errors.push(errorAt(node, 'validation.messages.nodeNotWired', { label: nodeLabel(node, context) }))
     })
 
     return { errors, warnings: [] }
@@ -850,7 +854,7 @@ const validateEdgeCompatibility: ValidationRule = {
   id: 'edge-form-compatibility',
   name: 'Edge Payload-Form Compatibility',
   description: 'Every data edge must deliver a payload form its downstream node accepts',
-  validate: (pipeline: Pipeline) => {
+  validate: (pipeline: Pipeline, context: PipelineValidationContext) => {
     const errors: PipelineValidationError[] = []
     const nodesById = new Map(pipeline.nodes.map(node => [node.id, node]))
 
@@ -873,8 +877,8 @@ const validateEdgeCompatibility: ValidationRule = {
 
       errors.push(
         errorAt(downstream, 'validation.messages.edgeFormIncompatible', {
-          label: nodeLabel(downstream),
-          upstreamLabel: nodeLabel(upstream),
+          label: nodeLabel(downstream, context),
+          upstreamLabel: nodeLabel(upstream, context),
           form: offered,
           accepted: accepted.join(', '),
         }),
@@ -896,7 +900,7 @@ const validateFlowShape: ValidationRule = {
   id: 'flow-shape',
   name: 'Flow Shape',
   description: 'The graph must describe one linear source-to-sink data flow with a valid trigger binding',
-  validate: (pipeline: Pipeline) => {
+  validate: (pipeline: Pipeline, context: PipelineValidationContext) => {
     const errors: PipelineValidationError[] = []
     const warnings: PipelineValidationWarning[] = []
     const nodesById = new Map(pipeline.nodes.map(node => [node.id, node]))
@@ -908,7 +912,7 @@ const validateFlowShape: ValidationRule = {
       for (const node of [nodesById.get(edge.source), nodesById.get(edge.target)]) {
         if (!node || flowDeclOf(node) || flaggedUnknown.has(node.id)) continue
         flaggedUnknown.add(node.id)
-        errors.push(errorAt(node, 'validation.messages.unknownNodeInFlow', { label: nodeLabel(node) }))
+        errors.push(errorAt(node, 'validation.messages.unknownNodeInFlow', { label: nodeLabel(node, context) }))
       }
     })
 
@@ -917,10 +921,10 @@ const validateFlowShape: ValidationRule = {
     if (sources.length === 0) errors.push(structureError('validation.messages.sourceNodeRequired'))
     if (sinks.length === 0) errors.push(structureError('validation.messages.sinkNodeRequired'))
     sources.slice(1).forEach(node => {
-      errors.push(errorAt(node, 'validation.messages.multipleSourceNodes', { label: nodeLabel(node) }))
+      errors.push(errorAt(node, 'validation.messages.multipleSourceNodes', { label: nodeLabel(node, context) }))
     })
     sinks.slice(1).forEach(node => {
-      errors.push(errorAt(node, 'validation.messages.multipleSinkNodes', { label: nodeLabel(node) }))
+      errors.push(errorAt(node, 'validation.messages.multipleSinkNodes', { label: nodeLabel(node, context) }))
     })
     // Without the 1/1 anchor pair the path is undefined; the cardinality errors are the finding.
     if (sources.length !== 1 || sinks.length !== 1) return { errors, warnings }
@@ -929,10 +933,10 @@ const validateFlowShape: ValidationRule = {
 
     const { dataOut, dataIn } = dataFlowAdjacency(pipeline, nodesById)
     if ((dataIn.get(source.id) ?? []).length > 0) {
-      errors.push(errorAt(source, 'validation.messages.nodeUnsupportedPosition', { label: nodeLabel(source) }))
+      errors.push(errorAt(source, 'validation.messages.nodeUnsupportedPosition', { label: nodeLabel(source, context) }))
     }
     if ((dataOut.get(sink.id) ?? []).length > 0) {
-      errors.push(errorAt(sink, 'validation.messages.nodeUnsupportedPosition', { label: nodeLabel(sink) }))
+      errors.push(errorAt(sink, 'validation.messages.nodeUnsupportedPosition', { label: nodeLabel(sink, context) }))
     }
 
     // Walk the single data path source → … → sink.
@@ -950,12 +954,12 @@ const validateFlowShape: ValidationRule = {
         break
       }
       if (next.length > 1) {
-        errors.push(errorAt(current, 'validation.messages.flowBranches', { label: nodeLabel(current) }))
+        errors.push(errorAt(current, 'validation.messages.flowBranches', { label: nodeLabel(current, context) }))
         break
       }
       const step = next[0]
       if (onPath.has(step.id)) {
-        errors.push(errorAt(step, 'validation.messages.flowCycle', { label: nodeLabel(step) }))
+        errors.push(errorAt(step, 'validation.messages.flowCycle', { label: nodeLabel(step, context) }))
         break
       }
       onPath.add(step.id)
@@ -971,7 +975,7 @@ const validateFlowShape: ValidationRule = {
     if (isWalkComplete) {
       pipeline.nodes.forEach(node => {
         if (node.type !== PIPELINE_NODE_TYPES.Mapping || onPath.has(node.id) || !isWired(node.id)) return
-        errors.push(errorAt(node, 'validation.messages.mappingNotOnPath', { label: nodeLabel(node) }))
+        errors.push(errorAt(node, 'validation.messages.mappingNotOnPath', { label: nodeLabel(node, context) }))
       })
     }
 
@@ -981,14 +985,14 @@ const validateFlowShape: ValidationRule = {
     for (const cron of pipeline.nodes.filter(node => node.type === PIPELINE_NODE_TYPES.Cron)) {
       const outgoing = pipeline.edges.filter(edge => edge.source === cron.id)
       if (outgoing.some(edge => edge.target !== source.id)) {
-        errors.push(errorAt(cron, 'validation.messages.nodeUnsupportedPosition', { label: nodeLabel(cron) }))
+        errors.push(errorAt(cron, 'validation.messages.nodeUnsupportedPosition', { label: nodeLabel(cron, context) }))
         continue
       }
       // a cron without an outgoing edge is validateCronAndMappingWired's finding
       if (outgoing.length > 0) schedulingCrons.push(cron)
     }
     schedulingCrons.slice(1).forEach(cron => {
-      errors.push(errorAt(cron, 'validation.messages.cronTriggerCapacity', { label: nodeLabel(cron) }))
+      errors.push(errorAt(cron, 'validation.messages.cronTriggerCapacity', { label: nodeLabel(cron, context) }))
     })
     if (schedulingCrons.length > 0) {
       const sourceDecl = flowDeclOf(source)
@@ -1024,7 +1028,7 @@ const validateMappingChainStructure: ValidationRule = {
   id: 'mapping-chain-structure',
   name: 'Mapping Chain Structure',
   description: "Each mapping in a chain must read its predecessor's target datastructure",
-  validate: (pipeline: Pipeline) => {
+  validate: (pipeline: Pipeline, context: PipelineValidationContext) => {
     const errors: PipelineValidationError[] = []
     const nodesById = new Map(pipeline.nodes.map(node => [node.id, node]))
 
@@ -1042,8 +1046,8 @@ const validateMappingChainStructure: ValidationRule = {
 
       errors.push(
         errorAt(downstream, 'validation.messages.mappingChainStructureMismatch', {
-          label: nodeLabel(downstream),
-          upstreamLabel: nodeLabel(upstream),
+          label: nodeLabel(downstream, context),
+          upstreamLabel: nodeLabel(upstream, context),
         }),
       )
     })
@@ -1091,12 +1095,12 @@ const validateMappingDataShape: ValidationRule = {
   id: 'mapping-data-shape',
   name: 'Mapping Data Shape',
   description: 'A mapping node must carry mapping-shaped data',
-  validate: (pipeline: Pipeline) => {
+  validate: (pipeline: Pipeline, context: PipelineValidationContext) => {
     const errors: PipelineValidationError[] = []
 
     pipeline.nodes.forEach(node => {
       if (node.type !== PIPELINE_NODE_TYPES.Mapping || isMappingNodeData(node.data)) return
-      errors.push(errorAt(node, 'validation.messages.mappingDataCorrupt', { label: nodeLabel(node) }))
+      errors.push(errorAt(node, 'validation.messages.mappingDataCorrupt', { label: nodeLabel(node, context) }))
     })
 
     return { errors, warnings: [] }
@@ -1120,7 +1124,7 @@ const validateMappingCoversRequiredTargetFields: ValidationRule = {
   id: 'mapping-required-target-fields',
   name: 'Mapping Covers Required Target Fields',
   description: 'A mapping must assign every required target field',
-  validate: (pipeline: Pipeline) => {
+  validate: (pipeline: Pipeline, context: PipelineValidationContext) => {
     const errors: PipelineValidationError[] = []
     const staMappingIds = lastMappingsBeforeFrostSinks(pipeline)
 
@@ -1140,7 +1144,7 @@ const validateMappingCoversRequiredTargetFields: ValidationRule = {
           type: 'node',
           elementId: node.id,
           messageKey: 'validation.messages.mappingNotSaved',
-          messageParams: { label: node.data.label || node.type },
+          messageParams: { label: nodeLabel(node, context) },
           severity: 'error',
         })
         return
@@ -1163,7 +1167,7 @@ const validateMappingCoversRequiredTargetFields: ValidationRule = {
         type: 'node',
         elementId: node.id,
         messageKey: 'validation.messages.mappingRequiredFieldsMissing',
-        messageParams: { label: node.data.label || node.type, fields: missing.join(', ') },
+        messageParams: { label: nodeLabel(node, context), fields: missing.join(', ') },
         severity: 'error',
       })
     })

@@ -1132,6 +1132,18 @@ describe('PipelineEditorProviderComponent', () => {
         expect.objectContaining({ apiCallNamesByDatasourceId: new Map([['http-1', ['Test Call 1']]]) }),
       )
     })
+
+    it('passes node names in the UI language to the validation service', () => {
+      renderProviderWithSessions([sessionWithGeoNode('session-1', 'persist-1', 'roads')])
+
+      act(() => {
+        contextRef.current?.runValidation()
+      })
+
+      const [pipeline, context] = vi.mocked(validatePipelineWithNodeStatus).mock.lastCall ?? []
+      const geoNode = pipeline?.nodes.find(node => node.id === 'persist-1')
+      expect(geoNode && context?.nodeName?.(geoNode)).toBe('nodeTypes.geoPersistence')
+    })
   })
 
   describe('hideValidationPanel', () => {

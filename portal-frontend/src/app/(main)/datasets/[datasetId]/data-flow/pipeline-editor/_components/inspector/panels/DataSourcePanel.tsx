@@ -9,22 +9,23 @@
  */
 import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import { CONNECTOR_TYPES } from '@/const/connectors'
 import { useDatasetPermissionsById } from '@/hooks/use-dataset-permissions'
+import { cn } from '@/lib/utils'
+import type { Datasource } from '@/types/datasources'
 
 import { useDatastructureVersionInfo } from '../../../_hooks/use-datastructure-version-info'
 import { usePipelineDatasources } from '../../../_hooks/use-pipeline-datasources'
-import {
-  apiCallNamesOf,
-  apiCallsOf,
-  datasourceToSelectable,
-  type SelectableEntity,
-} from '../../../_services/entityService'
+import { apiCallNamesOf, apiCallsOf, type SelectableEntity } from '../../../_services/entityService'
 import type { DataSourceNodeData } from '../../../_types/nodes'
+import { DataSourceSelectModal } from '../components/DataSourceSelectModal'
 import { EntityMetadata } from '../components/EntityMetadata'
 import { EntitySelector } from '../components/EntitySelector'
+
 interface DataSourcePanelProps {
   data: DataSourceNodeData
   onUpdate: (data: Partial<DataSourceNodeData>) => void
@@ -33,8 +34,10 @@ interface DataSourcePanelProps {
 
 export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate, isLocked }) => {
   const t = useTranslations('pipelineEditor')
+  const tCommon = useTranslations('common')
   const tStatus = useTranslations('common.status')
   const { entities, isLoading, isError, canReadDatasources, getEntityById, getName } = usePipelineDatasources()
+  const [isSelectModalOpen, setIsSelectModalOpen] = useState(false)
 
   const { datasetId } = useParams<{ datasetId: string }>()
   const { canReadDatastructures } = useDatasetPermissionsById(datasetId)
@@ -45,17 +48,18 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
     dataStructureVersion ? `${dataStructureVersion.dataStructureId}/${dataStructureVersion.id}` : undefined,
   )
 
-  const handleEntityChange = (entity: { id: string; name: string } | undefined) => {
+  const handleSelect = (entity: Datasource | undefined) => {
+    setIsSelectModalOpen(false)
     if (entity) {
-      const fullEntity = getEntityById(entity.id)
-      const apiCallNames = fullEntity ? apiCallNamesOf(fullEntity) : []
+      const apiCallNames = apiCallNamesOf(entity)
       onUpdate({
         entityId: entity.id,
         entityName: entity.name,
-        configurationUrn: fullEntity?.configurationUrn ?? undefined,
+        // The CORE configurationUrn is emitted as the CORE pipeline node's `sourceRef`; round-trips via `styles`.
+        configurationUrn: entity.configurationUrn ?? undefined,
         apiCallName: apiCallNames.length === 1 ? apiCallNames[0] : undefined,
         configured: true,
-        entityMetadata: fullEntity?.connector ? { connector: fullEntity.connector.connectorType } : undefined,
+        entityMetadata: entity.connector ? { connector: entity.connector.connectorType } : undefined,
       })
     } else {
       onUpdate({
@@ -69,7 +73,12 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
     }
   }
 
-  const selectableEntities = entities.map(datasourceToSelectable)
+  const selectionText = () => {
+    if (!canReadDatasources) return t('dataSourcePanel.noPermission')
+    if (isLoading) return tCommon('loading')
+    if (isError) return t('entitySelector.errorLoading')
+    return getName(data.entityId) ?? t('dataSourcePanel.placeholder')
+  }
 
   const isHttpSource = selectedEntity?.connector?.connectorType === CONNECTOR_TYPES.HTTP
   const apiCalls = selectedEntity ? apiCallsOf(selectedEntity) : []
@@ -91,17 +100,19 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
 
   return (
     <div className="space-y-4 p-4">
-      <EntitySelector
-        label={t('dataSourcePanel.label')}
-        placeholder={canReadDatasources ? t('dataSourcePanel.placeholder') : t('dataSourcePanel.noPermission')}
-        entities={selectableEntities}
-        selectedId={data.entityId}
-        isLoading={isLoading}
-        isError={isError}
-        onChange={handleEntityChange}
-        fallbackName={getName(data.entityId)}
-        isDisabled={isLocked}
-      />
+      <div className="space-y-2">
+        <Label htmlFor="dataSourceSelection">{t('dataSourcePanel.label')}</Label>
+        <Button
+          id="dataSourceSelection"
+          variant="outline"
+          size="sm"
+          className={cn('w-full justify-start', isError && 'border-destructive text-destructive')}
+          disabled={isLocked || !canReadDatasources || isLoading || isError}
+          onClick={() => setIsSelectModalOpen(true)}
+        >
+          <span className="truncate">{selectionText()}</span>
+        </Button>
+      </div>
 
       {isHttpSource && (
         <EntitySelector
@@ -136,21 +147,41 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
               },
             ]}
           />
-          {canReadDatastructures && dataStructureVersion && (
+          <div className="flex flex-wrap gap-4">
             <Button
               variant="outline"
               size="sm"
-              onClick={() =>
-                window.open(
-                  `/datastructures/${dataStructureVersion.dataStructureId}/${dataStructureVersion.id}`,
-                  '_blank',
-                )
-              }
+              onClick={() => window.open(`/datasources/${selectedEntity.id}`, '_blank')}
             >
-              {t('dataSourcePanel.showDataStructure')}
+              {t('dataSourcePanel.showDataSource')}
             </Button>
-          )}
+            {canReadDatastructures && dataStructureVersion && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  window.open(
+                    `/datastructures/${dataStructureVersion.dataStructureId}/${dataStructureVersion.id}`,
+                    '_blank',
+                  )
+                }
+              >
+                {t('dataSourcePanel.showDataStructure')}
+              </Button>
+            )}
+          </div>
         </>
+      )}
+
+      {canReadDatasources && (
+        <DataSourceSelectModal
+          isOpen={isSelectModalOpen}
+          onOpenChange={setIsSelectModalOpen}
+          datasources={entities}
+          isLoading={isLoading}
+          selectedId={data.entityId}
+          onSelect={handleSelect}
+        />
       )}
     </div>
   )

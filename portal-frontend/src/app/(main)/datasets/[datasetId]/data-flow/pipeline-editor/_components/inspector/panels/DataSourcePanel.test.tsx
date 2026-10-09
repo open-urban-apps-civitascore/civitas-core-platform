@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import type { Datasource } from '@/types/datasources'
@@ -49,11 +49,12 @@ const datasource = (
   name: string,
   connector: Record<string, unknown>,
   dataStructureVersion: Record<string, unknown> | null = null,
+  description: string | null = null,
 ): Datasource =>
   ({
     id,
     name,
-    description: null,
+    description,
     dataSourceStatus: 'AVAILABLE',
     connector,
     configurationUrn: `urn:test:${id}`,
@@ -70,7 +71,7 @@ const HTTP_TWO_CALLS = datasource('http-2', 'Test HTTP Source 2', {
   connectorType: 'HTTP',
   apiCalls: [apiCall('Test Call 1'), apiCall('Test Call 2')],
 })
-const SQL_SOURCE = datasource('sql-1', 'Test SQL Source', { connectorType: 'SQL' })
+const SQL_SOURCE = datasource('sql-1', 'Test SQL Source', { connectorType: 'SQL' }, null, 'Weather station')
 const MQTT_SOURCE = datasource(
   'mqtt-1',
   'Test MQTT Source',
@@ -96,8 +97,15 @@ const selectedNode = (entity: Datasource): Partial<DataSourceNodeData> => ({
   entityMetadata: { connector: String(entity.connector?.connectorType) },
 })
 
-const chooseOption = async (comboboxIndex: number, optionName: string | RegExp) => {
-  await userEvent.click(screen.getAllByRole('combobox')[comboboxIndex])
+const toggleInDialog = async (datasourceName: string) => {
+  await userEvent.click(screen.getByLabelText('dataSourcePanel.label'))
+  const dialog = await screen.findByRole('dialog')
+  await userEvent.click(within(dialog).getByRole('checkbox', { name: datasourceName }))
+  await userEvent.click(within(dialog).getByRole('button', { name: 'confirm' }))
+}
+
+const chooseApiCall = async (optionName: string | RegExp) => {
+  await userEvent.click(screen.getByRole('combobox'))
   await userEvent.click(screen.getByRole('option', { name: optionName }))
 }
 
@@ -114,7 +122,7 @@ describe('DataSourcePanel', () => {
   it('sets the only API call when an HTTP data source with one API call is selected', async () => {
     const onUpdate = renderPanel()
 
-    await chooseOption(0, 'Test HTTP Source 1')
+    await toggleInDialog('Test HTTP Source 1')
 
     expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ entityId: 'http-1', apiCallName: 'Test Call 1' }))
   })
@@ -122,7 +130,7 @@ describe('DataSourcePanel', () => {
   it('sets no API call when an HTTP data source with two API calls is selected', async () => {
     const onUpdate = renderPanel()
 
-    await chooseOption(0, 'Test HTTP Source 2')
+    await toggleInDialog('Test HTTP Source 2')
 
     expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ entityId: 'http-2', apiCallName: undefined }))
   })
@@ -130,7 +138,7 @@ describe('DataSourcePanel', () => {
   it('sets the API call chosen in the API call select', async () => {
     const onUpdate = renderPanel(selectedNode(HTTP_TWO_CALLS))
 
-    await chooseOption(1, /Test Call 2/)
+    await chooseApiCall(/Test Call 2/)
 
     expect(onUpdate).toHaveBeenCalledWith({ apiCallName: 'Test Call 2' })
   })
@@ -138,7 +146,7 @@ describe('DataSourcePanel', () => {
   it('shows the method before each API call name', async () => {
     renderPanel(selectedNode(HTTP_TWO_CALLS))
 
-    await userEvent.click(screen.getAllByRole('combobox')[1])
+    await userEvent.click(screen.getByRole('combobox'))
 
     expect(screen.getByRole('option', { name: 'GET Test Call 1' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'GET Test Call 2' })).toBeInTheDocument()
@@ -152,7 +160,7 @@ describe('DataSourcePanel', () => {
     mockUseGetDatasources.mockReturnValue({ data: { data: [httpNoMethod] }, isLoading: false, isError: false })
     renderPanel(selectedNode(httpNoMethod))
 
-    await userEvent.click(screen.getAllByRole('combobox')[1])
+    await userEvent.click(screen.getByRole('combobox'))
 
     expect(screen.getByRole('option', { name: 'Test Call 1' })).toBeInTheDocument()
   })
@@ -160,14 +168,14 @@ describe('DataSourcePanel', () => {
   it('shows no API call select for a SQL data source', () => {
     renderPanel(selectedNode(SQL_SOURCE))
 
-    expect(screen.getAllByRole('combobox')).toHaveLength(1)
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     expect(screen.queryByText('dataSourcePanel.apiCall')).not.toBeInTheDocument()
   })
 
   it('clears the API call when the data source is cleared', async () => {
     const onUpdate = renderPanel({ ...selectedNode(HTTP_ONE_CALL), apiCallName: 'Test Call 1' })
 
-    await chooseOption(0, 'entitySelector.clearSelection')
+    await toggleInDialog('Test HTTP Source 1')
 
     expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ entityId: undefined, apiCallName: undefined }))
   })
@@ -175,21 +183,21 @@ describe('DataSourcePanel', () => {
   it('shows the stored API call name when the data source no longer has it', () => {
     renderPanel({ ...selectedNode(HTTP_ONE_CALL), apiCallName: 'Test Old Call' })
 
-    expect(screen.getAllByRole('combobox')[1]).toHaveTextContent('Test Old Call')
-    expect(screen.getAllByRole('combobox')[1]).not.toHaveTextContent('GET')
+    expect(screen.getByRole('combobox')).toHaveTextContent('Test Old Call')
+    expect(screen.getByRole('combobox')).not.toHaveTextContent('GET')
   })
 
   it('marks the API call select as invalid when the data source no longer has the stored name', () => {
     renderPanel({ ...selectedNode(HTTP_ONE_CALL), apiCallName: 'Test Old Call' })
 
-    expect(screen.getAllByRole('combobox')[1]).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByRole('combobox')).toHaveAttribute('aria-invalid', 'true')
     expect(screen.getByText('dataSourcePanel.apiCallNotFound')).toBeInTheDocument()
   })
 
   it('shows the stored API call name in grey when the data source no longer has it', async () => {
     renderPanel({ ...selectedNode(HTTP_ONE_CALL), apiCallName: 'Test Old Call' })
 
-    await userEvent.click(screen.getAllByRole('combobox')[1])
+    await userEvent.click(screen.getByRole('combobox'))
 
     const option = screen.getByRole('option', { name: 'Test Old Call' })
     expect(within(option).getByText('Test Old Call')).toHaveClass('text-muted-foreground')
@@ -200,14 +208,14 @@ describe('DataSourcePanel', () => {
   it('does not mark an API call that the data source has', () => {
     renderPanel({ ...selectedNode(HTTP_ONE_CALL), apiCallName: 'Test Call 1' })
 
-    expect(screen.getAllByRole('combobox')[1]).toHaveAttribute('aria-invalid', 'false')
+    expect(screen.getByRole('combobox')).toHaveAttribute('aria-invalid', 'false')
     expect(screen.queryByText('dataSourcePanel.apiCallNotFound')).not.toBeInTheDocument()
   })
 
   it('does not mark a missing API call', () => {
     renderPanel(selectedNode(HTTP_TWO_CALLS))
 
-    expect(screen.getAllByRole('combobox')[1]).toHaveAttribute('aria-invalid', 'false')
+    expect(screen.getByRole('combobox')).toHaveAttribute('aria-invalid', 'false')
     expect(screen.queryByText('dataSourcePanel.apiCallNotFound')).not.toBeInTheDocument()
   })
 
@@ -217,7 +225,7 @@ describe('DataSourcePanel', () => {
 
     renderPanel(selectedNode(httpNoCalls))
 
-    expect(screen.getAllByRole('combobox')[1]).toHaveTextContent('dataSourcePanel.noApiCalls')
+    expect(screen.getByRole('combobox')).toHaveTextContent('dataSourcePanel.noApiCalls')
   })
 
   it('shows the Data structure, its version and status in the details', () => {
@@ -238,10 +246,71 @@ describe('DataSourcePanel', () => {
     open.mockRestore()
   })
 
-  it('disables the Data source selection but keeps Show Data structure in a locked panel', () => {
+  it('opens the selected Data source', async () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    renderPanel(selectedNode(MQTT_SOURCE))
+
+    await userEvent.click(screen.getByRole('button', { name: 'dataSourcePanel.showDataSource' }))
+
+    expect(open).toHaveBeenCalledWith('/datasources/mqtt-1', '_blank')
+    open.mockRestore()
+  })
+
+  it('disables the Data source selection but keeps both Show buttons in a locked panel', () => {
     renderPanel(selectedNode(MQTT_SOURCE), vi.fn(), true)
 
-    expect(screen.getByRole('combobox')).toBeDisabled()
+    expect(screen.getByLabelText('dataSourcePanel.label')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'dataSourcePanel.showDataSource' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'dataSourcePanel.showDataStructure' })).toBeEnabled()
+  })
+})
+
+describe('Data source selection dialog', () => {
+  it('shows the selected Data source and opens the dialog with all Data sources', async () => {
+    renderPanel(selectedNode(MQTT_SOURCE))
+
+    const selection = screen.getByLabelText('dataSourcePanel.label')
+    expect(selection).toHaveTextContent('Test MQTT Source')
+
+    await userEvent.click(selection)
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Test SQL Source')).toBeInTheDocument()
+    expect(within(dialog).getByRole('checkbox', { name: 'Test MQTT Source' })).toBeChecked()
+  })
+
+  it('selects another Data source', async () => {
+    const onUpdate = renderPanel(selectedNode(MQTT_SOURCE))
+
+    await toggleInDialog('Test SQL Source')
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      entityId: 'sql-1',
+      entityName: 'Test SQL Source',
+      configurationUrn: 'urn:test:sql-1',
+      apiCallName: undefined,
+      configured: true,
+      entityMetadata: { connector: 'SQL' },
+    })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('clears the selection when the selected Data source is unchecked', async () => {
+    const onUpdate = renderPanel(selectedNode(MQTT_SOURCE))
+
+    await toggleInDialog('Test MQTT Source')
+
+    expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ entityId: undefined, configured: false }))
+  })
+
+  it('filters the Data sources by the search text', async () => {
+    renderPanel(selectedNode(MQTT_SOURCE))
+
+    await userEvent.click(screen.getByLabelText('dataSourcePanel.label'))
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.type(within(dialog).getByRole('searchbox'), 'weather')
+
+    await waitFor(() => expect(within(dialog).queryByText('Test MQTT Source')).not.toBeInTheDocument())
+    expect(within(dialog).getByText('Test SQL Source')).toBeInTheDocument()
   })
 })

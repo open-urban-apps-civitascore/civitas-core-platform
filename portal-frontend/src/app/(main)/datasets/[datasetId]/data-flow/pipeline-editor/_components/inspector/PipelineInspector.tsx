@@ -16,9 +16,10 @@ import { useCallback } from 'react'
 
 import { InspectorShell } from '@/components/node-editor/inspector/InspectorShell'
 
-import { getNodeDef, getNodeDefForData } from '../../_config/nodeRegistry'
+import { getNodeDefForData } from '../../_config/nodeRegistry'
 import { LAYOUT_DIMENSIONS } from '../../_constants/pipelineStyles'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
+import { useNodeName } from '../../_hooks/use-node-name'
 import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
 import type { PipelineNodeData } from '../../_types/nodes'
 import { InspectorHeader } from './components/InspectorHeader'
@@ -39,6 +40,7 @@ interface PipelineInspectorProps {
 
 export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className = '' }) => {
   const t = useTranslations('pipelineEditor')
+  const nodeNameOf = useNodeName()
   const {
     pipeline,
     selectedNode,
@@ -67,9 +69,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
   const nodeName = (nodeId: string): string => {
     const node = pipeline?.nodes.find(candidate => candidate.id === nodeId)
     if (!node) return nodeId
-    const def = getNodeDef(node.type)
-    if (def && !def.hasEditableLabel) return t(`nodeTypes.${def.inspectorKey}`)
-    return node.data.label || node.type
+    return nodeNameOf(node)
   }
 
   // Render the appropriate panel by looking up the node's registry definition.

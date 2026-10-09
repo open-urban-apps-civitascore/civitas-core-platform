@@ -1428,13 +1428,19 @@
       "dataStructureVersion": "Datenstruktur-Version",
       "dataStructureVersionStatus": "Status der Datenstruktur-Version",
       "tags": "Tags",
+      "showDataSource": "Datenquelle anzeigen",
       "showDataStructure": "Datenstruktur anzeigen",
       "noPermission": "Keine Berechtigung zum Lesen von Datenquellen",
       "anonymousName": "Anonyme Datenquelle",
       "apiCall": "API-Aufruf",
       "apiCallPlaceholder": "API-Aufruf auswählen...",
       "noApiCalls": "Keine API-Aufrufe",
-      "apiCallNotFound": "Dieser API-Aufruf existiert nicht in der Datenquelle. Bitte einen anderen API-Aufruf wählen."
+      "apiCallNotFound": "Dieser API-Aufruf existiert nicht in der Datenquelle. Bitte einen anderen API-Aufruf wählen.",
+      "selectDialog": {
+        "title": "Datenquelle auswählen",
+        "description": "Wählen Sie die Datenquelle, aus der diese Pipeline liest.",
+        "confirm": "Auswählen"
+      }
     },
     "sink": {
       "locked": {
@@ -1533,9 +1539,7 @@
       "outputStatus": "Status Ausgangs-Datenstruktur"
     },
     "entitySelector": {
-      "selectEntity": "Entität auswählen...",
-      "errorLoading": "Fehler beim Laden der Entitäten",
-      "clearSelection": "Auswahl aufheben"
+      "errorLoading": "Fehler beim Laden der Entitäten"
     },
     "validation": {
       "results": "Validierungsergebnisse",
