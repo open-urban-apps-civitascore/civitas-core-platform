@@ -1,5 +1,6 @@
 package de.civitascore.portal.controller;
 
+import de.civitascore.portal.model.connector.ConnectorJson;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
@@ -42,8 +43,6 @@ public class DataSourceController
         DataSourceOutputDTO,
         DataSource,
         DataSourceSpec> {
-
-  private static final String CONNECTOR = "connector";
 
   private final DataSourceService dataSourceService;
   private final DataSourceAssembler dataSourceAssembler;
@@ -153,9 +152,11 @@ public class DataSourceController
   protected DataSourceInputDTO patchInput(
       DataSourceInputDTO currentDto, DataSource entity, JsonNode updates) throws IOException {
     JsonNode otherMembers =
-        updates instanceof ObjectNode object ? object.deepCopy().without(CONNECTOR) : updates;
+        updates instanceof ObjectNode object
+            ? object.deepCopy().without(ConnectorJson.ROOT)
+            : updates;
     DataSourceInputDTO patchedDto = super.patchInput(currentDto, entity, otherMembers);
-    patchedDto.setConnector(getService().patchConnector(entity, updates.path(CONNECTOR)));
+    patchedDto.setConnector(getService().patchConnector(entity, updates.path(ConnectorJson.ROOT)));
     return patchedDto;
   }
 }

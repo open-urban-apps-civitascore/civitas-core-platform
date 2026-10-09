@@ -37,6 +37,8 @@ import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
+import de.civitascore.portal.service.connector.ConnectorValidator;
+import de.civitascore.portal.service.connector.ConnectorViolation;
 import de.civitascore.portal.service.connector.DataSourceConnectorStore;
 import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.ConnectorValidationException;
@@ -44,8 +46,6 @@ import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -71,7 +71,7 @@ class DataSourceServiceTest {
 
   @Mock private DataSourceRepository dataSourceRepository;
   @Mock private DataSourceMapper dataSourceMapper;
-  @Spy private Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+  @Spy private ConnectorValidator connectorValidator = new ConnectorValidator(List.of());
 
   @Mock private AssignmentService assignmentService;
   @Mock private DataStructureVersionService dataStructureVersionService;
@@ -303,10 +303,10 @@ class DataSourceServiceTest {
 
       assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(ConnectorValidationException.class)
-          .extracting(e -> ((ConnectorValidationException) e).getFieldErrors())
+          .extracting(e -> ((ConnectorValidationException) e).getViolations())
           .isEqualTo(
               List.of(
-                  new ConnectorValidationException.FieldError(
+                  new ConnectorViolation(
                       "connector.urls", "'urls' is required and must be a non-empty list")));
     }
 
@@ -328,11 +328,8 @@ class DataSourceServiceTest {
 
       assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(ConnectorValidationException.class)
-          .extracting(e -> ((ConnectorValidationException) e).getFieldErrors())
-          .isEqualTo(
-              List.of(
-                  new ConnectorValidationException.FieldError(
-                      "connector.qos", "'qos' must be 0, 1, or 2")));
+          .extracting(e -> ((ConnectorValidationException) e).getViolations())
+          .isEqualTo(List.of(new ConnectorViolation("connector.qos", "'qos' must be 0, 1, or 2")));
     }
 
     @Test
@@ -352,10 +349,10 @@ class DataSourceServiceTest {
 
       assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(ConnectorValidationException.class)
-          .extracting(e -> ((ConnectorValidationException) e).getFieldErrors())
+          .extracting(e -> ((ConnectorValidationException) e).getViolations())
           .isEqualTo(
               List.of(
-                  new ConnectorValidationException.FieldError(
+                  new ConnectorViolation(
                       "connector.driver", "'driver' is required and must not be blank")));
     }
 

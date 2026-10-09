@@ -37,8 +37,8 @@ It holds `connectorType` (`MQTT` or `SQL`) and the fields of that type:
 | Unknown `connectorType` | 400 `MALFORMED_REQUEST` | `detail`: `Unknown connectorType: <value>` |
 | `connectorType` missing | 400 `MALFORMED_REQUEST` | `detail`: `Missing connector.connectorType` |
 | Wrong value type, invalid URL or DSN | 400 `MALFORMED_REQUEST` | `detail`: `Invalid value: connector.<path>` |
-| Value out of range on POST/PUT | 400 `VALIDATION_FAILED` | `fieldErrors[].field`: `connector.<key>` |
-| Release with missing required fields | 400 `VALIDATION_FAILED` | `fieldErrors[].field`: `connector.<key>` |
+| Value out of range on POST/PUT/PATCH | 400 `VALIDATION_FAILED` | `fieldErrors[].field`: `connector.<path>` |
+| Release with missing required fields | 400 `VALIDATION_FAILED` | `fieldErrors[].field`: `connector.<path>` |
 | Release without a stored connector | 400 `INVALID_INPUT` | `detail`: `Configuration is required for releasing` |
 
 A `detail` never echoes a value, because a value can carry a credential.

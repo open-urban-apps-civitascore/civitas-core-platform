@@ -105,14 +105,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ProblemDetail handleConnectorValidation(
       ConnectorValidationException ex, HttpServletRequest request) {
-    log.warn("Connector validation failed: {} field error(s)", ex.getFieldErrors().size());
+    log.warn("Connector validation failed: {} field error(s)", ex.getViolations().size());
     ProblemDetail problemDetail =
         createProblemDetail(
             HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Input validation failed", request);
     problemDetail.setProperty(
         "fieldErrors",
-        ex.getFieldErrors().stream()
-            .map(error -> Map.of("field", error.field(), "message", error.message()))
+        ex.getViolations().stream()
+            .map(violation -> Map.of("field", violation.path(), "message", violation.message()))
             .toList());
     return problemDetail;
   }

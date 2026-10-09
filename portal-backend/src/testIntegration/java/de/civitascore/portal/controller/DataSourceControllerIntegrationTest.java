@@ -402,6 +402,26 @@ class DataSourceControllerIntegrationTest
           .isEqualTo(
               List.of(Map.of("field", "connector.qos", "message", "'qos' must be 0, 1, or 2")));
     }
+
+    @Test
+    void patch_withInvalidValue_returnsFieldErrorNamingTheRequestKey() {
+      UUID id = createWithConnector(mqttConnector());
+
+      ResponseEntity<ProblemDetail> response =
+          writeExpectingProblem(
+              HttpMethod.PATCH, "/" + id, Map.of("connector", Map.of("protocol_version", "4")));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:VALIDATION_FAILED");
+      assertThat(response.getBody().getProperties().get("fieldErrors"))
+          .isEqualTo(
+              List.of(
+                  Map.of(
+                      "field",
+                      "connector.protocol_version",
+                      "message",
+                      "'protocol_version' must be 3 or 5")));
+    }
   }
 
   @Nested

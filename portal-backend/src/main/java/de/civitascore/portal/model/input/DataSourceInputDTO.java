@@ -3,7 +3,6 @@ package de.civitascore.portal.model.input;
 import de.civitascore.portal.model.connector.ConnectorConfiguration;
 import de.civitascore.portal.model.connector.ConnectorJson;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -15,7 +14,7 @@ import tools.jackson.databind.annotation.JsonDeserialize;
 public class DataSourceInputDTO extends DataSourceMetaInputDTO {
 
   @JsonDeserialize(using = ConnectorJson.RequestDeserializer.class)
-  @Valid private ConnectorConfiguration connector;
+  private ConnectorConfiguration connector;
 
   @Schema(description = "ID of the data structure version to associate")
   private UUID dataStructureVersionId;

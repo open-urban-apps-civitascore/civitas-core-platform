@@ -34,7 +34,9 @@ public final class ConnectorJson {
 
   static final String TYPE_PROPERTY = "connectorType";
   static final String DOCUMENT_TYPE_PROPERTY = "connectionType";
-  private static final String ROOT = "connector";
+
+  /** The request member that holds the connector, and the first key of every key path in it. */
+  public static final String ROOT = "connector";
 
   /**
    * Keys of a registry document that the registry and the shared schema own. A stored connector is

@@ -2,7 +2,6 @@ package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.DataSourceMapper;
 import de.civitascore.portal.model.connector.ConnectorConfiguration;
-import de.civitascore.portal.model.connector.OnRelease;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
@@ -20,15 +19,14 @@ import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
+import de.civitascore.portal.service.connector.ConnectorValidator;
+import de.civitascore.portal.service.connector.ConnectorViolation;
 import de.civitascore.portal.service.connector.DataSourceConnectorStore;
 import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.ConnectorValidationException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validator;
-import jakarta.validation.groups.Default;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -42,7 +40,8 @@ import tools.jackson.databind.JsonNode;
 /**
  * Service for managing {@link DataSource} entities through their full lifecycle (DRAFT to
  * AVAILABLE). Handles the connector, data structure version linking, and release/unrelease status
- * transitions. {@link DataSourceConnectorStore} keeps the connector.
+ * transitions. {@link DataSourceConnectorStore} keeps the connector and {@link ConnectorValidator}
+ * validates it.
  */
 @Service
 @RequiredArgsConstructor
@@ -51,13 +50,13 @@ public class DataSourceService
 
   private final DataSourceRepository dataSourceRepository;
   private final DataSourceMapper dataSourceMapper;
-  private final Validator validator;
   private final AssignmentFactory assignmentFactory;
   private final AssignmentChangeAuthorizer assignmentChangeAuthorizer;
   private final DataStructureVersionService dataStructureVersionService;
   private final PipelineRepository pipelineRepository;
   private final DataPoolRepository dataPoolRepository;
   private final DataSourceConnectorStore connectorStore;
+  private final ConnectorValidator connectorValidator;
   private final ScopeAccessAuthorizer scopeAccessAuthorizer;
   private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
   private final ArtifactUsageLookup artifactUsageLookup;
@@ -157,8 +156,15 @@ public class DataSourceService
   }
 
   @Override
+  protected DataSourceInputDTO preProcessCreateInput(DataSourceInputDTO input) {
+    requireValidConnector(input.getConnector(), ConnectorValidator.Stage.DRAFT);
+    return super.preProcessCreateInput(input);
+  }
+
+  @Override
   protected DataSourceInputDTO preProcessUpdateInput(
       DataSourceInputDTO input, DataSource existingEntity) {
+    requireValidConnector(input.getConnector(), ConnectorValidator.Stage.DRAFT);
     validateConnectorTypeChange(input, existingEntity);
     validateDataStructureVersionChange(input, existingEntity);
     return input;
@@ -379,8 +385,12 @@ public class DataSourceService
           getEntityName(), entity.getId(), "Configuration is required for releasing");
     }
 
-    Set<ConstraintViolation<ConnectorConfiguration>> violations =
-        validator.validate(connectorStore.read(entity), Default.class, OnRelease.class);
+    requireValidConnector(connectorStore.read(entity), ConnectorValidator.Stage.RELEASE);
+  }
+
+  private void requireValidConnector(
+      ConnectorConfiguration connector, ConnectorValidator.Stage stage) {
+    List<ConnectorViolation> violations = connectorValidator.validate(connector, stage);
     if (!violations.isEmpty()) {
       throw new ConnectorValidationException(violations);
     }
