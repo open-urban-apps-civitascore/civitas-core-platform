@@ -1,6 +1,7 @@
 package de.civitascore.portal.model.connector;
 
 import de.civitascore.portal.model.embedded.ConnectorType;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -80,7 +81,10 @@ public final class ConnectorJson {
     tree.remove(DOCUMENT_KEYS);
     tree.put(TYPE_PROPERTY, type.name());
     try {
-      return LENIENT.treeToValue(tree, ConnectorConfiguration.class);
+      return LENIENT
+          .readerFor(ConnectorConfiguration.class)
+          .withAttribute(Secret.StorageRead.class, new Secret.StorageRead())
+          .readValue(tree);
     } catch (JacksonException | IllegalArgumentException e) {
       throw new IllegalStateException("Stored " + type + " connector cannot be read", e);
     }
@@ -92,9 +96,10 @@ public final class ConnectorJson {
   }
 
   /**
-   * The registry document of {@code connector}. A clear-text secret is encrypted. A {@value
-   * Secret#PLACEHOLDER} takes the stored ciphertext at the same position, and is no secret if
-   * {@code storedDocument} has none there or belongs to another connector type.
+   * The registry document of {@code connector}. A clear-text secret is encrypted, and a secret read
+   * from the registry keeps its ciphertext. A {@value Secret#PLACEHOLDER} takes the stored secret
+   * at the same place, as {@link IdentifiedElement} defines it for list elements, and is no secret
+   * if {@code storedDocument} has none there or belongs to another connector type.
    *
    * @param storedDocument the current registry document, or null if none is stored
    */
@@ -102,22 +107,37 @@ public final class ConnectorJson {
       ConnectorConfiguration connector,
       Map<String, Object> storedDocument,
       UnaryOperator<String> encrypt) {
-    String documentType = connector.connectorType().name().toLowerCase(Locale.ROOT);
-    JsonNode stored =
-        storedDocument != null && documentType.equals(storedDocument.get(DOCUMENT_TYPE_PROPERTY))
-            ? LENIENT.valueToTree(storedDocument)
-            : JsonNodeFactory.instance.objectNode();
+    return writeDocument(connector, readStoredDocument(storedDocument), encrypt);
+  }
+
+  static Map<String, Object> writeDocument(
+      ConnectorConfiguration connector,
+      ConnectorConfiguration stored,
+      UnaryOperator<String> encrypt) {
+    ConnectorConfiguration resolved = PlaceholderResolver.resolve(connector, stored);
     ObjectNode document =
         (ObjectNode)
             STRICT.readTree(
                 STRICT
                     .writer()
-                    .withAttribute(
-                        Secret.StorageWrite.class, new Secret.StorageWrite(stored, encrypt))
-                    .writeValueAsString(connector));
+                    .withAttribute(Secret.StorageWrite.class, new Secret.StorageWrite(encrypt))
+                    .writeValueAsString(resolved));
     document.remove(TYPE_PROPERTY);
-    document.put(DOCUMENT_TYPE_PROPERTY, documentType);
+    document.put(DOCUMENT_TYPE_PROPERTY, connector.connectorType().name().toLowerCase(Locale.ROOT));
     return LENIENT.convertValue(document, new TypeReference<Map<String, Object>>() {});
+  }
+
+  /** The connector of a registry document, of the type that the document names. */
+  private static ConnectorConfiguration readStoredDocument(Map<String, Object> document) {
+    if (document == null
+        || !(document.get(DOCUMENT_TYPE_PROPERTY) instanceof String documentType)) {
+      return null;
+    }
+    return Arrays.stream(ConnectorType.values())
+        .filter(type -> type.name().toLowerCase(Locale.ROOT).equals(documentType))
+        .findFirst()
+        .map(type -> readStored(type, document))
+        .orElse(null);
   }
 
   /**

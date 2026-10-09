@@ -5,6 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import de.civitascore.portal.model.embedded.ConnectorType;
+import io.swagger.v3.oas.annotations.media.DiscriminatorMapping;
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.RecordComponent;
 import java.lang.reflect.Type;
@@ -14,11 +18,13 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -36,25 +42,55 @@ class ConnectorJsonTest {
   private static final NestedSecretsConnector NESTED =
       new NestedSecretsConnector(
           new NestedSecretsConnector.Auth("u", Secret.of("p")),
-          List.of(new NestedSecretsConnector.Call("/a", Secret.of("k"))),
-          List.of(Secret.of("t")));
+          List.of(new NestedSecretsConnector.Call("a", Secret.of("k"))));
 
   private static JsonNode json(String json) {
     return MAPPER.readTree(json.replace('\'', '"'));
   }
 
-  /** A connector with secrets in a nested object, in list elements and as list elements. */
-  record NestedSecretsConnector(Auth auth, List<Call> calls, List<Secret> tokens)
-      implements ConnectorConfiguration {
+  /** A connector with secrets in a nested object and in list elements. */
+  record NestedSecretsConnector(Auth auth, List<Call> calls) implements ConnectorConfiguration {
 
     record Auth(String user, Secret password) {}
 
-    record Call(String path, Secret apiKey) {}
+    record Call(String name, Secret apiKey) implements IdentifiedElement {
+      @Override
+      public Object identity() {
+        return name;
+      }
+    }
 
     @Override
     public ConnectorType connectorType() {
       return ConnectorType.SQL;
     }
+  }
+
+  private static NestedSecretsConnector.Call call(String name, Secret apiKey) {
+    return new NestedSecretsConnector.Call(name, apiKey);
+  }
+
+  private static NestedSecretsConnector withCalls(NestedSecretsConnector.Call... calls) {
+    return new NestedSecretsConnector(
+        new NestedSecretsConnector.Auth("u", Secret.of(Secret.PLACEHOLDER)), List.of(calls));
+  }
+
+  private static final NestedSecretsConnector.Call STORED_A = call("a", Secret.stored("ENC(a)"));
+  private static final NestedSecretsConnector.Call STORED_B = call("b", Secret.stored("ENC(b)"));
+  private static final NestedSecretsConnector.Call STORED_C = call("c", Secret.stored("ENC(c)"));
+
+  private static JsonNode documentOf(
+      NestedSecretsConnector connector, NestedSecretsConnector stored) {
+    return MAPPER.valueToTree(ConnectorJson.writeDocument(connector, stored, ENCRYPT));
+  }
+
+  private static List<String> apiKeys(JsonNode document) {
+    List<String> keys = new ArrayList<>();
+    document
+        .path("calls")
+        .forEach(
+            c -> keys.add(c.path("name").asString() + "=" + c.path("apiKey").asString("null")));
+    return keys;
   }
 
   @Test
@@ -113,41 +149,72 @@ class ConnectorJsonTest {
 
     assertThat(masked.at("/auth/password").asString()).isEqualTo(Secret.PLACEHOLDER);
     assertThat(masked.at("/calls/0/apiKey").asString()).isEqualTo(Secret.PLACEHOLDER);
-    assertThat(masked.at("/tokens/0").asString()).isEqualTo(Secret.PLACEHOLDER);
     assertThat(masked.at("/auth/user").asString()).isEqualTo("u");
   }
 
   @Test
   void toDocument_withClearTextSecrets_encryptsSecretsAtEveryDepth() {
-    Map<String, Object> document = ConnectorJson.toDocument(NESTED, null, ENCRYPT);
+    JsonNode document = documentOf(NESTED, null);
 
-    JsonNode tree = MAPPER.valueToTree(document);
-    assertThat(tree.at("/auth/password").asString()).isEqualTo("ENC(p)");
-    assertThat(tree.at("/calls/0/apiKey").asString()).isEqualTo("ENC(k)");
-    assertThat(tree.at("/tokens/0").asString()).isEqualTo("ENC(t)");
-    assertThat(tree.path("connectionType").asString()).isEqualTo("sql");
-    assertThat(tree.has("connectorType")).isFalse();
+    assertThat(document.at("/auth/password").asString()).isEqualTo("ENC(p)");
+    assertThat(document.at("/calls/0/apiKey").asString()).isEqualTo("ENC(k)");
+    assertThat(document.path("connectionType").asString()).isEqualTo("sql");
+    assertThat(document.has("connectorType")).isFalse();
   }
 
   @Test
-  void toDocument_withPlaceholders_takesStoredCiphertextAtSamePosition() {
-    Secret placeholder = Secret.of(Secret.PLACEHOLDER);
-    NestedSecretsConnector masked =
+  void toDocument_withPlaceholderInNestedObject_takesStoredCiphertext() {
+    NestedSecretsConnector stored =
         new NestedSecretsConnector(
-            new NestedSecretsConnector.Auth("u", placeholder),
-            List.of(
-                new NestedSecretsConnector.Call("/a", placeholder),
-                new NestedSecretsConnector.Call("/b", placeholder)),
-            List.of(placeholder, placeholder));
-    Map<String, Object> stored = ConnectorJson.toDocument(NESTED, null, ENCRYPT);
+            new NestedSecretsConnector.Auth("u", Secret.stored("ENC(p)")), List.of());
 
-    JsonNode tree = MAPPER.valueToTree(ConnectorJson.toDocument(masked, stored, ENCRYPT));
+    assertThat(documentOf(withCalls(), stored).at("/auth/password").asString()).isEqualTo("ENC(p)");
+  }
 
-    assertThat(tree.at("/auth/password").asString()).isEqualTo("ENC(p)");
-    assertThat(tree.at("/calls/0/apiKey").asString()).isEqualTo("ENC(k)");
-    assertThat(tree.at("/calls/1/apiKey").isNull()).isTrue();
-    assertThat(tree.at("/tokens/0").asString()).isEqualTo("ENC(t)");
-    assertThat(tree.at("/tokens/1").isNull()).isTrue();
+  @Test
+  void toDocument_withReorderedListElements_resolvesEachPlaceholderByIdentity() {
+    NestedSecretsConnector stored = withCalls(STORED_A, STORED_B, STORED_C);
+    Secret placeholder = Secret.of(Secret.PLACEHOLDER);
+
+    JsonNode document =
+        documentOf(
+            withCalls(call("c", placeholder), call("a", placeholder), call("b", placeholder)),
+            stored);
+
+    assertThat(apiKeys(document)).containsExactly("c=ENC(c)", "a=ENC(a)", "b=ENC(b)");
+  }
+
+  @Test
+  void toDocument_withInsertedListElement_givesItNoStoredSecret() {
+    NestedSecretsConnector stored = withCalls(STORED_A, STORED_B);
+    Secret placeholder = Secret.of(Secret.PLACEHOLDER);
+
+    JsonNode document =
+        documentOf(
+            withCalls(call("new", placeholder), call("a", placeholder), call("b", placeholder)),
+            stored);
+
+    assertThat(apiKeys(document)).containsExactly("new=null", "a=ENC(a)", "b=ENC(b)");
+  }
+
+  @Test
+  void toDocument_withRemovedListElement_keepsTheSecretsOfTheOthers() {
+    NestedSecretsConnector stored = withCalls(STORED_A, STORED_B, STORED_C);
+    Secret placeholder = Secret.of(Secret.PLACEHOLDER);
+
+    JsonNode document =
+        documentOf(withCalls(call("b", placeholder), call("c", placeholder)), stored);
+
+    assertThat(apiKeys(document)).containsExactly("b=ENC(b)", "c=ENC(c)");
+  }
+
+  @Test
+  void toDocument_withIdentityThatTwoStoredElementsShare_givesNoStoredSecret() {
+    NestedSecretsConnector stored = withCalls(STORED_A, call("a", Secret.stored("ENC(a2)")));
+
+    JsonNode document = documentOf(withCalls(call("a", Secret.of(Secret.PLACEHOLDER))), stored);
+
+    assertThat(apiKeys(document)).containsExactly("a=null");
   }
 
   @Test
@@ -198,7 +265,18 @@ class ConnectorJsonTest {
     assertThat(connector.urls()).containsExactly("tcp://broker:1883");
     assertThat(connector.protocolVersion()).isEqualTo("5");
     assertThat(connector.tls().enabled()).isTrue();
-    assertThat(connector.password()).isEqualTo(Secret.of("ENC(x)"));
+    assertThat(connector.password()).isEqualTo(Secret.stored("ENC(x)"));
+  }
+
+  @Test
+  void toDocument_ofStoredConnector_keepsTheStoredCiphertext() {
+    Map<String, Object> stored =
+        Map.of("connectionType", "sql", "dsn", "postgres://db/x", "password", "ENC(stored)");
+
+    ConnectorConfiguration connector = ConnectorJson.readStored(ConnectorType.SQL, stored);
+
+    assertThat(ConnectorJson.toDocument(connector, null, ENCRYPT))
+        .containsEntry("password", "ENC(stored)");
   }
 
   @Test
@@ -260,22 +338,69 @@ class ConnectorJsonTest {
     assertThat(ConnectorJson.patch(current, json("null"))).isNull();
   }
 
+  /**
+   * Without this test, a connector type added to one listing but not to another would be rejected,
+   * undocumented or unreadable from the registry only at runtime.
+   */
   @Test
-  void connectorTypes_eachHasARegisteredConfiguration() {
-    Set<String> registered =
+  void connectorTypes_areListedInEveryPlaceThatListsConnectorTypes() throws IOException {
+    List<String> enumTypes = Arrays.stream(ConnectorType.values()).map(Enum::name).toList();
+    Map<String, Class<?>> subTypes =
         Arrays.stream(ConnectorConfiguration.class.getAnnotation(JsonSubTypes.class).value())
-            .map(JsonSubTypes.Type::name)
-            .collect(Collectors.toSet());
+            .collect(Collectors.toMap(JsonSubTypes.Type::name, JsonSubTypes.Type::value));
+    Schema schema = ConnectorConfiguration.class.getAnnotation(Schema.class);
+    Map<String, Class<?>> discriminatorMapping =
+        Arrays.stream(schema.discriminatorMapping())
+            .collect(Collectors.toMap(DiscriminatorMapping::value, DiscriminatorMapping::schema));
 
-    assertThat(registered)
-        .containsExactlyInAnyOrderElementsOf(
-            Arrays.stream(ConnectorType.values()).map(Enum::name).toList());
+    SoftAssertions listings = new SoftAssertions();
+    listings.assertThat(subTypes.keySet()).as("@JsonSubTypes").hasSameElementsAs(enumTypes);
+    listings
+        .assertThat(discriminatorMapping)
+        .as("@Schema discriminatorMapping")
+        .containsExactlyInAnyOrderEntriesOf(subTypes);
+    listings
+        .assertThat(List.of(schema.oneOf()))
+        .as("@Schema oneOf")
+        .hasSameElementsAs(subTypes.values());
+    listings
+        .assertThat(modelForgeConnectionTypes())
+        .as("connectionType of datasource.schema.json in Model Forge")
+        .hasSameElementsAs(enumTypes.stream().map(t -> t.toLowerCase(Locale.ROOT)).toList());
+    for (ConnectorType type : ConnectorType.values()) {
+      listings
+          .assertThat(ConnectorJson.readStored(type, Map.of()))
+          .as("configuration read for %s", type)
+          .isInstanceOf(subTypes.getOrDefault(type.name(), Void.class))
+          .extracting(ConnectorConfiguration::connectorType)
+          .isEqualTo(type);
+    }
+    listings.assertAll();
   }
 
-  /** Without this test, a secret held as a String would be stored in clear text and returned. */
+  private static List<String> modelForgeConnectionTypes() throws IOException {
+    try (InputStream schema =
+        ConnectorJsonTest.class.getClassLoader().getResourceAsStream("datasource.schema.json")) {
+      assertThat(schema).as("datasource.schema.json on the class path").isNotNull();
+      List<String> connectionTypes = new ArrayList<>();
+      MAPPER
+          .readTree(schema)
+          .path("$defs")
+          .forEach(
+              variant ->
+                  connectionTypes.add(
+                      variant.path("properties").path("connectionType").path("const").asString()));
+      return connectionTypes;
+    }
+  }
+
+  /**
+   * Without this test, a secret held as a String would be stored in clear text and returned, and a
+   * secret in a list element without identity could resolve to the secret of another element.
+   */
   @Test
-  void registeredConfigurations_holdEverySecretAsSecret() {
-    List<String> secretsAsText = new ArrayList<>();
+  void registeredConfigurations_reachEverySecret() {
+    List<String> violations = new ArrayList<>();
     Deque<Class<?>> pending = new ArrayDeque<>();
     Arrays.stream(ConnectorConfiguration.class.getAnnotation(JsonSubTypes.class).value())
         .forEach(type -> pending.add(type.value()));
@@ -288,9 +413,15 @@ class ConnectorJsonTest {
       }
       assertThat(type.isRecord()).as("%s is a record", type.getName()).isTrue();
       for (RecordComponent component : type.getRecordComponents()) {
+        String name = type.getSimpleName() + "." + component.getName();
         Class<?> valueType = valueType(component.getGenericType());
         if (SECRET_NAME.matcher(component.getName()).matches() && valueType != Secret.class) {
-          secretsAsText.add(type.getSimpleName() + "." + component.getName());
+          violations.add(name + " holds a secret as text");
+        }
+        if (component.getGenericType() instanceof ParameterizedType
+            && carriesSecret(valueType, new HashSet<>())
+            && !IdentifiedElement.class.isAssignableFrom(valueType)) {
+          violations.add(name + " lists elements with secrets but without identity");
         }
         if (valueType.isRecord()) {
           pending.add(valueType);
@@ -298,7 +429,18 @@ class ConnectorJsonTest {
       }
     }
 
-    assertThat(secretsAsText).isEmpty();
+    assertThat(violations).isEmpty();
+  }
+
+  private static boolean carriesSecret(Class<?> type, Set<Class<?>> seen) {
+    if (type == Secret.class) {
+      return true;
+    }
+    if (!type.isRecord() || !seen.add(type)) {
+      return false;
+    }
+    return Arrays.stream(type.getRecordComponents())
+        .anyMatch(c -> carriesSecret(valueType(c.getGenericType()), seen));
   }
 
   private static Class<?> valueType(Type type) {
