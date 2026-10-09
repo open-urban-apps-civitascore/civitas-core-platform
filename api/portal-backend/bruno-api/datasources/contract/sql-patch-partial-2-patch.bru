@@ -24,16 +24,16 @@ tests {
   test("Only description was changed; other top-level fields preserved", function() {
     expect(res.body.name).to.equal("contract_sql_patch");
     expect(res.body.description).to.equal("contract — SQL patched");
-    expect(res.body.connectorType).to.equal("SQL");
+    expect(res.body.connector.connectorType).to.equal("SQL");
     expect(res.body.dataSourceStatus).to.equal("DRAFT");
     expect(res.body.inUse).to.equal(false);
   });
-  test("Configuration unchanged by description-only PATCH", function() {
-    expect(res.body.configuration.driver).to.equal("postgres");
-    expect(res.body.configuration.dsn).to.equal("postgres://example:5432/db");
-    expect(res.body.configuration.user).to.equal("alice");
-    expect(res.body.configuration.password).to.equal("********");
-    expect(res.body.configuration.table).to.equal("events");
-    expect(res.body.configuration.columns).to.deep.equal(["*"]);
+  test("Connector unchanged by description-only PATCH", function() {
+    expect(res.body.connector.driver).to.equal("postgres");
+    expect(res.body.connector.dsn).to.equal("postgres://example:5432/db");
+    expect(res.body.connector.user).to.equal("alice");
+    expect(res.body.connector.password).to.equal("********");
+    expect(res.body.connector.table).to.equal("events");
+    expect(res.body.connector.columns).to.deep.equal(["*"]);
   });
 }

@@ -33,7 +33,7 @@ import {
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
 import { getConnectorDefaults } from '@/utils/connectors'
 import { isDatastructureNotAvailableError, isResourceInUseError } from '@/utils/errors'
-import { pickDirtyValues } from '@/utils/form'
+import { hasDirtyField, pickDirtyValues } from '@/utils/form'
 
 export const useDatasourceForm = (
   datasource: Datasource,
@@ -233,23 +233,25 @@ export const useDatasourceForm = (
     }
 
     const dirtyFields = form.formState.dirtyFields
-    const dirtyValues = pickDirtyValues(parsed.data as Record<string, unknown>, dirtyFields)
+    const {
+      connectorType: _connectorType,
+      configuration: _configuration,
+      ...dirtyValues
+    } = pickDirtyValues(parsed.data as Record<string, unknown>, dirtyFields)
 
-    // Transform configuration to API format (needs full values for discriminated union)
-    const connectorParsed = ConnectorFormToApiSchema.safeParse(parsed.data)
-    const configuration = connectorParsed.success
-      ? connectorParsed.data.configuration
-      : (dirtyValues as Record<string, unknown>).configuration
+    // The backend replaces the stored connector when the type differs and merges it otherwise, so
+    // sending every field of the selected type is correct in both cases.
+    const isConnectorDirty = hasDirtyField(dirtyFields.connectorType) || hasDirtyField(dirtyFields.configuration)
+    const connectorParsed = isConnectorDirty ? ConnectorFormToApiSchema.safeParse(parsed.data) : null
+    const connector = connectorParsed?.success ? connectorParsed.data : undefined
 
     // Validate the outbound CORE DataSource document against the generated schema before sending —
     // the frontend guarantees a schema-valid payload to the (schema-agnostic) backend, mirroring the
     // pipeline/mapping editor. Model Forge stamps $schema/id; the backend adds connectionType from the
     // connectorType, so validate that projection ({connectionType, ...connectorConfig}) here.
-    if (dirtyFields.configuration && configuration && parsed.data.connectorType) {
-      const coreDoc = {
-        connectionType: String(parsed.data.connectorType).toLowerCase(),
-        ...(configuration as Record<string, unknown>),
-      }
+    if (connector) {
+      const { connectorType, ...connectorFields } = connector
+      const coreDoc = { connectionType: connectorType.toLowerCase(), ...connectorFields }
       const coreValid = DataSourceDraftSchema.safeParse(coreDoc)
       if (!coreValid.success) {
         console.error('DataSource configuration failed CORE schema validation:', coreValid.error.issues, coreDoc)
@@ -273,14 +275,17 @@ export const useDatasourceForm = (
 
     const apiPayload = {
       ...dirtyValues,
-      ...(dirtyFields.configuration ? { configuration } : {}),
+      ...(connector ? { connector } : {}),
       ...(areAssignmentsDirty ? { assignments: assignmentsPayload } : {}),
       ...datapoolScopePayload,
       id: datasource.id,
     } as DatasourcePatchData
 
     const shouldUpdateValues =
-      Object.keys(dirtyValues).some(key => key !== 'dataSourceStatus') || areAssignmentsDirty || areDatapoolsDirty
+      Object.keys(dirtyValues).some(key => key !== 'dataSourceStatus') ||
+      !!connector ||
+      areAssignmentsDirty ||
+      areDatapoolsDirty
     const shouldRelease = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
     const shouldUnrelease = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
 

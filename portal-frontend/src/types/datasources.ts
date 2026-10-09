@@ -11,7 +11,14 @@ import {
   STATUS_TYPES,
   WithId,
 } from './common'
-import { ConnectorApiToFormSchema, ConnectorLooseSchema, ConnectorStrictSchema } from './connectors'
+import {
+  ConnectorApiResponseSchema,
+  ConnectorApiToFormSchema,
+  ConnectorFormToApiSchema,
+  ConnectorLooseSchema,
+  ConnectorStrictSchema,
+  toConnectorFormShape,
+} from './connectors'
 import { DatastructureVersionSummaryApiResponseSchema } from './datastructures'
 
 export type DatasourceTab = 'basicInfo' | 'connector' | 'dataStructure' | 'datapools' | 'accessManagement'
@@ -77,8 +84,7 @@ export const DatasourceApiResponseSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   dataSourceStatus: DatasourceStatusSchema,
-  connectorType: ConnectorTypeSchema.nullable(),
-  configuration: z.record(z.string(), z.unknown()).nullable(),
+  connector: ConnectorApiResponseSchema.nullable(),
   dataStructureVersion: DatastructureVersionSummaryApiResponseSchema.nullable(),
   inUse: z.boolean(),
   inUseByReleased: z.boolean(),
@@ -139,9 +145,8 @@ export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.extend({
 export type DatasourceFormDraft = z.input<typeof DatasourceFormDraftSchema>
 
 export const DatasourceApiToFormSchema = DatasourceApiResponseSchema.transform(
-  ({ id, name, description, dataSourceStatus, dataStructureVersion, connectorType, configuration, datapoolScope }) => {
-    const connectorParsed =
-      connectorType && configuration ? ConnectorApiToFormSchema.safeParse({ connectorType, configuration }) : null
+  ({ id, name, description, dataSourceStatus, dataStructureVersion, connector, datapoolScope }) => {
+    const connectorParsed = connector ? ConnectorApiToFormSchema.safeParse(toConnectorFormShape(connector)) : null
     if (connectorParsed && !connectorParsed.success) {
       console.error('ConnectorApiToFormSchema parse failed:', connectorParsed.error.issues)
     }
@@ -171,7 +176,8 @@ export const DatasourceCreateFormSchema = z.object({
 })
 
 export type DatasourceCreateData = z.infer<typeof DatasourceCreateFormSchema>
-export type DatasourcePatchData = Partial<DatasourceFormDraft> & WithId & { assignments?: AssignmentScopedInput[] }
+export type DatasourcePatchData = Partial<Omit<DatasourceFormDraft, 'connectorType' | 'configuration'>> &
+  WithId & { connector?: z.output<typeof ConnectorFormToApiSchema>; assignments?: AssignmentScopedInput[] }
 export type DatasourceMetaPatchData = Pick<DatasourceFormDraft, 'name'> &
   Partial<Pick<DatasourceFormDraft, 'description' | 'datapoolScope'>> &
   WithId & { assignments?: AssignmentScopedInput[] }

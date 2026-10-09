@@ -1,0 +1,46 @@
+meta {
+  name: Contract SQL — PATCH clears field (2/4 patch)
+  type: http
+  seq: 58
+}
+
+patch {
+  url: {{baseUrl}}/datasources/{{contractSqlPatchClearId}}
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "connector": {
+      "where": null,
+      "user": ""
+    }
+  }
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("null and blank string clear their keys", function() {
+    expect(res.body.connector).to.have.property('where', null);
+    expect(res.body.connector).to.have.property('user', null);
+  });
+  test("Omitted keys keep their value", function() {
+    expect(res.body.connector.connectorType).to.equal("SQL");
+    expect(res.body.connector.driver).to.equal("postgres");
+    expect(res.body.connector.dsn).to.equal("postgres://example:5432/db");
+    expect(res.body.connector.table).to.equal("events");
+    expect(res.body.connector.columns).to.deep.equal(["*"]);
+    expect(res.body.connector.password).to.equal("********");
+  });
+}
+
+docs {
+  Pins that `connector` in a PATCH is a JSON merge patch (RFC 7386) of the
+  stored connector: `null` clears `where`, a blank string clears `user`,
+  and every key the patch omits keeps its value, the stored password
+  included. A patch without `connectorType` keeps the stored type.
+}

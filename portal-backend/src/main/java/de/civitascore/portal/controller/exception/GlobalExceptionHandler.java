@@ -1,5 +1,7 @@
 package de.civitascore.portal.controller.exception;
 
+import de.civitascore.portal.model.connector.InvalidConnectorException;
+import de.civitascore.portal.util.ConnectorValidationException;
 import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
@@ -19,6 +21,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
@@ -84,6 +87,32 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     // TR-03187 W-18/W-19: message is constructed by our own validation code (not reflected from
     // DB or framework internals). Clients rely on it to render actionable errors.
     return createProblemDetail(HttpStatus.BAD_REQUEST, "INVALID_INPUT", ex.getMessage(), request);
+  }
+
+  @ExceptionHandler(InvalidConnectorException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public ProblemDetail handleInvalidConnector(
+      InvalidConnectorException ex, HttpServletRequest request) {
+    log.warn("Invalid connector: {}", Encode.forJava(ex.getMessage()));
+    // TR-03187 W-18/W-19: the detail names only a key path or the connectorType the client sent.
+    return createProblemDetail(
+        HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", ex.getMessage(), request);
+  }
+
+  @ExceptionHandler(ConnectorValidationException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public ProblemDetail handleConnectorValidation(
+      ConnectorValidationException ex, HttpServletRequest request) {
+    log.warn("Connector validation failed: {} field error(s)", ex.getFieldErrors().size());
+    ProblemDetail problemDetail =
+        createProblemDetail(
+            HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Input validation failed", request);
+    problemDetail.setProperty(
+        "fieldErrors",
+        ex.getFieldErrors().stream()
+            .map(error -> Map.of("field", error.field(), "message", error.message()))
+            .toList());
+    return problemDetail;
   }
 
   @ExceptionHandler(DataSetNotEditableException.class)
@@ -398,10 +427,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       HttpStatusCode status,
       WebRequest request) {
     log.warn("Malformed request body: {}", Encode.forJava(ex.getMessage()));
+    String detail =
+        invalidConnectorIn(ex)
+            .map(InvalidConnectorException::getMessage)
+            .orElse("Request body is missing or malformed");
     ProblemDetail problemDetail =
-        createProblemDetail(
-            HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", "Request body is missing or malformed");
+        createProblemDetail(HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", detail);
     return ResponseEntity.badRequest().body(problemDetail);
+  }
+
+  private static Optional<InvalidConnectorException> invalidConnectorIn(Throwable ex) {
+    for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+      if (cause instanceof InvalidConnectorException invalidConnector) {
+        return Optional.of(invalidConnector);
+      }
+    }
+    return Optional.empty();
   }
 
   private ProblemDetail createProblemDetail(

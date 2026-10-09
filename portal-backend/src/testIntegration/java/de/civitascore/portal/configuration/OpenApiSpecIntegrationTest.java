@@ -16,6 +16,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 @DisplayName("OpenAPI Spec Integration Tests")
 class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
@@ -59,6 +61,46 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
     assertThat(schema.path("properties").has("connectorType")).isFalse();
     assertThat(schema.path("properties").has("model")).isFalse();
     assertThat(schema.has("required")).isFalse();
+  }
+
+  @ParameterizedTest
+  @CsvSource({"DataSourceInputDTO", "DataSourceOutputDTO"})
+  @DisplayName("Should describe the connector as oneOf with a connectorType discriminator")
+  void shouldDescribeConnectorAsDiscriminatedOneOf(String dto) {
+    JsonNode connector =
+        schemaOf(
+            spec.path("components").path("schemas").path(dto).path("properties").path("connector"));
+
+    assertThat(connector.path("discriminator").path("propertyName").asString())
+        .isEqualTo("connectorType");
+    assertThat(connector.path("discriminator").path("mapping").propertyNames())
+        .containsExactlyInAnyOrder("MQTT", "SQL");
+    assertThat(connector.path("oneOf").size()).isEqualTo(2);
+    for (JsonNode variant : connector.path("oneOf")) {
+      JsonNode properties = propertiesOf(schemaOf(variant));
+      assertThat(properties.has("connectorType")).as("%s", variant).isTrue();
+      assertThat(properties.path("user").path("description").asString()).isNotBlank();
+      assertThat(properties.path("password").path("writeOnly").asBoolean())
+          .as("%s password is write-only", variant)
+          .isTrue();
+    }
+  }
+
+  /** The properties of a schema, including those of the schemas it is {@code allOf}. */
+  private ObjectNode propertiesOf(JsonNode schema) {
+    ObjectNode properties = JsonNodeFactory.instance.objectNode();
+    for (JsonNode part : schema.path("allOf")) {
+      properties.setAll(propertiesOf(schemaOf(part)));
+    }
+    if (schema.path("properties") instanceof ObjectNode own) {
+      properties.setAll(own);
+    }
+    return properties;
+  }
+
+  private JsonNode schemaOf(JsonNode schemaOrRef) {
+    JsonNode ref = schemaOrRef.path("$ref");
+    return ref.isString() ? resolve(ref.asString()) : schemaOrRef;
   }
 
   private JsonNode requestBodySchema(String path) {

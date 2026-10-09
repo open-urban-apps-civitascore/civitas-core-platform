@@ -1,0 +1,47 @@
+meta {
+  name: Contract MQTT — PATCH changes connectorType (1/4 create)
+  type: http
+  seq: 53
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "name": "contract_mqtt_patch_type_change",
+    "description": "contract — MQTT (will be PATCHed to SQL)",
+    "connector": {
+      "connectorType": "MQTT",
+      "urls": ["tcp://broker:1883"],
+      "topics": ["sensor/data"],
+      "qos": 1,
+      "keepalive": "30s",
+      "user": "mqttuser",
+      "password": "s3cret"
+    },
+    "dataStructureVersionId": null
+  }
+}
+
+script:post-response {
+  if (!res.body || !res.body.id) {
+    throw new Error("Expected create response to include non-empty 'id'");
+  }
+  bru.setVar('contractMqttPatchTypeChangeId', res.body.id);
+}
+
+tests {
+  test("Status is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Created as MQTT in DRAFT with a stored password", function() {
+    expect(res.body.connector.connectorType).to.equal("MQTT");
+    expect(res.body.connector.password).to.equal("********");
+    expect(res.body.dataSourceStatus).to.equal("DRAFT");
+  });
+}

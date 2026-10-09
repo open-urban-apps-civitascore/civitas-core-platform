@@ -73,7 +73,8 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
         },
       },
     }),
-    columnHelper.accessor('connectorType', {
+    columnHelper.accessor(row => row.connector?.connectorType, {
+      id: 'connectorType',
       header: t('tableHeaders.connector'),
       cell: info => info.getValue() ?? '-',
       meta: {

@@ -14,9 +14,8 @@ post {
 body:json {
   {
     "name": "contract_mqtt_release_empty",
-    "description": "Pins that release rejects empty configuration on MQTT",
-    "connectorType": "MQTT",
-    "configuration": {},
+    "description": "Pins that release rejects an empty MQTT connector",
+    "connector": { "connectorType": "MQTT" },
     "dataStructureVersionId": "{{contractMqttReleaseEmptyDsvId}}"
   }
 }
@@ -28,7 +27,7 @@ script:post-response {
 }
 
 tests {
-  test("DataSource created in DRAFT with empty configuration (201)", function() {
+  test("DataSource created in DRAFT with empty connector (201)", function() {
     expect(res.getStatus()).to.equal(201);
   });
   test("Status is DRAFT", function() {
@@ -37,7 +36,7 @@ tests {
 }
 
 docs {
-  Creates an MQTT DataSource with `configuration: {}` (the deferred-validation
-  contract permits this on DRAFT). Step 3 attempts to release it and pins
-  the rejection contract.
+  Creates an MQTT DataSource with `connector: { "connectorType": "MQTT" }`
+  (the deferred-validation contract permits this on DRAFT). Step 5 attempts
+  to release it and pins the rejection contract.
 }

@@ -1,0 +1,25 @@
+meta {
+  name: Contract MQTT — PATCH changes connectorType (3/4 read-back)
+  type: http
+  seq: 55
+}
+
+get {
+  url: {{baseUrl}}/datasources/{{contractMqttPatchTypeChangeId}}
+  body: none
+  auth: inherit
+}
+
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("SQL connector persisted without MQTT keys or credentials", function() {
+    expect(res.body.connector.connectorType).to.equal("SQL");
+    expect(res.body.connector.dsn).to.equal("postgres://example:5432/db");
+    expect(res.body.connector).to.not.have.property('urls');
+    expect(res.body.connector).to.have.property('user', null);
+    expect(res.body.connector).to.have.property('password', null);
+  });
+}

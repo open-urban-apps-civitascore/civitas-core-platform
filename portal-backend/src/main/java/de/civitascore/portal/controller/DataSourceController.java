@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
 /** REST controller for managing data source resources, including release/unrelease lifecycle. */
 @RestController
@@ -41,6 +42,8 @@ public class DataSourceController
         DataSourceOutputDTO,
         DataSource,
         DataSourceSpec> {
+
+  private static final String CONNECTOR = "connector";
 
   private final DataSourceService dataSourceService;
   private final DataSourceAssembler dataSourceAssembler;
@@ -140,18 +143,19 @@ public class DataSourceController
   }
 
   /**
-   * Merges connector-specific configuration fields during a JSON-merge patch.
-   *
-   * <p>Delegates to {@link DataSourceService#mergeConfigurationForPatch} after the standard Jackson
-   * merge so that nested connector properties are handled correctly.
+   * Applies the {@code connector} member as a JSON merge patch of the stored connector, and the
+   * other members as usual. A {@code connector} with another {@code connectorType} replaces the
+   * stored one.
    *
    * <p>{@inheritDoc}
    */
   @Override
   protected DataSourceInputDTO patchInput(
       DataSourceInputDTO currentDto, DataSource entity, JsonNode updates) throws IOException {
-    DataSourceInputDTO patchedDto = super.patchInput(currentDto, entity, updates);
-    getService().mergeConfigurationForPatch(patchedDto, entity, updates);
+    JsonNode otherMembers =
+        updates instanceof ObjectNode object ? object.deepCopy().without(CONNECTOR) : updates;
+    DataSourceInputDTO patchedDto = super.patchInput(currentDto, entity, otherMembers);
+    patchedDto.setConnector(getService().patchConnector(entity, updates.path(CONNECTOR)));
     return patchedDto;
   }
 }

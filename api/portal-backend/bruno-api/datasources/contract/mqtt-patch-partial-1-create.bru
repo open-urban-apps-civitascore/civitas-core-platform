@@ -15,8 +15,8 @@ body:json {
   {
     "name": "contract_mqtt_patch",
     "description": "contract — MQTT",
-    "connectorType": "MQTT",
-    "configuration": {
+    "connector": {
+      "connectorType": "MQTT",
       "urls": ["tcp://broker:1883"],
       "topics": ["sensor/data"],
       "qos": 1

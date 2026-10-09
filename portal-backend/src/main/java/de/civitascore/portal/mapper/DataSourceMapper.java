@@ -28,15 +28,21 @@ public interface DataSourceMapper
   @Mapping(target = "dataStructureVersion", ignore = true)
   @Mapping(target = "datapoolScopeType", ignore = true)
   @Mapping(target = "scopedDataPools", ignore = true)
+  @Mapping(
+      target = "connectorType",
+      expression =
+          "java(input.getConnector() == null ? null : input.getConnector().connectorType())")
   @Override
   DataSource toEntity(DataSourceInputDTO input);
 
   @Mapping(target = "datapoolScope", ignore = true)
+  @Mapping(target = "connector", ignore = true)
   @Override
   DataSourceOutputDTO toOutput(DataSource entity);
 
   @Mapping(target = "assignments", ignore = true)
   @Mapping(target = "datapoolScope", ignore = true)
+  @Mapping(target = "connector", ignore = true)
   @Mapping(source = "dataStructureVersion.id", target = "dataStructureVersionId")
   @Override
   DataSourceInputDTO toInput(DataSource entity);
@@ -51,6 +57,10 @@ public interface DataSourceMapper
   @Mapping(target = "dataStructureVersion", ignore = true)
   @Mapping(target = "datapoolScopeType", ignore = true)
   @Mapping(target = "scopedDataPools", ignore = true)
+  @Mapping(
+      target = "connectorType",
+      expression =
+          "java(input.getConnector() == null ? null : input.getConnector().connectorType())")
   @Override
   void updateEntity(@MappingTarget DataSource entity, DataSourceInputDTO input);
 }

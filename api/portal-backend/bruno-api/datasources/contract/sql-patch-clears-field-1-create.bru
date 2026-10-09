@@ -1,0 +1,47 @@
+meta {
+  name: Contract SQL — PATCH clears field (1/4 create)
+  type: http
+  seq: 57
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "name": "contract_sql_patch_clear",
+    "description": "contract — SQL",
+    "connector": {
+      "connectorType": "SQL",
+      "driver": "postgres",
+      "dsn": "postgres://example:5432/db",
+      "user": "alice",
+      "password": "s3cret",
+      "table": "events",
+      "columns": ["*"],
+      "where": "id > 0"
+    },
+    "dataStructureVersionId": null
+  }
+}
+
+script:post-response {
+  if (!res.body || !res.body.id) {
+    throw new Error("Expected create response to include non-empty 'id'");
+  }
+  bru.setVar('contractSqlPatchClearId', res.body.id);
+}
+
+tests {
+  test("Status is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("where and user are set", function() {
+    expect(res.body.connector.where).to.equal("id > 0");
+    expect(res.body.connector.user).to.equal("alice");
+  });
+}

@@ -87,7 +87,7 @@ describe('MQTT connector transformations', () => {
       configuration: { urls: 'mqtts://broker.example:8883', tls: true },
     })
 
-    expect(result.configuration.tls).toEqual({ enabled: true })
+    expect(result).toMatchObject({ connectorType: CONNECTOR_TYPES.MQTT, tls: { enabled: true } })
   })
 
   it('maps tls.enabled from the API to the form switch', () => {
@@ -96,7 +96,7 @@ describe('MQTT connector transformations', () => {
       configuration: { urls: ['ssl://broker.example:8883'], tls: { enabled: true }, protocol_version: '3' },
     })
 
-    expect(result.configuration.tls).toBe(true)
+    expect(result).toMatchObject({ configuration: { tls: true } })
   })
 
   it('rejects an API response without a protocol version', () => {

@@ -177,7 +177,7 @@ describe('PipelineList', () => {
         },
       } as never)
       vi.mocked(useGetDatasources).mockReturnValue({
-        data: { data: [{ id: 'ds-1', connectorType: 'MQTT' }] },
+        data: { data: [{ id: 'ds-1', connector: { connectorType: 'MQTT' } }] },
       } as never)
 
       renderComponent({ pipelines: [makePipeline({ id: 'p1' })] })

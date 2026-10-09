@@ -11,7 +11,6 @@ import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.service.ArtifactUsageLookup;
-import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -26,13 +25,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class DataSourceAssemblerTest {
 
   @Mock private DataSourceMapper dataSourceMapper;
-  @Mock private ConnectorHandlerRegistry connectorHandlerRegistry;
   @Mock private ArtifactUsageLookup artifactUsageLookup;
   @Mock private ModelRegistryGateway modelRegistryGateway;
 
   private DataSourceAssembler assembler() {
-    return new DataSourceAssembler(
-        dataSourceMapper, connectorHandlerRegistry, artifactUsageLookup, modelRegistryGateway);
+    return new DataSourceAssembler(dataSourceMapper, artifactUsageLookup, modelRegistryGateway);
   }
 
   @Nested
