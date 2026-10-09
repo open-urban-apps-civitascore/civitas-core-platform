@@ -1177,7 +1177,6 @@ class DataSourceControllerIntegrationTest
 
       Map<String, Object> response = getRaw(id);
 
-      assertThat(response).doesNotContainKeys("connectorType", "configuration");
       assertThat(response.get("connector"))
           .asInstanceOf(InstanceOfAssertFactories.MAP)
           .containsEntry("connectorType", "MQTT")

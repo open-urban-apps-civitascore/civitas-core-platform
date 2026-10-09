@@ -326,8 +326,6 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
       String originalCiphertext = JsonPath.read(readStoredConfiguration(id), "$.password");
       assertThat(originalCiphertext).isNotEmpty();
 
-      // PATCH with a connector body that does NOT carry password.
-      // Pin whatever the system currently does — merge (preserve password) or replace (wipe it).
       String patchBody =
           """
           {
@@ -345,10 +343,8 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
       String ciphertextAfterPatch = JsonPath.read(readStoredConfiguration(id), "$.password");
       assertThat(ciphertextAfterPatch)
           .as(
-              "PATCH with a connector body that omits 'password' must preserve the stored "
-                  + "ciphertext. If this assertion ever fails because PATCH replaces (rather than "
-                  + "merges) configuration, that is a behavior change that the refactor must "
-                  + "explicitly acknowledge — do not silently weaken this assertion.")
+              "PATCH merges the connector into the stored one (RFC 7386), so an omitted "
+                  + "'password' keeps the stored ciphertext")
           .isEqualTo(originalCiphertext);
     }
 
