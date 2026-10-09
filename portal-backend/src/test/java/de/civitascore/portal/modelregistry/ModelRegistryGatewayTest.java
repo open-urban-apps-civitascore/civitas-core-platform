@@ -198,4 +198,30 @@ class ModelRegistryGatewayTest {
       assertThat(gateway.modelIdOf("ds-1")).isEmpty();
     }
   }
+
+  @Nested
+  @DisplayName("comparing against a fetched document")
+  class UnchangedAgainstAFetchedDocument {
+
+    @Test
+    @DisplayName("ignores the registry's identity stamps and compares the styles")
+    void ignoresStampsAndComparesStyles() {
+      ModelRegistryGateway.RegistryDocument stored =
+          new ModelRegistryGateway.RegistryDocument(
+              Map.of("$id", "urn:stamped", "qos", 1), Map.of("x", 1));
+
+      assertThat(gateway.isUnchanged(stored, Map.of("qos", 1), Map.of("x", 1))).isTrue();
+      assertThat(gateway.isUnchanged(stored, Map.of("qos", 2), Map.of("x", 1))).isFalse();
+      assertThat(gateway.isUnchanged(stored, Map.of("qos", 1), null)).isFalse();
+    }
+
+    @Test
+    @DisplayName("treats a stored document without content as an empty one")
+    void emptyContentEqualsNoContent() {
+      ModelRegistryGateway.RegistryDocument stored =
+          new ModelRegistryGateway.RegistryDocument(null, null);
+
+      assertThat(gateway.isUnchanged(stored, Map.of(), null)).isTrue();
+    }
+  }
 }

@@ -179,8 +179,8 @@ public class PortalTestDataFactory {
    */
   public DataSource attachSourceConfiguration(
       DataSource dataSource, Map<String, Object> configuration) {
-    // Mirror DataSourceService: the stored CORE payload carries connectionType (derived from the
-    // connector type); Model Forge stamps $schema + id on write and validates against
+    // Mirror DataSourceConnectorStore: the stored CORE payload carries connectionType (derived
+    // from the connector type); Model Forge stamps $schema + id on write and validates against
     // datasource.schema.json.
     Map<String, Object> payload = new LinkedHashMap<>(configuration);
     if (dataSource.getConnectorType() != null) {

@@ -507,6 +507,16 @@ public class ModelRegistryGateway {
   }
 
   /**
+   * As {@link #isUnchanged(String, Map, Map)}, against a document the caller has already read with
+   * {@link #fetchPayload(String)}.
+   */
+  public boolean isUnchanged(
+      RegistryDocument stored, Map<String, Object> content, Map<String, Object> styles) {
+    return comparable(mergeStyles(stored.content(), stored.styles()))
+        .equals(comparable(mergeStyles(content, styles)));
+  }
+
+  /**
    * Deletes the payload artifact (all versions) behind a logical URN. No-op semantics are Model
    * Forge's.
    */

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataSourceMapper;
+import de.civitascore.portal.model.connector.ConnectorJson;
 import de.civitascore.portal.model.connector.MqttConnectorConfiguration;
 import de.civitascore.portal.model.connector.Secret;
 import de.civitascore.portal.model.connector.SqlConnectorConfiguration;
@@ -31,12 +32,12 @@ import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataSourceMetaInputDTO;
 import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentScopedInputDTO;
-import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
+import de.civitascore.portal.service.connector.DataSourceConnectorStore;
 import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.ConnectorValidationException;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
@@ -46,7 +47,6 @@ import de.civitascore.portal.util.ResourceNotFoundException;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +64,6 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.crypto.encrypt.TextEncryptor;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DataSourceService Tests")
@@ -72,15 +71,13 @@ class DataSourceServiceTest {
 
   @Mock private DataSourceRepository dataSourceRepository;
   @Mock private DataSourceMapper dataSourceMapper;
-  @Spy private TextEncryptor textEncryptor = new PrefixEncryptor();
-
   @Spy private Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
   @Mock private AssignmentService assignmentService;
   @Mock private DataStructureVersionService dataStructureVersionService;
   @Mock private PipelineRepository pipelineRepository;
   @Mock private DataPoolRepository dataPoolRepository;
-  @Mock private ModelRegistryGateway modelRegistryGateway;
+  @Mock private DataSourceConnectorStore connectorStore;
   @Mock private ScopeAccessAuthorizer scopeAccessAuthorizer;
   @Mock private ArtifactUsageLookup artifactUsageLookup;
   @Mock private AssignmentFactory assignmentFactory;
@@ -89,10 +86,6 @@ class DataSourceServiceTest {
   @Spy private DataSourceDatapoolScopeValidator datapoolScopeValidator;
 
   @InjectMocks private DataSourceService dataSourceService;
-
-  private static final String STORED_LOGICAL_URN =
-      "urn:core:platform:civitas:datasource:common:00000000-0000-4000-8000-000000000014";
-  private static final String STORED_VERSIONED_URN = STORED_LOGICAL_URN + ":1.0.0";
 
   private static final ArtifactUsageLookup.ArtifactUsage NOT_IN_USE =
       new ArtifactUsageLookup.ArtifactUsage(false, List.of());
@@ -106,26 +99,8 @@ class DataSourceServiceTest {
                   ArtifactUsageLookup.ReferrerKind.PIPELINE, UUID.randomUUID().toString())));
 
   @BeforeEach
-  void stubPayloadStore() {
-    // Storing a configuration returns the registry-assigned pin. Lenient so tests that never
-    // store a configuration don't trip strict stubbing.
-    lenient()
-        .when(modelRegistryGateway.storePayload(any(), any(), any(), any(), any(), any()))
-        .thenReturn(
-            new ModelRegistryGateway.ModelPin(STORED_LOGICAL_URN, STORED_VERSIONED_URN, "1.0.0"));
+  void stubUsage() {
     lenient().when(artifactUsageLookup.of(any(DataSource.class))).thenReturn(NOT_IN_USE);
-  }
-
-  private static final class PrefixEncryptor implements TextEncryptor {
-    @Override
-    public String encrypt(String text) {
-      return "ENC(" + text + ")";
-    }
-
-    @Override
-    public String decrypt(String encryptedText) {
-      throw new UnsupportedOperationException();
-    }
   }
 
   private static SqlConnectorConfiguration sqlConnector(String password) {
@@ -139,30 +114,14 @@ class DataSourceServiceTest {
         Secret.of(password));
   }
 
-  /** The document of the last registry store. */
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> storedDocument() {
-    ArgumentCaptor<Map<String, Object>> document = ArgumentCaptor.forClass(Map.class);
-    verify(modelRegistryGateway)
-        .storePayload(any(), any(), any(), any(), document.capture(), any());
-    return document.getValue();
-  }
-
-  /**
-   * Pins a registry-stored configuration on the entity and stubs the gateway read for it, so the
-   * service's fetch-back paths (validation, masked-value restore, patch merge) see this document.
-   */
-  private void stubStoredConfiguration(DataSource entity, Map<String, Object> config) {
-    String urn =
-        "urn:core:platform:civitas:datasource:common:"
-            + (entity.getId() != null ? entity.getId() : UUID.randomUUID())
-            + ":1.0.0";
-    entity.setConfigurationLogicalUrn(urn.substring(0, urn.lastIndexOf(':')));
-    entity.setConfigurationUrn(urn);
+  /** Pins a stored connector on the entity, read from its registry document. */
+  private void stubStoredConnector(DataSource entity, Map<String, Object> document) {
+    String urn = "urn:core:platform:civitas:datasource:common:" + entity.getId();
+    entity.setConfigurationLogicalUrn(urn);
+    entity.setConfigurationUrn(urn + ":1.0.0");
     lenient()
-        .when(modelRegistryGateway.fetchPayload(urn))
-        .thenReturn(
-            Optional.of(new ModelRegistryGateway.RegistryDocument(new HashMap<>(config), null)));
+        .when(connectorStore.read(entity))
+        .thenReturn(ConnectorJson.readStored(entity.getConnectorType(), document));
   }
 
   @Nested
@@ -187,7 +146,7 @@ class DataSourceServiceTest {
     }
 
     @Test
-    void create_withConnector_storesDocumentWithEncryptedSecret() {
+    void create_withConnector_writesItForTheSavedDataSource() {
       DataSourceInputDTO input = new DataSourceInputDTO();
       input.setName("test-source");
       input.setConnector(sqlConnector("secret"));
@@ -201,13 +160,13 @@ class DataSourceServiceTest {
                 return entity;
               });
 
-      DataSource result = dataSourceService.create(input);
+      dataSourceService.create(input);
 
-      assertThat(storedDocument())
-          .containsEntry("connectionType", "sql")
-          .containsEntry("password", "ENC(secret)")
-          .doesNotContainKey("connectorType");
-      assertThat(result.getConfigurationUrn()).isEqualTo(STORED_VERSIONED_URN);
+      ArgumentCaptor<DataSource> written = ArgumentCaptor.forClass(DataSource.class);
+      verify(connectorStore).write(written.capture(), eq(input.getConnector()));
+      assertThat(written.getValue().getId())
+          .as("the registry artifact takes the id of the saved Data source")
+          .isNotNull();
     }
   }
 
@@ -337,7 +296,7 @@ class DataSourceServiceTest {
       entity.setDescription("A data source");
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(ConnectorType.MQTT);
-      stubStoredConfiguration(entity, Map.of("topics", List.of("sensor/data"), "qos", 1));
+      stubStoredConnector(entity, Map.of("topics", List.of("sensor/data"), "qos", 1));
       entity.setDataStructureVersion(createDataStructureVersion());
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
@@ -360,7 +319,7 @@ class DataSourceServiceTest {
       entity.setDescription("A data source");
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(ConnectorType.MQTT);
-      stubStoredConfiguration(
+      stubStoredConnector(
           entity,
           Map.of("urls", List.of("tcp://broker:1883"), "topics", List.of("sensor/data"), "qos", 5));
       entity.setDataStructureVersion(createDataStructureVersion());
@@ -385,7 +344,7 @@ class DataSourceServiceTest {
       entity.setDescription("A data source");
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(ConnectorType.SQL);
-      stubStoredConfiguration(
+      stubStoredConnector(
           entity, Map.of("dsn", "postgres://host/db", "table", "users", "columns", List.of("id")));
       entity.setDataStructureVersion(createDataStructureVersion());
 
@@ -565,7 +524,7 @@ class DataSourceServiceTest {
       entity.setName("old-name");
       entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
       entity.setConnectorType(ConnectorType.MQTT);
-      stubStoredConfiguration(entity, Map.of("urls", List.of("tcp://broker:1883")));
+      stubStoredConnector(entity, Map.of("urls", List.of("tcp://broker:1883")));
       String originalPin = entity.getConfigurationUrn();
 
       DataSourceMetaInputDTO input = new DataSourceMetaInputDTO();
@@ -576,7 +535,7 @@ class DataSourceServiceTest {
 
       DataSource result = dataSourceService.updateReleasedMeta(id, input);
 
-      verify(modelRegistryGateway, never()).storePayload(any(), any(), any(), any(), any(), any());
+      verify(connectorStore, never()).write(any(), any());
       assertThat(result.getConfigurationUrn())
           .as("the stored content pin stays untouched")
           .isEqualTo(originalPin);
@@ -781,7 +740,7 @@ class DataSourceServiceTest {
           .isInstanceOf(ResourceInUseException.class)
           .hasMessageContaining("referenced by a Pipeline");
       verify(dataSourceRepository, never()).deleteById(id);
-      verify(modelRegistryGateway, never()).deletePayload(any());
+      verify(connectorStore, never()).delete(any());
     }
 
     @Test
@@ -797,7 +756,7 @@ class DataSourceServiceTest {
       dataSourceService.deleteById(id);
 
       verify(dataSourceRepository).deleteById(id);
-      verify(modelRegistryGateway).deletePayload(entity.getConfigurationLogicalUrn());
+      verify(connectorStore).delete(entity);
     }
 
     @Test
@@ -1007,85 +966,21 @@ class DataSourceServiceTest {
       verify(dataSourceRepository, never()).save(any());
     }
 
-    private DataSource draftSqlSource(UUID id, String storedPassword) {
+    @Test
+    void update_writesTheConnectorOfTheInput() {
+      UUID id = UUID.randomUUID();
       DataSource entity = new DataSource();
       entity.setId(id);
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
-      entity.setConnectorType(ConnectorType.SQL);
-      Map<String, Object> stored = new HashMap<>();
-      stored.put("connectionType", "sql");
-      stored.put("driver", "postgres");
-      stored.put("dsn", "postgres://host/db");
-      stored.put("password", storedPassword);
-      stubStoredConfiguration(entity, stored);
-      return entity;
-    }
-
-    private void update(UUID id, DataSource entity, String password) {
       DataSourceInputDTO input = new DataSourceInputDTO();
       input.setName("updated");
-      input.setConnector(sqlConnector(password));
+      input.setConnector(sqlConnector(Secret.PLACEHOLDER));
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
       when(dataSourceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       dataSourceService.update(id, input);
-    }
 
-    @Test
-    void update_withPlaceholderPassword_keepsStoredCiphertext() {
-      UUID id = UUID.randomUUID();
-      DataSource entity = draftSqlSource(id, "ENC(stored)");
-
-      update(id, entity, Secret.PLACEHOLDER);
-
-      assertThat(storedDocument()).containsEntry("password", "ENC(stored)");
-    }
-
-    @Test
-    void update_withPlaceholderPasswordAndNoStoredPassword_storesNoPassword() {
-      UUID id = UUID.randomUUID();
-      DataSource entity = draftSqlSource(id, null);
-
-      update(id, entity, Secret.PLACEHOLDER);
-
-      assertThat(storedDocument()).containsEntry("password", null);
-    }
-
-    @Test
-    void update_withNewPassword_storesItEncrypted() {
-      UUID id = UUID.randomUUID();
-      DataSource entity = draftSqlSource(id, "ENC(old)");
-
-      update(id, entity, "newpass");
-
-      assertThat(storedDocument()).containsEntry("password", "ENC(newpass)");
-    }
-
-    @Test
-    @DisplayName("An unreadable stored configuration fails the update instead of losing the secret")
-    void shouldFailWhenStoredConfigurationCannotBeRead() {
-      UUID id = UUID.randomUUID();
-      DataSource entity = new DataSource();
-      entity.setId(id);
-      entity.setDataSourceStatus(DataSourceStatus.DRAFT);
-      entity.setConnectorType(ConnectorType.SQL);
-      entity.setConfigurationUrn(
-          "urn:core:platform:civitas:datasource:common:00000000-0000-4000-8000-000000000015:1.0.0");
-
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("updated");
-      input.setConnector(sqlConnector(Secret.PLACEHOLDER));
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-      // A pin is set but the artifact is gone: without the stored ciphertext, the placeholder
-      // could only be dropped or stored as the credential.
-      when(modelRegistryGateway.fetchPayload(entity.getConfigurationUrn()))
-          .thenReturn(Optional.empty());
-
-      assertThatThrownBy(() -> dataSourceService.update(id, input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("cannot be read");
-      verify(modelRegistryGateway, never()).storePayload(any(), any(), any(), any(), any(), any());
+      verify(connectorStore).write(entity, input.getConnector());
     }
 
     @Test
@@ -1327,7 +1222,7 @@ class DataSourceServiceTest {
     entity.setDescription("An MQTT data source");
     entity.setDataSourceStatus(DataSourceStatus.DRAFT);
     entity.setConnectorType(ConnectorType.MQTT);
-    stubStoredConfiguration(
+    stubStoredConnector(
         entity,
         Map.of("urls", List.of("tcp://broker:1883"), "topics", List.of("sensor/data"), "qos", 1));
     entity.setDataStructureVersion(createDataStructureVersion());
@@ -1341,7 +1236,7 @@ class DataSourceServiceTest {
     entity.setDescription("A SQL data source");
     entity.setDataSourceStatus(DataSourceStatus.DRAFT);
     entity.setConnectorType(ConnectorType.SQL);
-    stubStoredConfiguration(
+    stubStoredConnector(
         entity,
         Map.of(
             "driver", "postgres",

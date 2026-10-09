@@ -2,7 +2,6 @@ package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.DataSourceMapper;
 import de.civitascore.portal.model.connector.ConnectorConfiguration;
-import de.civitascore.portal.model.connector.ConnectorJson;
 import de.civitascore.portal.model.connector.OnRelease;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
@@ -16,13 +15,12 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataSourceMetaInputDTO;
 import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
-import de.civitascore.portal.modelregistry.ModelRegistryGateway;
-import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
+import de.civitascore.portal.service.connector.DataSourceConnectorStore;
 import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.ConnectorValidationException;
 import de.civitascore.portal.util.InvalidInputException;
@@ -31,16 +29,12 @@ import de.civitascore.portal.util.ResourceNotFoundException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import jakarta.validation.groups.Default;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.crypto.encrypt.TextEncryptor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -48,8 +42,7 @@ import tools.jackson.databind.JsonNode;
 /**
  * Service for managing {@link DataSource} entities through their full lifecycle (DRAFT to
  * AVAILABLE). Handles the connector, data structure version linking, and release/unrelease status
- * transitions. The connector lives in the Model Forge registry as a document with encrypted
- * secrets, pinned by the source's {@code configurationUrn}.
+ * transitions. {@link DataSourceConnectorStore} keeps the connector.
  */
 @Service
 @RequiredArgsConstructor
@@ -58,14 +51,13 @@ public class DataSourceService
 
   private final DataSourceRepository dataSourceRepository;
   private final DataSourceMapper dataSourceMapper;
-  private final TextEncryptor textEncryptor;
   private final Validator validator;
   private final AssignmentFactory assignmentFactory;
   private final AssignmentChangeAuthorizer assignmentChangeAuthorizer;
   private final DataStructureVersionService dataStructureVersionService;
   private final PipelineRepository pipelineRepository;
   private final DataPoolRepository dataPoolRepository;
-  private final ModelRegistryGateway modelRegistryGateway;
+  private final DataSourceConnectorStore connectorStore;
   private final ScopeAccessAuthorizer scopeAccessAuthorizer;
   private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
   private final ArtifactUsageLookup artifactUsageLookup;
@@ -151,10 +143,8 @@ public class DataSourceService
       applyDatapoolScope(entity, input.getDatapoolScope());
     }
 
-    // An absent connector on a full update clears the pin; the artifact history stays in the
-    // registry.
     if (entity.getId() != null) {
-      storeConnectorInRegistry(entity, input.getConnector());
+      connectorStore.write(entity, input.getConnector());
     }
 
     return super.postConvertToEntity(entity, input);
@@ -162,73 +152,8 @@ public class DataSourceService
 
   @Override
   protected DataSource postCreate(DataSource saved, DataSourceInputDTO input) {
-    storeConnectorInRegistry(saved, input.getConnector());
+    connectorStore.write(saved, input.getConnector());
     return super.postCreate(saved, input);
-  }
-
-  /**
-   * Stores the connector in the Model Forge registry (kind {@code DATA_SOURCE}) and mirrors the
-   * assigned pin onto the shell. A null connector clears the content pin; the logical URN is kept
-   * so a later store versions the same artifact.
-   *
-   * @param entity the data source entity, still pinned to the stored connector
-   * @param connector the connector of the request, or null to clear
-   */
-  private void storeConnectorInRegistry(DataSource entity, ConnectorConfiguration connector) {
-    if (connector == null) {
-      entity.setConfigurationUrn(null);
-      return;
-    }
-    Map<String, Object> document =
-        ConnectorJson.toDocument(connector, fetchConfiguration(entity), textEncryptor::encrypt);
-    if (entity.getConfigurationUrn() != null
-        && modelRegistryGateway.isUnchanged(entity.getConfigurationUrn(), document, null)) {
-      // Only a connector without a clear-text secret compares equal, because encryption is not
-      // deterministic.
-      return;
-    }
-    ModelRegistryGateway.ModelPin pin =
-        modelRegistryGateway.storePayload(
-            PayloadKind.DATA_SOURCE,
-            Optional.ofNullable(entity.getConfigurationLogicalUrn()),
-            entity.getId(),
-            entity.getName() != null ? entity.getName() : "datasource",
-            document,
-            null);
-    if (entity.getConfigurationLogicalUrn() == null) {
-      entity.setConfigurationLogicalUrn(pin.logicalUrn());
-    }
-    entity.setConfigurationUrn(pin.versionedUrn());
-  }
-
-  /**
-   * The stored registry document, or null when none is pinned. A pin that cannot be read fails
-   * instead of reading as absent, because absence means "no secret to keep".
-   */
-  private Map<String, Object> fetchConfiguration(DataSource entity) {
-    if (entity.getConfigurationUrn() == null) {
-      return null;
-    }
-    return modelRegistryGateway
-        .fetchPayload(entity.getConfigurationUrn())
-        .map(ModelRegistryGateway.RegistryDocument::content)
-        .map(HashMap::new)
-        .orElseThrow(
-            () ->
-                new InvalidInputException(
-                    getEntityName(),
-                    entity.getId(),
-                    "Stored configuration cannot be read: " + entity.getConfigurationUrn()));
-  }
-
-  /** The stored connector, or null when the data source has no connector type. */
-  private ConnectorConfiguration fetchConnector(DataSource entity) {
-    if (entity.getConnectorType() == null) {
-      return null;
-    }
-    Map<String, Object> document = fetchConfiguration(entity);
-    return ConnectorJson.readStored(
-        entity.getConnectorType(), document == null ? Map.of() : document);
   }
 
   @Override
@@ -249,7 +174,7 @@ public class DataSourceService
    *     connector cannot be read
    */
   public ConnectorConfiguration patchConnector(DataSource existing, JsonNode connectorPatch) {
-    return ConnectorJson.patch(fetchConnector(existing), connectorPatch);
+    return connectorStore.patch(existing, connectorPatch);
   }
 
   private void validateConnectorTypeChange(DataSourceInputDTO input, DataSource existingEntity) {
@@ -395,8 +320,8 @@ public class DataSourceService
    */
   @Override
   protected void postDelete(DataSource entity) {
-    if (entity != null && entity.getConfigurationLogicalUrn() != null) {
-      modelRegistryGateway.deletePayload(entity.getConfigurationLogicalUrn());
+    if (entity != null) {
+      connectorStore.delete(entity);
     }
   }
 
@@ -455,7 +380,7 @@ public class DataSourceService
     }
 
     Set<ConstraintViolation<ConnectorConfiguration>> violations =
-        validator.validate(fetchConnector(entity), Default.class, OnRelease.class);
+        validator.validate(connectorStore.read(entity), Default.class, OnRelease.class);
     if (!violations.isEmpty()) {
       throw new ConnectorValidationException(violations);
     }

@@ -9,8 +9,8 @@ import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
-import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.service.ArtifactUsageLookup;
+import de.civitascore.portal.service.connector.DataSourceConnectorStore;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -26,10 +26,10 @@ class DataSourceAssemblerTest {
 
   @Mock private DataSourceMapper dataSourceMapper;
   @Mock private ArtifactUsageLookup artifactUsageLookup;
-  @Mock private ModelRegistryGateway modelRegistryGateway;
+  @Mock private DataSourceConnectorStore connectorStore;
 
   private DataSourceAssembler assembler() {
-    return new DataSourceAssembler(dataSourceMapper, artifactUsageLookup, modelRegistryGateway);
+    return new DataSourceAssembler(dataSourceMapper, artifactUsageLookup, connectorStore);
   }
 
   @Nested

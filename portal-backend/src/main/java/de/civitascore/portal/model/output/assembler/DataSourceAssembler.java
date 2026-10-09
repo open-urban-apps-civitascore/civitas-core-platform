@@ -1,8 +1,6 @@
 package de.civitascore.portal.model.output.assembler;
 
 import de.civitascore.portal.mapper.DataSourceMapper;
-import de.civitascore.portal.model.connector.ConnectorConfiguration;
-import de.civitascore.portal.model.connector.ConnectorJson;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSource;
@@ -10,18 +8,16 @@ import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
 import de.civitascore.portal.model.output.DatapoolScopeOutputDTO;
-import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.service.ArtifactUsageLookup;
+import de.civitascore.portal.service.connector.DataSourceConnectorStore;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
  * Assembler for converting {@link DataSource} entities to {@link DataSourceOutputDTO}. Participates
- * in the template method pattern defined by {@link BaseAssembler}. The connector configuration is
- * read back from the Model Forge registry via the source's {@code configurationUrn} pin.
+ * in the template method pattern defined by {@link BaseAssembler}.
  */
 @Component
 @RequiredArgsConstructor
@@ -29,7 +25,7 @@ public class DataSourceAssembler implements BaseAssembler<DataSource, DataSource
 
   private final DataSourceMapper dataSourceMapper;
   private final ArtifactUsageLookup artifactUsageLookup;
-  private final ModelRegistryGateway modelRegistryGateway;
+  private final DataSourceConnectorStore connectorStore;
 
   /** {@inheritDoc} Delegates to the {@link DataSourceMapper} for basic field mapping. */
   @Override
@@ -39,8 +35,8 @@ public class DataSourceAssembler implements BaseAssembler<DataSource, DataSource
 
   /**
    * {@inheritDoc} Sets the {@code inUse} and {@code inUseByReleased} flags, populates the {@code
-   * datapoolScope} from the entity's scope type and associated Datapools, and serves the connector
-   * from the registry pin.
+   * datapoolScope} from the entity's scope type and associated Datapools, and serves the stored
+   * connector.
    */
   @Override
   public DataSourceOutputDTO enrichDto(DataSourceOutputDTO dto, DataSource entity) {
@@ -48,7 +44,7 @@ public class DataSourceAssembler implements BaseAssembler<DataSource, DataSource
     dto.setInUse(usage.inUse());
     dto.setInUseByReleased(usage.inUseByReleased());
     dto.setDatapoolScope(buildDatapoolScopeOutput(entity));
-    dto.setConnector(fetchConnector(entity));
+    dto.setConnector(connectorStore.read(entity));
     dto.setConfigurationUrn(entity.getConfigurationUrn());
     return dto;
   }
@@ -63,25 +59,6 @@ public class DataSourceAssembler implements BaseAssembler<DataSource, DataSource
     DataSourceInputDTO dto = dataSourceMapper.toInput(entity);
     dto.setDatapoolScope(buildDatapoolScopeInput(entity));
     return (I) dto;
-  }
-
-  /**
-   * The connector of the source's connector type, read from its registry document. Without a stored
-   * document every field of the connector is empty.
-   */
-  private ConnectorConfiguration fetchConnector(DataSource entity) {
-    if (entity.getConnectorType() == null) {
-      return null;
-    }
-    Map<String, Object> document =
-        entity.getConfigurationUrn() == null
-            ? null
-            : modelRegistryGateway
-                .fetchPayload(entity.getConfigurationUrn())
-                .map(ModelRegistryGateway.RegistryDocument::content)
-                .orElse(null);
-    return ConnectorJson.readStored(
-        entity.getConnectorType(), document == null ? Map.of() : document);
   }
 
   private DatapoolScopeOutputDTO buildDatapoolScopeOutput(DataSource entity) {

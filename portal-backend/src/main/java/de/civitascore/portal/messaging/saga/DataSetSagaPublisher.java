@@ -18,6 +18,7 @@ import de.civitascore.portal.model.saga.LayerPayload;
 import de.civitascore.portal.model.saga.StylePayload;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSinkRepository;
+import de.civitascore.portal.service.connector.DataSourceConnectorStore;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -53,18 +54,21 @@ public class DataSetSagaPublisher {
   private final SagaProperties sagaProperties;
   private final DataSinkRepository dataSinkRepository;
   private final ModelRegistryGateway modelRegistryGateway;
+  private final DataSourceConnectorStore connectorStore;
 
   public DataSetSagaPublisher(
       KafkaTemplate<String, String> eventKafkaTemplate,
       ObjectMapper objectMapper,
       SagaProperties sagaProperties,
       DataSinkRepository dataSinkRepository,
-      ModelRegistryGateway modelRegistryGateway) {
+      ModelRegistryGateway modelRegistryGateway,
+      DataSourceConnectorStore connectorStore) {
     this.eventKafkaTemplate = eventKafkaTemplate;
     this.objectMapper = objectMapper;
     this.sagaProperties = sagaProperties;
     this.dataSinkRepository = dataSinkRepository;
     this.modelRegistryGateway = modelRegistryGateway;
+    this.connectorStore = connectorStore;
   }
 
   /**
@@ -174,8 +178,7 @@ public class DataSetSagaPublisher {
               datasource.setName(ds.getName());
               datasource.setType(
                   ds.getConnectorType() != null ? ds.getConnectorType().name() : null);
-              Map<String, Object> configuration =
-                  fetchConfiguration(ds.getConfigurationUrn(), "DataSource", ds.getId());
+              Map<String, Object> configuration = connectorStore.storedDocument(ds);
               if (configuration != null) {
                 configuration.forEach(datasource::handleUnknownProperty);
               }

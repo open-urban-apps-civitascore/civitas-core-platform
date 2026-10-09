@@ -1,6 +1,7 @@
 package de.civitascore.portal.controller.exception;
 
 import de.civitascore.portal.model.connector.InvalidConnectorException;
+import de.civitascore.portal.service.connector.StoredConnectorUnreadableException;
 import de.civitascore.portal.util.ConnectorValidationException;
 import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
@@ -332,6 +333,25 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
           HttpStatus.BAD_REQUEST, "ENTITY_VALIDATION_FAILED", "Entity validation failed", request);
     }
     log.error("Persistence error: {}", Encode.forJava(ex.getMessage()), ex);
+    return toProblemDetailResponse(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        "PERSISTENCE_ERROR",
+        "A persistence error occurred",
+        request);
+  }
+
+  /**
+   * Handles a Data source pinned to a stored connector that the registry does not hold, and returns
+   * the 500 Problem Detail of a persistence error.
+   *
+   * @param ex the stored connector unreadable exception
+   * @param request the current HTTP request
+   * @return a Problem Detail with HTTP 500 status
+   */
+  @ExceptionHandler(StoredConnectorUnreadableException.class)
+  public ResponseEntity<ProblemDetail> handleStoredConnectorUnreadable(
+      StoredConnectorUnreadableException ex, HttpServletRequest request) {
+    log.error("{}", Encode.forJava(ex.getMessage()));
     return toProblemDetailResponse(
         HttpStatus.INTERNAL_SERVER_ERROR,
         "PERSISTENCE_ERROR",
