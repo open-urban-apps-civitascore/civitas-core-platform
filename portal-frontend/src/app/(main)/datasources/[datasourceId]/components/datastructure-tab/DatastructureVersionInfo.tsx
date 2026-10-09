@@ -16,12 +16,14 @@ export const DatastructureVersionInfo = (props: DatastructureVersionInfoProps) =
 
   return (
     <div
-      className="flex items-center gap-6 text-sm font-semibold text-foreground"
+      className="flex min-w-0 items-center gap-6 text-sm font-semibold text-foreground"
       data-testid="datastructureVersionInfo"
     >
-      <span>{version.dataStructure.name}</span>
-      <span>{version.version ? t('version', { version: version.version }) : t('noVersion')}</span>
-      <Badge variant="secondary" className="text-sm">
+      <span className="truncate" title={version.dataStructure.name}>
+        {version.dataStructure.name}
+      </span>
+      <span className="shrink-0">{version.version ? t('version', { version: version.version }) : t('noVersion')}</span>
+      <Badge variant="secondary" className="shrink-0 text-sm">
         {status === DATASTRUCTURE_STATUS_TYPES.DRAFT ? <CircleDashed /> : <CircleCheckBig />}
         {tCommon(`status.${status}`)}
       </Badge>

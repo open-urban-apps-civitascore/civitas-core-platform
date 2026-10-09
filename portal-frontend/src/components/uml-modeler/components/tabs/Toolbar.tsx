@@ -40,8 +40,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onImportFromDatastructure, con
   const t = useTranslations('umlModeler')
 
   return (
-    <div className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">
-      {content && <div className="mr-3">{content}</div>}
+    <div className="flex h-12 shrink-0 items-center gap-1 px-3 bg-white border-b border-gray-200">
+      {content && <div className="mr-3 min-w-0">{content}</div>}
       <div className="flex-1" />
       <div className="text-xs text-gray-500">
         <ImportedStructures />

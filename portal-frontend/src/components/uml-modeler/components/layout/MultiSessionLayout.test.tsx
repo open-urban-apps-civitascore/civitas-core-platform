@@ -91,59 +91,59 @@ const createMockSession = (diagram: UMLDiagram): DiagramSession => ({
   created: new Date(),
 })
 
+const renderLayout = (
+  diagram = createMockDiagram(),
+  isReadOnly = false,
+  canExportDiagram?: boolean,
+  hasDatastructureId = true,
+  toolbarContent?: ReactNode,
+) => {
+  const session = createMockSession(diagram)
+  let currentSession = session
+  const mockSessionManager = {
+    sessions: [session],
+    activeSessionId: session.id,
+    activeSession: session,
+    createSession: vi.fn(),
+    closeSession: vi.fn(),
+    setSession: vi.fn((_id, updated) => {
+      currentSession = updated
+      mockSessionManager.activeSession = updated
+      mockSessionManager.sessions = [updated]
+    }),
+    switchToSession: vi.fn(),
+    updateSessionName: vi.fn(),
+    updateSessionDiagram: vi.fn(),
+    markSessionDirty: vi.fn(),
+    markSessionClean: vi.fn(),
+    markFieldClean: vi.fn(),
+    getActiveSession: vi.fn(() => currentSession),
+    getAllSessions: vi.fn(() => [currentSession]),
+  }
+
+  const utils = render(
+    <QueryClientProvider client={queryClient}>
+      <ReadOnlyProvider isReadOnly={isReadOnly}>
+        <MultiSessionLayout
+          externalSessionManager={mockSessionManager as unknown as UseMultiSessionReturn}
+          isMultiSessionMode={false}
+          toolbarContent={toolbarContent}
+          canExportDiagram={canExportDiagram}
+          dataStructureName="School"
+          versionName="v1"
+          datastructureId={hasDatastructureId ? '12345' : undefined}
+        />
+      </ReadOnlyProvider>
+    </QueryClientProvider>,
+  )
+
+  return { ...utils, mockSessionManager }
+}
+
 describe('MultiSessionLayout Import & Export', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
-
-  const renderLayout = (
-    diagram = createMockDiagram(),
-    isReadOnly = false,
-    canExportDiagram?: boolean,
-    hasDatastructureId = true,
-    toolbarContent?: ReactNode,
-  ) => {
-    const session = createMockSession(diagram)
-    let currentSession = session
-    const mockSessionManager = {
-      sessions: [session],
-      activeSessionId: session.id,
-      activeSession: session,
-      createSession: vi.fn(),
-      closeSession: vi.fn(),
-      setSession: vi.fn((_id, updated) => {
-        currentSession = updated
-        mockSessionManager.activeSession = updated
-        mockSessionManager.sessions = [updated]
-      }),
-      switchToSession: vi.fn(),
-      updateSessionName: vi.fn(),
-      updateSessionDiagram: vi.fn(),
-      markSessionDirty: vi.fn(),
-      markSessionClean: vi.fn(),
-      markFieldClean: vi.fn(),
-      getActiveSession: vi.fn(() => currentSession),
-      getAllSessions: vi.fn(() => [currentSession]),
-    }
-
-    const utils = render(
-      <QueryClientProvider client={queryClient}>
-        <ReadOnlyProvider isReadOnly={isReadOnly}>
-          <MultiSessionLayout
-            externalSessionManager={mockSessionManager as unknown as UseMultiSessionReturn}
-            isMultiSessionMode={false}
-            toolbarContent={toolbarContent}
-            canExportDiagram={canExportDiagram}
-            dataStructureName="School"
-            versionName="v1"
-            datastructureId={hasDatastructureId ? '12345' : undefined}
-          />
-        </ReadOnlyProvider>
-      </QueryClientProvider>,
-    )
-
-    return { ...utils, mockSessionManager }
-  }
 
   it('triggers file picker click when Import button is clicked', () => {
     renderLayout()
@@ -310,15 +310,6 @@ describe('MultiSessionLayout Import & Export', () => {
     expect(toast.success).toHaveBeenCalledWith('import.added')
   })
 
-  it('shows the toolbar when only toolbar content is given', () => {
-    const { unmount } = renderLayout(createMockDiagram(), true)
-    expect(screen.queryByTestId('toolbar')).not.toBeInTheDocument()
-    unmount()
-
-    renderLayout(createMockDiagram(), true, undefined, true, <span>Test info</span>)
-    expect(screen.getByTestId('toolbar')).toBeInTheDocument()
-  })
-
   it('hides the export button when datastructureId is missing or canExportDiagram is false', () => {
     // 1. Missing datastructureId (e.g. on datasource page)
     const { unmount } = renderLayout(createMockDiagram(), false, undefined, false)
@@ -353,5 +344,21 @@ describe('MultiSessionLayout Import & Export', () => {
     fireEvent.click(screen.getByText('export.title'))
 
     expect(toast.error).toHaveBeenCalledWith('rootValidation.noRoot')
+  })
+})
+
+describe('MultiSessionLayout Toolbar', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('hides the toolbar when it has nothing to show', () => {
+    renderLayout(createMockDiagram(), true)
+    expect(screen.queryByTestId('toolbar')).not.toBeInTheDocument()
+  })
+
+  it('shows the toolbar when only toolbar content is given', () => {
+    renderLayout(createMockDiagram(), true, undefined, true, <span>Test info</span>)
+    expect(screen.getByTestId('toolbar')).toBeInTheDocument()
   })
 })

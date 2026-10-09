@@ -12,7 +12,7 @@ const { mockUseGetDatastructureVersion } = vi.hoisted(() => ({
 
 vi.mock('next-intl', () => ({
   useTranslations: () =>
-    Object.assign((key: string) => key, {
+    Object.assign((key: string, params?: Record<string, unknown>) => (params ? key + JSON.stringify(params) : key), {
       rich: (key: string) => key,
     }),
 }))
@@ -133,7 +133,7 @@ describe('DatastructureTab', () => {
 
     const header = screen.getByTestId('datastructureVersionInfo')
     expect(header).toHaveTextContent('Test Datastructure')
-    expect(header).toHaveTextContent('version')
+    expect(header).toHaveTextContent('version{"version":"2"}')
     expect(header).toHaveTextContent('status.AVAILABLE')
   })
 
@@ -146,6 +146,14 @@ describe('DatastructureTab', () => {
     const header = screen.getByTestId('datastructureVersionInfo')
     expect(header).toHaveTextContent('noVersion')
     expect(header).toHaveTextContent('status.DRAFT')
+  })
+
+  it('keeps the toolbar with an empty placeholder while the assigned version loads', () => {
+    mockUseGetDatastructureVersion.mockReturnValue({ data: undefined, isLoading: true })
+    renderComponent({ ...defaultProps, isReadOnly: true, selectedVersionId: 'datastructure-1/version-1' })
+
+    expect(screen.getByTestId('datastructureVersionInfoPlaceholder')).toBeInTheDocument()
+    expect(screen.queryByTestId('datastructureVersionInfo')).not.toBeInTheDocument()
   })
 
   it('shows no version info when no version is assigned', () => {
