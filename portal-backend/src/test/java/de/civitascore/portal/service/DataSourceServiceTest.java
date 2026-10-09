@@ -333,6 +333,39 @@ class DataSourceServiceTest {
     }
 
     @Test
+    @DisplayName("Should fail to release MQTT source with more than one topic filter")
+    void shouldFailToReleaseMqttWithMultipleTopics() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDescription("A data source");
+      entity.setDataSourceStatus(DataSourceStatus.DRAFT);
+      entity.setConnectorType(ConnectorType.MQTT);
+      stubStoredConnector(
+          entity,
+          Map.of(
+              "urls",
+              List.of("tcp://broker:1883"),
+              "topics",
+              List.of("sensor/a", "sensor/b"),
+              "qos",
+              1));
+      entity.setDataStructureVersion(createDataStructureVersion());
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+
+      assertThatThrownBy(() -> dataSourceService.release(id))
+          .isInstanceOf(ConnectorValidationException.class)
+          .extracting(e -> ((ConnectorValidationException) e).getViolations())
+          .isEqualTo(
+              List.of(
+                  new ConnectorViolation(
+                      "connector.topics",
+                      "'topics' must contain exactly one topic filter; use wildcards (+, #) for"
+                          + " multiple topics")));
+    }
+
+    @Test
     @DisplayName("Should fail to release SQL source without driver")
     void shouldFailToReleaseSqlWithoutDriver() {
       UUID id = UUID.randomUUID();
