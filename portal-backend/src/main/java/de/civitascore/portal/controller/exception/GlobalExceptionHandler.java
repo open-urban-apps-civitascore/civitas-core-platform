@@ -1,8 +1,8 @@
 package de.civitascore.portal.controller.exception;
 
 import de.civitascore.portal.model.connector.InvalidConnectorException;
+import de.civitascore.portal.service.connector.ConnectorValidationException;
 import de.civitascore.portal.service.connector.StoredConnectorUnreadableException;
-import de.civitascore.portal.util.ConnectorValidationException;
 import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.ExternalSystemRejectionException;

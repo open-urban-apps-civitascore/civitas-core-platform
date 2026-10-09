@@ -1,6 +1,5 @@
-package de.civitascore.portal.util;
+package de.civitascore.portal.service.connector;
 
-import de.civitascore.portal.service.connector.ConnectorViolation;
 import java.util.List;
 
 /** Thrown when the connector of a Data source violates the rules of a validation stage. */
