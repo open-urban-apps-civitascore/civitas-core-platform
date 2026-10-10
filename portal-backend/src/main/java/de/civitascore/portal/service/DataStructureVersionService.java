@@ -146,18 +146,6 @@ public class DataStructureVersionService
   }
 
   /**
-   * A stored version of the data structure that a logical CORE URN names, any version, with its
-   * parent fetched. Every version shares the parent, so the first match is enough to find it.
-   *
-   * @param logicalUrn the version-free CORE URN of the data structure
-   * @return a version of that structure, or empty when this instance holds none
-   */
-  @Transactional(readOnly = true)
-  public Optional<DataStructureVersion> findAnyByLogicalUrn(String logicalUrn) {
-    return dataStructureVersionRepository.findFirstByModelUrnStartingWith(logicalUrn + ":");
-  }
-
-  /**
    * Override update to ensure it can only be called for DRAFT versions. For released versions, use
    * updateReleasedMeta instead.
    *

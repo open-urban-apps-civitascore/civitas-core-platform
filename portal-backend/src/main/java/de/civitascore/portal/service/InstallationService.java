@@ -3,8 +3,6 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
-import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.InstalledArtifactAction;
 import de.civitascore.portal.model.embedded.InstalledArtifactType;
@@ -28,7 +26,6 @@ import de.civitascore.portal.model.input.PackageManifestInputDTO;
 import de.civitascore.portal.model.input.PackageMemberInputDTO;
 import de.civitascore.portal.model.input.PackageMemberKind;
 import de.civitascore.portal.model.input.PipelineInputDTO;
-import de.civitascore.portal.model.input.StructureIdentity;
 import de.civitascore.portal.modelregistry.DataStructureUrns;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.InstallationRepository;
@@ -72,10 +69,6 @@ import org.springframework.transaction.annotation.Transactional;
  * journal line as its origin. Identities inside the package only serve to let members refer to one
  * another; every such reference is rewritten to the minted copy before the referring member is
  * stored.
- *
- * <p>One exception, experimental: with {@link StructureIdentity#KEEP} the data structures keep the
- * URN the package gives them, and one this instance already holds under that URN is reused instead
- * of copied ({@link InstalledArtifactAction#REUSED}). Every other kind is still a copy.
  *
  * <p>An uninstall removes what the install created, in the reverse order, and keeps the record.
  */
@@ -133,14 +126,12 @@ public class InstallationService {
   private static final class Run {
     final Installation installation;
     final UUID datapoolId;
-    final StructureIdentity structureIdentity;
     final Map<String, Minted> minted = new LinkedHashMap<>();
     final Map<String, DataSet> datasets = new LinkedHashMap<>();
 
-    Run(Installation installation, UUID datapoolId, StructureIdentity structureIdentity) {
+    Run(Installation installation, UUID datapoolId) {
       this.installation = installation;
       this.datapoolId = datapoolId;
-      this.structureIdentity = structureIdentity;
     }
   }
 
@@ -162,13 +153,7 @@ public class InstallationService {
     installation.setPackageId(manifest.getId());
     installation.setPackageVersion(manifest.getVersion());
     claim(installation);
-    Run run =
-        new Run(
-            installation,
-            input.getDatapoolId(),
-            input.getStructureIdentity() == null
-                ? StructureIdentity.MINT
-                : input.getStructureIdentity());
+    Run run = new Run(installation, input.getDatapoolId());
 
     for (PackageMemberInputDTO member : members) {
       installation.addArtifact(
@@ -349,9 +334,6 @@ public class InstallationService {
    * copies.
    */
   private InstalledArtifact installDataStructure(PackageMemberInputDTO member, Run run) {
-    if (run.structureIdentity == StructureIdentity.KEEP) {
-      return installDataStructureKeepingIdentity(member, run);
-    }
     String name = displayName(member);
     String description = requireDescription(member);
 
@@ -362,36 +344,7 @@ public class InstallationService {
 
     String localUrn = DataStructureUrns.dataStructure(name, shell.getId());
     Map<String, Object> model = withMintedIdentities(member.getContent(), localUrn, run.minted);
-    DataStructureVersion version = createReleasedVersion(shell, name, description, model);
 
-    String logicalUrn = modelRegistryGateway.logicalUrn(version.getModelUrn());
-    run.minted.put(
-        key(member.getUrn()),
-        new Minted(
-            PackageMemberKind.DATASTRUCTURE,
-            logicalUrn,
-            version.getModelUrn(),
-            shell.getId(),
-            version.getId()));
-    return line(
-        InstalledArtifactType.DATA_STRUCTURE,
-        name,
-        shell.getId(),
-        logicalUrn,
-        version.getModelUrn(),
-        member.getUrn());
-  }
-
-  /**
-   * Stores the model as the shell's first version and releases both.
-   *
-   * <p>Released here, not later: a source links only an AVAILABLE version of an AVAILABLE
-   * structure, and the package's sources come next. Version first, then the shell - which checks
-   * its own versions collection, so the new version is registered on the managed shell (the
-   * version service only sets the owning side) before the shell's release looks at it.
-   */
-  private DataStructureVersion createReleasedVersion(
-      DataStructure shell, String name, String description, Map<String, Object> model) {
     DataStructureVersionInputDTO versionInput = new DataStructureVersionInputDTO();
     versionInput.setDataStructureId(shell.getId());
     versionInput.setDescription(description);
@@ -399,50 +352,15 @@ public class InstallationService {
     versionInput.setModel(model);
     DataStructureVersion version = dataStructureVersionService.create(versionInput);
 
+    // Released here, not later: a source links only an AVAILABLE version of an AVAILABLE
+    // structure, and the package's sources come next. Version first, then the shell - which
+    // checks its own versions collection, so the new version is registered on the managed shell
+    // (the version service only sets the owning side) before the shell's release looks at it.
     dataStructureVersionService.release(version.getId());
     shell.getDataStructureVersions().add(version);
     dataStructureService.release(shell.getId());
-    return version;
-  }
-
-  /**
-   * Installs a structure under the URN the package gives it ({@link StructureIdentity#KEEP},
-   * experimental), so it is the same structure on every instance that installs it this way.
-   *
-   * <p>Model Forge adopts a model's own root {@code $id} on import; the minting path replaces it on
-   * purpose, and this path leaves it. A structure this instance already holds under that URN is
-   * reused rather than stored twice, because two shells on one registry artifact would delete each
-   * other's model. The editor derives the URN of a structure from its name and shell id when it
-   * saves one, so a later edit in the editor may move a kept structure to a URN of its own.
-   */
-  private InstalledArtifact installDataStructureKeepingIdentity(
-      PackageMemberInputDTO member, Run run) {
-    String packageUrn = requireDataStructureUrn(member);
-    Optional<DataStructureVersion> held =
-        dataStructureVersionService.findAnyByLogicalUrn(packageUrn);
-    if (held.isPresent()) {
-      return reuseDataStructure(member, packageUrn, held.get().getDataStructure(), run);
-    }
-
-    String name = displayName(member);
-    String description = requireDescription(member);
-    DataStructureInputDTO structureInput = new DataStructureInputDTO();
-    structureInput.setName(name);
-    structureInput.setDescription(description);
-    DataStructure shell = dataStructureService.create(structureInput);
-
-    Map<String, Object> model = withOwnIdentities(member.getContent(), packageUrn, run.minted);
-    DataStructureVersion version = createReleasedVersion(shell, name, description, model);
 
     String logicalUrn = modelRegistryGateway.logicalUrn(version.getModelUrn());
-    if (!packageUrn.equals(logicalUrn)) {
-      // The registry chose a URN of its own. The install goes on; the journal line shows the
-      // difference between urn and origin.
-      log.warn(
-          "Kept identity {} was stored as {}",
-          Encode.forJava(packageUrn),
-          Encode.forJava(logicalUrn));
-    }
     run.minted.put(
         key(member.getUrn()),
         new Minted(
@@ -458,70 +376,6 @@ public class InstallationService {
         logicalUrn,
         version.getModelUrn(),
         member.getUrn());
-  }
-
-  /**
-   * Binds the package's structure to the one this instance already holds under the same URN: its
-   * newest released version, which a source can link, without comparing content - the URN says it
-   * is the same structure. A structure without a released version cannot be bound, and the install
-   * refuses rather than releasing somebody else's draft. The journal line says REUSED, so an
-   * uninstall leaves the structure alone.
-   */
-  private InstalledArtifact reuseDataStructure(
-      PackageMemberInputDTO member, String packageUrn, DataStructure shell, Run run) {
-    DataStructureVersion version =
-        shell.getDataStructureStatus() == DataStructureStatus.AVAILABLE
-            ? shell.getDataStructureVersions().stream()
-                .filter(
-                    candidate ->
-                        candidate.getDataStructureVersionStatus()
-                            == DataStructureVersionStatus.AVAILABLE)
-                .filter(candidate -> candidate.getModelUrn() != null)
-                .max(Comparator.comparing(DataStructureVersion::getCreatedAt))
-                .orElse(null)
-            : null;
-    if (version == null) {
-      throw new InvalidInputException(
-          "urn",
-          member.getUrn(),
-          ("This instance holds data structure '%s' already, but no released version of it to"
-                  + " reuse. Release it, or install with minted identities.")
-              .formatted(packageUrn));
-    }
-    // The package's element identities are the held ones; remembered so that a reference to one
-    // is refused with the usual message.
-    withOwnIdentities(member.getContent(), packageUrn, run.minted);
-
-    String logicalUrn = modelRegistryGateway.logicalUrn(version.getModelUrn());
-    run.minted.put(
-        key(member.getUrn()),
-        new Minted(
-            PackageMemberKind.DATASTRUCTURE,
-            logicalUrn,
-            version.getModelUrn(),
-            shell.getId(),
-            version.getId()));
-    return line(
-        InstalledArtifactType.DATA_STRUCTURE,
-        shell.getName(),
-        shell.getId(),
-        logicalUrn,
-        version.getModelUrn(),
-        member.getUrn(),
-        InstalledArtifactAction.REUSED);
-  }
-
-  /** Keeping an identity needs one that the registry stores as a data structure. */
-  private String requireDataStructureUrn(PackageMemberInputDTO member) {
-    String packageUrn = key(member.getUrn());
-    if (!"datastructure".equals(modelRegistryGateway.artifactType(packageUrn))) {
-      throw new InvalidInputException(
-          "urn",
-          member.getUrn(),
-          "Keeping identities needs a data structure URN; '%s' is none."
-              .formatted(member.getUrn()));
-    }
-    return packageUrn;
   }
 
   /**
@@ -845,9 +699,9 @@ public class InstallationService {
    * What a package URN became on this instance, checked against the kind the referring field
    * expects. Members of this package resolve to their copies. A structure the platform publishes
    * (the FROST port structures) resolves to itself: it carries the same URN on every instance and
-   * belongs to no package, so a reference to it is kept, not rewritten. A structure reused under a
-   * kept identity resolves like a member of the package. The order of kinds guarantees that
-   * whatever a member may reference has already been installed.
+   * belongs to no package, so a reference to it is kept, not rewritten. Binding to artifacts
+   * installed earlier, by origin, is a later increment. The order of kinds guarantees that whatever
+   * a member may reference has already been installed.
    */
   private Minted resolveReference(
       String reference,
@@ -988,40 +842,6 @@ public class InstallationService {
   }
 
   /**
-   * A copy of the model that keeps the package's identities: the root {@code $id} is the package
-   * URN, and each inline {@code $defs} member keeps its own {@code $id}. A member without one gets
-   * the URN derived from the root the way minting derives it, so it is the same on every instance
-   * instead of one the registry would pick at random.
-   */
-  private Map<String, Object> withOwnIdentities(
-      Map<String, Object> content, String rootUrn, Map<String, Minted> minted) {
-    Map<String, Object> model = new LinkedHashMap<>(content);
-    model.put(ID, rootUrn);
-
-    if (model.get(DEFS) instanceof Map<?, ?> defs) {
-      Map<String, Object> keptDefs = new LinkedHashMap<>();
-      defs.forEach(
-          (key, def) -> {
-            String memberName = String.valueOf(key);
-            if (def instanceof Map<?, ?> schema && !schema.containsKey(REF)) {
-              Map<String, Object> copy = stringKeyed(schema);
-              String elementUrn =
-                  copy.get(ID) instanceof String own && !own.isBlank()
-                      ? own
-                      : DataStructureUrns.elementForMember(rootUrn, memberName);
-              rememberOrigin(elementUrn, elementUrn, minted);
-              copy.put(ID, elementUrn);
-              keptDefs.put(memberName, copy);
-            } else {
-              keptDefs.put(memberName, def);
-            }
-          });
-      model.put(DEFS, keptDefs);
-    }
-    return model;
-  }
-
-  /**
    * Element identities inside a structure are minted with it but have no version of their own the
    * install could pin, and no member may reference them; they are remembered by logical URN only,
    * without a kind, so that a reference to one is refused with a clear message. The structure's own
@@ -1052,17 +872,6 @@ public class InstallationService {
       String urn,
       String versionedUrn,
       String origin) {
-    return line(type, name, shellId, urn, versionedUrn, origin, InstalledArtifactAction.CREATED);
-  }
-
-  private static InstalledArtifact line(
-      InstalledArtifactType type,
-      String name,
-      UUID shellId,
-      String urn,
-      String versionedUrn,
-      String origin,
-      InstalledArtifactAction action) {
     InstalledArtifact artifact = new InstalledArtifact();
     artifact.setArtifactType(type);
     artifact.setName(name);
@@ -1070,7 +879,7 @@ public class InstallationService {
     artifact.setUrn(urn);
     artifact.setVersionedUrn(versionedUrn);
     artifact.setOrigin(origin);
-    artifact.setAction(action);
+    artifact.setAction(InstalledArtifactAction.CREATED);
     return artifact;
   }
 }

@@ -36,11 +36,4 @@ public class InstallationInputDTO {
               + " parameter resolution is the next increment; until then a package has to carry"
               + " concrete values.")
   private Map<String, Object> parameters;
-
-  @Schema(
-      description =
-          "How the package's data structures are identified. MINT, the default, creates copies"
-              + " under URNs this instance mints; KEEP keeps the package's URNs and reuses a"
-              + " structure the instance already holds under one. Experimental.")
-  private StructureIdentity structureIdentity;
 }
