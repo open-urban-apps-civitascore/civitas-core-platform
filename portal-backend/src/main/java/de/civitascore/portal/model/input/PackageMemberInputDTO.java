@@ -45,7 +45,8 @@ public class PackageMemberInputDTO {
 
   @Size(max = 1024, message = "dataset must not exceed 1024 characters") @Schema(
       description =
-          "For members that belong to a dataset (mapping, data sink, pipeline): the package URN of"
+          "For members that belong to a dataset (api, mapping, data sink, pipeline, style, layer):"
+              + " the package URN of"
               + " the dataset member they belong to. May be omitted when the package ships exactly"
               + " one dataset.")
   private String dataset;

@@ -35,5 +35,17 @@ public enum InstalledArtifactType {
    * A pipeline created on the install's dataset. Like a sink it carries shell id plus its minted
    * model URN, and is always CREATED for the same reason.
    */
-  PIPELINE
+  PIPELINE,
+
+  /**
+   * A named API of the install's dataset. A portal row without a registry artifact, so the line
+   * carries the row's id but no URN.
+   */
+  NAMED_API,
+
+  /** An SLD style of the install's dataset. A portal row only, like a named API. */
+  STYLE,
+
+  /** A map layer of the install's dataset. A portal row only, like a named API. */
+  LAYER
 }

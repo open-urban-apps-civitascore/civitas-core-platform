@@ -1,5 +1,6 @@
 package de.civitascore.portal.service;
 
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
@@ -13,8 +14,11 @@ import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Installation;
 import de.civitascore.portal.model.entity.InstalledArtifact;
+import de.civitascore.portal.model.entity.Layer;
+import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.PublishedStructure;
+import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
@@ -22,10 +26,13 @@ import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
 import de.civitascore.portal.model.input.InstallationInputDTO;
+import de.civitascore.portal.model.input.LayerInputDTO;
+import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.model.input.PackageManifestInputDTO;
 import de.civitascore.portal.model.input.PackageMemberInputDTO;
 import de.civitascore.portal.model.input.PackageMemberKind;
 import de.civitascore.portal.model.input.PipelineInputDTO;
+import de.civitascore.portal.model.input.StyleInputDTO;
 import de.civitascore.portal.modelregistry.DataStructureUrns;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.InstallationRepository;
@@ -34,6 +41,8 @@ import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -62,7 +71,8 @@ import org.springframework.transaction.annotation.Transactional;
  * do by hand, in the order the platform enforces: structures first and released, because a source
  * links only a released structure; then sources, released, because a pipeline links only a released
  * source; then the dataset, which stays DRAFT because releasing it rolls out infrastructure and
- * remains the operator's own decision; then the mappings, sinks and pipelines that belong to it.
+ * remains the operator's own decision, together with its named APIs; then the mappings, sinks and
+ * pipelines that belong to it; last the styles and map layers that publish its sinks.
  *
  * <p>An installation is a copy, not a shared identity. Every artifact a package ships is created
  * under a URN this instance mints, and the URN the member carried in the package is recorded on its
@@ -95,6 +105,21 @@ public class InstallationService {
   private static final String LOOKUP_SOURCE_REF = "lookupSourceRef";
   private static final String MAPPING_REF = "mappingRef";
   private static final String SINK_REF = "sinkRef";
+  private static final String NAME = "name";
+  private static final String SLUG = "slug";
+  private static final String STANDARD = "standard";
+  private static final String VERSION = "version";
+  private static final String SLD_CONTENT = "sldContent";
+  private static final String LAYER_NAME = "layerName";
+  private static final String DEFAULT_STYLE_REF = "defaultStyleRef";
+  private static final String ALTERNATIVE_STYLE_REFS = "alternativeStyleRefs";
+  private static final String KEYWORDS = "keywords";
+  private static final String ATTRIBUTE = "attribute";
+  private static final String GEOMETRY_COLUMN_REF = "geometryColumnRef";
+  private static final String CQL_FILTER = "cqlFilter";
+  private static final String CRS = "crs";
+  private static final String NATIVE_BOUNDING_BOX = "nativeBoundingBox";
+  private static final String LAT_LON_BOUNDING_BOX = "latLonBoundingBox";
 
   private final InstallationRepository installationRepository;
   private final DataStructureService dataStructureService;
@@ -104,9 +129,17 @@ public class InstallationService {
   private final MappingService mappingService;
   private final DataSinkService dataSinkService;
   private final PipelineService pipelineService;
+  private final StyleService styleService;
+  private final LayerService layerService;
   private final PublishedStructureRepository publishedStructureRepository;
   private final ModelRegistryGateway modelRegistryGateway;
   private final UninstallGuard uninstallGuard;
+
+  /**
+   * The install builds the inputs of APIs, styles and layers itself, so no controller validates
+   * them; the install applies the same constraints with this validator.
+   */
+  private final Validator validator;
 
   /**
    * What one package member became on this instance. Sources reference structures by version id,
@@ -129,9 +162,16 @@ public class InstallationService {
     final Map<String, Minted> minted = new LinkedHashMap<>();
     final Map<String, DataSet> datasets = new LinkedHashMap<>();
 
-    Run(Installation installation, UUID datapoolId) {
+    /** The API members of each dataset member, by the dataset's package URN. */
+    final Map<String, List<PackageMemberInputDTO>> apisByDataset;
+
+    Run(
+        Installation installation,
+        UUID datapoolId,
+        Map<String, List<PackageMemberInputDTO>> apisByDataset) {
       this.installation = installation;
       this.datapoolId = datapoolId;
+      this.apisByDataset = apisByDataset;
     }
   }
 
@@ -149,22 +189,28 @@ public class InstallationService {
             .toList();
     requireDatapoolWhereNeeded(members, input.getDatapoolId(), manifest.getId());
 
+    Map<String, List<PackageMemberInputDTO>> apisByDataset = apisByDataset(members);
+
     Installation installation = new Installation();
     installation.setPackageId(manifest.getId());
     installation.setPackageVersion(manifest.getVersion());
     claim(installation);
-    Run run = new Run(installation, input.getDatapoolId());
+    Run run = new Run(installation, input.getDatapoolId(), apisByDataset);
 
     for (PackageMemberInputDTO member : members) {
-      installation.addArtifact(
-          switch (member.getKind()) {
-            case DATASTRUCTURE -> installDataStructure(member, run);
-            case DATASOURCE -> installDataSource(member, run);
-            case DATASET -> installDataSet(member, run);
-            case MAPPING -> installMapping(member, run);
-            case DATASINK -> installDataSink(member, run);
-            case PIPELINE -> installPipeline(member, run);
-          });
+      switch (member.getKind()) {
+        case DATASTRUCTURE -> installation.addArtifact(installDataStructure(member, run));
+        case DATASOURCE -> installation.addArtifact(installDataSource(member, run));
+        case DATASET -> installDataSet(member, run).forEach(installation::addArtifact);
+        case API -> {
+          // Installed with its dataset, see installDataSet.
+        }
+        case MAPPING -> installation.addArtifact(installMapping(member, run));
+        case DATASINK -> installation.addArtifact(installDataSink(member, run));
+        case PIPELINE -> installation.addArtifact(installPipeline(member, run));
+        case STYLE -> installation.addArtifact(installStyle(member, run));
+        case LAYER -> installation.addArtifact(installLayer(member, run));
+      }
     }
     return installationRepository.save(installation);
   }
@@ -259,8 +305,9 @@ public class InstallationService {
         case DATA_SET -> removeDataSet(line.getShellId());
         case DATA_SOURCE -> removeDataSource(line.getShellId());
         case DATA_STRUCTURE -> removeDataStructure(line.getShellId());
-        case MAPPING, DATA_SINK, PIPELINE -> {
-          // The Dataset removes its Mappings, Data sinks and Pipelines.
+        case MAPPING, DATA_SINK, PIPELINE, NAMED_API, STYLE, LAYER -> {
+          // The Dataset removes its Mappings, Data sinks, Pipelines, named APIs, Styles and
+          // Layers.
         }
       }
     } catch (ResourceInUseException e) {
@@ -448,8 +495,12 @@ public class InstallationService {
    * install list can show it without reading the lines. The structures and sources of the package
    * become members of the dataset's manifest the way they do in the editor: through the pipeline
    * that reaches them, which links its whole flow when it is stored.
+   *
+   * <p>The dataset's named APIs come with it. The dataset reconciles its APIs as one list and
+   * checks them as a whole (unique slugs, at most one OWS API), so the install hands over every API
+   * member of the dataset at creation and records one line per API after the dataset's own.
    */
-  private InstalledArtifact installDataSet(PackageMemberInputDTO member, Run run) {
+  private List<InstalledArtifact> installDataSet(PackageMemberInputDTO member, Run run) {
     String name = displayName(member);
     DataSetInputDTO input = new DataSetInputDTO();
     input.setName(name);
@@ -457,6 +508,11 @@ public class InstallationService {
     input.setDatapoolId(run.datapoolId);
     if (member.getContent().get(OPEN_DATA_ACCESS) instanceof Boolean openDataAccess) {
       input.setOpenDataAccess(openDataAccess);
+    }
+    List<PackageMemberInputDTO> apis =
+        run.apisByDataset.getOrDefault(key(member.getUrn()), List.of());
+    if (!apis.isEmpty()) {
+      input.setNamedApis(apis.stream().map(this::namedApiInput).toList());
     }
     DataSet dataSet = dataSetService.create(input);
 
@@ -475,13 +531,106 @@ public class InstallationService {
       run.installation.setDataSetId(dataSet.getId());
       run.installation.setDataSetName(dataSet.getName());
     }
-    return line(
-        InstalledArtifactType.DATA_SET,
-        name,
-        dataSet.getId(),
-        dataSet.getManifestLogicalUrn(),
-        null,
-        member.getUrn());
+    List<InstalledArtifact> lines = new ArrayList<>();
+    lines.add(
+        line(
+            InstalledArtifactType.DATA_SET,
+            name,
+            dataSet.getId(),
+            dataSet.getManifestLogicalUrn(),
+            null,
+            member.getUrn()));
+    for (PackageMemberInputDTO api : apis) {
+      String slug = requireString(api.getContent(), SLUG, api);
+      UUID apiId =
+          dataSet.getNamedApis().stream()
+              .filter(created -> slug.equals(created.getSlug()))
+              .map(NamedApi::getId)
+              .findFirst()
+              .orElse(null);
+      lines.add(
+          line(InstalledArtifactType.NAMED_API, apiName(api), apiId, null, null, api.getUrn()));
+    }
+    return lines;
+  }
+
+  /**
+   * Groups the API members by the dataset member they belong to. An API names its dataset like a
+   * sink does, or omits it when the package ships exactly one dataset. Checked before anything is
+   * created, so a package with a misplaced API changes nothing.
+   */
+  private Map<String, List<PackageMemberInputDTO>> apisByDataset(
+      List<PackageMemberInputDTO> members) {
+    List<String> datasets =
+        members.stream()
+            .filter(member -> member.getKind() == PackageMemberKind.DATASET)
+            .map(member -> key(member.getUrn()))
+            .toList();
+    Map<String, List<PackageMemberInputDTO>> byDataset = new LinkedHashMap<>();
+    for (PackageMemberInputDTO api : members) {
+      if (api.getKind() != PackageMemberKind.API) {
+        continue;
+      }
+      String dataset;
+      if (api.getDataset() != null && !api.getDataset().isBlank()) {
+        dataset = key(api.getDataset());
+        if (!datasets.contains(dataset)) {
+          throw new InvalidInputException(
+              "dataset",
+              api.getUrn(),
+              "Member '%s' names dataset '%s', which is not a dataset member of this package."
+                  .formatted(api.getUrn(), api.getDataset()));
+        }
+      } else if (datasets.size() == 1) {
+        dataset = datasets.getFirst();
+      } else {
+        throw new InvalidInputException(
+            "dataset",
+            api.getUrn(),
+            datasets.isEmpty()
+                ? "Member '%s' belongs to a dataset, but the package ships none."
+                    .formatted(api.getUrn())
+                : "Member '%s' must name its dataset: the package ships %d."
+                    .formatted(api.getUrn(), datasets.size()));
+      }
+      byDataset.computeIfAbsent(dataset, unused -> new ArrayList<>()).add(api);
+    }
+    return byDataset;
+  }
+
+  /**
+   * The member's content as the dataset endpoint takes a named API: {@code name}, {@code slug},
+   * {@code standard} ({@code OWS}, {@code STA} or {@code CUSTOM}), and optionally {@code version}
+   * and {@code description}. The route and its id are the platform's, so a package never carries
+   * them.
+   */
+  private NamedApiInputDTO namedApiInput(PackageMemberInputDTO member) {
+    Map<String, Object> content = member.getContent();
+    NamedApiInputDTO api = new NamedApiInputDTO();
+    api.setName(apiName(member));
+    api.setSlug(requireString(content, SLUG, member));
+    api.setStandard(apiStandard(requireString(content, STANDARD, member), member));
+    api.setVersion(optionalString(content, VERSION));
+    api.setDescription(optionalString(content, DESCRIPTION));
+    requireValid(api, member);
+    return api;
+  }
+
+  /** The API's own name, falling back to the member's display name. */
+  private static String apiName(PackageMemberInputDTO member) {
+    String name = optionalString(member.getContent(), NAME);
+    return name != null ? name : displayName(member);
+  }
+
+  private static ApiStandard apiStandard(String standard, PackageMemberInputDTO member) {
+    try {
+      return ApiStandard.valueOf(standard.toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw new InvalidInputException(
+          STANDARD,
+          member.getUrn(),
+          "Unknown API standard '%s'; expected OWS, STA or CUSTOM.".formatted(standard));
+    }
   }
 
   /**
@@ -617,6 +766,148 @@ public class InstallationService {
         pipeline.getModelLogicalUrn(),
         pipeline.getModelUrn(),
         member.getUrn());
+  }
+
+  /**
+   * The member's content names the style and carries its SLD ({@code name}, {@code sldContent}).
+   * The service checks the SLD the way GeoServer reads it and keeps names unique within the
+   * dataset. The install binds the style to its dataset and remembers the copy's id, because a
+   * layer references its styles by id.
+   */
+  private InstalledArtifact installStyle(PackageMemberInputDTO member, Run run) {
+    DataSet dataSet = datasetFor(member, run);
+    Map<String, Object> content = member.getContent();
+    StyleInputDTO input = new StyleInputDTO();
+    input.setDataSetId(dataSet.getId());
+    input.setName(requireString(content, NAME, member));
+    input.setSldContent(requireString(content, SLD_CONTENT, member));
+    requireValid(input, member);
+    Style style = styleService.create(input);
+
+    run.minted.put(
+        key(member.getUrn()), new Minted(PackageMemberKind.STYLE, null, null, style.getId(), null));
+    return line(
+        InstalledArtifactType.STYLE, style.getName(), style.getId(), null, null, member.getUrn());
+  }
+
+  /**
+   * The member's content is the layer as the layer endpoint takes it, with its references in
+   * package form: {@code sinkRef} names the data sink the layer publishes, {@code defaultStyleRef}
+   * and {@code alternativeStyleRefs} its styles, each by package URN. The install binds them to the
+   * ids of the copies made earlier; the service checks that all of them belong to the dataset. A
+   * layer is created in a DRAFT dataset, so its table need not exist yet: GeoServer reads it at
+   * release.
+   */
+  private InstalledArtifact installLayer(PackageMemberInputDTO member, Run run) {
+    DataSet dataSet = datasetFor(member, run);
+    Map<String, Object> content = member.getContent();
+    LayerInputDTO input = new LayerInputDTO();
+    input.setDataSetId(dataSet.getId());
+    input.setDataSinkId(
+        resolveReference(
+                requireString(content, SINK_REF, member),
+                SINK_REF,
+                PackageMemberKind.DATASINK,
+                member,
+                run)
+            .shellId());
+    if (content.get(DEFAULT_STYLE_REF) instanceof String reference && !reference.isBlank()) {
+      input.setDefaultStyleId(
+          resolveReference(reference, DEFAULT_STYLE_REF, PackageMemberKind.STYLE, member, run)
+              .shellId());
+    }
+    List<String> alternativeStyles = stringList(content, ALTERNATIVE_STYLE_REFS, member);
+    if (alternativeStyles != null) {
+      input.setAlternativeStyleIds(
+          alternativeStyles.stream()
+              .map(
+                  reference ->
+                      resolveReference(
+                              reference,
+                              ALTERNATIVE_STYLE_REFS,
+                              PackageMemberKind.STYLE,
+                              member,
+                              run)
+                          .shellId())
+              .toList());
+    }
+    input.setLayerName(requireString(content, LAYER_NAME, member));
+    input.setTitle(optionalString(content, TITLE));
+    input.setDescription(optionalString(content, DESCRIPTION));
+    input.setKeywords(stringList(content, KEYWORDS, member));
+    input.setAttribute(stringList(content, ATTRIBUTE, member));
+    input.setGeometryColumnRef(optionalString(content, GEOMETRY_COLUMN_REF));
+    input.setCqlFilter(optionalString(content, CQL_FILTER));
+    input.setCrs(optionalString(content, CRS));
+    input.setNativeBoundingBox(optionalMap(content, NATIVE_BOUNDING_BOX, member));
+    input.setLatLonBoundingBox(optionalMap(content, LAT_LON_BOUNDING_BOX, member));
+    requireValid(input, member);
+    Layer layer = layerService.create(input);
+
+    return line(
+        InstalledArtifactType.LAYER,
+        layer.getLayerName(),
+        layer.getId(),
+        null,
+        null,
+        member.getUrn());
+  }
+
+  /**
+   * Applies the constraints the endpoint of the input would apply. Reports the first violation, by
+   * field, so the same package always fails with the same message.
+   */
+  private <T> void requireValid(T input, PackageMemberInputDTO member) {
+    Set<ConstraintViolation<T>> violations = validator.validate(input);
+    violations.stream()
+        .min(
+            Comparator.comparing(
+                (ConstraintViolation<T> violation) -> violation.getPropertyPath().toString()))
+        .ifPresent(
+            violation -> {
+              throw new InvalidInputException(
+                  violation.getPropertyPath().toString(),
+                  member.getUrn(),
+                  "Member '%s': %s %s"
+                      .formatted(
+                          member.getUrn(), violation.getPropertyPath(), violation.getMessage()));
+            });
+  }
+
+  private static String optionalString(Map<String, Object> content, String field) {
+    return content.get(field) instanceof String value && !value.isBlank() ? value : null;
+  }
+
+  /** A list of strings, or null when the field is absent. */
+  private static List<String> stringList(
+      Map<String, Object> content, String field, PackageMemberInputDTO member) {
+    Object value = content.get(field);
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof List<?> list && list.stream().allMatch(String.class::isInstance)) {
+      return list.stream().map(String.class::cast).toList();
+    }
+    throw new InvalidInputException(
+        field,
+        member.getUrn(),
+        "Member '%s': '%s' must be a list of strings.".formatted(member.getUrn(), field));
+  }
+
+  /** An object, or null when the field is absent. */
+  private static Map<String, Object> optionalMap(
+      Map<String, Object> content, String field, PackageMemberInputDTO member) {
+    Object value = content.get(field);
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Map<?, ?> map) {
+      return stringKeyed(map);
+    }
+    throw new InvalidInputException(
+        field,
+        member.getUrn(),
+        "Member '%s': '%s' must be an object.".formatted(member.getUrn(), field));
   }
 
   /**
