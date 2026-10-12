@@ -46,7 +46,10 @@ public final class ConnectorJson {
       Set.of("$schema", "$id", "id", "title", "description", "element", DOCUMENT_TYPE_PROPERTY);
 
   private static final JsonMapper STRICT =
-      JsonMapper.builder().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
+      JsonMapper.builder()
+          .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+          .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
+          .build();
   private static final JsonMapper LENIENT =
       JsonMapper.builder().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
 
@@ -55,8 +58,8 @@ public final class ConnectorJson {
   /**
    * Reads the connector of a request.
    *
-   * @throws MalformedDataSourceRequestException for an unknown key at any level, an unknown or
-   *     missing {@code connectorType}, or a value of the wrong form
+   * @throws MalformedDataSourceRequestException for an unknown key, an unknown or missing type at
+   *     any level, or a value of the wrong form
    */
   public static ConnectorConfiguration read(JsonNode connector) {
     if (!connector.isObject()) {
@@ -187,10 +190,7 @@ public final class ConnectorJson {
       return new MalformedDataSourceRequestException("Unknown key: " + keyPath(e));
     }
     if (e instanceof InvalidTypeIdException typeId) {
-      return new MalformedDataSourceRequestException(
-          typeId.getTypeId() == null
-              ? "Missing " + ROOT + "." + TYPE_PROPERTY
-              : "Unknown " + TYPE_PROPERTY + ": " + typeId.getTypeId());
+      return new MalformedDataSourceRequestException(typeIdMessage(typeId));
     }
     for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
       if (cause instanceof InvalidConnectorValueException value) {
@@ -199,6 +199,18 @@ public final class ConnectorJson {
       }
     }
     return new MalformedDataSourceRequestException("Invalid value: " + keyPath(e));
+  }
+
+  private static String typeIdMessage(InvalidTypeIdException e) {
+    if (e.getPath().isEmpty()) {
+      return e.getTypeId() == null
+          ? "Missing " + ROOT + "." + TYPE_PROPERTY
+          : "Unknown " + TYPE_PROPERTY + ": " + e.getTypeId();
+    }
+    String typeKey = keyPath(e) + "." + JsonMergePatch.NESTED_TYPE_PROPERTY;
+    return e.getTypeId() == null
+        ? "Missing " + typeKey
+        : "Unknown " + typeKey + ": " + e.getTypeId();
   }
 
   private static String keyPath(JacksonException e) {
