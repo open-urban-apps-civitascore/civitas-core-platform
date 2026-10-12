@@ -391,14 +391,17 @@ class ConnectorJsonTest {
     try (InputStream schema =
         ConnectorJsonTest.class.getClassLoader().getResourceAsStream("datasource.schema.json")) {
       assertThat(schema).as("datasource.schema.json on the class path").isNotNull();
+      JsonNode root = MAPPER.readTree(schema);
       List<String> connectionTypes = new ArrayList<>();
-      MAPPER
-          .readTree(schema)
-          .path("$defs")
+      root.path("oneOf")
           .forEach(
               variant ->
                   connectionTypes.add(
-                      variant.path("properties").path("connectionType").path("const").asString()));
+                      root.at(variant.path("$ref").asString().substring(1))
+                          .path("properties")
+                          .path("connectionType")
+                          .path("const")
+                          .asString()));
       return connectionTypes;
     }
   }

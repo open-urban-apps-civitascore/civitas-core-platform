@@ -45,6 +45,8 @@ export const SourceNodeSchema = PipelineNodeBaseSchema.extend({
    * @coreRef { type: "urn:core:type:DataSource" }
    */
   sourceRef: z.string().optional(),
+  /** Name of the API call that the node reads, for an HTTP/REST Data source. Absent for other connector types. */
+  apiCallName: z.string().optional(),
 })
 
 /** Filters events with a boolean expression. */

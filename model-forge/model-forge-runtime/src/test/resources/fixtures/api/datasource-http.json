@@ -1,0 +1,27 @@
+{
+  "$schema": "https://civitasconnect.digital/core/datasource/v1",
+  "id": "urn:core:platform:civitas:datasource:common:7f3a91c2-4d1e-8b6a-9c2f-3e5d7a1b9c40:1.0.0",
+  "title": "Weather Stations API",
+  "description": "Reads weather stations from a REST API.",
+  "connectionType": "http",
+  "baseUrl": "https://api.example.org/v1",
+  "authentication": { "type": "BASIC", "username": "reader", "password": "ENC(ciphertext)" },
+  "apiCalls": [
+    {
+      "name": "Get all weather stations",
+      "method": "GET",
+      "path": "/stations",
+      "queryParameters": [{ "name": "status", "value": "active" }],
+      "headers": [{ "name": "Accept", "value": "application/json" }],
+      "pagination": {
+        "type": "PAGE_NUMBER",
+        "pageParameter": "page",
+        "pageSizeParameter": "size",
+        "pageSize": 100,
+        "startPage": 0,
+        "endPage": null
+      }
+    }
+  ],
+  "element": "urn:core:platform:civitas:element:common:0062782c-5353-87ad-b8d4-c1b90ed9b00a:1.0.0"
+}
