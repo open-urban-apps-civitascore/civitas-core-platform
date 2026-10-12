@@ -3,6 +3,7 @@ package de.civitascore.portal.model.input;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import de.civitascore.portal.model.connector.ConnectorConfiguration;
 import de.civitascore.portal.model.connector.ConnectorJson;
+import de.civitascore.portal.model.connector.ConnectorSchema;
 import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
@@ -15,6 +16,7 @@ import tools.jackson.databind.annotation.JsonDeserialize;
 @EqualsAndHashCode(callSuper = true)
 public class DataSourceInputDTO extends DataSourceMetaInputDTO {
 
+  @Schema(implementation = ConnectorSchema.class)
   @JsonDeserialize(using = ConnectorJson.RequestDeserializer.class)
   private ConnectorConfiguration connector;
 

@@ -350,7 +350,7 @@ class ConnectorJsonTest {
     Map<String, Class<?>> subTypes =
         Arrays.stream(ConnectorConfiguration.class.getAnnotation(JsonSubTypes.class).value())
             .collect(Collectors.toMap(JsonSubTypes.Type::name, JsonSubTypes.Type::value));
-    Schema schema = ConnectorConfiguration.class.getAnnotation(Schema.class);
+    Schema schema = ConnectorSchema.class.getAnnotation(Schema.class);
     Map<String, Class<?>> discriminatorMapping =
         Arrays.stream(schema.discriminatorMapping())
             .collect(Collectors.toMap(DiscriminatorMapping::value, DiscriminatorMapping::schema));
@@ -359,8 +359,12 @@ class ConnectorJsonTest {
     listings.assertThat(subTypes.keySet()).as("@JsonSubTypes").hasSameElementsAs(enumTypes);
     listings
         .assertThat(discriminatorMapping)
-        .as("@Schema discriminatorMapping")
+        .as("@Schema discriminatorMapping of ConnectorSchema")
         .containsExactlyInAnyOrderEntriesOf(subTypes);
+    listings
+        .assertThat(List.of(schema.oneOf()))
+        .as("@Schema oneOf of ConnectorSchema")
+        .hasSameElementsAs(subTypes.values());
     for (Map.Entry<String, Class<?>> subType : subTypes.entrySet()) {
       Schema typeSchema = subType.getValue().getMethod("connectorType").getAnnotation(Schema.class);
       listings

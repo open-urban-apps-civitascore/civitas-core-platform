@@ -1,6 +1,7 @@
 package de.civitascore.portal.model.output;
 
 import de.civitascore.portal.model.connector.ConnectorConfiguration;
+import de.civitascore.portal.model.connector.ConnectorSchema;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -21,6 +22,7 @@ public class DataSourceOutputDTO extends BaseOutputDTO {
   @Schema(example = "ACTIVE")
   private DataSourceStatus dataSourceStatus;
 
+  @Schema(implementation = ConnectorSchema.class)
   private ConnectorConfiguration connector;
 
   @Schema(

@@ -90,11 +90,18 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
     assertThat(connectorTypes).containsExactlyInAnyOrder("MQTT", "SQL");
   }
 
-  @Test
+  @ParameterizedTest
+  @CsvSource({"DataSourceInputDTO", "DataSourceOutputDTO"})
   @DisplayName("Should map each connectorType to the schema of its connector")
-  void shouldMapEachConnectorTypeToItsSchema() {
+  void shouldMapEachConnectorTypeToItsSchema(String dto) {
     JsonNode discriminator =
-        resolve("#/components/schemas/ConnectorConfiguration").path("discriminator");
+        schemaOf(
+                spec.path("components")
+                    .path("schemas")
+                    .path(dto)
+                    .path("properties")
+                    .path("connector"))
+            .path("discriminator");
 
     assertThat(discriminator.path("propertyName").asString()).isEqualTo("connectorType");
     assertThat(discriminator.path("mapping").propertyNames())
