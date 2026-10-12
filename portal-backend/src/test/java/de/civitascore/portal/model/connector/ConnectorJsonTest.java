@@ -397,7 +397,7 @@ class ConnectorJsonTest {
 
   /**
    * Without this test, a secret held as a String would be stored in clear text and returned, and a
-   * secret in a list element without identity could resolve to the secret of another element.
+   * secret in a list element without identity would be lost on the next save.
    */
   @Test
   void registeredConfigurations_reachEverySecret() {
@@ -409,9 +409,12 @@ class ConnectorJsonTest {
     assertThat(secretReachViolations(roots)).isEmpty();
   }
 
-  /** A connector with secrets in the shapes that the masking and the resolution do not walk. */
   record UnreachedSecretsConnector(
-      Map<String, Secret> headers, Variant auth, Secret[] keys, Opaque opaque)
+      Map<String, Secret> headers,
+      Variant auth,
+      Secret[] keys,
+      Opaque opaque,
+      List<Unidentified> calls)
       implements ConnectorConfiguration {
 
     sealed interface Variant permits Basic {}
@@ -420,6 +423,8 @@ class ConnectorJsonTest {
 
     interface Opaque {}
 
+    record Unidentified(String name, Secret apiKey) {}
+
     @Override
     public ConnectorType connectorType() {
       return ConnectorType.SQL;
@@ -427,12 +432,13 @@ class ConnectorJsonTest {
   }
 
   @Test
-  void secretReachViolations_reportsSecretsOutsideRecordsAndLists() {
+  void secretReachViolations_reportsEverySecretThatTheWalksCannotHandle() {
     assertThat(secretReachViolations(List.of(UnreachedSecretsConnector.class)))
         .containsExactlyInAnyOrder(
             "UnreachedSecretsConnector.headers holds secrets in a Map",
             "UnreachedSecretsConnector.keys holds secrets in an array",
             "UnreachedSecretsConnector.opaque has an interface type that is not sealed",
+            "UnreachedSecretsConnector.calls lists elements with secrets but without identity",
             "Basic.password holds a secret as text");
   }
 
