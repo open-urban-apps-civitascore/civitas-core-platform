@@ -10759,6 +10759,17 @@ components:
       required:
       - groupId
       - roleId
+    Connector:
+      description: Connector of the Data source. The connectorType selects the remaining
+        fields.
+      discriminator:
+        mapping:
+          MQTT: "#/components/schemas/MqttConnector"
+          SQL: "#/components/schemas/SqlConnector"
+        propertyName: connectorType
+      oneOf:
+      - $ref: "#/components/schemas/MqttConnector"
+      - $ref: "#/components/schemas/SqlConnector"
     DataEntitySummaryDTO:
       type: object
       properties:
@@ -11053,19 +11064,8 @@ components:
           items:
             $ref: "#/components/schemas/AssignmentScopedInputDTO"
           uniqueItems: true
-        configuration:
-          type: object
-          additionalProperties: {}
-          description: Connector-specific configuration. Structure depends on connectorType.
-          oneOf:
-          - $ref: "#/components/schemas/MqttConnectorConfiguration"
-          - $ref: "#/components/schemas/SqlConnectorConfiguration"
-        connectorType:
-          type: string
-          description: "Type of connector (e.g. MQTT, SQL)"
-          enum:
-          - MQTT
-          - SQL
+        connector:
+          $ref: "#/components/schemas/Connector"
         dataStructureVersionId:
           type: string
           format: uuid
@@ -11111,25 +11111,12 @@ components:
     DataSourceOutputDTO:
       type: object
       properties:
-        configuration:
-          type: object
-          additionalProperties: {}
-          description: "The configuration object, structure depends on the connector\
-            \ type"
-          oneOf:
-          - $ref: "#/components/schemas/MqttConnectorConfiguration"
-          - $ref: "#/components/schemas/SqlConnectorConfiguration"
         configurationUrn:
           type: string
           description: Versioned CORE URN of this DataSource's configuration artifact
             in Model Forge
-        connectorType:
-          type: string
-          description: "Type of connector (e.g. MQTT, SQL)"
-          enum:
-          - MQTT
-          - SQL
-          example: MQTT
+        connector:
+          $ref: "#/components/schemas/Connector"
         createdAt:
           type: string
           format: date-time
@@ -11728,26 +11715,32 @@ components:
           - DATASET
           - DATAPOOL
           example: DATASET
-    MqttConnectorConfiguration:
+    MqttConnector:
       type: object
+      description: Connector of an MQTT Data source.
       properties:
         connect_timeout:
           type: string
-          description: Connection timeout duration.
+          description: Connection timeout.
           example: 5s
+        connectorType:
+          type: string
+          enum:
+          - MQTT
         keepalive:
           type: string
           description: Keepalive interval.
           example: 30s
         password:
           type: string
-          description: Broker password. Write-only — returned as "********" in responses.
+          format: password
+          description: Broker password. Responses show "********" for a stored password.
           example: secret
           writeOnly: true
         protocol_version:
           type: string
           default: "3"
-          description: MQTT major protocol version.
+          description: MQTT major protocol version. Absent or null is "3".
           enum:
           - "3"
           - "5"
@@ -11762,7 +11755,7 @@ components:
           maximum: 2
           minimum: 0
         tls:
-          $ref: "#/components/schemas/Tls"
+          $ref: "#/components/schemas/MqttConnectorTls"
           description: TLS configuration.
         topics:
           type: array
@@ -11774,8 +11767,8 @@ components:
             type: string
         urls:
           type: array
-          description: Broker URLs. Embedded credentials are stripped — use user/password
-            instead.
+          description: Broker URLs. Embedded credentials are removed; use user and
+            password instead.
           example:
           - tcp://broker:1883
           items:
@@ -11785,7 +11778,14 @@ components:
           description: Broker username.
           example: mqttuser
       required:
-      - protocol_version
+      - connectorType
+    MqttConnectorTls:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: Whether to enable TLS.
+          example: false
     NamedApiInputDTO:
       type: object
       properties:
@@ -12366,19 +12366,8 @@ components:
           items:
             $ref: "#/components/schemas/AssignmentScopedInputDTO"
           uniqueItems: true
-        configuration:
-          type: object
-          additionalProperties: {}
-          description: Connector-specific configuration. Structure depends on connectorType.
-          oneOf:
-          - $ref: "#/components/schemas/MqttConnectorConfiguration"
-          - $ref: "#/components/schemas/SqlConnectorConfiguration"
-        connectorType:
-          type: string
-          description: "Type of connector (e.g. MQTT, SQL)"
-          enum:
-          - MQTT
-          - SQL
+        connector:
+          $ref: "#/components/schemas/Connector"
         dataStructureVersionId:
           type: string
           format: uuid
@@ -13006,8 +12995,9 @@ components:
           type: boolean
         unsorted:
           type: boolean
-    SqlConnectorConfiguration:
+    SqlConnector:
       type: object
+      description: Connector of an SQL Data source.
       properties:
         columns:
           type: array
@@ -13018,18 +13008,23 @@ components:
           - timestamp
           items:
             type: string
+        connectorType:
+          type: string
+          enum:
+          - SQL
         driver:
           type: string
           description: Database driver type.
           example: postgres
         dsn:
           type: string
-          description: Connection URL. Embedded credentials are stripped — use user/password
-            instead.
+          description: "Connection URL. Embedded credentials and a jdbc: prefix are\
+            \ removed; use user and password instead."
           example: postgres://localhost:5432/mydb
         password:
           type: string
-          description: Database password. Write-only — returned as "********" in responses.
+          format: password
+          description: Database password. Responses show "********" for a stored password.
           example: secret
           writeOnly: true
         table:
@@ -13044,6 +13039,8 @@ components:
           type: string
           description: SQL WHERE clause.
           example: id > :last_id
+      required:
+      - connectorType
     StyleInputDTO:
       type: object
       properties:
@@ -13093,13 +13090,6 @@ components:
         sldContent:
           type: string
           description: SLD (Styled Layer Descriptor) XML content
-    Tls:
-      type: object
-      properties:
-        enabled:
-          type: boolean
-          description: Whether to enable TLS.
-          example: false
     UserInputDTO:
       type: object
       properties:
