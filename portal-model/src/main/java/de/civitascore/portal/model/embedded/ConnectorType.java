@@ -7,4 +7,7 @@ public enum ConnectorType {
 
   /** SQL database connector. */
   SQL,
+
+  /** HTTP/REST API connector. */
+  HTTP,
 }
