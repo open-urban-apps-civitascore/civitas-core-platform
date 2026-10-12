@@ -245,7 +245,7 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
                 options={crsOptions}
                 onValueChange={e => handleCrsChange(e, attribute.id)}
                 value={attribute.meta?.gisInfo?.crs}
-                disabled={!isFirstGeomAttr(attribute.id)}
+                disabled={isReadOnly || !isFirstGeomAttr(attribute.id)}
                 size="sm"
                 triggerClassName="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
               />

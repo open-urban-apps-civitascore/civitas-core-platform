@@ -5,13 +5,14 @@ import type { UMLAttribute, UMLClass } from '../../types/uml'
 import { AttributeManager } from './AttributeManager'
 
 const updateNode = vi.fn()
+const readOnly = { isReadOnly: false }
 
 vi.mock('../../hooks/use-active-diagram', () => ({
   useActiveDiagram: () => ({ updateNode }),
 }))
 
 vi.mock('../../hooks/use-read-only', () => ({
-  useReadOnly: () => ({ isReadOnly: false }),
+  useReadOnly: () => readOnly,
 }))
 
 vi.mock('next-intl', () => ({
@@ -165,6 +166,38 @@ describe('AttributeManager attribute names', () => {
         expect.objectContaining({ name: 'neuesAttribut' }),
         expect.objectContaining({ name: 'neuesAttribut2' }),
       ],
+    })
+  })
+})
+
+describe('AttributeManager CRS', () => {
+  beforeEach(() => {
+    updateNode.mockClear()
+    readOnly.isReadOnly = false
+  })
+
+  const crsCombobox = () => within(screen.getByText('CRS').closest('div') as HTMLElement).getByRole('combobox')
+
+  const geometryElement = elementWith({ type: 'Point', meta: { gisInfo: { crs: 'EPSG:4326' } } })
+
+  it('disables the CRS select in read-only mode', () => {
+    readOnly.isReadOnly = true
+    render(<AttributeManager nodeId={NODE_ID} element={geometryElement} />)
+
+    expect(crsCombobox()).toBeDisabled()
+    fireEvent.click(crsCombobox())
+    fireEvent.keyDown(crsCombobox(), { key: 'Enter' })
+    expect(screen.queryByRole('option', { name: /EPSG:3857/ })).not.toBeInTheDocument()
+    expect(within(crsCombobox()).getByText(/EPSG:4326/)).toBeInTheDocument()
+  })
+
+  it('changes the CRS in edit mode', () => {
+    render(<AttributeManager nodeId={NODE_ID} element={geometryElement} />)
+    fireEvent.click(crsCombobox())
+    fireEvent.click(screen.getByRole('option', { name: /EPSG:3857/ }))
+
+    expect(updateNode).toHaveBeenCalledWith(NODE_ID, {
+      attributes: [expect.objectContaining({ id: 'a1', meta: { gisInfo: { crs: 'EPSG:3857' } } })],
     })
   })
 })
