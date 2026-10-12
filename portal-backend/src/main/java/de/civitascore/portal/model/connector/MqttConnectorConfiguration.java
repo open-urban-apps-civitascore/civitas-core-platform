@@ -76,7 +76,6 @@ public record MqttConnectorConfiguration(
   }
 
   @Override
-  @JsonProperty(ConnectorJson.TYPE_PROPERTY)
   @Schema(allowableValues = "MQTT", requiredMode = Schema.RequiredMode.REQUIRED)
   public ConnectorType connectorType() {
     return ConnectorType.MQTT;

@@ -1,5 +1,6 @@
 package de.civitascore.portal.model.connector;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import de.civitascore.portal.model.embedded.ConnectorType;
@@ -23,5 +24,6 @@ import de.civitascore.portal.model.embedded.ConnectorType;
 })
 public interface ConnectorConfiguration {
 
+  @JsonProperty(ConnectorJson.TYPE_PROPERTY)
   ConnectorType connectorType();
 }

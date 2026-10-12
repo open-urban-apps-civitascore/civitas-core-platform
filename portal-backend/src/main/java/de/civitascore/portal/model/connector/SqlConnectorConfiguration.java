@@ -1,6 +1,5 @@
 package de.civitascore.portal.model.connector;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -46,7 +45,6 @@ public record SqlConnectorConfiguration(
   }
 
   @Override
-  @JsonProperty(ConnectorJson.TYPE_PROPERTY)
   @Schema(allowableValues = "SQL", requiredMode = Schema.RequiredMode.REQUIRED)
   public ConnectorType connectorType() {
     return ConnectorType.SQL;
