@@ -12,6 +12,8 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.security.AllowedScopesFilter;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +25,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.skyscreamer.jsonassert.Customization;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.skyscreamer.jsonassert.JSONCompareMode;
@@ -31,12 +35,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 /**
- * Pins the persisted connector-configuration shape for the SQL and MQTT connectors, and pins the
- * mutation semantics on PUT and PATCH (Phase 1 of #1391). The inline {@code
+ * Pins the persisted connector-configuration shape for the SQL, MQTT and HTTP/REST connectors, and
+ * pins the mutation semantics on PUT and PATCH (Phase 1 of #1391). The inline {@code
  * data_sources.configuration} JSONB column was dropped (V1_2_17); the configuration now lives as a
  * CORE DataSource artifact in the Model Forge registry, read back here via its {@code
  * configurationUrn}.
@@ -104,9 +109,13 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
     return headers;
   }
 
+  private ResponseEntity<String> send(HttpMethod method, String urlPath, String body) {
+    return restTemplate.exchange(
+        urlPath, method, new HttpEntity<>(body, authHeaders()), String.class);
+  }
+
   private String exchange(HttpMethod method, String urlPath, String body) {
-    ResponseEntity<String> resp =
-        restTemplate.exchange(urlPath, method, new HttpEntity<>(body, authHeaders()), String.class);
+    ResponseEntity<String> resp = send(method, urlPath, body);
     assertThat(resp.getStatusCode().is2xxSuccessful())
         .as("%s %s should succeed; body=%s", method, urlPath, resp.getBody())
         .isTrue();
@@ -429,6 +438,224 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat((String) JsonPath.read(stored, "$.password"))
           .isEqualTo("ENC(previous-release-ciphertext)");
       assertThat((Object) JsonPath.read(stored, "$.topics[0]")).isEqualTo("sensor/other");
+    }
+  }
+
+  @Nested
+  @DisplayName("HTTP/REST connector")
+  class HttpConnector {
+
+    private static final String PASSWORD = "http-s3cret";
+
+    private static final String VALID_API_CALL =
+        """
+        { "name": "stations", "path": "/stations",
+          "pagination": { "type": "PAGE_NUMBER", "pageParameter": "page",
+                          "pageSizeParameter": "size", "pageSize": 100 } }
+        """;
+
+    private static String connector(String password) {
+      return """
+            { "connectorType": "HTTP",
+              "baseUrl": "https://api.example.org/v1",
+              "authentication": { "type": "BASIC", "username": "reader", "password": "%s" },
+              "apiCalls": [ %s ] }
+            """
+          .formatted(password, VALID_API_CALL);
+    }
+
+    private static String body(String name, String connector, UUID dsvId) {
+      return """
+          { "name": "%s", "description": "contract — HTTP", "connector": %s,
+            "dataStructureVersionId": "%s" }
+          """
+          .formatted(name, connector, dsvId);
+    }
+
+    private String storedPassword(String id) {
+      return JsonPath.read(readStoredConfiguration(id), "$.authentication.password");
+    }
+
+    @Test
+    @DisplayName(
+        "creates, reads, updates, patches, releases and deletes without exposing the password")
+    void lifecycleNeverExposesThePassword() throws Exception {
+      UUID dsvId = createAvailableDataStructureVersionId();
+      String path = DATASOURCES_ENDPOINT + "/";
+      List<String> responses = new ArrayList<>();
+
+      responses.add(
+          exchange(
+              HttpMethod.POST,
+              DATASOURCES_ENDPOINT,
+              body("contract_http_lifecycle", connector(PASSWORD), dsvId)));
+      String id = JsonPath.read(responses.getFirst(), "$.id");
+      JSONAssert.assertEquals(
+          """
+          {"connector": {"connectorType": "HTTP", "baseUrl": "https://api.example.org/v1",
+           "authentication": {"type": "BASIC", "username": "reader", "password": "********"},
+           "apiCalls": [{"name": "stations", "method": "GET", "path": "/stations",
+             "queryParameters": null, "headers": null,
+             "pagination": {"type": "PAGE_NUMBER", "pageParameter": "page",
+               "pageSizeParameter": "size", "pageSize": 100, "startPage": 0, "endPage": null}}]}}
+          """,
+          responses.getFirst(),
+          JSONCompareMode.LENIENT);
+      String ciphertext = storedPassword(id);
+      assertThat(ciphertext).isNotBlank().isNotEqualTo(PASSWORD).isNotEqualTo("********");
+
+      responses.add(exchange(HttpMethod.GET, path + id, null));
+      responses.add(
+          exchange(
+              HttpMethod.PUT,
+              path + id,
+              body("contract_http_lifecycle", connector("********"), dsvId)));
+      assertThat(storedPassword(id)).isEqualTo(ciphertext);
+
+      responses.add(
+          exchange(
+              HttpMethod.PATCH,
+              path + id,
+              """
+              { "connector": { "baseUrl": "https://other.example.org" } }
+              """));
+      assertThat((String) JsonPath.read(readStoredConfiguration(id), "$.baseUrl"))
+          .isEqualTo("https://other.example.org");
+      assertThat(storedPassword(id)).isEqualTo(ciphertext);
+
+      responses.add(exchange(HttpMethod.POST, path + id + "/release", null));
+      assertThat((String) JsonPath.read(responses.getLast(), "$.dataSourceStatus"))
+          .isEqualTo("AVAILABLE");
+      responses.add(exchange(HttpMethod.POST, path + id + "/unrelease", null));
+      exchange(HttpMethod.DELETE, path + id, null);
+
+      assertThat(send(HttpMethod.GET, path + id, null).getStatusCode())
+          .isEqualTo(HttpStatus.NOT_FOUND);
+      assertThat(responses).noneMatch(response -> response.contains(PASSWORD));
+    }
+
+    @ParameterizedTest(name = "{1}")
+    @CsvSource(
+        delimiter = '|',
+        quoteCharacter = '"',
+        value = {
+          "{'type':'BASIC','username':'a:b'} | [] | connector.authentication.username",
+          "null | [{'path':'stations'}] | connector.apiCalls[0].path",
+          "null | [{'headers':[{'name':'X Y','value':'v'}]}] | connector.apiCalls[0].headers[0].name",
+          "null | [{'headers':[{'name':'X','value':'a\\nb'}]}] | connector.apiCalls[0].headers[0].value",
+          "null | [{'headers':[{'name':'Cookie','value':'v'}]}] | connector.apiCalls[0].headers[0].name",
+          "null | [{'name':'a'},{'name':'a'}] | connector.apiCalls[1].name",
+          "null | [{'pagination':{'type':'PAGE_NUMBER','pageParameter':'p-1'}}]"
+              + " | connector.apiCalls[0].pagination.pageParameter",
+          "null | [{'pagination':{'type':'PAGE_NUMBER','pageSize':0}}]"
+              + " | connector.apiCalls[0].pagination.pageSize",
+          "null | [{'pagination':{'type':'PAGE_NUMBER','startPage':-1}}]"
+              + " | connector.apiCalls[0].pagination.startPage",
+          "null | [{'pagination':{'type':'PAGE_NUMBER','endPage':-1}}]"
+              + " | connector.apiCalls[0].pagination.endPage",
+          "null | [{'pagination':{'type':'PAGE_NUMBER','startPage':2,'endPage':1}}]"
+              + " | connector.apiCalls[0].pagination.endPage"
+        })
+    @DisplayName("rejects a save that breaks a rule, with the key path of the field")
+    void saveWithInvalidConfigurationNamesTheField(
+        String authentication, String apiCalls, String field) {
+      String connector =
+          """
+          { "connectorType": "HTTP", "authentication": %s, "apiCalls": %s }
+          """
+              .formatted(authentication, apiCalls)
+              .replace('\'', '"');
+
+      ResponseEntity<String> response =
+          send(
+              HttpMethod.POST,
+              DATASOURCES_ENDPOINT,
+              body("contract_http_invalid", connector, createAvailableDataStructureVersionId()));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat((List<String>) JsonPath.read(response.getBody(), "$.fieldErrors[*].field"))
+          .containsOnly(field);
+    }
+
+    @ParameterizedTest(name = "{1}")
+    @CsvSource(
+        delimiter = '|',
+        quoteCharacter = '"',
+        value = {
+          "'baseUrl':null | connector.baseUrl",
+          "'apiCalls':[] | connector.apiCalls",
+          "'authentication':{'type':'BASIC','password':'p'} | connector.authentication.username",
+          "'authentication':{'type':'BASIC','username':'u'} | connector.authentication.password",
+          "'apiCalls':[{'path':'/x'}] | connector.apiCalls[0].name",
+          "'apiCalls':[{'name':'a'}] | connector.apiCalls[0].path",
+          "'apiCalls':[{'name':'a','path':'/x','queryParameters':[{'value':'v'}]}]"
+              + " | connector.apiCalls[0].queryParameters[0].name",
+          "'apiCalls':[{'name':'a','path':'/x','headers':[{'value':'v'}]}]"
+              + " | connector.apiCalls[0].headers[0].name",
+          "'apiCalls':[{'name':'a','path':'/x','pagination':{'type':'PAGE_NUMBER',"
+              + "'pageSizeParameter':'s','pageSize':1}}] | connector.apiCalls[0].pagination.pageParameter",
+          "'apiCalls':[{'name':'a','path':'/x','pagination':{'type':'PAGE_NUMBER',"
+              + "'pageParameter':'p','pageSize':1}}] | connector.apiCalls[0].pagination.pageSizeParameter",
+          "'apiCalls':[{'name':'a','path':'/x','pagination':{'type':'PAGE_NUMBER',"
+              + "'pageParameter':'p','pageSizeParameter':'s'}}] | connector.apiCalls[0].pagination.pageSize"
+        })
+    @DisplayName("rejects a release of an incomplete configuration, with the key path of the field")
+    void releaseWithIncompleteConfigurationNamesTheField(String member, String field)
+        throws Exception {
+      JSONObject complete = new JSONObject(connector("p"));
+      JSONObject change = new JSONObject("{" + member.replace('\'', '"') + "}");
+      for (Iterator<String> keys = change.keys(); keys.hasNext(); ) {
+        String key = keys.next();
+        complete.put(key, change.get(key));
+      }
+      String id =
+          JsonPath.read(
+              exchange(
+                  HttpMethod.POST,
+                  DATASOURCES_ENDPOINT,
+                  body(
+                      "contract_http_incomplete",
+                      complete.toString(),
+                      createAvailableDataStructureVersionId())),
+              "$.id");
+
+      ResponseEntity<String> response =
+          send(HttpMethod.POST, DATASOURCES_ENDPOINT + "/" + id + "/release", null);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat((List<String>) JsonPath.read(response.getBody(), "$.fieldErrors[*].field"))
+          .containsOnly(field);
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        delimiter = '|',
+        quoteCharacter = '"',
+        value = {
+          "'startPage':'abc' | startPage",
+          "'endPage':1.5 | endPage",
+          "'pageSize':1.5 | pageSize"
+        })
+    @DisplayName("rejects a page number that is no integer on save as malformed")
+    void saveWithNonIntegerPageNumberIsMalformed(String member, String key) {
+      String connector =
+          """
+          { "connectorType": "HTTP",
+            "apiCalls": [{ "pagination": { "type": "PAGE_NUMBER", %s } }] }
+          """
+              .formatted(member.replace('\'', '"'));
+
+      ResponseEntity<String> response =
+          send(
+              HttpMethod.POST,
+              DATASOURCES_ENDPOINT,
+              body("contract_http_malformed", connector, createAvailableDataStructureVersionId()));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat((String) JsonPath.read(response.getBody(), "$.type"))
+          .endsWith("MALFORMED_REQUEST");
+      assertThat((String) JsonPath.read(response.getBody(), "$.detail"))
+          .isEqualTo("Invalid value: connector.apiCalls[0].pagination." + key);
     }
   }
 
