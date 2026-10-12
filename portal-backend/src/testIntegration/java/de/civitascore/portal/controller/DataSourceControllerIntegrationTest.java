@@ -518,8 +518,8 @@ class DataSourceControllerIntegrationTest
 
       assertMalformed(
           writeExpectingProblem(
-              HttpMethod.PATCH, "/" + id, Map.of("connector", Map.of("connectorType", "HTTP"))),
-          "Unknown connectorType: HTTP");
+              HttpMethod.PATCH, "/" + id, Map.of("connector", Map.of("connectorType", "FTP"))),
+          "Unknown connectorType: FTP");
     }
 
     @Test
