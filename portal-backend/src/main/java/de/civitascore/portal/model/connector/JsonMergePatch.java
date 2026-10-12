@@ -6,7 +6,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * A JSON merge patch (RFC 7386) for the tree of a connector, with one deviation: at every depth, a
+ * A JSON merge patch (RFC 7396) for the tree of a connector, with one deviation: at every depth, a
  * patch object that names another type than the target object replaces the target object, so that
  * no key of the previous type remains. The type is {@value ConnectorJson#TYPE_PROPERTY} at the root
  * and {@value #NESTED_TYPE_PROPERTY} in nested objects.

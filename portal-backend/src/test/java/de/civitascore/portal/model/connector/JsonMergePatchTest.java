@@ -24,7 +24,7 @@ class JsonMergePatchTest {
         "{'a':[1,2]} | {'a':[3]} | {'a':[3]}",
         "{'a':1} | {'a':{'b':null,'c':2}} | {'a':{'c':2}}",
       })
-  void apply_withoutTypeChange_mergesAsRfc7386(String target, String patch, String result) {
+  void apply_withoutTypeChange_mergesAsRfc7396(String target, String patch, String result) {
     assertThat(JsonMergePatch.apply(json(target), json(patch))).isEqualTo(json(result));
   }
 

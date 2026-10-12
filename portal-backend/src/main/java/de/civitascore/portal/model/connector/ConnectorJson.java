@@ -143,7 +143,7 @@ public final class ConnectorJson {
   }
 
   /**
-   * Applies a JSON merge patch (RFC 7386) to the response form of {@code current}. At every depth,
+   * Applies a JSON merge patch (RFC 7396) to the response form of {@code current}. At every depth,
    * an object whose type the patch changes is replaced instead of merged, as {@code JsonMergePatch}
    * defines it.
    *

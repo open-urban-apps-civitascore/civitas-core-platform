@@ -21,7 +21,7 @@ It holds `connectorType` (`MQTT` or `SQL`) and the fields of that type:
   `{ "enabled": false }` when unset.
 - **POST/PUT:** `connector` is the full connector. A PUT without
   `connector` removes it.
-- **PATCH:** `connector` is a JSON merge patch (RFC 7386) of the stored
+- **PATCH:** `connector` is a JSON merge patch (RFC 7396) of the stored
   connector. An omitted key keeps its value; `null` or a blank string
   clears it. A `connectorType` different from the stored one replaces the
   connector. The same holds at every depth: a nested object whose `type`

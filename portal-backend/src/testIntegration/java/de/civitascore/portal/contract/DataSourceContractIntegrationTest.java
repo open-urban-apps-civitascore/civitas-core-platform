@@ -343,7 +343,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
       String ciphertextAfterPatch = JsonPath.read(readStoredConfiguration(id), "$.password");
       assertThat(ciphertextAfterPatch)
           .as(
-              "PATCH merges the connector into the stored one (RFC 7386), so an omitted "
+              "PATCH merges the connector into the stored one (RFC 7396), so an omitted "
                   + "'password' keeps the stored ciphertext")
           .isEqualTo(originalCiphertext);
     }
