@@ -133,6 +133,7 @@ class ConnectorJsonTest {
         "{'connectorType':'HTTP'} | Unknown connectorType: HTTP",
         "{'dsn':'postgres://db/x'} | Missing connector.connectorType",
         "{'connectorType':'MQTT','qos':'high'} | Invalid value: connector.qos",
+        "{'connectorType':'MQTT','qos':1.5} | Invalid value: connector.qos",
         "{'connectorType':'MQTT','urls':['tcp://u:pw@broker:1883','no url']}"
             + " | Invalid value: connector.urls[1]",
         "{'connectorType':'SQL','dsn':'postgres://u:pw@ bad'} | Invalid value: connector.dsn",
