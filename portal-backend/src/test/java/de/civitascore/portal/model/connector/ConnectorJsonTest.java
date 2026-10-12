@@ -344,7 +344,8 @@ class ConnectorJsonTest {
    * undocumented or unreadable from the registry only at runtime.
    */
   @Test
-  void connectorTypes_areListedInEveryPlaceThatListsConnectorTypes() throws IOException {
+  void connectorTypes_areListedInEveryPlaceThatListsConnectorTypes()
+      throws IOException, ReflectiveOperationException {
     List<String> enumTypes = Arrays.stream(ConnectorType.values()).map(Enum::name).toList();
     Map<String, Class<?>> subTypes =
         Arrays.stream(ConnectorConfiguration.class.getAnnotation(JsonSubTypes.class).value())
@@ -360,10 +361,13 @@ class ConnectorJsonTest {
         .assertThat(discriminatorMapping)
         .as("@Schema discriminatorMapping")
         .containsExactlyInAnyOrderEntriesOf(subTypes);
-    listings
-        .assertThat(List.of(schema.oneOf()))
-        .as("@Schema oneOf")
-        .hasSameElementsAs(subTypes.values());
+    for (Map.Entry<String, Class<?>> subType : subTypes.entrySet()) {
+      Schema typeSchema = subType.getValue().getMethod("connectorType").getAnnotation(Schema.class);
+      listings
+          .assertThat(typeSchema == null ? List.of() : List.of(typeSchema.allowableValues()))
+          .as("@Schema allowableValues of %s.connectorType()", subType.getValue().getSimpleName())
+          .containsExactly(subType.getKey());
+    }
     listings
         .assertThat(modelForgeConnectionTypes())
         .as("connectionType of datasource.schema.json in Model Forge")
