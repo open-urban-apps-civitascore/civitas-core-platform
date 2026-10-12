@@ -42,7 +42,8 @@ It holds `connectorType` (`MQTT` or `SQL`) and the fields of that type:
 | Release with missing required fields | 400 `VALIDATION_FAILED` | `fieldErrors[].field`: `connector.<path>` |
 | Release without a stored connector | 400 `INVALID_INPUT` | `detail`: `Configuration is required for releasing` |
 
-A `detail` never echoes a value, because a value can carry a credential.
+A `detail` echoes no value other than the `connectorType`, because a value can carry a
+credential.
 
 ## How the tests are organised
 

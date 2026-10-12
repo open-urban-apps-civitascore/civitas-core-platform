@@ -35,8 +35,8 @@ public class DataSourceConnectorStore {
   /**
    * The stored connector, with its secrets as stored ciphertext.
    *
-   * @return the connector, every field empty when none is stored, or null when the Data source has
-   *     no connector type
+   * @return the connector, the defaults of its type when none is stored, or null when the Data
+   *     source has no connector type
    */
   public ConnectorConfiguration read(DataSource dataSource) {
     if (dataSource.getConnectorType() == null) {

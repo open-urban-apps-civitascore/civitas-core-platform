@@ -35,8 +35,8 @@ final class ConnectorUris {
   }
 
   /**
-   * The DSN without user info and without a {@code jdbc:} prefix, which Redpanda Connect does not
-   * accept. A blank DSN is null.
+   * The DSN without user info and without a {@code jdbc:} prefix, because the config-adapter builds
+   * the JDBC URL from a {@code postgres://} DSN. A blank DSN is null.
    *
    * @throws InvalidConnectorValueException naming {@code key} for a DSN without host
    */
