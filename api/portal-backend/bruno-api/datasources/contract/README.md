@@ -34,7 +34,7 @@ It holds `connectorType` (`MQTT` or `SQL`) and the fields of that type:
 
 | Case | Status / `type` | Body |
 |---|---|---|
-| Unknown key, also nested | 400 `MALFORMED_REQUEST` | `detail`: `Unknown key: connector.<path>` |
+| Unknown key, at the top level or in the connector | 400 `MALFORMED_REQUEST` | `detail`: `Unknown key: <key>` or `Unknown key: connector.<path>` |
 | Unknown `connectorType` | 400 `MALFORMED_REQUEST` | `detail`: `Unknown connectorType: <value>` |
 | `connectorType` missing | 400 `MALFORMED_REQUEST` | `detail`: `Missing connector.connectorType` |
 | Wrong value type, invalid URL or DSN | 400 `MALFORMED_REQUEST` | `detail`: `Invalid value: connector.<path>` |

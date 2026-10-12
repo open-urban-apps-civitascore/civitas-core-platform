@@ -53,8 +53,8 @@ public class DataSourceConnectorStore {
    *
    * @param connectorPatch the {@code connector} member of the patch, or a missing node
    * @return the patched connector, or null if the Data source has none afterwards
-   * @throws de.civitascore.portal.model.connector.InvalidConnectorException if the patched
-   *     connector cannot be read
+   * @throws de.civitascore.portal.model.connector.MalformedDataSourceRequestException if the
+   *     patched connector cannot be read
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public ConnectorConfiguration patch(DataSource dataSource, JsonNode connectorPatch) {

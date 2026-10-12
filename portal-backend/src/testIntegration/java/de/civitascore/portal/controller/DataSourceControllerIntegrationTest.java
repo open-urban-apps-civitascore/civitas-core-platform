@@ -435,7 +435,7 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    void create_withUnknownTopLevelKey_returnsMalformedRequestNamingTheKey() {
+    void create_withUnknownConnectorKey_returnsMalformedRequestNamingTheKey() {
       assertMalformed(
           writeExpectingProblem(
               HttpMethod.POST, "", body(mqttConnector("protocolVersion", "5"), null)),
@@ -450,6 +450,35 @@ class DataSourceControllerIntegrationTest
               "",
               body(mqttConnector("tls", Map.of("enabled", true, "verify", false)), null)),
           "Unknown key: connector.tls.verify");
+    }
+
+    @Test
+    void create_withKeyOfThePreviousShape_returnsMalformedRequestNamingTheKey() {
+      Map<String, Object> body = body(null, null);
+      body.put("configuration", Map.of("urls", List.of("tcp://broker:1883")));
+
+      assertMalformed(
+          writeExpectingProblem(HttpMethod.POST, "", body), "Unknown key: configuration");
+    }
+
+    @Test
+    void update_withUnknownTopLevelKey_returnsMalformedRequestNamingTheKey() {
+      UUID id = createTestEntity();
+      Map<String, Object> body = body(mqttConnector(), null);
+      body.put("connectorType", "MQTT");
+
+      assertMalformed(
+          writeExpectingProblem(HttpMethod.PUT, "/" + id, body), "Unknown key: connectorType");
+    }
+
+    @Test
+    void patch_withUnknownTopLevelKey_returnsMalformedRequestNamingTheKey() {
+      UUID id = createTestEntity();
+
+      assertMalformed(
+          writeExpectingProblem(
+              HttpMethod.PATCH, "/" + id, Map.of("dataSourceStatus", "AVAILABLE")),
+          "Unknown key: dataSourceStatus");
     }
 
     @Test

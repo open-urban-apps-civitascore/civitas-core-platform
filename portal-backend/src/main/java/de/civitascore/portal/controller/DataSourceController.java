@@ -1,6 +1,7 @@
 package de.civitascore.portal.controller;
 
 import de.civitascore.portal.model.connector.ConnectorJson;
+import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -155,7 +157,13 @@ public class DataSourceController
         updates instanceof ObjectNode object
             ? object.deepCopy().without(ConnectorJson.ROOT)
             : updates;
-    DataSourceInputDTO patchedDto = super.patchInput(currentDto, entity, otherMembers);
+    DataSourceInputDTO patchedDto;
+    // Jackson wraps the exception that the any-setter of the input throws for an unknown key.
+    try {
+      patchedDto = super.patchInput(currentDto, entity, otherMembers);
+    } catch (JacksonException e) {
+      throw e.getCause() instanceof MalformedDataSourceRequestException malformed ? malformed : e;
+    }
     patchedDto.setConnector(getService().patchConnector(entity, updates.path(ConnectorJson.ROOT)));
     return patchedDto;
   }

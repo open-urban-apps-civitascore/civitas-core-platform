@@ -140,7 +140,7 @@ class ConnectorJsonTest {
       })
   void read_withInvalidConnector_namesTheKeyButNoValue(String connector, String message) {
     assertThatThrownBy(() -> ConnectorJson.read(json(connector)))
-        .isInstanceOf(InvalidConnectorException.class)
+        .isInstanceOf(MalformedDataSourceRequestException.class)
         .hasMessage(message);
   }
 
@@ -328,7 +328,7 @@ class ConnectorJsonTest {
     ConnectorConfiguration current = ConnectorJson.read(json("{'connectorType':'SQL'}"));
 
     assertThatThrownBy(() -> ConnectorJson.patch(current, json("{'tabel':'t'}")))
-        .isInstanceOf(InvalidConnectorException.class)
+        .isInstanceOf(MalformedDataSourceRequestException.class)
         .hasMessage("Unknown key: connector.tabel");
   }
 

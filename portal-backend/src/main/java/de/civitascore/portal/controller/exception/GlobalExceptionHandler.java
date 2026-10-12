@@ -1,6 +1,6 @@
 package de.civitascore.portal.controller.exception;
 
-import de.civitascore.portal.model.connector.InvalidConnectorException;
+import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
 import de.civitascore.portal.service.connector.ConnectorValidationException;
 import de.civitascore.portal.service.connector.StoredConnectorUnreadableException;
 import de.civitascore.portal.util.DataSetNotEditableException;
@@ -91,11 +91,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return createProblemDetail(HttpStatus.BAD_REQUEST, "INVALID_INPUT", ex.getMessage(), request);
   }
 
-  @ExceptionHandler(InvalidConnectorException.class)
+  @ExceptionHandler(MalformedDataSourceRequestException.class)
   @ResponseStatus(HttpStatus.BAD_REQUEST)
-  public ProblemDetail handleInvalidConnector(
-      InvalidConnectorException ex, HttpServletRequest request) {
-    log.warn("Invalid connector: {}", Encode.forJava(ex.getMessage()));
+  public ProblemDetail handleMalformedDataSourceRequest(
+      MalformedDataSourceRequestException ex, HttpServletRequest request) {
+    log.warn("Malformed Data source request: {}", Encode.forJava(ex.getMessage()));
     return createProblemDetail(
         HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", ex.getMessage(), request);
   }
@@ -447,10 +447,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       HttpStatusCode status,
       WebRequest request) {
     log.warn("Malformed request body: {}", Encode.forJava(ex.getMessage()));
-    Optional<InvalidConnectorException> invalidConnector = invalidConnectorIn(ex);
-    if (invalidConnector.isPresent() && request instanceof ServletWebRequest servletRequest) {
+    Optional<MalformedDataSourceRequestException> malformedRequest =
+        malformedDataSourceRequestIn(ex);
+    if (malformedRequest.isPresent() && request instanceof ServletWebRequest servletRequest) {
       return ResponseEntity.badRequest()
-          .body(handleInvalidConnector(invalidConnector.get(), servletRequest.getRequest()));
+          .body(
+              handleMalformedDataSourceRequest(
+                  malformedRequest.get(), servletRequest.getRequest()));
     }
     ProblemDetail problemDetail =
         createProblemDetail(
@@ -458,10 +461,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return ResponseEntity.badRequest().body(problemDetail);
   }
 
-  private static Optional<InvalidConnectorException> invalidConnectorIn(Throwable ex) {
+  private static Optional<MalformedDataSourceRequestException> malformedDataSourceRequestIn(
+      Throwable ex) {
     for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
-      if (cause instanceof InvalidConnectorException invalidConnector) {
-        return Optional.of(invalidConnector);
+      if (cause instanceof MalformedDataSourceRequestException malformedRequest) {
+        return Optional.of(malformedRequest);
       }
     }
     return Optional.empty();

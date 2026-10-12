@@ -236,6 +236,7 @@ export const useDatasourceForm = (
     const {
       connectorType: _connectorType,
       configuration: _configuration,
+      dataSourceStatus: _dataSourceStatus,
       ...dirtyValues
     } = pickDirtyValues(parsed.data as Record<string, unknown>, dirtyFields)
 
@@ -282,10 +283,7 @@ export const useDatasourceForm = (
     } as DatasourcePatchData
 
     const shouldUpdateValues =
-      Object.keys(dirtyValues).some(key => key !== 'dataSourceStatus') ||
-      !!connector ||
-      areAssignmentsDirty ||
-      areDatapoolsDirty
+      Object.keys(dirtyValues).length > 0 || !!connector || areAssignmentsDirty || areDatapoolsDirty
     const shouldRelease = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
     const shouldUnrelease = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
 

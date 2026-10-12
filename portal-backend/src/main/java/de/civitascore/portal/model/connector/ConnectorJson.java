@@ -55,17 +55,17 @@ public final class ConnectorJson {
   /**
    * Reads the connector of a request.
    *
-   * @throws InvalidConnectorException for an unknown key at any level, an unknown or missing {@code
-   *     connectorType}, or a value of the wrong form
+   * @throws MalformedDataSourceRequestException for an unknown key at any level, an unknown or
+   *     missing {@code connectorType}, or a value of the wrong form
    */
   public static ConnectorConfiguration read(JsonNode connector) {
     if (!connector.isObject()) {
-      throw new InvalidConnectorException("Invalid value: " + ROOT);
+      throw new MalformedDataSourceRequestException("Invalid value: " + ROOT);
     }
     try {
       return STRICT.treeToValue(connector, ConnectorConfiguration.class);
     } catch (JacksonException e) {
-      throw toInvalidConnector(e);
+      throw toMalformedRequest(e);
     }
   }
 
@@ -150,14 +150,14 @@ public final class ConnectorJson {
    * @param current the connector before the patch, or null if there is none
    * @param patch the {@code connector} member of the request; a missing node keeps {@code current}
    * @return the patched connector, or null if the patch removes it or there is none
-   * @throws InvalidConnectorException if the patched connector cannot be read
+   * @throws MalformedDataSourceRequestException if the patched connector cannot be read
    */
   public static ConnectorConfiguration patch(ConnectorConfiguration current, JsonNode patch) {
     if (patch.isNull() || (patch.isMissingNode() && current == null)) {
       return null;
     }
     if (!patch.isMissingNode() && !patch.isObject()) {
-      throw new InvalidConnectorException("Invalid value: " + ROOT);
+      throw new MalformedDataSourceRequestException("Invalid value: " + ROOT);
     }
     return read(
         JsonMergePatch.apply(
@@ -182,22 +182,23 @@ public final class ConnectorJson {
     }
   }
 
-  private static InvalidConnectorException toInvalidConnector(JacksonException e) {
+  private static MalformedDataSourceRequestException toMalformedRequest(JacksonException e) {
     if (e instanceof UnrecognizedPropertyException) {
-      return new InvalidConnectorException("Unknown key: " + keyPath(e));
+      return new MalformedDataSourceRequestException("Unknown key: " + keyPath(e));
     }
     if (e instanceof InvalidTypeIdException typeId) {
-      return new InvalidConnectorException(
+      return new MalformedDataSourceRequestException(
           typeId.getTypeId() == null
               ? "Missing " + ROOT + "." + TYPE_PROPERTY
               : "Unknown " + TYPE_PROPERTY + ": " + typeId.getTypeId());
     }
     for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
       if (cause instanceof InvalidConnectorValueException value) {
-        return new InvalidConnectorException("Invalid value: " + keyPath(e) + "." + value.key());
+        return new MalformedDataSourceRequestException(
+            "Invalid value: " + keyPath(e) + "." + value.key());
       }
     }
-    return new InvalidConnectorException("Invalid value: " + keyPath(e));
+    return new MalformedDataSourceRequestException("Invalid value: " + keyPath(e));
   }
 
   private static String keyPath(JacksonException e) {

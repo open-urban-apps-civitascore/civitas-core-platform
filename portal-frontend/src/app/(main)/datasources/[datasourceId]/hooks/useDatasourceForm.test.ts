@@ -191,4 +191,23 @@ describe('useDatasourceForm', () => {
 
     expect(mockUpdateDatasource.mock.calls[0][0]).not.toHaveProperty('connector')
   })
+
+  // The backend rejects an unknown key, so a status in the update would block the save before the release.
+  it('does not send the status in the draft update when the status changes together with another field', async () => {
+    const datasource = createDatasource('DRAFT')
+    mockUpdateDatasource.mockResolvedValue({ data: datasource })
+    const { result } = renderDatasourceForm(datasource)
+    act(() => {
+      result.current.form.setValue('description', 'Changed description', { shouldDirty: true })
+      result.current.handleStatusChange('AVAILABLE')
+    })
+
+    await act(async () => {
+      await result.current.submitDatasource()
+    })
+
+    const payload = mockUpdateDatasource.mock.calls[0][0]
+    expect(payload).toMatchObject({ description: 'Changed description' })
+    expect(payload).not.toHaveProperty('dataSourceStatus')
+  })
 })
