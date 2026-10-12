@@ -13,10 +13,7 @@ import java.util.Locale;
 import java.util.Set;
 import org.springframework.stereotype.Component;
 
-/**
- * The rules of an HTTP/REST connector across its API calls and fields: unique API call names, no
- * credential headers, and an end page not before the start page. They apply at every stage.
- */
+/** The rules of an HTTP/REST connector beyond its Bean Validation constraints, at every stage. */
 @Component
 public class HttpConnectorRules implements ConnectorRules {
 

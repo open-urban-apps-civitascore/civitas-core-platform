@@ -99,7 +99,8 @@ public record HttpConnectorConfiguration(
       @Schema(
               description =
                   "Name of the API call, unique within the connector. A source node of a"
-                      + " pipeline refers to the API call by this name.",
+                      + " pipeline refers to the API call by this name, so a rename breaks that"
+                      + " reference.",
               example = "Get all weather stations")
           @NotNull(groups = OnRelease.class, message = "'name' is required") String name,
       @JsonProperty(access = JsonProperty.Access.READ_ONLY)
