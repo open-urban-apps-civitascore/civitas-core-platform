@@ -4,9 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -108,6 +112,8 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @ParameterizedTest
   @CsvSource({
+    "MqttConnector",
+    "SqlConnector",
     "HttpConnector",
     "HttpConnectorApiCall",
     "HttpConnectorParameter",
@@ -115,8 +121,8 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
     "HttpConnectorBasicAuthentication",
     "HttpConnectorPageNumberPagination"
   })
-  @DisplayName("Should describe every field of the HTTP/REST connector")
-  void shouldDescribeEveryHttpConnectorField(String schema) {
+  @DisplayName("Should describe every connector field")
+  void shouldDescribeEveryConnectorField(String schema) {
     List<String> undescribed = new ArrayList<>();
     propertiesOf(component(schema))
         .properties()
@@ -134,19 +140,35 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @ParameterizedTest
   @CsvSource({
-    "HttpConnector, authentication, HttpConnectorAuthentication, NONE",
-    "HttpConnectorApiCall, pagination, HttpConnectorPagination, PAGE_NUMBER"
+    "HttpConnector, authentication, HttpConnectorAuthentication,"
+        + " NONE=HttpConnectorNoAuthentication BASIC=HttpConnectorBasicAuthentication",
+    "HttpConnectorApiCall, pagination, HttpConnectorPagination,"
+        + " PAGE_NUMBER=HttpConnectorPageNumberPagination"
   })
   @DisplayName("Should describe each nested HTTP/REST variant as oneOf with a type discriminator")
   void shouldDescribeNestedHttpVariantsAsOneOf(
-      String schema, String property, String base, String type) {
+      String schema, String property, String base, String variants) {
+    Map<String, String> expected =
+        Arrays.stream(variants.split(" "))
+            .map(variant -> variant.split("="))
+            .collect(Collectors.toMap(v -> v[0], v -> "#/components/schemas/" + v[1]));
     JsonNode discriminator = component(base).path("discriminator");
+    Map<String, String> mapping = new HashMap<>();
+    discriminator
+        .path("mapping")
+        .properties()
+        .forEach(e -> mapping.put(e.getKey(), e.getValue().asString()));
+    List<String> oneOf = new ArrayList<>();
+    propertiesOf(component(schema))
+        .path(property)
+        .path("oneOf")
+        .forEach(variant -> oneOf.add(variant.path("$ref").asString()));
 
-    assertThat(propertiesOf(component(schema)).path(property).path("oneOf").isEmpty())
-        .as("%s.%s oneOf", schema, property)
-        .isFalse();
     assertThat(discriminator.path("propertyName").asString()).isEqualTo("type");
-    assertThat(discriminator.path("mapping").propertyNames()).contains(type);
+    assertThat(mapping).containsExactlyInAnyOrderEntriesOf(expected);
+    assertThat(oneOf)
+        .as("%s.%s oneOf", schema, property)
+        .containsExactlyInAnyOrderElementsOf(expected.values());
   }
 
   @ParameterizedTest

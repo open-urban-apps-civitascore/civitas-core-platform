@@ -501,6 +501,71 @@ class ConnectorJsonTest {
   }
 
   /**
+   * Without this test, a variant of a nested type added to one listing but not to another would be
+   * rejected or undocumented only at runtime.
+   */
+  @Test
+  void nestedVariants_areListedInEveryPlaceThatListsThem() {
+    SoftAssertions listings = new SoftAssertions();
+    List<String> checked = new ArrayList<>();
+    Deque<Class<?>> pending = new ArrayDeque<>();
+    Arrays.stream(ConnectorConfiguration.class.getAnnotation(JsonSubTypes.class).value())
+        .forEach(type -> pending.add(type.value()));
+    Set<Class<?>> seen = new HashSet<>();
+    while (!pending.isEmpty()) {
+      Class<?> type = pending.pop();
+      if (!seen.add(type) || !type.isRecord()) {
+        continue;
+      }
+      for (RecordComponent component : type.getRecordComponents()) {
+        Class<?> valueType = listElementType(component.getGenericType());
+        if (valueType != null && valueType.isSealed()) {
+          String name = type.getSimpleName() + "." + component.getName();
+          checked.add(name);
+          assertVariantListings(listings, name, component, valueType);
+          pending.addAll(Arrays.asList(valueType.getPermittedSubclasses()));
+        } else if (valueType != null && valueType.isRecord()) {
+          pending.add(valueType);
+        }
+      }
+    }
+    listings.assertAll();
+    assertThat(checked).contains("HttpConnectorConfiguration.authentication", "ApiCall.pagination");
+  }
+
+  private static void assertVariantListings(
+      SoftAssertions listings, String name, RecordComponent component, Class<?> variantType) {
+    JsonSubTypes subTypesAnnotation = variantType.getAnnotation(JsonSubTypes.class);
+    listings.assertThat(subTypesAnnotation).as("@JsonSubTypes of %s", name).isNotNull();
+    if (subTypesAnnotation == null) {
+      return;
+    }
+    Map<String, Class<?>> subTypes =
+        Arrays.stream(subTypesAnnotation.value())
+            .collect(Collectors.toMap(JsonSubTypes.Type::name, JsonSubTypes.Type::value));
+    listings
+        .assertThat(subTypes.values())
+        .as("@JsonSubTypes of %s", name)
+        .hasSameElementsAs(List.of(variantType.getPermittedSubclasses()));
+    Schema typeSchema = variantType.getAnnotation(Schema.class);
+    listings
+        .assertThat(
+            typeSchema == null
+                ? Map.of()
+                : Arrays.stream(typeSchema.discriminatorMapping())
+                    .collect(
+                        Collectors.toMap(
+                            DiscriminatorMapping::value, DiscriminatorMapping::schema)))
+        .as("@Schema discriminatorMapping of %s", variantType.getSimpleName())
+        .containsExactlyInAnyOrderEntriesOf(subTypes);
+    Schema propertySchema = component.getAccessor().getAnnotation(Schema.class);
+    listings
+        .assertThat(propertySchema == null ? List.of() : List.of(propertySchema.oneOf()))
+        .as("@Schema oneOf of %s", name)
+        .hasSameElementsAs(subTypes.values());
+  }
+
+  /**
    * Without this test, a secret held as a String would be stored in clear text and returned, and a
    * secret in a list element without identity would be lost on the next save.
    */

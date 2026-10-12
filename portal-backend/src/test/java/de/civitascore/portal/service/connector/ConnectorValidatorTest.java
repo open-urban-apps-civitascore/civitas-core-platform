@@ -1,6 +1,7 @@
 package de.civitascore.portal.service.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
@@ -26,8 +27,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import tools.jackson.databind.DeserializationConfig;
 import tools.jackson.databind.JavaType;
@@ -125,6 +130,48 @@ class ConnectorValidatorTest {
                 ConnectorValidator.Stage.RELEASE))
         .extracting(ConnectorViolation::path)
         .containsExactly("connector.apiCalls", "connector.baseUrl");
+  }
+
+  @ParameterizedTest(name = "{0} \"{1}\" accepted: {2}")
+  @MethodSource("httpCharacterSets")
+  void validate_httpConnectorAtDraft_acceptsExactlyTheAllowedCharacters(
+      String key, String value, boolean accepted) {
+    assertThat(validator.validate(httpConnectorWith(key, value), ConnectorValidator.Stage.DRAFT))
+        .extracting(ConnectorViolation::path)
+        .isEqualTo(accepted ? List.of() : List.of("connector.apiCalls[0]." + key));
+  }
+
+  private static Stream<Arguments> httpCharacterSets() {
+    return Stream.of(
+        arguments("path", "/v1/stations.json~a:b_c-D9/", true),
+        arguments("path", "/", true),
+        arguments("path", "/x?token=abc", false),
+        arguments("path", "/a b", false),
+        arguments("path", "/a%2Fb", false),
+        arguments("path", "/a#b", false),
+        arguments("pagination.pageParameter", "page.Number_@", true),
+        arguments("pagination.pageParameter", "page1", false),
+        arguments("pagination.pageParameter", "page-number", false),
+        arguments("headers[0].name", "!#$%&'*+.^_`|~09AZaz-", true),
+        arguments("headers[0].name", "X:Y", false),
+        arguments("headers[0].name", "X(Y)", false));
+  }
+
+  private static HttpConnectorConfiguration httpConnectorWith(String key, String value) {
+    String path = key.equals("path") ? value : "/stations";
+    String pageParameter = key.equals("pagination.pageParameter") ? value : "page";
+    String headerName = key.equals("headers[0].name") ? value : "Accept";
+    return new HttpConnectorConfiguration(
+        "https://api.example.org",
+        null,
+        List.of(
+            new ApiCall(
+                "a",
+                null,
+                path,
+                List.of(),
+                List.of(new Parameter(headerName, "v")),
+                new PageNumber(pageParameter, "size", 1, 0, null))));
   }
 
   @Test
