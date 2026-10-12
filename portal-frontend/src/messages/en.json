@@ -1120,6 +1120,10 @@
           "step3": "Return here and import it"
         }
       },
+      "restricted": {
+        "title": "Data structure not accessible",
+        "description": "You do not have permission to view the Data structure."
+      },
       "importModal": {
         "title": "Import Data Model",
         "to": "into {name}"

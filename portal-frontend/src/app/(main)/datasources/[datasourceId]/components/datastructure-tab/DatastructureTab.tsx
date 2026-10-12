@@ -10,6 +10,9 @@ import { useGetDatastructureVersion } from '@/app/services/api/datastructures/ve
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { InfoBox } from '@/components/text-box/TextBox'
 import { UmlModeler } from '@/components/uml-modeler/UmlModeler'
+import { usePermissions } from '@/hooks/use-permissions'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { DatastructureVersion } from '@/types/datastructures'
 import { mapDatastructureVersionApiToFormData } from '@/utils/datastructures'
 
@@ -33,6 +36,7 @@ export const DatastructureTab = (props: DatastructureTabProps) => {
     onSelectDatastructureVersion,
   } = props
   const t = useTranslations('datasources.dataModel.placeholder')
+  const tRestricted = useTranslations('datasources.dataModel.restricted')
   const tDataModel = useTranslations('datasources.dataModel')
   const canImport = !isDatasourceInUseByReleased && !isDatasourceReleased && !isReadOnly
   const [isImportDatastructureModalOpen, setIsImportDatastructureModalOpen] = useState(false)
@@ -40,22 +44,32 @@ export const DatastructureTab = (props: DatastructureTabProps) => {
   // Parse the composite "datastructureId/versionId" prop
   const [selectedDatastructureId, selectedDatastructureVersionId] = selectedVersionId?.split('/') ?? [null, null]
 
+  const { hasScopedPermission } = usePermissions()
+  const canReadSelectedDatastructure =
+    !!selectedDatastructureId &&
+    hasScopedPermission(
+      PERMISSION_NAMES.DATASTRUCTURE_READ,
+      ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
+      selectedDatastructureId,
+    )
+  const isSelectedDatastructureRestricted = !!selectedDatastructureVersionId && !canReadSelectedDatastructure
+
   // Fetch the full version data (needed for UML model/styles)
   const { data: datastructureVersionData } = useGetDatastructureVersion({
     datastructureId: selectedDatastructureId || '',
     versionId: selectedDatastructureVersionId || '',
-    isEnabled: !!selectedDatastructureId && !!selectedDatastructureVersionId,
+    isEnabled: !!selectedDatastructureVersionId && canReadSelectedDatastructure,
   })
 
   const [datastructureVersion, setDatastructureVersion] = useState<DatastructureVersion | null>(null)
 
   useEffect(() => {
-    if (!selectedDatastructureVersionId) {
+    if (!selectedDatastructureVersionId || !canReadSelectedDatastructure) {
       setDatastructureVersion(null)
     } else {
       setDatastructureVersion(datastructureVersionData?.data || null)
     }
-  }, [selectedDatastructureVersionId, datastructureVersionData?.data])
+  }, [selectedDatastructureVersionId, canReadSelectedDatastructure, datastructureVersionData?.data])
 
   const { modelSessionManager, resetFormAndSession } = useDatastructureVersion({
     datastructureId: selectedDatastructureId || '',
@@ -99,6 +113,13 @@ export const DatastructureTab = (props: DatastructureTabProps) => {
     </div>
   )
 
+  const RestrictedPlaceholder = (
+    <div className="text-center">
+      <p className="text-xl text-foreground font-semibold mb-2">{tRestricted('title')}</p>
+      <p className="text-muted-foreground text-sm">{tRestricted('description')}</p>
+    </div>
+  )
+
   return (
     <div className="flex h-full flex-col gap-4">
       {isDatasourceReleased && !isReadOnly && <InfoBox text={tDataModel('availableInfo')} />}
@@ -108,7 +129,7 @@ export const DatastructureTab = (props: DatastructureTabProps) => {
         modelSessionManager={modelSessionManager}
         isMultiSessionMode={false}
         canExportModel={false}
-        placeHolder={UmlCanvasPlaceholder}
+        placeHolder={isSelectedDatastructureRestricted ? RestrictedPlaceholder : UmlCanvasPlaceholder}
         onImportFromDatastructure={canImport ? handleImportFromDatastructure : undefined}
       />
       <DataModelImportModal

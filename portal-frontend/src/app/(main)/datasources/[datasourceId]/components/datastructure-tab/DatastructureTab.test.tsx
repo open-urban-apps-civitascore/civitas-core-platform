@@ -1,6 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { ComponentProps } from 'react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
+import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
+import { AssignmentScope } from '@/types/assignments'
+import { MeAssignment, PERMISSION_NAMES } from '@/types/currentUser'
 
 import { DatastructureTab } from './DatastructureTab'
 
@@ -28,8 +34,23 @@ vi.mock('@/app/services/api/datastructures/clientRequests', () => ({
 }))
 
 vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
-  useGetDatastructureVersion: () => ({ data: undefined }),
+  useGetDatastructureVersion: vi.fn().mockReturnValue({ data: undefined }),
 }))
+
+vi.mock('@/app/services/api/users/clientRequests', () => ({
+  useGetCurrentUser: vi.fn(),
+}))
+
+const mockAssignments = (assignments: Partial<MeAssignment>[]) =>
+  vi.mocked(useGetCurrentUser).mockReturnValue({
+    data: { assignments },
+  } as unknown as ReturnType<typeof useGetCurrentUser>)
+
+const readAssignment = (scopeType: AssignmentScope, scopeId: string | null) => ({
+  scopeType,
+  scopeId,
+  permissions: [PERMISSION_NAMES.DATASTRUCTURE_READ],
+})
 
 vi.mock('@/app/(main)/datastructures/[datastructureId]/(versions)/hooks/useDatastructureVersion', () => ({
   defaultDatastructureVersionFormData: {},
@@ -41,7 +62,7 @@ vi.mock('@/app/(main)/datastructures/[datastructureId]/(versions)/hooks/useDatas
   }),
 }))
 
-const defaultProps = {
+const defaultProps: ComponentProps<typeof DatastructureTab> = {
   datasourceTitle: 'Test Datasource',
   selectedVersionId: null,
   isReadOnly: false,
@@ -62,6 +83,11 @@ const renderComponent = (props = defaultProps) => {
 }
 
 describe('DatastructureTab', () => {
+  beforeEach(() => {
+    vi.mocked(useGetDatastructureVersion).mockClear()
+    mockAssignments([readAssignment('TENANT', null)])
+  })
+
   it('renders UmlModeler', () => {
     renderComponent()
     expect(screen.getByTestId('umlModeler')).toBeInTheDocument()
@@ -101,5 +127,39 @@ describe('DatastructureTab', () => {
     renderComponent()
 
     expect(screen.queryByText('availableInfo')).not.toBeInTheDocument()
+  })
+})
+
+describe('DatastructureTab with an assigned data structure', () => {
+  const assignedProps = { ...defaultProps, selectedVersionId: 'ds-1/v-1' }
+
+  beforeEach(() => vi.mocked(useGetDatastructureVersion).mockClear())
+
+  it('shows the restricted state and does not fetch the version without read access', () => {
+    mockAssignments([])
+    renderComponent(assignedProps)
+
+    expect(screen.getByText('title')).toBeInTheDocument()
+    expect(screen.getByText('description')).toBeInTheDocument()
+    expect(screen.queryByText('noDatastructures')).not.toBeInTheDocument()
+    expect(useGetDatastructureVersion).toHaveBeenLastCalledWith(expect.objectContaining({ isEnabled: false }))
+  })
+
+  it('shows the restricted state when the user can read only another data structure', () => {
+    mockAssignments([readAssignment('DATASTRUCTURE', 'ds-2')])
+    renderComponent(assignedProps)
+
+    expect(screen.getByText('description')).toBeInTheDocument()
+    expect(useGetDatastructureVersion).toHaveBeenLastCalledWith(expect.objectContaining({ isEnabled: false }))
+  })
+
+  it('fetches the version when the user can read the assigned data structure', () => {
+    mockAssignments([readAssignment('DATASTRUCTURE', 'ds-1')])
+    renderComponent(assignedProps)
+
+    expect(screen.queryByText('description')).not.toBeInTheDocument()
+    expect(useGetDatastructureVersion).toHaveBeenLastCalledWith(
+      expect.objectContaining({ datastructureId: 'ds-1', versionId: 'v-1', isEnabled: true }),
+    )
   })
 })

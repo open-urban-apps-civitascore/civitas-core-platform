@@ -1107,6 +1107,10 @@
           "step3": "Wieder hierher zurückkommen und die Datenstruktur importieren"
         }
       },
+      "restricted": {
+        "title": "Datenstruktur nicht zugänglich",
+        "description": "Sie haben keine Berechtigung zum Anzeigen der Datenstruktur."
+      },
       "importModal": {
         "title": "Datenmodell importieren",
         "to": "in {name}"
