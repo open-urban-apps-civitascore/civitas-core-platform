@@ -1,0 +1,36 @@
+meta {
+  name: Contract HTTP — PATCH changes auth type (2/4 patch NONE)
+  type: http
+  seq: 104
+}
+
+patch {
+  url: {{baseUrl}}/datasources/{{contractHttpPatchAuthId}}
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "connector": { "authentication": { "type": "NONE" } }
+  }
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("The authentication is replaced, not merged", function() {
+    expect(res.body.connector.authentication).to.deep.equal({ type: "NONE" });
+  });
+  test("The API calls are kept", function() {
+    expect(res.body.connector.apiCalls).to.have.lengthOf(2);
+  });
+}
+
+docs {
+  Pins that a PATCH whose `authentication` names another `type` replaces
+  the stored authentication. Merged, it would keep `username` and
+  `password`, which `NONE` does not know.
+}

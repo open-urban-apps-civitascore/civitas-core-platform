@@ -1,0 +1,43 @@
+meta {
+  name: Contract HTTP — create + read (2/3 read)
+  type: http
+  seq: 101
+}
+
+get {
+  url: {{baseUrl}}/datasources/{{contractHttpCreateId}}
+  body: none
+  auth: inherit
+}
+
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Defaults are applied and the method reads GET", function() {
+    const connector = res.body.connector;
+    expect(connector.connectorType).to.equal("HTTP");
+    expect(connector.baseUrl).to.equal("https://api.example.org/v1");
+    expect(connector.apiCalls).to.have.lengthOf(2);
+    expect(connector.apiCalls[0].method).to.equal("GET");
+    expect(connector.apiCalls[1].method).to.equal("GET");
+    expect(connector.apiCalls[0].pagination).to.deep.equal({
+      type: "PAGE_NUMBER", pageParameter: "page", pageSizeParameter: "size",
+      pageSize: 100, startPage: 0, endPage: null
+    });
+    expect(connector.apiCalls[0].queryParameters).to.deep.equal([{ name: "status", value: "active" }]);
+    expect(connector.apiCalls[0].headers).to.deep.equal([{ name: "Accept", value: "application/json" }]);
+    expect(connector.apiCalls[1]).to.have.property('pagination', null);
+    expect(connector.apiCalls[1]).to.have.property('queryParameters', null);
+    expect(connector.apiCalls[1]).to.have.property('headers', null);
+  });
+  test("The basic auth password is masked", function() {
+    expect(res.body.connector.authentication).to.deep.equal({
+      type: "BASIC", username: "reader", password: "********"
+    });
+  });
+  test("No response field holds the password in clear text", function() {
+    expect(JSON.stringify(res.body)).to.not.include("http-s3cret");
+  });
+}

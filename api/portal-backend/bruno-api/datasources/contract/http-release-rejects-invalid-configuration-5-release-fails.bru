@@ -1,0 +1,37 @@
+meta {
+  name: Contract HTTP — release rejects invalid config (5/6 release fails)
+  type: http
+  seq: 118
+}
+
+post {
+  url: {{baseUrl}}/datasources/{{contractHttpReleaseInvalidId}}/release
+  body: none
+  auth: inherit
+}
+
+
+tests {
+  test("Status is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Problem Detail matches the VALIDATION_FAILED contract", function() {
+    expect(res.body.type).to.equal("urn:civitas:error:VALIDATION_FAILED");
+    expect(res.body.title).to.equal("Bad Request");
+    expect(res.body.status).to.equal(400);
+  });
+  test("fieldErrors name the missing path and pagination fields by their connector path", function() {
+    const fields = res.body.fieldErrors.map(function(error) { return error.field; });
+    expect(fields).to.have.members([
+      "connector.apiCalls[0].path",
+      "connector.apiCalls[0].pagination.pageSizeParameter",
+      "connector.apiCalls[0].pagination.pageSize"
+    ]);
+  });
+}
+
+docs {
+  Pins the release half of the deferred validation for HTTP/REST: each
+  `fieldErrors` entry names the key path into the API call, so a client
+  can show the error at the field.
+}

@@ -1,0 +1,51 @@
+meta {
+  name: Contract HTTP — release rejects invalid config (4/6 create DS)
+  type: http
+  seq: 117
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "name": "contract_http_release_invalid",
+    "description": "contract — HTTP",
+    "connector": {
+      "connectorType": "HTTP",
+      "baseUrl": "https://api.example.org",
+      "apiCalls": [
+        {
+          "name": "stations",
+          "pagination": { "type": "PAGE_NUMBER", "pageParameter": "page" }
+        }
+      ]
+    },
+    "dataStructureVersionId": "{{contractHttpReleaseInvalidDsvId}}"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('contractHttpReleaseInvalidId', res.body.id);
+  }
+}
+
+tests {
+  test("Status is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Status is DRAFT", function() {
+    expect(res.body.dataSourceStatus).to.equal("DRAFT");
+  });
+}
+
+docs {
+  Creates an HTTP/REST Data source whose API call has no path and an
+  incomplete pagination. A DRAFT accepts it; step 5 pins the release
+  rejection.
+}
