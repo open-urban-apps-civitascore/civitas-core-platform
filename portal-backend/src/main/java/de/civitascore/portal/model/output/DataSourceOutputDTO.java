@@ -1,12 +1,10 @@
 package de.civitascore.portal.model.output;
 
-import de.civitascore.portal.model.connector.MqttConnectorConfiguration;
-import de.civitascore.portal.model.connector.SqlConnectorConfiguration;
-import de.civitascore.portal.model.embedded.ConnectorType;
+import de.civitascore.portal.model.connector.ConnectorConfiguration;
+import de.civitascore.portal.model.connector.ConnectorSchema;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.util.Map;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -24,13 +22,8 @@ public class DataSourceOutputDTO extends BaseOutputDTO {
   @Schema(example = "ACTIVE")
   private DataSourceStatus dataSourceStatus;
 
-  @Schema(description = "Type of connector (e.g. MQTT, SQL)", example = "MQTT")
-  private ConnectorType connectorType;
-
-  @Schema(
-      oneOf = {MqttConnectorConfiguration.class, SqlConnectorConfiguration.class},
-      description = "The configuration object, structure depends on the connector type")
-  private Map<String, Object> configuration;
+  @Schema(implementation = ConnectorSchema.class)
+  private ConnectorConfiguration connector;
 
   @Schema(
       description = "Versioned CORE URN of this DataSource's configuration artifact in Model Forge")

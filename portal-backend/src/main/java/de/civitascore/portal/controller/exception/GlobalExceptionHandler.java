@@ -1,5 +1,8 @@
 package de.civitascore.portal.controller.exception;
 
+import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
+import de.civitascore.portal.service.connector.ConnectorValidationException;
+import de.civitascore.portal.service.connector.StoredConnectorUnreadableException;
 import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
@@ -19,6 +22,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +39,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
@@ -84,6 +89,31 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     // TR-03187 W-18/W-19: message is constructed by our own validation code (not reflected from
     // DB or framework internals). Clients rely on it to render actionable errors.
     return createProblemDetail(HttpStatus.BAD_REQUEST, "INVALID_INPUT", ex.getMessage(), request);
+  }
+
+  @ExceptionHandler(MalformedDataSourceRequestException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public ProblemDetail handleMalformedDataSourceRequest(
+      MalformedDataSourceRequestException ex, HttpServletRequest request) {
+    log.warn("Malformed Data source request: {}", Encode.forJava(ex.getMessage()));
+    return createProblemDetail(
+        HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", ex.getMessage(), request);
+  }
+
+  @ExceptionHandler(ConnectorValidationException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public ProblemDetail handleConnectorValidation(
+      ConnectorValidationException ex, HttpServletRequest request) {
+    log.warn("Connector validation failed: {} field error(s)", ex.getViolations().size());
+    ProblemDetail problemDetail =
+        createProblemDetail(
+            HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Input validation failed", request);
+    problemDetail.setProperty(
+        "fieldErrors",
+        ex.getViolations().stream()
+            .map(violation -> Map.of("field", violation.path(), "message", violation.message()))
+            .toList());
+    return problemDetail;
   }
 
   @ExceptionHandler(DataSetNotEditableException.class)
@@ -310,6 +340,25 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /**
+   * Handles a Data source pinned to a stored connector that the registry does not hold, and returns
+   * the 500 Problem Detail of a persistence error.
+   *
+   * @param ex the stored connector unreadable exception
+   * @param request the current HTTP request
+   * @return a Problem Detail with HTTP 500 status
+   */
+  @ExceptionHandler(StoredConnectorUnreadableException.class)
+  public ResponseEntity<ProblemDetail> handleStoredConnectorUnreadable(
+      StoredConnectorUnreadableException ex, HttpServletRequest request) {
+    log.error("{}", Encode.forJava(ex.getMessage()));
+    return toProblemDetailResponse(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        "PERSISTENCE_ERROR",
+        "A persistence error occurred",
+        request);
+  }
+
+  /**
    * Handles external system rejection exceptions and returns a 502 Problem Detail response.
    *
    * @param ex the external system rejection exception
@@ -398,10 +447,28 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       HttpStatusCode status,
       WebRequest request) {
     log.warn("Malformed request body: {}", Encode.forJava(ex.getMessage()));
+    Optional<MalformedDataSourceRequestException> malformedRequest =
+        malformedDataSourceRequestIn(ex);
+    if (malformedRequest.isPresent() && request instanceof ServletWebRequest servletRequest) {
+      return ResponseEntity.badRequest()
+          .body(
+              handleMalformedDataSourceRequest(
+                  malformedRequest.get(), servletRequest.getRequest()));
+    }
     ProblemDetail problemDetail =
         createProblemDetail(
             HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", "Request body is missing or malformed");
     return ResponseEntity.badRequest().body(problemDetail);
+  }
+
+  private static Optional<MalformedDataSourceRequestException> malformedDataSourceRequestIn(
+      Throwable ex) {
+    for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+      if (cause instanceof MalformedDataSourceRequestException malformedRequest) {
+        return Optional.of(malformedRequest);
+      }
+    }
+    return Optional.empty();
   }
 
   private ProblemDetail createProblemDetail(

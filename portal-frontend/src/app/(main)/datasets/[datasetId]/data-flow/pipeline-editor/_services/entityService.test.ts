@@ -16,12 +16,11 @@ const mockDatasource = (overrides?: Partial<Datasource>): Datasource => ({
   id: 'ds-1',
   name: 'Test Datasource',
   dataSourceStatus: DATASOURCE_STATUS_TYPES.AVAILABLE,
-  connectorType: 'SQL',
+  connector: { connectorType: 'SQL' },
   description: 'A test datasource',
   datapoolScope: { type: DATAPOOL_SCOPE_TYPES.ALL },
   createdAt: '2024-01-01T00:00:00Z',
   modifiedAt: '2024-01-01T00:00:00Z',
-  configuration: null,
   dataStructureVersion: null,
   inUse: false,
   inUseByReleased: false,
@@ -169,7 +168,7 @@ describe('datasourceToSelectable', () => {
   })
 
   it('includes connectorType, status, and description in metadata', () => {
-    const ds = mockDatasource({ connectorType: 'MQTT', description: 'desc' })
+    const ds = mockDatasource({ connector: { connectorType: 'MQTT' }, description: 'desc' })
     const result = datasourceToSelectable(ds)
     expect(result.metadata?.connectorType).toBe('MQTT')
     expect(result.metadata?.status).toBe(DATASOURCE_STATUS_TYPES.AVAILABLE)

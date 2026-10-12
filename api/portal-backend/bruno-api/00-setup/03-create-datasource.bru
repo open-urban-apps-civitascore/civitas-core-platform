@@ -14,8 +14,8 @@ body:json {
   {
     "name": "API Test DataSource",
     "description": "Base datasource for API testing",
-    "connectorType": "MQTT",
-    "configuration": {
+    "connector": {
+      "connectorType": "MQTT",
       "urls": ["tcp://broker:1883"],
       "topics": ["test/#"],
       "qos": 1,

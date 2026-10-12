@@ -15,8 +15,8 @@ body:json {
   {
     "name": "contract_sql_put_type_change",
     "description": "contract — flipped to MQTT",
-    "connectorType": "MQTT",
-    "configuration": {
+    "connector": {
+      "connectorType": "MQTT",
       "urls": ["tcp://broker:1883"],
       "topics": ["sensor/data"],
       "qos": 1
@@ -30,35 +30,35 @@ tests {
     expect(res.getStatus()).to.equal(200);
   });
   test("Response reflects the new connectorType", function() {
-    expect(res.body.connectorType).to.equal("MQTT");
+    expect(res.body.connector.connectorType).to.equal("MQTT");
     expect(res.body.dataSourceStatus).to.equal("DRAFT");
     expect(res.body.name).to.equal("contract_sql_put_type_change");
     expect(res.body.description).to.equal("contract — flipped to MQTT");
   });
-  test("Configuration is normalized under the new (MQTT) connector schema", function() {
-    expect(res.body.configuration.urls).to.deep.equal(["tcp://broker:1883"]);
-    expect(res.body.configuration.topics).to.deep.equal(["sensor/data"]);
-    expect(res.body.configuration.qos).to.equal(1);
-    expect(res.body.configuration.tls).to.deep.equal({ enabled: false });
+  test("Connector follows the MQTT schema", function() {
+    expect(res.body.connector.urls).to.deep.equal(["tcp://broker:1883"]);
+    expect(res.body.connector.topics).to.deep.equal(["sensor/data"]);
+    expect(res.body.connector.qos).to.equal(1);
+    expect(res.body.connector.protocol_version).to.equal("3");
+    expect(res.body.connector.tls).to.deep.equal({ enabled: false });
   });
-  test("Old SQL-only schema fields are absent from the response", function() {
-    expect(res.body.configuration).to.not.have.property('driver');
-    expect(res.body.configuration).to.not.have.property('dsn');
-    expect(res.body.configuration).to.not.have.property('table');
-    expect(res.body.configuration).to.not.have.property('columns');
+  test("No SQL field and no SQL password remain", function() {
+    expect(res.body.connector).to.not.have.property('driver');
+    expect(res.body.connector).to.not.have.property('dsn');
+    expect(res.body.connector).to.not.have.property('table');
+    expect(res.body.connector).to.not.have.property('columns');
+    expect(res.body.connector).to.have.property('user', null);
+    expect(res.body.connector).to.have.property('password', null);
   });
 }
 
 docs {
-  Pins the current behaviour: a PUT that changes `connectorType` on a
-  **DRAFT** data source is accepted (200) and the configuration is
-  re-normalized under the new connector's schema.
+  Pins that a PUT with a `connector` of another `connectorType` on a
+  **DRAFT** data source is accepted (200) and replaces the connector: the
+  response has only the MQTT fields, and the SQL `user` and `password`
+  are not carried over.
 
-  Server-side: `DataSourceService.validateConnectorTypeChange` only rejects
-  the change when the resource is in `AVAILABLE` status. For DRAFT, the new
-  type and a configuration matching it round-trip cleanly.
-
-  Refactor target — connectorType is currently *mutable on DRAFT*. The
-  refactor must explicitly preserve or change this; if changed, this test
-  needs to be inverted.
+  `DataSourceService.validateConnectorTypeChange` rejects the change only
+  when the data source is `AVAILABLE`. The PATCH counterpart is pinned by
+  `mqtt-patch-changes-connector-type-*.bru`.
 }

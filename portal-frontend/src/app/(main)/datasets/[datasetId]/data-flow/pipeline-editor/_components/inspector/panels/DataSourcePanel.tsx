@@ -36,7 +36,7 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
         // the CORE pipeline node's `sourceRef`; round-trips via `styles`.
         configurationUrn: fullEntity?.configurationUrn ?? undefined,
         configured: true,
-        entityMetadata: fullEntity?.connectorType ? { connector: fullEntity.connectorType } : undefined,
+        entityMetadata: fullEntity?.connector ? { connector: fullEntity.connector.connectorType } : undefined,
       })
     } else {
       onUpdate({
@@ -69,7 +69,7 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
           <EntityMetadata
             title={t('dataSourcePanel.details')}
             items={[
-              { label: t('dataSourcePanel.connector'), value: selectedEntity.connectorType ?? undefined },
+              { label: t('dataSourcePanel.connector'), value: selectedEntity.connector?.connectorType },
               { label: t('dataSourcePanel.status'), value: tStatus(selectedEntity.dataSourceStatus) },
               { label: t('dataSourcePanel.description'), value: selectedEntity.description ?? undefined },
             ]}

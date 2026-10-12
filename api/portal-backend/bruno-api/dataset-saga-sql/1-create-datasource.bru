@@ -14,8 +14,8 @@ body:json {
   {
     "name": "SQL Saga Geo Source",
     "description": "SQL (JDBC) pull source — geo sensor demo rows (lon/lat scalars)",
-    "connectorType": "SQL",
-    "configuration": {
+    "connector": {
+      "connectorType": "SQL",
       "driver": "postgres",
       "dsn": "postgres://postgres-sink:5432/geosink",
       "user": "geosink",
@@ -44,7 +44,7 @@ tests {
 
   test("Has SQL connector type", function() {
     if (res.getStatus() === 201) {
-      expect(res.body.connectorType).to.equal('SQL');
+      expect(res.body.connector.connectorType).to.equal('SQL');
     }
   });
 }
@@ -66,7 +66,7 @@ docs {
   / verify step 10) until the SQL source is implemented, at which point it turns green. It mirrors the
   red unit test `NifiFlowBuilderTest.buildsSqlSourceChainCronScheduled`.
 
-  **Expected Response:** 201 Created, body contains `id` and `connectorType: "SQL"`.
+  **Expected Response:** 201 Created, body contains `id` and `connector.connectorType: "SQL"`.
 
   **Post-condition:** Save `sqlDataSourceId` from `body.id`.
 

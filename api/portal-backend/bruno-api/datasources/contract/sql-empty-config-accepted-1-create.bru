@@ -1,5 +1,5 @@
 meta {
-  name: Contract SQL — DRAFT accepts empty configuration (deferred validation)
+  name: Contract SQL — DRAFT accepts empty connector (deferred validation)
   type: http
   seq: 16
 }
@@ -15,8 +15,7 @@ body:json {
   {
     "name": "contract_sql_empty",
     "description": "x",
-    "connectorType": "SQL",
-    "configuration": {},
+    "connector": { "connectorType": "SQL" },
     "dataStructureVersionId": null
   }
 }
@@ -29,24 +28,25 @@ script:post-response {
 }
 
 tests {
-  test("Status is 201 — empty SQL configuration accepted on DRAFT", function() {
+  test("Status is 201 — empty SQL connector accepted on DRAFT", function() {
     expect(res.getStatus()).to.equal(201);
+  });
+  test("Every field reads back null", function() {
+    expect(res.body.connector.connectorType).to.equal("SQL");
+    ['driver', 'dsn', 'table', 'columns', 'where', 'user', 'password'].forEach(function(key) {
+      expect(res.body.connector).to.have.property(key, null);
+    });
   });
 }
 
 docs {
   Pins the deferred-validation contract: a DataSource in DRAFT status may
-  be saved with an incomplete or empty `configuration`. Validation of
-  required fields is deferred to the release transition, enforced via the
-  Bean Validation `OnRelease` group on `SqlConnectorConfiguration`
-  (`driver`, `dsn`, `table`, etc. carry `@NotBlank(groups = OnRelease.class)`).
+  be saved with an incomplete connector, here one with only
+  `connectorType`. Validation of required fields is deferred to the
+  release transition, enforced via the Bean Validation `OnRelease` group
+  on `SqlConnectorConfiguration` (`driver`, `dsn`, `table`, `columns`).
 
   The release-time half of this contract is pinned by
-  `sql-release-rejects-empty-configuration-*.bru` — if either half changes
-  during the refactor, both tests need to be revisited together.
-
-  Probing during #1391 phase 1 confirmed the DRAFT-side behaviour:
-  - POST with `configuration: {}` → 201, response config = all defaults
-  - POST with `configuration` omitted → 201, response config = null
-  - POST with only `password` present → 201, password kept and masked
+  `sql-release-rejects-empty-configuration-*.bru` — if either half
+  changes, both tests need to be revisited together.
 }

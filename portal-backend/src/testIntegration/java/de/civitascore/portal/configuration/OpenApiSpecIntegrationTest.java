@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +18,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 @DisplayName("OpenAPI Spec Integration Tests")
 class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
@@ -59,6 +63,98 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
     assertThat(schema.path("properties").has("connectorType")).isFalse();
     assertThat(schema.path("properties").has("model")).isFalse();
     assertThat(schema.has("required")).isFalse();
+  }
+
+  @ParameterizedTest
+  @CsvSource({"DataSourceInputDTO", "DataSourceOutputDTO"})
+  @DisplayName("Should describe the connector as oneOf its types, each with its own connectorType")
+  void shouldDescribeConnectorAsOneOfItsTypes(String dto) {
+    JsonNode connector =
+        schemaOf(
+            spec.path("components").path("schemas").path(dto).path("properties").path("connector"));
+
+    List<String> connectorTypes = new ArrayList<>();
+    for (JsonNode variant : connector.path("oneOf")) {
+      JsonNode variantSchema = schemaOf(variant);
+      JsonNode properties = propertiesOf(variantSchema);
+      properties.path("connectorType").path("enum").forEach(t -> connectorTypes.add(t.asString()));
+      assertThat(variantSchema.path("required").values())
+          .as("%s requires connectorType", variant)
+          .extracting(JsonNode::asString)
+          .contains("connectorType");
+      assertThat(properties.path("user").path("description").asString()).isNotBlank();
+      assertThat(properties.path("password").path("writeOnly").asBoolean())
+          .as("%s password is write-only", variant)
+          .isTrue();
+    }
+    assertThat(connectorTypes).containsExactlyInAnyOrder("MQTT", "SQL");
+  }
+
+  @ParameterizedTest
+  @CsvSource({"DataSourceInputDTO", "DataSourceOutputDTO"})
+  @DisplayName("Should map each connectorType to the schema of its connector")
+  void shouldMapEachConnectorTypeToItsSchema(String dto) {
+    JsonNode discriminator =
+        schemaOf(
+                spec.path("components")
+                    .path("schemas")
+                    .path(dto)
+                    .path("properties")
+                    .path("connector"))
+            .path("discriminator");
+
+    assertThat(discriminator.path("propertyName").asString()).isEqualTo("connectorType");
+    assertThat(discriminator.path("mapping").propertyNames())
+        .containsExactlyInAnyOrder("MQTT", "SQL");
+  }
+
+  /** Without this test, a JSON Schema validator would recurse without end on such a schema. */
+  @Test
+  @DisplayName("Should not let a schema contain itself through allOf, oneOf or anyOf")
+  void shouldNotComposeASchemaWithItself() {
+    List<String> selfComposed = new ArrayList<>();
+    for (String name : spec.path("components").path("schemas").propertyNames()) {
+      String ref = "#/components/schemas/" + name;
+      if (composes(ref, ref, new HashSet<>())) {
+        selfComposed.add(name);
+      }
+    }
+
+    assertThat(selfComposed).isEmpty();
+  }
+
+  private boolean composes(String ref, String target, Set<String> seen) {
+    if (!seen.add(ref)) {
+      return false;
+    }
+    JsonNode schema = resolve(ref);
+    for (String keyword : List.of("allOf", "oneOf", "anyOf")) {
+      for (JsonNode part : schema.path(keyword)) {
+        JsonNode partRef = part.path("$ref");
+        if (partRef.isString()
+            && (partRef.asString().equals(target) || composes(partRef.asString(), target, seen))) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /** The properties of a schema, including those of the schemas it is {@code allOf}. */
+  private ObjectNode propertiesOf(JsonNode schema) {
+    ObjectNode properties = JsonNodeFactory.instance.objectNode();
+    for (JsonNode part : schema.path("allOf")) {
+      properties.setAll(propertiesOf(schemaOf(part)));
+    }
+    if (schema.path("properties") instanceof ObjectNode own) {
+      properties.setAll(own);
+    }
+    return properties;
+  }
+
+  private JsonNode schemaOf(JsonNode schemaOrRef) {
+    JsonNode ref = schemaOrRef.path("$ref");
+    return ref.isString() ? resolve(ref.asString()) : schemaOrRef;
   }
 
   private JsonNode requestBodySchema(String path) {

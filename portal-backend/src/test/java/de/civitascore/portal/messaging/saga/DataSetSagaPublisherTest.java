@@ -19,6 +19,7 @@ import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSinkRepository;
+import de.civitascore.portal.service.connector.DataSourceConnectorStore;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -50,6 +51,7 @@ class DataSetSagaPublisherTest {
   @Mock private KafkaTemplate<String, String> kafkaTemplate;
   @Mock private DataSinkRepository dataSinkRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;
+  @Mock private DataSourceConnectorStore connectorStore;
 
   private DataSetSagaPublisher publisher;
 
@@ -61,7 +63,8 @@ class DataSetSagaPublisherTest {
             new JsonMapper(),
             new SagaProperties("test.saga.trigger", 5),
             dataSinkRepository,
-            modelRegistryGateway);
+            modelRegistryGateway,
+            connectorStore);
   }
 
   private static String datasourceUrn(UUID id) {
@@ -76,10 +79,7 @@ class DataSetSagaPublisherTest {
     // The datasource catalog is now keyed by the configuration CORE URN; pin one and stub its read.
     String urn = datasourceUrn(id);
     ds.setConfigurationUrn(urn);
-    lenient()
-        .when(modelRegistryGateway.fetchPayload(urn))
-        .thenReturn(
-            Optional.of(new ModelRegistryGateway.RegistryDocument(Map.of("host", "h"), null)));
+    lenient().when(connectorStore.storedDocument(ds)).thenReturn(Map.of("host", "h"));
     return ds;
   }
 

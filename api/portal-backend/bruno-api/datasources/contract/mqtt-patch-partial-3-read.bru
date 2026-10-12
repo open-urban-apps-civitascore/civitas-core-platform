@@ -15,10 +15,10 @@ tests {
   test("Status is 200", function() {
     expect(res.getStatus()).to.equal(200);
   });
-  test("Patched description persisted; configuration untouched", function() {
+  test("Patched description persisted; connector untouched", function() {
     expect(res.body.description).to.equal("contract — MQTT patched");
-    expect(res.body.configuration.urls).to.deep.equal(["tcp://broker:1883"]);
-    expect(res.body.configuration.topics).to.deep.equal(["sensor/data"]);
-    expect(res.body.configuration.qos).to.equal(1);
+    expect(res.body.connector.urls).to.deep.equal(["tcp://broker:1883"]);
+    expect(res.body.connector.topics).to.deep.equal(["sensor/data"]);
+    expect(res.body.connector.qos).to.equal(1);
   });
 }

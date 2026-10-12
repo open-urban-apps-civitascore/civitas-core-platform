@@ -3,6 +3,10 @@ package de.civitascore.portal.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.config.PortalTestDataFactory;
+import de.civitascore.portal.model.connector.ConnectorConfiguration;
+import de.civitascore.portal.model.connector.MqttConnectorConfiguration;
+import de.civitascore.portal.model.connector.Secret;
+import de.civitascore.portal.model.connector.SqlConnectorConfiguration;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
@@ -18,18 +22,22 @@ import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentScopedInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
-import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.util.RestPage;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -48,11 +56,15 @@ class DataSourceControllerIntegrationTest
     extends BaseDataEntityControllerIntegrationTest<DataSourceInputDTO, DataSourceOutputDTO> {
 
   private static final String DATASOURCES_ENDPOINT = "/datasources";
+  private static final MqttConnectorConfiguration EMPTY_MQTT =
+      new MqttConnectorConfiguration(null, null, null, null, null, null, null, null, null);
+  private static final Secret PLACEHOLDER = Secret.of(Secret.PLACEHOLDER);
 
   @Autowired protected PortalTestDataFactory portalData;
   @Autowired private DataSourceRepository dataSourceRepository;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private PipelineRepository pipelineRepository;
+  @Autowired private ModelRegistryGateway modelRegistryGateway;
 
   @Override
   protected String getEndpointPath() {
@@ -77,9 +89,17 @@ class DataSourceControllerIntegrationTest
     DataSourceInputDTO input = new DataSourceInputDTO();
     input.setName("test_datasource_" + UUID.randomUUID().toString().substring(0, 8));
     input.setDescription("A test data source for integration testing");
-    input.setConnectorType(ConnectorType.MQTT);
-    input.setConfiguration(
-        Map.of("urls", List.of("tcp://broker:1883"), "topics", List.of("sensor/data"), "qos", 1));
+    input.setConnector(
+        new MqttConnectorConfiguration(
+            List.of("tcp://broker:1883"),
+            List.of("sensor/data"),
+            1,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null));
     return input;
   }
 
@@ -95,7 +115,7 @@ class DataSourceControllerIntegrationTest
     DataSourceInputDTO input = new DataSourceInputDTO();
     input.setName("updated_datasource");
     input.setDescription("Updated description");
-    input.setConnectorType(ConnectorType.MQTT);
+    input.setConnector(EMPTY_MQTT);
     return input;
   }
 
@@ -123,11 +143,88 @@ class DataSourceControllerIntegrationTest
   }
 
   private UUID createReleasableSqlTestEntity() {
-    UUID dsvId = createAvailableDataStructureVersionId();
-    DataSourceInputDTO input = createValidSqlInput();
-    input.setDataStructureVersionId(dsvId);
-    ResponseEntity<DataSourceOutputDTO> response = performCreate(input);
-    return response.getBody().getId();
+    return createWithConnector(sqlConnector(), createAvailableDataStructureVersionId())
+        .getBody()
+        .getId();
+  }
+
+  /** The connector as JSON, because a {@link Secret} serializes to its placeholder. */
+  private static Map<String, Object> connector(String connectorType, Object... keysAndValues) {
+    Map<String, Object> connector = new LinkedHashMap<>();
+    connector.put("connectorType", connectorType);
+    for (int i = 0; i < keysAndValues.length; i += 2) {
+      connector.put((String) keysAndValues[i], keysAndValues[i + 1]);
+    }
+    return connector;
+  }
+
+  private static Map<String, Object> sqlConnector() {
+    return connector(
+        "SQL",
+        "driver",
+        "postgres",
+        "dsn",
+        "postgres://localhost:5432/db",
+        "table",
+        "measurements",
+        "columns",
+        List.of("id", "value", "timestamp"),
+        "user",
+        "admin",
+        "password",
+        "secret");
+  }
+
+  private static Map<String, Object> mqttConnector(Object... extraKeysAndValues) {
+    List<Object> keysAndValues =
+        new ArrayList<>(
+            List.of(
+                "urls", List.of("tcp://broker:1883"), "topics", List.of("sensor/data"), "qos", 1));
+    keysAndValues.addAll(Arrays.asList(extraKeysAndValues));
+    return connector("MQTT", keysAndValues.toArray());
+  }
+
+  private Map<String, Object> body(Map<String, Object> connector, UUID dataStructureVersionId) {
+    Map<String, Object> body = new HashMap<>();
+    body.put("name", "datasource_" + UUID.randomUUID().toString().substring(0, 8));
+    body.put("description", "a description");
+    body.put("connector", connector);
+    body.put("dataStructureVersionId", dataStructureVersionId);
+    return body;
+  }
+
+  private ResponseEntity<DataSourceOutputDTO> createWithConnector(
+      Map<String, Object> connector, UUID dataStructureVersionId) {
+    ResponseEntity<DataSourceOutputDTO> response =
+        exchange(
+            DATASOURCES_ENDPOINT,
+            HttpMethod.POST,
+            createAuthHeaders(),
+            body(connector, dataStructureVersionId),
+            getOutputTypeReference());
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    return response;
+  }
+
+  private UUID createWithConnector(Map<String, Object> connector) {
+    return createWithConnector(connector, null).getBody().getId();
+  }
+
+  private ResponseEntity<ProblemDetail> writeExpectingProblem(
+      HttpMethod method, String path, Object body) {
+    return exchangeForProblem(DATASOURCES_ENDPOINT + path, method, createAuthHeaders(), body);
+  }
+
+  private <T extends ConnectorConfiguration> T connectorOf(UUID id, Class<T> type) {
+    return type.cast(performGetById(id).getBody().getConnector());
+  }
+
+  /** The registry document, which follows {@code datasource.schema.json}. */
+  private Map<String, Object> storedDocument(UUID id) {
+    return modelRegistryGateway
+        .fetchPayload(dataSourceRepository.findById(id).orElseThrow().getConfigurationUrn())
+        .map(ModelRegistryGateway.RegistryDocument::content)
+        .orElseThrow();
   }
 
   private ResponseEntity<DataSourceOutputDTO> performRelease(UUID id) {
@@ -185,22 +282,6 @@ class DataSourceControllerIntegrationTest
     return dsv.getId();
   }
 
-  private DataSourceInputDTO createValidSqlInput() {
-    DataSourceInputDTO input = new DataSourceInputDTO();
-    input.setName("sql_datasource_" + UUID.randomUUID().toString().substring(0, 8));
-    input.setDescription("SQL data source");
-    input.setConnectorType(ConnectorType.SQL);
-    input.setConfiguration(
-        Map.of(
-            "driver", "postgres",
-            "dsn", "postgres://localhost:5432/db",
-            "table", "measurements",
-            "columns", List.of("id", "value", "timestamp"),
-            "user", "admin",
-            "password", "secret"));
-    return input;
-  }
-
   @Nested
   @DisplayName("Create DataSource Tests")
   class CreateTests {
@@ -220,7 +301,7 @@ class DataSourceControllerIntegrationTest
       assertThat(output.getName()).isEqualTo(input.getName());
       assertThat(output.getDescription()).isEqualTo(input.getDescription());
       assertThat(output.getDataSourceStatus()).isEqualTo(DataSourceStatus.DRAFT);
-      assertThat(output.getConnectorType()).isEqualTo(ConnectorType.MQTT);
+      assertThat(output.getConnector().connectorType()).isEqualTo(ConnectorType.MQTT);
       assertThat(output.getCreatedAt()).isNotNull();
     }
 
@@ -264,38 +345,188 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should create SQL data source with masked password in response")
-    void shouldCreateSqlDataSourceWithMaskedPassword() {
-      DataSourceInputDTO input = createValidSqlInput();
+    void create_withSqlConnector_returnsConnectorWithMaskedPassword() {
+      DataSourceOutputDTO output = createWithConnector(sqlConnector(), null).getBody();
 
-      ResponseEntity<DataSourceOutputDTO> response = performCreate(input);
+      assertThat(output.getConnector())
+          .isEqualTo(
+              new SqlConnectorConfiguration(
+                  "postgres",
+                  "postgres://localhost:5432/db",
+                  "measurements",
+                  List.of("id", "value", "timestamp"),
+                  null,
+                  "admin",
+                  PLACEHOLDER));
+    }
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
+    @Test
+    void create_withPassword_storesItEncryptedInTheRegistry() {
+      UUID id = createWithConnector(sqlConnector());
 
-      DataSourceOutputDTO output = response.getBody();
-      Map<String, Object> config = output.getConfiguration();
-      assertThat(config).isNotNull();
-      assertThat(config.get("driver")).isEqualTo("postgres");
-      assertThat(config.get("table")).isEqualTo("measurements");
-      assertThat(config.get("dsn").toString()).isEqualTo("postgres://localhost:5432/db");
-      assertThat(config.get("user")).isEqualTo("admin");
-      assertThat(config.get("password")).isEqualTo(ConnectorHandler.MASKED_VALUE);
+      Map<String, Object> document = storedDocument(id);
+      assertThat(document)
+          .containsEntry("connectionType", "sql")
+          .doesNotContainKey("connectorType");
+      assertThat((String) document.get("password")).startsWith("ENC(").doesNotContain("secret");
     }
 
     @Test
     @DisplayName("Should store the configuration under the data source's id")
     void shouldStoreTheConfigurationUnderTheDataSourceId() {
-      ResponseEntity<DataSourceOutputDTO> response = performCreate(createValidSqlInput());
+      UUID dataSourceId = createWithConnector(sqlConnector());
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      UUID dataSourceId = response.getBody().getId();
       assertThat(
               dataSourceRepository
                   .findById(dataSourceId)
                   .orElseThrow()
                   .getConfigurationLogicalUrn())
           .isEqualTo("urn:core:platform:civitas:datasource:common:" + dataSourceId);
+    }
+
+    @Test
+    void create_withExplicitNullProtocolVersion_storesDefault() {
+      UUID id = createWithConnector(mqttConnector("protocol_version", null));
+
+      assertThat(connectorOf(id, MqttConnectorConfiguration.class).protocolVersion())
+          .isEqualTo("3");
+    }
+
+    @Test
+    void create_withValueOutOfRange_returnsFieldError() {
+      ResponseEntity<ProblemDetail> response =
+          writeExpectingProblem(HttpMethod.POST, "", body(mqttConnector("qos", 5), null));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getProperties().get("fieldErrors"))
+          .isEqualTo(
+              List.of(Map.of("field", "connector.qos", "message", "'qos' must be 0, 1, or 2")));
+    }
+
+    @Test
+    void patch_withInvalidValue_returnsFieldErrorNamingTheRequestKey() {
+      UUID id = createWithConnector(mqttConnector());
+
+      ResponseEntity<ProblemDetail> response =
+          writeExpectingProblem(
+              HttpMethod.PATCH, "/" + id, Map.of("connector", Map.of("protocol_version", "4")));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:VALIDATION_FAILED");
+      assertThat(response.getBody().getProperties().get("fieldErrors"))
+          .isEqualTo(
+              List.of(
+                  Map.of(
+                      "field",
+                      "connector.protocol_version",
+                      "message",
+                      "'protocol_version' must be 3 or 5")));
+    }
+  }
+
+  @Nested
+  class MalformedConnectorTests {
+
+    private void assertMalformed(ResponseEntity<ProblemDetail> response, String detail) {
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:MALFORMED_REQUEST");
+      assertThat(response.getBody().getDetail()).isEqualTo(detail);
+      assertThat(response.getBody().getInstance()).asString().contains(DATASOURCES_ENDPOINT);
+    }
+
+    @Test
+    void create_withUnknownConnectorKey_returnsMalformedRequestNamingTheKey() {
+      assertMalformed(
+          writeExpectingProblem(
+              HttpMethod.POST, "", body(mqttConnector("protocolVersion", "5"), null)),
+          "Unknown key: connector.protocolVersion");
+    }
+
+    @Test
+    void create_withUnknownNestedKey_returnsMalformedRequestNamingTheKey() {
+      assertMalformed(
+          writeExpectingProblem(
+              HttpMethod.POST,
+              "",
+              body(mqttConnector("tls", Map.of("enabled", true, "verify", false)), null)),
+          "Unknown key: connector.tls.verify");
+    }
+
+    @Test
+    void create_withKeyOfThePreviousShape_returnsMalformedRequestNamingTheKey() {
+      Map<String, Object> body = body(null, null);
+      body.put("configuration", Map.of("urls", List.of("tcp://broker:1883")));
+
+      assertMalformed(
+          writeExpectingProblem(HttpMethod.POST, "", body), "Unknown key: configuration");
+    }
+
+    @Test
+    void update_withUnknownTopLevelKey_returnsMalformedRequestNamingTheKey() {
+      UUID id = createTestEntity();
+      Map<String, Object> body = body(mqttConnector(), null);
+      body.put("connectorType", "MQTT");
+
+      assertMalformed(
+          writeExpectingProblem(HttpMethod.PUT, "/" + id, body), "Unknown key: connectorType");
+    }
+
+    @Test
+    void patch_withUnknownTopLevelKey_returnsMalformedRequestNamingTheKey() {
+      UUID id = createTestEntity();
+
+      assertMalformed(
+          writeExpectingProblem(
+              HttpMethod.PATCH, "/" + id, Map.of("dataSourceStatus", "AVAILABLE")),
+          "Unknown key: dataSourceStatus");
+    }
+
+    @Test
+    void update_withUnknownKey_returnsMalformedRequestNamingTheKey() {
+      UUID id = createTestEntity();
+
+      assertMalformed(
+          writeExpectingProblem(HttpMethod.PUT, "/" + id, body(mqttConnector("broker", "x"), null)),
+          "Unknown key: connector.broker");
+    }
+
+    @Test
+    void patch_withUnknownKey_returnsMalformedRequestNamingTheKey() {
+      UUID id = createTestEntity();
+
+      assertMalformed(
+          writeExpectingProblem(
+              HttpMethod.PATCH, "/" + id, Map.of("connector", Map.of("tls", Map.of("verify", 1)))),
+          "Unknown key: connector.tls.verify");
+    }
+
+    @Test
+    void patch_withInvalidUrl_returnsMalformedRequestWithoutTheValue() {
+      UUID id = createTestEntity();
+
+      assertMalformed(
+          writeExpectingProblem(
+              HttpMethod.PATCH,
+              "/" + id,
+              Map.of("connector", Map.of("urls", List.of("tcp://user:pw@ no host")))),
+          "Invalid value: connector.urls[0]");
+    }
+
+    @Test
+    void patch_withUnknownConnectorType_returnsMalformedRequest() {
+      UUID id = createTestEntity();
+
+      assertMalformed(
+          writeExpectingProblem(
+              HttpMethod.PATCH, "/" + id, Map.of("connector", Map.of("connectorType", "HTTP"))),
+          "Unknown connectorType: HTTP");
+    }
+
+    @Test
+    void create_withUnknownConnectorType_returnsMalformedRequest() {
+      assertMalformed(
+          writeExpectingProblem(HttpMethod.POST, "", body(connector("FTP"), null)),
+          "Unknown connectorType: FTP");
     }
   }
 
@@ -306,57 +537,27 @@ class DataSourceControllerIntegrationTest
     @Test
     @DisplayName("Should normalize blank optional MQTT strings to null on create")
     void shouldNormalizeBlankOptionalStringsOnCreate() {
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("mqtt_blank_test_" + UUID.randomUUID().toString().substring(0, 8));
-      input.setDescription("a description");
-      input.setConnectorType(ConnectorType.MQTT);
-      Map<String, Object> config = new HashMap<>();
-      config.put("urls", List.of("tcp://broker:1883"));
-      config.put("topics", List.of("sensor/data"));
-      config.put("qos", 1);
-      config.put("connect_timeout", "   ");
-      config.put("keepalive", "");
-      config.put("user", " ");
-      input.setConfiguration(config);
+      UUID id =
+          createWithConnector(
+              mqttConnector("connect_timeout", "   ", "keepalive", "", "user", " "));
 
-      ResponseEntity<DataSourceOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      Map<String, Object> resultConfig = response.getBody().getConfiguration();
-      assertThat(resultConfig.get("connect_timeout")).isNull();
-      assertThat(resultConfig.get("keepalive")).isNull();
-      assertThat(resultConfig.get("user")).isNull();
+      MqttConnectorConfiguration connector = connectorOf(id, MqttConnectorConfiguration.class);
+      assertThat(connector.connectTimeout()).isNull();
+      assertThat(connector.keepalive()).isNull();
+      assertThat(connector.user()).isNull();
     }
 
     @Test
     @DisplayName("Should persist non-blank optional MQTT strings unchanged")
     void shouldPersistNonBlankOptionalStringsUnchanged() {
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("mqtt_nonblank_test_" + UUID.randomUUID().toString().substring(0, 8));
-      input.setDescription("a description");
-      input.setConnectorType(ConnectorType.MQTT);
-      input.setConfiguration(
-          Map.of(
-              "urls",
-              List.of("tcp://broker:1883"),
-              "topics",
-              List.of("sensor/data"),
-              "qos",
-              1,
-              "connect_timeout",
-              "5s",
-              "keepalive",
-              "30s",
-              "user",
-              "mqttuser"));
+      UUID id =
+          createWithConnector(
+              mqttConnector("connect_timeout", "5s", "keepalive", "30s", "user", "mqttuser"));
 
-      ResponseEntity<DataSourceOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      Map<String, Object> resultConfig = response.getBody().getConfiguration();
-      assertThat(resultConfig.get("connect_timeout")).isEqualTo("5s");
-      assertThat(resultConfig.get("keepalive")).isEqualTo("30s");
-      assertThat(resultConfig.get("user")).isEqualTo("mqttuser");
+      MqttConnectorConfiguration connector = connectorOf(id, MqttConnectorConfiguration.class);
+      assertThat(connector.connectTimeout()).isEqualTo("5s");
+      assertThat(connector.keepalive()).isEqualTo("30s");
+      assertThat(connector.user()).isEqualTo("mqttuser");
     }
   }
 
@@ -531,19 +732,35 @@ class DataSourceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should fail to release data source without configuration")
-    void shouldFailToReleaseWithoutConfiguration() {
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("bare_source_" + UUID.randomUUID().toString().substring(0, 8));
-      input.setDescription("a description");
-      input.setConnectorType(ConnectorType.MQTT);
+    void release_withIncompleteConnector_returnsFieldErrorsWithConnectorPaths() {
+      UUID id =
+          createWithConnector(connector("MQTT"), createAvailableDataStructureVersionId())
+              .getBody()
+              .getId();
 
-      ResponseEntity<DataSourceOutputDTO> createResponse = performCreate(input);
-      UUID id = createResponse.getBody().getId();
-
-      ResponseEntity<String> response = performReleaseExpectingError(id);
+      ResponseEntity<ProblemDetail> response =
+          writeExpectingProblem(HttpMethod.POST, "/" + id + "/release", null);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:VALIDATION_FAILED");
+      List<?> fieldErrors = (List<?>) response.getBody().getProperties().get("fieldErrors");
+      List<Object> fields =
+          fieldErrors.stream().map(error -> (Object) ((Map<?, ?>) error).get("field")).toList();
+      assertThat(fields).containsExactly("connector.qos", "connector.topics", "connector.urls");
+    }
+
+    @Test
+    void release_withoutConnector_isRejected() {
+      DataSourceInputDTO input = createValidInput();
+      input.setConnector(null);
+      input.setDataStructureVersionId(createAvailableDataStructureVersionId());
+      UUID id = performCreate(input).getBody().getId();
+
+      ResponseEntity<ProblemDetail> response =
+          writeExpectingProblem(HttpMethod.POST, "/" + id + "/release", null);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getDetail()).contains("Connector type");
     }
 
     @Test
@@ -621,125 +838,130 @@ class DataSourceControllerIntegrationTest
   }
 
   @Nested
-  @DisplayName("PATCH Configuration Tests")
-  class PatchConfigurationTests {
+  @DisplayName("PATCH Connector Tests")
+  class PatchConnectorTests {
 
-    @Test
-    @DisplayName("PATCH non-config fields should preserve existing configuration")
-    void patchNonConfigFieldsShouldPreserveConfiguration() {
-      DataSourceInputDTO input = createValidSqlInput();
-      ResponseEntity<DataSourceOutputDTO> createResponse = performCreate(input);
-      UUID id = createResponse.getBody().getId();
-
-      Map<String, Object> patch = Map.of("description", "updated description");
+    private SqlConnectorConfiguration patchSql(UUID id, Map<String, Object> patch) {
       ResponseEntity<DataSourceOutputDTO> response = performPatch(id, patch);
-
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody().getDescription()).isEqualTo("updated description");
-      Map<String, Object> config = response.getBody().getConfiguration();
-      assertThat(config).isNotNull();
-      assertThat(config.get("driver")).isEqualTo("postgres");
-      assertThat(config.get("table")).isEqualTo("measurements");
-      assertThat(config.get("dsn")).isEqualTo("postgres://localhost:5432/db");
-      assertThat(config.get("user")).isEqualTo("admin");
-      assertThat(config.get("password")).isEqualTo(ConnectorHandler.MASKED_VALUE);
+      return (SqlConnectorConfiguration) response.getBody().getConnector();
     }
 
     @Test
-    @DisplayName("PATCH non-sensitive config fields should preserve encrypted password")
-    void patchNonSensitiveConfigFieldsShouldPreservePassword() {
-      DataSourceInputDTO input = createValidSqlInput();
-      ResponseEntity<DataSourceOutputDTO> createResponse = performCreate(input);
-      UUID id = createResponse.getBody().getId();
+    @DisplayName("PATCH non-connector fields should preserve the connector and its secret")
+    void patchNonConnectorFieldsShouldPreserveConnector() {
+      UUID id = createWithConnector(sqlConnector());
+      Object storedPassword = storedDocument(id).get("password");
 
-      Map<String, Object> patch = Map.of("configuration", Map.of("table", "new_table"));
-      ResponseEntity<DataSourceOutputDTO> response = performPatch(id, patch);
+      SqlConnectorConfiguration connector =
+          patchSql(id, Map.of("description", "updated description"));
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      Map<String, Object> config = response.getBody().getConfiguration();
-      assertThat(config.get("table")).isEqualTo("new_table");
-      assertThat(config.get("dsn")).isEqualTo("postgres://localhost:5432/db");
-      assertThat(config.get("password")).isEqualTo(ConnectorHandler.MASKED_VALUE);
+      assertThat(connector.table()).isEqualTo("measurements");
+      assertThat(connector.password()).isEqualTo(PLACEHOLDER);
+      assertThat(storedDocument(id)).containsEntry("password", storedPassword);
+    }
+
+    @Test
+    @DisplayName("PATCH of one connector field keeps the others and the stored secret")
+    void patchOneConnectorFieldShouldPreserveOthers() {
+      UUID id = createWithConnector(sqlConnector());
+      Object storedPassword = storedDocument(id).get("password");
+
+      SqlConnectorConfiguration connector =
+          patchSql(id, Map.of("connector", Map.of("table", "new_table")));
+
+      assertThat(connector.table()).isEqualTo("new_table");
+      assertThat(connector.dsn()).isEqualTo("postgres://localhost:5432/db");
+      assertThat(storedDocument(id)).containsEntry("password", storedPassword);
     }
 
     @Test
     @DisplayName("PATCH with new password should encrypt new credentials")
     void patchWithNewPasswordShouldEncrypt() {
-      DataSourceInputDTO input = createValidSqlInput();
-      ResponseEntity<DataSourceOutputDTO> createResponse = performCreate(input);
-      UUID id = createResponse.getBody().getId();
+      UUID id = createWithConnector(sqlConnector());
+      Object storedPassword = storedDocument(id).get("password");
 
-      Map<String, Object> patch =
-          Map.of("configuration", Map.of("user", "newuser", "password", "newpass"));
-      ResponseEntity<DataSourceOutputDTO> response = performPatch(id, patch);
+      SqlConnectorConfiguration connector =
+          patchSql(id, Map.of("connector", Map.of("user", "newuser", "password", "newpass")));
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      Map<String, Object> config = response.getBody().getConfiguration();
-      assertThat(config.get("user")).isEqualTo("newuser");
-      assertThat(config.get("password")).isEqualTo(ConnectorHandler.MASKED_VALUE);
-      assertThat(config.get("dsn")).isEqualTo("postgres://localhost:5432/db");
+      assertThat(connector.user()).isEqualTo("newuser");
+      assertThat(connector.password()).isEqualTo(PLACEHOLDER);
+      assertThat((String) storedDocument(id).get("password"))
+          .startsWith("ENC(")
+          .isNotEqualTo(storedPassword);
     }
 
     @Test
-    @DisplayName("PATCH MQTT with new password should encrypt")
-    void patchMqttWithNewPasswordShouldEncrypt() {
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("mqtt_patch_test_" + UUID.randomUUID().toString().substring(0, 8));
-      input.setDescription("a description");
-      input.setConnectorType(ConnectorType.MQTT);
-      input.setConfiguration(
-          Map.of(
-              "urls",
-              List.of("tcp://broker:1883"),
-              "topics",
-              List.of("sensor/data"),
-              "qos",
-              1,
-              "user",
-              "mqttuser",
-              "password",
-              "mqttpass"));
-      ResponseEntity<DataSourceOutputDTO> createResponse = performCreate(input);
-      UUID id = createResponse.getBody().getId();
+    void patch_withNullAndBlankValues_clearsFields() {
+      UUID id = createWithConnector(sqlConnector());
+      Map<String, Object> connectorPatch = new HashMap<>();
+      connectorPatch.put("user", null);
+      connectorPatch.put("table", "  ");
+      connectorPatch.put("password", "");
 
-      Map<String, Object> patch =
-          Map.of("configuration", Map.of("user", "newuser", "password", "newpass"));
-      ResponseEntity<DataSourceOutputDTO> response = performPatch(id, patch);
+      SqlConnectorConfiguration connector = patchSql(id, Map.of("connector", connectorPatch));
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      Map<String, Object> config = response.getBody().getConfiguration();
-      assertThat(config.get("topics")).isEqualTo(List.of("sensor/data"));
-      assertThat(config.get("user")).isEqualTo("newuser");
-      assertThat(config.get("password")).isEqualTo(ConnectorHandler.MASKED_VALUE);
+      assertThat(connector.user()).isNull();
+      assertThat(connector.table()).isNull();
+      assertThat(connector.password()).isNull();
+      assertThat(storedDocument(id)).containsEntry("password", null);
     }
 
     @Test
-    @DisplayName("PATCH MQTT non-sensitive fields should preserve encrypted password")
-    void patchMqttNonSensitiveFieldsShouldPreservePassword() {
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("mqtt_patch_preserve_" + UUID.randomUUID().toString().substring(0, 8));
-      input.setDescription("a description");
-      input.setConnectorType(ConnectorType.MQTT);
-      input.setConfiguration(
-          Map.of(
-              "urls",
-              List.of("tcp://broker:1883"),
-              "topics",
-              List.of("sensor/data"),
-              "qos",
-              1,
-              "password",
-              "my-secret"));
-      ResponseEntity<DataSourceOutputDTO> createResponse = performCreate(input);
-      UUID id = createResponse.getBody().getId();
+    void patch_withOtherConnectorTypeOnDraft_replacesConnector() {
+      UUID id = createWithConnector(sqlConnector());
 
-      Map<String, Object> patch = Map.of("configuration", Map.of("topics", List.of("new/topic")));
+      ResponseEntity<DataSourceOutputDTO> response =
+          performPatch(id, Map.of("connector", mqttConnector()));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getConnector())
+          .isEqualTo(
+              new MqttConnectorConfiguration(
+                  List.of("tcp://broker:1883"),
+                  List.of("sensor/data"),
+                  1,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null));
+      assertThat(storedDocument(id))
+          .containsEntry("connectionType", "mqtt")
+          .containsEntry("password", null)
+          .doesNotContainKey("dsn");
+    }
+
+    @Test
+    void patch_withNullConnector_removesConnector() {
+      UUID id = createWithConnector(sqlConnector());
+      Map<String, Object> patch = new HashMap<>();
+      patch.put("connector", null);
+
       ResponseEntity<DataSourceOutputDTO> response = performPatch(id, patch);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      Map<String, Object> config = response.getBody().getConfiguration();
-      assertThat(config.get("topics")).isEqualTo(List.of("new/topic"));
-      assertThat(config.get("qos")).isEqualTo(1);
+      assertThat(response.getBody().getConnector()).isNull();
+    }
+
+    @Test
+    void update_withPlaceholderAndNoStoredPassword_storesNoPassword() {
+      UUID id = createWithConnector(mqttConnector());
+      Map<String, Object> put = body(mqttConnector("password", Secret.PLACEHOLDER), null);
+
+      ResponseEntity<DataSourceOutputDTO> response =
+          exchange(
+              DATASOURCES_ENDPOINT + "/" + id,
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              put,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(((MqttConnectorConfiguration) response.getBody().getConnector()).password())
+          .isNull();
+      assertThat(storedDocument(id)).containsEntry("password", null);
     }
 
     @Test
@@ -965,59 +1187,40 @@ class DataSourceControllerIntegrationTest
   }
 
   @Nested
-  @DisplayName("Configuration Masking Tests")
+  @DisplayName("Connector Masking Tests")
   class MaskingTests {
 
-    @Test
-    @DisplayName("Should mask sensitive SQL fields in GET response")
-    void shouldMaskSensitiveSqlFieldsInGetResponse() {
-      DataSourceInputDTO input = createValidSqlInput();
-      ResponseEntity<DataSourceOutputDTO> createResponse = performCreate(input);
-      UUID id = createResponse.getBody().getId();
-
-      ResponseEntity<DataSourceOutputDTO> response = performGetById(id);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-
-      Map<String, Object> config = response.getBody().getConfiguration();
-      assertThat(config.get("driver")).isEqualTo("postgres");
-      assertThat(config.get("table")).isEqualTo("measurements");
-      assertThat(config.get("dsn")).isEqualTo("postgres://localhost:5432/db");
-      assertThat(config.get("user")).isEqualTo("admin");
-      assertThat(config.get("password")).isEqualTo(ConnectorHandler.MASKED_VALUE);
+    private Map<String, Object> getRaw(UUID id) {
+      return exchange(
+              DATASOURCES_ENDPOINT + "/" + id,
+              HttpMethod.GET,
+              createAuthHeaders(),
+              null,
+              new ParameterizedTypeReference<Map<String, Object>>() {})
+          .getBody();
     }
 
     @Test
-    @DisplayName("Should mask sensitive MQTT fields in GET response")
-    void shouldMaskSensitiveMqttFieldsInGetResponse() {
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("mqtt_with_password_" + UUID.randomUUID().toString().substring(0, 8));
-      input.setDescription("a description");
-      input.setConnectorType(ConnectorType.MQTT);
-      input.setConfiguration(
-          Map.of(
-              "urls",
-              List.of("tcp://broker:1883"),
-              "topics",
-              List.of("sensor/data"),
-              "qos",
-              1,
-              "user",
-              "mqttuser",
-              "password",
-              "my-secret-password"));
+    void get_withStoredPassword_showsPlaceholderAndNoOtherConnectorMember() {
+      UUID id = createWithConnector(mqttConnector("user", "mqttuser", "password", "my-secret"));
 
-      ResponseEntity<DataSourceOutputDTO> createResponse = performCreate(input);
-      UUID id = createResponse.getBody().getId();
+      Map<String, Object> response = getRaw(id);
 
-      ResponseEntity<DataSourceOutputDTO> response = performGetById(id);
+      assertThat(response.get("connector"))
+          .asInstanceOf(InstanceOfAssertFactories.MAP)
+          .containsEntry("connectorType", "MQTT")
+          .containsEntry("user", "mqttuser")
+          .containsEntry("password", Secret.PLACEHOLDER)
+          .doesNotContainKey("connectionType");
+    }
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      Map<String, Object> config = response.getBody().getConfiguration();
-      assertThat(config.get("topics")).isEqualTo(List.of("sensor/data"));
-      assertThat(config.get("user")).isEqualTo("mqttuser");
-      assertThat(config.get("password")).isEqualTo(ConnectorHandler.MASKED_VALUE);
+    @Test
+    void get_withoutPassword_showsNull() {
+      UUID id = createWithConnector(mqttConnector("password", ""));
+
+      assertThat(getRaw(id).get("connector"))
+          .asInstanceOf(InstanceOfAssertFactories.MAP)
+          .containsEntry("password", null);
     }
   }
 
@@ -1118,7 +1321,7 @@ class DataSourceControllerIntegrationTest
               createAuthHeaders(),
               null,
               getOutputTypeReference());
-      Map<String, Object> originalConfig = before.getBody().getConfiguration();
+      var originalConnector = before.getBody().getConnector();
 
       Map<String, Object> metaUpdate =
           Map.of("name", "updated-name", "description", "a description");
@@ -1132,7 +1335,7 @@ class DataSourceControllerIntegrationTest
               getOutputTypeReference());
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody().getConfiguration()).isEqualTo(originalConfig);
+      assertThat(response.getBody().getConnector()).isEqualTo(originalConnector);
     }
 
     @Test
@@ -1276,7 +1479,7 @@ class DataSourceControllerIntegrationTest
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"connectorType", "configuration", "dataStructureVersionId"})
+    @ValueSource(strings = {"connector", "dataStructureVersionId"})
     @DisplayName("Should reject a field fixed after release when no dataset uses the data source")
     void shouldRejectFieldFixedAfterReleaseWhenNotInUse(String field) {
       UUID id = createReleasableTestEntity();
@@ -1286,7 +1489,7 @@ class DataSourceControllerIntegrationTest
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"connectorType", "configuration", "dataStructureVersionId"})
+    @ValueSource(strings = {"connector", "dataStructureVersionId"})
     @DisplayName("Should reject a field fixed after release when an AVAILABLE dataset uses it")
     void shouldRejectFieldFixedAfterReleaseWhenInUse(String field) {
       DataSource dataSource = createAvailableDataSource();
@@ -1299,10 +1502,8 @@ class DataSourceControllerIntegrationTest
       DataSourceOutputDTO before = performGetById(id).getBody();
       Map<String, Object> newValues =
           Map.of(
-              "connectorType",
-              "SQL",
-              "configuration",
-              Map.of("urls", List.of("tcp://new-broker:1883"), "topics", List.of("new/topic")),
+              "connector",
+              Map.of("connectorType", "MQTT", "urls", List.of("tcp://new-broker:1883")),
               "dataStructureVersionId",
               createAvailableDataStructureVersionId());
 
@@ -1317,8 +1518,7 @@ class DataSourceControllerIntegrationTest
       assertThat(response.getBody().getDetail()).contains(field);
       DataSourceOutputDTO after = performGetById(id).getBody();
       assertThat(after.getName()).isEqualTo(before.getName());
-      assertThat(after.getConnectorType()).isEqualTo(before.getConnectorType());
-      assertThat(after.getConfiguration()).isEqualTo(before.getConfiguration());
+      assertThat(after.getConnector()).isEqualTo(before.getConnector());
       assertThat(after.getDataStructureVersion().getId())
           .isEqualTo(before.getDataStructureVersion().getId());
     }

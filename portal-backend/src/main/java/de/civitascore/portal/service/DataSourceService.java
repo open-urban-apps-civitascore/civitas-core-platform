@@ -1,8 +1,7 @@
 package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.DataSourceMapper;
-import de.civitascore.portal.model.connector.OnRelease;
-import de.civitascore.portal.model.embedded.ConnectorType;
+import de.civitascore.portal.model.connector.ConnectorConfiguration;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
@@ -15,26 +14,20 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataSourceMetaInputDTO;
 import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
-import de.civitascore.portal.modelregistry.ModelRegistryGateway;
-import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
-import de.civitascore.portal.service.connector.ConnectorHandler;
-import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
+import de.civitascore.portal.service.connector.ConnectorValidationException;
+import de.civitascore.portal.service.connector.ConnectorValidator;
+import de.civitascore.portal.service.connector.ConnectorViolation;
+import de.civitascore.portal.service.connector.DataSourceConnectorStore;
 import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
-import jakarta.validation.groups.Default;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -46,10 +39,9 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Service for managing {@link DataSource} entities through their full lifecycle (DRAFT to
- * AVAILABLE). Handles connector configuration normalization, encryption of sensitive fields, data
- * structure version linking, and release/unrelease status transitions. The connector configuration
- * document (encrypted sensitive fields included) lives in the Model Forge registry, pinned by the
- * source's {@code configurationUrn}.
+ * AVAILABLE). Handles the connector, data structure version linking, and release/unrelease status
+ * transitions. {@link DataSourceConnectorStore} keeps the connector and {@link ConnectorValidator}
+ * validates it.
  */
 @Service
 @RequiredArgsConstructor
@@ -58,13 +50,13 @@ public class DataSourceService
 
   private final DataSourceRepository dataSourceRepository;
   private final DataSourceMapper dataSourceMapper;
-  private final ConnectorHandlerRegistry connectorHandlerRegistry;
   private final AssignmentFactory assignmentFactory;
   private final AssignmentChangeAuthorizer assignmentChangeAuthorizer;
   private final DataStructureVersionService dataStructureVersionService;
   private final PipelineRepository pipelineRepository;
   private final DataPoolRepository dataPoolRepository;
-  private final ModelRegistryGateway modelRegistryGateway;
+  private final DataSourceConnectorStore connectorStore;
+  private final ConnectorValidator connectorValidator;
   private final ScopeAccessAuthorizer scopeAccessAuthorizer;
   private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
   private final ArtifactUsageLookup artifactUsageLookup;
@@ -150,11 +142,8 @@ public class DataSourceService
       applyDatapoolScope(entity, input.getDatapoolScope());
     }
 
-    // The input's configuration was already normalized + encrypted by the pre-process hooks;
-    // store it in the registry and mirror the pin. An absent configuration on a full update
-    // clears the pin (the artifact history stays in the registry).
     if (entity.getId() != null) {
-      storeConfigurationInRegistry(entity, input.getConfiguration(), input.getConnectorType());
+      connectorStore.write(entity, input.getConnector());
     }
 
     return super.postConvertToEntity(entity, input);
@@ -162,209 +151,38 @@ public class DataSourceService
 
   @Override
   protected DataSource postCreate(DataSource saved, DataSourceInputDTO input) {
-    storeConfigurationInRegistry(saved, input.getConfiguration(), input.getConnectorType());
+    connectorStore.write(saved, input.getConnector());
     return super.postCreate(saved, input);
   }
 
-  /**
-   * Stores the (already normalized and encrypted) connector configuration in the Model Forge
-   * registry (kind {@code DATA_SOURCE}) and mirrors the assigned pin onto the shell. A null
-   * configuration clears the content pin; the logical URN is kept so a later store versions the
-   * same artifact.
-   *
-   * @param entity the data source entity
-   * @param configuration the encrypted configuration document, or null to clear
-   */
-  private void storeConfigurationInRegistry(
-      DataSource entity, Map<String, Object> configuration, ConnectorType connectorType) {
-    if (configuration == null || configuration.isEmpty()) {
-      entity.setConfigurationUrn(null);
-      return;
-    }
-    // The host supplies only content: the connectionType. Model Forge stamps $schema + id on write
-    // so
-    // the stored payload satisfies datasource.schema.json's
-    // required:["$schema","id","connectionType"].
-    // Resolve the type from the request first (create / connector PATCH), else the entity's stored
-    // value (a status-only PATCH does not re-send it) — it must never be null here or validation
-    // fails.
-    ConnectorType type = connectorType != null ? connectorType : entity.getConnectorType();
-    Map<String, Object> payload = new LinkedHashMap<>(configuration);
-    if (type != null) {
-      payload.put("connectionType", type.name().toLowerCase(Locale.ROOT));
-    }
-    if (entity.getConfigurationUrn() != null
-        && modelRegistryGateway.isUnchanged(entity.getConfigurationUrn(), payload, null)) {
-      // Unchanged configuration keeps the existing pin — no new registry version. (Encrypted
-      // values only compare equal when encryption is deterministic; otherwise this is a no-op.)
-      return;
-    }
-    ModelRegistryGateway.ModelPin pin =
-        modelRegistryGateway.storePayload(
-            PayloadKind.DATA_SOURCE,
-            Optional.ofNullable(entity.getConfigurationLogicalUrn()),
-            entity.getId(),
-            entity.getName() != null ? entity.getName() : "datasource",
-            payload,
-            null);
-    if (entity.getConfigurationLogicalUrn() == null) {
-      entity.setConfigurationLogicalUrn(pin.logicalUrn());
-    }
-    entity.setConfigurationUrn(pin.versionedUrn());
-  }
-
-  /**
-   * Reads the data source's current configuration document back from the registry. Returns a
-   * mutable copy, or {@code null} when no configuration is stored.
-   *
-   * @param entity the data source entity
-   * @return the stored configuration or null
-   */
-  /**
-   * The stored configuration, or null when none is pinned. A pin that cannot be read fails instead
-   * of reading as absent, because callers take absence as "no secret to preserve".
-   */
-  private Map<String, Object> fetchConfiguration(DataSource entity) {
-    if (entity.getConfigurationUrn() == null) {
-      return null;
-    }
-    return modelRegistryGateway
-        .fetchPayload(entity.getConfigurationUrn())
-        .map(ModelRegistryGateway.RegistryDocument::content)
-        .map(HashMap::new)
-        .orElseThrow(
-            () ->
-                new InvalidInputException(
-                    getEntityName(),
-                    entity.getId(),
-                    "Stored configuration cannot be read: " + entity.getConfigurationUrn()));
-  }
-
-  /**
-   * Normalizes and encrypts the connector configuration before creating the data source. Validates
-   * that a connector type is provided when configuration is present.
-   *
-   * @param input the data source creation input
-   * @return the input with normalized and encrypted configuration
-   * @throws InvalidInputException if configuration is set without a connector type
-   */
   @Override
   protected DataSourceInputDTO preProcessCreateInput(DataSourceInputDTO input) {
-    if (input.getConfiguration() != null) {
-      if (input.getConnectorType() == null) {
-        throw new InvalidInputException(
-            getEntityName(), (UUID) null, "Cannot set configuration without a connector type");
-      }
-      ConnectorHandler handler =
-          connectorHandlerRegistry.getHandlerOrThrow(input.getConnectorType());
-      Map<String, Object> normalized = handler.normalizeAndValidate(input.getConfiguration());
-      input.setConfiguration(handler.encryptSensitiveFields(normalized));
-    }
-    return input;
+    requireValidConnector(input.getConnector(), ConnectorValidator.Stage.DRAFT);
+    return super.preProcessCreateInput(input);
   }
 
-  /**
-   * Handles PUT and PATCH updates: validates connector type changes, normalizes configuration,
-   * encrypts sensitive fields, then restores masked placeholders with existing encrypted values.
-   */
   @Override
   protected DataSourceInputDTO preProcessUpdateInput(
       DataSourceInputDTO input, DataSource existingEntity) {
+    requireValidConnector(input.getConnector(), ConnectorValidator.Stage.DRAFT);
     validateConnectorTypeChange(input, existingEntity);
     validateDataStructureVersionChange(input, existingEntity);
-
-    if (input.getConfiguration() != null) {
-      ConnectorType type = resolveConnectorType(input, existingEntity);
-      if (type == null) {
-        throw new InvalidInputException(
-            getEntityName(),
-            existingEntity.getId(),
-            "Cannot set configuration without a connector type");
-      }
-      ConnectorHandler handler = connectorHandlerRegistry.getHandlerOrThrow(type);
-
-      // The current configuration is read back from the registry (masked-value restore needs the
-      // original encrypted values).
-      Map<String, Object> existingConfig = fetchConfiguration(existingEntity);
-
-      Map<String, Object> normalized = handler.normalizeAndValidate(input.getConfiguration());
-      // Encrypt first, then restore: masked "********" values get encrypted to a garbage value,
-      // which is then overwritten with the original encrypted value from the existing entity.
-      Map<String, Object> encrypted = handler.encryptSensitiveFields(normalized);
-      if (existingConfig != null) {
-        restoreMaskedValues(encrypted, existingConfig, handler, normalized);
-      }
-      input.setConfiguration(encrypted);
-    }
     return input;
   }
 
-  /**
-   * Merges configuration for a PATCH operation. Because Jackson's readerForUpdating performs a
-   * shallow replacement of the configuration map rather than a deep merge, this method starts from
-   * the existing (decrypted) config and overlays only the fields present in the patch.
-   *
-   * @param patchedDto the DTO produced by Jackson's partial deserialization
-   * @param existing the current persisted data source entity
-   * @param rawPatch the raw JSON patch node for inspecting which fields were supplied
-   */
-  public void mergeConfigurationForPatch(
-      DataSourceInputDTO patchedDto, DataSource existing, JsonNode rawPatch) {
-    JsonNode configPatch = rawPatch.path("configuration");
-    Map<String, Object> existingConfig = fetchConfiguration(existing);
-
-    if (configPatch.isMissingNode()) {
-      patchedDto.setConfiguration(existingConfig);
-      return;
-    }
-
-    patchedDto.setConfiguration(mergeConfiguration(existingConfig, patchedDto.getConfiguration()));
-  }
-
-  private Map<String, Object> mergeConfiguration(
-      Map<String, Object> existingConfig, Map<String, Object> patchConfig) {
-    Map<String, Object> merged =
-        existingConfig != null ? new HashMap<>(existingConfig) : new HashMap<>();
-    if (patchConfig != null) {
-      merged.putAll(patchConfig);
-    }
-    return merged;
-  }
-
-  private ConnectorType resolveConnectorType(DataSourceInputDTO input, DataSource existing) {
-    return input.getConnectorType() != null
-        ? input.getConnectorType()
-        : existing.getConnectorType();
+  /** {@link DataSourceConnectorStore#patch}, in the transaction of this service. */
+  public ConnectorConfiguration patchConnector(DataSource existing, JsonNode connectorPatch) {
+    return connectorStore.patch(existing, connectorPatch);
   }
 
   private void validateConnectorTypeChange(DataSourceInputDTO input, DataSource existingEntity) {
     if (existingEntity.getDataSourceStatus() == DataSourceStatus.AVAILABLE
-        && input.getConnectorType() != null
-        && existingEntity.getConnectorType() != input.getConnectorType()) {
+        && input.getConnector() != null
+        && existingEntity.getConnectorType() != input.getConnector().connectorType()) {
       throw new InvalidInputException(
           getEntityName(),
           existingEntity.getId(),
           "Cannot change connector type of an AVAILABLE data source");
-    }
-  }
-
-  /**
-   * Restores masked placeholder values in the encrypted config with the original encrypted values
-   * from the existing entity. Checks the pre-encryption (normalized) map to detect "********".
-   */
-  private void restoreMaskedValues(
-      Map<String, Object> encryptedConfig,
-      Map<String, Object> existingConfig,
-      ConnectorHandler handler,
-      Map<String, Object> normalizedConfig) {
-    for (String field : handler.getSensitiveFields()) {
-      Object preEncrypt = normalizedConfig.get(field);
-      Object existing = existingConfig.get(field);
-      if (preEncrypt instanceof String s
-          && ConnectorHandler.MASKED_VALUE.equals(s)
-          && existing != null) {
-        encryptedConfig.put(field, existing);
-      }
     }
   }
 
@@ -500,8 +318,8 @@ public class DataSourceService
    */
   @Override
   protected void postDelete(DataSource entity) {
-    if (entity != null && entity.getConfigurationLogicalUrn() != null) {
-      modelRegistryGateway.deletePayload(entity.getConfigurationLogicalUrn());
+    if (entity != null) {
+      connectorStore.delete(entity);
     }
   }
 
@@ -554,20 +372,19 @@ public class DataSourceService
       throw new InvalidInputException(
           getEntityName(), entity.getId(), "Connector type is required for validation");
     }
-
-    Map<String, Object> config = fetchConfiguration(entity);
-    if (config == null || config.isEmpty()) {
+    if (entity.getConfigurationUrn() == null) {
       throw new InvalidInputException(
           getEntityName(), entity.getId(), "Configuration is required for releasing");
     }
 
-    ConnectorHandler handler =
-        connectorHandlerRegistry.getHandlerOrThrow(entity.getConnectorType());
-    List<String> errors = handler.validate(config, Default.class, OnRelease.class);
+    requireValidConnector(connectorStore.read(entity), ConnectorValidator.Stage.RELEASE);
+  }
 
-    if (!errors.isEmpty()) {
-      throw new InvalidInputException(
-          getEntityName(), entity.getId(), "Invalid configuration: " + String.join("; ", errors));
+  private void requireValidConnector(
+      ConnectorConfiguration connector, ConnectorValidator.Stage stage) {
+    List<ConnectorViolation> violations = connectorValidator.validate(connector, stage);
+    if (!violations.isEmpty()) {
+      throw new ConnectorValidationException(violations);
     }
   }
 
