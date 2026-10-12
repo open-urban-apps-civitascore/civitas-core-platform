@@ -235,6 +235,53 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
           """;
       assertPersistedJsonbMatches(expected, actualJson);
     }
+
+    @Test
+    @DisplayName("HTTP/REST: configuration column matches expected JSONB shape")
+    void httpConfigurationIsPersistedInExpectedShape() throws Exception {
+      String connector =
+          """
+          { "connectorType": "HTTP",
+            "baseUrl": "https://api.example.org/v1",
+            "authentication": { "type": "BASIC", "username": "reader", "password": "s3cret" },
+            "apiCalls": [
+              { "name": "Get all weather stations", "path": "/stations",
+                "queryParameters": [{ "name": "status", "value": "active" }],
+                "headers": [{ "name": "Accept", "value": "application/json" }],
+                "pagination": { "type": "PAGE_NUMBER", "pageParameter": "page",
+                                "pageSizeParameter": "size", "pageSize": 100 } } ] }
+          """;
+      String id =
+          JsonPath.read(
+              exchange(
+                  HttpMethod.POST,
+                  DATASOURCES_ENDPOINT,
+                  HttpConnector.body(
+                      "contract_http_persist_create",
+                      connector,
+                      createAvailableDataStructureVersionId())),
+              "$.id");
+      String actualJson = readStoredConfiguration(id);
+      String expected =
+          """
+          {
+            "baseUrl": "https://api.example.org/v1",
+            "authentication": { "type": "BASIC", "username": "reader" },
+            "apiCalls": [
+              { "name": "Get all weather stations", "method": "GET", "path": "/stations",
+                "queryParameters": [{ "name": "status", "value": "active" }],
+                "headers": [{ "name": "Accept", "value": "application/json" }],
+                "pagination": { "type": "PAGE_NUMBER", "pageParameter": "page",
+                                "pageSizeParameter": "size", "pageSize": 100,
+                                "startPage": 0, "endPage": null } }
+            ]
+          }
+          """;
+      assertPersistedJsonbMatches(expected, actualJson);
+      assertThat((String) JsonPath.read(actualJson, "$.authentication.password"))
+          .isNotBlank()
+          .isNotEqualTo("s3cret");
+    }
   }
 
   /**
