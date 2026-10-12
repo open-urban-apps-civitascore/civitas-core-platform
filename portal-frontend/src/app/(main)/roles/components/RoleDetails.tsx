@@ -30,7 +30,7 @@ import { useQueryParams } from '@/hooks/use-query-params'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
-import { FormRole, Role, ROLE_TYPES, RoleSchema, RoleTab } from '@/types/roles'
+import { FormRole, Role, ROLE_TYPES, RoleSchema, RoleTab, RoleType } from '@/types/roles'
 import { isPlatformwideAssignment } from '@/utils/assignments'
 import { isNameConflictError, isPermissionsError } from '@/utils/errors'
 
@@ -39,13 +39,18 @@ import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
 import { GroupAssignmentTab } from './group-assignment-tab/GroupAssignmentTab'
 import { PermissionsTab } from './permissions-tab/PermissionsTab'
 
+const permissionsTabLabels: Record<RoleType, string> = {
+  SYSTEM: 'roles.tabLabels.systemPermissions',
+  DATA: 'roles.tabLabels.dataPermissions',
+}
+
 const subTabValues: Record<RoleTab, Tab<RoleTab>> = {
   basicInformation: {
     label: 'roles.tabLabels.basicInformation',
     value: 'basicInformation',
   },
   permissions: {
-    label: 'roles.tabLabels.permissions',
+    label: permissionsTabLabels[DEFAULT_TAB],
     value: 'permissions',
   },
   groupAssignment: {
@@ -352,9 +357,15 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   // - State-gated tabs (unsaved role) are disabled (visible but greyed out)
   const disabledTabs = !roleId ? ['groupAssignment'] : undefined
 
+  const roleType = roleId ? initialRole?.roleType : tabValue || DEFAULT_TAB
+  const permissionsSubTab: Tab<RoleTab> = {
+    ...subTabValues.permissions,
+    label: permissionsTabLabels[(roleType as RoleType) || DEFAULT_TAB],
+  }
+
   const subTabs: Tab<RoleTab>[] = [
     subTabValues.basicInformation,
-    ...(hasPermission(PERMISSION_NAMES.PERMISSION_READ) ? [subTabValues.permissions] : []),
+    ...(hasPermission(PERMISSION_NAMES.PERMISSION_READ) ? [permissionsSubTab] : []),
     ...(hasPermission(PERMISSION_NAMES.ASSIGNMENT_READ) && hasPermission(PERMISSION_NAMES.GROUP_READ)
       ? [subTabValues.groupAssignment]
       : []),
@@ -367,7 +378,6 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     }
   }, [subTabValue, setSubTabValueParam, defaultSubTab])
 
-  const roleType = roleId ? initialRole?.roleType : tabValue || DEFAULT_TAB
   const badgeTitle = roleType ? tRoles(`${roleType.toLowerCase()}Roles`).slice(0, -1) : undefined
 
   const SaveAndExitButtons = (

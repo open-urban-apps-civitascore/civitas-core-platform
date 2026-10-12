@@ -843,7 +843,8 @@
     "searchRoles": "Rollen durchsuchen",
     "tabLabels": {
       "basicInformation": "Basisinformationen",
-      "permissions": "Systemberechtigungen",
+      "systemPermissions": "Systemberechtigungen",
+      "dataPermissions": "Datenberechtigungen",
       "groupAssignment": "Gruppen"
     },
     "baseInfoTab": {

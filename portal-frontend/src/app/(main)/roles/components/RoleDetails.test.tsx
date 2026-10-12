@@ -640,13 +640,21 @@ describe('RoleDetails', () => {
       it('shows Permissions tab when user has PERMISSION_READ', () => {
         mockHasPermission([PERMISSION_NAMES.PERMISSION_READ])
         render(<RoleDetails roleId="role-1" />)
-        expect(screen.getByText('roles.tabLabels.permissions')).toBeInTheDocument()
+        expect(screen.getByText('roles.tabLabels.systemPermissions')).toBeInTheDocument()
+      })
+
+      it('labels the Permissions tab as data permissions for a Data role', () => {
+        mockHasPermission([PERMISSION_NAMES.PERMISSION_READ])
+        mockRoleResponse = { ...mockRoleResponse, data: { data: { ...mockRole, roleType: 'DATA' } } }
+        render(<RoleDetails roleId="role-1" />)
+        expect(screen.getByText('roles.tabLabels.dataPermissions')).toBeInTheDocument()
+        expect(screen.queryByText('roles.tabLabels.systemPermissions')).not.toBeInTheDocument()
       })
 
       it('hides Permissions tab when user lacks PERMISSION_READ', () => {
         mockHasPermission([PERMISSION_NAMES.ROLE_READ])
         render(<RoleDetails roleId="role-1" />)
-        expect(screen.queryByText('roles.tabLabels.permissions')).not.toBeInTheDocument()
+        expect(screen.queryByText('roles.tabLabels.systemPermissions')).not.toBeInTheDocument()
       })
     })
 
