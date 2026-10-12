@@ -11,10 +11,15 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Schema(
     name = "Connector",
     description = "Connector of the Data source. The connectorType selects the remaining fields.",
-    oneOf = {MqttConnectorConfiguration.class, SqlConnectorConfiguration.class},
+    oneOf = {
+      MqttConnectorConfiguration.class,
+      SqlConnectorConfiguration.class,
+      HttpConnectorConfiguration.class
+    },
     discriminatorProperty = "connectorType",
     discriminatorMapping = {
       @DiscriminatorMapping(value = "MQTT", schema = MqttConnectorConfiguration.class),
       @DiscriminatorMapping(value = "SQL", schema = SqlConnectorConfiguration.class),
+      @DiscriminatorMapping(value = "HTTP", schema = HttpConnectorConfiguration.class),
     })
 public interface ConnectorSchema {}

@@ -130,14 +130,26 @@ class ConnectorJsonTest {
         "{'connectorType':'SQL','table':'t','tabel':'t'} | Unknown key: connector.tabel",
         "{'connectorType':'MQTT','tls':{'enabled':true,'verify':false}}"
             + " | Unknown key: connector.tls.verify",
-        "{'connectorType':'HTTP'} | Unknown connectorType: HTTP",
+        "{'connectorType':'FTP'} | Unknown connectorType: FTP",
         "{'dsn':'postgres://db/x'} | Missing connector.connectorType",
         "{'connectorType':'MQTT','qos':'high'} | Invalid value: connector.qos",
         "{'connectorType':'MQTT','qos':1.5} | Invalid value: connector.qos",
         "{'connectorType':'MQTT','urls':['tcp://u:pw@broker:1883','no url']}"
             + " | Invalid value: connector.urls[1]",
         "{'connectorType':'SQL','dsn':'postgres://u:pw@ bad'} | Invalid value: connector.dsn",
-        "['SQL'] | Invalid value: connector"
+        "['SQL'] | Invalid value: connector",
+        "{'connectorType':'HTTP','apiCalls':[{'foo':1}]} | Unknown key: connector.apiCalls[0].foo",
+        "{'connectorType':'HTTP','authentication':{'type':'OAUTH2'}}"
+            + " | Unknown connector.authentication.type: OAUTH2",
+        "{'connectorType':'HTTP','apiCalls':[{'pagination':{'pageSize':1}}]}"
+            + " | Missing connector.apiCalls[0].pagination.type",
+        "{'connectorType':'HTTP','apiCalls':[{'pagination':{'type':'PAGE_NUMBER','pageSize':1.5}}]}"
+            + " | Invalid value: connector.apiCalls[0].pagination.pageSize",
+        "{'connectorType':'HTTP','apiCalls':[{'pagination':{'type':'PAGE_NUMBER','startPage':'abc'}}]}"
+            + " | Invalid value: connector.apiCalls[0].pagination.startPage",
+        "{'connectorType':'HTTP','apiCalls':[{},{'headers':[{'name':'a'},null]}]}"
+            + " | Invalid value: connector.apiCalls[1].headers[1]",
+        "{'connectorType':'HTTP','baseUrl':'ftp://api.example.org'} | Invalid value: connector.baseUrl"
       })
   void read_withInvalidConnector_namesTheKeyButNoValue(String connector, String message) {
     assertThatThrownBy(() -> ConnectorJson.read(json(connector)))
@@ -338,6 +350,87 @@ class ConnectorJsonTest {
     ConnectorConfiguration current = ConnectorJson.read(json("{'connectorType':'SQL'}"));
 
     assertThat(ConnectorJson.patch(current, json("null"))).isNull();
+  }
+
+  private static final String HTTP_BASIC =
+      "{'connectorType':'HTTP','baseUrl':'https://api.example.org',"
+          + "'authentication':{'type':'BASIC','username':'reader','password':'%s'},"
+          + "'apiCalls':[{'name':'a','path':'/x'}]}";
+
+  private static Map<String, Object> storedHttpBasic() {
+    return ConnectorJson.toDocument(
+        ConnectorJson.read(json(HTTP_BASIC.formatted("secret"))), null, ENCRYPT);
+  }
+
+  @Test
+  void httpBasicPassword_isMaskedInResponseEncryptedInDocumentAndKeptForPlaceholder() {
+    Map<String, Object> stored = storedHttpBasic();
+    ConnectorConfiguration placeholder = ConnectorJson.read(json(HTTP_BASIC.formatted("********")));
+
+    assertThat(
+            ConnectorJson.toMaskedTree(ConnectorJson.readStored(ConnectorType.HTTP, stored))
+                .at("/authentication/password")
+                .asString())
+        .isEqualTo(Secret.PLACEHOLDER);
+    assertThat(MAPPER.valueToTree(stored).at("/authentication/password").asString())
+        .isEqualTo("ENC(secret)");
+    assertThat(
+            MAPPER
+                .valueToTree(ConnectorJson.toDocument(placeholder, stored, ENCRYPT))
+                .at("/authentication/password")
+                .asString())
+        .isEqualTo("ENC(secret)");
+  }
+
+  @Test
+  void patch_withOtherAuthenticationType_dropsTheStoredPassword() {
+    Map<String, Object> stored = storedHttpBasic();
+    ConnectorConfiguration withoutAuthentication =
+        ConnectorJson.patch(
+            ConnectorJson.readStored(ConnectorType.HTTP, stored),
+            json("{'authentication':{'type':'NONE'}}"));
+    Map<String, Object> storedWithoutAuthentication =
+        ConnectorJson.toDocument(withoutAuthentication, stored, ENCRYPT);
+
+    ConnectorConfiguration basicAgain =
+        ConnectorJson.patch(
+            ConnectorJson.readStored(ConnectorType.HTTP, storedWithoutAuthentication),
+            json("{'authentication':{'type':'BASIC','username':'reader','password':'********'}}"));
+
+    assertThat(MAPPER.valueToTree(storedWithoutAuthentication).path("authentication"))
+        .isEqualTo(json("{'type':'NONE'}"));
+    assertThat(
+            MAPPER
+                .valueToTree(
+                    ConnectorJson.toDocument(basicAgain, storedWithoutAuthentication, ENCRYPT))
+                .at("/authentication/password")
+                .isNull())
+        .isTrue();
+  }
+
+  @Test
+  void patch_ofStoredHttpConnector_acceptsTheMethodOfTheResponseForm() {
+    ConnectorConfiguration stored = ConnectorJson.readStored(ConnectorType.HTTP, storedHttpBasic());
+
+    HttpConnectorConfiguration patched =
+        (HttpConnectorConfiguration)
+            ConnectorJson.patch(stored, json("{'baseUrl':'https://other.example.org'}"));
+
+    assertThat(ConnectorJson.toMaskedTree(stored).at("/apiCalls/0/method").asString())
+        .isEqualTo("GET");
+    assertThat(patched.baseUrl()).isEqualTo("https://other.example.org");
+    assertThat(patched.apiCalls())
+        .extracting(HttpConnectorConfiguration.ApiCall::name)
+        .containsExactly("a");
+  }
+
+  @Test
+  void toMaskedTree_ofHttpConnectorWithOnlyItsType_showsTheDefaults() {
+    assertThat(ConnectorJson.toMaskedTree(ConnectorJson.read(json("{'connectorType':'HTTP'}"))))
+        .isEqualTo(
+            json(
+                "{'connectorType':'HTTP','baseUrl':null,'authentication':{'type':'NONE'},"
+                    + "'apiCalls':null}"));
   }
 
   /**

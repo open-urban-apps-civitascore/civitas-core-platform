@@ -16,7 +16,7 @@ final class ConnectorValues {
    *
    * @throws InvalidConnectorValueException naming {@code key[i]} for a null element
    */
-  static List<String> listOf(List<String> values, String key) {
+  static <T> List<T> listOf(List<T> values, String key) {
     if (values == null) {
       return null;
     }
