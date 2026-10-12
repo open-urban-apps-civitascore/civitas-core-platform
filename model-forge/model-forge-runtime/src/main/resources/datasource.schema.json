@@ -2,10 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id":     "https://civitasconnect.digital/core/datasource/v1",
   "title":   "CORE DataSource",
-  "description": "Configuration for a data source that feeds data into a CORE pipeline. The connector-specific fields are chosen by 'connectionType' (mqtt | sql); each variant declares exactly the fields the host persists (the connector configuration POJO). Only 'password' is stored ENCRYPTED by the host — every other field is stored as-is. 'element' references the DataStructure describing the payload format by versioned CORE URN.",
+  "description": "Configuration for a data source that feeds data into a CORE pipeline. The connector-specific fields are chosen by 'connectionType' (mqtt | sql | http); each variant declares exactly the fields the host persists (the connector configuration POJO). Only the fields named 'password', at any depth, are stored ENCRYPTED by the host — every other field is stored as-is. 'element' references the DataStructure describing the payload format by versioned CORE URN.",
   "oneOf": [
     { "$ref": "#/$defs/MqttDataSource" },
-    { "$ref": "#/$defs/SqlDataSource" }
+    { "$ref": "#/$defs/SqlDataSource" },
+    { "$ref": "#/$defs/HttpDataSource" }
   ],
   "$defs": {
     "MqttDataSource": {
@@ -87,6 +88,107 @@
         "where":   { "type": ["string", "null"], "description": "SQL WHERE clause." },
         "user":     { "type": ["string", "null"], "description": "Database login username." },
         "password": { "type": ["string", "null"], "description": "Database login password. Stored ENCRYPTED by the host; null/absent when unset." }
+      }
+    },
+    "HttpDataSource": {
+      "type": "object",
+      "title": "HTTP/REST DataSource",
+      "description": "Reads from an HTTP/REST API with one or more named GET API calls.",
+      "required": ["$schema", "id", "connectionType"],
+      "additionalProperties": false,
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "enum": [
+            "https://civitasconnect.digital/core/datasource/v1",
+            "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSource"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "description": "Versioned CORE URN of this DataSource.",
+          "pattern": "^urn:core:[^:]+:[^:]+:datasource:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$"
+        },
+        "title":       { "type": "string", "description": "Human-readable display name." },
+        "description": { "type": "string" },
+        "connectionType": { "const": "http", "description": "HTTP/REST API source." },
+        "element": {
+          "type": "string",
+          "description": "Versioned CORE URN of the DataStructure that describes the payload format.",
+          "pattern": "^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$",
+          "x-core-ref": { "type": "urn:core:type:DataStructure" }
+        },
+        "baseUrl": { "type": ["string", "null"], "description": "API host: an http or https URL without user info, query, fragment or trailing '/'." },
+        "authentication": {
+          "oneOf": [
+            { "$ref": "#/$defs/HttpNoAuthentication" },
+            { "$ref": "#/$defs/HttpBasicAuthentication" },
+            { "enum": [null] }
+          ],
+          "description": "Authentication of every API call, chosen by 'type'."
+        },
+        "apiCalls": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/HttpApiCall" },
+          "description": "The GET API calls. A source node names the one it reads by 'apiCallName'."
+        }
+      }
+    },
+    "HttpNoAuthentication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "NONE" }
+      }
+    },
+    "HttpBasicAuthentication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type":     { "const": "BASIC" },
+        "username": { "type": ["string", "null"], "description": "Basic auth username." },
+        "password": { "type": ["string", "null"], "description": "Basic auth password. Stored ENCRYPTED by the host; null/absent when unset." }
+      }
+    },
+    "HttpApiCall": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name":            { "type": ["string", "null"], "description": "Name of the API call, unique within the DataSource." },
+        "method":          { "const": "GET", "description": "HTTP method. Only GET is supported." },
+        "path":            { "type": ["string", "null"], "description": "Path relative to 'baseUrl', starting with '/'." },
+        "queryParameters": { "type": ["array", "null"], "items": { "$ref": "#/$defs/HttpParameter" }, "description": "Query parameters, in clear text." },
+        "headers":         { "type": ["array", "null"], "items": { "$ref": "#/$defs/HttpParameter" }, "description": "Request headers, in clear text." },
+        "pagination": {
+          "oneOf": [
+            { "$ref": "#/$defs/HttpPageNumberPagination" },
+            { "enum": [null] }
+          ],
+          "description": "Pagination of the API call, chosen by 'type'; null for none."
+        }
+      }
+    },
+    "HttpParameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name":  { "type": ["string", "null"] },
+        "value": { "type": ["string", "null"] }
+      }
+    },
+    "HttpPageNumberPagination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type":              { "const": "PAGE_NUMBER" },
+        "pageParameter":     { "type": ["string", "null"], "description": "Query parameter that carries the page number." },
+        "pageSizeParameter": { "type": ["string", "null"], "description": "Query parameter that carries the page size." },
+        "pageSize":          { "type": ["integer", "null"], "description": "Number of records per page." },
+        "startPage":         { "type": ["integer", "null"], "description": "First page number." },
+        "endPage":           { "type": ["integer", "null"], "description": "Last page number; null for no end page." }
       }
     }
   }

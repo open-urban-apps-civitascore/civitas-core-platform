@@ -124,6 +124,10 @@
               "type": "string",
               "description": "CORE URN of the referenced DataSource.",
               "x-core-ref": { "type": "urn:core:type:DataSource" }
+            },
+            "apiCallName": {
+              "type": "string",
+              "description": "Name of the API call that the node reads, for an HTTP/REST Data source. Absent for other connector types."
             }
           }
         }
