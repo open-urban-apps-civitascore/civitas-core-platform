@@ -2,6 +2,7 @@ package de.civitascore.portal.controller;
 
 import de.civitascore.portal.model.connector.ConnectorJson;
 import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
+import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
@@ -103,10 +104,7 @@ public class DataSourceController
         name = "connectorType",
         description = "Filter by connector type (exact match).",
         in = ParameterIn.QUERY,
-        schema =
-            @Schema(
-                type = "string",
-                allowableValues = {"MQTT", "SQL"})),
+        schema = @Schema(implementation = ConnectorType.class)),
     @Parameter(
         name = "datapoolId",
         description =
