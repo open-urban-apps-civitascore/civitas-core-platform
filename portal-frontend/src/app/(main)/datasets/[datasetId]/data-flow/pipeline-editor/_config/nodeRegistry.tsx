@@ -220,8 +220,6 @@ export const PIPELINE_NODE_DEFS: PipelineNodeDef[] = [
       // Pipeline writes, and an unconfigured node is what stops the Dataset from publishing.
       configured: false,
       entityType: ENTITY_TYPES.Frost,
-      serverName: 'Sensor Data storage',
-      serverUrl: '',
       version: '1.1',
     }),
     isData: (data): data is FrostNodeData =>

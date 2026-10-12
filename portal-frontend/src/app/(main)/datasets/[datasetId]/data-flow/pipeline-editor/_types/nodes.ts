@@ -115,10 +115,6 @@ export interface FrostNodeData extends BasePipelineNodeData {
    * must not decide what a Pipeline writes.
    */
   port?: FrostSinkPort
-  /** Fixed FROST server display name */
-  serverName: string
-  /** Fixed FROST server URL */
-  serverUrl: string
   /** SensorThings API version */
   version: string
 }

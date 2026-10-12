@@ -128,7 +128,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
         header={
           <InspectorHeader
             nodeType={selectedNode.type}
-            label={nodeName(selectedNode.id)}
+            label={nodeNameOf(selectedNode)}
             isConfigured={selectedNode.data.configured as boolean}
           />
         }

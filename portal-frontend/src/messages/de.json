@@ -1470,7 +1470,6 @@
     },
     "frostPanel": {
       "details": "Details",
-      "serverName": "Servername",
       "serverUrl": "Server-URL",
       "internalServer": "Interner Server",
       "version": "Version",

@@ -135,8 +135,6 @@ export const frostNode = (overrides: NodeOverrides = {}): FixtureNode =>
       entityType: 'frost',
       entityId: 'frost-guid-1',
       configurationUrn: FROST_SINK_URN,
-      serverName: 'Sensor Data Storage',
-      serverUrl: '',
       version: '1.1',
       port: 'Things',
     },

@@ -59,8 +59,6 @@ const nodeData: FrostNodeData = {
   label: 'Sensor Data Storage',
   configured: false,
   entityType: 'frost',
-  serverName: 'Sensor Data Storage',
-  serverUrl: '',
   version: '1.1',
 }
 
@@ -147,11 +145,11 @@ describe('FrostPanel', () => {
     expect(screen.queryByText('frostPanel.expects')).not.toBeInTheDocument()
   })
 
-  it('shows the fixed server name, the internal server and the version', () => {
+  it('shows the internal server and the version', () => {
     renderPanel()
 
     const valueOf = (label: string) => screen.getByText(label).nextElementSibling
-    expect(valueOf('frostPanel.serverName')).toHaveTextContent('Sensor Data Storage')
+    expect(screen.queryByText('frostPanel.serverName')).not.toBeInTheDocument()
     expect(valueOf('frostPanel.serverUrl')).toHaveTextContent('frostPanel.internalServer')
     expect(valueOf('frostPanel.version')).toHaveTextContent('1.1')
   })
