@@ -6,6 +6,9 @@
 // differs from the committed file, it pushes the export to a bot branch and opens a merge request
 // against develop, or refreshes the one already open. Reads OPENAPI_BOT_TOKEN and the predefined
 // GitLab CI variables from the environment.
+//
+// The spec is a backend output, so the merge request goes to the reviewers of the backend package
+// rule in renovate.json.
 
 import { execFileSync } from 'node:child_process'
 import { copyFileSync, existsSync, readFileSync, statSync } from 'node:fs'
@@ -14,16 +17,19 @@ const EXPORT = 'openapi.generated.yaml'
 const SPEC_PATH = 'api/portal-backend/openapi.yaml'
 const BOT_BRANCH = 'ci/openapi-spec-update'
 const TARGET_BRANCH = 'develop'
+const RENOVATE_CONFIG = 'renovate.json'
+const REVIEWERS_RULE_FILES = 'portal-backend/**'
 
 await main()
 
 async function main() {
   const token = process.env.OPENAPI_BOT_TOKEN
-  // Checked before anything else, so a missing token fails the first develop pipeline and not
-  // only the next one that changes the API
+  // Both checked before anything else, so a missing token or reviewer rule fails the first develop
+  // pipeline and not only the next one that changes the API
   if (!token) {
     exitWith('OPENAPI_BOT_TOKEN is not set — cannot push the bot branch or open a merge request.')
   }
+  const reviewers = backendReviewers()
   if (!existsSync(EXPORT) || statSync(EXPORT).size === 0) {
     exitWith(`${EXPORT} is missing or empty — export-openapi-spec did not export the spec.`)
   }
@@ -46,7 +52,7 @@ async function main() {
     console.log(`Merge request for ${BOT_BRANCH} is already open — branch updated.`)
     return
   }
-  const mergeRequest = await openMergeRequest(token)
+  const mergeRequest = await openMergeRequest(token, reviewers)
   console.log(`Opened merge request ${mergeRequest.web_url}`)
 }
 
@@ -95,25 +101,44 @@ async function openMergeRequestExists(token) {
   return open.length > 0
 }
 
-function openMergeRequest(token) {
-  return gitLabApi(token, mergeRequestsUrl(), {
-    method: 'POST',
-    body: new URLSearchParams({
-      source_branch: BOT_BRANCH,
-      target_branch: TARGET_BRANCH,
-      title: 'chore(api): sync openapi.yaml with the backend',
-      description: [
-        `Automated update of \`${SPEC_PATH}\`.`,
-        '',
-        `The file is the OpenAPI description exported from the backend built in pipeline ` +
-          `${env('CI_PIPELINE_URL')} (${TARGET_BRANCH} @ ${env('CI_COMMIT_SHORT_SHA')}) and differs ` +
-          'from the committed copy. Do not edit it by hand — merge to bring the repository in line ' +
-          `with the running code, or fix the backend and let the next ${TARGET_BRANCH} pipeline ` +
-          'refresh this merge request.',
-      ].join('\n'),
-      remove_source_branch: 'true',
-    }),
+async function openMergeRequest(token, reviewers) {
+  const reviewerIds = await Promise.all(reviewers.map(username => userId(token, username)))
+  const body = new URLSearchParams({
+    source_branch: BOT_BRANCH,
+    target_branch: TARGET_BRANCH,
+    title: 'chore(api): sync openapi.yaml with the backend',
+    description: [
+      `Automated update of \`${SPEC_PATH}\`.`,
+      '',
+      `The file is the OpenAPI description exported from the backend built in pipeline ` +
+        `${env('CI_PIPELINE_URL')} (${TARGET_BRANCH} @ ${env('CI_COMMIT_SHORT_SHA')}) and differs ` +
+        'from the committed copy. Do not edit it by hand — merge to bring the repository in line ' +
+        `with the running code, or fix the backend and let the next ${TARGET_BRANCH} pipeline ` +
+        'refresh this merge request.',
+    ].join('\n'),
+    remove_source_branch: 'true',
   })
+  for (const id of reviewerIds) {
+    body.append('reviewer_ids[]', String(id))
+  }
+  return gitLabApi(token, mergeRequestsUrl(), { method: 'POST', body })
+}
+
+function backendReviewers() {
+  const { packageRules = [] } = JSON.parse(readFileSync(RENOVATE_CONFIG, 'utf8'))
+  const rule = packageRules.find(r => r.matchFileNames?.includes(REVIEWERS_RULE_FILES) && r.reviewers?.length)
+  if (!rule) {
+    exitWith(`${RENOVATE_CONFIG} has no package rule for ${REVIEWERS_RULE_FILES} with reviewers.`)
+  }
+  return rule.reviewers
+}
+
+async function userId(token, username) {
+  const [user] = await gitLabApi(token, `${env('CI_API_V4_URL')}/users?${new URLSearchParams({ username })}`)
+  if (!user) {
+    exitWith(`GitLab user ${username} from ${RENOVATE_CONFIG} does not exist.`)
+  }
+  return user.id
 }
 
 function mergeRequestsUrl() {
