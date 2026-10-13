@@ -14,6 +14,7 @@ const EXPORT = 'openapi.generated.yaml'
 const SPEC_PATH = 'api/portal-backend/openapi.yaml'
 const BOT_BRANCH = 'ci/openapi-spec-update'
 const TARGET_BRANCH = 'develop'
+const REVIEWER_IDS = { franklex: 5050761, jonasfrz: 9856387 }
 
 await main()
 
@@ -96,24 +97,25 @@ async function openMergeRequestExists(token) {
 }
 
 function openMergeRequest(token) {
-  return gitLabApi(token, mergeRequestsUrl(), {
-    method: 'POST',
-    body: new URLSearchParams({
-      source_branch: BOT_BRANCH,
-      target_branch: TARGET_BRANCH,
-      title: 'chore(api): sync openapi.yaml with the backend',
-      description: [
-        `Automated update of \`${SPEC_PATH}\`.`,
-        '',
-        `The file is the OpenAPI description exported from the backend built in pipeline ` +
-          `${env('CI_PIPELINE_URL')} (${TARGET_BRANCH} @ ${env('CI_COMMIT_SHORT_SHA')}) and differs ` +
-          'from the committed copy. Do not edit it by hand — merge to bring the repository in line ' +
-          `with the running code, or fix the backend and let the next ${TARGET_BRANCH} pipeline ` +
-          'refresh this merge request.',
-      ].join('\n'),
-      remove_source_branch: 'true',
-    }),
+  const body = new URLSearchParams({
+    source_branch: BOT_BRANCH,
+    target_branch: TARGET_BRANCH,
+    title: 'chore(api): sync openapi.yaml with the backend',
+    description: [
+      `Automated update of \`${SPEC_PATH}\`.`,
+      '',
+      `The file is the OpenAPI description exported from the backend built in pipeline ` +
+        `${env('CI_PIPELINE_URL')} (${TARGET_BRANCH} @ ${env('CI_COMMIT_SHORT_SHA')}) and differs ` +
+        'from the committed copy. Do not edit it by hand — merge to bring the repository in line ' +
+        `with the running code, or fix the backend and let the next ${TARGET_BRANCH} pipeline ` +
+        'refresh this merge request.',
+    ].join('\n'),
+    remove_source_branch: 'true',
   })
+  for (const id of Object.values(REVIEWER_IDS)) {
+    body.append('reviewer_ids[]', String(id))
+  }
+  return gitLabApi(token, mergeRequestsUrl(), { method: 'POST', body })
 }
 
 function mergeRequestsUrl() {
