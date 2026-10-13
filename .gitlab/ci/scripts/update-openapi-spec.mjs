@@ -6,6 +6,9 @@
 // differs from the committed file, it pushes the export to a bot branch and opens a merge request
 // against develop, or refreshes the one already open. Reads OPENAPI_BOT_TOKEN and the predefined
 // GitLab CI variables from the environment.
+//
+// The spec is a backend output, so the merge request goes to the reviewers of the backend package
+// rule in renovate.json.
 
 import { execFileSync } from 'node:child_process'
 import { copyFileSync, existsSync, readFileSync, statSync } from 'node:fs'
@@ -14,7 +17,8 @@ const EXPORT = 'openapi.generated.yaml'
 const SPEC_PATH = 'api/portal-backend/openapi.yaml'
 const BOT_BRANCH = 'ci/openapi-spec-update'
 const TARGET_BRANCH = 'develop'
-const REVIEWER_IDS = { franklex: 5050761, jonasfrz: 9856387 }
+const RENOVATE_CONFIG = 'renovate.json'
+const REVIEWERS_RULE_FILES = 'portal-backend/**'
 
 await main()
 
@@ -96,7 +100,8 @@ async function openMergeRequestExists(token) {
   return open.length > 0
 }
 
-function openMergeRequest(token) {
+async function openMergeRequest(token) {
+  const reviewerIds = await Promise.all(backendReviewers().map(username => userId(token, username)))
   const body = new URLSearchParams({
     source_branch: BOT_BRANCH,
     target_branch: TARGET_BRANCH,
@@ -112,10 +117,27 @@ function openMergeRequest(token) {
     ].join('\n'),
     remove_source_branch: 'true',
   })
-  for (const id of Object.values(REVIEWER_IDS)) {
+  for (const id of reviewerIds) {
     body.append('reviewer_ids[]', String(id))
   }
   return gitLabApi(token, mergeRequestsUrl(), { method: 'POST', body })
+}
+
+function backendReviewers() {
+  const { packageRules = [] } = JSON.parse(readFileSync(RENOVATE_CONFIG, 'utf8'))
+  const rule = packageRules.find(r => r.matchFileNames?.includes(REVIEWERS_RULE_FILES) && r.reviewers?.length)
+  if (!rule) {
+    exitWith(`${RENOVATE_CONFIG} has no package rule for ${REVIEWERS_RULE_FILES} with reviewers.`)
+  }
+  return rule.reviewers
+}
+
+async function userId(token, username) {
+  const [user] = await gitLabApi(token, `${env('CI_API_V4_URL')}/users?${new URLSearchParams({ username })}`)
+  if (!user) {
+    exitWith(`GitLab user ${username} from ${RENOVATE_CONFIG} does not exist.`)
+  }
+  return user.id
 }
 
 function mergeRequestsUrl() {
