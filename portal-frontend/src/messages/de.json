@@ -993,6 +993,9 @@
       "brokerTlsMismatch": "Broker-URL und TLS-Einstellung passen nicht zusammen.",
       "topicInvalidChars": "Das Topic darf keine Kommas, Semikolons oder Leerzeichen enthalten.",
       "topicSingle": "Es ist nur ein Topic erlaubt.",
+      "invalidBaseUrl": "Geben Sie eine gültige http- oder https-URL ohne Query und Fragment ein (z. B. https://api.example.org/v1).",
+      "baseUrlCredentials": "Geben Sie keine Zugangsdaten im API-Host ein. Tragen Sie sie in der Authentifizierung ein.",
+      "usernameColon": "Der Benutzername darf keinen Doppelpunkt (:) enthalten.",
       "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten",
       "inUseError": "Diese Datenquelle wird noch von einer Pipeline verwendet.",
@@ -1037,6 +1040,11 @@
       "connection": "Verbindung",
       "establishConnection": "Verbindung herstellen",
       "availableInfo": "Diese Datenquelle hat den Status \"Verfügbar\". Um den Konnektor zu ändern, setzen Sie den Status zuerst auf \"Entwurf\".",
+      "types": {
+        "MQTT": "MQTT",
+        "SQL": "SQL",
+        "HTTP": "HTTP/REST"
+      },
       "mqtt": {
         "urls": {
           "label": "Broker",
@@ -1093,6 +1101,22 @@
         },
         "where": {
           "label": "WHERE"
+        }
+      },
+      "http": {
+        "baseUrl": {
+          "label": "API-Host"
+        },
+        "authentication": {
+          "label": "Authentifizierung",
+          "none": "Keine",
+          "basic": "Basic"
+        },
+        "username": {
+          "label": "Benutzername"
+        },
+        "password": {
+          "label": "Passwort"
         }
       }
     },
