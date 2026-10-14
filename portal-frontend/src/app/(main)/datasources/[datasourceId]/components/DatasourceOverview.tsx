@@ -16,6 +16,7 @@ import PageEditControls from '@/components/page-edit-controls/PageEditControls'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Form } from '@/components/ui/form'
+import { CONNECTOR_TYPES } from '@/const/connectors'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
@@ -33,6 +34,7 @@ import { getSelectedDatastructureVersion } from '@/utils/datasources'
 
 import { useDatasourceForm } from '../hooks/useDatasourceForm'
 import { AccessManagementTab } from './access-management/AccessManagementTab'
+import { ApiCallsTab } from './api-calls-tab/ApiCallsTab'
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { ConnectorTab } from './connector-tab/ConnectorTab'
 import { AddDatapoolModal } from './datapools-tab/AddDatapoolModal'
@@ -48,6 +50,7 @@ const allTabs: Tab<DatasourceTab>[] = [
   { value: 'basicInfo', label: 'datasources.tabs.basicInfo' },
   { value: 'connector', label: 'datasources.tabs.connector' },
   { value: 'dataStructure', label: 'datasources.tabs.dataStructure' },
+  { value: 'apiCalls', label: 'datasources.tabs.apiCalls' },
   { value: 'datapools', label: 'datasources.tabs.datapools' },
   { value: 'accessManagement', label: 'datasources.tabs.accessManagement' },
 ]
@@ -162,10 +165,21 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const hasUnsavedChanges =
     datasourceForm.formState.isDirty || areAssignmentsDirty || areDatapoolsDirty || hasStatusChanged
 
+  const isHttpConnector = selectedConnectorType === CONNECTOR_TYPES.HTTP
+
   const tabs = useMemo(
-    () => allTabs.filter(tab => tab.value !== 'dataStructure' || canReadDatastructures),
-    [canReadDatastructures],
+    () =>
+      allTabs.filter(tab => {
+        if (tab.value === 'dataStructure') return canReadDatastructures
+        if (tab.value === 'apiCalls') return isHttpConnector
+        return true
+      }),
+    [canReadDatastructures, isHttpConnector],
   )
+
+  useEffect(() => {
+    if (selectedTab === 'apiCalls' && !isHttpConnector) setSelectedTab('connector')
+  }, [selectedTab, isHttpConnector])
 
   const resetToInitialState = () => {
     resetDatasourceToInitialState()
@@ -260,6 +274,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             isDatasourceReleased={isReleased}
           />
         )
+      case 'apiCalls':
+        return <ApiCallsTab />
       case 'datapools':
         return (
           <DatapoolsTab

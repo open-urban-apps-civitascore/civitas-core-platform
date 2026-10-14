@@ -1033,8 +1033,12 @@
       "basicInfo": "Basisinformationen",
       "connector": "Konnektor",
       "dataStructure": "Datenstruktur",
+      "apiCalls": "API-Aufrufe",
       "accessManagement": "Zugriff",
       "datapools": "Datenpools"
+    },
+    "apiCallsTab": {
+      "title": "API-Aufrufe"
     },
     "connectorTab": {
       "title1": "Konnektor",

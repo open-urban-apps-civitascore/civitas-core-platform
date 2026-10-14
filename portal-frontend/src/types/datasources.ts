@@ -22,7 +22,7 @@ import {
 } from './connectors'
 import { DatastructureVersionSummaryApiResponseSchema } from './datastructures'
 
-export type DatasourceTab = 'basicInfo' | 'connector' | 'dataStructure' | 'datapools' | 'accessManagement'
+export type DatasourceTab = 'basicInfo' | 'connector' | 'dataStructure' | 'apiCalls' | 'datapools' | 'accessManagement'
 
 export const DATASOURCE_STATUS_TYPES = {
   DRAFT: 'DRAFT',

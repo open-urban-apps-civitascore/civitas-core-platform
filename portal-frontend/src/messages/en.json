@@ -1036,6 +1036,7 @@
       "basicInfo": "Base Information",
       "connector": "Connector",
       "dataStructure": "Data structure",
+      "apiCalls": "API calls",
       "accessManagement": "Access",
       "datapools": "Data pools"
     },
@@ -1048,6 +1049,9 @@
       "title": "Save before exiting?",
       "description": "There are unsaved changes. \"Discard\" cannot be undone.",
       "discard": "Discard"
+    },
+    "apiCallsTab": {
+      "title": "API calls"
     },
     "connectorTab": {
       "title1": "Connector",
