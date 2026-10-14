@@ -335,7 +335,7 @@ const HttpPathSchema = z
 
 const HttpParameterFormSchema = z.object({ name: z.string().trim(), value: z.string() })
 
-type HttpParameterForm = z.infer<typeof HttpParameterFormSchema>
+export type HttpParameterForm = z.infer<typeof HttpParameterFormSchema>
 
 const isEmptyParameter = (parameter: HttpParameterForm) => !parameter.name && !parameter.value
 
@@ -364,6 +364,14 @@ const HttpApiCallFormSchema = z.object({
   headers: z.array(HttpParameterFormSchema.superRefine(validateHeader)).transform(withoutEmptyParameters),
   pagination: HttpPaginationSchema,
 })
+
+export type HttpApiCallForm = z.input<typeof HttpApiCallFormSchema>
+
+export type HttpApiCallsForm = { configuration: { apiCalls: HttpApiCallForm[] } }
+
+export type HttpParameterListPath =
+  | `configuration.apiCalls.${number}.queryParameters`
+  | `configuration.apiCalls.${number}.headers`
 
 const HttpApiCallStrictFormSchema = HttpApiCallFormSchema.extend({
   name: z.string().trim().min(1, 'common.errors.required'),

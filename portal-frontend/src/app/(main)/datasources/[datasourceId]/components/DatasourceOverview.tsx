@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useGetDatapools } from '@/app/services/api/datapools/clientRequests'
+import { useGetDatastructures } from '@/app/services/api/datastructures/clientRequests'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -181,6 +182,18 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     if (selectedTab === 'apiCalls' && !isHttpConnector) setSelectedTab('connector')
   }, [selectedTab, isHttpConnector])
 
+  const datastructureIdParam = useMemo(
+    () => (selectedDatastructureId ? new URLSearchParams({ id: selectedDatastructureId }) : undefined),
+    [selectedDatastructureId],
+  )
+
+  const { data: selectedDatastructureResponse } = useGetDatastructures({
+    params: datastructureIdParam,
+    isEnabled: isHttpConnector && canReadDatastructures && !!selectedDatastructureId,
+  })
+
+  const selectedDatastructureName = selectedDatastructureId ? selectedDatastructureResponse?.data?.[0]?.name : undefined
+
   const resetToInitialState = () => {
     resetDatasourceToInitialState()
     datasourceForm.reset()
@@ -275,7 +288,14 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
           />
         )
       case 'apiCalls':
-        return <ApiCallsTab />
+        return (
+          <ApiCallsTab
+            form={datasourceForm}
+            isReadOnly={isReadOnly}
+            isDatasourceReleased={isReleased}
+            dataStructureName={selectedDatastructureName}
+          />
+        )
       case 'datapools':
         return (
           <DatapoolsTab

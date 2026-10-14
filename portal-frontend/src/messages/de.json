@@ -1038,7 +1038,40 @@
       "datapools": "Datenpools"
     },
     "apiCallsTab": {
-      "title": "API-Aufrufe"
+      "title": "API-Aufrufe",
+      "add": "API-Aufruf erstellen",
+      "empty": {
+        "title": "Noch kein API-Aufruf"
+      },
+      "unnamed": "Unbenannter API-Aufruf",
+      "request": {
+        "title": "Request",
+        "question": "Welcher Endpunkt soll aufgerufen werden?"
+      },
+      "method": {
+        "label": "Methode"
+      },
+      "path": {
+        "label": "Pfad",
+        "hint": "Erlaubte Zeichen: a–z, A–Z, 0–9, -, _, ., ~, :, /. Beginnt mit /."
+      },
+      "name": {
+        "label": "Name",
+        "placeholder": "Name des API-Aufrufs"
+      },
+      "parameters": {
+        "query": "Query",
+        "header": "Header",
+        "addQuery": "+ Query-Parameter",
+        "addHeader": "+ Header",
+        "name": "Name",
+        "value": "Wert",
+        "remove": "Entfernen"
+      },
+      "delete": {
+        "title": "API-Aufruf löschen?",
+        "description": "Pipelines, die „{name}“ verwenden, funktionieren nicht mehr."
+      }
     },
     "connectorTab": {
       "title1": "Konnektor",

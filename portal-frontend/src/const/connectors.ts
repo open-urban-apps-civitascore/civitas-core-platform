@@ -17,6 +17,10 @@ export const HTTP_AUTHENTICATION_TYPES = {
   BASIC: 'BASIC',
 } as const
 
+export const HTTP_METHODS = {
+  GET: 'GET',
+} as const
+
 export const MAX_HTTP_API_CALLS = 1
 
 export const CONNECTOR_TYPE_KEYS: Record<ConnectorType, ConnectorTypeKey> = Object.fromEntries(

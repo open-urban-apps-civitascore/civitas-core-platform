@@ -1,6 +1,6 @@
 import { CONNECTOR_TYPES } from '@/const/connectors'
 
-import { getConnectorDefaults, getConnectorFormData } from './connectors'
+import { formatPathWithQuery, getConnectorDefaults, getConnectorFormData } from './connectors'
 
 vi.mock('@/app/(main)/datasources/[datasourceId]/components/connector-tab/connectorSources', () => ({
   CONNECTOR_INPUTS: {
@@ -69,5 +69,27 @@ describe('getConnectorFormData', () => {
       topics: '',
       connect_timeout: '3s',
     })
+  })
+})
+
+describe('formatPathWithQuery', () => {
+  it('returns the path without query parameters', () => {
+    expect(formatPathWithQuery('/stations', [])).toBe('/stations')
+  })
+
+  it('appends the query parameters', () => {
+    const queryParameters = [
+      { name: 'status', value: 'active' },
+      { name: 'limit', value: '10' },
+    ]
+    expect(formatPathWithQuery('/stations', queryParameters)).toBe('/stations?status=active&limit=10')
+  })
+
+  it('leaves out query parameters without a name', () => {
+    const queryParameters = [
+      { name: '', value: 'x' },
+      { name: 'debug', value: '' },
+    ]
+    expect(formatPathWithQuery('/stations', queryParameters)).toBe('/stations?debug=')
   })
 })

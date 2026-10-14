@@ -1051,7 +1051,40 @@
       "discard": "Discard"
     },
     "apiCallsTab": {
-      "title": "API calls"
+      "title": "API calls",
+      "add": "Create API call",
+      "empty": {
+        "title": "No API call yet"
+      },
+      "unnamed": "Unnamed API call",
+      "request": {
+        "title": "Request",
+        "question": "Which endpoint should be called?"
+      },
+      "method": {
+        "label": "Method"
+      },
+      "path": {
+        "label": "Path",
+        "hint": "Allowed: a–z A–Z 0–9 - _ . ~ : /. Starts with /."
+      },
+      "name": {
+        "label": "Name",
+        "placeholder": "Name of API call"
+      },
+      "parameters": {
+        "query": "query",
+        "header": "header",
+        "addQuery": "+ Query parameter",
+        "addHeader": "+ Header",
+        "name": "Name",
+        "value": "Value",
+        "remove": "Remove"
+      },
+      "delete": {
+        "title": "Delete API call?",
+        "description": "Pipelines that use \"{name}\" stop working."
+      }
     },
     "connectorTab": {
       "title1": "Connector",

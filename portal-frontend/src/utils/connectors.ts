@@ -1,7 +1,7 @@
 import { set } from 'react-hook-form'
 
 import { CONNECTOR_INPUTS } from '@/app/(main)/datasources/[datasourceId]/components/connector-tab/connectorSources'
-import { ConnectorDraft, ConnectorType } from '@/types/connectors'
+import { ConnectorDraft, ConnectorType, HttpParameterForm } from '@/types/connectors'
 
 type ConnectorConfig = NonNullable<ConnectorDraft['configuration']>
 
@@ -19,4 +19,11 @@ export const getConnectorFormData = (
     ...getConnectorDefaults(connectorType),
     ...(currentConfig ?? {}),
   }
+}
+
+export const formatPathWithQuery = (path: string, queryParameters: HttpParameterForm[]): string => {
+  const namedParameters = queryParameters.filter(parameter => parameter.name)
+  const pairs = namedParameters.map(({ name, value }) => `${name}=${value}`)
+  const query = pairs.join('&')
+  return query ? `${path}?${query}` : path
 }

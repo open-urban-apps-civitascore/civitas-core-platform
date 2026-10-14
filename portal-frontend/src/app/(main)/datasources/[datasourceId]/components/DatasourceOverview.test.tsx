@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { useGetDatastructures } from '@/app/services/api/datastructures/clientRequests'
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import { ConnectorType } from '@/types/connectors'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
@@ -15,6 +16,10 @@ vi.mock('@/app/services/api/users/clientRequests', () => ({
 
 vi.mock('@/app/services/api/datapools/clientRequests', () => ({
   useGetDatapools: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+}))
+
+vi.mock('@/app/services/api/datastructures/clientRequests', () => ({
+  useGetDatastructures: vi.fn().mockReturnValue({ data: undefined }),
 }))
 
 const mockCurrentUser = (permissions: PermissionName[]) => {
@@ -431,6 +436,36 @@ describe('DatasourceOverview', () => {
 
       expect(screen.queryByTestId('apiCallsTab')).not.toBeInTheDocument()
       expect(screen.getByTestId('connectorTab')).toBeInTheDocument()
+    })
+
+    const withDatastructure = {
+      ...datasource,
+      dataStructureVersion: {
+        id: 'version-1',
+        version: '1.0.0',
+        description: null,
+        dataStructureVersionStatus: 'AVAILABLE' as const,
+        dataStructureVersionSource: 'OWN' as const,
+        createdAt: '2024-01-01',
+        modifiedAt: '2024-01-01',
+        dataStructureId: 'structure-1',
+      },
+    }
+
+    const lastDatastructureQuery = () => vi.mocked(useGetDatastructures).mock.lastCall?.[0]
+
+    it('loads the selected data structure for an HTTP connector', () => {
+      mockSelectedConnectorType = 'HTTP'
+      render(<DatasourceOverview datasource={withDatastructure} initialAssignments={[]} />)
+
+      expect(lastDatastructureQuery()?.params?.get('id')).toBe('structure-1')
+      expect(lastDatastructureQuery()?.isEnabled).toBe(true)
+    })
+
+    it('does not load the data structure for an MQTT connector', () => {
+      render(<DatasourceOverview datasource={withDatastructure} initialAssignments={[]} />)
+
+      expect(lastDatastructureQuery()?.isEnabled).toBe(false)
     })
   })
 
