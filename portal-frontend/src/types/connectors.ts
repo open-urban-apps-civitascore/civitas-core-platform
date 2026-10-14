@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { z } from 'zod'
 
-import { CONNECTOR_TYPES, HTTP_AUTHENTICATION_TYPES } from '@/const/connectors'
+import { CONNECTOR_TYPES, HTTP_AUTHENTICATION_TYPES, MAX_HTTP_API_CALLS } from '@/const/connectors'
 
 export type ConnectorTypeKey = keyof typeof CONNECTOR_TYPES
 
@@ -256,12 +256,32 @@ const HttpAuthenticationApiResponseSchema = z.discriminatedUnion('type', [
   }),
 ])
 
-const HttpApiCallsSchema = z.array(z.record(z.string(), z.unknown()))
+const HttpPaginationSchema = z.record(z.string(), z.unknown()).nullable().optional()
+
+const HttpParameterApiResponseSchema = z
+  .object({ name: z.string().nullable().optional(), value: z.string().nullable().optional() })
+  .transform(({ name, value }) => ({ name: name ?? '', value: value ?? '' }))
+
+const HttpApiCallApiResponseSchema = z
+  .object({
+    name: z.string().nullable().optional(),
+    path: z.string().nullable().optional(),
+    queryParameters: z.array(HttpParameterApiResponseSchema).nullable().optional(),
+    headers: z.array(HttpParameterApiResponseSchema).nullable().optional(),
+    pagination: HttpPaginationSchema,
+  })
+  .transform(({ name, path, queryParameters, headers, pagination }) => ({
+    name: name ?? '',
+    path: path ?? '',
+    queryParameters: queryParameters ?? [],
+    headers: headers ?? [],
+    pagination: pagination ?? null,
+  }))
 
 export const HttpApiResponseSchema = z.object({
   baseUrl: z.string().nullable().optional(),
   authentication: HttpAuthenticationApiResponseSchema.nullable().optional(),
-  apiCalls: HttpApiCallsSchema.nullable().optional(),
+  apiCalls: z.array(HttpApiCallApiResponseSchema).nullable().optional(),
 })
 
 export const HttpApiToFormSchema = HttpApiResponseSchema.transform(({ baseUrl, authentication, apiCalls }) => {
@@ -273,7 +293,7 @@ export const HttpApiToFormSchema = HttpApiResponseSchema.transform(({ baseUrl, a
       username: isBasic ? (authentication.username ?? '') : '',
       password: isBasic ? (authentication.password ?? '') : '',
     },
-    apiCalls: apiCalls ?? undefined,
+    apiCalls: apiCalls ?? [],
   }
 })
 
@@ -303,16 +323,74 @@ const requireBasicCredentials = (authentication: HttpAuthenticationForm, ctx: z.
   }
 }
 
+// Same rules as the backend.
+const HTTP_PATH = /^\/[A-Za-z0-9._~:/-]*$/
+const HTTP_HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/
+const CREDENTIAL_HEADERS = new Set(['authorization', 'proxy-authorization', 'cookie'])
+
+const HttpPathSchema = z
+  .string()
+  .trim()
+  .refine(v => !v || HTTP_PATH.test(v), 'datasources.errors.invalidPath')
+
+const HttpParameterFormSchema = z.object({ name: z.string().trim(), value: z.string() })
+
+type HttpParameterForm = z.infer<typeof HttpParameterFormSchema>
+
+const isEmptyParameter = (parameter: HttpParameterForm) => !parameter.name && !parameter.value
+
+const withoutEmptyParameters = (parameters: HttpParameterForm[]) =>
+  parameters.filter(parameter => !isEmptyParameter(parameter))
+
+const requireParameterName = (parameter: HttpParameterForm, ctx: z.RefinementCtx) => {
+  if (!parameter.name && parameter.value) {
+    ctx.addIssue({ code: 'custom', path: ['name'], message: 'common.errors.required' })
+  }
+}
+
+const validateHeader = (header: HttpParameterForm, ctx: z.RefinementCtx) => {
+  if (header.name && !HTTP_HEADER_NAME.test(header.name)) {
+    ctx.addIssue({ code: 'custom', path: ['name'], message: 'datasources.errors.invalidHeaderName' })
+  }
+  if (CREDENTIAL_HEADERS.has(header.name.toLowerCase())) {
+    ctx.addIssue({ code: 'custom', path: ['name'], message: 'datasources.errors.credentialHeader' })
+  }
+}
+
+const HttpApiCallFormSchema = z.object({
+  name: z.string().trim(),
+  path: HttpPathSchema,
+  queryParameters: z.array(HttpParameterFormSchema).transform(withoutEmptyParameters),
+  headers: z.array(HttpParameterFormSchema.superRefine(validateHeader)).transform(withoutEmptyParameters),
+  pagination: HttpPaginationSchema,
+})
+
+const HttpApiCallStrictFormSchema = HttpApiCallFormSchema.extend({
+  name: z.string().trim().min(1, 'common.errors.required'),
+  path: z.string().trim().min(1, 'common.errors.required').pipe(HttpPathSchema),
+  queryParameters: z.array(HttpParameterFormSchema.superRefine(requireParameterName)).transform(withoutEmptyParameters),
+  headers: z
+    .array(HttpParameterFormSchema.superRefine(validateHeader).superRefine(requireParameterName))
+    .transform(withoutEmptyParameters),
+})
+
+const HttpApiCallsLooseSchema = z.array(HttpApiCallFormSchema).max(MAX_HTTP_API_CALLS, 'datasources.errors.apiCallsMax')
+
+export const HttpApiCallsStrictSchema = z
+  .array(HttpApiCallStrictFormSchema)
+  .min(1, 'common.errors.required')
+  .max(MAX_HTTP_API_CALLS, 'datasources.errors.apiCallsMax')
+
 export const HttpLooseSchema = z.object({
   baseUrl: HttpBaseUrlSchema.optional(),
   authentication: HttpAuthenticationFormSchema.superRefine(validateBasicUsername).optional(),
-  apiCalls: HttpApiCallsSchema.optional(),
+  apiCalls: HttpApiCallsLooseSchema.optional(),
 })
 
 export const HttpStrictSchema = z.object({
   baseUrl: z.string().trim().min(1, 'common.errors.required').pipe(HttpBaseUrlSchema),
   authentication: HttpAuthenticationFormSchema.superRefine(requireBasicCredentials),
-  apiCalls: HttpApiCallsSchema.min(1, 'common.errors.required'),
+  apiCalls: HttpApiCallsStrictSchema,
 })
 
 const HttpFormToApiSchema = HttpLooseSchema.transform(({ authentication, ...rest }) => {

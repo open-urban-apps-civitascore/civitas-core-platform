@@ -119,7 +119,7 @@ describe('MQTT connector transformations', () => {
 })
 
 describe('HTTP connector schemas', () => {
-  const API_CALL = { name: 'Get all stations', path: '/stations' }
+  const API_CALL = { name: 'Get all stations', path: '/stations', queryParameters: [], headers: [], pagination: null }
   const BASIC = { type: 'BASIC' as const, username: 'reader', password: 'secret' }
   const NONE = { type: 'NONE' as const, username: '', password: '' }
 
@@ -236,7 +236,7 @@ describe('HTTP connector schemas', () => {
     expect(result.configuration).toEqual({
       baseUrl: 'https://api.example.org/v1',
       authentication: NONE,
-      apiCalls: undefined,
+      apiCalls: [],
     })
   })
 
@@ -269,5 +269,139 @@ describe('HTTP connector schemas', () => {
     })
 
     expect(result).toMatchObject({ authentication: BASIC })
+  })
+})
+
+describe('HTTP API call schemas', () => {
+  const API_CALL = { name: 'Get all stations', path: '/stations', queryParameters: [], headers: [], pagination: null }
+  const HEADER = { name: 'Accept', value: 'application/json' }
+
+  const issues = (schema: typeof HttpLooseSchema | typeof HttpStrictSchema, apiCalls: unknown[]) => {
+    const result = schema.shape.apiCalls.safeParse(apiCalls)
+    return result.success ? [] : result.error.issues
+  }
+
+  it.each(['/', '/v2/stations', '/stations/:id', '/a-b_c.d~e'])('accepts the path %s', path => {
+    expect(issues(HttpLooseSchema, [{ ...API_CALL, path }])).toEqual([])
+  })
+
+  it.each(['stations', '/a b', '/a?x', '/a#b', '/ä'])('rejects the path %s', path => {
+    expect(issues(HttpLooseSchema, [{ ...API_CALL, path }])).toContainEqual(
+      expect.objectContaining({ path: [0, 'path'], message: 'datasources.errors.invalidPath' }),
+    )
+  })
+
+  it.each([
+    ['loose', HttpLooseSchema],
+    ['strict', HttpStrictSchema],
+  ] as const)('rejects a second API call in the %s schema', (_name, schema) => {
+    expect(issues(schema, [API_CALL, { ...API_CALL, name: 'Other' }])).toContainEqual(
+      expect.objectContaining({ path: [], message: 'datasources.errors.apiCallsMax' }),
+    )
+  })
+
+  it.each([
+    ['an invalid header name', 'Bad Name', 'datasources.errors.invalidHeaderName'],
+    ['an Authorization header', 'Authorization', 'datasources.errors.credentialHeader'],
+    ['a cookie header', 'cookie', 'datasources.errors.credentialHeader'],
+  ])('rejects %s', (_name, name, message) => {
+    expect(issues(HttpLooseSchema, [{ ...API_CALL, headers: [{ name, value: 'x' }] }])).toContainEqual(
+      expect.objectContaining({ path: [0, 'headers', 0, 'name'], message }),
+    )
+  })
+
+  it('accepts as a query parameter what is not allowed in a header', () => {
+    const queryParameters = [
+      { name: 'Authorization', value: 'x' },
+      { name: 'Bad Name', value: 'x' },
+    ]
+    expect(issues(HttpLooseSchema, [{ ...API_CALL, queryParameters }])).toEqual([])
+  })
+
+  it('accepts an incomplete API call in a draft', () => {
+    const apiCall = { ...API_CALL, name: '', path: '', queryParameters: [{ name: '', value: '' }] }
+    expect(issues(HttpLooseSchema, [apiCall])).toEqual([])
+  })
+
+  it('accepts a complete API call for release', () => {
+    expect(issues(HttpStrictSchema, [{ ...API_CALL, headers: [HEADER] }])).toEqual([])
+  })
+
+  it('accepts empty parameter rows for release', () => {
+    const empty = { name: '', value: '' }
+    expect(issues(HttpStrictSchema, [{ ...API_CALL, queryParameters: [empty], headers: [empty] }])).toEqual([])
+  })
+
+  it('accepts a parameter with a name and an empty value for release', () => {
+    expect(issues(HttpStrictSchema, [{ ...API_CALL, queryParameters: [{ name: 'debug', value: '' }] }])).toEqual([])
+  })
+
+  it.each([
+    ['the name', { ...API_CALL, name: '' }, [0, 'name']],
+    ['the path', { ...API_CALL, path: '' }, [0, 'path']],
+    [
+      'a query parameter name',
+      { ...API_CALL, queryParameters: [{ name: '', value: 'x' }] },
+      [0, 'queryParameters', 0, 'name'],
+    ],
+    ['a header name', { ...API_CALL, headers: [{ name: '', value: 'x' }] }, [0, 'headers', 0, 'name']],
+  ])('requires %s for release', (_name, apiCall, path) => {
+    expect(issues(HttpStrictSchema, [apiCall])).toContainEqual(
+      expect.objectContaining({ path, message: 'common.errors.required' }),
+    )
+  })
+
+  it('maps API calls from the API to the form', () => {
+    const pagination = { type: 'PAGE_NUMBER', pageParameter: 'page', pageSizeParameter: 'size', pageSize: 100 }
+    const result = ConnectorApiToFormSchema.parse({
+      connectorType: CONNECTOR_TYPES.HTTP,
+      configuration: {
+        apiCalls: [
+          {
+            name: null,
+            method: 'GET',
+            path: '/stations',
+            queryParameters: [{ name: 'status', value: null }],
+            headers: null,
+            pagination,
+          },
+        ],
+      },
+    })
+
+    expect(result.configuration).toMatchObject({
+      apiCalls: [
+        { name: '', path: '/stations', queryParameters: [{ name: 'status', value: '' }], headers: [], pagination },
+      ],
+    })
+  })
+
+  it('leaves out parameter rows without name and value when sending', () => {
+    const empty = { name: '', value: '' }
+    const result = ConnectorFormToApiSchema.parse({
+      connectorType: CONNECTOR_TYPES.HTTP,
+      configuration: {
+        apiCalls: [{ ...API_CALL, queryParameters: [empty, { name: 'debug', value: '' }], headers: [empty] }],
+      },
+    })
+
+    expect(result).toMatchObject({
+      apiCalls: [{ queryParameters: [{ name: 'debug', value: '' }], headers: [] }],
+    })
+  })
+
+  it('sends API calls without the method and with the pagination unchanged', () => {
+    const pagination = { type: 'PAGE_NUMBER', pageParameter: 'page', pageSizeParameter: 'size', pageSize: 100 }
+    const apiCall = { ...API_CALL, method: 'GET', headers: [HEADER], pagination }
+    const result = ConnectorFormToApiSchema.parse({
+      connectorType: CONNECTOR_TYPES.HTTP,
+      configuration: { apiCalls: [apiCall] },
+    })
+
+    expect(result).toEqual({
+      connectorType: CONNECTOR_TYPES.HTTP,
+      authentication: { type: 'NONE' },
+      apiCalls: [{ ...API_CALL, headers: [HEADER], pagination }],
+    })
   })
 })

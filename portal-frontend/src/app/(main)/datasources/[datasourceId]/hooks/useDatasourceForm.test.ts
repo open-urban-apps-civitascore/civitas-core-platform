@@ -274,7 +274,7 @@ describe('useDatasourceForm with an HTTP connector', () => {
       connectorType: 'HTTP',
       baseUrl: 'https://api.example.org/v2',
       authentication: { type: 'BASIC', username: 'reader', password: '********' },
-      apiCalls: [{ name: 'Get all stations', method: 'GET', path: '/stations' }],
+      apiCalls: [{ name: 'Get all stations', path: '/stations', queryParameters: [], headers: [], pagination: null }],
     })
   })
 
