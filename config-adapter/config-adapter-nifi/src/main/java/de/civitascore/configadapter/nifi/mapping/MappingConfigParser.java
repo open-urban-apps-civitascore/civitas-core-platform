@@ -26,10 +26,10 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Parses a mapping document — resolved from the pipeline's shipped mappings catalog by the node's
- * {@code mappingRef} — into a typed {@link MappingConfig}. The grammar is closed: a field value is
- * either a shorthand source-path string (copy) or an object with a known {@code op}. Anything else
- * — an unknown op, a malformed operand, a bare literal — is rejected with {@link
+ * Parses a mapping document — resolved from the trigger's artifacts by the node's {@code
+ * mappingRef} — into a typed {@link MappingConfig}. The grammar is closed: a field value is either
+ * a shorthand source-path string (copy) or an object with a known {@code op}. Anything else — an
+ * unknown op, a malformed operand, a bare literal — is rejected with {@link
  * AdapterErrorCode#NIFI_MAPPING_ERROR}, so a tenant can never smuggle an unsupported transform past
  * this boundary.
  */

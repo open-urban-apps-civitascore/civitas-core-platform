@@ -202,6 +202,16 @@ public class DataSourceService
   }
 
   @Override
+  @Transactional
+  public DataSource release(UUID id) {
+    DataSource released = super.release(id);
+    // A DRAFT Data structure version mints a new modelUrn on each model edit, possibly after the
+    // connector was stored; after release neither of the two can change any more.
+    connectorStore.refreshElement(released);
+    return released;
+  }
+
+  @Override
   protected void validateRelease(DataSource entity) {
     if (entity.getConnectorType() == null) {
       throw new InvalidInputException(

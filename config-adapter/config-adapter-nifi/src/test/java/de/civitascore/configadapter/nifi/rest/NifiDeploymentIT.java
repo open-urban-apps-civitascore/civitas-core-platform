@@ -85,8 +85,8 @@ class NifiDeploymentIT extends AbstractNifiIT {
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
             """);
-    Map<String, Object> mappings =
-        map(
+    Map<String, Map<String, Object>> mappings =
+        NifiTestFixtures.artifacts(
             """
             { "map-1": { "fields": {
                 "$.station_id": "$.station_id",

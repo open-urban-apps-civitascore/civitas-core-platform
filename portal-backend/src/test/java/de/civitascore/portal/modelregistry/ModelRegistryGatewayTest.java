@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.contract.DependencyClosureView;
+import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.facade.ModelForge;
@@ -113,6 +114,50 @@ class ModelRegistryGatewayTest {
       assertThat(gateway.closure("  ", 10).artifacts()).isEmpty();
       assertThat(gateway.closure(PIPELINE_URN, 0).artifacts()).isEmpty();
       verify(modelForge, never()).closure(any());
+    }
+  }
+
+  @Nested
+  @DisplayName("the direct dependencies")
+  class DirectDependencies {
+
+    private static final String PIPELINE_URN =
+        "urn:core:platform:civitas:pipeline:common:a8ff27eb-c6c3-8136-9fac-596b9b92356a:1.0.0";
+    private static final String SOURCE_URN =
+        "urn:core:platform:civitas:datasource:common:6ddf8001-3ba6-83db-8d23-b547419c1ff2:1.1.0";
+    private static final String MAPPING_URN =
+        "urn:core:platform:civitas:mapping:common:158a41e4-f47b-8e87-bc6f-d6573a02ab99:1.0.0";
+
+    private DependencyGraphView.Edge edge(String target) {
+      return new DependencyGraphView.Edge(
+          new ArtifactId(PIPELINE_URN), new ArtifactId(target), "depends-on");
+    }
+
+    @Test
+    @DisplayName("are the edge targets, without the queried artifact and without duplicates")
+    void edgeTargetsWithoutTheQueriedArtifact() {
+      when(modelForge.dependencies(any()))
+          .thenReturn(
+              new DependencyGraphView(
+                  List.of(
+                      new DependencyGraphView.Node(new ArtifactId(PIPELINE_URN), "pipeline"),
+                      new DependencyGraphView.Node(new ArtifactId(SOURCE_URN), "source"),
+                      new DependencyGraphView.Node(new ArtifactId(MAPPING_URN), "mapping")),
+                  List.of(edge(SOURCE_URN), edge(MAPPING_URN), edge(SOURCE_URN))));
+
+      assertThat(gateway.dependencyUrns(PIPELINE_URN)).containsExactly(SOURCE_URN, MAPPING_URN);
+      ArgumentCaptor<DependencyQuery> query = ArgumentCaptor.forClass(DependencyQuery.class);
+      verify(modelForge).dependencies(query.capture());
+      assertThat(query.getValue().artifactId().value()).isEqualTo(PIPELINE_URN);
+      assertThat(query.getValue().maxDepth()).isNull();
+    }
+
+    @Test
+    @DisplayName("of a blank artifact are empty, without asking Model Forge")
+    void nothingForABlankArtifact() {
+      assertThat(gateway.dependencyUrns(null)).isEmpty();
+      assertThat(gateway.dependencyUrns("  ")).isEmpty();
+      verify(modelForge, never()).dependencies(any());
     }
   }
 

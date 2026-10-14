@@ -8,57 +8,6 @@
   "data": {
     "id": "b7c8b5d4-3d9c-4e3b-9a12-6b7c3f1d9e2a",
     "name": "Neustadt Traffic Counts 2025",
-    "datasources": [
-      {
-        "id": "urn:core:platform:civitas:datasource:common:c712b9ae-3e8d-8fc7-9a12-f0d5ba1c83b1:1.0.0",
-        "type": "postgresql",
-        "name": "Neustadt Mobility DB",
-        "description": "Primary PostgreSQL database for mobility and traffic datasets.",
-        "host": "pg-mobility.neustadt.de",
-        "port": 5432,
-        "database": "mobility",
-        "schema": "public",
-        "username": "mobility_reader",
-        "ssl": true,
-        "ssl_mode": "require",
-        "connect_timeout_seconds": 10,
-        "pool": {
-          "min": 1,
-          "max": 10,
-          "idle_timeout_seconds": 300
-        }
-      },
-      {
-        "id": "urn:core:platform:civitas:datasource:common:1a5b119c-46af-85a3-920f-d68bb70a4b07:1.0.0",
-        "type": "mqtt",
-        "name": "Neustadt IoT MQTT Broker",
-        "description": "MQTT broker for real-time sensor telemetry.",
-        "broker_url": "mqtts://iot-broker.neustadt.de",
-        "host": "iot-broker.neustadt.de",
-        "port": 8883,
-        "client_id": "civitas-core-ingestion",
-        "username": "telemetry_consumer",
-        "qos": 1,
-        "clean_session": false,
-        "keep_alive_seconds": 60,
-        "topics": [
-          "neustadt/traffic/+/counts",
-          "neustadt/weather/+/observations",
-          "neustadt/parking/+/occupancy"
-        ],
-        "tls": {
-          "enabled": true,
-          "ca_cert_path": "/etc/ssl/certs/neustadt-root-ca.pem",
-          "verify_hostname": true
-        },
-        "reconnect": {
-          "max_retries": 20,
-          "initial_delay_seconds": 1,
-          "max_delay_seconds": 30,
-          "backoff_multiplier": 2.0
-        }
-      }
-    ],
     "datapipelines": [
       {
         "id": "db-to-frost-01",
@@ -158,16 +107,6 @@
               ]
             }
           }
-        },
-        "mappings": {
-          "urn:core:dataset:neustadt:mapping:traffic:4af71165-ea38-8247-bc44-481a078a9b5e:1.0.0": {
-            "source": "urn:core:dataset:neustadt:datastructure:traffic:0396ceb8-b76a-8436-9bd5-85a9a13bd889:1.0.0",
-            "target": "urn:core:dataset:neustadt:datastructure:traffic:f3855c3d-ed10-8cee-9540-99f1c5c835ee:1.0.0",
-            "fields": {
-              "$.name": "$.id",
-              "$.properties.art": "$.art"
-            }
-          }
         }
       },
       {
@@ -176,6 +115,80 @@
         "action": "DELETE"
       }
     ],
+    "artifacts": {
+      "urn:core:platform:civitas:datasource:common:c712b9ae-3e8d-8fc7-9a12-f0d5ba1c83b1:1.0.0": {
+        "connectionType": "sql",
+        "name": "Neustadt Mobility DB",
+        "description": "Primary PostgreSQL database for mobility and traffic datasets.",
+        "host": "pg-mobility.neustadt.de",
+        "port": 5432,
+        "database": "mobility",
+        "schema": "public",
+        "username": "mobility_reader",
+        "ssl": true,
+        "ssl_mode": "require",
+        "connect_timeout_seconds": 10,
+        "pool": {
+          "min": 1,
+          "max": 10,
+          "idle_timeout_seconds": 300
+        },
+        "element": "urn:core:dataset:neustadt:element:traffic:0396ceb8-b76a-8436-9bd5-85a9a13bd889:1.0.0"
+      },
+      "urn:core:platform:civitas:datasource:common:1a5b119c-46af-85a3-920f-d68bb70a4b07:1.0.0": {
+        "connectionType": "mqtt",
+        "name": "Neustadt IoT MQTT Broker",
+        "description": "MQTT broker for real-time sensor telemetry.",
+        "broker_url": "mqtts://iot-broker.neustadt.de",
+        "host": "iot-broker.neustadt.de",
+        "port": 8883,
+        "client_id": "civitas-core-ingestion",
+        "username": "telemetry_consumer",
+        "qos": 1,
+        "clean_session": false,
+        "keep_alive_seconds": 60,
+        "topics": [
+          "neustadt/traffic/+/counts",
+          "neustadt/weather/+/observations",
+          "neustadt/parking/+/occupancy"
+        ],
+        "tls": {
+          "enabled": true,
+          "ca_cert_path": "/etc/ssl/certs/neustadt-root-ca.pem",
+          "verify_hostname": true
+        },
+        "reconnect": {
+          "max_retries": 20,
+          "initial_delay_seconds": 1,
+          "max_delay_seconds": 30,
+          "backoff_multiplier": 2.0
+        },
+        "element": "urn:core:dataset:neustadt:element:traffic:0396ceb8-b76a-8436-9bd5-85a9a13bd889:1.0.0"
+      },
+      "urn:core:dataset:neustadt:mapping:traffic:4af71165-ea38-8247-bc44-481a078a9b5e:1.0.0": {
+        "source": "urn:core:dataset:neustadt:element:traffic:0396ceb8-b76a-8436-9bd5-85a9a13bd889:1.0.0",
+        "target": "urn:core:dataset:neustadt:datastructure:traffic:f3855c3d-ed10-8cee-9540-99f1c5c835ee:1.0.0",
+        "fields": {
+          "$.name": "$.id",
+          "$.properties.art": "$.art"
+        }
+      },
+      "urn:core:dataset:neustadt:element:traffic:0396ceb8-b76a-8436-9bd5-85a9a13bd889:1.0.0": {
+        "type": "object",
+        "default": null,
+        "properties": {
+          "id": { "type": "string" },
+          "art": { "type": "string" }
+        }
+      },
+      "urn:core:dataset:neustadt:datastructure:traffic:f3855c3d-ed10-8cee-9540-99f1c5c835ee:1.0.0": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "properties": { "type": "object" }
+        }
+      }
+    },
     "namedApis": [
       { "slug": "traffic", "standard": "STA", "version": "1.1" },
       { "slug": "boundaries", "standard": "OWS" }

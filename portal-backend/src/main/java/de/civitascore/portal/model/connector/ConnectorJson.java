@@ -38,12 +38,15 @@ public final class ConnectorJson {
   /** The request member that holds the connector, and the first key of every key path in it. */
   public static final String ROOT = "connector";
 
+  /** The registry document member that names the Data structure version of the Data source. */
+  public static final String ELEMENT = "element";
+
   /**
    * Keys of a registry document that the registry and the shared schema own. A stored connector is
    * read without them.
    */
   private static final Set<String> DOCUMENT_KEYS =
-      Set.of("$schema", "$id", "id", "title", "description", "element", DOCUMENT_TYPE_PROPERTY);
+      Set.of("$schema", "$id", "id", "title", "description", ELEMENT, DOCUMENT_TYPE_PROPERTY);
 
   private static final JsonMapper STRICT =
       JsonMapper.builder().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();

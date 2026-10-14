@@ -233,11 +233,10 @@ class CoreUrnRekeyMigrationIntegrationTest {
 
     assertThat(
             JdbcClient.create(fresh)
-                .sql(
-                    "SELECT version FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1")
-                .query(String.class)
+                .sql("SELECT success FROM flyway_schema_history WHERE version = '1.2.26'")
+                .query(Boolean.class)
                 .single())
-        .isEqualTo("1.2.26");
+        .isTrue();
   }
 
   private static FluentConfiguration portalFlyway(DriverManagerDataSource dataSource) {

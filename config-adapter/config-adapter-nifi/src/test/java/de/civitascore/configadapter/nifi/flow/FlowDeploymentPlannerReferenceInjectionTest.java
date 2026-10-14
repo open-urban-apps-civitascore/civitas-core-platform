@@ -56,7 +56,10 @@ class FlowDeploymentPlannerReferenceInjectionTest {
   private static final List<String> REFERENCES = List.of("${HOSTNAME}", "#{MQTT_TRUSTSTORE}");
 
   private record Case(
-      Map<String, Object> graph, Datasource source, SinkSpec sink, Map<String, Object> mappings) {}
+      Map<String, Object> graph,
+      Datasource source,
+      SinkSpec sink,
+      Map<String, Map<String, Object>> artifacts) {}
 
   @FunctionalInterface
   private interface CaseFactory {
@@ -195,7 +198,7 @@ class FlowDeploymentPlannerReferenceInjectionTest {
                               input.graph(),
                               input.source(),
                               input.sink(),
-                              input.mappings())));
+                              input.artifacts())));
 
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
       assertInstanceOf(UnsafePropertyValueException.class, ex.getCause());
@@ -207,7 +210,7 @@ class FlowDeploymentPlannerReferenceInjectionTest {
   void plan_literalDollarSigns_reachTheFlowUnchanged() throws Exception {
     byte[] key = stretchedKey();
     Datasource source = mqttSource(encrypted("pa$$word$", key));
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> mappings =
         mappingsWith(MAP_BASIC, "{\"$.price\":{\"op\":\"const\",\"value\":\"US$5\"}}");
 
     try (CredentialResolver resolver = new CredentialResolver(key)) {
@@ -261,9 +264,9 @@ class FlowDeploymentPlannerReferenceInjectionTest {
         + ")";
   }
 
-  private static Map<String, Object> mappingsWith(String mappingRef, String fieldsJson)
+  private static Map<String, Map<String, Object>> mappingsWith(String mappingRef, String fieldsJson)
       throws Exception {
-    Map<String, Object> mappings = new LinkedHashMap<>(MAPPINGS);
+    Map<String, Map<String, Object>> mappings = new LinkedHashMap<>(MAPPINGS);
     mappings.put(mappingRef, map("{\"fields\": " + fieldsJson + "}"));
     return mappings;
   }

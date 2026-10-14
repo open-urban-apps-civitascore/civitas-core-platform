@@ -3,10 +3,13 @@ package de.civitascore.portal.service.connector;
 import de.civitascore.portal.model.connector.ConnectorConfiguration;
 import de.civitascore.portal.model.connector.ConnectorJson;
 import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway.RegistryDocument;
 import de.civitascore.portal.modelregistry.PayloadKind;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
@@ -18,7 +21,8 @@ import tools.jackson.databind.JsonNode;
 /**
  * The connector of a Data source as the Model Forge registry stores it: a document of kind {@code
  * DATA_SOURCE} with encrypted secrets, pinned by the Data source's {@code configurationUrn}. The
- * logical URN in {@code configurationLogicalUrn} stays across versions.
+ * logical URN in {@code configurationLogicalUrn} stays across versions. The document names the
+ * {@code modelUrn} of the Data source's Data structure version in {@code element}.
  *
  * <p>Every operation reads the stored document at most once. A pin that points at no stored
  * document throws {@link StoredConnectorUnreadableException}.
@@ -76,13 +80,41 @@ public class DataSourceConnectorStore {
     }
     Optional<RegistryDocument> stored = fetch(dataSource);
     Map<String, Object> document =
-        ConnectorJson.toDocument(
-            connector, stored.map(RegistryDocument::content).orElse(null), textEncryptor::encrypt);
+        withElement(
+            ConnectorJson.toDocument(
+                connector,
+                stored.map(RegistryDocument::content).orElse(null),
+                textEncryptor::encrypt),
+            elementOf(dataSource));
     // Only a connector without a clear-text secret compares equal, because encryption is not
     // deterministic.
     if (stored.isPresent() && modelRegistryGateway.isUnchanged(stored.get(), document, null)) {
       return;
     }
+    store(dataSource, document);
+  }
+
+  /**
+   * Stores a new version of the stored document when its {@code element} does not name the {@code
+   * modelUrn} of the Data source's Data structure version, and sets the versioned pin on {@code
+   * dataSource}. Does nothing when no connector is stored.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void refreshElement(DataSource dataSource) {
+    Optional<RegistryDocument> stored = fetch(dataSource);
+    if (stored.isEmpty()) {
+      return;
+    }
+    Map<String, Object> content =
+        Objects.requireNonNullElse(stored.get().content(), Map.<String, Object>of());
+    String element = elementOf(dataSource);
+    if (Objects.equals(content.get(ConnectorJson.ELEMENT), element)) {
+      return;
+    }
+    store(dataSource, withElement(content, element));
+  }
+
+  private void store(DataSource dataSource, Map<String, Object> document) {
     ModelRegistryGateway.ModelPin pin =
         modelRegistryGateway.storePayload(
             PayloadKind.DATA_SOURCE,
@@ -95,6 +127,21 @@ public class DataSourceConnectorStore {
       dataSource.setConfigurationLogicalUrn(pin.logicalUrn());
     }
     dataSource.setConfigurationUrn(pin.versionedUrn());
+  }
+
+  private static String elementOf(DataSource dataSource) {
+    DataStructureVersion version = dataSource.getDataStructureVersion();
+    return version == null ? null : version.getModelUrn();
+  }
+
+  private static Map<String, Object> withElement(Map<String, Object> document, String element) {
+    Map<String, Object> copy = new LinkedHashMap<>(document);
+    if (element == null) {
+      copy.remove(ConnectorJson.ELEMENT);
+    } else {
+      copy.put(ConnectorJson.ELEMENT, element);
+    }
+    return copy;
   }
 
   /**

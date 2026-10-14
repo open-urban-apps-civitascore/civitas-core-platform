@@ -4,8 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.portal.configuration.PipelineClosureValidationProperties;
 import de.civitascore.portal.configuration.SagaProperties;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.ConnectorType;
@@ -19,7 +23,6 @@ import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSinkRepository;
-import de.civitascore.portal.service.connector.DataSourceConnectorStore;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -29,12 +32,16 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Stream;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -51,20 +58,22 @@ class DataSetSagaPublisherTest {
   @Mock private KafkaTemplate<String, String> kafkaTemplate;
   @Mock private DataSinkRepository dataSinkRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;
-  @Mock private DataSourceConnectorStore connectorStore;
 
   private DataSetSagaPublisher publisher;
 
   @BeforeEach
   void setUp() {
-    publisher =
-        new DataSetSagaPublisher(
-            kafkaTemplate,
-            new JsonMapper(),
-            new SagaProperties("test.saga.trigger", 5),
-            dataSinkRepository,
-            modelRegistryGateway,
-            connectorStore);
+    publisher = publisher(10);
+  }
+
+  private DataSetSagaPublisher publisher(int maxDepth) {
+    return new DataSetSagaPublisher(
+        kafkaTemplate,
+        new JsonMapper(),
+        new SagaProperties("test.saga.trigger", 5),
+        dataSinkRepository,
+        modelRegistryGateway,
+        new PipelineClosureValidationProperties(maxDepth));
   }
 
   private static String datasourceUrn(UUID id) {
@@ -76,10 +85,7 @@ class DataSetSagaPublisherTest {
     ds.setId(id);
     ds.setName("ds-" + id);
     ds.setConnectorType(type);
-    // The datasource catalog is now keyed by the configuration CORE URN; pin one and stub its read.
-    String urn = datasourceUrn(id);
-    ds.setConfigurationUrn(urn);
-    lenient().when(connectorStore.storedDocument(ds)).thenReturn(Map.of("host", "h"));
+    ds.setConfigurationUrn(datasourceUrn(id));
     return ds;
   }
 
@@ -130,44 +136,6 @@ class DataSetSagaPublisherTest {
             CompletableFuture.completedFuture(
                 new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
     return jsonCaptor;
-  }
-
-  @Nested
-  @DisplayName("buildDatasources() deduplication")
-  class BuildDatasourcesTests {
-
-    @Test
-    @DisplayName("deduplicates datasources shared across multiple pipelines")
-    void deduplicatesDatasourcesAcrossPipelines() {
-      UUID dsId = UUID.randomUUID();
-      DataSource shared = dataSource(dsId, ConnectorType.MQTT);
-
-      Pipeline p1 = pipeline(UUID.randomUUID(), shared);
-      Pipeline p2 = pipeline(UUID.randomUUID(), shared);
-
-      DataSet dataSet = new DataSet();
-      dataSet.setId(UUID.randomUUID());
-      dataSet.setName("test");
-      dataSet.setOpenDataAccess(false);
-      dataSet.setPipelines(Set.of(p1, p2));
-
-      ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
-      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
-          .thenReturn(
-              CompletableFuture.completedFuture(
-                  new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
-
-      publisher.publishCreateRequested(dataSet);
-
-      ObjectMapper mapper = new JsonMapper();
-      var payload = mapper.readTree(jsonCaptor.getValue());
-      var datasources = payload.get("datasources");
-      assertThat(datasources).isNotNull();
-      assertThat(datasources.size()).as("Shared datasource should appear only once").isEqualTo(1);
-      assertThat(datasources.get(0).get("id").asString())
-          .as("datasource is keyed by its configuration CORE URN, not its GUID")
-          .isEqualTo(datasourceUrn(dsId));
-    }
   }
 
   @Nested
@@ -347,6 +315,326 @@ class DataSetSagaPublisherTest {
       assertThat(ds.get("type").asString()).isEqualTo("POSTGIS");
       assertThat(ds.get("configuration").get("tableName").asString())
           .isEqualTo("sensor_observations");
+    }
+  }
+
+  @Nested
+  @DisplayName("artifacts from the dependency graph")
+  class ArtifactsTests {
+
+    private static final String PIPELINE_URN =
+        "urn:core:platform:civitas:pipeline:common:8a46d02f-0994-8f94-8b55-031414ee2859:1.0.0";
+    private static final String OTHER_PIPELINE_URN =
+        "urn:core:platform:civitas:pipeline:common:3f0c1d2e-4b5a-8c6d-9e7f-0a1b2c3d4e5f:1.0.0";
+    private static final String SOURCE_URN =
+        "urn:core:platform:civitas:datasource:common:1c9b8d42-6f3e-8a71-b2d4-5e6f7a8b9c0d:1.1.0";
+    private static final String SINK_URN =
+        "urn:core:platform:civitas:datasink:common:7d2e4f60-8a1b-8c3d-9e5f-6a7b8c9d0e1f:1.0.0";
+    private static final String MAPPING_URN =
+        "urn:core:dataset:neustadt:mapping:traffic:b539f598-2ce4-8cb9-8068-920e30194249:1.0.0";
+    private static final String SOURCE_STRUCTURE =
+        "urn:core:platform:civitas:element:common:5cf6e9e7-fa0d-877a-bda7-df0cc339e439:1.0.0";
+    private static final String TARGET_STRUCTURE =
+        "urn:core:platform:civitas:datastructure:common:0e1c3a52-9f4b-8d2e-a7c6-3b5d1f2e4a60:2.0.0";
+    private static final String NESTED_STRUCTURE =
+        "urn:core:platform:civitas:element:common:9a8b7c6d-5e4f-8a3b-9c2d-1e0f9a8b7c6d:1.0.0";
+
+    @BeforeEach
+    void readArtifactTypeFromTheUrn() {
+      lenient()
+          .when(modelRegistryGateway.artifactType(anyString()))
+          .thenAnswer(invocation -> invocation.<String>getArgument(0).split(":")[4]);
+    }
+
+    private void stored(String urn, Map<String, Object> document, String... dependencies) {
+      when(modelRegistryGateway.fetchPayload(urn))
+          .thenReturn(Optional.of(new ModelRegistryGateway.RegistryDocument(document, null)));
+      when(modelRegistryGateway.dependencyUrns(urn)).thenReturn(List.of(dependencies));
+    }
+
+    private void structure(String urn, String title) {
+      when(modelRegistryGateway.fetchInlinedModel(urn))
+          .thenReturn(Optional.of(Map.of("$id", urn, "title", title, "type", "object")));
+    }
+
+    private void storedPipeline(String urn, String... dependencies) {
+      stored(urn, Map.of("nodes", List.of()), dependencies);
+    }
+
+    private void sourceSinkAndMapping() {
+      storedPipeline(PIPELINE_URN, SOURCE_URN, SINK_URN, MAPPING_URN);
+      stored(
+          SOURCE_URN,
+          Map.of("connectionType", "mqtt", "password", "ENC(secret)", "element", SOURCE_STRUCTURE),
+          SOURCE_STRUCTURE);
+      stored(
+          SINK_URN,
+          Map.of("connectionType", "postgis", "tableName", "obs", "element", TARGET_STRUCTURE),
+          TARGET_STRUCTURE);
+      stored(
+          MAPPING_URN,
+          Map.of(
+              "source",
+              SOURCE_STRUCTURE,
+              "target",
+              TARGET_STRUCTURE,
+              "fields",
+              Map.of("$.name", "$.station")),
+          SOURCE_STRUCTURE,
+          TARGET_STRUCTURE);
+      structure(SOURCE_STRUCTURE, "Reading");
+      structure(TARGET_STRUCTURE, "Observation");
+    }
+
+    private Pipeline modelledPipeline(String modelUrn) {
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      pipeline.setModelUrn(modelUrn);
+      return pipeline;
+    }
+
+    private DataSet dataSet(Pipeline... pipelines) {
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setPipelines(Set.of(pipelines));
+      return dataSet;
+    }
+
+    private JsonNode publishCreate(DataSet dataSet) {
+      var jsonCaptor = stubKafkaSend();
+      publisher.publishCreateRequested(dataSet);
+      return new JsonMapper().readTree(jsonCaptor.getValue());
+    }
+
+    @Test
+    @DisplayName("configurations and Mappings ship as stored, keyed by the URN the graph reports")
+    void configurationsAndMappingsShipAsStored() {
+      sourceSinkAndMapping();
+
+      JsonNode artifacts = publishCreate(dataSet(modelledPipeline(PIPELINE_URN))).get("artifacts");
+
+      JsonNode source = artifacts.get(SOURCE_URN);
+      assertThat(source.get("connectionType").asString()).isEqualTo("mqtt");
+      assertThat(source.get("password").asString()).isEqualTo("ENC(secret)");
+      assertThat(source.get("element").asString()).isEqualTo(SOURCE_STRUCTURE);
+      assertThat(artifacts.get(SINK_URN).get("tableName").asString()).isEqualTo("obs");
+      assertThat(artifacts.get(MAPPING_URN).get("fields").get("$.name").asString())
+          .isEqualTo("$.station");
+      assertThat(artifacts.has(PIPELINE_URN)).isFalse();
+    }
+
+    @Test
+    @DisplayName("every referenced Data structure ships once, as its inlined view")
+    void dataStructuresShipInlinedOnce() {
+      sourceSinkAndMapping();
+
+      JsonNode artifacts = publishCreate(dataSet(modelledPipeline(PIPELINE_URN))).get("artifacts");
+
+      assertThat(artifacts.get(SOURCE_STRUCTURE).get("title").asString()).isEqualTo("Reading");
+      assertThat(artifacts.get(TARGET_STRUCTURE).get("title").asString()).isEqualTo("Observation");
+      verify(modelRegistryGateway, times(1)).fetchInlinedModel(SOURCE_STRUCTURE);
+      verify(modelRegistryGateway, times(1)).fetchInlinedModel(TARGET_STRUCTURE);
+    }
+
+    @Test
+    @DisplayName("the walk stops at a Data structure")
+    void walkStopsAtDataStructures() {
+      sourceSinkAndMapping();
+      lenient()
+          .when(modelRegistryGateway.dependencyUrns(TARGET_STRUCTURE))
+          .thenReturn(List.of(NESTED_STRUCTURE));
+
+      JsonNode artifacts = publishCreate(dataSet(modelledPipeline(PIPELINE_URN))).get("artifacts");
+
+      assertThat(artifacts.has(NESTED_STRUCTURE)).isFalse();
+      verify(modelRegistryGateway, never()).dependencyUrns(SOURCE_STRUCTURE);
+      verify(modelRegistryGateway, never()).dependencyUrns(TARGET_STRUCTURE);
+    }
+
+    @Test
+    @DisplayName("the keys are sorted")
+    void keysAreSorted() {
+      sourceSinkAndMapping();
+
+      JsonNode artifacts = publishCreate(dataSet(modelledPipeline(PIPELINE_URN))).get("artifacts");
+
+      assertThat(List.copyOf(artifacts.propertyNames()))
+          .containsExactlyInAnyOrder(
+              SOURCE_URN, SINK_URN, MAPPING_URN, SOURCE_STRUCTURE, TARGET_STRUCTURE)
+          .isSorted();
+    }
+
+    @Test
+    @DisplayName(
+        "the current configuration of an associated Data source and Data sink ships beside the"
+            + " pinned one")
+    void currentConfigurationsOfAssociatedEntitiesShip() {
+      String currentSource = SOURCE_URN.replace(":1.1.0", ":1.2.0");
+      String currentSink = SINK_URN.replace(":1.0.0", ":1.1.0");
+      String currentStructure = SOURCE_STRUCTURE.replace(":1.0.0", ":1.1.0");
+      storedPipeline(PIPELINE_URN, SOURCE_URN, SINK_URN);
+      stored(
+          SOURCE_URN,
+          Map.of("connectionType", "mqtt", "element", SOURCE_STRUCTURE),
+          SOURCE_STRUCTURE);
+      stored(
+          currentSource,
+          Map.of("connectionType", "mqtt", "element", currentStructure),
+          currentStructure);
+      stored(SINK_URN, Map.of("connectionType", "postgis", "tableName", "obs"));
+      stored(currentSink, Map.of("connectionType", "postgis", "tableName", "obs_current"));
+      structure(SOURCE_STRUCTURE, "Reading");
+      structure(currentStructure, "Reading, edited");
+      DataSource source = dataSource(UUID.randomUUID(), ConnectorType.MQTT);
+      source.setConfigurationUrn(currentSource);
+      Pipeline pipeline = pipeline(UUID.randomUUID(), source);
+      pipeline.setModelUrn(PIPELINE_URN);
+      DataSink sink = new DataSink();
+      sink.setConfigurationUrn(currentSink);
+      when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sink));
+
+      JsonNode payload = publishCreate(dataSet(pipeline));
+
+      assertThat(List.copyOf(payload.get("artifacts").propertyNames()))
+          .containsExactlyInAnyOrder(
+              SOURCE_URN, currentSource, SINK_URN, currentSink, SOURCE_STRUCTURE, currentStructure);
+      JsonNode entry = payload.get("dataPipelines").get(0);
+      assertThat(entry.get("dataSourceIds").get(0).asString()).isEqualTo(currentSource);
+      assertThat(entry.get("dataSinkIds").get(0).asString()).isEqualTo(currentSink);
+    }
+
+    @Test
+    @DisplayName("a Data source two Pipelines share is fetched and shipped once")
+    void sharedDataSourceShipsOnce() {
+      storedPipeline(PIPELINE_URN, SOURCE_URN);
+      storedPipeline(OTHER_PIPELINE_URN, SOURCE_URN);
+      stored(SOURCE_URN, Map.of("connectionType", "sql"));
+
+      JsonNode artifacts =
+          publishCreate(
+                  dataSet(modelledPipeline(PIPELINE_URN), modelledPipeline(OTHER_PIPELINE_URN)))
+              .get("artifacts");
+
+      assertThat(List.copyOf(artifacts.propertyNames())).containsExactly(SOURCE_URN);
+      verify(modelRegistryGateway, times(1)).fetchPayload(SOURCE_URN);
+      verify(modelRegistryGateway, times(1)).dependencyUrns(SOURCE_URN);
+    }
+
+    @Test
+    @DisplayName("an UPDATE trigger carries the artifacts of the current Pipelines only")
+    void updateTriggerCarriesArtifactsOfCurrentPipelines() {
+      storedPipeline(PIPELINE_URN, SOURCE_URN);
+      stored(SOURCE_URN, Map.of("connectionType", "sql"));
+      Pipeline current = modelledPipeline(PIPELINE_URN);
+      Pipeline removed = modelledPipeline(OTHER_PIPELINE_URN);
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishUpdateRequested(dataSet(current), Set.of(current, removed));
+
+      JsonNode artifacts = new JsonMapper().readTree(jsonCaptor.getValue()).get("artifacts");
+      assertThat(List.copyOf(artifacts.propertyNames())).containsExactly(SOURCE_URN);
+      verify(modelRegistryGateway, never()).dependencyUrns(OTHER_PIPELINE_URN);
+    }
+
+    @Test
+    @DisplayName("a Pipeline without a stored model contributes nothing, artifacts stays an object")
+    void pipelineWithoutModelContributesNothing() {
+      JsonNode payload = publishCreate(dataSet(pipeline(UUID.randomUUID())));
+
+      assertThat(payload.get("artifacts").isObject()).isTrue();
+      assertThat(payload.get("artifacts").isEmpty()).isTrue();
+    }
+
+    @Test
+    @DisplayName(
+        "DELETE and UNRELEASE do not walk the graph, so a dangling artifact cannot block them")
+    void teardownTriggersDoNotWalkTheGraph() {
+      DataSet dataSet = dataSet(modelledPipeline(PIPELINE_URN));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishDeleteRequested(dataSet);
+      publisher.publishUnreleaseRequested(dataSet);
+
+      assertThat(jsonCaptor.getAllValues()).hasSize(2);
+      verify(modelRegistryGateway, never()).dependencyUrns(anyString());
+    }
+
+    @Test
+    @DisplayName("fails the publish when a referenced configuration is not stored")
+    void unresolvedConfigurationFailsThePublish() {
+      storedPipeline(PIPELINE_URN, SOURCE_URN);
+      when(modelRegistryGateway.fetchPayload(SOURCE_URN)).thenReturn(Optional.empty());
+      DataSet dataSet = dataSet(modelledPipeline(PIPELINE_URN));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining(SOURCE_URN);
+      verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
+    }
+
+    @ParameterizedTest(name = "inlined view {0}")
+    @MethodSource("missingModels")
+    @DisplayName("fails the publish when a referenced Data structure has no model")
+    void unresolvedDataStructureFailsThePublish(
+        String description, Optional<Map<String, Object>> model) {
+      storedPipeline(PIPELINE_URN, SOURCE_URN);
+      stored(SOURCE_URN, Map.of("element", SOURCE_STRUCTURE), SOURCE_STRUCTURE);
+      when(modelRegistryGateway.fetchInlinedModel(SOURCE_STRUCTURE)).thenReturn(model);
+      DataSet dataSet = dataSet(modelledPipeline(PIPELINE_URN));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining(SOURCE_STRUCTURE);
+      verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
+    }
+
+    static Stream<Arguments> missingModels() {
+      return Stream.of(
+          Arguments.of("absent", Optional.empty()), Arguments.of("empty", Optional.of(Map.of())));
+    }
+
+    @Test
+    @DisplayName("fails the publish when the walk reaches an artifact type no Pipeline uses")
+    void unexpectedArtifactTypeFailsThePublish() {
+      storedPipeline(PIPELINE_URN, OTHER_PIPELINE_URN);
+      DataSet dataSet = dataSet(modelledPipeline(PIPELINE_URN));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining(OTHER_PIPELINE_URN)
+          .hasMessageContaining("type pipeline");
+      verify(modelRegistryGateway, never()).fetchPayload(OTHER_PIPELINE_URN);
+      verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("fails the publish when the artifacts reach beyond the depth bound")
+    void walkPastTheDepthBoundFailsThePublish() {
+      storedPipeline(PIPELINE_URN, SOURCE_URN);
+      stored(SOURCE_URN, Map.of("element", SOURCE_STRUCTURE), SOURCE_STRUCTURE);
+      DataSet dataSet = dataSet(modelledPipeline(PIPELINE_URN));
+
+      assertThatThrownBy(() -> publisher(1).publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("beyond 1 references");
+      verify(modelRegistryGateway, never()).fetchInlinedModel(anyString());
+      verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("a walk exactly as deep as the bound publishes")
+    void walkAtTheDepthBoundPublishes() {
+      storedPipeline(PIPELINE_URN, SOURCE_URN);
+      stored(SOURCE_URN, Map.of("element", SOURCE_STRUCTURE), SOURCE_STRUCTURE);
+      structure(SOURCE_STRUCTURE, "Reading");
+      var jsonCaptor = stubKafkaSend();
+
+      publisher(2).publishCreateRequested(dataSet(modelledPipeline(PIPELINE_URN)));
+
+      JsonNode artifacts = new JsonMapper().readTree(jsonCaptor.getValue()).get("artifacts");
+      assertThat(List.copyOf(artifacts.propertyNames()))
+          .containsExactly(SOURCE_URN, SOURCE_STRUCTURE);
     }
   }
 
@@ -806,8 +1094,7 @@ class DataSetSagaPublisherTest {
     @Test
     @DisplayName("pipeline model is served from the registry pin (layout styles stripped)")
     void pipelineModelServedFromRegistry() {
-      DataSource ds = dataSource(UUID.randomUUID(), ConnectorType.MQTT);
-      Pipeline p = pipeline(UUID.randomUUID(), ds);
+      Pipeline p = pipeline(UUID.randomUUID());
       String urn =
           "urn:core:platform:civitas:pipeline:common:8a46d02f-0994-8f94-8b55-031414ee2859:1.2.0";
       p.setModelUrn(urn);
@@ -836,55 +1123,6 @@ class DataSetSagaPublisherTest {
           .as("the saga payload carries the definition only, never the UI layout")
           .isFalse();
       assertThat(entry.get("version").asString()).isEqualTo("3");
-    }
-
-    @Test
-    @DisplayName("pipeline ships the Mapping artifacts it depends on (from the dependency graph)")
-    void pipelineShipsMappingsForDependencies() {
-      DataSource ds = dataSource(UUID.randomUUID(), ConnectorType.MQTT);
-      Pipeline p = pipeline(UUID.randomUUID(), ds);
-      String pipelineUrn =
-          "urn:core:platform:civitas:pipeline:common:8a46d02f-0994-8f94-8b55-031414ee2859:1.0.0";
-      String mappingUrn =
-          "urn:core:dataset:neustadt:mapping:traffic:b539f598-2ce4-8cb9-8068-920e30194249:1.0.0";
-      p.setModelUrn(pipelineUrn);
-      // The saga learns which Mappings the pipeline uses from Model Forge's dependency graph (an
-      // envelope concern) — never by parsing the pipeline document — then ships each Mapping's
-      // content so the callback-free config-adapter can build it.
-      when(modelRegistryGateway.dependencyUrnsOfType(pipelineUrn, "mapping"))
-          .thenReturn(List.of(mappingUrn));
-      when(modelRegistryGateway.fetchPayload(pipelineUrn))
-          .thenReturn(
-              Optional.of(
-                  new ModelRegistryGateway.RegistryDocument(
-                      Map.of(
-                          "nodes",
-                          List.of(
-                              Map.of("id", "n-map", "kind", "mapping", "mappingRef", mappingUrn))),
-                      null)));
-      when(modelRegistryGateway.fetchPayload(mappingUrn))
-          .thenReturn(
-              Optional.of(
-                  new ModelRegistryGateway.RegistryDocument(
-                      Map.of("fields", Map.of("$.name", "$.station")), null)));
-
-      DataSet dataSet = new DataSet();
-      dataSet.setId(UUID.randomUUID());
-      dataSet.setName("test");
-      dataSet.setOpenDataAccess(false);
-      dataSet.setPipelines(Set.of(p));
-      var jsonCaptor = stubKafkaSend();
-
-      publisher.publishCreateRequested(dataSet);
-
-      var entry = new JsonMapper().readTree(jsonCaptor.getValue()).get("dataPipelines").get(0);
-      var mappings = entry.get("mappings");
-      assertThat(mappings).as("the pipeline entry carries a mappings catalog").isNotNull();
-      assertThat(mappings.get(mappingUrn))
-          .as("keyed by the Mapping CORE URN the pipeline depends on")
-          .isNotNull();
-      assertThat(mappings.get(mappingUrn).get("fields").get("$.name").asString())
-          .isEqualTo("$.station");
     }
 
     @Test

@@ -223,13 +223,13 @@ public final class FrostSinkStage implements SinkStage<FrostSinkSpec> {
   }
 
   /**
-   * The {@code properties} bag of the sink's Thing-shaped target structure ({@code
-   * datasinks[].dataStructure}, the mapping's target the portal embeds at publish time), per
-   * entity: every attribute the bag declares, its match key being the {@code x-core-primaryKey}
-   * attribute (fallback: one named {@code reference}) — SensorThings keeps identifiers in {@code
-   * properties}, and so may any number of free attributes alongside it. Null when the datasink
-   * carries no structure — a passthrough flow needs none; the mapping compilation rejects a mapped
-   * flow without keys, since only it knows a mapping is present. A structurally broken schema
+   * The {@code properties} bag of the sink's Thing-shaped target structure (the stage input's
+   * {@code dataStructure}, the inlined Data structure the sink configuration names), per entity:
+   * every attribute the bag declares, its match key being the {@code x-core-primaryKey} attribute
+   * (fallback: one named {@code reference}) — SensorThings keeps identifiers in {@code properties},
+   * and so may any number of free attributes alongside it. Null when the datasink carries no
+   * structure — a passthrough flow needs none; the mapping compilation rejects a mapped flow
+   * without keys, since only it knows a mapping is present. A structurally broken schema
    * (unresolvable root, mis-shaped {@code Locations} or {@code Datastreams} class) throws {@link
    * IllegalArgumentException} instead of degrading to "no keys" — the caller turns it into a
    * payload error; a legitimately absent {@code Locations}, {@code Datastreams} or {@code
