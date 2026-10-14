@@ -63,3 +63,40 @@ VALUES ('d0000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-0000000
         'urn:core:platform:civitas:element:common:10000000-0000-4000-8000-000000000001:1.0.0',
         'a0000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001',
         'datasource-element', NULL, 0, now());
+
+-- A Pipeline whose version 1.0.0 pins the configurations of Data sources 01 and 03 and of a Data
+-- sink, and whose version 1.1.0 already names Data source 01 through `:latest`.
+INSERT INTO model_forge.artifact (id, logical_urn, artifact_type, name, current_version, created_at, updated_at)
+VALUES ('a0000000-0000-4000-8000-000000000005', 'urn:core:platform:civitas:pipeline:common:40000000-0000-4000-8000-000000000001', 'pipeline', 'Weather flow', '1.1.0', now(), now());
+
+INSERT INTO model_forge.artifact_version (id, artifact_id, version, primary_format, created_at)
+VALUES ('b0000000-0000-4000-8000-000000000006', 'a0000000-0000-4000-8000-000000000005', '1.0.0', 'core-json', now() - interval '1 hour'),
+       ('b0000000-0000-4000-8000-000000000007', 'a0000000-0000-4000-8000-000000000005', '1.1.0', 'core-json', now());
+
+INSERT INTO model_forge.artifact_representation (id, version_id, format, content_type, content_jsonb, content_hash, created_at)
+VALUES ('c0000000-0000-4000-8000-000000000006', 'b0000000-0000-4000-8000-000000000006', 'core-json', 'application/json',
+        '{"nodes": [{"id": "src", "kind": "source", "sourceRef": "urn:core:platform:civitas:datasource:common:20000000-0000-4000-8000-000000000001:1.0.0"},
+                    {"id": "enrich", "kind": "enrich", "lookupKey": "id", "lookupSourceRef": "urn:core:platform:civitas:datasource:common:20000000-0000-4000-8000-000000000003:1.0.0"},
+                    {"id": "sink", "kind": "sink", "sinkRef": "urn:core:platform:civitas:datasink:common:30000000-0000-4000-8000-000000000001:1.0.0"}],
+          "edges": [{"id": "e1", "source": "src", "target": "enrich"}, {"id": "e2", "source": "enrich", "target": "sink"}],
+          "x-ui-styles": {"nodes": [{"id": "src", "data": {"configurationUrn": "urn:core:platform:civitas:datasource:common:20000000-0000-4000-8000-000000000001:1.0.0"}}]}}',
+        'fixture', now()),
+       ('c0000000-0000-4000-8000-000000000007', 'b0000000-0000-4000-8000-000000000007', 'core-json', 'application/json',
+        '{"nodes": [{"id": "src", "kind": "source", "sourceRef": "urn:core:platform:civitas:datasource:common:20000000-0000-4000-8000-000000000001:latest"}], "edges": []}',
+        'fixture', now());
+
+INSERT INTO model_forge.artifact_reference (id, from_version_id, target_urn, target_artifact_id, target_version_id, reference_type, reference_name, sort_order, created_at)
+VALUES ('d0000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000006',
+        'urn:core:platform:civitas:datasource:common:20000000-0000-4000-8000-000000000001:1.0.0',
+        'a0000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000002',
+        'pipeline-node', 'source', 0, now()),
+       ('d0000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000006',
+        'urn:core:platform:civitas:datasource:common:20000000-0000-4000-8000-000000000003:1.0.0',
+        'a0000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000005',
+        'pipeline-node', 'enrich', 1, now()),
+       ('d0000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000006',
+        'urn:core:platform:civitas:datasink:common:30000000-0000-4000-8000-000000000001:1.0.0',
+        NULL, NULL, 'pipeline-node', 'sink', 2, now()),
+       ('d0000000-0000-4000-8000-000000000005', 'b0000000-0000-4000-8000-000000000007',
+        'urn:core:platform:civitas:datasource:common:20000000-0000-4000-8000-000000000001:latest',
+        'a0000000-0000-4000-8000-000000000002', NULL, 'pipeline-node', 'source', 0, now());

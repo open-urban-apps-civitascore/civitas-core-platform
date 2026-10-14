@@ -68,7 +68,7 @@ class CoreUrnRekeyMigrationIntegrationTest {
       throw new IllegalStateException(e);
     }
 
-    portalFlyway(dataSource).load().migrate();
+    portalFlyway(dataSource).target(MigrationVersion.fromVersion("1.2.26")).load().migrate();
   }
 
   @AfterAll

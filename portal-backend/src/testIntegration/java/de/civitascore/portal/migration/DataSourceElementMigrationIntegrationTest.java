@@ -6,6 +6,7 @@ import db.migration.V1_2_27__stamp_datasource_element;
 import de.civitascore.portal.util.TestContainerImages;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.flywaydb.core.Flyway;
@@ -36,6 +37,13 @@ class DataSourceElementMigrationIntegrationTest {
       List.of("b0000000-0000-4000-8000-000000000002", "b0000000-0000-4000-8000-000000000003");
   private static final String SOURCE_WITHOUT_STRUCTURE = "b0000000-0000-4000-8000-000000000004";
   private static final String SOURCE_ALREADY_STAMPED = "b0000000-0000-4000-8000-000000000005";
+  private static final String DATASOURCE = "urn:core:platform:civitas:datasource:common:";
+  private static final String WEATHER_SOURCE = DATASOURCE + "20000000-0000-4000-8000-000000000001";
+  private static final String STAMPED_SOURCE = DATASOURCE + "20000000-0000-4000-8000-000000000003";
+  private static final String PINNED_SINK =
+      "urn:core:platform:civitas:datasink:common:30000000-0000-4000-8000-000000000001:1.0.0";
+  private static final String PIPELINE_WITH_PINS = "b0000000-0000-4000-8000-000000000006";
+  private static final String PIPELINE_ON_LATEST = "b0000000-0000-4000-8000-000000000007";
 
   private static PostgreSQLContainer postgres;
   private static DriverManagerDataSource dataSource;
@@ -123,6 +131,59 @@ class DataSourceElementMigrationIntegrationTest {
   }
 
   @Test
+  void migrate_pointsTheDataSourceReferencesOfAPipelineVersionAtLatest() {
+    assertThat(pipelineNodeRef(PIPELINE_WITH_PINS, "src", "sourceRef"))
+        .isEqualTo(WEATHER_SOURCE + ":latest");
+    assertThat(pipelineNodeRef(PIPELINE_WITH_PINS, "enrich", "lookupSourceRef"))
+        .isEqualTo(STAMPED_SOURCE + ":latest");
+  }
+
+  @Test
+  void migrate_keepsTheSinkPinAndTheEditorLayoutOfAPipelineVersion() {
+    assertThat(pipelineNodeRef(PIPELINE_WITH_PINS, "sink", "sinkRef")).isEqualTo(PINNED_SINK);
+    assertThat(
+            jdbc.sql(
+                    """
+                    SELECT content_jsonb #>> '{x-ui-styles,nodes,0,data,configurationUrn}'
+                    FROM model_forge.artifact_representation WHERE version_id = :id::uuid
+                    """)
+                .param("id", PIPELINE_WITH_PINS)
+                .query(String.class)
+                .single())
+        .isEqualTo(WEATHER_SOURCE + ":1.0.0");
+  }
+
+  @Test
+  void migrate_recordsThePipelineEdgesToDataSourcesAsModelForgeRecordsLatest() {
+    assertThat(pipelineNodeReferencesOf(PIPELINE_WITH_PINS))
+        .containsExactly(
+            Map.of(
+                "reference_name", "source",
+                "target_urn", WEATHER_SOURCE + ":latest",
+                "target_artifact_id", "a0000000-0000-4000-8000-000000000002"),
+            Map.of(
+                "reference_name", "enrich",
+                "target_urn", STAMPED_SOURCE + ":latest",
+                "target_artifact_id", "a0000000-0000-4000-8000-000000000004"),
+            Map.of("reference_name", "sink", "target_urn", PINNED_SINK));
+  }
+
+  @Test
+  void migrate_rehashesARewrittenPipelineVersionOnly() {
+    assertThat(hashOf(PIPELINE_WITH_PINS))
+        .isEqualTo(
+            jdbc.sql(
+                    """
+                    SELECT encode(sha256(convert_to(content_jsonb::text, 'UTF8')), 'hex')
+                    FROM model_forge.artifact_representation WHERE version_id = :id::uuid
+                    """)
+                .param("id", PIPELINE_WITH_PINS)
+                .query(String.class)
+                .single());
+    assertThat(hashOf(PIPELINE_ON_LATEST)).isEqualTo("fixture");
+  }
+
+  @Test
   void migrate_runAgain_changesNothing() throws SQLException {
     List<Map<String, Object>> representations = representations();
     List<Map<String, Object>> references = references();
@@ -183,6 +244,51 @@ class DataSourceElementMigrationIntegrationTest {
         .param("id", versionId)
         .query()
         .listOfRows();
+  }
+
+  private static String pipelineNodeRef(String versionId, String nodeId, String field) {
+    return jdbc.sql(
+            """
+            SELECT n ->> :field
+            FROM model_forge.artifact_representation r,
+              jsonb_array_elements(r.content_jsonb -> 'nodes') n
+            WHERE r.version_id = :id::uuid AND n ->> 'id' = :node
+            """)
+        .param("field", field)
+        .param("id", versionId)
+        .param("node", nodeId)
+        .query(String.class)
+        .single();
+  }
+
+  /** The non-null columns of each row, so that a NULL target version shows as an absent key. */
+  private static List<Map<String, Object>> pipelineNodeReferencesOf(String versionId) {
+    return jdbc
+        .sql(
+            """
+            SELECT reference_name, target_urn, target_artifact_id::text AS target_artifact_id,
+                   target_version_id::text AS target_version_id
+            FROM model_forge.artifact_reference
+            WHERE from_version_id = :id::uuid AND reference_type = 'pipeline-node'
+            ORDER BY sort_order
+            """)
+        .param("id", versionId)
+        .query()
+        .listOfRows()
+        .stream()
+        .map(DataSourceElementMigrationIntegrationTest::withoutNulls)
+        .toList();
+  }
+
+  private static Map<String, Object> withoutNulls(Map<String, Object> row) {
+    Map<String, Object> present = new LinkedHashMap<>();
+    row.forEach(
+        (column, value) -> {
+          if (value != null) {
+            present.put(column, value);
+          }
+        });
+    return present;
   }
 
   private static List<Map<String, Object>> representations() {

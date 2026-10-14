@@ -1,6 +1,7 @@
 package de.civitascore.portal.messaging.saga;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -11,6 +12,9 @@ import de.civitascore.portal.configuration.PipelineClosureValidationProperties;
 import de.civitascore.portal.configuration.SagaProperties;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSinkType;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
+import de.civitascore.portal.model.embedded.DataStructureStatus;
+import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
@@ -20,6 +24,9 @@ import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
+import de.civitascore.portal.security.AllowedScopes;
+import de.civitascore.portal.security.dto.PrincipalUserDetails;
+import de.civitascore.portal.service.validation.PipelineClosureValidator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +42,12 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -50,6 +62,8 @@ class DataSetSagaPublisherIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private SagaProperties sagaProperties;
   @Autowired private PipelineClosureValidationProperties closureProperties;
   @Autowired private TransactionTemplate transactionTemplate;
+  @Autowired private PipelineClosureValidator pipelineClosureValidator;
+  @Autowired private AllowedScopes allowedScopes;
 
   @AfterEach
   void cleanup() {
@@ -90,6 +104,33 @@ class DataSetSagaPublisherIntegrationTest extends BaseKeycloakIntegrationTest {
         status ->
             publisher.publishCreateRequested(dataSetRepository.findById(dataSetId).orElseThrow()));
     return objectMapper.readTree(trigger.getValue());
+  }
+
+  /** The release check, for a caller with Platform-wide access. */
+  private void validateRelease(UUID dataSetId) {
+    RequestContextHolder.setRequestAttributes(
+        new ServletRequestAttributes(new MockHttpServletRequest()));
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new UsernamePasswordAuthenticationToken(
+                PrincipalUserDetails.builder().userId(UUID.randomUUID()).build(), null, List.of()));
+    try {
+      allowedScopes.setWildcard();
+      transactionTemplate.executeWithoutResult(
+          status ->
+              pipelineClosureValidator.validate(
+                  dataSetRepository.findById(dataSetId).orElseThrow().getPipelines()));
+    } finally {
+      SecurityContextHolder.clearContext();
+      RequestContextHolder.resetRequestAttributes();
+    }
+  }
+
+  private static Map<String, Object> mqttConfiguration(DataStructureVersion element) {
+    return Map.of(
+        "urls", List.of("mqtt://broker:1883"),
+        "topics", List.of("readings/+"),
+        "element", element.getModelUrn());
   }
 
   private static List<String> nodeRefs(JsonNode pipelineEntry) {
@@ -183,5 +224,56 @@ class DataSetSagaPublisherIntegrationTest extends BaseKeycloakIntegrationTest {
     assertThat(artifacts.has(position.getModelUrn()))
         .as("a Data structure only another Data structure references")
         .isFalse();
+  }
+
+  @Test
+  @DisplayName(
+      "a source node that names its Data source by :latest follows it to its current Data"
+          + " structure, in the release check and in the artifacts")
+  void latestSourceRef_afterTheDataSourceMovesToAnotherStructure_followsTheCurrentConfiguration() {
+    DataStructureVersion abandoned =
+        structureVersion(portalData.dataStructureVersionModel("Reading"));
+    DataStructureVersion released =
+        portalData.attachModel(
+            portalData.dataStructureVersion(
+                portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE)),
+                b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)),
+            portalData.dataStructureVersionModel("Reading, released"));
+    DataSet dataSet = portalData.dataSet();
+    DataSource dataSource =
+        portalData.attachSourceConfiguration(
+            portalData.dataSource(
+                b ->
+                    b.connectorType(ConnectorType.MQTT)
+                        .dataSourceStatus(DataSourceStatus.AVAILABLE)
+                        .dataStructureVersion(abandoned)),
+            mqttConfiguration(abandoned));
+    String firstSource = dataSource.getConfigurationUrn();
+    Pipeline pipeline = portalData.pipeline(dataSet, b -> b.dataSources(Set.of(dataSource)));
+    portalData.attachPipelineDefinition(
+        pipeline,
+        Map.of(
+            "nodes",
+            List.of(
+                node(
+                    "src",
+                    "source",
+                    "sourceRef",
+                    dataSource.getConfigurationLogicalUrn() + ":latest")),
+            "edges",
+            List.of()),
+        null);
+    dataSource.setDataStructureVersion(released);
+    String currentSource =
+        portalData
+            .attachSourceConfiguration(dataSource, mqttConfiguration(released))
+            .getConfigurationUrn();
+
+    assertThatCode(() -> validateRelease(dataSet.getId())).doesNotThrowAnyException();
+    JsonNode artifacts = publishCreate(dataSet.getId()).get("artifacts");
+
+    assertThat(currentSource).isNotEqualTo(firstSource);
+    assertThat(List.copyOf(artifacts.propertyNames()))
+        .containsExactlyInAnyOrder(currentSource, released.getModelUrn());
   }
 }

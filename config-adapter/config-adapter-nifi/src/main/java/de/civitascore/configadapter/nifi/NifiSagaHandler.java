@@ -519,12 +519,12 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     }
   }
 
-  /** Rejects a graph node that names a URN which is not a key of {@code artifacts}. */
+  /** Rejects a mapping or sink node that names a URN which is not a key of {@code artifacts}. */
   private static void requireNodeArtifacts(
       PipelineGraph graph, Map<String, Map<String, Object>> artifacts)
       throws FatalAdapterException {
     for (GraphNode node : graph.nodes()) {
-      for (String ref : new String[] {node.sourceRef(), node.mappingRef(), node.sinkRef()}) {
+      for (String ref : new String[] {node.mappingRef(), node.sinkRef()}) {
         if (ref != null && !ref.isBlank()) {
           requireArtifact(artifacts, ref, "pipeline node '" + node.id() + "' references");
         }
@@ -557,11 +557,11 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Resolves the pipeline's own datasource. The graph's source node pins the configuration version
-   * the user picked; the pipeline's {@code dataSourceIds} entry for the same logical URN names the
-   * current version, and that version's {@code artifacts} entry is what deploys, so a connector
-   * edit made after the pick takes effect. Its secrets stay ciphertext until the source stage
-   * decrypts them.
+   * Resolves the pipeline's own datasource. The source node's {@code sourceRef} names the Data
+   * source by {@code :latest} or by a version, and only selects the pipeline's {@code
+   * dataSourceIds} entry for the same logical URN. That entry names the current configuration
+   * version, and that version's {@code artifacts} entry is what deploys. Its secrets stay
+   * ciphertext until the source stage decrypts them.
    */
   private static Datasource resolveSource(
       GraphNode sourceNode, List<String> dataSourceIds, Map<String, Map<String, Object>> artifacts)

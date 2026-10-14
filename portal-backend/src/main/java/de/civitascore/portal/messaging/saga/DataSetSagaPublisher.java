@@ -359,10 +359,12 @@ public class DataSetSagaPublisher {
    * content. The walk stops at a Data structure, because its inlined view already contains the Data
    * structures it references.
    *
-   * <p>A Pipeline node pins the configuration version that was current when the user picked the
-   * Data source or Data sink, while a later edit or release moves the entity on. The walk therefore
-   * also starts at the current configuration of every associated Data source and Data sink, the
-   * version that {@code dataSourceIds} and {@code dataSinkIds} name and that the adapter deploys.
+   * <p>A source node names its Data source by {@code :latest}, which the dependency graph reports
+   * as the current configuration. A sink node, and a source node that a client stored with a pin,
+   * keeps the configuration version that was current when it was picked, while a later edit or
+   * release moves the entity on. The walk therefore also starts at the current configuration of
+   * every associated Data source and Data sink, the version that {@code dataSourceIds} and {@code
+   * dataSinkIds} name and that the adapter deploys.
    *
    * @throws InvalidInputException if the walk reaches an artifact the registry does not hold, an
    *     artifact type the payload does not carry, or more than {@code

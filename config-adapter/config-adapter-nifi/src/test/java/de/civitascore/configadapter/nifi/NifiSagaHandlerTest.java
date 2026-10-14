@@ -239,7 +239,7 @@ class NifiSagaHandlerTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"ds-1", "sk-1", "map-1"})
+  @ValueSource(strings = {"sk-1", "map-1"})
   void nodeReferenceMissingFromArtifactsFailsBeforeDeploying(String ref) throws Exception {
     Map<String, Object> payload = deployPayload();
     artifacts(payload).remove(ref);
@@ -255,6 +255,8 @@ class NifiSagaHandlerTest {
       "urn:core:dataset:d:datasource:c:9787c3df-5325-8a02-8722-d44c626bed38:1.0.0";
   private static final String CURRENT_SOURCE =
       "urn:core:dataset:d:datasource:c:9787c3df-5325-8a02-8722-d44c626bed38:1.1.0";
+  private static final String LATEST_SOURCE =
+      "urn:core:dataset:d:datasource:c:9787c3df-5325-8a02-8722-d44c626bed38:latest";
   private static final String PINNED_SINK =
       "urn:core:dataset:d:datasink:c:5e0d3a41-7b2c-8f19-a6d4-3c2b1a0f9e8d:1.0.0";
   private static final String CURRENT_SINK =
@@ -316,10 +318,33 @@ class NifiSagaHandlerTest {
     assertFalse(snapshot.contains("obs_pinned"), "the pinned Data sink configuration does not");
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {LATEST_SOURCE, PINNED_SOURCE})
+  void sourceReferenceDeploysTheCurrentConfigurationWithoutAnArtifactOfItsOwn(String sourceRef)
+      throws Exception {
+    Map<String, Object> drifted = deployPayloadWithDriftedConfigurations();
+    artifacts(drifted).put(PINNED_SINK, artifacts(drifted).get(CURRENT_SINK));
+    Map<String, Object> payload =
+        map(
+            mapper
+                .writeValueAsString(drifted)
+                .replace(
+                    "\"sourceRef\":\"" + PINNED_SOURCE + "\"",
+                    "\"sourceRef\":\"" + sourceRef + "\""));
+    when(restClient.deployFlow(any())).thenReturn("pg-1");
+
+    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+
+    assertEquals("STEP_COMPLETED", result.type());
+    ArgumentCaptor<DeploymentPlan> plan = ArgumentCaptor.forClass(DeploymentPlan.class);
+    verify(restClient, times(1)).deployFlow(plan.capture());
+    assertTrue(plan.getValue().snapshotJson().contains("t/current"));
+  }
+
   @Test
-  void nodeReferenceIsResolvedByExactUrnOnly() throws Exception {
-    // Guards the fail-closed key contract: a logical-URN fallback would accept a node whose pinned
-    // artifact the payload does not carry, because another version of it is there.
+  void sinkReferenceIsResolvedByExactUrnOnly() throws Exception {
+    // Guards the fail-closed key contract: a logical-URN fallback would accept a sink node whose
+    // pinned artifact the payload does not carry, because another version of it is there.
     SagaCommandResult result =
         handler.handle(SagaCommandMessage.fromMap(deployPayloadWithDriftedConfigurations()));
 
