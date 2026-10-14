@@ -24,6 +24,7 @@ import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -33,7 +34,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.errors.NotLeaderOrFollowerException;
+import org.apache.kafka.common.errors.RecordTooLargeException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -45,6 +49,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.kafka.core.KafkaProducerException;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import tools.jackson.databind.JsonNode;
@@ -1449,6 +1454,58 @@ class DataSetSagaPublisherTest {
       SagaResultPayload roundTripped = mapper.readValue(json, SagaResultPayload.class);
 
       assertThat(roundTripped.routeIds()).isNull();
+    }
+  }
+
+  @Nested
+  @DisplayName("sendTrigger() failures")
+  class SendTriggerTests {
+
+    private DataSet emptyDataSet() {
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setPipelines(Set.of());
+      return dataSet;
+    }
+
+    private void stubKafkaFailure(Exception cause) {
+      when(kafkaTemplate.send(anyString(), anyString(), anyString()))
+          .thenReturn(
+              CompletableFuture.failedFuture(
+                  new KafkaProducerException(
+                      new ProducerRecord<>("test.saga.trigger", "{}"), "Failed to send", cause)));
+    }
+
+    @Test
+    @DisplayName("a trigger above the Kafka size limit fails as invalid input with its UTF-8 size")
+    void tooLargeTriggerFailsAsInvalidInputWithItsSize() {
+      DataSet dataSet = emptyDataSet();
+      dataSet.setName("Straßenbäume");
+      stubKafkaFailure(new RecordTooLargeException("too large"));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageStartingWith(
+              "The saga trigger of this Dataset is " + sentTriggerBytes() + " bytes, ");
+    }
+
+    private int sentTriggerBytes() {
+      ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
+      verify(kafkaTemplate).send(anyString(), anyString(), jsonCaptor.capture());
+      return jsonCaptor.getValue().getBytes(StandardCharsets.UTF_8).length;
+    }
+
+    @Test
+    @DisplayName("any other broker failure stays an internal error")
+    void otherBrokerFailureStaysInternal() {
+      DataSet dataSet = emptyDataSet();
+      stubKafkaFailure(new NotLeaderOrFollowerException("no leader"));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessage("Failed to send saga trigger to Kafka");
     }
   }
 }

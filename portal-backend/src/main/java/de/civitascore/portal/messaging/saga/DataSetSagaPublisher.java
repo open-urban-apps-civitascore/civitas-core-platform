@@ -19,6 +19,7 @@ import de.civitascore.portal.model.saga.StylePayload;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -32,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.common.errors.RecordTooLargeException;
 import org.owasp.encoder.Encode;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -593,24 +595,33 @@ public class DataSetSagaPublisher {
   private void sendTrigger(SagaTrigger trigger) {
     String datasetId = trigger.datasetId();
     String sagaType = trigger.sagaType().name();
+    String json = toJson(trigger);
+    int payloadBytes = json.getBytes(StandardCharsets.UTF_8).length;
     try {
-      String json = objectMapper.writeValueAsString(trigger);
       eventKafkaTemplate
           .send(sagaProperties.triggerTopic(), datasetId, json)
           .get(sagaProperties.publishTimeoutSeconds(), TimeUnit.SECONDS);
       log.info(
-          "Published saga trigger: sagaType={}, datasetId={}, topic={}",
+          "Published saga trigger: sagaType={}, datasetId={}, topic={}, bytes={}",
           Encode.forJava(sagaType),
           Encode.forJava(datasetId),
-          Encode.forJava(sagaProperties.triggerTopic()));
-    } catch (JacksonException e) {
-      log.error(
-          "Failed to serialize saga trigger for dataset {}: {}",
-          Encode.forJava(datasetId),
-          e.getMessage(),
-          e);
-      throw new IllegalStateException("Failed to serialize saga trigger", e);
+          Encode.forJava(sagaProperties.triggerTopic()),
+          payloadBytes);
     } catch (ExecutionException e) {
+      if (isCausedByRecordTooLarge(e)) {
+        log.warn(
+            "Kafka rejected saga trigger for dataset {} as too large: sagaType={}, bytes={}",
+            Encode.forJava(datasetId),
+            Encode.forJava(sagaType),
+            payloadBytes);
+        throw new InvalidInputException(
+            "DataSet",
+            UUID.fromString(datasetId),
+            "The saga trigger of this Dataset is "
+                + payloadBytes
+                + " bytes, more than the platform accepts. Reduce the size of its Data"
+                + " structures.");
+      }
       log.error(
           "Kafka broker rejected saga trigger for dataset {}, sagaType={}: {}",
           Encode.forJava(datasetId),
@@ -636,5 +647,27 @@ public class DataSetSagaPublisher {
       throw new IllegalStateException(
           "Interrupted while waiting for Kafka ack for saga trigger", e);
     }
+  }
+
+  private String toJson(SagaTrigger trigger) {
+    try {
+      return objectMapper.writeValueAsString(trigger);
+    } catch (JacksonException e) {
+      log.error(
+          "Failed to serialize saga trigger for dataset {}: {}",
+          Encode.forJava(trigger.datasetId()),
+          e.getMessage(),
+          e);
+      throw new IllegalStateException("Failed to serialize saga trigger", e);
+    }
+  }
+
+  private static boolean isCausedByRecordTooLarge(Throwable failure) {
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause instanceof RecordTooLargeException) {
+        return true;
+      }
+    }
+    return false;
   }
 }
