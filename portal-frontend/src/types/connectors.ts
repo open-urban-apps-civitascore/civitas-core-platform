@@ -351,6 +351,11 @@ export const ConnectorStrictSchema = connectorUnion({
   SQL: SqlStrictSchema,
   HTTP: HttpStrictSchema,
 })
+export const ConnectorTabCompleteSchema = connectorUnion({
+  MQTT: MqttStrictSchema,
+  SQL: SqlStrictSchema,
+  HTTP: HttpStrictSchema.omit({ apiCalls: true }),
+})
 export const ConnectorApiToFormSchema = connectorUnion({
   MQTT: MqttApiToFormSchema,
   SQL: SqlApiToFormSchema,

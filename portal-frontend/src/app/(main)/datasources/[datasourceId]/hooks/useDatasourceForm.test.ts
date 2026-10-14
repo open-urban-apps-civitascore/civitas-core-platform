@@ -242,6 +242,21 @@ describe('useDatasourceForm with an HTTP connector', () => {
     return mockUpdateDatasource.mock.calls[0][0].connector
   }
 
+  it('marks the connector tab complete without API calls, but does not allow release', () => {
+    const datasource = createHttpDatasource()
+    const { result } = renderDatasourceForm({ ...datasource, connector: { ...datasource.connector!, apiCalls: [] } })
+
+    expect(result.current.completedTabs).toContain('connector')
+    expect(result.current.canStage).toBe(false)
+  })
+
+  it('allows release with an API call', () => {
+    const { result } = renderDatasourceForm(createHttpDatasource())
+
+    expect(result.current.completedTabs).toContain('connector')
+    expect(result.current.canStage).toBe(true)
+  })
+
   it('loads the masked password into the form', () => {
     const { result } = renderDatasourceForm(createHttpDatasource())
 

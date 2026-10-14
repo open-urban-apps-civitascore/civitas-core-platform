@@ -14,7 +14,7 @@ import {
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { DataSourceDraftSchema } from '@/generated/core'
 import { useError } from '@/hooks/use-error'
-import { ConnectorFormToApiSchema, ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
+import { ConnectorFormToApiSchema, ConnectorTabCompleteSchema, ConnectorType } from '@/types/connectors'
 import { Datapool } from '@/types/datapools'
 import {
   DATAPOOL_SCOPE_TYPES,
@@ -158,7 +158,7 @@ export const useDatasourceForm = (
     if (nameWatch.length > 0 && descriptionWatch.length > 0) completed.push('basicInfo')
     try {
       const { connectorType, configuration } = formValues
-      if (ConnectorStrictSchema.safeParse({ connectorType, configuration }).success) completed.push('connector')
+      if (ConnectorTabCompleteSchema.safeParse({ connectorType, configuration }).success) completed.push('connector')
     } catch {
       // Zod v4: safeParse throws on stale keys
     }
