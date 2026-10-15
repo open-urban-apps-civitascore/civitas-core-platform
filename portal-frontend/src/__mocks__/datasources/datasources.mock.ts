@@ -68,7 +68,15 @@ export const mockDatasources: Datasource[] = [
       connectorType: 'HTTP',
       baseUrl: 'https://api.example.org/v1',
       authentication: { type: 'BASIC', username: 'reader', password: '********' },
-      apiCalls: [{ name: 'Get all stations', method: 'GET', path: '/stations' }],
+      apiCalls: [
+        {
+          name: 'Get all stations',
+          method: 'GET',
+          path: '/stations',
+          queryParameters: [{ name: 'status', value: 'active' }],
+          headers: [{ name: 'Accept', value: 'application/json' }],
+        },
+      ],
     },
     dataStructureVersion: null,
     inUse: false,

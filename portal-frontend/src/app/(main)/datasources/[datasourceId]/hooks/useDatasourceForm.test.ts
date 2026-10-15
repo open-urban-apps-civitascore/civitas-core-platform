@@ -257,6 +257,30 @@ describe('useDatasourceForm with an HTTP connector', () => {
     expect(result.current.canStage).toBe(true)
   })
 
+  it.each([
+    ['without a name', [{ name: '', path: '/stations' }]],
+    ['without a path', [{ name: 'Get all stations', path: '' }]],
+  ])('does not allow release with an API call %s', (_name, apiCalls) => {
+    const datasource = createHttpDatasource()
+    const { result } = renderDatasourceForm({ ...datasource, connector: { ...datasource.connector!, apiCalls } })
+
+    expect(result.current.canStage).toBe(false)
+  })
+
+  it('saves a draft with an API call without a name', async () => {
+    const connector = await submitAfter(form =>
+      form.setValue(
+        'configuration.apiCalls',
+        [{ name: '', path: '/stations', queryParameters: [], headers: [], pagination: null }],
+        { shouldDirty: true },
+      ),
+    )
+
+    expect(connector.apiCalls).toEqual([
+      { name: '', path: '/stations', queryParameters: [], headers: [], pagination: null },
+    ])
+  })
+
   it('marks the API calls tab complete with a complete API call', () => {
     const { result } = renderDatasourceForm(createHttpDatasource())
 

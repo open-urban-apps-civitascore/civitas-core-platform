@@ -157,7 +157,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const [editingApiCalls, setEditingApiCalls] = useState<ApiCallSnapshots>(new Map())
   const [collapsedRequestIndexes, setCollapsedRequestIndexes] = useState<ReadonlySet<number>>(new Set())
   // Index of each API call at the last save, null for a new API call. Undefined: no change since then.
-  const [savedApiCallIndexes, setSavedApiCallIndexes] = useState<ReadonlyArray<number | null>>()
+  const [initialApiCallIndexes, setInitialApiCallIndexes] = useState<ReadonlyArray<number | null>>()
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isDraftBlockedModalOpen, setIsDraftBlockedModalOpen] = useState(false)
 
@@ -188,6 +188,12 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     if (selectedTab === 'apiCalls' && !isHttpConnector) setSelectedTab('connector')
   }, [selectedTab, isHttpConnector])
 
+  useEffect(() => {
+    setEditingApiCalls(new Map())
+    setCollapsedRequestIndexes(new Set())
+    setInitialApiCallIndexes(undefined)
+  }, [selectedConnectorType])
+
   const datastructureIdParam = useMemo(
     () => (selectedDatastructureId ? new URLSearchParams({ id: selectedDatastructureId }) : undefined),
     [selectedDatastructureId],
@@ -200,34 +206,37 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const selectedDatastructureName = selectedDatastructureId ? selectedDatastructureResponse?.data?.[0]?.name : undefined
 
-  const getSavedApiCallIndexes = () => {
-    const savedApiCalls = (datasourceForm.formState.defaultValues?.configuration?.apiCalls ?? []) as HttpApiCallForm[]
-    return savedApiCallIndexes ?? savedApiCalls.map((_, index) => index)
+  const getInitialApiCallIndexes = () => {
+    const initialApiCalls = (datasourceForm.formState.defaultValues?.configuration?.apiCalls ?? []) as HttpApiCallForm[]
+    return initialApiCallIndexes ?? initialApiCalls.map((_, index) => index)
   }
 
-  const handleApiCallAdd = () => setSavedApiCallIndexes([...getSavedApiCallIndexes(), null])
+  const handleApiCallAdd = () => setInitialApiCallIndexes([...getInitialApiCallIndexes(), null])
 
   const handleApiCallRemove = (removedIndex: number) =>
-    setSavedApiCallIndexes(getSavedApiCallIndexes().filter((_, index) => index !== removedIndex))
+    setInitialApiCallIndexes(getInitialApiCallIndexes().filter((_, index) => index !== removedIndex))
 
   // Call after the form holds the saved values.
-  const syncApiCallViews = (toSavedIndex: (index: number) => number | null) => {
-    const savedApiCalls = (datasourceForm.getValues('configuration.apiCalls') ?? []) as HttpApiCallForm[]
+  const syncApiCallViews = (toInitialIndex: (index: number) => number | null) => {
+    const initialApiCalls = (datasourceForm.getValues('configuration.apiCalls') ?? []) as HttpApiCallForm[]
     const editingEntries = [...editingApiCalls.keys()].flatMap(index => {
-      const savedIndex = toSavedIndex(index)
-      return savedIndex === null ? [] : [[savedIndex, structuredClone(savedApiCalls[savedIndex] ?? null)] as const]
+      const initialIndex = toInitialIndex(index)
+      return initialIndex === null
+        ? []
+        : [[initialIndex, structuredClone(initialApiCalls[initialIndex] ?? null)] as const]
     })
-    const collapsedIndexes = [...collapsedRequestIndexes].map(toSavedIndex).filter(index => index !== null)
+    const initialCollapsedIndexes = [...collapsedRequestIndexes].map(toInitialIndex)
+    const collapsedIndexes = initialCollapsedIndexes.filter(index => index !== null)
     setEditingApiCalls(new Map(editingEntries))
     setCollapsedRequestIndexes(new Set(collapsedIndexes))
-    setSavedApiCallIndexes(undefined)
+    setInitialApiCallIndexes(undefined)
   }
 
   const resetToInitialState = () => {
-    const savedIndexes = getSavedApiCallIndexes()
+    const initialIndexes = getInitialApiCallIndexes()
     resetDatasourceToInitialState()
     datasourceForm.reset()
-    syncApiCallViews(index => savedIndexes[index] ?? null)
+    syncApiCallViews(index => initialIndexes[index] ?? null)
     setAssignedGroups(initialAssignments)
     setAssignedDatapools(initialDatapools)
     setSelectedDatastructureId(initialDatastructureId)
