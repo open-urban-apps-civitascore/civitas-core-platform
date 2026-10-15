@@ -1,151 +1,31 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    "gitlab>civitas-connect/civitas-core/civitas-core-v2/renovate-config//platform.json#main"
   ],
-  "baseBranchPatterns": ["develop"],
-  "labels": ["v::2", "dependencies"],
-  "prConcurrentLimit": 10,
+  "baseBranchPatterns": [
+    "develop"
+  ],
+  "labels": [
+    "v::2",
+    "dependencies"
+  ],
   "rangeStrategy": "bump",
   "semanticCommits": "enabled",
-  "separateMajorMinor": true,
-  "separateMultipleMajor": true,
-  "minimumReleaseAge": "7 days",
-  "vulnerabilityAlerts": {
-    "labels": ["security"],
-    "assignees": [],
-    "minimumReleaseAge": "0 days"
-  },
   "packageRules": [
     {
-      "description": "Frontend dependencies (Next.js/React)",
-      "matchFileNames": ["portal-frontend/**"],
-      "groupName": "frontend dependencies",
-      "commitMessagePrefix": "chore(frontend):",
-      "addLabels": ["cop frontend", "team data mgmt"]
-    },
-    {
-      "description": "Backend dependencies (Spring Boot). The OpenAPI bot (.gitlab/ci/scripts/update-openapi-spec.mjs) also takes its reviewers from this rule.",
-      "matchFileNames": ["portal-backend/**"],
-      "dependencyDashboardApproval": false,
-      "commitMessagePrefix": "chore(backend):",
-      "reviewers": ["franklex", "jonasfrz"],
-      "reviewersSampleSize": 1,
-      "addLabels": ["cop backend", "team data mgmt"]
-    },
-    {
-      "description": "Automerge minor and patch updates for linting and testing packages",
-      "matchFileNames": ["portal-backend/**"],
-      "matchPackageNames": [
-        "org.testcontainers:testcontainers**",
-        "org.apache.maven.plugins:maven-failsafe-plugin",
-        "org.apache.maven.plugins:maven-surefire-plugin",
-        "org.jacoco:jacoco-maven-plugin",
-        "com.diffplug.spotless:spotless-maven-plugin",
-        "org.wiremock.integrations:wiremock-spring-boot"
+      "description": "Reviewers for backend dependency MRs. The OpenAPI bot (.gitlab/ci/scripts/update-openapi-spec.mjs) also takes its reviewers from this rule. Everything else about backend dependencies is in the renovate-config preset.",
+      "matchFileNames": [
+        "portal-backend/**"
       ],
-      "matchUpdateTypes": ["minor", "patch"],
-      "automerge": true
-    },
-    {
-      "description": "Config Adapter dependencies",
-      "matchFileNames": ["config-adapter/**"],
-      "groupName": "config-adapter dependencies",
-      "commitMessagePrefix": "chore(config-adapter):",
-      "addLabels": ["cop backend", "team interfaces"]
-    },
-    {
-      "description": "Group Spring Boot dependencies",
-      "groupName": "Spring Boot dependencies",
-      "matchFileNames": ["portal-backend/**", "config-adapter/**"],
-      "matchPackageNames": [
-        "/^org\\.springframework/"
+      "reviewers": [
+        "franklex",
+        "jonasfrz"
       ],
-      "dependencyDashboardApproval": false
-    },
-    {
-      "description": "Group React ecosystem",
-      "groupName": "React ecosystem",
-      "matchFileNames": ["portal-frontend/**"],
-      "matchPackageNames": [
-        "/^react/",
-        "/^@types/react/"
-      ]
-    },
-    {
-      "description": "Group Next.js related packages",
-      "matchPackageNames": ["next", "/^@next//", "/^next-/"],
-      "groupName": "Next.js",
-      "matchFileNames": ["portal-frontend/**"]
-    },
-    {
-      "description": "Group testing libraries",
-      "groupName": "testing libraries",
-      "matchPackageNames": [
-        "/^@testing-library//",
-        "/^vitest/",
-        "/^@vitest//",
-        "/^@playwright//",
-        "/junit/",
-        "/mockito/"
-      ]
-    },
-    {
-      "description": "Group linting and formatting tools",
-      "groupName": "linting and formatting",
-      "matchPackageNames": [
-        "/^eslint/",
-        "/^@eslint//",
-        "/^prettier/",
-        "/^@prettier//",
-        "/checkstyle/",
-        "/spotbugs/"
-      ]
-    },
-    {
-      "description": "Pin Docker digests",
-      "matchDatasources": ["docker"],
-      "pinDigests": true
-    },
-    {
-      "description": "Update Docker base images",
-      "matchDatasources": ["docker"],
-      "matchUpdateTypes": ["major", "minor", "patch"],
-      "groupName": "Docker base images",
-      "commitMessagePrefix": "chore(docker):"
-    },
-    {
-      "description": "Group GitLab CI container images",
-      "matchDatasources": ["docker"],
-      "matchFileNames": [".gitlab-ci.yml", ".gitlab/ci/**"],
-      "groupName": "GitLab CI images",
-      "commitMessagePrefix": "chore(ci):",
-      "addLabels": ["ci/cd"]
-    },
-    {
-      "description": "Group dev environment containers",
-      "matchDatasources": ["docker"],
-      "matchFileNames": ["dev-environment/**"],
-      "groupName": "dev environment containers",
-      "commitMessagePrefix": "chore(dev-env):",
-      "addLabels": ["dev-environment"]
+      "reviewersSampleSize": 1
     }
   ],
-  "maven": {
-    "enabled": true
-  },
-  "npm": {
-    "enabled": true
-  },
-  "dockerfile": {
-    "enabled": true
-  },
-  "docker-compose": {
-    "enabled": true
-  },
-  "gitlabci": {
-    "enabled": true
-  },
   "customManagers": [
     {
       "description": "Track Docker image versions declared as Testcontainers Java constants. Lines annotated with '// renovate: datasource=docker' immediately above a 'public static final String NAME = \"image:tag\"' constant are matched. The existing pinDigests rule additionally appends @sha256: digests for full reproducibility.",
