@@ -4,25 +4,15 @@
     "config:recommended",
     "gitlab>civitas-connect/civitas-core/civitas-core-v2/renovate-config//platform.json#main"
   ],
-  "baseBranchPatterns": [
-    "develop"
-  ],
-  "labels": [
-    "v::2",
-    "dependencies"
-  ],
+  "baseBranchPatterns": ["develop"],
+  "labels": ["v::2", "dependencies"],
   "rangeStrategy": "bump",
   "semanticCommits": "enabled",
   "packageRules": [
     {
-      "description": "Reviewers for backend dependency MRs. The OpenAPI bot (.gitlab/ci/scripts/update-openapi-spec.mjs) also takes its reviewers from this rule. Everything else about backend dependencies is in the renovate-config preset.",
-      "matchFileNames": [
-        "portal-backend/**"
-      ],
-      "reviewers": [
-        "franklex",
-        "jonasfrz"
-      ],
+      "description": "Backend dependencies (Spring Boot): reviewers only. The OpenAPI bot (.gitlab/ci/scripts/update-openapi-spec.mjs) also takes its reviewers from this rule. Everything else about backend dependencies is in the renovate-config preset.",
+      "matchFileNames": ["portal-backend/**"],
+      "reviewers": ["franklex", "jonasfrz"],
       "reviewersSampleSize": 1
     }
   ],
