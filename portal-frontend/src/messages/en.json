@@ -1053,6 +1053,8 @@
     "apiCallsTab": {
       "title": "API calls",
       "availableInfo": "This Data source has the status \"Available\". To change the API calls, set it to \"Draft\" first.",
+      "copyUrl": "Copy URL",
+      "copySuccess": "URL copied to clipboard.",
       "add": "Create API call",
       "empty": {
         "title": "No API call yet"

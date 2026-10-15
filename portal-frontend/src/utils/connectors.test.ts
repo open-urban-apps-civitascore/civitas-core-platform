@@ -1,6 +1,6 @@
 import { CONNECTOR_TYPES } from '@/const/connectors'
 
-import { formatPathWithQuery, getConnectorDefaults, getConnectorFormData } from './connectors'
+import { buildApiCallUrl, formatPathWithQuery, getConnectorDefaults, getConnectorFormData } from './connectors'
 
 vi.mock('@/app/(main)/datasources/[datasourceId]/components/connector-tab/connectorSources', () => ({
   CONNECTOR_INPUTS: {
@@ -91,5 +91,36 @@ describe('formatPathWithQuery', () => {
       { name: 'debug', value: '' },
     ]
     expect(formatPathWithQuery('/stations', queryParameters)).toBe('/stations?debug=')
+  })
+})
+
+describe('buildApiCallUrl', () => {
+  const queryParameters = [{ name: 'status', value: 'active' }]
+
+  it('joins host, path and query parameters', () => {
+    expect(buildApiCallUrl('https://api.example.org/v1', '/stations', queryParameters)).toBe(
+      'https://api.example.org/v1/stations?status=active',
+    )
+  })
+
+  it('removes the trailing slash of the host', () => {
+    expect(buildApiCallUrl('https://api.example.org/v1/', '/stations', [])).toBe('https://api.example.org/v1/stations')
+  })
+
+  it('encodes names and values of query parameters', () => {
+    const specialParameters = [{ name: 'q a', value: 'a&b #c' }]
+    expect(buildApiCallUrl('https://api.example.org', '/search', specialParameters)).toBe(
+      'https://api.example.org/search?q%20a=a%26b%20%23c',
+    )
+  })
+
+  it('leaves out query parameters without a name', () => {
+    expect(buildApiCallUrl('https://api.example.org', '/stations', [{ name: '', value: 'x' }])).toBe(
+      'https://api.example.org/stations',
+    )
+  })
+
+  it('returns the path with query parameters without a host', () => {
+    expect(buildApiCallUrl('', '/stations', queryParameters)).toBe('/stations?status=active')
   })
 })

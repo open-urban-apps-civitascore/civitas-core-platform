@@ -1,6 +1,7 @@
-import { ChevronDown, Trash2 } from 'lucide-react'
+import { ChevronDown, Copy, Trash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { get, useFieldArray, UseFormReturn, useWatch } from 'react-hook-form'
+import { toast } from 'sonner'
 
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { Button } from '@/components/ui/button'
@@ -9,10 +10,11 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupInput } from '@/components/ui/input-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { HTTP_METHODS } from '@/const/connectors'
 import { cn } from '@/lib/utils'
 import { HttpApiCallsForm } from '@/types/connectors'
-import { formatPathWithQuery } from '@/utils/connectors'
+import { buildApiCallUrl, formatPathWithQuery } from '@/utils/connectors'
 
 import { ApiCallParameterRows } from './ApiCallParameterRows'
 
@@ -51,6 +53,7 @@ export const ApiCallItem = (props: ApiCallItemProps) => {
 
   const apiCallPath = `configuration.apiCalls.${index}` as const
   const apiCall = useWatch({ control: form.control, name: apiCallPath })
+  const baseUrl = useWatch({ control: form.control, name: 'configuration.baseUrl' })
   const queryParameters = useFieldArray({ control: form.control, name: `${apiCallPath}.queryParameters` })
   const headers = useFieldArray({ control: form.control, name: `${apiCallPath}.headers` })
 
@@ -59,6 +62,17 @@ export const ApiCallItem = (props: ApiCallItemProps) => {
   const hasParameters = queryParameters.fields.length > 0 || headers.fields.length > 0
   const hasError = !!get(form.formState.errors, apiCallPath)
   const borderClassName = cn('rounded-md border py-3', hasError ? 'border-destructive' : 'border-transparent')
+
+  const handleCopyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        buildApiCallUrl(baseUrl ?? '', apiCall?.path ?? '', apiCall?.queryParameters ?? []),
+      )
+      toast.success(t('copySuccess'))
+    } catch {
+      // Clipboard access can fail in insecure contexts.
+    }
+  }
 
   if (!isEditing) {
     return (
@@ -85,15 +99,36 @@ export const ApiCallItem = (props: ApiCallItemProps) => {
       <span className="font-semibold">{displayName}</span>
 
       <Collapsible open={isRequestOpen} onOpenChange={onRequestOpenChange} className="group/request">
-        <CollapsibleTrigger asChild>
-          <button type="button" className="flex w-full items-center gap-6 text-left">
-            <span className="text-sm font-semibold uppercase tracking-wide text-primary">{t('request.title')}</span>
-            <span className="flex-1 font-mono text-sm text-muted-foreground">
-              {HTTP_METHODS.GET} {pathWithQuery}
-            </span>
-            <ChevronDown className="size-4 group-data-[state=open]/request:rotate-180" />
-          </button>
-        </CollapsibleTrigger>
+        <div className="group/request-row flex items-center">
+          <CollapsibleTrigger asChild>
+            <button type="button" className="flex items-center gap-6 text-left">
+              <span className="text-sm font-semibold uppercase tracking-wide text-primary">{t('request.title')}</span>
+              <span data-endpoint className="font-mono text-sm text-muted-foreground">
+                {HTTP_METHODS.GET} {pathWithQuery}
+              </span>
+            </button>
+          </CollapsibleTrigger>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={t('copyUrl')}
+                className="ml-2 size-8 text-muted-foreground opacity-0 hover:opacity-100 focus-visible:opacity-100 group-has-[[data-endpoint]:hover]/request-row:opacity-100"
+                onClick={handleCopyUrl}
+              >
+                <Copy />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t('copyUrl')}</TooltipContent>
+          </Tooltip>
+          <CollapsibleTrigger asChild>
+            <button type="button" tabIndex={-1} aria-hidden className="flex flex-1 justify-end self-stretch">
+              <ChevronDown className="size-4 group-data-[state=open]/request:rotate-180" />
+            </button>
+          </CollapsibleTrigger>
+        </div>
 
         <CollapsibleContent className="flex flex-col gap-4 pt-4">
           <div className="flex flex-col gap-2 mb-2">

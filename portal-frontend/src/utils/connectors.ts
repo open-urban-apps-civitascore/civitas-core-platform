@@ -1,7 +1,7 @@
 import { set } from 'react-hook-form'
 
 import { CONNECTOR_INPUTS } from '@/app/(main)/datasources/[datasourceId]/components/connector-tab/connectorSources'
-import { ConnectorDraft, ConnectorType, HttpParameterForm } from '@/types/connectors'
+import { ConnectorDraft, ConnectorType, HttpParameterForm, normalizeHttpBaseUrl } from '@/types/connectors'
 
 type ConnectorConfig = NonNullable<ConnectorDraft['configuration']>
 
@@ -26,4 +26,12 @@ export const formatPathWithQuery = (path: string, queryParameters: HttpParameter
   const pairs = namedParameters.map(({ name, value }) => `${name}=${value}`)
   const query = pairs.join('&')
   return query ? `${path}?${query}` : path
+}
+
+export const buildApiCallUrl = (baseUrl: string, path: string, queryParameters: HttpParameterForm[]): string => {
+  const encodedParameters = queryParameters.map(({ name, value }) => ({
+    name: encodeURIComponent(name),
+    value: encodeURIComponent(value),
+  }))
+  return `${normalizeHttpBaseUrl(baseUrl)}${formatPathWithQuery(path, encodedParameters)}`
 }

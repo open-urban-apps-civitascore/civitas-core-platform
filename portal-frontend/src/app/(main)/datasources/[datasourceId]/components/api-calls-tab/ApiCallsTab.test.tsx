@@ -3,6 +3,7 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { useForm, UseFormReturn } from 'react-hook-form'
+import { toast } from 'sonner'
 import { describe, expect, it, vi } from 'vitest'
 
 import { Form } from '@/components/ui/form'
@@ -13,6 +14,10 @@ import { ApiCallsTab } from './ApiCallsTab'
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string, values?: { name?: string }) => (values?.name ? `${key}:${values.name}` : key),
+}))
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn() },
 }))
 
 const API_CALL: HttpApiCallForm = {
@@ -28,10 +33,11 @@ interface RenderOptions {
   isReadOnly?: boolean
   isDatasourceReleased?: boolean
   dataStructureName?: string
+  baseUrl?: string
 }
 
 const renderApiCallsTab = (options: RenderOptions = {}) => {
-  const { apiCalls = [], isReadOnly = false, isDatasourceReleased = false, dataStructureName } = options
+  const { apiCalls = [], isReadOnly = false, isDatasourceReleased = false, dataStructureName, baseUrl = '' } = options
   const defaultValues: DatasourceFormDraft = {
     id: '1',
     name: 'Test Data source',
@@ -39,7 +45,7 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
     dataSourceStatus: 'DRAFT',
     dataStructureVersionId: null,
     connectorType: 'HTTP',
-    configuration: { baseUrl: '', authentication: { type: 'NONE', username: '', password: '' }, apiCalls },
+    configuration: { baseUrl, authentication: { type: 'NONE', username: '', password: '' }, apiCalls },
   }
   let form: UseFormReturn<DatasourceFormDraft> | undefined
   let remountTab: (() => void) | undefined
@@ -268,6 +274,45 @@ describe('ApiCallsTab', () => {
     await user.click(screen.getByRole('button', { name: 'close' }))
 
     expect(screen.queryByRole('textbox', { name: 'path.label' })).not.toBeInTheDocument()
+  })
+
+  describe('copy URL', () => {
+    it('copies the URL with host and shows a toast', async () => {
+      const { user } = renderApiCallsTab({ apiCalls: [API_CALL], baseUrl: 'https://api.example.org/v1/' })
+      await openApiCall(user)
+
+      await user.click(screen.getByRole('button', { name: 'copyUrl' }))
+
+      expect(await navigator.clipboard.readText()).toBe('https://api.example.org/v1/stations?status=active')
+      expect(toast.success).toHaveBeenCalledWith('copySuccess')
+    })
+
+    it('copies only the path without a host', async () => {
+      const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+      await openApiCall(user)
+
+      await user.click(screen.getByRole('button', { name: 'copyUrl' }))
+
+      expect(await navigator.clipboard.readText()).toBe('/stations?status=active')
+    })
+
+    it('keeps the request step open after a copy', async () => {
+      const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+      await openApiCall(user)
+
+      await user.click(screen.getByRole('button', { name: 'copyUrl' }))
+
+      expect(screen.getByText('request.question')).toBeInTheDocument()
+    })
+  })
+
+  it('collapses the request step on a click on the free space of the row', async () => {
+    const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+    await openApiCall(user)
+
+    await user.click(screen.getByText('request.title').closest('div')!.lastElementChild!)
+
+    expect(screen.queryByText('request.question')).not.toBeInTheDocument()
   })
 
   it('shows GET as the only, disabled method', async () => {
