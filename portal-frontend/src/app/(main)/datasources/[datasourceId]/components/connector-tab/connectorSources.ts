@@ -1,5 +1,5 @@
 import { CONNECTOR_TYPES, HTTP_AUTHENTICATION_TYPES } from '@/const/connectors'
-import { ConnectorType } from '@/types/connectors'
+import { ConnectorType, normalizeHttpBaseUrl } from '@/types/connectors'
 import { ConnectorField } from '@/types/datasources'
 
 export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
@@ -25,6 +25,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
     {
       key: 'user',
       type: 'input',
+      autoComplete: 'off',
       label: { labelKey: 'mqtt.user.label' },
       defaultValue: '',
       required: false,
@@ -106,6 +107,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
     {
       key: 'user',
       type: 'input',
+      autoComplete: 'off',
       label: { labelKey: 'sql.user.label' },
       defaultValue: '',
       required: false,
@@ -149,6 +151,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
     {
       key: 'baseUrl',
       type: 'input',
+      normalize: normalizeHttpBaseUrl,
       label: { labelKey: 'http.baseUrl.label' },
       placeholder: 'https://api.example.org/v1',
       defaultValue: '',
@@ -168,6 +171,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
     {
       key: 'authentication.username',
       type: 'input',
+      autoComplete: 'off',
       label: { labelKey: 'http.username.label' },
       visibleWhen: { key: 'authentication.type', value: HTTP_AUTHENTICATION_TYPES.BASIC },
       defaultValue: '',

@@ -253,6 +253,15 @@ describe('HTTP connector schemas', () => {
     })
   })
 
+  it('sends the API host without trailing slashes', () => {
+    const result = ConnectorFormToApiSchema.parse({
+      connectorType: CONNECTOR_TYPES.HTTP,
+      configuration: { baseUrl: 'https://api.example.org/v1//', authentication: NONE },
+    })
+
+    expect(result).toMatchObject({ baseUrl: 'https://api.example.org/v1' })
+  })
+
   it('sends the Basic credentials as entered', () => {
     const result = ConnectorFormToApiSchema.parse({
       connectorType: CONNECTOR_TYPES.HTTP,

@@ -238,11 +238,14 @@ const hasUrlCredentials = (value: string) => {
   return url.username !== '' || url.password !== ''
 }
 
+export const normalizeHttpBaseUrl = (value: string) => value.trim().replace(/\/+$/, '')
+
 const HttpBaseUrlSchema = z
   .string()
   .trim()
   .refine(v => !v || isValidHttpBaseUrl(v), 'datasources.errors.invalidBaseUrl')
   .refine(v => !hasUrlCredentials(v), 'datasources.errors.baseUrlCredentials')
+  .transform(normalizeHttpBaseUrl)
 
 const HttpAuthenticationApiResponseSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal(HTTP_AUTHENTICATION_TYPES.NONE) }),

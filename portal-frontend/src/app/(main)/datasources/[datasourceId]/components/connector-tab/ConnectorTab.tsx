@@ -105,6 +105,8 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
               placeholder={property.placeholderKey ? t(property.placeholderKey) : (property.placeholder ?? '')}
               type={property.type}
               inputType={property.inputType}
+              autoComplete={property.autoComplete}
+              normalize={property.normalize}
               options={property.options?.map(toSelectOption)}
               shouldShowErrors
               required={property.required}

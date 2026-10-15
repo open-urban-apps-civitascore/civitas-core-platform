@@ -1,3 +1,4 @@
+import { HTMLInputAutoCompleteAttribute } from 'react'
 import z from 'zod'
 
 import { CONNECTOR_TYPES } from '@/const/connectors'
@@ -53,6 +54,8 @@ export type ConnectorField = {
   key: string
   type: FormFieldType
   inputType?: FormInputType
+  autoComplete?: HTMLInputAutoCompleteAttribute
+  normalize?: (value: string) => string
   label: ConnectorFieldLabel
   options?: ConnectorFieldOption[]
   // Shows the field only while the configuration field `key` has the given `value`.

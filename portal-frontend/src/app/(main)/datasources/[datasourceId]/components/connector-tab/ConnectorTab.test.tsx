@@ -308,6 +308,23 @@ describe('ConnectorTab (integration)', () => {
       expect(screen.getByLabelText(/http\.password\.label/)).toHaveAttribute('type', 'password')
     })
 
+    it('removes spaces and trailing slashes from the API host when the field loses focus', async () => {
+      renderConnectorTab(httpConfiguration('NONE'))
+      const baseUrl = screen.getByLabelText(/http\.baseUrl\.label/)
+
+      fireEvent.change(baseUrl, { target: { value: '  https://api.example.org/v1/  ' } })
+      fireEvent.blur(baseUrl)
+
+      await waitFor(() => expect(baseUrl).toHaveValue('https://api.example.org/v1'))
+    })
+
+    it('turns off browser autocomplete for the credentials', () => {
+      renderConnectorTab(httpConfiguration('BASIC'))
+
+      expect(screen.getByLabelText(/http\.username\.label/)).toHaveAttribute('autocomplete', 'off')
+      expect(screen.getByLabelText(/http\.password\.label/)).toHaveAttribute('autocomplete', 'new-password')
+    })
+
     it('shows the credentials after the user selects Basic', async () => {
       renderConnectorTab(httpConfiguration('NONE'))
 
