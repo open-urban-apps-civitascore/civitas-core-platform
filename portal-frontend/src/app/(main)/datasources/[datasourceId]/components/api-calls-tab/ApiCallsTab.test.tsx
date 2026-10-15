@@ -6,7 +6,7 @@ import { useForm, UseFormReturn } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 
 import { Form } from '@/components/ui/form'
-import { HttpApiCallForm } from '@/types/connectors'
+import { ApiCallSnapshots, HttpApiCallForm } from '@/types/connectors'
 import { DatasourceFormDraft, DatasourceFormDraftSchema } from '@/types/datasources'
 
 import { ApiCallsTab } from './ApiCallsTab'
@@ -50,7 +50,7 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
       mode: 'onChange',
       defaultValues,
     })
-    const [editingIndexes, setEditingIndexes] = useState<ReadonlySet<number>>(new Set())
+    const [editingApiCalls, setEditingApiCalls] = useState<ApiCallSnapshots>(new Map())
     const [collapsedRequestIndexes, setCollapsedRequestIndexes] = useState<ReadonlySet<number>>(new Set())
     const [tabKey, setTabKey] = useState(0)
     remountTab = () => setTabKey(key => key + 1)
@@ -62,9 +62,9 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
           isReadOnly={isReadOnly}
           isDatasourceReleased={isDatasourceReleased}
           dataStructureName={dataStructureName}
-          editingIndexes={editingIndexes}
+          editingApiCalls={editingApiCalls}
           collapsedRequestIndexes={collapsedRequestIndexes}
-          onEditingIndexesChange={setEditingIndexes}
+          onEditingApiCallsChange={setEditingApiCalls}
           onCollapsedRequestIndexesChange={setCollapsedRequestIndexes}
         />
       </Form>
@@ -73,9 +73,10 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
 
   render(<Wrapper />)
   const getApiCalls = () => form?.getValues('configuration.apiCalls') as HttpApiCallForm[] | undefined
+  const isDirty = () => form?.formState.isDirty
   const resetForm = () => act(() => form?.reset(defaultValues))
   const remount = () => act(() => remountTab?.())
-  return { user: userEvent.setup(), getApiCalls, resetForm, remount }
+  return { user: userEvent.setup(), getApiCalls, isDirty, resetForm, remount }
 }
 
 const openApiCall = async (user: ReturnType<typeof userEvent.setup>) => {
@@ -191,6 +192,80 @@ describe('ApiCallsTab', () => {
 
     await user.click(requestStep)
     expect(screen.getByText('request.question')).toBeInTheDocument()
+  })
+
+  it('keeps the changes and shows the row after apply', async () => {
+    const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [API_CALL] })
+    await openApiCall(user)
+
+    await user.type(screen.getByRole('textbox', { name: 'path.label' }), '/v2')
+    await user.click(screen.getByRole('button', { name: 'apply' }))
+
+    expect(screen.queryByRole('textbox', { name: 'path.label' })).not.toBeInTheDocument()
+    expect(screen.getByText('/stations/v2?status=active')).toBeInTheDocument()
+    expect(getApiCalls()?.[0].path).toBe('/stations/v2')
+  })
+
+  it('restores path, name, query parameters and headers after cancel', async () => {
+    const { user, getApiCalls, isDirty } = renderApiCallsTab({ apiCalls: [API_CALL] })
+    await openApiCall(user)
+
+    await user.type(screen.getByRole('textbox', { name: 'path.label' }), '/v2')
+    await user.clear(screen.getByRole('textbox', { name: /^name\.label/ }))
+    await user.click(screen.getByRole('button', { name: 'parameters.addQuery' }))
+    await user.click(screen.getByRole('button', { name: 'parameters.header remove' }))
+    await user.click(screen.getByRole('button', { name: 'cancel' }))
+
+    expect(screen.queryByRole('textbox', { name: 'path.label' })).not.toBeInTheDocument()
+    expect(getApiCalls()).toEqual([API_CALL])
+    expect(isDirty()).toBe(false)
+  })
+
+  it('removes a created API call after cancel', async () => {
+    const { user, getApiCalls } = renderApiCallsTab()
+    await user.click(screen.getByRole('button', { name: 'add' }))
+
+    await user.click(screen.getByRole('button', { name: 'cancel' }))
+
+    expect(getApiCalls()).toEqual([])
+    expect(screen.getByText('empty.title')).toBeInTheDocument()
+  })
+
+  it('restores the applied values after cancel', async () => {
+    const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [API_CALL] })
+    await openApiCall(user)
+    await user.type(screen.getByRole('textbox', { name: 'path.label' }), '/v2')
+    await user.click(screen.getByRole('button', { name: 'apply' }))
+
+    await openApiCall(user)
+    await user.type(screen.getByRole('textbox', { name: 'path.label' }), '/v3')
+    await user.click(screen.getByRole('button', { name: 'cancel' }))
+
+    expect(getApiCalls()?.[0].path).toBe('/stations/v2')
+  })
+
+  it('shows apply and cancel while the request step is collapsed', async () => {
+    const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+    await openApiCall(user)
+
+    await user.click(screen.getByRole('button', { name: /^request\.title/ }))
+
+    expect(screen.getByRole('button', { name: 'apply' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'cancel' })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['read-only', { isReadOnly: true }],
+    ['released', { isDatasourceReleased: true }],
+  ])('shows only close when %s', async (_name, options) => {
+    const { user } = renderApiCallsTab({ apiCalls: [API_CALL], ...options })
+    await openApiCall(user)
+
+    expect(screen.queryByRole('button', { name: 'apply' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'cancel' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'close' }))
+
+    expect(screen.queryByRole('textbox', { name: 'path.label' })).not.toBeInTheDocument()
   })
 
   it('shows GET as the only, disabled method', async () => {

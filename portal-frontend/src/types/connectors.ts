@@ -369,6 +369,9 @@ export type HttpApiCallForm = z.input<typeof HttpApiCallFormSchema>
 
 export type HttpApiCallsForm = { configuration: { apiCalls: HttpApiCallForm[] } }
 
+// Key: index of the API call. Value: its values when the edit view opened, null for a new API call.
+export type ApiCallSnapshots = ReadonlyMap<number, HttpApiCallForm | null>
+
 export type HttpParameterListPath =
   | `configuration.apiCalls.${number}.queryParameters`
   | `configuration.apiCalls.${number}.headers`

@@ -22,6 +22,7 @@ import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
+import { ApiCallSnapshots, HttpApiCallForm } from '@/types/connectors'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Datapool } from '@/types/datapools'
 import {
@@ -153,7 +154,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
   // Field ids change on every form reset, indexes do not.
-  const [editingApiCallIndexes, setEditingApiCallIndexes] = useState<ReadonlySet<number>>(new Set())
+  const [editingApiCalls, setEditingApiCalls] = useState<ApiCallSnapshots>(new Map())
   const [collapsedRequestIndexes, setCollapsedRequestIndexes] = useState<ReadonlySet<number>>(new Set())
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isDraftBlockedModalOpen, setIsDraftBlockedModalOpen] = useState(false)
@@ -197,23 +198,35 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const selectedDatastructureName = selectedDatastructureId ? selectedDatastructureResponse?.data?.[0]?.name : undefined
 
+  const refreshApiCallSnapshots = () => {
+    const savedApiCalls = (datasourceForm.getValues('configuration.apiCalls') ?? []) as HttpApiCallForm[]
+    const refreshedEntries = [...editingApiCalls.keys()].map(
+      index => [index, structuredClone(savedApiCalls[index] ?? null)] as const,
+    )
+    setEditingApiCalls(new Map(refreshedEntries))
+  }
+
   const resetToInitialState = () => {
     resetDatasourceToInitialState()
     datasourceForm.reset()
+    refreshApiCallSnapshots()
     setAssignedGroups(initialAssignments)
     setAssignedDatapools(initialDatapools)
     setSelectedDatastructureId(initialDatastructureId)
     setSelectedDatastructureVersionId(initialVersionId)
   }
+
   const handleSave = () =>
     submitDatasource(() => {
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
+      refreshApiCallSnapshots()
       router.refresh()
     })
 
   const handleSaveForUnsavedChanges = () =>
     submitDatasource(() => {
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
+      refreshApiCallSnapshots()
     })
 
   useRegisterUnsavedChanges(hasUnsavedChanges, handleSaveForUnsavedChanges)
@@ -237,6 +250,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const handleSaveAndExit = async () => {
     await submitDatasource(() => {
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
+      refreshApiCallSnapshots()
       setIsExitModalOpen(false)
       updateMode(false)
     })
@@ -297,9 +311,9 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             isReadOnly={isReadOnly}
             isDatasourceReleased={isReleased}
             dataStructureName={selectedDatastructureName}
-            editingIndexes={editingApiCallIndexes}
+            editingApiCalls={editingApiCalls}
             collapsedRequestIndexes={collapsedRequestIndexes}
-            onEditingIndexesChange={setEditingApiCallIndexes}
+            onEditingApiCallsChange={setEditingApiCalls}
             onCollapsedRequestIndexesChange={setCollapsedRequestIndexes}
           />
         )

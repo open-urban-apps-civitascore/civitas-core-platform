@@ -11,7 +11,7 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { InfoBox } from '@/components/text-box/TextBox'
 import { Button } from '@/components/ui/button'
 import { MAX_HTTP_API_CALLS } from '@/const/connectors'
-import { HttpApiCallForm, HttpApiCallsForm } from '@/types/connectors'
+import { ApiCallSnapshots, HttpApiCallForm, HttpApiCallsForm } from '@/types/connectors'
 import { DatasourceFormDraft } from '@/types/datasources'
 
 import { ApiCallItem } from './ApiCallItem'
@@ -28,10 +28,26 @@ const removeIndex = (indexes: ReadonlySet<number>, index: number) => {
   return nextIndexes
 }
 
+const shiftIndex = (index: number, removedIndex: number) => (index > removedIndex ? index - 1 : index)
+
 const removeIndexAndShift = (indexes: ReadonlySet<number>, removedIndex: number) => {
   const remainingIndexes = [...indexes].filter(index => index !== removedIndex)
-  const shiftedIndexes = remainingIndexes.map(index => (index > removedIndex ? index - 1 : index))
+  const shiftedIndexes = remainingIndexes.map(index => shiftIndex(index, removedIndex))
   return new Set(shiftedIndexes)
+}
+
+const removeSnapshot = (snapshots: ApiCallSnapshots, index: number) => {
+  const nextSnapshots = new Map(snapshots)
+  nextSnapshots.delete(index)
+  return nextSnapshots
+}
+
+const removeSnapshotAndShift = (snapshots: ApiCallSnapshots, removedIndex: number) => {
+  const remainingEntries = [...snapshots].filter(([index]) => index !== removedIndex)
+  const shiftedEntries = remainingEntries.map(
+    ([index, snapshot]) => [shiftIndex(index, removedIndex), snapshot] as const,
+  )
+  return new Map(shiftedEntries)
 }
 
 interface ApiCallsTabProps {
@@ -39,9 +55,9 @@ interface ApiCallsTabProps {
   isReadOnly?: boolean
   isDatasourceReleased?: boolean
   dataStructureName?: string
-  editingIndexes: ReadonlySet<number>
+  editingApiCalls: ApiCallSnapshots
   collapsedRequestIndexes: ReadonlySet<number>
-  onEditingIndexesChange: (editingIndexes: ReadonlySet<number>) => void
+  onEditingApiCallsChange: (editingApiCalls: ApiCallSnapshots) => void
   onCollapsedRequestIndexesChange: (collapsedRequestIndexes: ReadonlySet<number>) => void
 }
 
@@ -51,9 +67,9 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
     isReadOnly = false,
     isDatasourceReleased = false,
     dataStructureName,
-    editingIndexes,
+    editingApiCalls,
     collapsedRequestIndexes,
-    onEditingIndexesChange,
+    onEditingApiCallsChange,
     onCollapsedRequestIndexesChange,
   } = props
   const isDisabled = isReadOnly || isDatasourceReleased
@@ -63,7 +79,10 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
 
   // DatasourceFormDraft types the configuration as a plain record.
   const apiCallsForm = form as unknown as UseFormReturn<HttpApiCallsForm>
-  const { fields, append, remove } = useFieldArray({ control: apiCallsForm.control, name: 'configuration.apiCalls' })
+  const { fields, append, remove, update } = useFieldArray({
+    control: apiCallsForm.control,
+    name: 'configuration.apiCalls',
+  })
 
   const [deleteIndex, setDeleteIndex] = useState<number | null>(null)
 
@@ -71,9 +90,31 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
   const arrayError: ArrayError | undefined = get(form.formState.errors, 'configuration.apiCalls')
   const arrayErrorMessage = arrayError?.root?.message ?? arrayError?.message
 
-  const handleEdit = (index: number) => {
-    onEditingIndexesChange(addIndex(editingIndexes, index))
+  const openEditView = (index: number, snapshot: HttpApiCallForm | null) => {
+    onEditingApiCallsChange(new Map(editingApiCalls).set(index, snapshot))
     onCollapsedRequestIndexesChange(removeIndex(collapsedRequestIndexes, index))
+  }
+
+  const removeApiCall = (index: number) => {
+    onEditingApiCallsChange(removeSnapshotAndShift(editingApiCalls, index))
+    onCollapsedRequestIndexesChange(removeIndexAndShift(collapsedRequestIndexes, index))
+    remove(index)
+  }
+
+  // getValues returns the live form objects, which change on input.
+  const handleEdit = (index: number) =>
+    openEditView(index, structuredClone(apiCallsForm.getValues(`configuration.apiCalls.${index}`)))
+
+  const handleClose = (index: number) => onEditingApiCallsChange(removeSnapshot(editingApiCalls, index))
+
+  const handleCancel = (index: number) => {
+    const snapshot = editingApiCalls.get(index)
+    if (!snapshot) {
+      removeApiCall(index)
+      return
+    }
+    update(index, snapshot)
+    handleClose(index)
   }
 
   const handleRequestOpenChange = (index: number, isRequestOpen: boolean) => {
@@ -84,15 +125,13 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
   }
 
   const handleAdd = () => {
-    handleEdit(fields.length)
+    openEditView(fields.length, null)
     append(EMPTY_API_CALL, { focusName: `configuration.apiCalls.${fields.length}.path` })
   }
 
   const handleConfirmDelete = () => {
     if (deleteIndex === null) return
-    onEditingIndexesChange(removeIndexAndShift(editingIndexes, deleteIndex))
-    onCollapsedRequestIndexesChange(removeIndexAndShift(collapsedRequestIndexes, deleteIndex))
-    remove(deleteIndex)
+    removeApiCall(deleteIndex)
     setDeleteIndex(null)
   }
 
@@ -129,13 +168,15 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
                 key={field.id}
                 form={apiCallsForm}
                 index={index}
-                isEditing={editingIndexes.has(index)}
+                isEditing={editingApiCalls.has(index)}
                 isRequestOpen={!collapsedRequestIndexes.has(index)}
                 isDisabled={isDisabled}
                 dataStructureName={dataStructureName}
                 onEdit={() => handleEdit(index)}
                 onRequestOpenChange={isRequestOpen => handleRequestOpenChange(index, isRequestOpen)}
                 onDelete={() => setDeleteIndex(index)}
+                onClose={() => handleClose(index)}
+                onCancel={() => handleCancel(index)}
               />
             ))}
           </div>

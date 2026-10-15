@@ -28,6 +28,8 @@ interface ApiCallItemProps {
   onEdit: () => void
   onRequestOpenChange: (isRequestOpen: boolean) => void
   onDelete: () => void
+  onClose: () => void
+  onCancel: () => void
 }
 
 export const ApiCallItem = (props: ApiCallItemProps) => {
@@ -41,6 +43,8 @@ export const ApiCallItem = (props: ApiCallItemProps) => {
     onEdit,
     onRequestOpenChange,
     onDelete,
+    onClose,
+    onCancel,
   } = props
   const t = useTranslations('datasources.apiCallsTab')
   const tActions = useTranslations('common.actions')
@@ -186,6 +190,23 @@ export const ApiCallItem = (props: ApiCallItemProps) => {
           )}
         </CollapsibleContent>
       </Collapsible>
+
+      <div className={cn('flex gap-2', isDisabled && 'mt-4')}>
+        {isDisabled ? (
+          <Button type="button" onClick={onClose}>
+            {tActions('close')}
+          </Button>
+        ) : (
+          <>
+            <Button type="button" onClick={onClose}>
+              {tActions('apply')}
+            </Button>
+            <Button type="button" variant="secondary" onClick={onCancel}>
+              {tActions('cancel')}
+            </Button>
+          </>
+        )}
+      </div>
     </div>
   )
 }
