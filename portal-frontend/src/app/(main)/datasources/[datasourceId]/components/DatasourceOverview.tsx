@@ -153,7 +153,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
   // Field ids change on every form reset, indexes do not.
-  const [openApiCallIndexes, setOpenApiCallIndexes] = useState<ReadonlySet<number>>(new Set())
+  const [editingApiCallIndexes, setEditingApiCallIndexes] = useState<ReadonlySet<number>>(new Set())
+  const [collapsedRequestIndexes, setCollapsedRequestIndexes] = useState<ReadonlySet<number>>(new Set())
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isDraftBlockedModalOpen, setIsDraftBlockedModalOpen] = useState(false)
 
@@ -296,8 +297,10 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             isReadOnly={isReadOnly}
             isDatasourceReleased={isReleased}
             dataStructureName={selectedDatastructureName}
-            openIndexes={openApiCallIndexes}
-            onOpenIndexesChange={setOpenApiCallIndexes}
+            editingIndexes={editingApiCallIndexes}
+            collapsedRequestIndexes={collapsedRequestIndexes}
+            onEditingIndexesChange={setEditingApiCallIndexes}
+            onCollapsedRequestIndexesChange={setCollapsedRequestIndexes}
           />
         )
       case 'datapools':

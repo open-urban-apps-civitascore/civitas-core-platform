@@ -20,13 +20,29 @@ const EMPTY_API_CALL: HttpApiCallForm = { name: '', path: '', queryParameters: [
 
 type ArrayError = { message?: string; root?: { message?: string } }
 
+const addIndex = (indexes: ReadonlySet<number>, index: number) => new Set([...indexes, index])
+
+const removeIndex = (indexes: ReadonlySet<number>, index: number) => {
+  const nextIndexes = new Set(indexes)
+  nextIndexes.delete(index)
+  return nextIndexes
+}
+
+const removeIndexAndShift = (indexes: ReadonlySet<number>, removedIndex: number) => {
+  const remainingIndexes = [...indexes].filter(index => index !== removedIndex)
+  const shiftedIndexes = remainingIndexes.map(index => (index > removedIndex ? index - 1 : index))
+  return new Set(shiftedIndexes)
+}
+
 interface ApiCallsTabProps {
   form: UseFormReturn<DatasourceFormDraft>
   isReadOnly?: boolean
   isDatasourceReleased?: boolean
   dataStructureName?: string
-  openIndexes: ReadonlySet<number>
-  onOpenIndexesChange: (openIndexes: ReadonlySet<number>) => void
+  editingIndexes: ReadonlySet<number>
+  collapsedRequestIndexes: ReadonlySet<number>
+  onEditingIndexesChange: (editingIndexes: ReadonlySet<number>) => void
+  onCollapsedRequestIndexesChange: (collapsedRequestIndexes: ReadonlySet<number>) => void
 }
 
 export const ApiCallsTab = (props: ApiCallsTabProps) => {
@@ -35,8 +51,10 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
     isReadOnly = false,
     isDatasourceReleased = false,
     dataStructureName,
-    openIndexes,
-    onOpenIndexesChange,
+    editingIndexes,
+    collapsedRequestIndexes,
+    onEditingIndexesChange,
+    onCollapsedRequestIndexesChange,
   } = props
   const isDisabled = isReadOnly || isDatasourceReleased
   const tApiCalls = useTranslations('datasources.apiCallsTab')
@@ -53,26 +71,27 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
   const arrayError: ArrayError | undefined = get(form.formState.errors, 'configuration.apiCalls')
   const arrayErrorMessage = arrayError?.root?.message ?? arrayError?.message
 
-  const setApiCallOpen = (index: number, isOpen: boolean) => {
-    const nextOpenIndexes = new Set(openIndexes)
-    if (isOpen) {
-      nextOpenIndexes.add(index)
-    } else {
-      nextOpenIndexes.delete(index)
-    }
-    onOpenIndexesChange(nextOpenIndexes)
+  const handleEdit = (index: number) => {
+    onEditingIndexesChange(addIndex(editingIndexes, index))
+    onCollapsedRequestIndexesChange(removeIndex(collapsedRequestIndexes, index))
+  }
+
+  const handleRequestOpenChange = (index: number, isRequestOpen: boolean) => {
+    const nextCollapsedRequestIndexes = isRequestOpen
+      ? removeIndex(collapsedRequestIndexes, index)
+      : addIndex(collapsedRequestIndexes, index)
+    onCollapsedRequestIndexesChange(nextCollapsedRequestIndexes)
   }
 
   const handleAdd = () => {
-    setApiCallOpen(fields.length, true)
+    handleEdit(fields.length)
     append(EMPTY_API_CALL, { focusName: `configuration.apiCalls.${fields.length}.path` })
   }
 
   const handleConfirmDelete = () => {
     if (deleteIndex === null) return
-    const remainingIndexes = [...openIndexes].filter(index => index !== deleteIndex)
-    const shiftedIndexes = remainingIndexes.map(index => (index > deleteIndex ? index - 1 : index))
-    onOpenIndexesChange(new Set(shiftedIndexes))
+    onEditingIndexesChange(removeIndexAndShift(editingIndexes, deleteIndex))
+    onCollapsedRequestIndexesChange(removeIndexAndShift(collapsedRequestIndexes, deleteIndex))
     remove(deleteIndex)
     setDeleteIndex(null)
   }
@@ -110,10 +129,12 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
                 key={field.id}
                 form={apiCallsForm}
                 index={index}
-                isOpen={openIndexes.has(index)}
+                isEditing={editingIndexes.has(index)}
+                isRequestOpen={!collapsedRequestIndexes.has(index)}
                 isDisabled={isDisabled}
                 dataStructureName={dataStructureName}
-                onOpenChange={isOpen => setApiCallOpen(index, isOpen)}
+                onEdit={() => handleEdit(index)}
+                onRequestOpenChange={isRequestOpen => handleRequestOpenChange(index, isRequestOpen)}
                 onDelete={() => setDeleteIndex(index)}
               />
             ))}

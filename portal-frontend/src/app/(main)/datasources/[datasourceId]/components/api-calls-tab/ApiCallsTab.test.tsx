@@ -50,7 +50,8 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
       mode: 'onChange',
       defaultValues,
     })
-    const [openIndexes, setOpenIndexes] = useState<ReadonlySet<number>>(new Set())
+    const [editingIndexes, setEditingIndexes] = useState<ReadonlySet<number>>(new Set())
+    const [collapsedRequestIndexes, setCollapsedRequestIndexes] = useState<ReadonlySet<number>>(new Set())
     const [tabKey, setTabKey] = useState(0)
     remountTab = () => setTabKey(key => key + 1)
     return (
@@ -61,8 +62,10 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
           isReadOnly={isReadOnly}
           isDatasourceReleased={isDatasourceReleased}
           dataStructureName={dataStructureName}
-          openIndexes={openIndexes}
-          onOpenIndexesChange={setOpenIndexes}
+          editingIndexes={editingIndexes}
+          collapsedRequestIndexes={collapsedRequestIndexes}
+          onEditingIndexesChange={setEditingIndexes}
+          onCollapsedRequestIndexesChange={setCollapsedRequestIndexes}
         />
       </Form>
     )
@@ -117,14 +120,47 @@ describe('ApiCallsTab', () => {
     expect(screen.getByText('/stations?status=active')).toBeInTheDocument()
   })
 
-  it('opens the API call on a click on the row and closes it on a click on the name', async () => {
+  it('opens the edit view on a click on the row', async () => {
     const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
 
     await openApiCall(user)
-    expect(screen.getByRole('textbox', { name: 'path.label' })).toHaveValue('/stations')
 
-    await user.click(screen.getByRole('button', { name: 'stations' }))
-    expect(screen.queryByRole('textbox', { name: 'path.label' })).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'path.label' })).toHaveValue('/stations')
+    expect(screen.queryByRole('button', { name: 'Open menu' })).not.toBeInTheDocument()
+  })
+
+  it('shows the name in the edit view as text, not as a button', async () => {
+    const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+    await openApiCall(user)
+
+    expect(screen.getByText('stations')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'stations' })).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['a form reset', 'resetForm'],
+    ['mounting the tab again', 'remount'],
+  ] as const)('keeps the request step collapsed after %s', async (_name, action) => {
+    const rendered = renderApiCallsTab({ apiCalls: [API_CALL] })
+    await openApiCall(rendered.user)
+    await rendered.user.click(screen.getByRole('button', { name: /^request\.title/ }))
+
+    rendered[action]()
+
+    expect(screen.getByText('request.title')).toBeInTheDocument()
+    expect(screen.queryByText('request.question')).not.toBeInTheDocument()
+  })
+
+  it('keeps the edit view of the following API call after a deletion', async () => {
+    const otherApiCall = { ...API_CALL, name: 'sensors', path: '/sensors', queryParameters: [] }
+    const { user } = renderApiCallsTab({ apiCalls: [API_CALL, otherApiCall] })
+    await user.click(screen.getByRole('button', { name: /sensors/ }))
+
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    await user.click(await screen.findByText('delete'))
+    await user.click(screen.getByTestId('confirmButton'))
+
+    expect(screen.getByRole('textbox', { name: 'path.label' })).toHaveValue('/sensors')
   })
 
   it('keeps the API call open after a form reset', async () => {
