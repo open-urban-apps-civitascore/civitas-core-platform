@@ -56,6 +56,7 @@ export const ApiCallItem = (props: ApiCallItemProps) => {
 
   const displayName = apiCall?.name || t('unnamed')
   const pathWithQuery = formatPathWithQuery(apiCall?.path ?? '', apiCall?.queryParameters ?? [])
+  const hasParameters = queryParameters.fields.length > 0 || headers.fields.length > 0
   const hasError = !!get(form.formState.errors, apiCallPath)
   const borderClassName = cn('rounded-md border py-3', hasError ? 'border-destructive' : 'border-transparent')
 
@@ -96,7 +97,10 @@ export const ApiCallItem = (props: ApiCallItemProps) => {
 
         <CollapsibleContent className="flex flex-col gap-4 pt-4">
           <div className="flex flex-col gap-2 mb-2">
-            <p className="font-semibold">{t('request.question')}</p>
+            <p className="font-semibold">
+              {t('request.question')}
+              <span className="text-red-500 ml-1">*</span>
+            </p>
             <p className="text-sm text-muted-foreground">{t('path.hint')}</p>
           </div>
 
@@ -154,24 +158,26 @@ export const ApiCallItem = (props: ApiCallItemProps) => {
             )}
           />
 
-          <div className="flex flex-col gap-3">
-            <ApiCallParameterRows
-              form={form}
-              name={`${apiCallPath}.queryParameters`}
-              fields={queryParameters.fields}
-              typeLabel={t('parameters.query')}
-              isDisabled={isDisabled}
-              onRemove={queryParameters.remove}
-            />
-            <ApiCallParameterRows
-              form={form}
-              name={`${apiCallPath}.headers`}
-              fields={headers.fields}
-              typeLabel={t('parameters.header')}
-              isDisabled={isDisabled}
-              onRemove={headers.remove}
-            />
-          </div>
+          {hasParameters && (
+            <div className="flex flex-col gap-3">
+              <ApiCallParameterRows
+                form={form}
+                name={`${apiCallPath}.queryParameters`}
+                fields={queryParameters.fields}
+                typeLabel={t('parameters.query')}
+                isDisabled={isDisabled}
+                onRemove={queryParameters.remove}
+              />
+              <ApiCallParameterRows
+                form={form}
+                name={`${apiCallPath}.headers`}
+                fields={headers.fields}
+                typeLabel={t('parameters.header')}
+                isDisabled={isDisabled}
+                onRemove={headers.remove}
+              />
+            </div>
+          )}
 
           {!isDisabled && (
             <div className="flex gap-4">

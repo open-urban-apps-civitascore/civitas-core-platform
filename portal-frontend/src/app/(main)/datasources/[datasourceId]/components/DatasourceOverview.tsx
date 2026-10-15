@@ -156,6 +156,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   // Field ids change on every form reset, indexes do not.
   const [editingApiCalls, setEditingApiCalls] = useState<ApiCallSnapshots>(new Map())
   const [collapsedRequestIndexes, setCollapsedRequestIndexes] = useState<ReadonlySet<number>>(new Set())
+  // Index of each API call at the last save, null for a new API call. Undefined: no change since then.
+  const [savedApiCallIndexes, setSavedApiCallIndexes] = useState<ReadonlyArray<number | null>>()
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isDraftBlockedModalOpen, setIsDraftBlockedModalOpen] = useState(false)
 
@@ -198,18 +200,34 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const selectedDatastructureName = selectedDatastructureId ? selectedDatastructureResponse?.data?.[0]?.name : undefined
 
-  const refreshApiCallSnapshots = () => {
+  const getSavedApiCallIndexes = () => {
+    const savedApiCalls = (datasourceForm.formState.defaultValues?.configuration?.apiCalls ?? []) as HttpApiCallForm[]
+    return savedApiCallIndexes ?? savedApiCalls.map((_, index) => index)
+  }
+
+  const handleApiCallAdd = () => setSavedApiCallIndexes([...getSavedApiCallIndexes(), null])
+
+  const handleApiCallRemove = (removedIndex: number) =>
+    setSavedApiCallIndexes(getSavedApiCallIndexes().filter((_, index) => index !== removedIndex))
+
+  // Call after the form holds the saved values.
+  const syncApiCallViews = (toSavedIndex: (index: number) => number | null) => {
     const savedApiCalls = (datasourceForm.getValues('configuration.apiCalls') ?? []) as HttpApiCallForm[]
-    const refreshedEntries = [...editingApiCalls.keys()].map(
-      index => [index, structuredClone(savedApiCalls[index] ?? null)] as const,
-    )
-    setEditingApiCalls(new Map(refreshedEntries))
+    const editingEntries = [...editingApiCalls.keys()].flatMap(index => {
+      const savedIndex = toSavedIndex(index)
+      return savedIndex === null ? [] : [[savedIndex, structuredClone(savedApiCalls[savedIndex] ?? null)] as const]
+    })
+    const collapsedIndexes = [...collapsedRequestIndexes].map(toSavedIndex).filter(index => index !== null)
+    setEditingApiCalls(new Map(editingEntries))
+    setCollapsedRequestIndexes(new Set(collapsedIndexes))
+    setSavedApiCallIndexes(undefined)
   }
 
   const resetToInitialState = () => {
+    const savedIndexes = getSavedApiCallIndexes()
     resetDatasourceToInitialState()
     datasourceForm.reset()
-    refreshApiCallSnapshots()
+    syncApiCallViews(index => savedIndexes[index] ?? null)
     setAssignedGroups(initialAssignments)
     setAssignedDatapools(initialDatapools)
     setSelectedDatastructureId(initialDatastructureId)
@@ -219,14 +237,14 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const handleSave = () =>
     submitDatasource(() => {
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
-      refreshApiCallSnapshots()
+      syncApiCallViews(index => index)
       router.refresh()
     })
 
   const handleSaveForUnsavedChanges = () =>
     submitDatasource(() => {
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
-      refreshApiCallSnapshots()
+      syncApiCallViews(index => index)
     })
 
   useRegisterUnsavedChanges(hasUnsavedChanges, handleSaveForUnsavedChanges)
@@ -250,7 +268,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const handleSaveAndExit = async () => {
     await submitDatasource(() => {
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
-      refreshApiCallSnapshots()
+      syncApiCallViews(index => index)
       setIsExitModalOpen(false)
       updateMode(false)
     })
@@ -314,6 +332,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             editingApiCalls={editingApiCalls}
             collapsedRequestIndexes={collapsedRequestIndexes}
             onEditingApiCallsChange={setEditingApiCalls}
+            onApiCallAdd={handleApiCallAdd}
+            onApiCallRemove={handleApiCallRemove}
             onCollapsedRequestIndexesChange={setCollapsedRequestIndexes}
           />
         )

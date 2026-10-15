@@ -65,6 +65,8 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
           editingApiCalls={editingApiCalls}
           collapsedRequestIndexes={collapsedRequestIndexes}
           onEditingApiCallsChange={setEditingApiCalls}
+          onApiCallAdd={vi.fn()}
+          onApiCallRemove={vi.fn()}
           onCollapsedRequestIndexesChange={setCollapsedRequestIndexes}
         />
       </Form>

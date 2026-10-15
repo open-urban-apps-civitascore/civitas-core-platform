@@ -59,6 +59,8 @@ interface ApiCallsTabProps {
   collapsedRequestIndexes: ReadonlySet<number>
   onEditingApiCallsChange: (editingApiCalls: ApiCallSnapshots) => void
   onCollapsedRequestIndexesChange: (collapsedRequestIndexes: ReadonlySet<number>) => void
+  onApiCallAdd: () => void
+  onApiCallRemove: (index: number) => void
 }
 
 export const ApiCallsTab = (props: ApiCallsTabProps) => {
@@ -71,6 +73,8 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
     collapsedRequestIndexes,
     onEditingApiCallsChange,
     onCollapsedRequestIndexesChange,
+    onApiCallAdd,
+    onApiCallRemove,
   } = props
   const isDisabled = isReadOnly || isDatasourceReleased
   const tApiCalls = useTranslations('datasources.apiCallsTab')
@@ -98,6 +102,7 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
   const removeApiCall = (index: number) => {
     onEditingApiCallsChange(removeSnapshotAndShift(editingApiCalls, index))
     onCollapsedRequestIndexesChange(removeIndexAndShift(collapsedRequestIndexes, index))
+    onApiCallRemove(index)
     remove(index)
   }
 
@@ -126,6 +131,7 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
 
   const handleAdd = () => {
     openEditView(fields.length, null)
+    onApiCallAdd()
     append(EMPTY_API_CALL, { focusName: `configuration.apiCalls.${fields.length}.path` })
   }
 
@@ -162,7 +168,7 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
         <ContentCard className="h-full overflow-auto" footerElement={<FooterElement />}>
           <SubHeader title={tApiCalls('title')} className="pb-4 border-b-1" customElement={addButton} />
           {arrayErrorMessage && <p className="pt-3 text-sm text-destructive">{t(arrayErrorMessage)}</p>}
-          <div className="flex flex-col gap-2 pt-3">
+          <div className="flex flex-col gap-4 pt-3">
             {fields.map((field, index) => (
               <ApiCallItem
                 key={field.id}
