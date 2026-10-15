@@ -1039,6 +1039,7 @@
     },
     "apiCallsTab": {
       "title": "API-Aufrufe",
+      "availableInfo": "Diese Datenquelle hat den Status \"Verfügbar\". Um die API-Aufrufe zu ändern, setzen Sie den Status zuerst auf \"Entwurf\".",
       "add": "API-Aufruf erstellen",
       "empty": {
         "title": "Noch kein API-Aufruf"

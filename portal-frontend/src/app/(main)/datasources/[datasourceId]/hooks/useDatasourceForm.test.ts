@@ -257,6 +257,29 @@ describe('useDatasourceForm with an HTTP connector', () => {
     expect(result.current.canStage).toBe(true)
   })
 
+  it('marks the API calls tab complete with a complete API call', () => {
+    const { result } = renderDatasourceForm(createHttpDatasource())
+
+    expect(result.current.completedTabs).toContain('apiCalls')
+  })
+
+  it.each([
+    ['without an API call', []],
+    ['with an API call without a name', [{ name: '', path: '/stations' }]],
+    ['with an API call without a path', [{ name: 'Get all stations', path: '' }]],
+  ])('does not mark the API calls tab complete %s', (_name, apiCalls) => {
+    const datasource = createHttpDatasource()
+    const { result } = renderDatasourceForm({ ...datasource, connector: { ...datasource.connector!, apiCalls } })
+
+    expect(result.current.completedTabs).not.toContain('apiCalls')
+  })
+
+  it('does not mark the API calls tab complete for an MQTT connector', () => {
+    const { result } = renderDatasourceForm(createDatasource('DRAFT'))
+
+    expect(result.current.completedTabs).not.toContain('apiCalls')
+  })
+
   it('loads the masked password into the form', () => {
     const { result } = renderDatasourceForm(createHttpDatasource())
 

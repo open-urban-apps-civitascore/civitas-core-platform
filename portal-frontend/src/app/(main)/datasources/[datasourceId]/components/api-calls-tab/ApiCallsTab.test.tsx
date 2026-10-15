@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { useForm, UseFormReturn } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -41,6 +42,7 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
     configuration: { baseUrl: '', authentication: { type: 'NONE', username: '', password: '' }, apiCalls },
   }
   let form: UseFormReturn<DatasourceFormDraft> | undefined
+  let remountTab: (() => void) | undefined
 
   const Wrapper = () => {
     form = useForm<DatasourceFormDraft>({
@@ -48,13 +50,19 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
       mode: 'onChange',
       defaultValues,
     })
+    const [openIndexes, setOpenIndexes] = useState<ReadonlySet<number>>(new Set())
+    const [tabKey, setTabKey] = useState(0)
+    remountTab = () => setTabKey(key => key + 1)
     return (
       <Form {...form}>
         <ApiCallsTab
+          key={tabKey}
           form={form}
           isReadOnly={isReadOnly}
           isDatasourceReleased={isDatasourceReleased}
           dataStructureName={dataStructureName}
+          openIndexes={openIndexes}
+          onOpenIndexesChange={setOpenIndexes}
         />
       </Form>
     )
@@ -62,7 +70,9 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
 
   render(<Wrapper />)
   const getApiCalls = () => form?.getValues('configuration.apiCalls') as HttpApiCallForm[] | undefined
-  return { user: userEvent.setup(), getApiCalls }
+  const resetForm = () => act(() => form?.reset(defaultValues))
+  const remount = () => act(() => remountTab?.())
+  return { user: userEvent.setup(), getApiCalls, resetForm, remount }
 }
 
 const openApiCall = async (user: ReturnType<typeof userEvent.setup>) => {
@@ -115,6 +125,24 @@ describe('ApiCallsTab', () => {
 
     await user.click(screen.getByRole('button', { name: 'stations' }))
     expect(screen.queryByRole('textbox', { name: 'path.label' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the API call open after a form reset', async () => {
+    const { user, resetForm } = renderApiCallsTab({ apiCalls: [API_CALL] })
+    await openApiCall(user)
+
+    resetForm()
+
+    expect(screen.getByRole('textbox', { name: 'path.label' })).toBeInTheDocument()
+  })
+
+  it('keeps the API call open after the tab is mounted again', async () => {
+    const { user, remount } = renderApiCallsTab({ apiCalls: [API_CALL] })
+    await openApiCall(user)
+
+    remount()
+
+    expect(screen.getByRole('textbox', { name: 'path.label' })).toBeInTheDocument()
   })
 
   it('collapses and expands the request step', async () => {

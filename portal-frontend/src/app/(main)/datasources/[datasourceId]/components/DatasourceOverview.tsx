@@ -152,6 +152,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   } = useDatasourceForm(datasource, assignedGroups, initialAssignments, assignedDatapools, initialDatapools)
 
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
+  // Field ids change on every form reset, indexes do not.
+  const [openApiCallIndexes, setOpenApiCallIndexes] = useState<ReadonlySet<number>>(new Set())
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isDraftBlockedModalOpen, setIsDraftBlockedModalOpen] = useState(false)
 
@@ -294,6 +296,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             isReadOnly={isReadOnly}
             isDatasourceReleased={isReleased}
             dataStructureName={selectedDatastructureName}
+            openIndexes={openApiCallIndexes}
+            onOpenIndexesChange={setOpenApiCallIndexes}
           />
         )
       case 'datapools':

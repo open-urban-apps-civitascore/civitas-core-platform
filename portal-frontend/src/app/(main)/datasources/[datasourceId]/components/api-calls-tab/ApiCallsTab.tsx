@@ -25,13 +25,21 @@ interface ApiCallsTabProps {
   isReadOnly?: boolean
   isDatasourceReleased?: boolean
   dataStructureName?: string
+  openIndexes: ReadonlySet<number>
+  onOpenIndexesChange: (openIndexes: ReadonlySet<number>) => void
 }
 
 export const ApiCallsTab = (props: ApiCallsTabProps) => {
-  const { form, isReadOnly = false, isDatasourceReleased = false, dataStructureName } = props
+  const {
+    form,
+    isReadOnly = false,
+    isDatasourceReleased = false,
+    dataStructureName,
+    openIndexes,
+    onOpenIndexesChange,
+  } = props
   const isDisabled = isReadOnly || isDatasourceReleased
   const tApiCalls = useTranslations('datasources.apiCallsTab')
-  const tConnector = useTranslations('datasources.connectorTab')
   const tActions = useTranslations('common.actions')
   const t = useTranslations()
 
@@ -39,21 +47,32 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
   const apiCallsForm = form as unknown as UseFormReturn<HttpApiCallsForm>
   const { fields, append, remove } = useFieldArray({ control: apiCallsForm.control, name: 'configuration.apiCalls' })
 
-  const [hasAddedApiCall, setHasAddedApiCall] = useState(false)
   const [deleteIndex, setDeleteIndex] = useState<number | null>(null)
 
-  const lastIndex = fields.length - 1
   const canAdd = !isDisabled && fields.length < MAX_HTTP_API_CALLS
   const arrayError: ArrayError | undefined = get(form.formState.errors, 'configuration.apiCalls')
   const arrayErrorMessage = arrayError?.root?.message ?? arrayError?.message
 
+  const setApiCallOpen = (index: number, isOpen: boolean) => {
+    const nextOpenIndexes = new Set(openIndexes)
+    if (isOpen) {
+      nextOpenIndexes.add(index)
+    } else {
+      nextOpenIndexes.delete(index)
+    }
+    onOpenIndexesChange(nextOpenIndexes)
+  }
+
   const handleAdd = () => {
-    setHasAddedApiCall(true)
+    setApiCallOpen(fields.length, true)
     append(EMPTY_API_CALL, { focusName: `configuration.apiCalls.${fields.length}.path` })
   }
 
   const handleConfirmDelete = () => {
     if (deleteIndex === null) return
+    const remainingIndexes = [...openIndexes].filter(index => index !== deleteIndex)
+    const shiftedIndexes = remainingIndexes.map(index => (index > deleteIndex ? index - 1 : index))
+    onOpenIndexesChange(new Set(shiftedIndexes))
     remove(deleteIndex)
     setDeleteIndex(null)
   }
@@ -72,7 +91,7 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
 
   return (
     <div className="flex flex-col gap-6">
-      {isDatasourceReleased && !isReadOnly && <InfoBox text={tConnector('availableInfo')} />}
+      {isDatasourceReleased && !isReadOnly && <InfoBox text={tApiCalls('availableInfo')} />}
 
       {fields.length === 0 ? (
         <NoDataCard
@@ -91,9 +110,10 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
                 key={field.id}
                 form={apiCallsForm}
                 index={index}
-                isDefaultOpen={hasAddedApiCall && index === lastIndex}
+                isOpen={openIndexes.has(index)}
                 isDisabled={isDisabled}
                 dataStructureName={dataStructureName}
+                onOpenChange={isOpen => setApiCallOpen(index, isOpen)}
                 onDelete={() => setDeleteIndex(index)}
               />
             ))}

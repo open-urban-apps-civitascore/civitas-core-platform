@@ -21,14 +21,15 @@ const EMPTY_PARAMETER = { name: '', value: '' }
 interface ApiCallItemProps {
   form: UseFormReturn<HttpApiCallsForm>
   index: number
-  isDefaultOpen: boolean
+  isOpen: boolean
   isDisabled: boolean
   dataStructureName?: string
+  onOpenChange: (isOpen: boolean) => void
   onDelete: () => void
 }
 
 export const ApiCallItem = (props: ApiCallItemProps) => {
-  const { form, index, isDefaultOpen, isDisabled, dataStructureName, onDelete } = props
+  const { form, index, isOpen, isDisabled, dataStructureName, onOpenChange, onDelete } = props
   const t = useTranslations('datasources.apiCallsTab')
   const tActions = useTranslations('common.actions')
 
@@ -43,7 +44,8 @@ export const ApiCallItem = (props: ApiCallItemProps) => {
 
   return (
     <Collapsible
-      defaultOpen={isDefaultOpen}
+      open={isOpen}
+      onOpenChange={onOpenChange}
       className={cn('group/api-call rounded-md border py-3', hasError ? 'border-destructive' : 'border-transparent')}
     >
       <div className="flex items-center gap-4 rounded-md hover:bg-accent group-data-[state=open]/api-call:hidden p-2">
