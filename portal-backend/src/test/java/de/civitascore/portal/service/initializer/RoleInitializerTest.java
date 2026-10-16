@@ -239,7 +239,38 @@ class RoleInitializerTest {
             "DATASOURCE_RELEASE",
             "DATASTRUCTURE_READ",
             "DATASTRUCTURE_RELEASE",
-            "DATAPOOL_READ");
+            "DATAPOOL_READ",
+            "INSTALLATION_READ");
+  }
+
+  @Test
+  @DisplayName(
+      "Should give INSTALLATION_CREATE only with DATASTRUCTURE_CREATE and DATASTRUCTURE_UPDATE")
+  void shouldGiveInstallationCreateOnlyWithDataStructureCreateAndUpdate() {
+    // given
+    when(permissionRepository.findAll()).thenReturn(allPermissions);
+    when(roleRepository.findAll()).thenReturn(List.of());
+
+    // when
+    roleInitializer.initialize();
+
+    // then
+    verify(roleRepository).saveAll(rolesCaptor.capture());
+    List<Role> installers =
+        rolesCaptor.getValue().stream()
+            .filter(
+                role ->
+                    role.getPermissions().stream()
+                        .anyMatch(permission -> "INSTALLATION_CREATE".equals(permission.getName())))
+            .toList();
+
+    assertThat(installers)
+        .isNotEmpty()
+        .allSatisfy(
+            role ->
+                assertThat(role.getPermissions())
+                    .extracting(Permission::getName)
+                    .contains("DATASTRUCTURE_CREATE", "DATASTRUCTURE_UPDATE"));
   }
 
   @Test
