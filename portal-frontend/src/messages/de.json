@@ -1000,6 +1000,7 @@
       "apiCallsMax": "Es ist nur ein API-Aufruf möglich.",
       "invalidHeaderName": "Erlaubte Zeichen im Header-Namen: a–z, A–Z, 0–9 und ! # $ % & ' * + - . ^ _ ` | ~. Keine Leerzeichen.",
       "credentialHeader": "Zugangsdaten gehören in die Authentifizierung.",
+      "headerValueLineBreak": "Der Header-Wert darf keinen Zeilenumbruch enthalten.",
       "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten",
       "inUseError": "Diese Datenquelle wird noch von einer Pipeline verwendet.",

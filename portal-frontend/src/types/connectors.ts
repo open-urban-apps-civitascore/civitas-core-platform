@@ -128,7 +128,7 @@ export type FieldRevalidationRule = { watch: string; revalidate: string }
 export const CONNECTOR_FIELD_REVALIDATION_RULES: Record<ConnectorType, FieldRevalidationRule | null> = {
   [CONNECTOR_TYPES.MQTT]: { watch: 'tls', revalidate: 'urls' },
   [CONNECTOR_TYPES.SQL]: null,
-  [CONNECTOR_TYPES.HTTP]: null,
+  [CONNECTOR_TYPES.HTTP]: { watch: 'authentication.type', revalidate: 'authentication' },
 }
 
 export const MqttLooseSchema = MqttBaseSchema.partial()
@@ -327,6 +327,7 @@ const requireBasicCredentials = (authentication: HttpAuthenticationForm, ctx: z.
 const HTTP_PATH = /^\/[A-Za-z0-9._~:/-]*$/
 const HTTP_HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/
 const CREDENTIAL_HEADERS = new Set(['authorization', 'proxy-authorization', 'cookie'])
+const LINE_BREAK = /[\r\n]/
 
 const HttpPathSchema = z
   .string()
@@ -354,6 +355,9 @@ const validateHeader = (header: HttpParameterForm, ctx: z.RefinementCtx) => {
   }
   if (CREDENTIAL_HEADERS.has(header.name.toLowerCase())) {
     ctx.addIssue({ code: 'custom', path: ['name'], message: 'datasources.errors.credentialHeader' })
+  }
+  if (LINE_BREAK.test(header.value)) {
+    ctx.addIssue({ code: 'custom', path: ['value'], message: 'datasources.errors.headerValueLineBreak' })
   }
 }
 

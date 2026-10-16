@@ -335,6 +335,18 @@ describe('ConnectorTab (integration)', () => {
       expect(screen.getByLabelText(/http\.password\.label/)).toBeInTheDocument()
     })
 
+    it('validates the credentials when the user selects Basic', async () => {
+      renderConnectorTab({
+        connectorType: 'HTTP',
+        configuration: { baseUrl: '', authentication: { type: 'NONE', username: 'a:b', password: '' } },
+      })
+
+      fireEvent.click(screen.getByLabelText(/http\.authentication\.label/))
+      fireEvent.click(await screen.findByText('http.authentication.basic'))
+
+      expect(await screen.findByText('datasources.errors.usernameColon')).toBeInTheDocument()
+    })
+
     it('disables the HTTP fields in read-only mode', () => {
       renderConnectorTab(httpConfiguration('BASIC'), true)
 

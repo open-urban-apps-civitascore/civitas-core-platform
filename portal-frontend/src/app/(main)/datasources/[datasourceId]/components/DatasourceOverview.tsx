@@ -204,7 +204,10 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     isEnabled: isHttpConnector && canReadDatastructures && !!selectedDatastructureId,
   })
 
-  const selectedDatastructureName = selectedDatastructureId ? selectedDatastructureResponse?.data?.[0]?.name : undefined
+  // The query keeps the previous data until the response for the new id arrives.
+  const loadedDatastructure = selectedDatastructureResponse?.data?.[0]
+  const selectedDatastructureName =
+    loadedDatastructure?.id === selectedDatastructureId ? loadedDatastructure?.name : undefined
 
   const getInitialApiCallIndexes = () => {
     const initialApiCalls = (datasourceForm.formState.defaultValues?.configuration?.apiCalls ?? []) as HttpApiCallForm[]

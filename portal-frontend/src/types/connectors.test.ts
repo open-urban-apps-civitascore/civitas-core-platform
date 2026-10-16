@@ -310,10 +310,17 @@ describe('HTTP API call schemas', () => {
     )
   })
 
+  it.each(['a\nb', 'a\rb'])('rejects the header value %j', value => {
+    expect(issues(HttpLooseSchema, [{ ...API_CALL, headers: [{ name: 'Accept', value }] }])).toContainEqual(
+      expect.objectContaining({ path: [0, 'headers', 0, 'value'], message: 'datasources.errors.headerValueLineBreak' }),
+    )
+  })
+
   it('accepts as a query parameter what is not allowed in a header', () => {
     const queryParameters = [
       { name: 'Authorization', value: 'x' },
       { name: 'Bad Name', value: 'x' },
+      { name: 'note', value: 'a\nb' },
     ]
     expect(issues(HttpLooseSchema, [{ ...API_CALL, queryParameters }])).toEqual([])
   })

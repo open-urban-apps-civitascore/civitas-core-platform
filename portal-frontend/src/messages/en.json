@@ -1008,6 +1008,7 @@
       "apiCallsMax": "Only one API call is possible.",
       "invalidHeaderName": "Allowed in the header name: a–z A–Z 0–9 and ! # $ % & ' * + - . ^ _ ` | ~. No spaces.",
       "credentialHeader": "Use the authentication for credentials.",
+      "headerValueLineBreak": "The header value must not contain a line break.",
       "creationError": "An error occurred while creating the Data source.",
       "updateError": "An error occurred while updating the Data source.",
       "inUseError": "This Data source is still used by a pipeline.",

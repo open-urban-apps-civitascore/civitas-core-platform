@@ -125,7 +125,9 @@ vi.mock('./connector-tab/ConnectorTab', () => ({
 }))
 
 vi.mock('./api-calls-tab/ApiCallsTab', () => ({
-  ApiCallsTab: () => <div data-testid="apiCallsTab" />,
+  ApiCallsTab: ({ dataStructureName }: { dataStructureName?: string }) => (
+    <div data-testid="apiCallsTab" data-datastructure-name={dataStructureName} />
+  ),
 }))
 
 vi.mock('./access-management/AccessManagementTab', () => ({
@@ -242,6 +244,7 @@ const defaultProps = {
 describe('DatasourceOverview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(useGetDatastructures).mockReturnValue({ data: undefined } as ReturnType<typeof useGetDatastructures>)
     mockSearchParams = new URLSearchParams()
     mockCanSetDraft = true
     mockSelectedConnectorType = 'MQTT'
@@ -460,6 +463,21 @@ describe('DatasourceOverview', () => {
 
       expect(lastDatastructureQuery()?.params?.get('id')).toBe('structure-1')
       expect(lastDatastructureQuery()?.isEnabled).toBe(true)
+    })
+
+    it.each([
+      ['the loaded data structure is the selected one', 'structure-1', 'Charging Station'],
+      ['the loaded data structure is a previous one', 'structure-0', undefined],
+    ])('passes the data structure name when %s', (_name, loadedId, expectedName) => {
+      mockSelectedConnectorType = 'HTTP'
+      vi.mocked(useGetDatastructures).mockReturnValue({
+        data: { data: [{ id: loadedId, name: 'Charging Station' }] },
+      } as unknown as ReturnType<typeof useGetDatastructures>)
+      render(<DatasourceOverview datasource={withDatastructure} initialAssignments={[]} />)
+      fireEvent.click(screen.getByTestId('tab-apiCalls'))
+
+      const passedName = screen.getByTestId('apiCallsTab').getAttribute('data-datastructure-name') ?? undefined
+      expect(passedName).toBe(expectedName)
     })
 
     it('does not load the data structure for an MQTT connector', () => {
