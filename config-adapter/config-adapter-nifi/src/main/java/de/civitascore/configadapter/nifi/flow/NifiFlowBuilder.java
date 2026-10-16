@@ -165,8 +165,9 @@ public class NifiFlowBuilder {
     // on 'success', so it is wired straight into the transform/sink with no convert. The sink stage
     // differs: PostGIS is a single terminal processor (PutDatabaseRecord), FROST is a multi-stage
     // find-or-create sub-flow.
-    List<Processor> prefix = new ArrayList<>(sourceStage.build(ctx).chain());
-    List<Processor> failureSources = new ArrayList<>();
+    StageResult sourceResult = sourceStage.build(ctx);
+    List<Processor> prefix = new ArrayList<>(sourceResult.chain());
+    List<Processor> failureSources = new ArrayList<>(sourceResult.failureSources());
     for (TransformStage transform : transformsFor(sourceStage, sinkStage, spec)) {
       StageResult result = transform.build(ctx);
       prefix.addAll(result.chain());
