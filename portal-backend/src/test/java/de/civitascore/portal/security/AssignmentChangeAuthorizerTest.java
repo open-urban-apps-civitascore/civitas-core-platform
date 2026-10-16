@@ -30,6 +30,7 @@ import de.civitascore.portal.service.AssignmentService;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -449,9 +450,18 @@ class AssignmentChangeAuthorizerTest {
                     .isInstanceOf(AccessDeniedException.class));
   }
 
+  /**
+   * The data permissions that apply only to the whole Tenant. An installation has no Scope of its
+   * own, so these permissions apply to no entity type. The check of assignment changes on an entity
+   * does not use them.
+   */
+  private static final Set<PermissionName> TENANT_ONLY_DATA_PERMISSIONS =
+      Set.of(PermissionName.INSTALLATION_CREATE, PermissionName.INSTALLATION_READ);
+
   static Stream<PermissionName> dataPermissions() {
     return Arrays.stream(PermissionName.values())
-        .filter(permission -> permission.getPermissionType() == PermissionType.DATA);
+        .filter(permission -> permission.getPermissionType() == PermissionType.DATA)
+        .filter(permission -> !TENANT_ONLY_DATA_PERMISSIONS.contains(permission));
   }
 
   // --- fixtures ---
