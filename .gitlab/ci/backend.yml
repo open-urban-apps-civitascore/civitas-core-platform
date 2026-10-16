@@ -286,10 +286,11 @@ saga-e2e-test-backend:
     reports:
       junit: portal-backend/target/failsafe-reports/TEST-*.xml
 
-# The FROST NAR for the NiFi of the API test. The saga collections deploy FROST Pipelines, and a
-# FROST flow writes through PutFrostRecord, so NiFi has to carry the NAR. It is built here on the
-# rules of the API test, not taken from the extensions lane: that lane runs only when the
-# extensions change, and the API test would then lose its FROST Pipelines in every other MR.
+# The NARs of the NiFi extensions for the NiFi of the API test. The saga collections deploy FROST
+# Pipelines, and a FROST flow writes through PutFrostRecord, so NiFi has to carry the FROST NAR. The
+# NARs are built here on the rules of the API test, not taken from the extensions lane: that lane
+# runs only when the extensions change, and the API test would then lose its FROST Pipelines in
+# every other MR.
 build-frost-nar-api-test:
   extends: .api-test-stack-changes
   image: maven:3.9-eclipse-temurin-25
@@ -310,7 +311,7 @@ build-frost-nar-api-test:
   artifacts:
     expire_in: 1 day
     paths:
-      - nifi-extensions/nifi-frost-nar/target/*.nar
+      - nifi-extensions/nifi-*-nar/target/*.nar
 
 # Bruno API smoke tests — spins up a real backend stack (PostgreSQL, Keycloak,
 # Kafka, Portal Backend) via Docker Compose and runs the full Bruno CLI test

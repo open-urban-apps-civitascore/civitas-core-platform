@@ -21,7 +21,7 @@ mvn verify -DskipITs       # skip the integration test when no Docker daemon is 
 through Testcontainers. Without a Docker daemon it skips, so `mvn verify` still passes on a
 workstation without one — check the failsafe report when you need to know whether it ran.
 
-The NAR is at `nifi-frost-nar/target/nifi-frost-nar-<version>.nar`.
+Each NAR is at `nifi-<name>-nar/target/nifi-<name>-nar-<version>.nar`.
 
 **This tree compiles to Java 21**, while the rest of the repository is on 25. That is the NiFi
 extension API level: every NiFi 2.x release, including the newest, compiles to release 21, and the
@@ -31,13 +31,13 @@ follows the NiFi baseline, not the repository.
 
 ## Install into the development NiFi
 
-`start-portal-dev.sh` builds the NAR and copies it to `dev-environment/nifi/extensions`. That
+`start-portal-dev.sh` builds the NARs and copies them to `dev-environment/nifi/extensions`. That
 directory is mounted as the NiFi container's NAR autoload directory, and NiFi loads a NAR dropped
 there without a restart. To install a changed NAR into a running NiFi:
 
 ```bash
 mvn -q package -DskipTests
-cp nifi-frost-nar/target/nifi-frost-nar-*.nar ../dev-environment/nifi/extensions/
+cp nifi-*-nar/target/nifi-*-nar-*.nar ../dev-environment/nifi/extensions/
 ```
 
 ## Install into a deployed NiFi
