@@ -3,7 +3,7 @@ package de.civitascore.portal.service.connector;
 import de.civitascore.portal.model.connector.ConnectorConfiguration;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ApiCall;
-import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Basic;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.None;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.PageNumber;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Parameter;
 import de.civitascore.portal.model.embedded.ConnectorType;
@@ -38,7 +38,7 @@ public class HttpConnectorRules implements ConnectorRules {
     List<ConnectorViolation> violations = new ArrayList<>();
     if (sendsCredentialsInClearText(http)) {
       violations.add(
-          ConnectorViolation.at("baseUrl", "'baseUrl' must use https with BASIC authentication"));
+          ConnectorViolation.at("baseUrl", "'baseUrl' must use https with authentication"));
     }
     if (apiCalls == null) {
       return violations;
@@ -65,7 +65,7 @@ public class HttpConnectorRules implements ConnectorRules {
   }
 
   private static boolean sendsCredentialsInClearText(HttpConnectorConfiguration http) {
-    return http.authentication() instanceof Basic
+    return !(http.authentication() instanceof None)
         && http.baseUrl() != null
         && http.baseUrl().regionMatches(true, 0, "http:", 0, "http:".length());
   }

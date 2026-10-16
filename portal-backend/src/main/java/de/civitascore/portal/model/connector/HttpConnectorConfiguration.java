@@ -22,8 +22,8 @@ public record HttpConnectorConfiguration(
             description =
                 "API host: an http or https URL, which every API call path extends. Embedded"
                     + " credentials and a trailing '/' are removed; a query or fragment is"
-                    + " rejected. Use authentication for credentials; BASIC authentication needs"
-                    + " an https URL.",
+                    + " rejected. Use authentication for credentials; any authentication other than"
+                    + " NONE needs an https URL.",
             example = "https://api.example.org/v1")
         @NotNull(groups = OnRelease.class, message = "'baseUrl' is required") String baseUrl,
     @Schema(
