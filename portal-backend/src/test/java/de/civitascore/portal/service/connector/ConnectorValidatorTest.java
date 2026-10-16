@@ -154,13 +154,20 @@ class ConnectorValidatorTest {
         arguments("pagination.pageParameter", "page-number", false),
         arguments("headers[0].name", "!#$%&'*+.^_`|~09AZaz-", true),
         arguments("headers[0].name", "X:Y", false),
-        arguments("headers[0].name", "X(Y)", false));
+        arguments("headers[0].name", "X(Y)", false),
+        arguments("headers[0].value", "text/plain; q=0.5\tMünster ~", true),
+        arguments("headers[0].value", "", true),
+        arguments("headers[0].value", "a\r\nX-Injected: y", false),
+        arguments("headers[0].value", "a\u0000b", false),
+        arguments("headers[0].value", "a\u007Fb", false),
+        arguments("headers[0].value", "price in €", false));
   }
 
   private static HttpConnectorConfiguration httpConnectorWith(String key, String value) {
     String path = key.equals("path") ? value : "/stations";
     String pageParameter = key.equals("pagination.pageParameter") ? value : "page";
     String headerName = key.equals("headers[0].name") ? value : "Accept";
+    String headerValue = key.equals("headers[0].value") ? value : "v";
     return new HttpConnectorConfiguration(
         "https://api.example.org",
         null,
@@ -170,7 +177,7 @@ class ConnectorValidatorTest {
                 null,
                 path,
                 List.of(),
-                List.of(new Parameter(headerName, "v")),
+                List.of(new Parameter(headerName, headerValue)),
                 new PageNumber(pageParameter, "size", 1, 0, null))));
   }
 

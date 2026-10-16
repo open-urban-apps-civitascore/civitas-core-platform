@@ -22,7 +22,8 @@ public record HttpConnectorConfiguration(
             description =
                 "API host: an http or https URL, which every API call path extends. Embedded"
                     + " credentials and a trailing '/' are removed; a query or fragment is"
-                    + " rejected. Use authentication for credentials.",
+                    + " rejected. Use authentication for credentials; BASIC authentication needs"
+                    + " an https URL.",
             example = "https://api.example.org/v1")
         @NotNull(groups = OnRelease.class, message = "'baseUrl' is required") String baseUrl,
     @Schema(
@@ -128,9 +129,11 @@ public record HttpConnectorConfiguration(
           List<@Valid Parameter> queryParameters,
       @Schema(
               description =
-                  "Request headers. Name and value are plain text, sent as given and"
-                      + " percent-encoded by the processor. Values are stored and returned in"
-                      + " clear text, so they must not hold secrets; use authentication for"
+                  "Request headers, sent as given. A name is a header token and not"
+                      + " Authorization, Proxy-Authorization, Cookie, Connection, Content-Length,"
+                      + " Expect, Host or Upgrade. A value holds only printable ISO-8859-1"
+                      + " characters, spaces and tabs. Values are stored and returned in clear"
+                      + " text, so they must not hold secrets; use authentication for"
                       + " credentials.")
           List<
                   @Valid @ConvertGroup(from = Default.class, to = Parameter.HeaderRules.class)
@@ -167,8 +170,8 @@ public record HttpConnectorConfiguration(
       @Schema(description = "Value, as plain text. Can be empty.", example = "active")
           @Pattern(
               groups = HeaderRules.class,
-              regexp = "[^\\r\\n]*",
-              message = "'value' must not contain a line break")
+              regexp = "[\\t\\x20-\\x7E\\x{80}-\\x{FF}]*",
+              message = "'value' must hold only printable ISO-8859-1 characters, spaces and tabs")
           String value) {
 
     public Parameter {
