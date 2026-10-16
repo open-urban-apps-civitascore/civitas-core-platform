@@ -9,6 +9,12 @@ export const CONNECTION_TYPES = {
 export const CONNECTOR_TYPES = {
   MQTT: 'MQTT',
   SQL: 'SQL',
+  HTTP: 'HTTP',
+} as const
+
+export const HTTP_AUTHENTICATION_TYPES = {
+  NONE: 'NONE',
+  BASIC: 'BASIC',
 } as const
 
 export const CONNECTOR_TYPE_KEYS: Record<ConnectorType, ConnectorTypeKey> = Object.fromEntries(

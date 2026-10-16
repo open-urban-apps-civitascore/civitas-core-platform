@@ -12,8 +12,9 @@ import { ConnectorTab } from './ConnectorTab'
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }))
-vi.mock('./connectorSources', () => ({
+vi.mock('./connectorSources', async importOriginal => ({
   CONNECTOR_INPUTS: {
+    HTTP: (await importOriginal<typeof import('./connectorSources')>()).CONNECTOR_INPUTS.HTTP,
     MQTT: [
       {
         key: 'urls',
@@ -144,10 +145,11 @@ describe('ConnectorTab (integration)', () => {
     expect(screen.getByText('title1')).toBeInTheDocument()
     expect(screen.getByText('title2')).toBeInTheDocument()
     expect(screen.getByLabelText('type')).toBeInTheDocument()
-    expect(screen.getByText('MQTT')).toBeInTheDocument()
+    expect(screen.getByText('types.MQTT')).toBeInTheDocument()
     fireEvent.click(select)
-    await screen.findByText('SQL')
-    expect(screen.getByText('SQL')).toBeInTheDocument()
+    await screen.findByText('types.SQL')
+    expect(screen.getByText('types.SQL')).toBeInTheDocument()
+    expect(screen.getByText('types.HTTP')).toBeInTheDocument()
   })
 
   it('does not render config when no connector type selected', async () => {
@@ -155,8 +157,8 @@ describe('ConnectorTab (integration)', () => {
 
     expect(screen.getByText('title1')).toBeInTheDocument()
     expect(screen.getByLabelText('type')).toBeInTheDocument()
-    expect(screen.queryByText('MQTT')).not.toBeInTheDocument()
-    expect(screen.queryByText('SQL')).not.toBeInTheDocument()
+    expect(screen.queryByText('types.MQTT')).not.toBeInTheDocument()
+    expect(screen.queryByText('types.SQL')).not.toBeInTheDocument()
     expect(screen.queryByText('title2')).not.toBeInTheDocument()
   })
 
@@ -280,6 +282,66 @@ describe('ConnectorTab (integration)', () => {
       await waitFor(() => {
         expect(screen.getByText('datasources.errors.brokerTlsMismatch')).toBeInTheDocument()
       })
+    })
+  })
+
+  describe('HTTP connector', () => {
+    const httpConfiguration = (type: 'NONE' | 'BASIC') => ({
+      connectorType: 'HTTP' as const,
+      configuration: { baseUrl: '', authentication: { type, username: '', password: '' } },
+    })
+
+    it('shows the API host and the authentication type, but no credentials for None', () => {
+      renderConnectorTab(httpConfiguration('NONE'))
+
+      expect(screen.getByLabelText(/http\.baseUrl\.label/)).toBeInTheDocument()
+      expect(screen.getByLabelText(/http\.authentication\.label/)).toBeInTheDocument()
+      expect(screen.getByText('http.authentication.none')).toBeInTheDocument()
+      expect(screen.queryByLabelText(/http\.username\.label/)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/http\.password\.label/)).not.toBeInTheDocument()
+    })
+
+    it('shows username and password for Basic', () => {
+      renderConnectorTab(httpConfiguration('BASIC'))
+
+      expect(screen.getByLabelText(/http\.username\.label/)).toBeInTheDocument()
+      expect(screen.getByLabelText(/http\.password\.label/)).toHaveAttribute('type', 'password')
+    })
+
+    it('removes spaces and trailing slashes from the API host when the field loses focus', async () => {
+      renderConnectorTab(httpConfiguration('NONE'))
+      const baseUrl = screen.getByLabelText(/http\.baseUrl\.label/)
+
+      fireEvent.change(baseUrl, { target: { value: '  https://api.example.org/v1/  ' } })
+      fireEvent.blur(baseUrl)
+
+      await waitFor(() => expect(baseUrl).toHaveValue('https://api.example.org/v1'))
+    })
+
+    it('turns off browser autocomplete for the credentials', () => {
+      renderConnectorTab(httpConfiguration('BASIC'))
+
+      expect(screen.getByLabelText(/http\.username\.label/)).toHaveAttribute('autocomplete', 'off')
+      expect(screen.getByLabelText(/http\.password\.label/)).toHaveAttribute('autocomplete', 'new-password')
+    })
+
+    it('shows the credentials after the user selects Basic', async () => {
+      renderConnectorTab(httpConfiguration('NONE'))
+
+      fireEvent.click(screen.getByLabelText(/http\.authentication\.label/))
+      fireEvent.click(await screen.findByText('http.authentication.basic'))
+
+      expect(await screen.findByLabelText(/http\.username\.label/)).toBeInTheDocument()
+      expect(screen.getByLabelText(/http\.password\.label/)).toBeInTheDocument()
+    })
+
+    it('disables the HTTP fields in read-only mode', () => {
+      renderConnectorTab(httpConfiguration('BASIC'), true)
+
+      expect(screen.getByLabelText(/http\.baseUrl\.label/)).toBeDisabled()
+      expect(screen.getByLabelText(/http\.authentication\.label/)).toBeDisabled()
+      expect(screen.getByLabelText(/http\.username\.label/)).toBeDisabled()
+      expect(screen.getByLabelText(/http\.password\.label/)).toBeDisabled()
     })
   })
 

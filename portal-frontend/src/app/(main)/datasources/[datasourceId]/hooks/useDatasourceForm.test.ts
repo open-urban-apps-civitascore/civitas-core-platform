@@ -68,6 +68,16 @@ const editTechnicalFieldsAndDescription = (result: ReturnType<typeof renderDatas
   })
 }
 
+const createHttpDatasource = (): Datasource => ({
+  ...createDatasource('DRAFT'),
+  connector: {
+    connectorType: 'HTTP',
+    baseUrl: 'https://api.example.org/v1',
+    authentication: { type: 'BASIC', username: 'reader', password: '********' },
+    apiCalls: [{ name: 'Get all stations', method: 'GET', path: '/stations' }],
+  },
+})
+
 describe('useDatasourceForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -209,5 +219,86 @@ describe('useDatasourceForm', () => {
     const payload = mockUpdateDatasource.mock.calls[0][0]
     expect(payload).toMatchObject({ description: 'Changed description' })
     expect(payload).not.toHaveProperty('dataSourceStatus')
+  })
+})
+
+describe('useDatasourceForm with an HTTP connector', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  const submitAfter = async (
+    edit: (form: ReturnType<typeof renderDatasourceForm>['result']['current']['form']) => void,
+  ) => {
+    const datasource = createHttpDatasource()
+    mockUpdateDatasource.mockResolvedValue({ data: datasource })
+    const { result } = renderDatasourceForm(datasource)
+    act(() => edit(result.current.form))
+
+    await act(async () => {
+      await result.current.submitDatasource()
+    })
+
+    return mockUpdateDatasource.mock.calls[0][0].connector
+  }
+
+  it('marks the connector tab complete without API calls, but does not allow release', () => {
+    const datasource = createHttpDatasource()
+    const { result } = renderDatasourceForm({ ...datasource, connector: { ...datasource.connector!, apiCalls: [] } })
+
+    expect(result.current.completedTabs).toContain('connector')
+    expect(result.current.canStage).toBe(false)
+  })
+
+  it('allows release with an API call', () => {
+    const { result } = renderDatasourceForm(createHttpDatasource())
+
+    expect(result.current.completedTabs).toContain('connector')
+    expect(result.current.canStage).toBe(true)
+  })
+
+  it('loads the masked password into the form', () => {
+    const { result } = renderDatasourceForm(createHttpDatasource())
+
+    expect(result.current.form.getValues('configuration')).toMatchObject({
+      authentication: { type: 'BASIC', username: 'reader', password: '********' },
+    })
+  })
+
+  it('sends the masked password back when the password did not change', async () => {
+    const connector = await submitAfter(form =>
+      form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true }),
+    )
+
+    expect(connector).toEqual({
+      connectorType: 'HTTP',
+      baseUrl: 'https://api.example.org/v2',
+      authentication: { type: 'BASIC', username: 'reader', password: '********' },
+      apiCalls: [{ name: 'Get all stations', method: 'GET', path: '/stations' }],
+    })
+  })
+
+  it('sends a new password', async () => {
+    const connector = await submitAfter(form =>
+      form.setValue(
+        'configuration.authentication',
+        { type: 'BASIC', username: 'reader', password: 'new-secret' },
+        { shouldDirty: true },
+      ),
+    )
+
+    expect(connector.authentication).toEqual({ type: 'BASIC', username: 'reader', password: 'new-secret' })
+  })
+
+  it('sends only the type when the authentication changes to None', async () => {
+    const connector = await submitAfter(form =>
+      form.setValue(
+        'configuration.authentication',
+        { type: 'NONE', username: 'reader', password: '********' },
+        { shouldDirty: true },
+      ),
+    )
+
+    expect(connector.authentication).toEqual({ type: 'NONE' })
   })
 })

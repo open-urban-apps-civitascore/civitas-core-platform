@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { z } from 'zod'
 
-import { CONNECTOR_TYPES } from '@/const/connectors'
+import { CONNECTOR_TYPES, HTTP_AUTHENTICATION_TYPES } from '@/const/connectors'
 
 export type ConnectorTypeKey = keyof typeof CONNECTOR_TYPES
 
@@ -128,6 +128,7 @@ export type FieldRevalidationRule = { watch: string; revalidate: string }
 export const CONNECTOR_FIELD_REVALIDATION_RULES: Record<ConnectorType, FieldRevalidationRule | null> = {
   [CONNECTOR_TYPES.MQTT]: { watch: 'tls', revalidate: 'urls' },
   [CONNECTOR_TYPES.SQL]: null,
+  [CONNECTOR_TYPES.HTTP]: null,
 }
 
 export const MqttLooseSchema = MqttBaseSchema.partial()
@@ -214,6 +215,111 @@ export const SqlApiToFormSchema = SqlApiResponseSchema.transform(({ columns, ...
   columns: columns?.join(', '),
 }))
 
+// Matches the URL rules of java.net.URI in the backend.
+const HTTP_URL_PARTS = /^https?:\/\/(?:[^@/?#]*@)?(\[[^\]]*\]|[^:/?#]*)(.*)$/i
+const DOMAIN_NAME = /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)*[a-z](?:[a-z0-9-]*[a-z0-9])?\.?$/i
+const IPV4_ADDRESS = /^\d{1,3}(?:\.\d{1,3}){3}$/
+const IPV6_ADDRESS = /^\[[0-9a-f:.]+\]$/i
+const AFTER_HOST = /^[A-Za-z0-9\-._~!$&'()*+,;=:@/%\u0080-\uFFFF]*$/
+const INVALID_PERCENT_ESCAPE = /%(?![0-9a-f]{2})/i
+const SPACE_OR_CONTROL = /[\p{Z}\p{Cc}]/u
+
+const isValidHost = (host: string) => DOMAIN_NAME.test(host) || IPV4_ADDRESS.test(host) || IPV6_ADDRESS.test(host)
+
+const isValidHttpBaseUrl = (value: string) => {
+  const [, host, afterHost] = HTTP_URL_PARTS.exec(value) ?? []
+  if (!host || !AFTER_HOST.test(afterHost) || SPACE_OR_CONTROL.test(afterHost)) return false
+  return !INVALID_PERCENT_ESCAPE.test(value) && isValidUri(value) && isValidHost(host)
+}
+
+const hasUrlCredentials = (value: string) => {
+  if (!isValidUri(value)) return false
+  const url = new URL(value)
+  return url.username !== '' || url.password !== ''
+}
+
+export const normalizeHttpBaseUrl = (value: string) => value.trim().replace(/\/+$/, '')
+
+const HttpBaseUrlSchema = z
+  .string()
+  .trim()
+  .refine(v => !v || isValidHttpBaseUrl(v), 'datasources.errors.invalidBaseUrl')
+  .refine(v => !hasUrlCredentials(v), 'datasources.errors.baseUrlCredentials')
+  .transform(normalizeHttpBaseUrl)
+
+const HttpAuthenticationApiResponseSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal(HTTP_AUTHENTICATION_TYPES.NONE) }),
+  z.object({
+    type: z.literal(HTTP_AUTHENTICATION_TYPES.BASIC),
+    username: z.string().nullable().optional(),
+    password: z.string().nullable().optional(),
+  }),
+])
+
+const HttpApiCallsSchema = z.array(z.record(z.string(), z.unknown()))
+
+export const HttpApiResponseSchema = z.object({
+  baseUrl: z.string().nullable().optional(),
+  authentication: HttpAuthenticationApiResponseSchema.nullable().optional(),
+  apiCalls: HttpApiCallsSchema.nullable().optional(),
+})
+
+export const HttpApiToFormSchema = HttpApiResponseSchema.transform(({ baseUrl, authentication, apiCalls }) => {
+  const isBasic = authentication?.type === HTTP_AUTHENTICATION_TYPES.BASIC
+  return {
+    baseUrl: baseUrl ?? undefined,
+    authentication: {
+      type: authentication?.type ?? HTTP_AUTHENTICATION_TYPES.NONE,
+      username: isBasic ? (authentication.username ?? '') : '',
+      password: isBasic ? (authentication.password ?? '') : '',
+    },
+    apiCalls: apiCalls ?? undefined,
+  }
+})
+
+const HttpAuthenticationFormSchema = z.object({
+  type: z.enum(HTTP_AUTHENTICATION_TYPES),
+  username: z.string().trim().optional(),
+  password: z.string().optional(),
+})
+
+type HttpAuthenticationForm = z.infer<typeof HttpAuthenticationFormSchema>
+
+const validateBasicUsername = (authentication: HttpAuthenticationForm, ctx: z.RefinementCtx) => {
+  if (authentication.type !== HTTP_AUTHENTICATION_TYPES.BASIC) return
+  if (authentication.username?.includes(':')) {
+    ctx.addIssue({ code: 'custom', path: ['username'], message: 'datasources.errors.usernameColon' })
+  }
+}
+
+const requireBasicCredentials = (authentication: HttpAuthenticationForm, ctx: z.RefinementCtx) => {
+  if (authentication.type !== HTTP_AUTHENTICATION_TYPES.BASIC) return
+  validateBasicUsername(authentication, ctx)
+  if (!authentication.username) {
+    ctx.addIssue({ code: 'custom', path: ['username'], message: 'common.errors.required' })
+  }
+  if (!authentication.password) {
+    ctx.addIssue({ code: 'custom', path: ['password'], message: 'common.errors.required' })
+  }
+}
+
+export const HttpLooseSchema = z.object({
+  baseUrl: HttpBaseUrlSchema.optional(),
+  authentication: HttpAuthenticationFormSchema.superRefine(validateBasicUsername).optional(),
+  apiCalls: HttpApiCallsSchema.optional(),
+})
+
+export const HttpStrictSchema = z.object({
+  baseUrl: z.string().trim().min(1, 'common.errors.required').pipe(HttpBaseUrlSchema),
+  authentication: HttpAuthenticationFormSchema.superRefine(requireBasicCredentials),
+  apiCalls: HttpApiCallsSchema.min(1, 'common.errors.required'),
+})
+
+const HttpFormToApiSchema = HttpLooseSchema.transform(({ authentication, ...rest }) => {
+  if (authentication?.type === HTTP_AUTHENTICATION_TYPES.BASIC) return { ...rest, authentication }
+  return { ...rest, authentication: { type: HTTP_AUTHENTICATION_TYPES.NONE } }
+})
+
 const MqttFormToApiSchema = MqttLooseSchema.transform(({ tls, ...rest }) => ({
   ...rest,
   tls: { enabled: tls ?? false },
@@ -224,6 +330,7 @@ const connectorUnion = <T extends Record<ConnectorType, z.ZodTypeAny>>(schemas: 
   z.discriminatedUnion('connectorType', [
     z.object({ connectorType: z.literal(CONNECTOR_TYPES.MQTT), configuration: schemas.MQTT }),
     z.object({ connectorType: z.literal(CONNECTOR_TYPES.SQL), configuration: schemas.SQL }),
+    z.object({ connectorType: z.literal(CONNECTOR_TYPES.HTTP), configuration: schemas.HTTP }),
   ])
 
 // Keeps the type's fields unvalidated, so a connector the form schemas reject does not stop the Data
@@ -237,13 +344,32 @@ export const toConnectorFormShape = ({ connectorType, ...configuration }: Connec
   configuration,
 })
 
-export const ConnectorLooseSchema = connectorUnion({ MQTT: MqttLooseSchema, SQL: SqlLooseSchema })
-export const ConnectorStrictSchema = connectorUnion({ MQTT: MqttStrictSchema, SQL: SqlStrictSchema })
-export const ConnectorApiToFormSchema = connectorUnion({ MQTT: MqttApiToFormSchema, SQL: SqlApiToFormSchema })
+export const ConnectorLooseSchema = connectorUnion({
+  MQTT: MqttLooseSchema,
+  SQL: SqlLooseSchema,
+  HTTP: HttpLooseSchema,
+})
+export const ConnectorStrictSchema = connectorUnion({
+  MQTT: MqttStrictSchema,
+  SQL: SqlStrictSchema,
+  HTTP: HttpStrictSchema,
+})
+export const ConnectorTabCompleteSchema = connectorUnion({
+  MQTT: MqttStrictSchema,
+  SQL: SqlStrictSchema,
+  HTTP: HttpStrictSchema.omit({ apiCalls: true }),
+})
+export const ConnectorApiToFormSchema = connectorUnion({
+  MQTT: MqttApiToFormSchema,
+  SQL: SqlApiToFormSchema,
+  HTTP: HttpApiToFormSchema,
+})
 
 /** Maps the form's `connectorType` and `configuration` to the API `connector` member. */
-export const ConnectorFormToApiSchema = connectorUnion({ MQTT: MqttFormToApiSchema, SQL: SqlLooseSchema }).transform(
-  ({ connectorType, configuration }) => ({ connectorType, ...(configuration as Record<string, unknown>) }),
-)
+export const ConnectorFormToApiSchema = connectorUnion({
+  MQTT: MqttFormToApiSchema,
+  SQL: SqlLooseSchema,
+  HTTP: HttpFormToApiSchema,
+}).transform(({ connectorType, configuration }) => ({ connectorType, ...(configuration as Record<string, unknown>) }))
 
 export type ConnectorDraft = z.infer<typeof ConnectorLooseSchema>

@@ -13,6 +13,11 @@ vi.mock('@/app/(main)/datasources/[datasourceId]/components/connector-tab/connec
       { key: 'columns', defaultValue: '' },
       { key: 'init_files', defaultValue: '' },
     ],
+    HTTP: [
+      { key: 'baseUrl', defaultValue: '' },
+      { key: 'authentication.type', defaultValue: 'NONE' },
+      { key: 'authentication.username', defaultValue: '' },
+    ],
   },
 }))
 
@@ -31,6 +36,14 @@ describe('getConnectorDefaults', () => {
     expect(result).toEqual({
       columns: '',
       init_files: '',
+    })
+  })
+
+  it('builds nested defaults for dot-path keys', () => {
+    const result = getConnectorDefaults(CONNECTOR_TYPES.HTTP)
+    expect(result).toEqual({
+      baseUrl: '',
+      authentication: { type: 'NONE', username: '' },
     })
   })
 })

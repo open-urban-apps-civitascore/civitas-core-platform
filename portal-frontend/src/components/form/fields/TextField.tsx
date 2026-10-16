@@ -19,6 +19,7 @@ interface TextFieldProps<T extends FieldValues> extends InputPropsWithoutForm {
   manualError?: string
   maxLength?: number
   hasCharacterCount?: boolean
+  normalize?: (value: string) => string
 }
 
 export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
@@ -35,6 +36,8 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
     type,
     maxLength,
     hasCharacterCount,
+    autoComplete,
+    normalize,
   } = props
   const isMobile = useIsMobile()
   const fieldValue = form.watch(name)
@@ -60,11 +63,18 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
                 data-testid={`${name}TextField`}
                 data-test-element="formField"
                 type={type}
-                autoComplete={type === 'password' ? 'new-password' : undefined}
+                autoComplete={autoComplete ?? (type === 'password' ? 'new-password' : undefined)}
                 className="disabled:opacity-100 disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
                 placeholder={disabled ? undefined : placeholder}
                 maxLength={maxLength}
                 {...field}
+                onBlur={() => {
+                  if (normalize && typeof field.value === 'string') {
+                    const normalized = normalize(field.value)
+                    if (normalized !== field.value) field.onChange(normalized)
+                  }
+                  field.onBlur()
+                }}
                 disabled={disabled}
                 aria-invalid={!!manualError || !!form.formState.errors[name]}
               />

@@ -1,5 +1,5 @@
-import { CONNECTOR_TYPES } from '@/const/connectors'
-import { ConnectorType } from '@/types/connectors'
+import { CONNECTOR_TYPES, HTTP_AUTHENTICATION_TYPES } from '@/const/connectors'
+import { ConnectorType, normalizeHttpBaseUrl } from '@/types/connectors'
 import { ConnectorField } from '@/types/datasources'
 
 export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
@@ -25,6 +25,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
     {
       key: 'user',
       type: 'input',
+      autoComplete: 'off',
       label: { labelKey: 'mqtt.user.label' },
       defaultValue: '',
       required: false,
@@ -106,6 +107,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
     {
       key: 'user',
       type: 'input',
+      autoComplete: 'off',
       label: { labelKey: 'sql.user.label' },
       defaultValue: '',
       required: false,
@@ -142,6 +144,47 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       placeholder: 'col > 10 AND active',
       defaultValue: '',
       required: false,
+    },
+  ],
+
+  [CONNECTOR_TYPES.HTTP]: [
+    {
+      key: 'baseUrl',
+      type: 'input',
+      normalize: normalizeHttpBaseUrl,
+      label: { labelKey: 'http.baseUrl.label' },
+      placeholder: 'https://api.example.org/v1',
+      defaultValue: '',
+      required: true,
+    },
+    {
+      key: 'authentication.type',
+      type: 'select',
+      label: { labelKey: 'http.authentication.label' },
+      options: [
+        { value: HTTP_AUTHENTICATION_TYPES.NONE, labelKey: 'http.authentication.none' },
+        { value: HTTP_AUTHENTICATION_TYPES.BASIC, labelKey: 'http.authentication.basic' },
+      ],
+      defaultValue: HTTP_AUTHENTICATION_TYPES.NONE,
+      required: true,
+    },
+    {
+      key: 'authentication.username',
+      type: 'input',
+      autoComplete: 'off',
+      label: { labelKey: 'http.username.label' },
+      visibleWhen: { key: 'authentication.type', value: HTTP_AUTHENTICATION_TYPES.BASIC },
+      defaultValue: '',
+      required: true,
+    },
+    {
+      key: 'authentication.password',
+      type: 'input',
+      inputType: 'password',
+      label: { labelKey: 'http.password.label' },
+      visibleWhen: { key: 'authentication.type', value: HTTP_AUTHENTICATION_TYPES.BASIC },
+      defaultValue: '',
+      required: true,
     },
   ],
 }
