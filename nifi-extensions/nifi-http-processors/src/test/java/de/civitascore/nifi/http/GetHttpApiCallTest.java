@@ -14,8 +14,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collection;
@@ -23,13 +26,16 @@ import java.util.List;
 import java.util.Map;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.reporting.InitializationException;
+import org.apache.nifi.ssl.SSLContextProvider;
 import org.apache.nifi.util.LogMessage;
 import org.apache.nifi.util.MockComponentLog;
 import org.apache.nifi.util.MockFlowFile;
 import org.apache.nifi.util.TestRunner;
 import org.apache.nifi.util.TestRunners;
 import org.apache.nifi.web.client.provider.service.StandardWebClientServiceProvider;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -37,8 +43,18 @@ import org.junit.jupiter.params.provider.ValueSource;
 class GetHttpApiCallTest {
 
   private static final String WEB_CLIENT = "web-client";
+  private static final String TLS = "tls";
 
   private static final String STATIONS = "{\"name\":\"Stations\",\"path\":\"/stations\"}";
+
+  @TempDir static Path keys;
+
+  private static TestTls tls;
+
+  @BeforeAll
+  static void createCertificate() throws IOException, GeneralSecurityException {
+    tls = TestTls.create(keys);
+  }
 
   @Test
   void onTrigger_withQueryParameters_sendsAGetToTheBasePathAndThePathWithTheQueryInOrder()
@@ -122,8 +138,8 @@ class GetHttpApiCallTest {
   @Test
   void onTrigger_withBasicAuthentication_sendsTheAuthorizationHeader()
       throws InitializationException {
-    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, "[]")) {
-      TestRunner runner = runner(endpoint.baseUrl());
+    try (ApiEndpoint endpoint = ApiEndpoint.answeringOverTls(tls.server(), 200, "[]")) {
+      TestRunner runner = runner(endpoint.baseUrl(), tls);
       runner.setProperty(GetHttpApiCall.AUTHENTICATION_TYPE, "BASIC");
       runner.setProperty(GetHttpApiCall.BASIC_AUTH_USERNAME, "weather");
       runner.setProperty(GetHttpApiCall.BASIC_AUTH_PASSWORD, "s3cret:ü");
@@ -238,31 +254,17 @@ class GetHttpApiCallTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"X-Key, key-€-6d2f", "Host, api.example.org"})
-  void onTrigger_whenTheHttpClientRejectsAHeader_routesAFatalFailureWithoutTheValue(
-      String name, String value) throws InitializationException {
-    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, "[]")) {
+  @ValueSource(strings = {"", "[{\"id\":1"})
+  void onTrigger_whenTheBodyBreaksOff_routesATransientFailureAndNoPartialFlowFile(String part)
+      throws IOException, InitializationException {
+    try (BreakingEndpoint endpoint = BreakingEndpoint.sending(part)) {
       TestRunner runner = runner(endpoint.baseUrl());
-      runner.setProperty(
-          GetHttpApiCall.API_CALL,
-          "{\"name\":\"Stations\",\"path\":\"/stations\",\"headers\":"
-              + "[{\"name\":\""
-              + name
-              + "\",\"value\":\""
-              + value
-              + "\"}]}");
 
       runner.run();
 
       assertFailure(
-          runner,
-          "fatal",
-          0,
-          "GET " + endpoint.baseUrl() + "/stations failed: IllegalArgumentException");
-      assertTrue(endpoint.requests().isEmpty());
-      for (String text : logged(runner.getLogger())) {
-        assertFalse(text.contains(value), text);
-      }
+          runner, "transient", 0, "GET " + endpoint.baseUrl() + "/stations failed: IOException");
+      assertEquals(1, runner.getLogger().getWarnMessages().size());
     }
   }
 
@@ -273,12 +275,13 @@ class GetHttpApiCallTest {
     String password = "pw-5b0e7c41d9";
     String queryValue = "qv-93f2a6d8e1";
     String username = "user-1c84f0aa";
-    try (ApiEndpoint endpoint = ApiEndpoint.answering(status == 0 ? 200 : status, "[]")) {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringOverTls(tls.server(), status == 0 ? 200 : status, "[]")) {
       String baseUrl = endpoint.baseUrl();
       if (status == 0) {
         endpoint.close();
       }
-      TestRunner runner = runner(baseUrl);
+      TestRunner runner = runner(baseUrl, tls);
       runner.setProperty(GetHttpApiCall.AUTHENTICATION_TYPE, "BASIC");
       runner.setProperty(GetHttpApiCall.BASIC_AUTH_USERNAME, username);
       runner.setProperty(GetHttpApiCall.BASIC_AUTH_PASSWORD, password);
@@ -355,6 +358,19 @@ class GetHttpApiCallTest {
     assertTrue(
         results.stream().anyMatch(r -> "Base URL".equals(r.getSubject())), results::toString);
     assertFalse(results.toString().contains(secret), results::toString);
+  }
+
+  @Test
+  void validate_withBasicAuthenticationOverHttp_isInvalid() throws InitializationException {
+    TestRunner runner = runner("http://api.example.org/v1");
+    runner.setProperty(GetHttpApiCall.AUTHENTICATION_TYPE, "BASIC");
+    runner.setProperty(GetHttpApiCall.BASIC_AUTH_USERNAME, "weather");
+    runner.setProperty(GetHttpApiCall.BASIC_AUTH_PASSWORD, "secret");
+
+    Collection<ValidationResult> results = invalid(runner);
+
+    assertTrue(
+        results.stream().anyMatch(r -> "Base URL".equals(r.getSubject())), results::toString);
   }
 
   @Test
@@ -437,6 +453,10 @@ class GetHttpApiCallTest {
         "{\"name\":\"n\",\"path\":\"/s\",\"headers\":[{\"name\":\"COOKIE\",\"value\":\"v-61b0\"}]} | headers[0].name",
         "{\"name\":\"n\",\"path\":\"/s\",\"headers\":[{\"name\":\"X\",\"value\":\"v-61b0\\r\\nY: z\"}]} | headers[0].value",
         "{\"name\":\"n\",\"path\":\"/s\",\"headers\":[{\"name\":\"X\",\"value\":\"v-61b0\\n\"}]} | headers[0].value",
+        "{\"name\":\"n\",\"path\":\"/s\",\"headers\":[{\"name\":\"Host\",\"value\":\"v-61b0\"}]} | headers[0].name",
+        "{\"name\":\"n\",\"path\":\"/s\",\"headers\":[{\"name\":\"content-length\",\"value\":\"v-61b0\"}]} | headers[0].name",
+        "{\"name\":\"n\",\"path\":\"/s\",\"headers\":[{\"name\":\"X\",\"value\":\"v-61b0-€\"}]} | headers[0].value",
+        "{\"name\":\"n\",\"path\":\"/s\",\"headers\":[{\"name\":\"X\",\"value\":\"v-61b0\\u0000\"}]} | headers[0].value",
         "{\"name\":\"n\",\"path\":\"/s\",\"pagination\":{\"type\":\"v-61b0\"}} | pagination",
         "{\"name\":\"n\",\"path\":\"/s\",\"extra\":\"v-61b0\"}              | extra",
         "{\"name\":\"n\",\"path\":\"/s\",\"headers\":[{\"name\":\"A\",\"value\":\"b\"},{\"name\":\"X\",\"extra\":\"v-61b0\"}]} | headers[1].extra",
@@ -504,10 +524,21 @@ class GetHttpApiCallTest {
   }
 
   private static TestRunner runner(String baseUrl) throws InitializationException {
+    return runner(baseUrl, null);
+  }
+
+  /** A runner whose web client service trusts the certificate of {@code trusted}, if given. */
+  private static TestRunner runner(String baseUrl, TestTls trusted) throws InitializationException {
     TestRunner runner = TestRunners.newTestRunner(GetHttpApiCall.class);
     StandardWebClientServiceProvider webClient = new StandardWebClientServiceProvider();
     runner.addControllerService(WEB_CLIENT, webClient);
     runner.setProperty(webClient, "Redirect Handling Strategy", "IGNORED");
+    if (trusted != null) {
+      SSLContextProvider provider = trusted.clientProvider();
+      runner.addControllerService(TLS, provider);
+      runner.enableControllerService(provider);
+      runner.setProperty(webClient, "SSL Context Service", TLS);
+    }
     runner.enableControllerService(webClient);
 
     runner.setProperty(GetHttpApiCall.WEB_CLIENT_SERVICE, WEB_CLIENT);

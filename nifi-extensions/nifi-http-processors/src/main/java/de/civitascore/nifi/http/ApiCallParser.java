@@ -29,7 +29,9 @@ import java.util.regex.Pattern;
  *
  * <p>The processor checks them again because it builds the request and the credentials from them: a
  * header that the configuration sets could replace the authentication, and a line break in a header
- * value could start a second header.
+ * value could start a second header. The header rules also reject what the JDK HTTP client behind
+ * the web client service refuses, so that such a header makes the processor invalid instead of
+ * failing every run.
  */
 final class ApiCallParser {
 
@@ -41,8 +43,10 @@ final class ApiCallParser {
 
   private static final Pattern PATH = Pattern.compile("/[A-Za-z0-9._~:/-]*");
   private static final Pattern HEADER_NAME = Pattern.compile("[!#$%&'*+.^_`|~0-9A-Za-z-]+");
-  private static final Set<String> RESERVED_HEADERS =
+  private static final Set<String> CREDENTIAL_HEADERS =
       Set.of("authorization", "proxy-authorization", "cookie");
+  private static final Set<String> CLIENT_HEADERS =
+      Set.of("connection", "content-length", "expect", "host", "upgrade");
 
   private ApiCallParser() {}
 
@@ -128,14 +132,23 @@ final class ApiCallParser {
   }
 
   private static void checkHeader(String name, String value, String path, List<String> violations) {
-    if (RESERVED_HEADERS.contains(name.toLowerCase(Locale.ROOT))) {
+    String lowerCase = name.toLowerCase(Locale.ROOT);
+    if (CREDENTIAL_HEADERS.contains(lowerCase)) {
       violations.add(path + ".name must not be Authorization, Proxy-Authorization or Cookie");
+    } else if (CLIENT_HEADERS.contains(lowerCase)) {
+      violations.add(path + ".name names a header the HTTP client sets itself");
     } else if (!HEADER_NAME.matcher(name).matches()) {
       violations.add(path + ".name is not a valid header name");
     }
-    if (value.indexOf('\r') >= 0 || value.indexOf('\n') >= 0) {
-      violations.add(path + ".value must not contain a line break");
+    if (!value.chars().allMatch(ApiCallParser::isFieldValueCharacter)) {
+      violations.add(
+          path + ".value must hold only printable ISO-8859-1 characters, spaces and tabs");
     }
+  }
+
+  /** The field-value characters of RFC 9110, section 5.5. */
+  private static boolean isFieldValueCharacter(int c) {
+    return c == '\t' || (c >= ' ' && c <= '~') || (c >= 0x80 && c <= 0xFF);
   }
 
   private static boolean notBlank(String text, String path, List<String> violations) {

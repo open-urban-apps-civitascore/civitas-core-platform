@@ -62,8 +62,7 @@ final class ApiCallClient {
     } catch (WebClientServiceException e) {
       return ApiCallOutcome.Failure.ofTransport(request, e);
     } catch (IllegalArgumentException e) {
-      // The JDK HTTP client rejects a restricted header name or a header value outside Latin-1, and
-      // puts the value into the exception message.
+      // The last guard: the JDK HTTP client puts the header value into the exception message.
       return ApiCallOutcome.Failure.ofRejectedRequest(request, e);
     }
     return classify(request, response);

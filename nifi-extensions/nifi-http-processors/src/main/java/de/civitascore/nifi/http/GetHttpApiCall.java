@@ -128,7 +128,7 @@ public class GetHttpApiCall extends AbstractProcessor {
           .displayName("Authentication Type")
           .description("How the request authenticates.")
           .required(true)
-          .allowableValues(AuthenticationType.NONE.name(), AuthenticationType.BASIC.name())
+          .allowableValues(AuthenticationType.class)
           .defaultValue(AuthenticationType.NONE.name())
           .build();
 
@@ -199,15 +199,21 @@ public class GetHttpApiCall extends AbstractProcessor {
       ApiCallParser.parse(context.getProperty(API_CALL).getValue());
     } catch (InvalidApiCallException e) {
       for (String violation : e.violations()) {
-        results.add(
-            new ValidationResult.Builder()
-                .subject(API_CALL.getDisplayName())
-                .valid(false)
-                .explanation(violation)
-                .build());
+        results.add(result(API_CALL.getDisplayName(), violation));
       }
     }
+    if (sendsCredentialsInClearText(context)) {
+      results.add(
+          result(BASE_URL.getDisplayName(), "must use https when the request authenticates"));
+    }
     return results;
+  }
+
+  private static boolean sendsCredentialsInClearText(ValidationContext context) {
+    AuthenticationType type =
+        context.getProperty(AUTHENTICATION_TYPE).asAllowableValue(AuthenticationType.class);
+    String scheme = URI.create(context.getProperty(BASE_URL).getValue()).getScheme();
+    return type != AuthenticationType.NONE && "http".equalsIgnoreCase(scheme);
   }
 
   @OnScheduled
@@ -225,7 +231,9 @@ public class GetHttpApiCall extends AbstractProcessor {
                 .getWebClientService(),
             context.getProperty(BASE_URL).getValue());
     Authentication authentication =
-        AuthenticationType.valueOf(context.getProperty(AUTHENTICATION_TYPE).getValue())
+        context
+            .getProperty(AUTHENTICATION_TYPE)
+            .asAllowableValue(AuthenticationType.class)
             .authentication(context);
 
     switch (client.send(apiCall, authentication)) {

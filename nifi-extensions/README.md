@@ -210,7 +210,7 @@ call the API otherwise, and one run at a time. The cron schedule of the flow dec
 | `Base URL` | Scheme `http` or `https`, a host, an optional port and an optional path. No user info, no query, no fragment. A trailing `/` is removed. |
 | `API Call` | The API call as JSON, in the form the portal stores it. |
 | `Authentication Type` | `NONE` (default) or `BASIC`. |
-| `Basic Auth Username` / `Basic Auth Password` | Required with `BASIC`. The username contains no colon; the password is sensitive. |
+| `Basic Auth Username` / `Basic Auth Password` | Required with `BASIC`, which also requires an `https` Base URL. The username contains no colon; the password is sensitive. |
 
 No property supports Expression Language.
 
@@ -227,8 +227,10 @@ No property supports Expression Language.
 
 The processor checks the rules of the portal backend again, because it builds the request and the
 credentials from them. `method` is `GET` or absent, `path` matches `^/[A-Za-z0-9._~:/-]*$`, a header
-name is a token and not `Authorization`, `Proxy-Authorization` or `Cookie`, a header value has no
-line break, and `pagination` is absent or null. An unknown key fails. A broken rule makes the
+name is a token and not `Authorization`, `Proxy-Authorization` or `Cookie`, and `pagination` is
+absent or null. A header must also be one the JDK HTTP client behind the web client service sends:
+not `Connection`, `Content-Length`, `Expect`, `Host` or `Upgrade`, and a value of printable
+ISO-8859-1 characters, spaces and tabs only. An unknown key fails. A broken rule makes the
 processor invalid, and the explanation names the key path, for example `headers[1].name`, never the
 value.
 
@@ -246,7 +248,6 @@ Relationships: `success` and `failure`. There is no `retry`; the next cron run i
 | 3xx, 4xx except 408 and 429 | `failure`, `fatal`, an error log entry |
 | 408, 429, 5xx, any other status | `failure`, `transient`, a warn log entry |
 | Connection refused, timeout, TLS error | `failure`, `transient`, status `0` |
-| A header the HTTP client refuses, for example `Host` | `failure`, `fatal`, status `0` |
 
 A 3xx is fatal because the processor expects a web client service that does not follow
 redirects (`Redirect Handling Strategy` = `IGNORED`), so a redirect shows a wrong host or path.
