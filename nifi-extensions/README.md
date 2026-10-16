@@ -257,7 +257,7 @@ is empty and carries `http.request.path`, `http.error.kind`, `http.error.status`
 `http.error.message`. The message is the one the log entry and the bulletin show:
 
 ```text
-GET https://api.example.org/v1/stations returned 404
+GET https://api.example.org/v1/stations failed with status 404
 GET https://api.example.org/v1/stations failed: ConnectException
 ```
 

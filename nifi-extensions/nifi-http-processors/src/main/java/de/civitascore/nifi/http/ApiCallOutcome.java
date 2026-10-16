@@ -42,8 +42,13 @@ sealed interface ApiCallOutcome {
    */
   record Failure(ErrorKind kind, int status, String message) implements ApiCallOutcome {
 
+    /**
+     * The runtime monitor of the NiFi config-adapter counts a WARN bulletin only when its text
+     * holds a word such as {@code failed}, so a transient status sets the Pipeline to ERROR only
+     * with this wording.
+     */
     static Failure ofStatus(String request, int status, ErrorKind kind) {
-      return new Failure(kind, status, request + " returned " + status);
+      return new Failure(kind, status, request + " failed with status " + status);
     }
 
     /**

@@ -210,7 +210,7 @@ class GetHttpApiCallTest {
 
       runner.run();
 
-      String message = "GET " + endpoint.baseUrl() + "/stations returned " + status;
+      String message = "GET " + endpoint.baseUrl() + "/stations failed with status " + status;
       assertFailure(runner, "fatal", status, message);
       assertEquals(1, endpoint.requests().size());
       List<LogMessage> errors = runner.getLogger().getErrorMessages();
@@ -229,7 +229,7 @@ class GetHttpApiCallTest {
 
       runner.run();
 
-      String message = "GET " + endpoint.baseUrl() + "/stations returned " + status;
+      String message = "GET " + endpoint.baseUrl() + "/stations failed with status " + status;
       assertFailure(runner, "transient", status, message);
       List<LogMessage> warnings = runner.getLogger().getWarnMessages();
       assertEquals(1, warnings.size());
