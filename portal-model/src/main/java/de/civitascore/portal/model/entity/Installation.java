@@ -30,7 +30,11 @@ import org.hibernate.annotations.BatchSize;
 @Table(name = "installations")
 public class Installation extends BaseEntity {
 
-  private static final int PACKAGE_ID_LENGTH = 1024;
+  /** The maximum length of the package id, in characters. */
+  public static final int PACKAGE_ID_LENGTH = 1024;
+
+  /** The maximum length of the package version, in characters. */
+  public static final int PACKAGE_VERSION_LENGTH = 255;
 
   /**
    * The identity of the package, as the caller gives it. The journal keeps this value as it is and
@@ -40,7 +44,7 @@ public class Installation extends BaseEntity {
   @Column(name = "package_id", length = PACKAGE_ID_LENGTH, nullable = false)
   private String packageId;
 
-  @Column(name = "package_version")
+  @Column(name = "package_version", length = PACKAGE_VERSION_LENGTH)
   private String packageVersion;
 
   /**

@@ -25,7 +25,11 @@ import lombok.Setter;
 @Table(name = "installed_artifacts")
 public class InstalledArtifact extends BaseEntity {
 
-  private static final int URN_LENGTH = 1024;
+  /** The maximum length of a URN in a line, in characters. */
+  public static final int URN_LENGTH = 1024;
+
+  /** The maximum length of the name in a line, in characters. */
+  public static final int NAME_LENGTH = 255;
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "installation_id", nullable = false)
@@ -39,7 +43,7 @@ public class InstalledArtifact extends BaseEntity {
   @Column(name = "artifact_type", nullable = false)
   private InstalledArtifactType artifactType;
 
-  @Column(name = "name")
+  @Column(name = "name", length = NAME_LENGTH)
   private String name;
 
   /** The id of the shell row that the install created, for example the row of a Data structure. */
