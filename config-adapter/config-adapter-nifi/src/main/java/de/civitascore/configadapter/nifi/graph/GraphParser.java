@@ -46,6 +46,7 @@ public class GraphParser {
               asString(typed.get("id")),
               asString(typed.get("kind")),
               asString(typed.get("sourceRef")),
+              asString(typed.get("apiCallName")),
               asString(typed.get("sinkRef")),
               asString(typed.get("mappingRef")),
               asString(typed.get("cronExpression"))));

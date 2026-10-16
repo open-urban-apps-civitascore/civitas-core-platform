@@ -53,7 +53,7 @@ class MappingNodeTypeTest {
       "urn:core:platform:civitas:element:common:de96c47e-bb88-87c7-becf-ee40109662ce:1.0.0";
 
   private static GraphNode mappingNode(String id, String mappingRef) {
-    return new GraphNode(id, "mapping", null, null, mappingRef, null);
+    return new GraphNode(id, "mapping", null, null, null, mappingRef, null);
   }
 
   /** A mapping document ({@code fields} only). */

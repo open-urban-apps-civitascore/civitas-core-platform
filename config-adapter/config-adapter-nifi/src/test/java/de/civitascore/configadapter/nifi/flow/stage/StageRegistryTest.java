@@ -48,6 +48,10 @@ class StageRegistryTest {
   }
 
   private static SourceStage sourceStage(SourceType type) {
+    return sourceStage(type, false);
+  }
+
+  private static SourceStage sourceStage(SourceType type, boolean requiresSchedule) {
     return new SourceStage() {
       @Override
       public SourceType type() {
@@ -65,7 +69,12 @@ class StageRegistryTest {
       }
 
       @Override
-      public void bind(Datasource source, String sourceNodeKey, PlanContext out) {}
+      public boolean requiresSchedule() {
+        return requiresSchedule;
+      }
+
+      @Override
+      public void bind(Datasource source, GraphNode node, String sourceNodeKey, PlanContext out) {}
 
       @Override
       public StageResult build(BuildContext ctx) {
@@ -136,7 +145,7 @@ class StageRegistryTest {
     TransformNodeType mapping = transformNodeType(NodeKind.MAPPING);
     StageRegistry registry =
         new StageRegistry(
-            List.of(mqtt, sourceStage(SourceType.SQL)),
+            List.of(mqtt, sourceStage(SourceType.SQL), sourceStage(SourceType.HTTP)),
             List.of(postgis, sinkStage(SinkType.FROST)),
             List.of(mapping));
 
@@ -150,6 +159,19 @@ class StageRegistryTest {
     assertThrows(
         IllegalArgumentException.class,
         () -> new StageRegistry(List.of(), allSinks(), allTransformKinds()));
+  }
+
+  @Test
+  void sourceThatRequiresAScheduleItDoesNotAcceptIsRejectedAtConstruction() {
+    List<SourceStage> sources =
+        List.of(
+            sourceStage(SourceType.MQTT),
+            sourceStage(SourceType.SQL),
+            sourceStage(SourceType.HTTP, true));
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new StageRegistry(sources, allSinks(), allTransformKinds()));
   }
 
   @Test

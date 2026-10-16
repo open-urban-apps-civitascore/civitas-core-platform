@@ -21,6 +21,7 @@ import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.source.HttpSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import de.civitascore.configadapter.nifi.flow.stage.source.SqlSourceStage;
@@ -148,7 +149,10 @@ public final class NifiTestFixtures {
       String frostBaseUrl,
       MqttTruststoreConfig mqttTruststore) {
     return new StageRegistry(
-        List.of(new MqttSourceStage(resolver, mqttTruststore), new SqlSourceStage(resolver, probe)),
+        List.of(
+            new MqttSourceStage(resolver, mqttTruststore),
+            new SqlSourceStage(resolver, probe),
+            new HttpSourceStage(resolver)),
         List.of(
             new PostgisSinkStage(platformSink),
             new FrostSinkStage(frostBaseUrl, FrostSinkAuth.basicAuth("frost", "secret"))),
@@ -351,6 +355,60 @@ public final class NifiTestFixtures {
         }
         """
             .formatted(cronExpression, SRC_REF, MAP_CRON, SINK_REF));
+  }
+
+  /**
+   * A graph from the source through ConvertRecord to the sink. A null {@code apiCallName} leaves
+   * the key out of the source node; a null {@code cronExpression} leaves out the cron node.
+   */
+  @SuppressWarnings("unchecked")
+  static Map<String, Object> graphWithHttpSource(String apiCallName, String cronExpression)
+      throws Exception {
+    Map<String, Object> graph = graphWithoutMapping();
+    List<Map<String, Object>> nodes = (List<Map<String, Object>>) graph.get("nodes");
+    if (apiCallName != null) {
+      nodes.get(1).put("apiCallName", apiCallName);
+    }
+    if (cronExpression != null) {
+      List<Map<String, Object>> edges = (List<Map<String, Object>>) graph.get("edges");
+      nodes.add(
+          map(
+              "{ \"id\": \"n-cron\", \"kind\": \"cron\", \"cronExpression\": \"%s\" }"
+                  .formatted(cronExpression)));
+      edges.set(0, map("{ \"id\": \"e1\", \"source\": \"n-start\", \"target\": \"n-cron\" }"));
+      edges.add(map("{ \"id\": \"e4\", \"source\": \"n-cron\", \"target\": \"n-src\" }"));
+    }
+    return graph;
+  }
+
+  /**
+   * An HTTP/REST Data source with the API calls {@code stations} and {@code readings}; the second
+   * one has a pagination.
+   *
+   * @param authenticationJson the {@code authentication} object, or {@code null} to leave it out
+   */
+  static Datasource httpSource(String authenticationJson) throws Exception {
+    Datasource source = new Datasource();
+    source.setId("h1");
+    source.setType("http");
+    source.handleUnknownProperty("baseUrl", "https://api.example.org/v1");
+    if (authenticationJson != null) {
+      source.handleUnknownProperty("authentication", map(authenticationJson));
+    }
+    source.handleUnknownProperty(
+        "apiCalls",
+        MAPPER.readValue(
+            """
+            [ { "name": "stations", "method": "GET", "path": "/stations",
+                "queryParameters": [ { "name": "limit", "value": "100" } ],
+                "headers": [ { "name": "Accept", "value": "application/json" } ],
+                "pagination": null },
+              { "name": "readings", "method": "GET", "path": "/readings",
+                "queryParameters": [], "headers": [],
+                "pagination": { "type": "PAGE_NUMBER", "pageParameter": "page" } } ]
+            """,
+            List.class));
+    return source;
   }
 
   static Datasource mqttSource(String encryptedPassword) {

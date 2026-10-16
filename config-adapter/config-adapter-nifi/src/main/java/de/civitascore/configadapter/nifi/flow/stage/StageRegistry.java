@@ -37,6 +37,10 @@ public final class StageRegistry {
       List<? extends SinkStage<?>> sinkStages,
       List<TransformNodeType> transformKinds) {
     for (SourceStage stage : sourceStages) {
+      if (stage.requiresSchedule() && !stage.acceptsSchedule()) {
+        throw new IllegalArgumentException(
+            "source stage " + stage.type() + " requires a schedule it does not accept");
+      }
       register(sources, stage.type(), stage, "source stage");
     }
     for (SinkStage<?> stage : sinkStages) {

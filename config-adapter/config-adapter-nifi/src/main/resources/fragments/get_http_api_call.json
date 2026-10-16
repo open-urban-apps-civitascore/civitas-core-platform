@@ -1,0 +1,82 @@
+{
+  "name": "HttpApiCall",
+  "comments": "",
+  "type": "de.civitascore.nifi.http.GetHttpApiCall",
+  "bundle": {
+    "group": "de.civitas-core",
+    "artifact": "nifi-http-nar",
+    "version": "1.0.0"
+  },
+  "properties": {
+    "Web Client Service Provider": "${CS:HttpSourceWebClient}",
+    "Base URL": null,
+    "API Call": null,
+    "Authentication Type": "NONE",
+    "Basic Auth Username": null,
+    "Basic Auth Password": null
+  },
+  "propertyDescriptors": {
+    "Web Client Service Provider": {
+      "name": "Web Client Service Provider",
+      "displayName": "Web Client Service Provider",
+      "identifiesControllerService": true,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Base URL": {
+      "name": "Base URL",
+      "displayName": "Base URL",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "API Call": {
+      "name": "API Call",
+      "displayName": "API Call",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Authentication Type": {
+      "name": "Authentication Type",
+      "displayName": "Authentication Type",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Basic Auth Username": {
+      "name": "Basic Auth Username",
+      "displayName": "Basic Auth Username",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Basic Auth Password": {
+      "name": "Basic Auth Password",
+      "displayName": "Basic Auth Password",
+      "identifiesControllerService": false,
+      "sensitive": true,
+      "dynamic": false
+    }
+  },
+  "position": {
+    "x": 0.0,
+    "y": 0.0
+  },
+  "style": {},
+  "autoTerminatedRelationships": [],
+  "scheduledState": "ENABLED",
+  "schedulingPeriod": "0 0 0 * * ?",
+  "schedulingStrategy": "CRON_DRIVEN",
+  "executionNode": "PRIMARY",
+  "penaltyDuration": "30 sec",
+  "yieldDuration": "1 sec",
+  "bulletinLevel": "WARN",
+  "runDurationMillis": 0,
+  "concurrentlySchedulableTaskCount": 1,
+  "componentType": "PROCESSOR",
+  "retryCount": 10,
+  "retriedRelationships": [],
+  "backoffMechanism": "PENALIZE_FLOWFILE",
+  "maxBackoffPeriod": "10 mins"
+}

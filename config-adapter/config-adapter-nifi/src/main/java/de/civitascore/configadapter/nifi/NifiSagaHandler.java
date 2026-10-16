@@ -37,6 +37,7 @@ import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkAuth;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.source.HttpSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import de.civitascore.configadapter.nifi.flow.stage.source.SqlSourceStage;
@@ -160,7 +161,8 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
         new StageRegistry(
             List.of(
                 new MqttSourceStage(credentialResolver, mqttTruststore),
-                new SqlSourceStage(credentialResolver, new JdbcSqlSourceProbe())),
+                new SqlSourceStage(credentialResolver, new JdbcSqlSourceProbe()),
+                new HttpSourceStage(credentialResolver)),
             List.of(
                 new PostgisSinkStage(platformSink),
                 new FrostSinkStage(getProperty("frost.url", null), resolveFrostSinkAuth(config))),

@@ -46,6 +46,7 @@ public record PipelineGraph(List<GraphNode> nodes, List<GraphEdge> edges) {
    * @param kind the CORE node kind (e.g. {@code start}, {@code source}, {@code mapping}, {@code
    *     sink}, {@code end})
    * @param sourceRef the referenced DataSource configuration CORE URN, or null
+   * @param apiCallName the name of the API call an HTTP/REST source node reads, or null
    * @param sinkRef the referenced DataSink configuration CORE URN, or null
    * @param mappingRef the referenced Mapping CORE URN, or null
    * @param cronExpression the cron schedule expression (cron nodes only), or null
@@ -54,6 +55,7 @@ public record PipelineGraph(List<GraphNode> nodes, List<GraphEdge> edges) {
       String id,
       String kind,
       String sourceRef,
+      String apiCallName,
       String sinkRef,
       String mappingRef,
       String cronExpression) {}
