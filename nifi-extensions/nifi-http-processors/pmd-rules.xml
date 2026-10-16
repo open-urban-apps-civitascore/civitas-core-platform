@@ -6,33 +6,24 @@
            https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
 
   <description>PMD rules for the nifi-http-processors module.
-    Mirrors the exclusions of config-adapter-nifi; only actionable findings remain.</description>
+    Excludes only the rules this module triggers.</description>
 
   <!-- Best Practices -->
   <rule ref="category/java/bestpractices.xml">
-    <exclude name="GuardLogStatement"/>          <!-- SLF4J parameterized logging is lazy -->
+    <exclude name="GuardLogStatement"/>          <!-- ComponentLog formats its arguments lazily -->
   </rule>
 
   <!-- Design -->
   <rule ref="category/java/design.xml">
-    <exclude name="LawOfDemeter"/>               <!-- Too strict for fluent builder APIs -->
-    <exclude name="CyclomaticComplexity"/>       <!-- The port builders are branchy by nature -->
-    <exclude name="TooManyMethods"/>             <!-- Small focused helpers in the batch builder -->
-    <exclude name="ExcessiveImports"/>           <!-- The processor wires many small collaborators -->
-    <exclude name="CouplingBetweenObjects"/>     <!-- The processor is the intended composition point -->
-    <exclude name="GodClass"/>                   <!-- Cohesive builders; one method per sub-request -->
-    <!-- The builder parameters are the fields of the sub-request they build. A carrier object would
-         take the same list in its own constructor and move the finding one call further. -->
-    <exclude name="UseObjectForClearerAPI"/>
+    <!-- The processor declares its annotations, properties, validators and session handling in one
+         class, as NiFi expects of a processor. -->
+    <exclude name="ExcessiveImports"/>
   </rule>
 
   <!-- Error Prone -->
   <rule ref="category/java/errorprone.xml">
-    <exclude name="NullAssignment"/>
-    <exclude name="AvoidLiteralsInIfCondition"/> <!-- HTTP status codes read clearer as literals -->
-    <exclude name="AvoidDuplicateLiterals"/>     <!-- Repeated STA entity names are clearer inline -->
+    <!-- An accessor takes the name of its field, as the accessor of a record does. -->
     <exclude name="AvoidFieldNameMatchingMethodName"/>
-    <exclude name="UseProperClassLoader"/>
   </rule>
 
   <!-- Code Style -->
@@ -44,10 +35,5 @@
     <exclude name="AtLeastOneConstructor"/>
     <exclude name="LongVariable"/>
     <exclude name="ShortVariable"/>
-    <exclude name="UseExplicitTypes"/>
-    <exclude name="TooManyStaticImports"/>
-    <!-- of() and id() are the idiomatic names for a factory and for an identifier, the same reason
-         ShortVariable is excluded above. -->
-    <exclude name="ShortMethodName"/>
   </rule>
 </ruleset>
