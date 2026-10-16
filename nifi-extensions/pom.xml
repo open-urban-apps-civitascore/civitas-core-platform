@@ -23,6 +23,8 @@
 	<modules>
 		<module>nifi-frost-processors</module>
 		<module>nifi-frost-nar</module>
+		<module>nifi-http-processors</module>
+		<module>nifi-http-nar</module>
 	</modules>
 
 	<properties>
