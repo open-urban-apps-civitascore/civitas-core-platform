@@ -1,0 +1,1176 @@
+package de.civitascore.portal.service;
+
+import de.civitascore.portal.model.embedded.ApiStandard;
+import de.civitascore.portal.model.embedded.ConnectorType;
+import de.civitascore.portal.model.embedded.DataSinkType;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
+import de.civitascore.portal.model.embedded.DatapoolScopeType;
+import de.civitascore.portal.model.embedded.InstalledArtifactAction;
+import de.civitascore.portal.model.embedded.InstalledArtifactType;
+import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
+import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.DataStructure;
+import de.civitascore.portal.model.entity.DataStructureVersion;
+import de.civitascore.portal.model.entity.Installation;
+import de.civitascore.portal.model.entity.InstalledArtifact;
+import de.civitascore.portal.model.entity.Layer;
+import de.civitascore.portal.model.entity.NamedApi;
+import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.entity.PublishedStructure;
+import de.civitascore.portal.model.entity.Style;
+import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.DataSinkInputDTO;
+import de.civitascore.portal.model.input.DataSourceInputDTO;
+import de.civitascore.portal.model.input.DataStructureInputDTO;
+import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
+import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
+import de.civitascore.portal.model.input.InstallationInputDTO;
+import de.civitascore.portal.model.input.LayerInputDTO;
+import de.civitascore.portal.model.input.NamedApiInputDTO;
+import de.civitascore.portal.model.input.PackageManifestInputDTO;
+import de.civitascore.portal.model.input.PackageMemberInputDTO;
+import de.civitascore.portal.model.input.PackageMemberKind;
+import de.civitascore.portal.model.input.PipelineInputDTO;
+import de.civitascore.portal.model.input.StyleInputDTO;
+import de.civitascore.portal.modelregistry.DataStructureUrns;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.repository.InstallationRepository;
+import de.civitascore.portal.repository.PublishedStructureRepository;
+import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
+import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.UniqueConstraintViolationException;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.owasp.encoder.Encode;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Installs one package on this instance and records what it did.
+ *
+ * <p>Everything happens in one transaction, so a package is installed whole or not at all — and the
+ * journal entry exists exactly when the install committed. The install does what an operator would
+ * do by hand, in the order the platform enforces: structures first and released, because a source
+ * links only a released structure; then sources, released, because a pipeline links only a released
+ * source; then the dataset, which stays DRAFT because releasing it rolls out infrastructure and
+ * remains the operator's own decision, together with its named APIs; then the mappings, sinks and
+ * pipelines that belong to it; last the styles and map layers that publish its sinks.
+ *
+ * <p>An installation is a copy, not a shared identity. Every artifact a package ships is created
+ * under a URN this instance mints, and the URN the member carried in the package is recorded on its
+ * journal line as its origin. Identities inside the package only serve to let members refer to one
+ * another; every such reference is rewritten to the minted copy before the referring member is
+ * stored.
+ *
+ * <p>An uninstall removes what the install created, in the reverse order, and keeps the record.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class InstallationService {
+
+  private static final String ID = "$id";
+  private static final String DEFS = "$defs";
+  private static final String REF = "$ref";
+  private static final String SCHEMA = "$schema";
+  private static final String STAMPED_ID = "id";
+  private static final String TITLE = "title";
+  private static final String DESCRIPTION = "description";
+  private static final String CONNECTION_TYPE = "connectionType";
+  private static final String ELEMENT = "element";
+  private static final String SOURCE = "source";
+  private static final String TARGET = "target";
+  private static final String OPEN_DATA_ACCESS = "openDataAccess";
+  private static final String NODES = "nodes";
+  private static final String UI_STYLES = "x-ui-styles";
+  private static final String SOURCE_REF = "sourceRef";
+  private static final String LOOKUP_SOURCE_REF = "lookupSourceRef";
+  private static final String MAPPING_REF = "mappingRef";
+  private static final String SINK_REF = "sinkRef";
+  private static final String NAME = "name";
+  private static final String SLUG = "slug";
+  private static final String STANDARD = "standard";
+  private static final String VERSION = "version";
+  private static final String SLD_CONTENT = "sldContent";
+  private static final String LAYER_NAME = "layerName";
+  private static final String DEFAULT_STYLE_REF = "defaultStyleRef";
+  private static final String ALTERNATIVE_STYLE_REFS = "alternativeStyleRefs";
+  private static final String KEYWORDS = "keywords";
+  private static final String ATTRIBUTE = "attribute";
+  private static final String GEOMETRY_COLUMN_REF = "geometryColumnRef";
+  private static final String CQL_FILTER = "cqlFilter";
+  private static final String CRS = "crs";
+  private static final String NATIVE_BOUNDING_BOX = "nativeBoundingBox";
+  private static final String LAT_LON_BOUNDING_BOX = "latLonBoundingBox";
+
+  private final InstallationRepository installationRepository;
+  private final DataStructureService dataStructureService;
+  private final DataStructureVersionService dataStructureVersionService;
+  private final DataSourceService dataSourceService;
+  private final DataSetService dataSetService;
+  private final MappingService mappingService;
+  private final DataSinkService dataSinkService;
+  private final PipelineService pipelineService;
+  private final StyleService styleService;
+  private final LayerService layerService;
+  private final PublishedStructureRepository publishedStructureRepository;
+  private final ModelRegistryGateway modelRegistryGateway;
+  private final UninstallGuard uninstallGuard;
+
+  /**
+   * The install builds the inputs of APIs, styles and layers itself, so no controller validates
+   * them; the install applies the same constraints with this validator.
+   */
+  private final Validator validator;
+
+  /**
+   * What one package member became on this instance. Sources reference structures by version id,
+   * mappings and pipeline nodes by versioned URN, pipelines their sources and sinks by shell id,
+   * the journal by both URNs — so the copy is remembered in every form the later members need. The
+   * kind lets a reference be checked against what the referring field expects; element identities
+   * minted inside a structure carry no kind, because no member may reference them.
+   */
+  private record Minted(
+      PackageMemberKind kind,
+      String logicalUrn,
+      String versionedUrn,
+      UUID shellId,
+      UUID versionId) {}
+
+  /** Everything one install accumulates while it works through the members. */
+  private static final class Run {
+    final Installation installation;
+    final UUID datapoolId;
+    final Map<String, Minted> minted = new LinkedHashMap<>();
+    final Map<String, DataSet> datasets = new LinkedHashMap<>();
+
+    /** The API members of each dataset member, by the dataset's package URN. */
+    final Map<String, List<PackageMemberInputDTO>> apisByDataset;
+
+    Run(
+        Installation installation,
+        UUID datapoolId,
+        Map<String, List<PackageMemberInputDTO>> apisByDataset) {
+      this.installation = installation;
+      this.datapoolId = datapoolId;
+      this.apisByDataset = apisByDataset;
+    }
+  }
+
+  @Transactional
+  public Installation install(InstallationInputDTO input) {
+    PackageManifestInputDTO manifest = input.getPackageManifest();
+    // A policy, not a technical limit: two copies of the same package on one instance serve
+    // nobody. Updating means installing the new version and uninstalling the old one.
+    if (installationRepository.existsByPackageIdAndUninstalledAtIsNull(manifest.getId())) {
+      throw alreadyInstalled(manifest.getId());
+    }
+    List<PackageMemberInputDTO> members =
+        manifest.getMembers().stream()
+            .sorted(Comparator.comparing(PackageMemberInputDTO::getKind))
+            .toList();
+    requireDatapoolWhereNeeded(members, input.getDatapoolId(), manifest.getId());
+
+    Map<String, List<PackageMemberInputDTO>> apisByDataset = apisByDataset(members);
+
+    Installation installation = new Installation();
+    installation.setPackageId(manifest.getId());
+    installation.setPackageVersion(manifest.getVersion());
+    claim(installation);
+    Run run = new Run(installation, input.getDatapoolId(), apisByDataset);
+
+    for (PackageMemberInputDTO member : members) {
+      switch (member.getKind()) {
+        case DATASTRUCTURE -> installation.addArtifact(installDataStructure(member, run));
+        case DATASOURCE -> installation.addArtifact(installDataSource(member, run));
+        case DATASET -> installDataSet(member, run).forEach(installation::addArtifact);
+        case API -> {
+          // Installed with its dataset, see installDataSet.
+        }
+        case MAPPING -> installation.addArtifact(installMapping(member, run));
+        case DATASINK -> installation.addArtifact(installDataSink(member, run));
+        case PIPELINE -> installation.addArtifact(installPipeline(member, run));
+        case STYLE -> installation.addArtifact(installStyle(member, run));
+        case LAYER -> installation.addArtifact(installLayer(member, run));
+      }
+    }
+    return installationRepository.save(installation);
+  }
+
+  /**
+   * Writes the installation before the first artifact. The database allows one active installation
+   * per package, so a second install of the same package that runs at the same time waits here
+   * until the first one commits, and then fails before it creates anything. The check before the
+   * install gives the same answer in the usual case, where the first install is complete.
+   */
+  private void claim(Installation installation) {
+    try {
+      installationRepository.saveAndFlush(installation);
+    } catch (DataIntegrityViolationException e) {
+      throw alreadyInstalled(installation.getPackageId());
+    }
+  }
+
+  private static UniqueConstraintViolationException alreadyInstalled(String packageId) {
+    return new UniqueConstraintViolationException(
+        ("Package '%s' is already installed on this instance; updating an installation is not"
+                + " supported yet.")
+            .formatted(packageId));
+  }
+
+  @Transactional(readOnly = true)
+  public Page<Installation> findAll(Pageable pageable) {
+    return installationRepository.findAllByOrderByCreatedAtDesc(pageable);
+  }
+
+  @Transactional(readOnly = true)
+  public Installation findByIdOrThrow(UUID id) {
+    return installationRepository
+        .findById(id)
+        .orElseThrow(() -> new ResourceNotFoundException("Installation", id.toString()));
+  }
+
+  /**
+   * Removes what an installation created and keeps its record.
+   *
+   * <p>The uninstall first makes sure that each artifact can be removed, and changes nothing if one
+   * cannot: a Dataset that is released or has infrastructure, and an artifact that something
+   * outside the installation uses, stop the uninstall. Then the artifacts are removed in the
+   * reverse order of the install: first the Dataset, then the Data sources, then the Data
+   * structures. Each removal goes through the service of its artifact, so the rules of the platform
+   * apply. All changes are in one transaction.
+   *
+   * <p>The Dataset is removed with all that it contains. This includes Pipelines, Data sinks and
+   * Mappings that were added after the install.
+   *
+   * <p>An artifact that no longer exists is skipped, because an operator can delete it by hand. An
+   * artifact that the install reused is not removed, because it does not belong to the
+   * installation. An installation that is already uninstalled stays as it is.
+   *
+   * @param id the id of the installation
+   * @throws ResourceNotFoundException if the installation does not exist
+   * @throws ResourceInUseException if a Dataset of the installation is released or has
+   *     infrastructure on the platform, or if an artifact is still in use
+   * @throws de.civitascore.portal.util.SagaInFlightException if an operation on a Dataset of the
+   *     installation is in progress
+   */
+  @Transactional
+  public void uninstall(UUID id) {
+    Installation installation = findByIdOrThrow(id);
+    if (installation.isUninstalled()) {
+      return;
+    }
+    List<InstalledArtifact> created =
+        installation.getArtifacts().stream()
+            .filter(line -> line.getAction() == InstalledArtifactAction.CREATED)
+            .toList();
+    uninstallGuard.requireRemovable(id, created);
+
+    created.reversed().forEach(this::remove);
+
+    installation.setUninstalledAt(LocalDateTime.now());
+    installationRepository.save(installation);
+    log.info(
+        "Uninstalled installation {} of package {}",
+        id,
+        Encode.forJava(installation.getPackageId()));
+  }
+
+  /**
+   * Removes the artifact of one journal line. The guard refused the known cases before the first
+   * removal, thus a refusal here is not usual. It names the artifact, because the message of the
+   * artifact service does not, and a package can contain more than one of a kind.
+   */
+  private void remove(InstalledArtifact line) {
+    try {
+      switch (line.getArtifactType()) {
+        case DATA_SET -> removeDataSet(line.getShellId());
+        case DATA_SOURCE -> removeDataSource(line.getShellId());
+        case DATA_STRUCTURE -> removeDataStructure(line.getShellId());
+        case MAPPING, DATA_SINK, PIPELINE, NAMED_API, STYLE, LAYER -> {
+          // The Dataset removes its Mappings, Data sinks, Pipelines, named APIs, Styles and
+          // Layers.
+        }
+      }
+    } catch (ResourceInUseException e) {
+      throw new ResourceInUseException(
+          e.getResourceType(),
+          e.getResourceId(),
+          "Cannot uninstall because '%s' is in use. %s".formatted(line.getName(), e.getMessage()),
+          e.getBlockedBy());
+    }
+  }
+
+  private void removeDataSet(UUID dataSetId) {
+    if (!dataSetService.existsById(dataSetId)) {
+      logSkipped(InstalledArtifactType.DATA_SET, dataSetId);
+      return;
+    }
+    dataSetService.deleteById(dataSetId);
+  }
+
+  /** The install released the Data source, and a released Data source cannot be deleted. */
+  private void removeDataSource(UUID dataSourceId) {
+    Optional<DataSource> dataSource = dataSourceService.findById(dataSourceId);
+    if (dataSource.isEmpty()) {
+      logSkipped(InstalledArtifactType.DATA_SOURCE, dataSourceId);
+      return;
+    }
+    if (dataSource.get().getDataSourceStatus() == DataSourceStatus.AVAILABLE) {
+      dataSourceService.unrelease(dataSourceId);
+    }
+    dataSourceService.deleteById(dataSourceId);
+  }
+
+  private void removeDataStructure(UUID dataStructureId) {
+    if (!dataStructureService.existsById(dataStructureId)) {
+      logSkipped(InstalledArtifactType.DATA_STRUCTURE, dataStructureId);
+      return;
+    }
+    dataStructureService.deleteById(dataStructureId);
+  }
+
+  private static void logSkipped(InstalledArtifactType type, UUID shellId) {
+    log.info("Uninstall skips {} {} because it no longer exists", type, shellId);
+  }
+
+  /**
+   * The datapool is instance knowledge no package can carry, and sources and datasets cannot exist
+   * without one — so it is demanded up front, before anything is created.
+   */
+  private static void requireDatapoolWhereNeeded(
+      List<PackageMemberInputDTO> members, UUID datapoolId, String packageId) {
+    boolean needsPool =
+        members.stream()
+            .anyMatch(
+                m ->
+                    m.getKind() == PackageMemberKind.DATASOURCE
+                        || m.getKind() == PackageMemberKind.DATASET);
+    if (needsPool && datapoolId == null) {
+      throw new InvalidInputException(
+          "datapoolId",
+          packageId,
+          "The package ships data sources or datasets; datapoolId names the datapool they are"
+              + " installed into.");
+    }
+  }
+
+  /**
+   * Creates the shell first, because the minted URN derives from the shell's id — exactly as the
+   * editor does it — then stores the model under that identity and releases both. The package's own
+   * {@code $id}s are replaced, not kept: root and every inline {@code $defs} member get the minted
+   * URNs, and the replaced values are remembered so later members can be rewritten to point at the
+   * copies.
+   */
+  private InstalledArtifact installDataStructure(PackageMemberInputDTO member, Run run) {
+    String name = displayName(member);
+    String description = requireDescription(member);
+
+    DataStructureInputDTO structureInput = new DataStructureInputDTO();
+    structureInput.setName(name);
+    structureInput.setDescription(description);
+    DataStructure shell = dataStructureService.create(structureInput);
+
+    String localUrn = DataStructureUrns.dataStructure(name, shell.getId());
+    Map<String, Object> model = withMintedIdentities(member.getContent(), localUrn, run.minted);
+
+    DataStructureVersionInputDTO versionInput = new DataStructureVersionInputDTO();
+    versionInput.setDataStructureId(shell.getId());
+    versionInput.setDescription(description);
+    versionInput.setModelName(name);
+    versionInput.setModel(model);
+    DataStructureVersion version = dataStructureVersionService.create(versionInput);
+
+    // Released here, not later: a source links only an AVAILABLE version of an AVAILABLE
+    // structure, and the package's sources come next. Version first, then the shell - which
+    // checks its own versions collection, so the new version is registered on the managed shell
+    // (the version service only sets the owning side) before the shell's release looks at it.
+    dataStructureVersionService.release(version.getId());
+    shell.getDataStructureVersions().add(version);
+    dataStructureService.release(shell.getId());
+
+    String logicalUrn = modelRegistryGateway.logicalUrn(version.getModelUrn());
+    run.minted.put(
+        key(member.getUrn()),
+        new Minted(
+            PackageMemberKind.DATASTRUCTURE,
+            logicalUrn,
+            version.getModelUrn(),
+            shell.getId(),
+            version.getId()));
+    return line(
+        InstalledArtifactType.DATA_STRUCTURE,
+        name,
+        shell.getId(),
+        logicalUrn,
+        version.getModelUrn(),
+        member.getUrn());
+  }
+
+  /**
+   * The member's content is the CORE datasource document: {@code connectionType} and, as {@code
+   * element}, the package URN of the structure it reads; everything else is connector
+   * configuration. The service normalises and encrypts that configuration and validates it against
+   * the connector; the install only translates the document into the service's input and binds the
+   * structure reference to the copy made earlier.
+   */
+  private InstalledArtifact installDataSource(PackageMemberInputDTO member, Run run) {
+    String name = displayName(member);
+    Map<String, Object> content = member.getContent();
+    ConnectorType connectorType =
+        connectorType(requireString(content, CONNECTION_TYPE, member), member);
+    Minted structure =
+        resolveReference(
+            requireString(content, ELEMENT, member),
+            ELEMENT,
+            PackageMemberKind.DATASTRUCTURE,
+            member,
+            run);
+    if (structure.versionId() == null) {
+      // A platform-published structure resolves, but has no version a source could link.
+      throw new InvalidInputException(
+          ELEMENT, member.getUrn(), "'element' must reference a data structure of this package.");
+    }
+    // The document's own labels name the source; the connector schema knows neither key.
+    Map<String, Object> configuration = new LinkedHashMap<>(content);
+    configuration
+        .keySet()
+        .removeAll(List.of(CONNECTION_TYPE, ELEMENT, SCHEMA, STAMPED_ID, TITLE, DESCRIPTION));
+
+    DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
+    scope.setType(DatapoolScopeType.SPECIFIC);
+    scope.setDatapoolIds(List.of(run.datapoolId));
+
+    DataSourceInputDTO input = new DataSourceInputDTO();
+    input.setName(name);
+    input.setDescription(requireDescription(member));
+    input.setConnectorType(connectorType);
+    input.setConfiguration(configuration);
+    input.setDataStructureVersionId(structure.versionId());
+    input.setDatapoolScope(scope);
+    DataSource source = dataSourceService.create(input);
+    // A pipeline links only a released source; releasing here is what makes the package's own
+    // pipelines installable, and what an operator would do by hand.
+    dataSourceService.release(source.getId());
+
+    run.minted.put(
+        key(member.getUrn()),
+        new Minted(
+            PackageMemberKind.DATASOURCE,
+            source.getConfigurationLogicalUrn(),
+            source.getConfigurationUrn(),
+            source.getId(),
+            null));
+    return line(
+        InstalledArtifactType.DATA_SOURCE,
+        name,
+        source.getId(),
+        source.getConfigurationLogicalUrn(),
+        source.getConfigurationUrn(),
+        member.getUrn());
+  }
+
+  /**
+   * The dataset is the container the package's mappings, sinks and pipelines belong to. It stays
+   * DRAFT: releasing a dataset rolls out infrastructure, and that remains the operator's explicit
+   * decision. The first dataset of a package is also named on the installation header, so the
+   * install list can show it without reading the lines. The structures and sources of the package
+   * become members of the dataset's manifest the way they do in the editor: through the pipeline
+   * that reaches them, which links its whole flow when it is stored.
+   *
+   * <p>The dataset's named APIs come with it. The dataset reconciles its APIs as one list and
+   * checks them as a whole (unique slugs, at most one OWS API), so the install hands over every API
+   * member of the dataset at creation and records one line per API after the dataset's own.
+   */
+  private List<InstalledArtifact> installDataSet(PackageMemberInputDTO member, Run run) {
+    String name = displayName(member);
+    DataSetInputDTO input = new DataSetInputDTO();
+    input.setName(name);
+    input.setDescription(requireDescription(member));
+    input.setDatapoolId(run.datapoolId);
+    if (member.getContent().get(OPEN_DATA_ACCESS) instanceof Boolean openDataAccess) {
+      input.setOpenDataAccess(openDataAccess);
+    }
+    List<PackageMemberInputDTO> apis =
+        run.apisByDataset.getOrDefault(key(member.getUrn()), List.of());
+    if (!apis.isEmpty()) {
+      input.setNamedApis(apis.stream().map(this::namedApiInput).toList());
+    }
+    DataSet dataSet = dataSetService.create(input);
+
+    run.datasets.put(key(member.getUrn()), dataSet);
+    // The platform does not pin the manifest of a dataset to a version, so the copy and its
+    // journal line carry the logical URN only.
+    run.minted.put(
+        key(member.getUrn()),
+        new Minted(
+            PackageMemberKind.DATASET,
+            dataSet.getManifestLogicalUrn(),
+            null,
+            dataSet.getId(),
+            null));
+    if (run.installation.getDataSetId() == null) {
+      run.installation.setDataSetId(dataSet.getId());
+      run.installation.setDataSetName(dataSet.getName());
+    }
+    List<InstalledArtifact> lines = new ArrayList<>();
+    lines.add(
+        line(
+            InstalledArtifactType.DATA_SET,
+            name,
+            dataSet.getId(),
+            dataSet.getManifestLogicalUrn(),
+            null,
+            member.getUrn()));
+    for (PackageMemberInputDTO api : apis) {
+      String slug = requireString(api.getContent(), SLUG, api);
+      UUID apiId =
+          dataSet.getNamedApis().stream()
+              .filter(created -> slug.equals(created.getSlug()))
+              .map(NamedApi::getId)
+              .findFirst()
+              .orElse(null);
+      lines.add(
+          line(InstalledArtifactType.NAMED_API, apiName(api), apiId, null, null, api.getUrn()));
+    }
+    return lines;
+  }
+
+  /**
+   * Groups the API members by the dataset member they belong to. An API names its dataset like a
+   * sink does, or omits it when the package ships exactly one dataset. Checked before anything is
+   * created, so a package with a misplaced API changes nothing.
+   */
+  private Map<String, List<PackageMemberInputDTO>> apisByDataset(
+      List<PackageMemberInputDTO> members) {
+    List<String> datasets =
+        members.stream()
+            .filter(member -> member.getKind() == PackageMemberKind.DATASET)
+            .map(member -> key(member.getUrn()))
+            .toList();
+    Map<String, List<PackageMemberInputDTO>> byDataset = new LinkedHashMap<>();
+    for (PackageMemberInputDTO api : members) {
+      if (api.getKind() != PackageMemberKind.API) {
+        continue;
+      }
+      String dataset;
+      if (api.getDataset() != null && !api.getDataset().isBlank()) {
+        dataset = key(api.getDataset());
+        if (!datasets.contains(dataset)) {
+          throw new InvalidInputException(
+              "dataset",
+              api.getUrn(),
+              "Member '%s' names dataset '%s', which is not a dataset member of this package."
+                  .formatted(api.getUrn(), api.getDataset()));
+        }
+      } else if (datasets.size() == 1) {
+        dataset = datasets.getFirst();
+      } else {
+        throw new InvalidInputException(
+            "dataset",
+            api.getUrn(),
+            datasets.isEmpty()
+                ? "Member '%s' belongs to a dataset, but the package ships none."
+                    .formatted(api.getUrn())
+                : "Member '%s' must name its dataset: the package ships %d."
+                    .formatted(api.getUrn(), datasets.size()));
+      }
+      byDataset.computeIfAbsent(dataset, unused -> new ArrayList<>()).add(api);
+    }
+    return byDataset;
+  }
+
+  /**
+   * The member's content as the dataset endpoint takes a named API: {@code name}, {@code slug},
+   * {@code standard} ({@code OWS}, {@code STA} or {@code CUSTOM}), and optionally {@code version}
+   * and {@code description}. The route and its id are the platform's, so a package never carries
+   * them.
+   */
+  private NamedApiInputDTO namedApiInput(PackageMemberInputDTO member) {
+    Map<String, Object> content = member.getContent();
+    NamedApiInputDTO api = new NamedApiInputDTO();
+    api.setName(apiName(member));
+    api.setSlug(requireString(content, SLUG, member));
+    api.setStandard(apiStandard(requireString(content, STANDARD, member), member));
+    api.setVersion(optionalString(content, VERSION));
+    api.setDescription(optionalString(content, DESCRIPTION));
+    requireValid(api, member);
+    return api;
+  }
+
+  /** The API's own name, falling back to the member's display name. */
+  private static String apiName(PackageMemberInputDTO member) {
+    String name = optionalString(member.getContent(), NAME);
+    return name != null ? name : displayName(member);
+  }
+
+  private static ApiStandard apiStandard(String standard, PackageMemberInputDTO member) {
+    try {
+      return ApiStandard.valueOf(standard.toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw new InvalidInputException(
+          STANDARD,
+          member.getUrn(),
+          "Unknown API standard '%s'; expected OWS, STA or CUSTOM.".formatted(standard));
+    }
+  }
+
+  /**
+   * The member's content is the CORE mapping document. {@code source} and {@code target} name
+   * structures by package URN and are bound to the versioned URN of the copies — the form the
+   * mapping compiler requires — before the service stores the mapping under its dataset, mints its
+   * URN and links it into the dataset's manifest.
+   */
+  private InstalledArtifact installMapping(PackageMemberInputDTO member, Run run) {
+    String name = displayName(member);
+    DataSet dataSet = datasetFor(member, run);
+    Map<String, Object> document = new LinkedHashMap<>(member.getContent());
+    document.remove(SCHEMA);
+    document.remove(STAMPED_ID);
+    for (String field : List.of(SOURCE, TARGET)) {
+      if (document.get(field) instanceof String reference && !reference.isBlank()) {
+        Minted structure =
+            resolveReference(reference, field, PackageMemberKind.DATASTRUCTURE, member, run);
+        document.put(field, structure.versionedUrn());
+      }
+    }
+    if (!(document.get(TITLE) instanceof String title) || title.isBlank()) {
+      document.put(TITLE, name);
+    }
+    ModelRegistryGateway.ModelPin pin = mappingService.store(dataSet.getId(), null, document);
+
+    run.minted.put(
+        key(member.getUrn()),
+        new Minted(PackageMemberKind.MAPPING, pin.logicalUrn(), pin.versionedUrn(), null, null));
+    return line(
+        InstalledArtifactType.MAPPING,
+        name,
+        null,
+        pin.logicalUrn(),
+        pin.versionedUrn(),
+        member.getUrn());
+  }
+
+  /**
+   * The member's content is the CORE datasink document: {@code connectionType} picks the sink type,
+   * {@code element} names, by package URN, the structure whose rows the sink writes. The service
+   * validates the type-specific fields, authorizes the referenced structure and mints the
+   * configuration artifact; the install binds the reference to the copy and hands over the rest.
+   * The document's own labels are stripped rather than passed through — a FROST sink accepts no key
+   * but the reference — and the sink is named by its journal line and its registry artifact.
+   */
+  private InstalledArtifact installDataSink(PackageMemberInputDTO member, Run run) {
+    String name = displayName(member);
+    DataSet dataSet = datasetFor(member, run);
+    Map<String, Object> content = member.getContent();
+    DataSinkType type = dataSinkType(requireString(content, CONNECTION_TYPE, member), member);
+
+    Map<String, Object> configuration = new LinkedHashMap<>(content);
+    configuration
+        .keySet()
+        .removeAll(List.of(CONNECTION_TYPE, SCHEMA, STAMPED_ID, TITLE, DESCRIPTION));
+    if (configuration.get(ELEMENT) instanceof String reference && !reference.isBlank()) {
+      Minted structure =
+          resolveReference(reference, ELEMENT, PackageMemberKind.DATASTRUCTURE, member, run);
+      configuration.put(ELEMENT, structure.versionedUrn());
+    }
+
+    DataSinkInputDTO input = new DataSinkInputDTO();
+    input.setDataSetId(dataSet.getId());
+    input.setDataSinkType(type);
+    input.setConfiguration(configuration);
+    DataSink sink = dataSinkService.create(input);
+
+    run.minted.put(
+        key(member.getUrn()),
+        new Minted(
+            PackageMemberKind.DATASINK,
+            sink.getConfigurationLogicalUrn(),
+            sink.getConfigurationUrn(),
+            sink.getId(),
+            null));
+    return line(
+        InstalledArtifactType.DATA_SINK,
+        name,
+        sink.getId(),
+        sink.getConfigurationLogicalUrn(),
+        sink.getConfigurationUrn(),
+        member.getUrn());
+  }
+
+  /**
+   * The member's content is the CORE pipeline document. Its nodes reference the package's sources,
+   * mappings and sinks by package URN; each reference is bound to the versioned URN of the copy —
+   * what the closure walk and the flow compiler read — and the shells of the sources and sinks it
+   * reaches are handed to the service as the links it maintains. The service checks that every
+   * source is released for the dataset's pool, stores the model and links the flow's whole closure
+   * into the dataset's manifest.
+   *
+   * <p>The pipeline is stored without styles. The styles of a pipeline are the working state of the
+   * editor: they hold the ids of the sources and sinks of the instance that wrote them, and the
+   * editor builds the model from them on each save. Styles from a package would thus name artifacts
+   * that do not exist here. The layout travels in the model, as {@code x-ui-position} on each node,
+   * and the editor derives its graph from the model.
+   */
+  private InstalledArtifact installPipeline(PackageMemberInputDTO member, Run run) {
+    String name = displayName(member);
+    DataSet dataSet = datasetFor(member, run);
+    Map<String, Object> model = new LinkedHashMap<>(member.getContent());
+    model.remove(SCHEMA);
+    model.remove(STAMPED_ID);
+    model.remove(UI_STYLES);
+
+    Set<UUID> sourceIds = new LinkedHashSet<>();
+    Set<UUID> sinkIds = new LinkedHashSet<>();
+    model.put(NODES, withBoundReferences(model.get(NODES), member, run, sourceIds, sinkIds));
+
+    PipelineInputDTO input = new PipelineInputDTO();
+    input.setDataSetId(dataSet.getId());
+    input.setName(name);
+    input.setDescription(member.getDescription());
+    input.setModel(model);
+    input.setDataSourceIds(sourceIds);
+    input.setDataSinkIds(sinkIds);
+    Pipeline pipeline = pipelineService.create(input);
+
+    run.minted.put(
+        key(member.getUrn()),
+        new Minted(
+            PackageMemberKind.PIPELINE,
+            pipeline.getModelLogicalUrn(),
+            pipeline.getModelUrn(),
+            pipeline.getId(),
+            null));
+    return line(
+        InstalledArtifactType.PIPELINE,
+        name,
+        pipeline.getId(),
+        pipeline.getModelLogicalUrn(),
+        pipeline.getModelUrn(),
+        member.getUrn());
+  }
+
+  /**
+   * The member's content names the style and carries its SLD ({@code name}, {@code sldContent}).
+   * The service checks the SLD the way GeoServer reads it and keeps names unique within the
+   * dataset. The install binds the style to its dataset and remembers the copy's id, because a
+   * layer references its styles by id.
+   */
+  private InstalledArtifact installStyle(PackageMemberInputDTO member, Run run) {
+    DataSet dataSet = datasetFor(member, run);
+    Map<String, Object> content = member.getContent();
+    StyleInputDTO input = new StyleInputDTO();
+    input.setDataSetId(dataSet.getId());
+    input.setName(requireString(content, NAME, member));
+    input.setSldContent(requireString(content, SLD_CONTENT, member));
+    requireValid(input, member);
+    Style style = styleService.create(input);
+
+    run.minted.put(
+        key(member.getUrn()), new Minted(PackageMemberKind.STYLE, null, null, style.getId(), null));
+    return line(
+        InstalledArtifactType.STYLE, style.getName(), style.getId(), null, null, member.getUrn());
+  }
+
+  /**
+   * The member's content is the layer as the layer endpoint takes it, with its references in
+   * package form: {@code sinkRef} names the data sink the layer publishes, {@code defaultStyleRef}
+   * and {@code alternativeStyleRefs} its styles, each by package URN. The install binds them to the
+   * ids of the copies made earlier; the service checks that all of them belong to the dataset. A
+   * layer is created in a DRAFT dataset, so its table need not exist yet: GeoServer reads it at
+   * release.
+   */
+  private InstalledArtifact installLayer(PackageMemberInputDTO member, Run run) {
+    DataSet dataSet = datasetFor(member, run);
+    Map<String, Object> content = member.getContent();
+    LayerInputDTO input = new LayerInputDTO();
+    input.setDataSetId(dataSet.getId());
+    input.setDataSinkId(
+        resolveReference(
+                requireString(content, SINK_REF, member),
+                SINK_REF,
+                PackageMemberKind.DATASINK,
+                member,
+                run)
+            .shellId());
+    if (content.get(DEFAULT_STYLE_REF) instanceof String reference && !reference.isBlank()) {
+      input.setDefaultStyleId(
+          resolveReference(reference, DEFAULT_STYLE_REF, PackageMemberKind.STYLE, member, run)
+              .shellId());
+    }
+    List<String> alternativeStyles = stringList(content, ALTERNATIVE_STYLE_REFS, member);
+    if (alternativeStyles != null) {
+      input.setAlternativeStyleIds(
+          alternativeStyles.stream()
+              .map(
+                  reference ->
+                      resolveReference(
+                              reference,
+                              ALTERNATIVE_STYLE_REFS,
+                              PackageMemberKind.STYLE,
+                              member,
+                              run)
+                          .shellId())
+              .toList());
+    }
+    input.setLayerName(requireString(content, LAYER_NAME, member));
+    input.setTitle(optionalString(content, TITLE));
+    input.setDescription(optionalString(content, DESCRIPTION));
+    input.setKeywords(stringList(content, KEYWORDS, member));
+    input.setAttribute(stringList(content, ATTRIBUTE, member));
+    input.setGeometryColumnRef(optionalString(content, GEOMETRY_COLUMN_REF));
+    input.setCqlFilter(optionalString(content, CQL_FILTER));
+    input.setCrs(optionalString(content, CRS));
+    input.setNativeBoundingBox(optionalMap(content, NATIVE_BOUNDING_BOX, member));
+    input.setLatLonBoundingBox(optionalMap(content, LAT_LON_BOUNDING_BOX, member));
+    requireValid(input, member);
+    Layer layer = layerService.create(input);
+
+    return line(
+        InstalledArtifactType.LAYER,
+        layer.getLayerName(),
+        layer.getId(),
+        null,
+        null,
+        member.getUrn());
+  }
+
+  /**
+   * Applies the constraints the endpoint of the input would apply. Reports the first violation, by
+   * field, so the same package always fails with the same message.
+   */
+  private <T> void requireValid(T input, PackageMemberInputDTO member) {
+    Set<ConstraintViolation<T>> violations = validator.validate(input);
+    violations.stream()
+        .min(
+            Comparator.comparing(
+                (ConstraintViolation<T> violation) -> violation.getPropertyPath().toString()))
+        .ifPresent(
+            violation -> {
+              throw new InvalidInputException(
+                  violation.getPropertyPath().toString(),
+                  member.getUrn(),
+                  "Member '%s': %s %s"
+                      .formatted(
+                          member.getUrn(), violation.getPropertyPath(), violation.getMessage()));
+            });
+  }
+
+  private static String optionalString(Map<String, Object> content, String field) {
+    return content.get(field) instanceof String value && !value.isBlank() ? value : null;
+  }
+
+  /** A list of strings, or null when the field is absent. */
+  private static List<String> stringList(
+      Map<String, Object> content, String field, PackageMemberInputDTO member) {
+    Object value = content.get(field);
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof List<?> list && list.stream().allMatch(String.class::isInstance)) {
+      return list.stream().map(String.class::cast).toList();
+    }
+    throw new InvalidInputException(
+        field,
+        member.getUrn(),
+        "Member '%s': '%s' must be a list of strings.".formatted(member.getUrn(), field));
+  }
+
+  /** An object, or null when the field is absent. */
+  private static Map<String, Object> optionalMap(
+      Map<String, Object> content, String field, PackageMemberInputDTO member) {
+    Object value = content.get(field);
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Map<?, ?> map) {
+      return stringKeyed(map);
+    }
+    throw new InvalidInputException(
+        field,
+        member.getUrn(),
+        "Member '%s': '%s' must be an object.".formatted(member.getUrn(), field));
+  }
+
+  /**
+   * A copy of the node list with every artifact reference bound to its copy. Only the reference
+   * fields are touched; the platform otherwise treats pipeline content as opaque, and so does the
+   * install. The shells of referenced sources and sinks are collected on the way, because the
+   * pipeline service links those by id.
+   */
+  private List<Object> withBoundReferences(
+      Object nodes, PackageMemberInputDTO member, Run run, Set<UUID> sourceIds, Set<UUID> sinkIds) {
+    if (!(nodes instanceof List<?> list)) {
+      throw new InvalidInputException(
+          NODES, member.getUrn(), "Member '%s' needs 'nodes'.".formatted(member.getUrn()));
+    }
+    List<Object> bound = new ArrayList<>(list.size());
+    for (Object node : list) {
+      if (!(node instanceof Map<?, ?> raw)) {
+        bound.add(node);
+        continue;
+      }
+      Map<String, Object> copy = stringKeyed(raw);
+      bind(copy, SOURCE_REF, PackageMemberKind.DATASOURCE, member, run, sourceIds);
+      bind(copy, LOOKUP_SOURCE_REF, PackageMemberKind.DATASOURCE, member, run, sourceIds);
+      bind(copy, MAPPING_REF, PackageMemberKind.MAPPING, member, run, null);
+      bind(copy, SINK_REF, PackageMemberKind.DATASINK, member, run, sinkIds);
+      bound.add(copy);
+    }
+    return bound;
+  }
+
+  /** Rewrites one reference field of a node, if present, and collects the copy's shell. */
+  private void bind(
+      Map<String, Object> node,
+      String field,
+      PackageMemberKind expected,
+      PackageMemberInputDTO member,
+      Run run,
+      Set<UUID> shells) {
+    if (!(node.get(field) instanceof String reference) || reference.isBlank()) {
+      return;
+    }
+    Minted target = resolveReference(reference, field, expected, member, run);
+    node.put(field, target.versionedUrn());
+    if (shells != null) {
+      shells.add(target.shellId());
+    }
+  }
+
+  /**
+   * The dataset a dataset-bound member belongs to: the one it names, or the package's only one.
+   * Members are installed in kind order, so every dataset of the package exists by the time this is
+   * asked.
+   */
+  private DataSet datasetFor(PackageMemberInputDTO member, Run run) {
+    if (member.getDataset() != null && !member.getDataset().isBlank()) {
+      DataSet named = run.datasets.get(key(member.getDataset()));
+      if (named == null) {
+        throw new InvalidInputException(
+            "dataset",
+            member.getUrn(),
+            "Member '%s' names dataset '%s', which is not a dataset member of this package."
+                .formatted(member.getUrn(), member.getDataset()));
+      }
+      return named;
+    }
+    if (run.datasets.size() == 1) {
+      return run.datasets.values().iterator().next();
+    }
+    throw new InvalidInputException(
+        "dataset",
+        member.getUrn(),
+        run.datasets.isEmpty()
+            ? "Member '%s' belongs to a dataset, but the package ships none."
+                .formatted(member.getUrn())
+            : "Member '%s' must name its dataset: the package ships %d."
+                .formatted(member.getUrn(), run.datasets.size()));
+  }
+
+  /**
+   * What a package URN became on this instance, checked against the kind the referring field
+   * expects. Members of this package resolve to their copies. A structure the platform publishes
+   * (the FROST port structures) resolves to itself: it carries the same URN on every instance and
+   * belongs to no package, so a reference to it is kept, not rewritten. Binding to artifacts
+   * installed earlier, by origin, is a later increment. The order of kinds guarantees that whatever
+   * a member may reference has already been installed.
+   */
+  private Minted resolveReference(
+      String reference,
+      String field,
+      PackageMemberKind expected,
+      PackageMemberInputDTO member,
+      Run run) {
+    Minted minted = run.minted.get(key(reference));
+    if (minted == null) {
+      minted =
+          publishedStructureRepository
+              .findByLogicalUrn(key(reference))
+              .map(InstallationService::published)
+              .orElseThrow(
+                  () ->
+                      new InvalidInputException(
+                          field,
+                          member.getUrn(),
+                          "Member '%s' references '%s' in '%s', which is not part of this package."
+                              .formatted(member.getUrn(), reference, field)));
+    }
+    if (minted.kind() != expected) {
+      throw new InvalidInputException(
+          field,
+          member.getUrn(),
+          "Member '%s' references '%s' in '%s', which is not a %s member."
+              .formatted(
+                  member.getUrn(), reference, field, expected.name().toLowerCase(Locale.ROOT)));
+    }
+    return minted;
+  }
+
+  /**
+   * A published structure has no shell and no version of its own in the portal; mappings and
+   * pipeline nodes bind to its versioned URN, which is all they need.
+   */
+  private static Minted published(PublishedStructure structure) {
+    return new Minted(
+        PackageMemberKind.DATASTRUCTURE,
+        structure.getLogicalUrn(),
+        structure.getVersionedUrn(),
+        null,
+        null);
+  }
+
+  /**
+   * The platform requires a description on structures, sources and datasets; a package member of
+   * those kinds carries it on the member or, as CORE documents do, inside its content.
+   */
+  private static String requireDescription(PackageMemberInputDTO member) {
+    if (member.getDescription() != null && !member.getDescription().isBlank()) {
+      return member.getDescription();
+    }
+    if (member.getContent().get(DESCRIPTION) instanceof String description
+        && !description.isBlank()) {
+      return description;
+    }
+    throw new InvalidInputException(
+        DESCRIPTION,
+        member.getUrn(),
+        "Member '%s' needs a description; the platform requires one for %s."
+            .formatted(member.getUrn(), member.getKind().name().toLowerCase(Locale.ROOT)));
+  }
+
+  private static ConnectorType connectorType(String connectionType, PackageMemberInputDTO member) {
+    try {
+      return ConnectorType.valueOf(connectionType.toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw new InvalidInputException(
+          CONNECTION_TYPE,
+          member.getUrn(),
+          "Unknown connectionType '%s'.".formatted(connectionType));
+    }
+  }
+
+  private static DataSinkType dataSinkType(String connectionType, PackageMemberInputDTO member) {
+    try {
+      return DataSinkType.valueOf(connectionType.toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw new InvalidInputException(
+          CONNECTION_TYPE,
+          member.getUrn(),
+          "Unknown sink connectionType '%s'.".formatted(connectionType));
+    }
+  }
+
+  private static String requireString(
+      Map<String, Object> content, String field, PackageMemberInputDTO member) {
+    if (content.get(field) instanceof String value && !value.isBlank()) {
+      return value;
+    }
+    throw new InvalidInputException(
+        field, member.getUrn(), "Member '%s' needs '%s'.".formatted(member.getUrn(), field));
+  }
+
+  /** Package URNs are compared version-free; a package may pin a version, the copy decides it. */
+  private String key(String packageUrn) {
+    return modelRegistryGateway.logicalUrn(packageUrn);
+  }
+
+  /** Jackson delivers string keys already; the copy makes that a type the services accept. */
+  private static Map<String, Object> stringKeyed(Map<?, ?> raw) {
+    Map<String, Object> copy = new LinkedHashMap<>();
+    raw.forEach((k, v) -> copy.put(String.valueOf(k), v));
+    return copy;
+  }
+
+  /**
+   * A copy of the model with the root {@code $id} and each inline {@code $defs} member's {@code
+   * $id} replaced by minted URNs. Members that are only a {@code $ref} to something existing are
+   * left alone. Only these two levels carry identities the registry would otherwise adopt as its
+   * own; deeper {@code $id}s are not part of the CORE data structure contract.
+   */
+  private Map<String, Object> withMintedIdentities(
+      Map<String, Object> content, String localUrn, Map<String, Minted> minted) {
+    Map<String, Object> model = new LinkedHashMap<>(content);
+    rememberOrigin(model.get(ID), localUrn, minted);
+    model.put(ID, localUrn);
+
+    if (model.get(DEFS) instanceof Map<?, ?> defs) {
+      Map<String, Object> rewrittenDefs = new LinkedHashMap<>();
+      defs.forEach(
+          (key, def) -> {
+            String memberName = String.valueOf(key);
+            if (def instanceof Map<?, ?> schema && !schema.containsKey(REF)) {
+              Map<String, Object> copy = stringKeyed(schema);
+              String elementUrn = DataStructureUrns.elementForMember(localUrn, memberName);
+              rememberOrigin(copy.get(ID), elementUrn, minted);
+              copy.put(ID, elementUrn);
+              rewrittenDefs.put(memberName, copy);
+            } else {
+              rewrittenDefs.put(memberName, def);
+            }
+          });
+      model.put(DEFS, rewrittenDefs);
+    }
+    return model;
+  }
+
+  /**
+   * Element identities inside a structure are minted with it but have no version of their own the
+   * install could pin, and no member may reference them; they are remembered by logical URN only,
+   * without a kind, so that a reference to one is refused with a clear message. The structure's own
+   * entry is written afterwards and takes precedence over the root origin remembered here.
+   */
+  private void rememberOrigin(Object packageId, String localUrn, Map<String, Minted> minted) {
+    if (packageId instanceof String origin && !origin.isBlank()) {
+      minted.putIfAbsent(key(origin), new Minted(null, localUrn, null, null, null));
+    }
+  }
+
+  /** The member's name, falling back to the document's title — the URN's name segment needs one. */
+  private static String displayName(PackageMemberInputDTO member) {
+    if (member.getName() != null && !member.getName().isBlank()) {
+      return member.getName();
+    }
+    if (member.getContent().get(TITLE) instanceof String title && !title.isBlank()) {
+      return title;
+    }
+    throw new InvalidInputException(
+        "name", member.getUrn(), "A package member needs a name or a document title.");
+  }
+
+  private static InstalledArtifact line(
+      InstalledArtifactType type,
+      String name,
+      UUID shellId,
+      String urn,
+      String versionedUrn,
+      String origin) {
+    InstalledArtifact artifact = new InstalledArtifact();
+    artifact.setArtifactType(type);
+    artifact.setName(name);
+    artifact.setShellId(shellId);
+    artifact.setUrn(urn);
+    artifact.setVersionedUrn(versionedUrn);
+    artifact.setOrigin(origin);
+    artifact.setAction(InstalledArtifactAction.CREATED);
+    return artifact;
+  }
+}

@@ -1,0 +1,49 @@
+meta {
+  name: Uninstall the uninstalled installation again (no change)
+  type: http
+  seq: 21
+}
+
+delete {
+  url: {{baseUrl}}/installations/{{flowInstallationId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  A second uninstall of the same installation has no effect: the answer is the same, and the time
+  of the first uninstall stays. The package has an active installation again (case 20). The
+  second uninstall does not touch it, because it removes what its own installation created.
+}
+
+script:post-response {
+  const axios = require('axios');
+  const options = { headers: { Authorization: `Bearer ${bru.getVar('accessToken')}` } };
+  const baseUrl = bru.getEnvVar('baseUrl');
+
+  // Each read must find its installation. If one does not, axios stops the script with the status
+  // in its message, and the tests below fail.
+  const first = await axios.get(`${baseUrl}/installations/${bru.getVar('flowInstallationId')}`, options);
+  bru.setVar('repeatedUninstalledAt', first.data.uninstalledAt);
+  const second = await axios.get(`${baseUrl}/installations/${bru.getVar('secondFlowInstallationId')}`, options);
+  // Variables hold text, so that a test compares the same type in each version of the runner.
+  bru.setVar('secondIsActive', second.status === 200 && second.data.uninstalledAt == null ? 'yes' : 'no');
+}
+
+tests {
+  test("should answer as the first uninstall did", function() {
+    expect(res.status).to.equal(204);
+  });
+
+  test("should keep the time of the first uninstall", function() {
+    expect(bru.getVar('repeatedUninstalledAt')).to.equal(bru.getVar('flowUninstalledAt'));
+  });
+
+  test("should leave the new installation of the package active", function() {
+    expect(bru.getVar('secondIsActive')).to.equal('yes');
+  });
+}

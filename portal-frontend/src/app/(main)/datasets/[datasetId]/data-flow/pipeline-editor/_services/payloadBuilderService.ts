@@ -192,8 +192,9 @@ export interface MappingArtifactRequest {
   body: MappingArtifactBody
 }
 
-/** A readable mapping title, e.g. `Source-to-Target`. */
+/** A readable mapping title, e.g. `Source-to-Target`. A stored mapping keeps the title it has. */
 const mappingTitle = (data: PipelineNodeData): string => {
+  if (isMappingNodeData(data) && data.mappingTitle) return data.mappingTitle
   const source = (isMappingNodeData(data) && data.sourceName) || 'source'
   const target = (isMappingNodeData(data) && data.targetName) || 'target'
   return `${source}-to-${target}`

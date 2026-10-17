@@ -1,0 +1,83 @@
+meta {
+  name: Uninstall while another data source uses the installed structure (refused)
+  type: http
+  seq: 16
+}
+
+delete {
+  url: {{baseUrl}}/installations/{{flowInstallationId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  An operator can use an installed artifact in work of their own. Here a data source that the
+  installation did not create is pinned to the data structure that case 10 installed.
+
+  The uninstall makes its checks before it removes anything. It refuses, and the installation and
+  all its artifacts stay as they are. The answer names the artifact of the installation and the
+  kind of user, and it does not name the user.
+}
+
+script:pre-request {
+  const axios = require('axios');
+  const headers = { Authorization: `Bearer ${bru.getVar('accessToken')}` };
+  const baseUrl = bru.getEnvVar('baseUrl');
+
+  const structure = await axios.get(`${baseUrl}/datastructures/${bru.getVar('flowStructureId')}`, { headers });
+  const blocking = await axios.post(
+    `${baseUrl}/datasources`,
+    {
+      name: `Uses the installed structure ${bru.getVar('runId')}`,
+      description: 'Created by the installations flow, not by an installation',
+      dataStructureVersionId: structure.data.dataStructureVersions[0].id,
+      datapoolScope: { type: 'ALL' }
+    },
+    { headers }
+  );
+  bru.setVar('blockingSourceId', blocking.data.id);
+}
+
+script:post-response {
+  const axios = require('axios');
+  const options = { headers: { Authorization: `Bearer ${bru.getVar('accessToken')}` } };
+  const baseUrl = bru.getEnvVar('baseUrl');
+
+  // Each read must find its artifact. If one does not, axios stops the script with the status in
+  // its message, and the tests below fail.
+  // Variables hold text, so that a test compares the same type in each version of the runner.
+  const installation = await axios.get(`${baseUrl}/installations/${bru.getVar('flowInstallationId')}`, options);
+  bru.setVar('refusedUninstalledAt', installation.data.uninstalledAt == null ? 'none' : installation.data.uninstalledAt);
+  const dataSet = await axios.get(`${baseUrl}/datasets/${bru.getVar('flowDataSetId')}`, options);
+  bru.setVar('refusedDataSetStatus', String(dataSet.status));
+  const pipeline = await axios.get(
+    `${baseUrl}/datasets/${bru.getVar('flowDataSetId')}/pipelines/${bru.getVar('flowPipelineId')}`, options);
+  const nodes = pipeline.status === 200 && pipeline.data.model ? pipeline.data.model.nodes.length : 0;
+  bru.setVar('refusedPipelineNodes', String(nodes));
+}
+
+tests {
+  test("should refuse: something that the installation did not create uses an artifact", function() {
+    expect(res.status).to.equal(409);
+    expect(res.body.type).to.equal("urn:civitas:error:RESOURCE_IN_USE");
+  });
+
+  test("should name the artifact of the installation and not its user", function() {
+    expect(res.body.detail).to.have.string("Data structure 'Soil moisture'");
+    expect(res.body.detail).to.have.string("Data source that the installation did not create");
+    expect(res.body.detail).to.not.have.string(bru.getVar('blockingSourceId'));
+  });
+
+  test("should leave the installation active", function() {
+    expect(bru.getVar('refusedUninstalledAt')).to.equal('none');
+  });
+
+  test("should leave the dataset and the model of its pipeline in place", function() {
+    expect(bru.getVar('refusedDataSetStatus')).to.equal('200');
+    expect(bru.getVar('refusedPipelineNodes')).to.equal('5');
+  });
+}

@@ -86,6 +86,16 @@ export const usePipelineSession = (initialSession?: PipelineSession): UsePipelin
     [dispatch],
   )
 
+  const syncSessionPipeline = useCallback(
+    (sessionId: string, pipeline: PipelineUpdater): void => {
+      dispatch({
+        type: 'SYNC_SESSION_PIPELINE',
+        payload: { sessionId, pipeline },
+      })
+    },
+    [dispatch],
+  )
+
   const markSessionDirty = useCallback(
     (sessionId: string): void => {
       dispatch({
@@ -135,6 +145,7 @@ export const usePipelineSession = (initialSession?: PipelineSession): UsePipelin
     switchToSession,
     updateSessionName,
     updateSessionPipeline,
+    syncSessionPipeline,
     markSessionDirty,
     markSessionClean,
     getActiveSession,

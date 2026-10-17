@@ -1,0 +1,73 @@
+meta {
+  name: Install the package again after the uninstall
+  type: http
+  seq: 20
+}
+
+post {
+  url: {{baseUrl}}/installations
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "package": {
+      "id": "{{flowPackageId}}",
+      "version": "1.0.1",
+      "title": "Soil moisture, end to end",
+      "members": [
+        {
+          "kind": "datastructure",
+          "urn": "{{flowStructureUrn}}",
+          "name": "Soil moisture",
+          "description": "Installed by the installations flow",
+          "content": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "{{flowStructureUrn}}",
+            "title": "Soil moisture",
+            "$defs": {
+              "Reading": {
+                "$id": "{{flowElementUrn}}",
+                "type": "object",
+                "properties": {
+                  "tensionKpa": { "type": "number" },
+                  "measuredAt": { "type": "string", "format": "date-time" }
+                },
+                "required": ["tensionKpa", "measuredAt"]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  A package installs once per instance (case 04). An installation that was uninstalled does not
+  count, thus the package of case 10 installs again. One member is sufficient here, because the
+  rule reads the id of the package only.
+
+  The member has the same URN as before. The install gives each copy a URN of this instance, thus
+  the URN that the uninstall made free is not necessary for the new copy.
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar('secondFlowInstallationId', res.body.id);
+  }
+}
+
+tests {
+  test("should install the package again", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.packageId).to.equal(bru.getVar('flowPackageId'));
+    expect(res.body.id).to.not.equal(bru.getVar('flowInstallationId'));
+    expect(res.body.uninstalledAt == null).to.equal(true);
+  });
+}

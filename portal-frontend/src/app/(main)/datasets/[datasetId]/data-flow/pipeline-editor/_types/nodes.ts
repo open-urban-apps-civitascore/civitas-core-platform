@@ -187,6 +187,17 @@ export interface MappingNodeData extends BasePipelineNodeData {
    */
   mappingLogicalUrn?: string
   /**
+   * Title of the stored Mapping artifact, when the node was drawn from a stored mapping. A save
+   * sends this title again, instead of a title made from the structure names.
+   */
+  mappingTitle?: string
+  /**
+   * Set when the node was drawn from the CORE model of a pipeline, not saved in the mapping editor.
+   * The registry checked the assignments when they were stored, and the node has no snapshot of the
+   * required target fields until the mapping editor saves it.
+   */
+  isStoredOutsideEditor?: boolean
+  /**
    * Snapshot of the required target-field paths (e.g. {@code $.name}) at mapping-save time. Lets the
    * synchronous, pure pipeline validation check that every required target field is assigned without
    * re-fetching the target schema. {@code undefined} on legacy nodes saved before this existed.

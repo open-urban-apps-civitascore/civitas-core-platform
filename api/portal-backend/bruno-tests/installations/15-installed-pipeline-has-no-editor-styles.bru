@@ -1,0 +1,57 @@
+meta {
+  name: The installed pipeline has a model and no editor styles
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/datasets/{{flowDataSetId}}/pipelines/{{flowPipelineId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  The styles of a pipeline are the working state of the editor. They hold the ids of the data
+  sources and data sinks of the instance that wrote them, and the editor builds the model from them
+  on each save. The package of case 10 carries such styles. If the install kept them, the editor
+  would show a data source that does not exist on this instance, and the first save would write
+  that reference into the model.
+
+  The install thus stores the model only. The layout travels in the model, and the editor derives
+  its graph from the model when a pipeline has no styles.
+}
+
+tests {
+  test("should return the pipeline that case 10 installed", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.id).to.equal(bru.getVar('flowPipelineId'));
+  });
+
+  test("should have no editor styles, although the package carried some", function() {
+    expect(res.body.styles == null).to.equal(true);
+    expect(res.body.model).to.not.have.property('x-ui-styles');
+  });
+
+  test("should keep the whole flow in the model", function() {
+    expect(res.body.model.nodes.map(node => node.kind)).to.deep.equal(
+      ["start", "source", "mapping", "sink", "end"]);
+    expect(res.body.model.edges).to.have.lengthOf(4);
+  });
+
+  test("should name the copies of this instance in the model, not the members of the package", function() {
+    const references = res.body.model.nodes
+      .flatMap(node => [node.sourceRef, node.mappingRef, node.sinkRef])
+      .filter(Boolean);
+    expect(references).to.have.lengthOf(3);
+    references.forEach(reference => expect(reference).to.have.string("urn:core:platform:civitas:"));
+  });
+
+  test("should link the pipeline to the installed source and sink", function() {
+    expect(res.body.dataSourceIds).to.have.lengthOf(1);
+    expect(res.body.dataSinkIds).to.deep.equal([bru.getVar('flowSinkId')]);
+  });
+}

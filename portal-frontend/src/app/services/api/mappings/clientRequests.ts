@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueries, type UseQueryResult } from '@tanstack/react-query'
 
 import { apiRequest, type ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import type { MappingField } from '@/generated/core'
@@ -78,6 +78,57 @@ export const useUpdateMapping = (datasetId: string) =>
         data,
         errorMessage: 'An error occurred while updating the mapping.',
       }),
+  })
+
+/** A stored mapping document as the backend returns it: its rules, and the editor's node layout. */
+export type MappingDocument = Record<string, unknown>
+
+interface StoredMapping {
+  /** The URN the document was read by. */
+  reference: string
+  document: MappingDocument
+}
+
+export interface MappingDocuments {
+  /** The documents that could be read, by the URN they were read by. */
+  byReference: ReadonlyMap<string, MappingDocument>
+  isLoading: boolean
+}
+
+/** Module-level, so that react-query keeps the combined result while the queries do not change. */
+const combineMappingDocuments = (results: UseQueryResult<StoredMapping>[]): MappingDocuments => {
+  const byReference = new Map<string, MappingDocument>()
+  for (const result of results) {
+    if (result.data) byReference.set(result.data.reference, result.data.document)
+  }
+  return { byReference, isLoading: results.some(result => result.isLoading) }
+}
+
+/**
+ * Reads stored Mapping documents of a dataset by their CORE URNs, one request per URN.
+ * GET /v1/datasets/{datasetId}/mappings?urn={urn}
+ *
+ * A document that cannot be read (deleted, or not a member of the dataset) is left out of the
+ * result. The caller then works without it, so the request is not repeated.
+ */
+export const useGetMappingDocuments = (datasetId: string, urns: readonly string[]): MappingDocuments =>
+  useQueries({
+    queries: urns.map(urn => ({
+      queryKey: [mappingsEndpoint(datasetId), urn],
+      queryFn: async (): Promise<StoredMapping> => {
+        const response = await apiRequest<MappingDocument>({
+          method: 'GET',
+          endpoint: mappingsEndpoint(datasetId),
+          params: new URLSearchParams({ urn }),
+          headers: { [API_REQUEST_HEADER]: 'true' },
+          errorMessage: 'An error occurred while fetching the mapping.',
+        })
+        return { reference: urn, document: response.data }
+      },
+      enabled: Boolean(datasetId),
+      retry: false,
+    })),
+    combine: combineMappingDocuments,
   })
 
 /**

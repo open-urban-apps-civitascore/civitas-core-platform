@@ -1,0 +1,39 @@
+meta {
+  name: Install a package with a dataset but no datapool (refused)
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/installations
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "package": {
+      "id": "{{fullPackageId}}_nopool",
+      "version": "1.0.0",
+      "title": "Soil moisture without a pool (smoke)",
+      "members": [
+        {
+          "kind": "dataset",
+          "urn": "{{fullDataSetUrn}}",
+          "name": "Soil moisture readings",
+          "content": {}
+        }
+      ]
+    }
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("should refuse: sources and datasets need a datapool, which only the instance knows", function() {
+    expect(res.status).to.equal(400);
+  });
+}

@@ -1,0 +1,25 @@
+meta {
+  name: Read the installation back
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/installations/{{installationId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("should return the installation with its artifact lines", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.id).to.equal(bru.getVar('installationId'));
+    expect(res.body.packageId).to.equal(bru.getVar('packageId'));
+    expect(res.body.artifacts).to.have.lengthOf(1);
+    expect(res.body.artifacts[0].shellId).to.equal(bru.getVar('installedShellId'));
+  });
+}

@@ -1,0 +1,23 @@
+meta {
+  name: List installations
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/installations
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("should list the installation, newest first", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.content).to.be.an('array');
+    expect(res.body.content[0].id).to.equal(bru.getVar('installationId'));
+  });
+}

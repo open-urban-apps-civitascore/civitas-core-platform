@@ -1,0 +1,29 @@
+meta {
+  name: Stage the installed dataset (the chain holds)
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/datasets/{{flowDataSetId}}/stage
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  Staging is the platform's own check that a dataset can carry a release: a pipeline with a
+  released source, a stored definition, and a reference closure in which every structure is
+  released and readable. It moves DRAFT to READY without a saga, so it runs against the dev stack.
+  Passing here is the proof that the install left the operator exactly one decision: releasing.
+}
+
+tests {
+  test("should stage: the installed chain satisfies every release precondition", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.dataSetStatus).to.equal("READY");
+  });
+}

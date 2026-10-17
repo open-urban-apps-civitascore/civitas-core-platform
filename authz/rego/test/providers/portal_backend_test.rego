@@ -291,3 +291,30 @@ test_is_collection_endpoint_datapools if {
 test_not_collection_endpoint_datapools_resource if {
 	not portal_backend.is_collection_endpoint with input as portal_request("GET", "/v1/datapools/pool-123")
 }
+
+# =============================================================================
+# INSTALLATION ENDPOINT TESTS
+# =============================================================================
+
+test_endpoints_contains_installations if {
+	portal_backend.endpoints["/v1/installations"]
+}
+
+test_endpoints_contains_installations_id if {
+	portal_backend.endpoints["/v1/installations/{id}"]
+}
+
+test_path_pattern_installations_with_id if {
+	result := portal_backend.path_pattern with input as portal_request("DELETE", "/v1/installations/installation-123")
+	result == "/v1/installations/{id}"
+}
+
+# Installations are tenant-level resources (the {id} is not a scopeId)
+test_scope_type_installations if {
+	result := portal_backend.expected_scope_type with input as portal_request("DELETE", "/v1/installations/installation-123")
+	result == "TENANT"
+}
+
+test_is_collection_endpoint_installations if {
+	portal_backend.is_collection_endpoint with input as portal_request("POST", "/v1/installations")
+}

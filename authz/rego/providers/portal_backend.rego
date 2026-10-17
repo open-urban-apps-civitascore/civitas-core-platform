@@ -41,7 +41,7 @@ path_pattern := restmapper.match_pattern(input.request.path, endpoints)
 # for scope enforcement on resource endpoints.
 #
 # Scope model (with TENANT inheritance per ADM spec):
-#   - TENANT resources: users, groups, roles, permissions, assignments
+#   - TENANT resources: users, groups, roles, permissions, assignments, installations
 #   - DATASET resources: datasets (TENANT scope inherits down)
 #   - DATASOURCE resources: datasources (TENANT scope inherits down)
 #   - DATASTRUCTURE resources: datastructures (TENANT scope inherits down)
@@ -57,6 +57,7 @@ resource_scope_type := {
 	"roles": "TENANT",
 	"permissions": "TENANT",
 	"assignments": "TENANT",
+	"installations": "TENANT",
 	"datasets": "DATASET",
 	"datasources": "DATASOURCE",
 	"datastructures": "DATASTRUCTURE",

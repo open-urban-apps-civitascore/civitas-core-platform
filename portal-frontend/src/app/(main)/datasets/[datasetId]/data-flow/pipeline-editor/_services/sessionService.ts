@@ -7,6 +7,7 @@
 
 import type { Pipeline, PipelineOutputDTO, PipelineStylesPayload } from '../_types/pipeline'
 import type { PipelineSession, PipelineSessionAction, PipelineSessionState } from '../_types/session'
+import { hydrateFromCoreModel, type ModelHydrationContext, needsModelHydration } from './modelHydrationService'
 import { createEmptyPipeline } from './pipelineService'
 
 // ============================================================================
@@ -44,8 +45,14 @@ export const createInitialSessionState = (initialSession?: PipelineSession): Pip
 /**
  * Creates a PipelineSession from a backend PipelineOutputDTO.
  * Parses the `styles` JSON string to restore nodes, edges, and viewport.
+ *
+ * A pipeline without a stored graph is drawn from its CORE model when the caller supplies the
+ * hydration context. Without the context the behavior is as before: the canvas stays empty.
  */
-export const createSessionFromBackendDTO = (dto: PipelineOutputDTO): PipelineSession => {
+export const createSessionFromBackendDTO = (
+  dto: PipelineOutputDTO,
+  hydration?: ModelHydrationContext,
+): PipelineSession => {
   const now = new Date()
   let parsedStyles: PipelineStylesPayload | null = null
 
@@ -57,12 +64,14 @@ export const createSessionFromBackendDTO = (dto: PipelineOutputDTO): PipelineSes
     console.error(`Failed to parse styles for pipeline ${dto.id}:`, dto.styles)
   }
 
+  const derivedGraph = hydration && needsModelHydration(dto) ? hydrateFromCoreModel(dto, hydration) : undefined
+
   const pipeline: Pipeline = {
     id: dto.id,
     name: dto.name,
     description: dto.description || '',
-    nodes: parsedStyles?.nodes ?? [],
-    edges: parsedStyles?.edges ?? [],
+    nodes: derivedGraph?.nodes ?? parsedStyles?.nodes ?? [],
+    edges: derivedGraph?.edges ?? parsedStyles?.edges ?? [],
     viewport: parsedStyles?.viewport ?? { x: 0, y: 0, zoom: 1 },
     createdAt: dto.createdAt ? new Date(dto.createdAt) : now,
     updatedAt: dto.modifiedAt ? new Date(dto.modifiedAt) : now,
@@ -174,6 +183,19 @@ export const sessionReducer = (state: PipelineSessionState, action: PipelineSess
             isDirty: true,
             lastModified: new Date(),
           }
+        }),
+      }
+    }
+
+    case 'SYNC_SESSION_PIPELINE': {
+      const { sessionId, pipeline } = action.payload
+
+      return {
+        ...state,
+        sessions: state.sessions.map(session => {
+          if (session.id !== sessionId) return session
+          // Not an edit: the state of the session and of the pipeline stays as it was.
+          return { ...session, pipeline: { ...pipeline(session.pipeline), isDirty: session.pipeline.isDirty } }
         }),
       }
     }
