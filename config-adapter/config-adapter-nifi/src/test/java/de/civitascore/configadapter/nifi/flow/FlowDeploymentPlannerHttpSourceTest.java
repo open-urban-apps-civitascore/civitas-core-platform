@@ -137,20 +137,20 @@ class FlowDeploymentPlannerHttpSourceTest {
     assertEquals(List.of(errorSinkId), failureTargets);
   }
 
+  private static String encryptedSecret() throws Exception {
+    return "ENC("
+        + CredentialEncryptor.encrypt(
+            SECRET, stretchedKey(), CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT)
+        + ")";
+  }
+
   @Test
   void basicAuthPasswordReachesOnlyTheSensitiveMap() throws Exception {
-    byte[] key = stretchedKey();
-    String encrypted =
-        "ENC("
-            + CredentialEncryptor.encrypt(
-                SECRET, key, CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT)
-            + ")";
-
     DeploymentPlan plan =
         plan(
             "stations",
             "{ \"type\": \"BASIC\", \"username\": \"reader\", \"password\": \"%s\" }"
-                .formatted(encrypted));
+                .formatted(encryptedSecret()));
 
     JsonNode properties = httpProcessor(plan).path("properties");
     assertEquals("BASIC", properties.path("Authentication Type").asText());
@@ -178,7 +178,10 @@ class FlowDeploymentPlannerHttpSourceTest {
 
   @Test
   void withoutAuthenticationNothingIsPushedToTheProcessor() throws Exception {
-    DeploymentPlan plan = plan("stations", "{ \"type\": \"NONE\" }");
+    DeploymentPlan plan =
+        plan(
+            "stations",
+            "{ \"type\": \"NONE\", \"password\": \"%s\" }".formatted(encryptedSecret()));
 
     assertEquals(
         "NONE", httpProcessor(plan).path("properties").path("Authentication Type").asText());
