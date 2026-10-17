@@ -62,7 +62,6 @@ public interface SourceStage {
    * Plan-time half: validates the datasource, decrypts credentials, and fills the property maps.
    * Secrets go only into {@link PlanContext#putSensitive}, never into snapshot-bound properties.
    *
-   * @param node the source node of the pipeline graph; the stage reads what it needs from it
    * @param sourceNodeKey unique per source node across all pipelines and the same on every deploy
    *     of it, for properties that must be unique per source node rather than per (shared)
    *     datasource
