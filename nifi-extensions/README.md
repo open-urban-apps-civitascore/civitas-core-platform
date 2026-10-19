@@ -244,7 +244,8 @@ Relationships: `success` and `failure`. There is no `retry`; the next cron run i
 
 | Result | Outcome |
 |---|---|
-| 2xx with a body | `success`, the body unchanged, `mime.type` `application/json` |
+| 2xx with a JSON object or an array of JSON objects | `success`, the body unchanged, `mime.type` `application/json` |
+| 2xx with any other body, for example `42`, `["a"]` or HTML | `failure`, `fatal`, an error log entry |
 | 2xx without a body, for example 204 | No FlowFile, a debug log entry |
 | 3xx, 4xx except 408 and 429 | `failure`, `fatal`, an error log entry |
 | 408, 429, 5xx, any other status | `failure`, `transient`, a warn log entry |
@@ -252,6 +253,10 @@ Relationships: `success` and `failure`. There is no `retry`; the next cron run i
 
 A 3xx is fatal because the processor expects a web client service that does not follow
 redirects (`Redirect Handling Strategy` = `IGNORED`), so a redirect shows a wrong host or path.
+
+The processor checks the shape of a 2xx body because NiFi's JSON record reader gives no record and
+no error for a value that is not an object, and in an array it also drops the object after such a
+value.
 
 A FlowFile on `success` carries `http.status.code` and `http.request.path`. A FlowFile on `failure`
 is empty and carries `http.request.path`, `http.error.kind`, `http.error.status` and

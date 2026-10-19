@@ -49,9 +49,10 @@ import org.apache.nifi.web.client.provider.api.WebClientServiceProvider;
  */
 @Tags({"HTTP", "REST", "API", "GET", "source", "civitas"})
 @CapabilityDescription(
-    "Sends the HTTP GET request of one API call of an HTTP/REST Data source. A 2xx response with a"
-        + " body becomes a FlowFile on success. An error becomes a FlowFile on failure that says"
-        + " whether it is fatal or transient.")
+    "Sends the HTTP GET request of one API call of an HTTP/REST Data source. A 2xx response whose"
+        + " body is a JSON object or an array of JSON objects becomes a FlowFile on success. An"
+        + " error, and any other body, becomes a FlowFile on failure that says whether it is fatal"
+        + " or transient.")
 @InputRequirement(Requirement.INPUT_FORBIDDEN)
 @PrimaryNodeOnly
 @TriggerSerially
@@ -169,7 +170,9 @@ public class GetHttpApiCall extends AbstractProcessor {
   static final Relationship SUCCESS =
       new Relationship.Builder()
           .name("success")
-          .description("One FlowFile for each 2xx response with a body. The content is the body.")
+          .description(
+              "One FlowFile for each 2xx response whose body is a JSON object or an array of JSON"
+                  + " objects. The content is the body.")
           .build();
 
   static final Relationship FAILURE =
@@ -267,11 +270,19 @@ public class GetHttpApiCall extends AbstractProcessor {
   private void transferBody(
       ProcessSession session, ApiCallClient client, ApiCallOutcome.Body body) {
     FlowFile flowFile = session.create();
+    boolean holdsRecords;
     try {
       flowFile = session.importFrom(body.content(), flowFile);
+      holdsRecords = RecordShape.holdsRecords(session, flowFile);
     } catch (FlowFileAccessException e) {
       session.remove(flowFile);
       transferFailure(session, ApiCallOutcome.Failure.ofTransport(client.describe(apiCall), e));
+      return;
+    }
+    if (!holdsRecords) {
+      session.remove(flowFile);
+      transferFailure(
+          session, ApiCallOutcome.Failure.ofBodyShape(client.describe(apiCall), body.status()));
       return;
     }
     Map<String, String> attributes = new LinkedHashMap<>();
