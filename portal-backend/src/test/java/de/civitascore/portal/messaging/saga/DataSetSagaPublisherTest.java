@@ -49,6 +49,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.kafka.KafkaException;
 import org.springframework.kafka.core.KafkaProducerException;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
@@ -1479,8 +1480,26 @@ class DataSetSagaPublisherTest {
     }
 
     @Test
-    @DisplayName("a trigger above the Kafka size limit fails as invalid input with its UTF-8 size")
-    void tooLargeTriggerFailsAsInvalidInputWithItsSize() {
+    @DisplayName(
+        "a trigger above the producer size limit, which send() rejects synchronously, fails as"
+            + " invalid input with its UTF-8 size")
+    void tooLargeTriggerRejectedBySendFailsAsInvalidInputWithItsSize() {
+      DataSet dataSet = emptyDataSet();
+      dataSet.setName("Straßenbäume");
+      when(kafkaTemplate.send(anyString(), anyString(), anyString()))
+          .thenThrow(new KafkaException("Send failed", new RecordTooLargeException("too large")));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageStartingWith(
+              "The saga trigger of this Dataset is " + sentTriggerBytes() + " bytes, ");
+    }
+
+    @Test
+    @DisplayName(
+        "a trigger above the broker size limit, which fails the send future, fails as invalid"
+            + " input with its UTF-8 size")
+    void tooLargeTriggerRejectedByBrokerFailsAsInvalidInputWithItsSize() {
       DataSet dataSet = emptyDataSet();
       dataSet.setName("Straßenbäume");
       stubKafkaFailure(new RecordTooLargeException("too large"));

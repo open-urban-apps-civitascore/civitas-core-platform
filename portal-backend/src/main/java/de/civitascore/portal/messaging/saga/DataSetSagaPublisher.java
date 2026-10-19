@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.common.errors.RecordTooLargeException;
 import org.owasp.encoder.Encode;
+import org.springframework.kafka.KafkaException;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
@@ -609,28 +610,8 @@ public class DataSetSagaPublisher {
           Encode.forJava(datasetId),
           Encode.forJava(sagaProperties.triggerTopic()),
           payloadBytes);
-    } catch (ExecutionException e) {
-      if (isCausedByRecordTooLarge(e)) {
-        log.warn(
-            "Kafka rejected saga trigger for dataset {} as too large: sagaType={}, bytes={}",
-            Encode.forJava(datasetId),
-            Encode.forJava(sagaType),
-            payloadBytes);
-        throw new InvalidInputException(
-            "DataSet",
-            UUID.fromString(datasetId),
-            "The saga trigger of this Dataset is "
-                + payloadBytes
-                + " bytes, more than the platform accepts. Reduce the size of its Data"
-                + " structures.");
-      }
-      log.error(
-          "Kafka broker rejected saga trigger for dataset {}, sagaType={}: {}",
-          Encode.forJava(datasetId),
-          Encode.forJava(sagaType),
-          e.getCause() != null ? e.getCause().getMessage() : e.getMessage(),
-          e);
-      throw new IllegalStateException("Failed to send saga trigger to Kafka", e);
+    } catch (ExecutionException | KafkaException e) {
+      throw sendFailure(datasetId, sagaType, payloadBytes, e);
     } catch (TimeoutException e) {
       log.error(
           "Timed out after {}s waiting for Kafka ack for saga trigger: sagaType={}, datasetId={}",
@@ -649,6 +630,31 @@ public class DataSetSagaPublisher {
       throw new IllegalStateException(
           "Interrupted while waiting for Kafka ack for saga trigger", e);
     }
+  }
+
+  private static RuntimeException sendFailure(
+      String datasetId, String sagaType, int payloadBytes, Exception failure) {
+    if (isCausedByRecordTooLarge(failure)) {
+      log.warn(
+          "Kafka rejected saga trigger for dataset {} as too large: sagaType={}, bytes={}",
+          Encode.forJava(datasetId),
+          Encode.forJava(sagaType),
+          payloadBytes);
+      return new InvalidInputException(
+          "DataSet",
+          UUID.fromString(datasetId),
+          "The saga trigger of this Dataset is "
+              + payloadBytes
+              + " bytes, more than the platform accepts. Reduce the size of its Data"
+              + " structures.");
+    }
+    log.error(
+        "Kafka rejected saga trigger for dataset {}, sagaType={}: {}",
+        Encode.forJava(datasetId),
+        Encode.forJava(sagaType),
+        failure.getCause() != null ? failure.getCause().getMessage() : failure.getMessage(),
+        failure);
+    return new IllegalStateException("Failed to send saga trigger to Kafka", failure);
   }
 
   private String toJson(SagaTrigger trigger) {
