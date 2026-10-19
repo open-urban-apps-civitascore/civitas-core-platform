@@ -56,6 +56,8 @@ class PipelineClosureValidatorTest {
       "urn:core:platform:civitas:pipeline:common:896b1290-56de-81ab-9dda-d64c011d4e56:1.0.0";
   private static final String STRUCTURE_URN =
       "urn:core:platform:civitas:datastructure:common:6ddf8001-3ba6-83db-8d23-b547419c1ff2:1.0.0";
+  private static final String NESTED_STRUCTURE_URN =
+      "urn:core:platform:civitas:datastructure:common:3f1c9e2a-7b44-8d0e-a5c1-2e9b6d40f713:1.0.0";
   private static final String ELEMENT_URN =
       "urn:core:platform:civitas:element:common:d765420c-9793-8201-bca9-6167ec41c109:1.0.0";
 
@@ -96,6 +98,14 @@ class PipelineClosureValidatorTest {
     dataSource.setId(UUID.randomUUID());
     dataSource.setDataSourceStatus(status);
     return dataSource;
+  }
+
+  private Pipeline pipelineWithDataSourceOf(DataStructureVersion version) {
+    DataSource dataSource = dataSource(DataSourceStatus.AVAILABLE);
+    dataSource.setDataStructureVersion(version);
+    Pipeline pipeline = pipeline(pipelineId, PIPELINE_URN);
+    pipeline.setDataSources(Set.of(dataSource));
+    return pipeline;
   }
 
   /** What the registry reports for a flow: everything it reaches, and what it no longer holds. */
@@ -357,6 +367,51 @@ class PipelineClosureValidatorTest {
       assertThatCode(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
           .as("two records pin one artifact when their content is identical")
           .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName(
+        "a data structure a data source names passes for a caller who may not read it, once"
+            + " released")
+    void aReleasedStructureOfADataSourcePassesWithoutReadPermission() {
+      DataStructureVersion version = released(STRUCTURE_URN);
+      Pipeline pipeline = pipelineWithDataSourceOf(version);
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
+      when(governingVersions.governingAll(any())).thenReturn(governedBy(List.of(version)));
+      lenient()
+          .doThrow(new AccessDeniedException("denied"))
+          .when(scopeAccessAuthorizer)
+          .authorizeReferences(any(), any());
+
+      assertThatCode(() -> validator().validate(List.of(pipeline))).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("a data structure a data source names still blocks the flow while in draft")
+    void aDraftStructureOfADataSourceBlocks() {
+      DataStructureVersion version =
+          version(STRUCTURE_URN, DataStructureVersionStatus.DRAFT, DataStructureStatus.AVAILABLE);
+      Pipeline pipeline = pipelineWithDataSourceOf(version);
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
+      when(governingVersions.governingAll(any())).thenReturn(governedBy(List.of(version)));
+
+      assertThat(blockedPipelinesOf(catchThrowable(() -> validator().validate(List.of(pipeline)))))
+          .containsExactly(pipelineId);
+      verify(scopeAccessAuthorizer, never()).authorizeReferences(any(), any());
+    }
+
+    @Test
+    @DisplayName("a data structure nested in the one a data source names must still be readable")
+    void aNestedStructureOfADataSourceStructureNeedsReadPermission() {
+      DataStructureVersion version = released(STRUCTURE_URN);
+      Pipeline pipeline = pipelineWithDataSourceOf(version);
+      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN, NESTED_STRUCTURE_URN), Set.of());
+      when(governingVersions.governingAll(any()))
+          .thenReturn(governedBy(List.of(version, released(NESTED_STRUCTURE_URN))));
+      denyEveryStructure();
+
+      assertThat(blockedPipelinesOf(catchThrowable(() -> validator().validate(List.of(pipeline)))))
+          .containsExactly(pipelineId);
     }
 
     @Test
