@@ -69,11 +69,21 @@ describe('node flow declarations mirror the adapter stages', () => {
       expect(decl.acceptsSchedule(sourceData('SQL'))).toBe(true)
     })
 
+    it('HTTP emits raw JSON and accepts a schedule (pull source)', () => {
+      expect(decl.output(sourceData('HTTP'))).toBe('RAW_JSON')
+      expect(decl.acceptsSchedule(sourceData('HTTP'))).toBe(true)
+    })
+
     it('an unknown connector cannot be verified either way', () => {
       expect(decl.output(sourceData())).toBeUndefined()
       expect(decl.acceptsSchedule(sourceData())).toBeUndefined()
-      expect(decl.output(sourceData('HTTP'))).toBeUndefined()
-      expect(decl.acceptsSchedule(sourceData('HTTP'))).toBeUndefined()
+    })
+
+    it('only HTTP requires a schedule', () => {
+      expect(decl.requiresSchedule(sourceData('HTTP'))).toBe(true)
+      expect(decl.requiresSchedule(sourceData('SQL'))).toBe(false)
+      expect(decl.requiresSchedule(sourceData('MQTT'))).toBe(false)
+      expect(decl.requiresSchedule(sourceData())).toBe(false)
     })
   })
 
