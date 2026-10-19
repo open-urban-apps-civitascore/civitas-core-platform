@@ -1004,6 +1004,11 @@
       "invalidBaseUrl": "Enter a valid http or https URL without query or fragment (e.g. https://api.example.org/v1).",
       "baseUrlCredentials": "Do not put credentials into the API host. Enter them in the authentication.",
       "usernameColon": "The username must not contain a colon (:).",
+      "invalidPath": "The path must start with / and contain only allowed characters.",
+      "apiCallsMax": "Only one API call is possible.",
+      "invalidHeaderName": "Allowed in the header name: a–z A–Z 0–9 and ! # $ % & ' * + - . ^ _ ` | ~. No spaces.",
+      "credentialHeader": "Use the authentication for credentials.",
+      "headerValueLineBreak": "The header value must not contain a line break.",
       "creationError": "An error occurred while creating the Data source.",
       "updateError": "An error occurred while updating the Data source.",
       "inUseError": "This Data source is still used by a pipeline.",
@@ -1032,6 +1037,7 @@
       "basicInfo": "Base Information",
       "connector": "Connector",
       "dataStructure": "Data structure",
+      "apiCalls": "API calls",
       "accessManagement": "Access",
       "datapools": "Data pools"
     },
@@ -1044,6 +1050,45 @@
       "title": "Save before exiting?",
       "description": "There are unsaved changes. \"Discard\" cannot be undone.",
       "discard": "Discard"
+    },
+    "apiCallsTab": {
+      "title": "API calls",
+      "availableInfo": "This Data source has the status \"Available\". To change the API calls, set it to \"Draft\" first.",
+      "copyUrl": "Copy URL",
+      "copySuccess": "URL copied to clipboard.",
+      "add": "Create API call",
+      "empty": {
+        "title": "No API call yet"
+      },
+      "unnamed": "Unnamed API call",
+      "request": {
+        "title": "Request",
+        "question": "Which endpoint should be called?"
+      },
+      "method": {
+        "label": "Method"
+      },
+      "path": {
+        "label": "Path",
+        "hint": "Allowed: a–z A–Z 0–9 - _ . ~ : /. Starts with /."
+      },
+      "name": {
+        "label": "Name",
+        "placeholder": "Name of API call"
+      },
+      "parameters": {
+        "query": "query",
+        "header": "header",
+        "addQuery": "+ Query parameter",
+        "addHeader": "+ Header",
+        "name": "Name",
+        "value": "Value",
+        "remove": "Remove"
+      },
+      "delete": {
+        "title": "Delete API call?",
+        "description": "Pipelines that use \"{name}\" stop working."
+      }
     },
     "connectorTab": {
       "title1": "Connector",

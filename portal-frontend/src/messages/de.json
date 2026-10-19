@@ -996,6 +996,11 @@
       "invalidBaseUrl": "Geben Sie eine gültige http- oder https-URL ohne Query und Fragment ein (z. B. https://api.example.org/v1).",
       "baseUrlCredentials": "Geben Sie keine Zugangsdaten im API-Host ein. Tragen Sie sie in der Authentifizierung ein.",
       "usernameColon": "Der Benutzername darf keinen Doppelpunkt (:) enthalten.",
+      "invalidPath": "Der Pfad muss mit / beginnen und darf nur erlaubte Zeichen enthalten.",
+      "apiCallsMax": "Es ist nur ein API-Aufruf möglich.",
+      "invalidHeaderName": "Erlaubte Zeichen im Header-Namen: a–z, A–Z, 0–9 und ! # $ % & ' * + - . ^ _ ` | ~. Keine Leerzeichen.",
+      "credentialHeader": "Zugangsdaten gehören in die Authentifizierung.",
+      "headerValueLineBreak": "Der Header-Wert darf keinen Zeilenumbruch enthalten.",
       "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten",
       "inUseError": "Diese Datenquelle wird noch von einer Pipeline verwendet.",
@@ -1029,8 +1034,48 @@
       "basicInfo": "Basisinformationen",
       "connector": "Konnektor",
       "dataStructure": "Datenstruktur",
+      "apiCalls": "API-Aufrufe",
       "accessManagement": "Zugriff",
       "datapools": "Datenpools"
+    },
+    "apiCallsTab": {
+      "title": "API-Aufrufe",
+      "availableInfo": "Diese Datenquelle hat den Status \"Verfügbar\". Um die API-Aufrufe zu ändern, setzen Sie den Status zuerst auf \"Entwurf\".",
+      "copyUrl": "URL kopieren",
+      "copySuccess": "URL wurde in die Zwischenablage kopiert.",
+      "add": "API-Aufruf erstellen",
+      "empty": {
+        "title": "Noch kein API-Aufruf"
+      },
+      "unnamed": "Unbenannter API-Aufruf",
+      "request": {
+        "title": "Request",
+        "question": "Welcher Endpunkt soll aufgerufen werden?"
+      },
+      "method": {
+        "label": "Methode"
+      },
+      "path": {
+        "label": "Pfad",
+        "hint": "Erlaubte Zeichen: a–z, A–Z, 0–9, -, _, ., ~, :, /. Beginnt mit /."
+      },
+      "name": {
+        "label": "Name",
+        "placeholder": "Name des API-Aufrufs"
+      },
+      "parameters": {
+        "query": "Query",
+        "header": "Header",
+        "addQuery": "+ Query-Parameter",
+        "addHeader": "+ Header",
+        "name": "Name",
+        "value": "Wert",
+        "remove": "Entfernen"
+      },
+      "delete": {
+        "title": "API-Aufruf löschen?",
+        "description": "Pipelines, die „{name}“ verwenden, funktionieren nicht mehr."
+      }
     },
     "connectorTab": {
       "title1": "Konnektor",

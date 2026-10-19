@@ -12,9 +12,15 @@ import {
   useUpdateDatasourceReleased,
 } from '@/app/services/api/datasources/clientRequests'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
+import { CONNECTOR_TYPES } from '@/const/connectors'
 import { DataSourceDraftSchema } from '@/generated/core'
 import { useError } from '@/hooks/use-error'
-import { ConnectorFormToApiSchema, ConnectorTabCompleteSchema, ConnectorType } from '@/types/connectors'
+import {
+  ConnectorFormToApiSchema,
+  ConnectorTabCompleteSchema,
+  ConnectorType,
+  HttpApiCallsStrictSchema,
+} from '@/types/connectors'
 import { Datapool } from '@/types/datapools'
 import {
   DATAPOOL_SCOPE_TYPES,
@@ -159,6 +165,10 @@ export const useDatasourceForm = (
     try {
       const { connectorType, configuration } = formValues
       if (ConnectorTabCompleteSchema.safeParse({ connectorType, configuration }).success) completed.push('connector')
+      const isHttpConnector = connectorType === CONNECTOR_TYPES.HTTP
+      if (isHttpConnector && HttpApiCallsStrictSchema.safeParse(configuration?.apiCalls).success) {
+        completed.push('apiCalls')
+      }
     } catch {
       // Zod v4: safeParse throws on stale keys
     }
