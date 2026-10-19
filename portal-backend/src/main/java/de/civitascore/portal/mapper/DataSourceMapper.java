@@ -2,8 +2,8 @@ package de.civitascore.portal.mapper;
 
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
+import de.civitascore.portal.model.input.DataSourceMetaInputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
-import de.civitascore.portal.model.output.summary.DataSourceSummaryDTO;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -28,20 +28,28 @@ public interface DataSourceMapper
   @Mapping(target = "dataStructureVersion", ignore = true)
   @Mapping(target = "datapoolScopeType", ignore = true)
   @Mapping(target = "scopedDataPools", ignore = true)
+  @Mapping(
+      target = "connectorType",
+      expression =
+          "java(input.getConnector() == null ? null : input.getConnector().connectorType())")
   @Override
   DataSource toEntity(DataSourceInputDTO input);
 
   @Mapping(target = "datapoolScope", ignore = true)
+  @Mapping(target = "connector", ignore = true)
   @Override
   DataSourceOutputDTO toOutput(DataSource entity);
 
   @Mapping(target = "assignments", ignore = true)
   @Mapping(target = "datapoolScope", ignore = true)
+  @Mapping(target = "connector", ignore = true)
   @Mapping(source = "dataStructureVersion.id", target = "dataStructureVersionId")
   @Override
   DataSourceInputDTO toInput(DataSource entity);
 
-  DataSourceSummaryDTO toSummary(DataSource entity);
+  @Mapping(target = "assignments", ignore = true)
+  @Mapping(target = "datapoolScope", ignore = true)
+  DataSourceMetaInputDTO toMetaInput(DataSource entity);
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Mapping(target = "dataSourceStatus", ignore = true)
@@ -49,6 +57,10 @@ public interface DataSourceMapper
   @Mapping(target = "dataStructureVersion", ignore = true)
   @Mapping(target = "datapoolScopeType", ignore = true)
   @Mapping(target = "scopedDataPools", ignore = true)
+  @Mapping(
+      target = "connectorType",
+      expression =
+          "java(input.getConnector() == null ? null : input.getConnector().connectorType())")
   @Override
   void updateEntity(@MappingTarget DataSource entity, DataSourceInputDTO input);
 }

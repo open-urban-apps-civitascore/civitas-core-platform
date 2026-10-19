@@ -14,10 +14,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 /**
  * A named API endpoint exposed by a dataset (per concept #1379, #1383, and #1384, ADR #1362).
  *
- * <p>This record is the saga-contract shape — it carries only the fields config-adapter needs to
- * provision APISIX routes. Human-readable metadata (display name, description) lives on the
- * portal-backend entity and DTOs and is not transmitted across the saga boundary; config-adapter
- * never displays named APIs to end users.
+ * <p>This record is the saga-contract shape: the fields for the APISIX route and, for an {@code
+ * OWS} API, the WMS service title and abstract.
  *
  * <p>{@code slug} is the URL segment in the public route {@code /v1/datasets/{datasetId}/{slug}}.
  * {@code standard} carries the API standard per ADR #1362 (controlled vocabulary {@code WFS}/{@code
@@ -38,6 +36,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * @param slug URL slug used in the public route (e.g. "traffic")
  * @param standard API standard string (e.g. "STA"); any value accepted for forward compatibility
  * @param version optional standard version (e.g. "1.1" for STA); nullable
+ * @param name display name of the API; nullable, absent from an older producer
+ * @param description optional description of the API; nullable
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record NamedApi(String slug, String standard, String version) {}
+public record NamedApi(
+    String slug, String standard, String version, String name, String description) {}

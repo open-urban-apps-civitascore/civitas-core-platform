@@ -29,9 +29,6 @@ public class LayerOutputDTO extends BaseOutputDTO {
   @Schema(description = "Human-readable description")
   private String description;
 
-  @Schema(description = "Keywords associated with the layer")
-  private List<String> keywords = new ArrayList<>();
-
   @Schema(description = "Attribute names exposed by the layer")
   private List<String> attribute = new ArrayList<>();
 
@@ -50,22 +47,9 @@ public class LayerOutputDTO extends BaseOutputDTO {
   @Schema(description = "Coordinate reference system (e.g. EPSG:4326)")
   private String crs;
 
-  @Schema(description = "When true, the bounding box is computed automatically")
-  private boolean bboxAutoCalculate;
-
   @Schema(description = "Native bounding box of the layer data")
   private Map<String, Object> nativeBoundingBox;
 
   @Schema(description = "Bounding box in WGS84 lat/lon coordinates")
   private Map<String, Object> latLonBoundingBox;
-
-  @Schema(
-      description = "Derived geometry type — null until provisioned",
-      accessMode = Schema.AccessMode.READ_ONLY)
-  private String geometryType;
-
-  @Schema(
-      description = "Native CRS — null until provisioned",
-      accessMode = Schema.AccessMode.READ_ONLY)
-  private String nativeCRS;
 }

@@ -10,9 +10,6 @@ get {
   auth: inherit
 }
 
-headers {
-  X-Allowed-Scope-Ids: *
-}
 
 script:post-response {
   if (res.getStatus() === 200 && res.body && res.body.content) {

@@ -14,7 +14,6 @@ export const getMockUserData = (overrides: Partial<User> = {}): User => {
     email: `${firstName}@e2e.test`,
     groups: [],
     phone: '+49 157 11111111',
-    active: true,
     ...overrides,
   }
 }

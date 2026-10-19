@@ -25,12 +25,16 @@ import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
 import de.civitascore.configadapter.nifi.flow.stage.Processor;
 import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageResult;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -48,13 +52,13 @@ public final class MqttSourceStage implements SourceStage {
   /** Stable friendly name used for the deterministic controller-service id and processor token. */
   public static final String MQTT_SSL_CONTEXT_SERVICE = "MQTT SSL Context Service";
 
-  /** Parameter Context provisioned by the NiFi deployment for the node truststore password. */
-  public static final String NODE_TRUSTSTORE_PARAMETER_CONTEXT = "NiFi Node Truststore";
-
-  /** Sensitive parameter supplied by the deployment, never serialized with a value here. */
-  public static final String TRUSTSTORE_PASSWORD_PARAMETER = "TRUSTSTORE_PASSWORD";
-
   private static final String MQTT_SSL_CONTEXT_REFERENCE = "${CS:" + MQTT_SSL_CONTEXT_SERVICE + "}";
+
+  /** Alphanumeric only, to stay within the client ids every broker must accept [MQTT-3.1.3-5]. */
+  private static final String CLIENT_ID_PREFIX = "civitascore";
+
+  /** Keeps prefix plus id within the 23 characters MQTT 3.1 allows a client id. */
+  private static final int SHORT_ID_LENGTH = 10;
 
   private static final Set<String> PLAINTEXT_SCHEMES = Set.of("tcp", "ws", "mqtt");
   private static final Set<String> TLS_SCHEMES = Set.of("ssl", "mqtts", "wss");
@@ -76,6 +80,9 @@ public final class MqttSourceStage implements SourceStage {
    */
   private static final Map<String, String> SCHEME_ALIASES = Map.of("mqtt", "tcp", "mqtts", "ssl");
 
+  /** MQTT major versions mapped to NiFi/Paho/HiveMQ protocol-level values. */
+  private static final Map<String, String> MQTT_PROTOCOL_VERSIONS = Map.of("3", "0", "5", "5");
+
   private static final Pattern BROKER_SCHEME =
       Pattern.compile("^([a-z][a-z0-9+.-]*)://", Pattern.CASE_INSENSITIVE);
 
@@ -87,9 +94,11 @@ public final class MqttSourceStage implements SourceStage {
       Pattern.compile("(\\d+)\\s*(?:s|sec|secs|second|seconds)?", Pattern.CASE_INSENSITIVE);
 
   private final CredentialResolver credentials;
+  private final MqttTruststoreConfig truststore;
 
-  public MqttSourceStage(CredentialResolver credentials) {
+  public MqttSourceStage(CredentialResolver credentials, MqttTruststoreConfig truststore) {
     this.credentials = credentials;
+    this.truststore = truststore;
   }
 
   @Override
@@ -111,12 +120,13 @@ public final class MqttSourceStage implements SourceStage {
 
   /**
    * Binds an MQTT datasource to ConsumeMQTT, using the portal's connector field names ({@code
-   * urls}/{@code topics} as lists, {@code user}, {@code client_id}, {@code qos}). Broker URI and
-   * Topic Filter are required — without them ConsumeMQTT would fall back to the fragment's demo
-   * broker/topic and silently consume from the wrong source, so a missing value fails the deploy.
+   * urls}/{@code topics} as lists, {@code user}, {@code qos}). Broker URI and Topic Filter are
+   * required — without them ConsumeMQTT would fall back to the fragment's demo broker/topic and
+   * silently consume from the wrong source, so a missing value fails the deploy.
    */
   @Override
-  public void bind(Datasource source, PlanContext out) throws FatalAdapterException {
+  public void bind(Datasource source, String sourceNodeKey, PlanContext out)
+      throws FatalAdapterException {
     Map<String, Object> original = source.getAdditionalProperties();
     Map<String, Object> decrypted = credentials.decrypt(original);
     // NiFi's Broker URI accepts a comma-separated list; Topic Filter is a single filter, so one
@@ -140,11 +150,13 @@ public final class MqttSourceStage implements SourceStage {
     out.putSourceProperty("Broker URI", String.join(",", brokers));
     out.putSourceProperty("Topic Filter", topics.get(0));
     if (tlsEnabled) {
+      bindTruststore(out);
       out.putSourceProperty("SSL Context Service", MQTT_SSL_CONTEXT_REFERENCE);
     }
     putIfPresent(out::putSourceProperty, "Username", decrypted.get("user"));
-    putIfPresent(out::putSourceProperty, "Client ID", decrypted.get("client_id"));
+    out.putSourceProperty("Client ID", clientId(sourceNodeKey));
     putIfPresent(out::putSourceProperty, "Quality of Service", decrypted.get("qos"));
+    bindProtocolVersion(out, decrypted.get("protocol_version"));
     bindSeconds(out, "Connection Timeout", decrypted.get("connect_timeout"));
     bindSeconds(out, "Keep Alive", decrypted.get("keepalive"));
     // A password, if present, must be encrypted: a plaintext secret must never be written into
@@ -161,26 +173,88 @@ public final class MqttSourceStage implements SourceStage {
     }
   }
 
-  @Override
-  public void registerControllerServices(BuildContext ctx) throws FatalAdapterException {
-    if (MQTT_SSL_CONTEXT_REFERENCE.equals(
-        ctx.spec().sourceProperties().get("SSL Context Service"))) {
-      ctx.addControllerService(Fragment.MQTT_SSL_CONTEXT_SERVICE, MQTT_SSL_CONTEXT_SERVICE);
+  /**
+   * Checks the trust anchor and collects its literal password. A password parameter contributes
+   * only its <em>name</em> to the snapshot, applied with the other truststore properties in {@link
+   * #registerControllerServices} — the value lives in NiFi, supplied by the deployment, so no
+   * truststore secret passes through the adapter. A literal password (the JDK store's {@code
+   * changeit}) instead goes the post-upload sensitive route, never into the snapshot. A missing
+   * anchor fails the deploy instead of falling back to plaintext or to NiFi's node truststore.
+   */
+  private void bindTruststore(PlanContext out) throws FatalAdapterException {
+    if (truststore.path().isEmpty() || truststore.type().isEmpty()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "MQTT TLS needs a truststore: set nifi.mqtt.truststore.path and"
+              + " nifi.mqtt.truststore.type");
     }
+    if (truststore.hasPasswordParameter() && truststore.parameterContext().isEmpty()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "MQTT truststore password parameter '"
+              + truststore.passwordParameter()
+              + "' needs nifi.mqtt.truststore.parameter-context");
+    }
+    truststore
+        .sensitiveProperties()
+        .forEach((key, value) -> out.putSensitive(MQTT_SSL_CONTEXT_SERVICE, key, value));
+  }
+
+  /** Hashed, because the key has neither the length nor the characters a client id allows. */
+  private static String clientId(String sourceNodeKey) {
+    UUID name = UUID.nameUUIDFromBytes(sourceNodeKey.getBytes(StandardCharsets.UTF_8));
+    return CLIENT_ID_PREFIX + shortId(name);
+  }
+
+  /**
+   * Must reproduce the client ids deployed flows already carry; another derivation renames every
+   * flow's broker client on its next deploy.
+   */
+  private static String shortId(UUID id) {
+    ByteBuffer bytes =
+        ByteBuffer.allocate(16)
+            .putLong(id.getMostSignificantBits())
+            .putLong(id.getLeastSignificantBits());
+    String base36 = new BigInteger(1, bytes.array()).toString(36);
+    String tail =
+        base36.length() > SHORT_ID_LENGTH
+            ? base36.substring(base36.length() - SHORT_ID_LENGTH)
+            : base36;
+    return "0".repeat(SHORT_ID_LENGTH - tail.length()) + tail;
   }
 
   @Override
+  public void registerControllerServices(BuildContext ctx) throws FatalAdapterException {
+    if (tlsRequested(ctx)) {
+      ctx.addControllerService(Fragment.MQTT_SSL_CONTEXT_SERVICE, MQTT_SSL_CONTEXT_SERVICE);
+      for (Map.Entry<String, String> property : truststore.sslContextProperties().entrySet()) {
+        ctx.setControllerServiceExpression(
+            MQTT_SSL_CONTEXT_SERVICE, property.getKey(), property.getValue());
+      }
+    }
+  }
+
+  /**
+   * Binds the flow to the Parameter Context holding the truststore password; a store that opens
+   * without one needs no context at all. The declaration carries no value — the deployment
+   * populates the sensitive parameter in NiFi.
+   */
+  @Override
   public Optional<ParameterContextSpec> parameterContext(BuildContext ctx) {
-    if (!MQTT_SSL_CONTEXT_REFERENCE.equals(
-        ctx.spec().sourceProperties().get("SSL Context Service"))) {
+    if (!tlsRequested(ctx) || !truststore.hasPasswordParameter()) {
       return Optional.empty();
     }
     return Optional.of(
         new ParameterContextSpec(
-            NODE_TRUSTSTORE_PARAMETER_CONTEXT,
+            truststore.parameterContext(),
             List.of(
                 new ParameterSpec(
-                    TRUSTSTORE_PASSWORD_PARAMETER, "Password of the NiFi node truststore", true))));
+                    truststore.passwordParameter(), "Password of the MQTT truststore", true))));
+  }
+
+  private static boolean tlsRequested(BuildContext ctx) {
+    return MQTT_SSL_CONTEXT_REFERENCE.equals(
+        ctx.spec().sourceProperties().get("SSL Context Service"));
   }
 
   @Override
@@ -283,5 +357,17 @@ public final class MqttSourceStage implements SourceStage {
           "MQTT '" + nifiKey + "' is not a valid seconds duration: " + text);
     }
     out.putSourceProperty(nifiKey, matcher.group(1));
+  }
+
+  private void bindProtocolVersion(PlanContext out, Object value) throws FatalAdapterException {
+    // Missing values belong to pre-version-field datasources and retain the old fragment behaviour:
+    // Paho's v3 AUTO mode tries MQTT 3.1.1 first, then falls back to MQTT 3.1.0.
+    String configured = value == null ? "3" : String.valueOf(value).trim();
+    String nifiValue = MQTT_PROTOCOL_VERSIONS.get(configured);
+    if (nifiValue == null) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR, "MQTT protocol version must be 3 or 5");
+    }
+    out.putSourceProperty("MQTT Specification Version", nifiValue);
   }
 }

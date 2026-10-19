@@ -120,7 +120,7 @@ export const collectParentIds = (diagram: UMLDiagram, elementId: string): string
 export type RootResolutionFailure =
   | { code: 'noRoot' }
   | { code: 'ambiguousRoot'; candidateNames: string[] }
-  | { code: 'unreachable'; rootName: string; unreachableNames: string[] }
+  | { code: 'misdirected'; name1: string; name2: string }
 
 export type RootResolution =
   | { kind: 'empty' }
@@ -139,6 +139,10 @@ const namesOf = (elements: UMLElement[]): string[] => elements.map(e => e.name |
  * merged into the subclass), and attribute type references (an element used as an attribute's type
  * is embedded without any edge). A subclass of a reached class is deliberately NOT reached — its
  * own properties never appear in the record.
+ *
+ * Currently unused: root resolution refuses only a root that is itself embedded, not elements it
+ * cannot reach. Kept for the planned editor warning that marks what will not carry data — do not
+ * drop it as dead code.
  */
 export const collectReachableIds = (diagram: UMLDiagram, rootId: string): Set<string> => {
   const partsByContainer = new Map<string, string[]>()
@@ -179,14 +183,36 @@ export const collectReachableIds = (diagram: UMLDiagram, rootId: string): Set<st
   return reachable
 }
 
+/** Names both ends of the first relation that embeds the root: composition part or inheritance parent. */
+const findRelationEmbeddingRoot = (diagram: UMLDiagram, rootId: string): { name1: string; name2: string } | null => {
+  const nameById = new Map(elementsOf(diagram).map(e => [e.id, e.name || e.type]))
+  for (const edge of diagram.edges ?? []) {
+    const rel = edge.data?.relationship
+    if (!rel) continue
+
+    const isRootEmbedded = INHERITANCE_RELATIONS.has(rel.type)
+      ? rel.target === rootId
+      : classifyStructuralEdge(rel)?.partId === rootId
+    if (!isRootEmbedded) continue
+
+    const name1 = nameById.get(rel.source)
+    const name2 = nameById.get(rel.target)
+    if (name1 && name2) return { name1, name2 }
+  }
+  return null
+}
+
 /**
  * The single hierarchy root of a diagram: the explicitly flagged element (`isRoot`, set via the
  * editor's root checkbox) or, without a flag, strictly the one non-embedded, non-enumeration
- * element. From the root, every other element must be reachable. Anything else is `invalid` with
- * a typed failure instead of an order-dependent guess — several flags or several derivation
- * candidates (`ambiguousRoot`), a fully embedded/cyclic diagram (`noRoot`), or stranded elements
- * (`unreachable`). A diagram consisting of exactly one enumeration keeps its special enum-root
- * form.
+ * element. The only way to fail is an unresolvable root — several flags or several derivation
+ * candidates (`ambiguousRoot`), or a fully embedded/cyclic diagram (`noRoot`) — because an
+ * order-dependent guess would silently pick someone's entry point for them. A diagram consisting of
+ * exactly one enumeration keeps its special enum-root form.
+ *
+ * Elements the root cannot reach are no failure — not wired up yet is a normal intermediate state,
+ * kept as unreferenced `$defs` entries. Refused is only a root that is itself embedded by a
+ * relation, since it cannot both start the record and sit inside another element (`misdirected`).
  */
 export const resolveRootElement = (diagram: UMLDiagram): RootResolution => {
   const elements = elementsOf(diagram)
@@ -201,18 +227,9 @@ export const resolveRootElement = (diagram: UMLDiagram): RootResolution => {
   const root = designatedRoot(nonEnum) ?? derivedRoot(nonEnum, diagram)
   if ('failure' in root) return { kind: 'invalid', failure: root.failure }
 
-  const reachable = collectReachableIds(diagram, root.element.id)
-  const unreachable = elements.filter(e => !reachable.has(e.id))
-  if (unreachable.length > 0) {
-    return {
-      kind: 'invalid',
-      failure: {
-        code: 'unreachable',
-        rootName: root.element.name || root.element.type,
-        unreachableNames: namesOf(unreachable),
-      },
-    }
-  }
+  const misdirected = findRelationEmbeddingRoot(diagram, root.element.id)
+  if (misdirected) return { kind: 'invalid', failure: { code: 'misdirected', ...misdirected } }
+
   return { kind: 'class', root: root.element }
 }
 

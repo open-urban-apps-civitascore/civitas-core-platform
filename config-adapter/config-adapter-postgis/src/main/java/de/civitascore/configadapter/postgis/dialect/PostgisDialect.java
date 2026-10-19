@@ -216,6 +216,16 @@ public final class PostgisDialect implements SqlDialect {
   }
 
   @Override
+  public String tableExistsQuery() {
+    return "SELECT 1 FROM pg_catalog.pg_tables WHERE schemaname = ? AND tablename = ?";
+  }
+
+  @Override
+  public String schemaExistsQuery() {
+    return "SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = ?";
+  }
+
+  @Override
   public boolean isDuplicate(SQLException e) {
     String state = e == null ? null : e.getSQLState();
     return SQLSTATE_DUPLICATE_TABLE.equals(state)

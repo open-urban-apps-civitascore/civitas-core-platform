@@ -12,8 +12,6 @@ package de.civitascore.configadapter.apisix;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
@@ -28,8 +26,7 @@ import de.civitascore.configadapter.model.apisix.plugins.ResponseRewritePlugin;
 import de.civitascore.configadapter.model.apisix.plugins.RewriteHeaders;
 import de.civitascore.configadapter.model.apisix.plugins.RoutePlugins;
 import de.civitascore.configadapter.model.apisix.plugins.ServerlessFunctionPlugin;
-import jakarta.ws.rs.ProcessingException;
-import jakarta.ws.rs.client.Entity;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -224,9 +221,9 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
   }
 
   @Test
-  void testRouteCreateWithConnectionException() {
-    when(mockBuilder.post(any(Entity.class)))
-        .thenThrow(new ProcessingException("Connection refused"));
+  void testRouteCreateWithConnectionException() throws IOException {
+    // Torn down before the request is even made: the connection attempt itself fails.
+    server.close();
 
     RouteConfigValue routeConfig = new RouteConfigValue();
     routeConfig.setUri("/api/v1/test");

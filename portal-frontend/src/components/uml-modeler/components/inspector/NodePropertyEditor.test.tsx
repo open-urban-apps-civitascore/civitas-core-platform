@@ -8,9 +8,14 @@ import { NodePropertyEditor } from './NodePropertyEditor'
 const updateNode = vi.fn()
 const setRootNode = vi.fn()
 let isReadOnly = false
+let diagramNodes: UMLNode[] = []
+
+vi.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => key,
+}))
 
 vi.mock('../../hooks/use-active-diagram', () => ({
-  useActiveDiagram: () => ({ updateNode, setRootNode }),
+  useActiveDiagram: () => ({ diagram: { nodes: diagramNodes }, updateNode, setRootNode }),
 }))
 
 vi.mock('../../hooks/use-read-only', () => ({
@@ -59,5 +64,99 @@ describe('NodePropertyEditor root checkbox', () => {
     isReadOnly = true
     render(<NodePropertyEditor node={node({})} />)
     expect(rootCheckbox()).toBeDisabled()
+  })
+})
+
+describe('NodePropertyEditor name validation', () => {
+  beforeEach(() => {
+    isReadOnly = false
+    diagramNodes = []
+  })
+
+  it('shows no error for a valid unique name', () => {
+    render(<NodePropertyEditor node={node({})} />)
+    expect(screen.getByPlaceholderText('Element name')).toHaveAttribute('aria-invalid', 'false')
+    expect(screen.queryByText('invalidCharacters')).not.toBeInTheDocument()
+  })
+
+  it('shows the character error for a name with a space', () => {
+    render(<NodePropertyEditor node={node({ name: 'Foo Bar' })} />)
+    expect(screen.getByText('invalidCharacters')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Element name')).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('shows the duplicate error when another class has the same name', () => {
+    const other = { ...node({}), id: 'node-2' } as UMLNode
+    diagramNodes = [node({}), other]
+    render(<NodePropertyEditor node={node({})} />)
+    expect(screen.getByText('duplicateElement')).toBeInTheDocument()
+  })
+
+  it('shows the duplicate error on an enumeration named like a class', () => {
+    const enumeration = node({ type: 'enumeration', literals: [] } as Partial<UMLElement>)
+    diagramNodes = [enumeration, { ...node({}), id: 'node-2' } as UMLNode]
+    render(<NodePropertyEditor node={enumeration} />)
+    expect(screen.getByText('duplicateElement')).toBeInTheDocument()
+  })
+
+  it('shows the character error on an enumeration', () => {
+    render(
+      <NodePropertyEditor
+        node={node({ type: 'enumeration', name: 'Neue Aufzählung', literals: [] } as Partial<UMLElement>)}
+      />,
+    )
+    expect(screen.getByText('invalidCharacters')).toBeInTheDocument()
+  })
+
+  it('shows the required error for an empty name', () => {
+    render(<NodePropertyEditor node={node({ name: '' })} />)
+    expect(screen.getByText('required')).toBeInTheDocument()
+  })
+})
+
+describe('NodePropertyEditor enumeration values', () => {
+  const enumerationWith = (valueNames: string[]) =>
+    node({
+      type: 'enumeration',
+      name: 'Status',
+      literals: valueNames.map((name, index) => ({ id: `l${index}`, name })),
+    } as Partial<UMLElement>)
+
+  const openValues = () => fireEvent.click(screen.getByRole('button', { name: 'Values' }))
+
+  beforeEach(() => {
+    updateNode.mockClear()
+    isReadOnly = false
+    diagramNodes = []
+  })
+
+  it('shows one duplicate error below the values and marks both fields', () => {
+    render(<NodePropertyEditor node={enumerationWith(['ACTIVE', 'ACTIVE', 'INACTIVE'])} />)
+    openValues()
+    expect(screen.getAllByText('duplicateEnumValue')).toHaveLength(1)
+    const invalidFields = screen
+      .getAllByPlaceholderText('VALUE_NAME')
+      .filter(field => field.getAttribute('aria-invalid') === 'true')
+    expect(invalidFields).toHaveLength(2)
+  })
+
+  it('shows no error for unique value names', () => {
+    render(<NodePropertyEditor node={enumerationWith(['ACTIVE', 'INACTIVE'])} />)
+    openValues()
+    expect(screen.queryByText('duplicateEnumValue')).not.toBeInTheDocument()
+  })
+
+  it('gives a new value the first free default name after a delete', () => {
+    render(<NodePropertyEditor node={enumerationWith(['WERT2', 'WERT3'])} />)
+    openValues()
+    fireEvent.click(screen.getByRole('button', { name: /Add Value/ }))
+
+    expect(updateNode).toHaveBeenCalledWith('node-1', {
+      literals: [
+        expect.objectContaining({ name: 'WERT2' }),
+        expect.objectContaining({ name: 'WERT3' }),
+        expect.objectContaining({ name: 'WERT1' }),
+      ],
+    })
   })
 })

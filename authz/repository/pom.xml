@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.0</version>
+        <version>4.1.1</version>
         <relativePath/>
     </parent>
 
@@ -22,10 +22,26 @@
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <portal-model.version>1.0.0</portal-model.version>
         <assertj.version>3.27.7</assertj.version>
+        <!-- Drop once the Spring Boot parent manages Tomcat >= 11.0.25: Boot 4.1.1 pins 11.0.24,
+             affected by GHSA-9xv2-5v5q-p794, GHSA-gcx9-497g-6cp6 and GHSA-h3x4-894j-xpx5. -->
+        <tomcat.version>11.0.26</tomcat.version>
+        <!-- Spring Boot 4.1.1 pins jackson-bom to 3.1.5, vulnerable to CVE-2026-68497
+             (jackson-databind DoS via unbounded number parsing). Override until a
+             Spring Boot patch ships a fixed jackson-bom. -->
+        <jackson-bom.version>3.2.3</jackson-bom.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <!-- jackson-annotations doesn't follow jackson-databind's patch versioning (only
+                 coarse 2.21/2.22 releases exist). jackson-databind 3.2.3 (jackson-bom.version
+                 above) transitively depends on jackson-annotations 2.21, which is missing a
+                 class (JsonApplyView) jackson-databind expects. Force 2.22 to fix that. -->
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>2.22</version>
+            </dependency>
             <dependency>
                 <groupId>org.testcontainers</groupId>
                 <artifactId>testcontainers-bom</artifactId>
@@ -135,30 +151,25 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <configuration>
-                    <ignoredUsedUndeclaredDependencies>
-                        <!-- Transitively pulled by Spring Boot starters; versions managed
-                             by spring-boot-starter-parent BOM -->
-                        <ignoredUsedUndeclaredDependency>org.springframework.boot:*</ignoredUsedUndeclaredDependency>
-                        <ignoredUsedUndeclaredDependency>org.springframework:*</ignoredUsedUndeclaredDependency>
-                        <ignoredUsedUndeclaredDependency>org.springframework.data:*</ignoredUsedUndeclaredDependency>
-                        <ignoredUsedUndeclaredDependency>jakarta.*:*</ignoredUsedUndeclaredDependency>
-                        <ignoredUsedUndeclaredDependency>org.slf4j:*</ignoredUsedUndeclaredDependency>
-                        <ignoredUsedUndeclaredDependency>org.assertj:*</ignoredUsedUndeclaredDependency>
-                        <ignoredUsedUndeclaredDependency>org.junit.jupiter:*</ignoredUsedUndeclaredDependency>
-                        <ignoredUsedUndeclaredDependency>org.mockito:*</ignoredUsedUndeclaredDependency>
-                    </ignoredUsedUndeclaredDependencies>
-                    <ignoredNonTestScopedDependencies>
-                        <!-- Spring framework deps used at runtime by Spring autoconfig but
-                             with direct imports only in test code -->
-                        <ignoredNonTestScopedDependency>org.springframework:*</ignoredNonTestScopedDependency>
-                    </ignoredNonTestScopedDependencies>
                     <ignoredUnusedDeclaredDependencies>
-                        <!-- Spring Boot starters bring autoconfig at runtime; analyzer
-                             can't see them as "used" because no direct main-code import -->
+                        <!-- Starters and BOM aggregators are runtime-wired; no bytecode references them. -->
                         <ignoredUnusedDeclaredDependency>org.springframework.boot:*</ignoredUnusedDeclaredDependency>
+                        <!-- JDBC driver: loaded by name at runtime -->
                         <ignoredUnusedDeclaredDependency>org.postgresql:postgresql</ignoredUnusedDeclaredDependency>
                     </ignoredUnusedDeclaredDependencies>
+                    <!-- Compile scope required for boot; direct imports only in tests -->
+                    <ignoredNonTestScopedDependencies>
+                        <ignoredNonTestScopedDependency>org.springframework:spring-beans</ignoredNonTestScopedDependency>
+                        <ignoredNonTestScopedDependency>org.springframework:spring-jdbc</ignoredNonTestScopedDependency>
+                        <ignoredNonTestScopedDependency>org.springframework:spring-core</ignoredNonTestScopedDependency>
+                    </ignoredNonTestScopedDependencies>
+                    <!-- The used-undeclared check is off: compiling against a starter's or aggregator's
+                         transitive closure is deliberate here, so every finding is a false positive. -->
+                    <ignoredUsedUndeclaredDependencies>
+                        <ignoredUsedUndeclaredDependency>*:*</ignoredUsedUndeclaredDependency>
+                    </ignoredUsedUndeclaredDependencies>
                 </configuration>
+
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

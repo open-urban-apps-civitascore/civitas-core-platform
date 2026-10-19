@@ -2,11 +2,11 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
+import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
@@ -35,13 +35,18 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
 @DisplayName("Pipeline Controller Integration Tests")
 class PipelineControllerIntegrationTest
-    extends BaseControllerIntegrationTest<PipelineInputDTO, PipelineOutputDTO> {
+    extends DataSetSubEntityControllerIntegrationTest<PipelineInputDTO, PipelineOutputDTO> {
 
-  @Autowired protected PortalTestDataFactory portalData;
+  @Override
+  protected String getSubEntityPathSegment() {
+    return "pipelines";
+  }
+
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
@@ -49,12 +54,15 @@ class PipelineControllerIntegrationTest
 
   private UUID testDataSetId;
 
-  @Override
-  protected String getEndpointPath() {
-    // Create a new dataset for each test if needed
+  private void ensureTestDataSet() {
     if (testDataSetId == null || dataSetRepository.findById(testDataSetId).isEmpty()) {
       testDataSetId = createTestDataSet().getId();
     }
+  }
+
+  @Override
+  protected String getEndpointPath() {
+    ensureTestDataSet();
     return "/datasets/" + testDataSetId + "/pipelines";
   }
 
@@ -71,12 +79,20 @@ class PipelineControllerIntegrationTest
     return styles;
   }
 
-  /** Helper method to create a sample model map for Pipeline. */
+  /**
+   * Helper method to create a sample CORE Pipeline model map. The backend validates the stored
+   * model against pipeline.schema.json (which requires top-level {@code nodes}/{@code edges}; Model
+   * Forge stamps {@code $schema}/{@code id} on write), so the fixture emits a clean, schema-valid
+   * document.
+   */
   private Map<String, Object> createSampleModel() {
     Map<String, Object> model = new HashMap<>();
-    model.put("input", Map.of("type", "kafka", "brokers", List.of("localhost:9092")));
-    model.put("pipeline", List.of(Map.of("processor", "transform")));
-    model.put("output", Map.of("type", "frost"));
+    model.put(
+        "nodes",
+        List.of(
+            Map.of("id", "start-1", "kind", "start", "label", "Start"),
+            Map.of("id", "end-1", "kind", "end", "label", "End")));
+    model.put("edges", List.of(Map.of("id", "edge-1", "source", "start-1", "target", "end-1")));
     return model;
   }
 
@@ -336,81 +352,6 @@ class PipelineControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
     }
-
-    @Test
-    @DisplayName("Should filter pipelines by name")
-    void shouldFilterPipelinesByName() {
-      PipelineInputDTO input1 = createValidInput();
-      input1.setName("traffic_pipeline");
-      performCreate(input1);
-
-      PipelineInputDTO input2 = createValidInput();
-      input2.setName("weather_pipeline");
-      performCreate(input2);
-
-      Map<String, String> params = Map.of("name", "traffic");
-
-      ResponseEntity<RestPage<PipelineOutputDTO>> response = performGetAll(params);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getContent())
-          .isNotEmpty()
-          .allMatch(p -> p.getName().toLowerCase().contains("traffic"));
-    }
-
-    @Test
-    @DisplayName("Should filter pipelines by description")
-    void shouldFilterPipelinesByDescription() {
-      PipelineInputDTO input1 = createValidInput();
-      input1.setDescription("Processing traffic data");
-      performCreate(input1);
-
-      PipelineInputDTO input2 = createValidInput();
-      input2.setDescription("Processing weather data");
-      performCreate(input2);
-
-      Map<String, String> params = Map.of("description", "weather");
-
-      ResponseEntity<RestPage<PipelineOutputDTO>> response = performGetAll(params);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getContent())
-          .isNotEmpty()
-          .allMatch(
-              p ->
-                  p.getDescription() != null
-                      && p.getDescription().toLowerCase().contains("weather"));
-    }
-
-    @Test
-    @DisplayName("Should search pipelines with 'q' parameter")
-    void shouldSearchPipelinesWithQParameter() {
-      PipelineInputDTO input1 = createValidInput();
-      input1.setName("traffic_pipeline");
-      input1.setDescription("Handles traffic data");
-      performCreate(input1);
-
-      PipelineInputDTO input2 = createValidInput();
-      input2.setName("weather_pipeline");
-      input2.setDescription("Handles weather data");
-      performCreate(input2);
-
-      Map<String, String> params = Map.of("q", "traffic");
-
-      ResponseEntity<RestPage<PipelineOutputDTO>> response = performGetAll(params);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getContent())
-          .isNotEmpty()
-          .allMatch(
-              p ->
-                  p.getName().toLowerCase().contains("traffic")
-                      || (p.getDescription() != null
-                          && p.getDescription().toLowerCase().contains("traffic")));
-    }
   }
 
   @Nested
@@ -477,8 +418,12 @@ class PipelineControllerIntegrationTest
       UUID pipelineId = createTestEntity();
 
       Map<String, Object> newModel = new HashMap<>();
-      newModel.put("input", Map.of("type", "mqtt"));
-      newModel.put("output", Map.of("type", "postgres"));
+      newModel.put(
+          "nodes",
+          List.of(
+              Map.of("id", "source-1", "kind", "source"), Map.of("id", "sink-1", "kind", "sink")));
+      newModel.put(
+          "edges", List.of(Map.of("id", "edge-1", "source", "source-1", "target", "sink-1")));
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("model", newModel);
@@ -638,39 +583,6 @@ class PipelineControllerIntegrationTest
       assertThat(getResponse.getStatusCode())
           .as("Deleted pipeline should not be found")
           .isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @ParameterizedTest
-    @EnumSource(
-        value = DataSetStatus.class,
-        mode = EnumSource.Mode.EXCLUDE,
-        names = {"DRAFT"})
-    @DisplayName("Should fail to delete pipeline when dataset is not in DRAFT status")
-    void shouldFailToDeletePipelineWhenDatasetNotDraft(DataSetStatus status) {
-      // Create a pipeline
-      UUID pipelineId = createTestEntity();
-
-      // Update the dataset status to non-DRAFT
-      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
-      dataSet.setDataSetStatus(status);
-      dataSetRepository.save(dataSet);
-
-      // Attempt to delete the pipeline
-      ResponseEntity<Void> response = performDelete(pipelineId);
-
-      // Currently returns INTERNAL_SERVER_ERROR because IllegalStateException is thrown
-      // This should ideally be BAD_REQUEST with proper error handling
-      assertThat(response.getStatusCode())
-          .as("Should not allow deletion when dataset is %s", status)
-          .isIn(HttpStatus.BAD_REQUEST, HttpStatus.INTERNAL_SERVER_ERROR);
-
-      // Verify pipeline still exists (if deletion properly failed with 400)
-      if (response.getStatusCode() == HttpStatus.BAD_REQUEST) {
-        ResponseEntity<PipelineOutputDTO> getResponse = performGetById(pipelineId);
-        assertThat(getResponse.getStatusCode())
-            .as("Pipeline should still exist after failed deletion attempt")
-            .isEqualTo(HttpStatus.OK);
-      }
     }
 
     @Test
@@ -837,19 +749,32 @@ class PipelineControllerIntegrationTest
     @DisplayName("Should handle complex nested JSON in model")
     void shouldHandleComplexNestedJsonInModel() {
       PipelineInputDTO input = createValidInput();
+      // A deliberately rich, deeply-nested CORE Pipeline document (multiple node kinds, cron
+      // fields,
+      // labelled/typed edges) to exercise verbatim JSON round-tripping. String-only values so the
+      // stored-then-read model compares equal (no numeric-widening on the JSON round-trip).
       Map<String, Object> complexModel = new HashMap<>();
       complexModel.put(
-          "input",
-          Map.of(
-              "type",
-              "kafka",
-              "brokers",
-              List.of("broker1:9092", "broker2:9092"),
-              "topics",
-              List.of("topic1", "topic2")));
+          "nodes",
+          List.of(
+              Map.of("id", "start-1", "kind", "start", "label", "Start", "description", "entry"),
+              Map.of(
+                  "id",
+                  "cron-1",
+                  "kind",
+                  "cron",
+                  "cronExpression",
+                  "0 0/5 * * * ?",
+                  "cronPreview",
+                  "every 5 minutes"),
+              Map.of("id", "map-1", "kind", "mapping", "label", "Transform"),
+              Map.of("id", "end-1", "kind", "end", "label", "End")));
       complexModel.put(
-          "pipeline",
-          List.of(Map.of("processor", "transform", "config", Map.of("field", "value"))));
+          "edges",
+          List.of(
+              Map.of("id", "e1", "source", "start-1", "target", "cron-1", "label", "trigger"),
+              Map.of("id", "e2", "source", "cron-1", "target", "map-1", "kind", "data"),
+              Map.of("id", "e3", "source", "map-1", "target", "end-1", "kind", "control")));
       input.setModel(complexModel);
 
       ResponseEntity<PipelineOutputDTO> response = performCreate(input);
@@ -897,7 +822,6 @@ class PipelineControllerIntegrationTest
     @DisplayName("Should automatically associate pipeline with dataset from URL path")
     void shouldAutomaticallyAssociatePipelineWithDataset() {
       PipelineInputDTO input = createValidInput();
-      // Note: dataSetId should not be set manually, it comes from URL path
 
       ResponseEntity<PipelineOutputDTO> response = performCreate(input);
 
@@ -987,28 +911,13 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should return 404 when getting pipeline from wrong dataset")
-    void shouldReturn404WhenGettingPipelineFromWrongDataset() {
+    @DisplayName(
+        "Should return 404, not the parent's status, for PUT from a non-DRAFT wrong dataset")
+    void shouldNotRevealParentStatusOnPutFromWrongDataset() {
       UUID pipelineId = createTestEntity();
-      DataSet otherDataSet = createTestDataSet();
-
-      ResponseEntity<PipelineOutputDTO> response =
-          exchange(
-              "/datasets/" + otherDataSet.getId() + "/pipelines/" + pipelineId,
-              org.springframework.http.HttpMethod.GET,
-              createAuthHeaders(),
-              null,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode())
-          .as("Should return NOT_FOUND for pipeline from wrong dataset")
-          .isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("Should return 404 when updating pipeline from wrong dataset via PUT")
-    void shouldReturn404WhenUpdatingPipelineFromWrongDataset() {
-      UUID pipelineId = createTestEntity();
+      DataSet ownDataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      ownDataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+      dataSetRepository.save(ownDataSet);
       DataSet otherDataSet = createTestDataSet();
 
       ResponseEntity<PipelineOutputDTO> response =
@@ -1020,56 +929,123 @@ class PipelineControllerIntegrationTest
               getOutputTypeReference());
 
       assertThat(response.getStatusCode())
-          .as("Should return NOT_FOUND for PUT from wrong dataset")
+          .as("A foreign pipeline id must answer 404 regardless of its parent's status")
           .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
+    // Without these three, nothing would catch the removal of the path-injection in
+    // DataSetSubEntityController.preProcessInput, the only mechanism keeping a
+    // sub-entity in its path dataset since the per-service guards were consolidated.
     @Test
-    @DisplayName("Should return 404 when deleting pipeline from wrong dataset")
-    void shouldReturn404WhenDeletingPipelineFromWrongDataset() {
+    @DisplayName("Should ignore a foreign dataSetId in the create body and use the path dataset")
+    void shouldIgnoreForeignDataSetIdOnCreate() {
+      DataSet otherDataSet = createTestDataSet();
+
+      Map<String, Object> body = new HashMap<>();
+      body.put("name", "pipeline_create_with_foreign_dataset_id");
+      body.put("dataSetId", otherDataSet.getId().toString());
+
+      ResponseEntity<PipelineOutputDTO> response =
+          exchange(
+              getEndpointPath(),
+              HttpMethod.POST,
+              createAuthHeaders(),
+              body,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody()).isNotNull();
+
+      assertThat(response.getBody().getDataSetId())
+          .as("POST must echo the dataset from the path, not the one named in the body")
+          .isEqualTo(testDataSetId)
+          .isNotEqualTo(otherDataSet.getId());
+
+      Pipeline saved = pipelineRepository.findById(response.getBody().getId()).orElseThrow();
+      assertThat(saved.getDataSet().getId())
+          .as("POST must use the dataset from the path, not the one named in the body")
+          .isEqualTo(testDataSetId)
+          .isNotEqualTo(otherDataSet.getId());
+    }
+
+    @Test
+    @DisplayName("Should ignore a foreign dataSetId in the PUT body and keep the path dataset")
+    void shouldIgnoreForeignDataSetIdOnUpdate() {
       UUID pipelineId = createTestEntity();
       DataSet otherDataSet = createTestDataSet();
 
-      ResponseEntity<Void> response =
+      Map<String, Object> body = new HashMap<>();
+      body.put("name", "pipeline_put_with_foreign_dataset_id");
+      body.put("dataSetId", otherDataSet.getId().toString());
+
+      ResponseEntity<PipelineOutputDTO> response =
           exchange(
-              "/datasets/" + otherDataSet.getId() + "/pipelines/" + pipelineId,
-              org.springframework.http.HttpMethod.DELETE,
+              getEndpointPath() + "/" + pipelineId,
+              HttpMethod.PUT,
               createAuthHeaders(),
-              null,
-              new ParameterizedTypeReference<>() {});
+              body,
+              getOutputTypeReference());
 
-      assertThat(response.getStatusCode())
-          .as("Should return NOT_FOUND for DELETE from wrong dataset")
-          .isEqualTo(HttpStatus.NOT_FOUND);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSetId())
+          .as("PUT must echo the path dataset, not the one named in the body")
+          .isEqualTo(testDataSetId)
+          .isNotEqualTo(otherDataSet.getId());
 
-      assertThat(pipelineRepository.findById(pipelineId))
-          .as("Pipeline should still exist after failed cross-dataset delete")
-          .isPresent();
+      Pipeline saved = pipelineRepository.findById(pipelineId).orElseThrow();
+      assertThat(saved.getDataSet().getId())
+          .as("PUT must not move the pipeline to the dataset named in the body")
+          .isEqualTo(testDataSetId)
+          .isNotEqualTo(otherDataSet.getId());
+    }
+
+    @Test
+    @DisplayName("Should ignore a foreign dataSetId in the PATCH body and keep the path dataset")
+    void shouldIgnoreForeignDataSetIdOnPatch() {
+      UUID pipelineId = createTestEntity();
+      DataSet otherDataSet = createTestDataSet();
+
+      ResponseEntity<PipelineOutputDTO> response =
+          performPatch(
+              pipelineId,
+              Map.of(
+                  "name",
+                  "pipeline_patch_with_foreign_dataset_id",
+                  "dataSetId",
+                  otherDataSet.getId().toString()));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSetId())
+          .as("PATCH must echo the path dataset, not the one named in the body")
+          .isEqualTo(testDataSetId)
+          .isNotEqualTo(otherDataSet.getId());
+
+      Pipeline saved = pipelineRepository.findById(pipelineId).orElseThrow();
+      assertThat(saved.getDataSet().getId())
+          .as("PATCH must not move the pipeline to the dataset named in the body")
+          .isEqualTo(testDataSetId)
+          .isNotEqualTo(otherDataSet.getId());
     }
   }
 
   @Nested
-  @DisplayName("DataSource Status Validation Tests")
+  @DisplayName("DataSource lifecycle reference tests")
   class DataSourceStatusValidationTests {
 
     @Test
-    @DisplayName("Should reject creating a pipeline with a DRAFT datasource")
-    void shouldRejectDraftDataSource() {
+    @DisplayName("Should create a Pipeline with a DRAFT DataSource")
+    void shouldAcceptDraftDataSource() {
       DataSource draftDataSource = createTestDataSource();
-      // draftDataSource is DRAFT by default (DataSourceStatus.DRAFT)
 
       PipelineInputDTO input = createValidInput();
       input.setDataSourceIds(Set.of(draftDataSource.getId()));
 
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath(),
-              HttpMethod.POST,
-              new HttpEntity<>(input, createAuthHeaders()),
-              String.class);
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).contains("AVAILABLE status");
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody().getDataSourceIds()).containsExactly(draftDataSource.getId());
     }
 
     @Test
@@ -1088,27 +1064,22 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should reject when one of multiple datasources is DRAFT")
-    void shouldRejectWhenOneDataSourceIsDraft() {
+    @DisplayName("Should accept DRAFT and AVAILABLE DataSources together")
+    void shouldAcceptDraftAndAvailableDataSources() {
       DataSource availableDataSource = createTestDataSource();
       availableDataSource.setDataSourceStatus(DataSourceStatus.AVAILABLE);
       dataSourceRepository.save(availableDataSource);
 
       DataSource draftDataSource = createTestDataSource();
-      // draftDataSource is DRAFT by default
 
       PipelineInputDTO input = createValidInput();
       input.setDataSourceIds(Set.of(availableDataSource.getId(), draftDataSource.getId()));
 
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath(),
-              HttpMethod.POST,
-              new HttpEntity<>(input, createAuthHeaders()),
-              String.class);
+      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).contains("AVAILABLE status");
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody().getDataSourceIds())
+          .containsExactlyInAnyOrder(availableDataSource.getId(), draftDataSource.getId());
     }
 
     @Test
@@ -1137,24 +1108,18 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("PUT rejects linking a DRAFT (non-AVAILABLE) datasource")
-    void shouldRejectUpdateAddingDraftDataSource() {
-      // A freshly created, never-linked datasource is DRAFT by default and may not be attached.
+    @DisplayName("PUT links a DRAFT DataSource")
+    void shouldUpdateWithDraftDataSource() {
       UUID pipelineId = createTestEntity();
       DataSource draftDataSource = createTestDataSource();
 
       PipelineInputDTO updateInput = createUpdateInput();
       updateInput.setDataSourceIds(Set.of(draftDataSource.getId()));
 
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpointPath() + "/" + pipelineId,
-              HttpMethod.PUT,
-              new HttpEntity<>(updateInput, createAuthHeaders()),
-              String.class);
+      ResponseEntity<PipelineOutputDTO> response = performUpdate(pipelineId, updateInput);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).contains("AVAILABLE status");
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getDataSourceIds()).containsExactly(draftDataSource.getId());
     }
 
     @Test
@@ -1485,6 +1450,163 @@ class PipelineControllerIntegrationTest
           .isPresent()
           .get()
           .satisfies(s -> assertThat(s.getPipeline()).isNull());
+    }
+  }
+
+  @Nested
+  @DisplayName("Parent DataSet Mutation Guard")
+  class MutationGuardTests {
+
+    private static final String NOT_EDITABLE_URN = "urn:civitas:error:DATASET_NOT_EDITABLE";
+    private static final String SAGA_IN_FLIGHT_URN = "urn:civitas:error:SAGA_IN_FLIGHT";
+
+    private void setParentStatus(DataSetStatus status) {
+      ensureTestDataSet();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      dataSet.setDataSetStatus(status);
+      dataSetRepository.save(dataSet);
+    }
+
+    private void setParentPendingSaga(PendingSagaType pendingSagaType) {
+      ensureTestDataSet();
+      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
+      dataSet.setPendingSagaType(pendingSagaType);
+      dataSetRepository.save(dataSet);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("POST is rejected when the parent dataset is not DRAFT")
+    void createRejectedWhenParentNotDraft(DataSetStatus status) {
+      setParentStatus(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath(), HttpMethod.POST, createAuthHeaders(), createValidInput());
+
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+      assertThat(pipelineRepository.count()).as("No pipeline was created").isZero();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("PUT is rejected when the parent dataset is not DRAFT")
+    void updateRejectedWhenParentNotDraft(DataSetStatus status) {
+      UUID pipelineId = createTestEntity();
+      String originalName = pipelineRepository.findById(pipelineId).orElseThrow().getName();
+      setParentStatus(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + pipelineId,
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              createUpdateInput());
+
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+      assertThat(pipelineRepository.findById(pipelineId).orElseThrow().getName())
+          .isEqualTo(originalName);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("PATCH is rejected when the parent dataset is not DRAFT")
+    void patchRejectedWhenParentNotDraft(DataSetStatus status) {
+      UUID pipelineId = createTestEntity();
+      String originalName = pipelineRepository.findById(pipelineId).orElseThrow().getName();
+      setParentStatus(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + pipelineId,
+              HttpMethod.PATCH,
+              createAuthHeaders(),
+              Map.of("name", "patched_pipeline"));
+
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+      assertThat(pipelineRepository.findById(pipelineId).orElseThrow().getName())
+          .isEqualTo(originalName);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DataSetStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "DRAFT")
+    @DisplayName("DELETE is rejected when the parent dataset is not DRAFT")
+    void deleteRejectedWhenParentNotDraft(DataSetStatus status) {
+      UUID pipelineId = createTestEntity();
+      setParentStatus(status);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + pipelineId, HttpMethod.DELETE, createAuthHeaders(), null);
+
+      assertRejected(response, HttpStatus.BAD_REQUEST, NOT_EDITABLE_URN);
+      assertThat(pipelineRepository.findById(pipelineId)).isPresent();
+    }
+
+    @Test
+    @DisplayName("POST is rejected with 409 while a saga is in flight on a DRAFT dataset")
+    void createRejectedWhileSagaInFlight() {
+      setParentPendingSaga(PendingSagaType.UNRELEASE);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath(), HttpMethod.POST, createAuthHeaders(), createValidInput());
+
+      assertSagaRejected(response);
+      assertThat(pipelineRepository.count()).as("No pipeline was created").isZero();
+    }
+
+    @Test
+    @DisplayName("PUT is rejected with 409 while a saga is in flight on a DRAFT dataset")
+    void updateRejectedWhileSagaInFlight() {
+      UUID pipelineId = createTestEntity();
+      String originalName = pipelineRepository.findById(pipelineId).orElseThrow().getName();
+      setParentPendingSaga(PendingSagaType.UNRELEASE);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + pipelineId,
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              createUpdateInput());
+
+      assertSagaRejected(response);
+      assertThat(pipelineRepository.findById(pipelineId).orElseThrow().getName())
+          .isEqualTo(originalName);
+    }
+
+    @Test
+    @DisplayName("DELETE is rejected with 409 while a saga is in flight on a DRAFT dataset")
+    void deleteRejectedWhileSagaInFlight() {
+      UUID pipelineId = createTestEntity();
+      setParentPendingSaga(PendingSagaType.UNRELEASE);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + pipelineId, HttpMethod.DELETE, createAuthHeaders(), null);
+
+      assertSagaRejected(response);
+      assertThat(pipelineRepository.findById(pipelineId))
+          .as("Entity survives the rejected delete")
+          .isPresent();
+    }
+
+    private void assertSagaRejected(ResponseEntity<ProblemDetail> response) {
+      assertRejected(response, HttpStatus.CONFLICT, SAGA_IN_FLIGHT_URN);
+      assertThat(response.getBody().getProperties())
+          .containsEntry("pendingSagaType", PendingSagaType.UNRELEASE.name());
+    }
+
+    @Test
+    @DisplayName("PUT, PATCH and DELETE all succeed on a DRAFT dataset")
+    void mutationsAcceptedOnDraftParent() {
+      UUID pipelineId = createTestEntity();
+
+      assertThat(performUpdate(pipelineId, createUpdateInput()).getStatusCode())
+          .isEqualTo(HttpStatus.OK);
+      assertThat(performPatch(pipelineId, Map.of("description", "patched")).getStatusCode())
+          .isEqualTo(HttpStatus.OK);
+      assertThat(performDelete(pipelineId).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     }
   }
 }

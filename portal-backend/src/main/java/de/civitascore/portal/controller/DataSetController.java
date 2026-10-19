@@ -4,6 +4,7 @@ import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.DataSetMetaInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.model.output.NamedApiOutputDTO;
 import de.civitascore.portal.model.output.assembler.DataSetAssembler;
@@ -35,12 +36,14 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
 
 /** REST controller for managing dataset resources, including release lifecycle operations. */
 @RestController
@@ -48,7 +51,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(name = "DataSets", description = "Dataset management endpoints")
 public class DataSetController
-    extends BaseDataEntityController<DataSetInputDTO, DataSetOutputDTO, DataSet, DataSetSpec> {
+    extends BaseDataEntityController<
+        DataSetInputDTO, DataSetMetaInputDTO, DataSetOutputDTO, DataSet, DataSetSpec> {
 
   private final DataSetService dataSetService;
   private final DataSetAssembler dataSetAssembler;
@@ -78,7 +82,12 @@ public class DataSetController
             @Schema(
                 type = "string",
                 example =
-                    "550e8400-e29b-41d4-a716-446655440000,3fa85f64-5717-4562-b3fc-2c963f66afa6"))
+                    "550e8400-e29b-41d4-a716-446655440000,3fa85f64-5717-4562-b3fc-2c963f66afa6")),
+    @Parameter(
+        name = "includePendingDelete",
+        description = "Include datasets with pendingSagaType DELETE. Defaults to false.",
+        in = ParameterIn.QUERY,
+        schema = @Schema(type = "boolean", defaultValue = "false", example = "true"))
   })
   /**
    * Retrieves a paginated list of datasets with optional filtering by name, description, or
@@ -183,7 +192,7 @@ public class DataSetController
   @Operation(
       summary = "Update a DRAFT dataset",
       description =
-          "Updates a dataset in DRAFT status. For released datasets (READY or AVAILABLE), use PUT /datasets/{id}/released/meta instead.")
+          "Updates a dataset in DRAFT status. For released datasets (READY or AVAILABLE), use PATCH /datasets/{id}/released/meta instead.")
   public ResponseEntity<DataSetOutputDTO> update(
       @PathVariable UUID id, @Valid @RequestBody DataSetInputDTO input) {
     return super.update(id, input);
@@ -200,7 +209,23 @@ public class DataSetController
       operationId = "stageDataSet",
       summary = "Stage a dataset",
       description =
-          "Validates the dataset's pipeline configuration and transitions status from DRAFT to READY.")
+          "Validates the dataset's pipeline configuration, then transitions status from DRAFT to"
+              + " READY. The artifacts participating in its flows may still be DRAFT; release"
+              + " validates them.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "The dataset is staged",
+      content = @Content(schema = @Schema(implementation = DataSetOutputDTO.class)))
+  @ApiResponse(
+      responseCode = "400",
+      description =
+          "The dataset carries no name, description or Pipeline, or one of its Pipelines has no"
+              + " stored definition",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "422",
+      description = "A pipeline DataSource is out of the dataset's datapool scope",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> stage(@PathVariable UUID id) {
     DataSet ready = dataSetService.stage(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(ready);
@@ -212,6 +237,10 @@ public class DataSetController
       operationId = "unstageDataSet",
       summary = "Unstage a dataset",
       description = "Reverts the dataset from READY to DRAFT.")
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> unstage(@PathVariable UUID id) {
     DataSet draft = dataSetService.unstage(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(draft);
@@ -219,6 +248,21 @@ public class DataSetController
   }
 
   @Override
+  @ApiResponse(
+      responseCode = "202",
+      description = "The release was accepted; infrastructure is provisioned asynchronously",
+      content = @Content(schema = @Schema(implementation = DataSetOutputDTO.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "422",
+      description =
+          "A pipeline DataSource is out of the dataset's datapool scope, an artifact"
+              + " participating in a pipeline's flow cannot carry a release, or a flow reaches"
+              + " further than the walk is configured to follow",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataSetOutputDTO> release(@PathVariable UUID id) {
     DataSet released = dataSetService.release(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(released);
@@ -241,10 +285,43 @@ public class DataSetController
       responseCode = "409",
       description = "Conflict (saga is in-flight for this dataset)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content = @Content(schema = @Schema(implementation = DataSetMetaInputDTO.class)))
   public ResponseEntity<DataSetOutputDTO> updateReleasedMeta(
-      @PathVariable UUID id, @Valid @RequestBody DataSetInputDTO input) {
-    DataSetInputDTO preProcessedInput = preProcessInput(input);
-    DataSet updated = dataSetService.updateReleasedMeta(id, preProcessedInput);
+      @PathVariable UUID id, @RequestBody JsonNode updates) {
+    return super.updateReleasedMeta(id, updates);
+  }
+
+  @PatchMapping("/{id}/ready/meta")
+  @Operation(
+      operationId = "updateReadyDataSetMeta",
+      summary = "Update READY dataset metadata",
+      description =
+          "Applies a JSON merge patch to the metadata of a dataset in READY status, requiring only"
+              + " DATASET_UPDATE — unlike PATCH /datasets/{id}/released/meta, which also requires"
+              + " DATASET_RELEASE. An omitted field keeps its value. Rejects DRAFT and AVAILABLE"
+              + " datasets. A field that is not metadata, such as namedApis, answers 400 — unrelease"
+              + " the dataset and edit it in DRAFT.")
+  @ApiResponse(responseCode = "200", description = "Dataset metadata updated successfully")
+  @ApiResponse(
+      responseCode = "400",
+      description =
+          "Dataset is not READY, the request contains a field that is not metadata, or the"
+              + " patched metadata is invalid",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "422",
+      description = "A datapool switch leaves a pipeline DataSource out of scope",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content = @Content(schema = @Schema(implementation = DataSetMetaInputDTO.class)))
+  public ResponseEntity<DataSetOutputDTO> updateReadyMeta(
+      @PathVariable UUID id, @RequestBody JsonNode updates) {
+    DataSet updated = dataSetService.updateReadyMeta(id, patchMeta(id, updates));
     DataSetOutputDTO output = dataSetAssembler.toOutput(updated);
     return ResponseEntity.ok(output);
   }
@@ -265,6 +342,10 @@ public class DataSetController
               + "A dataset that still holds a provisioned sink is torn down asynchronously via a "
               + "DELETE saga and removed once the saga completes. An AVAILABLE dataset cannot be "
               + "deleted directly — unrelease it first (POST /{id}/unrelease).")
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (saga is in-flight for this dataset)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public void delete(@PathVariable UUID id) {
     dataSetService.deleteById(id);
   }

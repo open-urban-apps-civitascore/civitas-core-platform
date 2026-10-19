@@ -33,7 +33,7 @@ $COMPOSE_DOWN 2>/dev/null && echo "  Application services stopped (Docker)" || t
 # (Maven forks child JVMs that don't match pkill patterns)
 echo "Stopping application processes (local)..."
 docker rm -f civitas-portal-frontend 2>/dev/null || true
-for port_info in "8088:Config Adapter" "8089:Portal Backend" "3000:Portal Frontend"; do
+for port_info in "8088:Config Adapter" "8089:Portal Backend" "3000:Portal Frontend" "8092:Model Forge Admin UI"; do
     port="${port_info%%:*}"
     name="${port_info##*:}"
     if [ "$(uname -s)" = "Darwin" ]; then

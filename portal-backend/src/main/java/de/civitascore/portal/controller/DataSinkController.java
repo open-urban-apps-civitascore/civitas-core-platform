@@ -30,21 +30,25 @@ import tools.jackson.databind.JsonNode;
 @RequiredArgsConstructor
 @Tag(name = "DataSinks", description = "DataSink management endpoints")
 public class DataSinkController
-    extends BaseController<DataSinkInputDTO, DataSinkOutputDTO, DataSink, DataSinkSpec> {
+    extends DataSetSubEntityController<
+        DataSinkInputDTO, DataSinkOutputDTO, DataSink, DataSinkSpec> {
 
   private final DataSinkService dataSinkService;
   private final DataSinkAssembler dataSinkAssembler;
 
-  /** {@inheritDoc} */
   @Override
   protected DataSinkService getService() {
     return dataSinkService;
   }
 
-  /** {@inheritDoc} */
   @Override
   protected DataSinkAssembler getAssembler() {
     return dataSinkAssembler;
+  }
+
+  @Override
+  protected Class<DataSink> getEntityClass() {
+    return DataSink.class;
   }
 
   /** {@inheritDoc} Lists all DataSinks scoped to the parent dataset. */
@@ -58,58 +62,35 @@ public class DataSinkController
     return super.getAll(spec, pageable);
   }
 
-  /** {@inheritDoc} Retrieves a DataSink by ID, verifying it belongs to the parent dataset. */
   @Override
   @Operation(operationId = "getDataSink", summary = "Get DataSink by ID")
   public ResponseEntity<DataSinkOutputDTO> getById(@PathVariable UUID id) {
-    UUID dataSetId = extractDataSetId();
-    DataSink sink = dataSinkService.findByIdAndDataSetOrThrow(id, dataSetId);
-    return ResponseEntity.ok(dataSinkAssembler.toOutput(sink));
+    return super.getById(id);
   }
 
-  /** Creates a new DataSink under the parent dataset. */
   @Override
   @Operation(operationId = "createDataSink", summary = "Create a new DataSink")
   public ResponseEntity<DataSinkOutputDTO> create(@Valid @RequestBody DataSinkInputDTO input) {
     return super.create(input);
   }
 
-  /** Replaces an existing DataSink after verifying it belongs to the parent dataset. */
   @Override
   @Operation(operationId = "updateDataSink", summary = "Replace a DataSink")
   public ResponseEntity<DataSinkOutputDTO> update(
       @PathVariable UUID id, @Valid @RequestBody DataSinkInputDTO input) {
-    UUID dataSetId = extractDataSetId();
-    dataSinkService.findByIdAndDataSetOrThrow(id, dataSetId);
     return super.update(id, input);
   }
 
-  /** Partially updates a DataSink after verifying it belongs to the parent dataset. */
   @Override
   @Operation(operationId = "patchDataSink", summary = "Partially update a DataSink")
   public ResponseEntity<DataSinkOutputDTO> patch(
       @PathVariable UUID id, @RequestBody JsonNode updates) throws IOException {
-    UUID dataSetId = extractDataSetId();
-    dataSinkService.findByIdAndDataSetOrThrow(id, dataSetId);
     return super.patch(id, updates);
   }
 
-  /** Deletes a DataSink after verifying it belongs to the parent dataset. */
   @Override
   @Operation(operationId = "deleteDataSink", summary = "Delete a DataSink")
   public void delete(@PathVariable UUID id) {
-    UUID dataSetId = extractDataSetId();
-    dataSinkService.findByIdAndDataSetOrThrow(id, dataSetId);
     super.delete(id);
-  }
-
-  @Override
-  protected DataSinkInputDTO preProcessInput(DataSinkInputDTO input) {
-    input.setDataSetId(extractDataSetId());
-    return super.preProcessInput(input);
-  }
-
-  private UUID extractDataSetId() {
-    return extractUUIDFromPathVariable("dataSetId", DataSink.class);
   }
 }

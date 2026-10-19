@@ -29,9 +29,9 @@ import org.junit.jupiter.api.Test;
 class MappingConfigParserTest {
 
   private static final String SOURCE_URN =
-      "urn:core:platform:civitas:datastructure:common:Source:2dmtus8w40:1.0.0";
+      "urn:core:platform:civitas:datastructure:common:69805d0e-f2ea-852d-ab06-23fe8283bc59:1.0.0";
   private static final String TARGET_URN =
-      "urn:core:platform:civitas:datastructure:common:Target:abcdefghij:1.0.0";
+      "urn:core:platform:civitas:datastructure:common:625828d3-ecb3-806b-8666-dab644eca1d7:1.0.0";
 
   private final ObjectMapper mapper = new ObjectMapper();
   private final MappingConfigParser parser = new MappingConfigParser();
@@ -159,6 +159,56 @@ class MappingConfigParserTest {
     assertEquals(ConversionOp.TO_DATE, conv.op());
     assertEquals("yyyy-MM-dd", conv.pattern());
     assertInstanceOf(CopyNode.class, conv.input());
+  }
+
+  @Test
+  void toDateTimeWithPattern() throws Exception {
+    // 'toDate' is a prefix of 'toDateTime': a lookup that stopped being an exact match would
+    // resolve the longer token to the date-only op and invert what the mapping writes.
+    MappingConfig mc =
+        parse(
+            """
+        { "fields": { "$.observed_at": { "op": "toDateTime", "input": "$.ts", "pattern": "yyyy-MM-dd HH:mm:ss" } } }
+        """);
+
+    ConvertNode conv = assertInstanceOf(ConvertNode.class, mc.fields().get("$.observed_at"));
+    assertEquals(ConversionOp.TO_DATE_TIME, conv.op());
+    assertEquals("yyyy-MM-dd HH:mm:ss", conv.pattern());
+  }
+
+  @Test
+  void toDateTimeWithEpochMilliseconds() throws Exception {
+    MappingConfig mc =
+        parse(
+            """
+        { "fields": { "$.observed_at": { "op": "toDateTime", "input": "$.ts", "inputType": "epoch", "unit": "milliseconds" } } }
+        """);
+
+    ConvertNode conv = assertInstanceOf(ConvertNode.class, mc.fields().get("$.observed_at"));
+    assertEquals(ConversionOp.TO_DATE_TIME, conv.op());
+    assertEquals("milliseconds", conv.unit());
+  }
+
+  @Test
+  void toDateTimeEpochWithoutUnitIsRejected() {
+    assertThrows(
+        FatalAdapterException.class,
+        () ->
+            parse(
+                """
+            { "fields": { "$.ts": { "op": "toDateTime", "input": "$.raw", "inputType": "epoch" } } }
+            """));
+  }
+
+  @Test
+  void toDateTimeEpochWithPatternIsRejected() {
+    assertThrows(
+        FatalAdapterException.class,
+        () ->
+            parse(
+                """
+            { "fields": { "$.ts": { "op": "toDateTime", "input": "$.raw", "inputType": "epoch", "unit": "seconds", "pattern": "yyyy" } } }
+            """));
   }
 
   @Test
@@ -310,6 +360,21 @@ class MappingConfigParserTest {
                 parse(
                     """
             { "fields": { "$.ts": { "op": "toDate", "input": "$.raw" } } }
+            """));
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+  }
+
+  @Test
+  void toDateTimeWithoutPatternIsRejected() {
+    // requiresPattern is a plain constructor flag with nothing enforcing it per op; without this,
+    // clearing it for toDateTime would compile and emit toDate(/raw, null) at deployment time.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                parse(
+                    """
+            { "fields": { "$.ts": { "op": "toDateTime", "input": "$.raw" } } }
             """));
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
   }

@@ -126,7 +126,6 @@ services:
       KEYCLOAK_REALM: civitas-core
       KEYCLOAK_TARGET_REALM: civitas-core
       # App config
-      APP_URL: http://localhost:8089
       SERVER_PORT: 8089
       EVENT_CONFIG_ADAPTER_TIMEOUT_SECONDS: 30
       # ---- E2E Test Groups ----

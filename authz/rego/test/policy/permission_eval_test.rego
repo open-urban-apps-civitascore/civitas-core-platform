@@ -44,7 +44,7 @@ mock_send_external_id_only(_) := {"status_code": 200, "body": {"externalId": "ex
 mock_send_empty(_) := {"status_code": 200, "body": {}}
 mock_send_multiple_groups(_) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
 	{"perms": ["DATASET_READ"], "scope_type": "DATASET", "scope_id": "dataset-1"},
-	{"perms": ["DATASET_CREATE"], "scope_type": "DATASET", "scope_id": "dataset-2"},
+	{"perms": ["DATASET_CREATE"], "scope_type": "TENANT", "scope_id": null},
 ])}
 
 mock_send_multi_role(_) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
@@ -84,6 +84,28 @@ test_required_permissions_delete_group if {
 	result == {"GROUP_DELETE"}
 }
 
+# Test: a Mapping is part of its dataset, so every write to it changes the dataset and requires
+# DATASET_UPDATE, never DATASET_CREATE or DATASET_DELETE.
+test_required_permissions_read_dataset_mapping if {
+	result := permission_eval.required_permissions with input as portal_request_no_auth("GET", "/v1/datasets/dataset-1/mappings")
+	result == {"DATASET_READ"}
+}
+
+test_required_permissions_create_dataset_mapping if {
+	result := permission_eval.required_permissions with input as portal_request_no_auth("POST", "/v1/datasets/dataset-1/mappings")
+	result == {"DATASET_UPDATE"}
+}
+
+test_required_permissions_version_dataset_mapping if {
+	result := permission_eval.required_permissions with input as portal_request_no_auth("PUT", "/v1/datasets/dataset-1/mappings")
+	result == {"DATASET_UPDATE"}
+}
+
+test_required_permissions_delete_dataset_mapping if {
+	result := permission_eval.required_permissions with input as portal_request_no_auth("DELETE", "/v1/datasets/dataset-1/mappings")
+	result == {"DATASET_UPDATE"}
+}
+
 # Test: Permission lookup from mappings - PATCH resource
 test_required_permissions_patch_role if {
 	result := permission_eval.required_permissions with input as portal_request_no_auth("PATCH", "/v1/roles/r1")
@@ -92,7 +114,7 @@ test_required_permissions_patch_role if {
 
 # Test: AND-permission array → multi-element set
 test_required_permissions_and_array if {
-	result := permission_eval.required_permissions with input as portal_request_no_auth("PUT", "/v1/datasets/abc/released/meta")
+	result := permission_eval.required_permissions with input as portal_request_no_auth("PATCH", "/v1/datasets/abc/released/meta")
 	result == {"DATASET_UPDATE", "DATASET_RELEASE"}
 }
 
@@ -142,7 +164,7 @@ test_is_known_endpoint_unknown if {
 
 # Test: AND-permission endpoint is known
 test_is_known_endpoint_and_permission if {
-	result := permission_eval.is_known_endpoint with input as portal_request_no_auth("PUT", "/v1/datasets/abc/released/meta")
+	result := permission_eval.is_known_endpoint with input as portal_request_no_auth("PATCH", "/v1/datasets/abc/released/meta")
 	result == true
 }
 
@@ -202,7 +224,7 @@ test_has_permission_no_groups if {
 test_has_permission_and_both_present if {
 	result := permission_eval.has_permission with http.send as mock_send_and_both
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/dataset-1/released/meta")
+		with input as portal_request("PATCH", "/v1/datasets/dataset-1/released/meta")
 	result == true
 }
 
@@ -210,7 +232,7 @@ test_has_permission_and_both_present if {
 test_has_permission_and_missing_one if {
 	result := permission_eval.has_permission with http.send as mock_send_and_missing_one
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v1/datasets/dataset-1/released/meta")
+		with input as portal_request("PATCH", "/v1/datasets/dataset-1/released/meta")
 	result == false
 }
 
@@ -313,6 +335,39 @@ test_tenant_allows_datapool_collection_create if {
 		with data.config as mock_http.mock_config
 		with input as portal_request("POST", "/v1/datapools")
 	result == true
+}
+
+scoped_user(perms, scope_type, scope_id) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(perms, scope_type, scope_id)}
+
+test_dataset_scoped_create_denies_dataset_collection_create if {
+	not permission_eval.has_permission with http.send as scoped_user(["DATASET_CREATE"], "DATASET", "dataset-1")
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/datasets")
+}
+
+test_datasource_scoped_create_denies_datasource_collection_create if {
+	not permission_eval.has_permission with http.send as scoped_user(["DATASOURCE_CREATE"], "DATASOURCE", "source-1")
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/datasources")
+}
+
+test_datastructure_scoped_create_denies_datastructure_collection_create if {
+	not permission_eval.has_permission with http.send as scoped_user(["DATASTRUCTURE_CREATE"], "DATASTRUCTURE", "structure-1")
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/datastructures")
+}
+
+test_datapool_scoped_create_denies_datapool_collection_create if {
+	not permission_eval.has_permission with http.send as scoped_user(["DATAPOOL_CREATE"], "DATAPOOL", "pool-1")
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/datapools")
+}
+
+# Without this grant pool editors would lose Dataset create in their own pool.
+test_datapool_scoped_dataset_create_allows_dataset_collection_create if {
+	permission_eval.has_permission with http.send as scoped_user(["DATASET_CREATE"], "DATAPOOL", "pool-1")
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/datasets")
 }
 
 # A DATAPOOL/TENANT user with DATAPOOL_UPDATE

@@ -4,10 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.portal.model.embedded.PendingSagaType;
+import de.civitascore.portal.service.connector.StoredConnectorUnreadableException;
+import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ModelMemberUnreachableException;
+import de.civitascore.portal.util.ModelMissingException;
+import de.civitascore.portal.util.ModelRootMissingException;
+import de.civitascore.portal.util.PipelineClosureValidationException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.SagaInFlightException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import jakarta.persistence.PersistenceException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,6 +28,8 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -84,6 +94,58 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("Should return 400 for DataSetNotEditableException")
+    void shouldReturn400ForDataSetNotEditable() {
+      DataSetNotEditableException ex = new DataSetNotEditableException("Dataset must be DRAFT");
+
+      ProblemDetail problemDetail = handler.handleDataSetNotEditable(ex, mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:DATASET_NOT_EDITABLE");
+      assertThat(problemDetail.getDetail()).isEqualTo("Dataset must be DRAFT");
+      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+    }
+
+    @Test
+    @DisplayName("Should return 400 with its own type for ModelRootMissingException")
+    void shouldReturn400ForModelRootMissing() {
+      ModelRootMissingException ex = new ModelRootMissingException();
+
+      ProblemDetail problemDetail = handler.handleModelRootMissing(ex, mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:MODEL_ROOT_MISSING");
+      assertThat(problemDetail.getDetail()).isEqualTo(ex.getMessage());
+      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+    }
+
+    @Test
+    @DisplayName(
+        "Should return 400 naming the unreachable members for ModelMemberUnreachableException")
+    void shouldReturn400ForModelMemberUnreachable() {
+      ModelMemberUnreachableException ex = new ModelMemberUnreachableException(List.of("Orphan"));
+
+      ProblemDetail problemDetail = handler.handleModelMemberUnreachable(ex, mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:MODEL_MEMBER_UNREACHABLE");
+      assertThat(problemDetail.getProperties()).containsEntry("memberNames", List.of("Orphan"));
+    }
+
+    @Test
+    @DisplayName("Should return 409 with its own type for ModelMissingException")
+    void shouldReturn409ForModelMissing() {
+      ModelMissingException ex = new ModelMissingException();
+
+      ProblemDetail problemDetail = handler.handleModelMissing(ex, mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:MODEL_MISSING");
+      assertThat(problemDetail.getDetail()).isEqualTo(ex.getMessage());
+      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+    }
+
+    @Test
     @DisplayName("Should return 409 for UniqueConstraintViolationException")
     void shouldReturn409ForUniqueConstraint() {
       UniqueConstraintViolationException ex =
@@ -109,7 +171,67 @@ class GlobalExceptionHandlerTest {
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
       assertThat(problemDetail.getDetail()).isEqualTo("Referenced by DataSource");
+      assertThat(problemDetail.getProperties()).isNullOrEmpty();
       assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+    }
+
+    @Test
+    @DisplayName("Should keep the blocking artifacts out of the response body")
+    void shouldNotReturnBlockersForResourceInUse() {
+      List<String> blockers =
+          List.of(
+              "urn:core:platform:civitas:datasink:common:00000000-0000-4000-8000-000000000031",
+              "urn:core:platform:civitas:mapping:common:00000000-0000-4000-8000-000000000032");
+      ResourceInUseException ex =
+          new ResourceInUseException(
+              "DataStructure", UUID.randomUUID(), "Still referenced", blockers);
+
+      ProblemDetail problemDetail = handler.handleResourceInUse(ex, mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+      assertThat(problemDetail.getDetail()).isEqualTo("Still referenced");
+      assertThat(problemDetail.getProperties()).isNullOrEmpty();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(PendingSagaType.class)
+    @DisplayName("Should return 409 with the pending saga type for SagaInFlightException")
+    void shouldReturn409ForSagaInFlight(PendingSagaType pendingSagaType) {
+      UUID id = UUID.randomUUID();
+      SagaInFlightException ex =
+          new SagaInFlightException(
+              id, pendingSagaType, "Cannot write while a saga is in-flight: " + pendingSagaType);
+
+      ProblemDetail problemDetail = handler.handleSagaInFlight(ex, mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:SAGA_IN_FLIGHT");
+      assertThat(problemDetail.getDetail()).contains(pendingSagaType.name());
+      assertThat(problemDetail.getProperties()).containsEntry("pendingSagaType", pendingSagaType);
+      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+    }
+
+    @Test
+    @DisplayName("Should return 422 naming the blocked pipelines for PipelineClosureValidation")
+    void shouldReturn422NamingTheBlockedPipelines() {
+      UUID first = UUID.randomUUID();
+      UUID second = UUID.randomUUID();
+
+      ProblemDetail problemDetail =
+          handler.handlePipelineClosureValidation(
+              new PipelineClosureValidationException(List.of(first, second)), mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:PIPELINE_CLOSURE_INVALID");
+      assertThat(problemDetail.getProperties())
+          .containsEntry("offendingPipelineIds", List.of(first, second));
+      assertThat(problemDetail.getDetail())
+          .as("the reply names no artifact, so the message has to state every condition")
+          .contains("exist", "readable", "released")
+          .doesNotContain("urn:core:");
+      assertThat(problemDetail.getProperties().toString())
+          .as("an artifact added as a further property would disclose it just as well")
+          .doesNotContain("urn:core:");
     }
 
     @Test
@@ -265,6 +387,21 @@ class GlobalExceptionHandlerTest {
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
       assertThat(response.getBody().getType()).hasToString("urn:civitas:error:PERSISTENCE_ERROR");
+    }
+
+    @Test
+    void storedConnectorUnreadable_returns500WithoutTheUrn() {
+      String urn = "urn:core:platform:civitas:datasource:common:" + UUID.randomUUID() + ":1.0.0";
+      StoredConnectorUnreadableException ex =
+          new StoredConnectorUnreadableException(UUID.randomUUID(), urn);
+
+      ResponseEntity<ProblemDetail> response =
+          handler.handleStoredConnectorUnreadable(ex, mockRequest());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:PERSISTENCE_ERROR");
+      assertThat(response.getBody().getDetail()).doesNotContain(urn);
+      assertThat(response.getBody().getInstance()).isEqualTo(URI.create(TEST_URI));
     }
   }
 

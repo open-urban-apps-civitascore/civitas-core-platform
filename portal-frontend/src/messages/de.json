@@ -1,6 +1,6 @@
 {
   "welcome": {
-    "title": "Willkommen in CIVITAS/CORE V2 Beta",
+    "title": "Willkommen in CIVITAS/CORE V2",
     "subtitle": "Neu hier?",
     "docsButton": "Dokumentation",
     "recommendedWorkflow": {
@@ -113,10 +113,10 @@
     },
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
-      "commaSeparated": "durch Kommas getrennt",
       "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus.",
+      "requiredField": "Pflichtfeld",
       "descriptionHint": "max. 150 Zeichen",
-      "creationSubtitle": "Im ersten Schritt ist nur ein Name erforderlich. Weitere Basisinformationen können später ergänzt werden.",
+      "creationSubtitle": "Im ersten Schritt sind nur ein Name und eine Beschreibung erforderlich. Weitere Informationen können später ergänzt werden.",
       "notAvailable": "Nicht verfügbar"
     },
     "success": {
@@ -128,6 +128,14 @@
       "DRAFT": "Entwurf",
       "AVAILABLE": "Verfügbar",
       "READY": "Fertig"
+    },
+    "inUse": {
+      "columnHeader": "Verwendung",
+      "tooltip": "Wird derzeit verwendet. Die Bearbeitung ist eingeschränkt und das Löschen nicht möglich."
+    },
+    "draftBlockedModal": {
+      "title": "Status kann nicht auf Entwurf gesetzt werden",
+      "description": "Dieses datenbezogene Element wird derzeit verwendet und kann daher nicht auf Entwurf gesetzt werden."
     },
     "exitModal": {
       "title": "Vor dem Beenden speichern?",
@@ -203,7 +211,6 @@
     "home": "Home",
     "menu-item": "Menüpunkt",
     "sub-item": "Unterpunkt",
-    "data-catalog": "Datenkatalog",
     "all-datasets": "Alle Datensätze",
     "documentation": "Dokumentation",
     "logout": "Abmelden",
@@ -310,9 +317,30 @@
             "addButton": "Pipeline hinzufügen",
             "unknownError": "Unbekannter Fehler.",
             "pipelineError": "Pipelinefehler",
+            "activeLabel": "Aktiv",
             "errorLabel": "Fehler",
             "errorDetails": "Fehlerdetails für {name}",
-            "errorToast": "Pipeline „{name}“: {message}"
+            "errorToast": "Pipeline „{name}“: {message}",
+            "menuLabel": "Aktionen für {name}",
+            "actions": {
+              "open": "Öffnen",
+              "delete": "Löschen"
+            },
+            "deleteConfirm": {
+              "title": "Pipeline löschen",
+              "description": "Möchtest du die Pipeline „{name}“ wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+              "confirm": "Löschen"
+            },
+            "deleteBlocked": {
+              "title": "Pipeline kann nicht gelöscht werden",
+              "inUseByLayer": "Ein Geodaten-Speicher der Pipeline wird von einem Layer der WFS/WMS API verwendet. Zuerst muss der Layer gelöscht werden.",
+              "lastPostgisWithOws": "Ein Geodaten-Speicher der Pipeline wird von der WFS/WMS API verwendet. Zuerst muss die API gelöscht werden.",
+              "lastFrostWithSta": "Ein Sensordaten-Speicher der Pipeline wird von der SensorThings API verwendet. Zuerst muss die API gelöscht werden."
+            },
+            "messages": {
+              "deleteSuccess": "Pipeline wurde erfolgreich gelöscht.",
+              "deleteError": "Beim Löschen der Pipeline ist ein Fehler aufgetreten. Bitte versuche es erneut."
+            }
           },
           "apis": {
             "title": "APIs",
@@ -328,6 +356,7 @@
               "CUSTOM": "Custom API"
             },
             "card": {
+              "menuLabel": "Aktionen für {name}",
               "actions": {
                 "edit": "Bearbeiten",
                 "view": "Öffnen",
@@ -375,7 +404,9 @@
               "deleteStyle": "Stil löschen",
               "validation": {
                 "nameRequired": "Stilname ist erforderlich",
-                "sldContentRequired": "Stilinhalt ist erforderlich"
+                "sldContentRequired": "Stilinhalt ist erforderlich",
+                "sldContentDoctypeNotAllowed": "XML darf keine DOCTYPE-Deklaration enthalten. Entferne die <!DOCTYPE ...>-Zeile",
+                "sldContentMalformed": "Stilinhalt ist kein gültiges XML"
               },
               "noStyles": {
                 "title": "Keine Stile vorhanden",
@@ -478,7 +509,10 @@
               "updateStyleSuccess": "Stil wurde erfolgreich aktualisiert.",
               "saveStyleError": "Beim Speichern des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",
               "deleteStyleSuccess": "Stil wurde erfolgreich gelöscht.",
-              "deleteStyleError": "Beim Löschen des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut."
+              "deleteStyleError": "Beim Löschen des Stils ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "styleInUseError": "Dieser Stil wird noch von mindestens einem Layer verwendet. Entferne ihn dort zuerst.",
+              "notDraftError": "Der Datensatz muss im Entwurfsstatus sein, um Änderungen vorzunehmen.",
+              "sagaInFlightError": "Der Datensatz wird gerade verarbeitet. Bitte versuche es später erneut."
             },
             "errors": {
               "name": {
@@ -496,6 +530,12 @@
               },
               "persistence": {
                 "required": "Persistenz ist erforderlich"
+              },
+              "title": {
+                "tooLong": "Titel darf maximal 80 Zeichen lang sein"
+              },
+              "layerName": {
+                "tooLong": "Technischer Name darf maximal 80 Zeichen lang sein"
               }
             }
           }
@@ -573,12 +613,17 @@
       "releaseSuccess": "Der Datensatz wurde erfolgreich freigegeben.",
       "unreleaseSuccess": "Die Freigabe des Datensatzes wurde erfolgreich aufgehoben.",
       "transitionError": "Beim Ändern des Datensatzstatus ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+      "sagaInFlightError": "Der Datensatz wird gerade verarbeitet. Bitte versuche es später erneut.",
       "datasourceScopeViolation": "Der ausgewählte Datenpool ist nicht mit den verwendeten Datenquellen kompatibel. Eine oder mehrere Datenquellen sind für diesen Datenpool nicht freigegeben."
     },
     "warningModal": {
       "title": "Datensatz löschen?",
       "description": "Diese Aktion kann nicht rückgängig gemacht werden. Dies wird den Datensatz und alle zugehörigen Daten dauerhaft löschen.",
       "confirm": "Löschen"
+    },
+    "releaseBlockedModal": {
+      "title": "Dataset kann nicht freigegeben werden",
+      "description": "Dieses Dataset verwendet datenbezogene Elemente, die sich noch im Status Entwurf befinden. Alle erforderlichen Elemente müssen zunächst auf Verfügbar gesetzt werden."
     }
   },
   "users": {
@@ -604,11 +649,6 @@
       "phone": "Telefonnummer",
       "email": "E-Mail",
       "group": "Gruppe",
-      "status": {
-        "title": "Status",
-        "active": "Aktiv",
-        "inactive": "Inaktiv"
-      },
       "selectTitle": "Titel wählen..."
     },
     "detailsTabs": {
@@ -695,8 +735,7 @@
     "detailsTabs": {
       "info": "Basisinformationen",
       "roles": "Rollen",
-      "users": "User",
-      "subgroups": "Untergruppen"
+      "users": "User"
     },
     "details": {
       "baseInfo": "Basisinformationen",
@@ -1012,6 +1051,8 @@
       "topicSingle": "Es ist nur ein Topic erlaubt.",
       "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten",
+      "inUseError": "Diese Datenquelle wird noch von einer Pipeline verwendet.",
+      "datastructureNotAvailableError": "Die Datenquelle konnte nicht auf \"Verfügbar\" gesetzt werden. Bitte setzen Sie zuerst die Datenstruktur und ihre Version auf \"Verfügbar\".",
       "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
     },
     "connection": {
@@ -1050,7 +1091,66 @@
       "type": "Typ",
       "typePlaceholder": "Konnektortyp auswählen",
       "connection": "Verbindung",
-      "establishConnection": "Verbindung herstellen"
+      "establishConnection": "Verbindung herstellen",
+      "availableInfo": "Diese Datenquelle hat den Status \"Verfügbar\". Um den Konnektor zu ändern, setzen Sie den Status zuerst auf \"Entwurf\".",
+      "mqtt": {
+        "urls": {
+          "label": "Broker",
+          "hint": "kommagetrennt"
+        },
+        "protocolVersion": {
+          "label": "Protokollversion",
+          "placeholder": "Version auswählen"
+        },
+        "user": {
+          "label": "User"
+        },
+        "password": {
+          "label": "Passwort"
+        },
+        "topics": {
+          "label": "Topic"
+        },
+        "qos": {
+          "label": "QoS"
+        },
+        "connectTimeout": {
+          "label": "Verbindungs-Timeout"
+        },
+        "keepalive": {
+          "label": "Keepalive"
+        },
+        "tls": {
+          "label": "TLS aktiviert"
+        }
+      },
+      "sql": {
+        "driver": {
+          "label": "Treiber"
+        },
+        "dsn": {
+          "label": "DSN",
+          "placeholder": "treiber-spezifischer Connection String"
+        },
+        "user": {
+          "label": "User"
+        },
+        "password": {
+          "label": "Passwort"
+        },
+        "table": {
+          "label": "Tabelle",
+          "placeholder": "Tabellenname"
+        },
+        "columns": {
+          "label": "Spalten",
+          "hint": "kommagetrennt",
+          "placeholder": "* oder col1, col2"
+        },
+        "where": {
+          "label": "WHERE"
+        }
+      }
     },
     "dataModel": {
       "placeholder": {
@@ -1066,7 +1166,12 @@
       "importModal": {
         "title": "Datenmodell importieren",
         "to": "in {name}"
-      }
+      },
+      "versionInfo": {
+        "version": "Version {version}",
+        "noVersion": "Keine Versionsnummer"
+      },
+      "availableInfo": "Diese Datenquelle hat den Status \"Verfügbar\". Um die Datenstruktur zu ändern, setzen Sie den Status zuerst auf \"Entwurf\"."
     },
     "accessManagementTab": {
       "infoBoxes": {
@@ -1149,6 +1254,7 @@
     },
     "errors": {
       "deletionError": "Beim Löschen der Datenstruktur ist ein Fehler aufgetreten.",
+      "inUseError": "Diese Datenstruktur wird noch von einer Datenquelle oder einem Datenspeicher verwendet.",
       "creationError": "Beim Anlegen der Datenstruktur ist ein Fehler aufgetreten.",
       "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
     },
@@ -1175,9 +1281,10 @@
     "versionInfo": {
       "title": "Versionsinformationen",
       "versionNumber": "Versionsnummer",
-      "versionNumberPlaceholder": "z. B. 1.0.0",
+      "versionNumberPlaceholder": "Wird beim Speichern des Modells zugewiesen",
       "description": "Versionsbeschreibung",
-      "source": "Quelle"
+      "source": "Quelle",
+      "builtFrom": "Aufgebaut aus"
     },
     "source": {
       "OWN": "Eigene"
@@ -1185,15 +1292,15 @@
     "messages": {
       "createSuccess": "Die Version der Datenstruktur wurde erfolgreich angelegt.",
       "updateSuccess": "Die Version der Datenstruktur wurde erfolgreich aktualisiert.",
-      "isInUseModelHint": "Das Datenmodell kann nicht bearbeitet werden, da es bereits verwendet wird.",
-      "isInUseStatusHint": "Kann nicht auf Entwurf gesetzt werden, da diese Version bereits verwendet wird.",
+      "isAvailableModelHint": "Die Versionsinformationen und die Strukturdefinition können nicht bearbeitet werden, da diese Version bereits den Status 'Verfügbar' hat.",
       "isLastAvailableVersion": "Kann nicht auf Entwurf gesetzt werden, da dies die letzte verfügbare Version einer verfügbaren Datenstruktur ist. Setzen Sie zuerst die Datenstruktur auf Entwurf."
     },
     "errors": {
       "creationError": "Beim Anlegen der Version der Datenstruktur ist ein Fehler aufgetreten.",
-      "versionAlreadyExists": "Es existiert bereits eine Version mit der gleichen Versionsnummer in dieser Datenstruktur.",
-      "versionFormat": "Die Versionsnummer muss dem Format X.Y.Z folgen (z. B. 1.0.0).",
-      "releaseInvalidModel": "Die Version kann nicht veröffentlicht werden: {reason}"
+      "saveInvalidModel": "Die Version kann nicht gespeichert werden: {reason}",
+      "modelRootMissingError": "Die Version kann nicht auf \"Verfügbar\" gesetzt werden, weil ihr gespeichertes Modell keine Wurzelklasse hat. Markieren Sie die Wurzelklasse im Diagramm, speichern Sie die Version und setzen Sie sie dann auf \"Verfügbar\".",
+      "modelMemberUnreachableError": "Die Version kann nicht auf \"Verfügbar\" gesetzt werden, weil diese Klassen nicht mit der Wurzelklasse verbunden sind: {names}. Verbinden Sie sie mit der Wurzelklasse oder entfernen Sie sie, speichern Sie die Version und setzen Sie sie dann auf \"Verfügbar\".",
+      "inUseError": "Diese Version wird noch von einer Datenquelle oder einem Datenspeicher verwendet."
     }
   },
   "pipelineEditor": {
@@ -1277,24 +1384,82 @@
       "noPermission": "Keine Berechtigung zum Lesen von Datenquellen",
       "anonymousName": "Anonyme Datenquelle"
     },
+    "sink": {
+      "locked": {
+        "provisioned": {
+          "title": "Bereitgestellt",
+          "description": "Dieser Datenspeicher wurde bereitgestellt und kann nicht mehr bearbeitet oder entfernt werden."
+        },
+        "inUseByLayer": {
+          "title": "In Verwendung",
+          "tooltip": "Dieser Datenspeicher wird von API-Layern verwendet. Zum Bearbeiten oder Entfernen müssen zuerst die Layer-Zuordnungen aufgehoben werden."
+        },
+        "inUseBySta": {
+          "title": "In Verwendung",
+          "tooltip": "Dieser Datenspeicher wird von einer SensorThings API verwendet. Zum Löschen des Datenspeichers muss zuerst die API gelöscht werden."
+        },
+        "inUseByOws": {
+          "title": "In Verwendung",
+          "tooltip": "Dieser Datenspeicher wird von der WFS/WMS API verwendet. Zum Löschen des Datenspeichers muss zuerst die API gelöscht werden."
+        }
+      },
+      "notRemovable": {
+        "provisioned": "Datenspeicher kann nicht entfernt werden. Dieser Datenspeicher wurde bereitgestellt und kann nicht mehr entfernt werden.",
+        "inUseByLayer": "Datenspeicher kann nicht entfernt werden. Dieser Datenspeicher wird von API-Layern verwendet. Heben Sie zuerst die Layer-Zuordnungen auf.",
+        "inUseBySta": "Datenspeicher kann nicht gelöscht werden. Dieser Datenspeicher wird von einer SensorThings API verwendet. Zuerst muss die API gelöscht werden.",
+        "inUseByOws": "Datenspeicher kann nicht gelöscht werden. Dieser Datenspeicher wird von der WFS/WMS API verwendet. Zuerst muss die API gelöscht werden."
+      }
+    },
     "frostPanel": {
       "details": "Sensordaten-Speicher Details",
       "serverName": "Servername",
       "serverUrl": "Server-URL",
       "internalServer": "Interner Server",
-      "version": "Version"
+      "version": "Version",
+      "port": "Port",
+      "portPlaceholder": "Wählen Sie, was diese Senke schreibt",
+      "portHelp": "Der Port entscheidet, was die Senke schreibt. Es gibt keine Vorgabe: ohne ihn veröffentlicht das Dataset nicht.",
+      "expects": "Erwartet:",
+      "logic": {
+        "ownKey": "Upsert mit eigenem Schlüssel",
+        "parentReference": "Anhängen mit Elternreferenz",
+        "composite": "Zusammengesetzt"
+      },
+      "ports": {
+        "Things": {
+          "description": "Legt ein Thing über seine Referenz an oder aktualisiert es, im Projekt des Datasets.",
+          "cost": "1 Entität je Datensatz",
+          "expects": "properties.reference"
+        },
+        "Observations": {
+          "description": "Hängt eine Messung an einen Datastream an, der bestehen muss. Eine Messung mit eigener Referenz wird aktualisiert statt hinzugefügt.",
+          "cost": "1 Entität je Datensatz",
+          "expects": "parameters.thingReference, parameters.datastreamReference, result"
+        },
+        "ThingTree": {
+          "description": "Legt ein Thing mit Location, Datastream, Sensor und ObservedProperty an oder aktualisiert es und hängt eine Messung an.",
+          "cost": "6 Entitäten je Datensatz",
+          "expects": "properties.reference, Datastreams[].properties.reference"
+        }
+      },
+      "structure": "Was ein Datensatz enthalten muss",
+      "structureHelp": "* kennzeichnet ein Pflichtfeld. „Referenz\" kennzeichnet das Feld, über das der Port die Entität wiederfindet.",
+      "required": "Pflichtfeld",
+      "reference": "Referenz"
     },
     "geoPersistencePanel": {
       "title": "Geodaten-Speicher",
       "tableName": "Tabellenname",
       "tableNamePlaceholder": "Tabellennamen eingeben...",
+      "tableNameInvalid": "Erlaubt sind nur Buchstaben (a–z, A–Z), Ziffern und Unterstriche. Das erste Zeichen muss ein Buchstabe oder ein Unterstrich sein.",
       "dataStructureVersion": "Datenstruktur-Version",
       "importDataStructure": "Datenstruktur importieren",
       "changeDataStructure": "Datenstruktur ändern",
       "details": "Datenstruktur-Details",
       "dataStructureName": "Datenstruktur",
       "versionNumber": "Version",
-      "anonymousDataStructure": "Anonyme Datenstruktur"
+      "anonymousDataStructure": "Anonyme Datenstruktur",
+      "status": "Status"
     },
     "mappingPanel": {
       "hint": "Definiere deine Datentransformations-Zuordnung im YAML- oder JSON-Format.",
@@ -1308,7 +1473,10 @@
       "selectDatastructure": "Datenstruktur auswählen…",
       "inputDatastructure": "Eingangs-Datenstruktur",
       "outputDatastructure": "Ausgangs-Datenstruktur",
-      "openMappingEditor": "Mapping-Editor öffnen"
+      "openMappingEditor": "Mapping-Editor öffnen",
+      "details": "Referenzierte Datenstrukturen",
+      "inputStatus": "Status Eingangs-Datenstruktur",
+      "outputStatus": "Status Ausgangs-Datenstruktur"
     },
     "entitySelector": {
       "selectEntity": "Entität auswählen...",
@@ -1331,18 +1499,19 @@
         "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld NiFi-Syntax sein.",
         "orphanNode": "{label} ist mit keinem anderen Knoten verbunden",
         "minimumFunctionalNodes": "Pipeline muss mindestens einen funktionalen Knoten zwischen Start und Ende haben",
-        "duplicateTableName": "Zwei Geo-Persistenz-Speicher dürfen nicht den gleichen Namen haben",
+        "duplicateTableName": "Der Tabellenname \"{tableName}\" wird bereits in der Pipeline \"{pipeline}\" verwendet",
         "cronMqttIncompatible": "Ein CRON-Trigger kann nicht mit einer MQTT-Datenquelle verwendet werden. Bitte eine SQL-Quelle (Pull) verwenden.",
         "cronSourceConnectorUnknown": "Der Quell-Konnektor konnte nicht ermittelt werden; ein CRON-Trigger funktioniert nur mit einer SQL-Quelle (Pull), nicht mit MQTT.",
         "sqlSourceNoScheduleDefaultPoll": "Diese SQL-Quelle hat keinen CRON-Knoten und pollt im Standardintervall (alle 5 Minuten). Für einen expliziten Zeitplan bitte einen CRON-Knoten hinzufügen.",
-        "sqlSourceToFrost": "Eine SQL-Quelle kann nur über ein Feld-Mapping in einen FROST-Speicher schreiben — bitte einen Mapping-Knoten hinzufügen oder eine SensorThings-Quelle (MQTT) verwenden.",
         "frostMappingUnknownStaTarget": "{label} bildet {path} ab — kein gültiger SensorThings-Zielpfad; erlaubt sind die Katalogpfade des Thing-förmigen Zielmodells (z. B. $.name, $.Datastreams[].name, $.Datastreams[].Observations[].result) sowie dessen Match-Schlüssel",
         "frostMappingMissingMatchKeys": "{label} muss die Match-Schlüssel ({entity}) abbilden: {fields} — sie identifizieren die Entität beim Find-or-Create",
         "frostMappingNoMatchKeyInStructure": "{label}: die Zielstruktur deklariert keinen Match-Schlüssel für {entity} — markiere ein Attribut mit dem UML-'{id}'-Flag oder lege ein Attribut \"reference\" an",
         "frostMappingCreateSetIncomplete": "{label} bildet {entity} unvollständig ab; für das Anlegen fehlen: {fields} (oder alle Anlege-Felder weglassen für reinen Lookup)",
         "frostMappingLocationNeedsCreatableThing": "{label} bildet eine Location ab — das geht nur mit vollständig abgebildetem Thing (name, description), da Locations über dessen Deep-Insert entstehen",
+        "frostMappingObservationPortNeedsReferences": "{label} bildet auf den Observations-Port ab, weist aber nicht zu: {fields} — über diese Referenzen findet der Port den Datastream des Messwerts",
         "frostMappingObservationNeedsResult": "{label} bildet eine Observation ohne $.Datastreams[].Observations[].result ab",
         "frostMappingFeatureOfInterestNeedsObservation": "{label} bildet eine FeatureOfInterest ohne Observation ab — das Feature wird per Deep-Insert in die Observation eingebettet",
+        "frostMappingFeatureOfInterestNeedsFeature": "{label} bildet eine FeatureOfInterest ohne ihr feature ab — FROST lehnt sie ab; feature in der Zielstruktur als Klasse oder Geometrie modellieren und abbilden, oder keine FeatureOfInterest abbilden",
         "frostMappingUnsafeMatchKeyName": "{label}: der Match-Schlüssel-Name \"{keyName}\" ist kein gültiger Bezeichner (erlaubt: Buchstaben, Ziffern, Unterstrich, nicht mit Ziffer beginnend) — benenne das Attribut um",
         "frostMappingReservedMatchKeyName": "{label}: der Match-Schlüssel-Name \"{keyName}\" ist reserviert — er darf nicht wie der properties-Bag heißen, in dem er liegt; benenne das identifizierende Attribut um",
         "frostMappingFallbackMatchKey": "{label}: kein '{id}'-Attribut markiert — Match-Schlüssel fällt auf \"reference\" zurück",
@@ -1352,15 +1521,15 @@
         "mappingDataCorrupt": "{label} trägt keine gültigen Mapping-Daten — bitte den Knoten löschen und neu anlegen",
         "edgeEndpointMissing": "Eine Kante verweist auf einen nicht vorhandenen Knoten — bitte die Kante entfernen",
         "sourceNodeRequired": "Pipeline hat keinen Datenquellen-Knoten; genau eine verdrahtete Datenquelle ist erforderlich",
-        "sinkNodeRequired": "Pipeline hat keinen Datensenken-Knoten (Sensor- oder Geodaten-Speicher); genau eine verdrahtete Datensenke ist erforderlich",
+        "sinkNodeRequired": "Pipeline hat keinen Datenspeicher-Knoten (Sensor- oder Geodaten-Speicher); genau ein Datenspeicher ist erforderlich",
         "multipleSourceNodes": "{label} ist ein zusätzlicher Datenquellen-Knoten; eine Pipeline unterstützt genau einen",
-        "multipleSinkNodes": "{label} ist ein zusätzlicher Datensenken-Knoten; eine Pipeline unterstützt genau einen",
+        "multipleSinkNodes": "{label} ist ein zusätzlicher Datenspeicher-Knoten; eine Pipeline unterstützt genau einen",
         "nodeUnsupportedPosition": "{label} ist an einer nicht unterstützten Position verdrahtet",
         "unknownNodeInFlow": "{label} hat einen nicht unterstützten Knotentyp und kann nicht in den Datenfluss verdrahtet werden",
         "flowBranches": "Der Datenfluss verzweigt bei {label}; ein linearer Fluss von Quelle zu Senke ist erforderlich",
         "flowCycle": "Der Datenfluss enthält einen Zyklus bei {label}",
-        "noDataPath": "Es gibt keinen Datenfluss-Pfad von der Datenquelle zur Datensenke",
-        "mappingNotOnPath": "{label} liegt nicht auf dem Datenfluss-Pfad zwischen Datenquelle und Datensenke",
+        "noDataPath": "Es gibt keinen Datenfluss-Pfad von der Datenquelle zum Datenspeicher",
+        "mappingNotOnPath": "{label} liegt nicht auf dem Datenfluss-Pfad zwischen Datenquelle und Datenspeicher",
         "cronTriggerCapacity": "{label} ist ein zusätzlicher Zeitplan-Trigger an der Datenquelle; der Trigger-Port fasst höchstens einen",
         "edgeFormIncompatible": "{label} kann {form} von {upstreamLabel} nicht verarbeiten; akzeptiert wird: {accepted}",
         "mappingChainStructureMismatch": "Die Output-Datenstruktur in Mapping-Node {upstreamLabel} und die Input-Datenstruktur in Mapping-Node {label} sind inkompatibel"
@@ -1374,9 +1543,14 @@
       "saving": "Speichert...",
       "loading": "Pipelines werden geladen...",
       "pipelineSettings": "Pipeline-Einstellungen",
+      "renamePipeline": "Pipeline umbenennen",
       "deletePipeline": "Pipeline löschen",
       "deleteConfirmTitle": "Pipeline löschen?",
-      "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
+      "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "deleteFailed": "Beim Löschen der Pipeline ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+      "discardPipeline": "Pipeline verwerfen",
+      "discardConfirmTitle": "Pipeline wirklich verwerfen?",
+      "discardConfirmDescription": "Sind Sie sicher, dass Sie die Pipeline verwerfen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
     },
     "dataLoss": {
       "title": "Gespeicherte Daten verwerfen und neu erzeugen?",
@@ -1384,6 +1558,7 @@
       "confirm": "Gespeicherte Daten verwerfen"
     },
     "header": {
+      "loadFailed": "Es konnten nicht alle Daten geladen werden. Das Bearbeiten der Pipelines ist daher nicht möglich. Bitte versuchen Sie es später erneut.",
       "saveAll": "Alle speichern",
       "savingAll": "Speichert...",
       "exit": "Beenden",
@@ -1391,7 +1566,17 @@
       "duplicateNames": "Doppelte Pipeline-Namen: {names}",
       "saveFailed": "Speichern fehlgeschlagen: {names}",
       "saveSuccess": "Pipeline \"{name}\" erfolgreich gespeichert",
-      "datasourceScopeViolation": "\"{name}\" kann nicht gespeichert werden: Eine oder mehrere Datenquellen sind für diesen Datapool nicht erlaubt."
+      "datasourceScopeViolation": "\"{name}\" kann nicht gespeichert werden: Eine oder mehrere Datenquellen sind für diesen Datenpool nicht erlaubt.",
+      "tableNameConflict": "{names} kann nicht gespeichert werden: Ein Geo-Persistenz-Tabellenname wird bereits von einem anderen Datenspeicher dieses Datensatzes verwendet.",
+      "dataSinkInUseError": "{names} kann nicht gespeichert werden: Ein Datenspeicher wird noch von mindestens einem Layer verwendet.",
+      "unconfirmedDataLossError": "{names} kann nicht gespeichert werden: Die Änderung verwirft gespeicherte Daten.",
+      "missingDataStructureUrn": "{names} kann nicht gespeichert werden: Der Geo-Persistenz-Knoten ist nicht valide. Weise ihm seine Datenstruktur neu zu oder lösche ihn und lege ihn neu an.",
+      "notDraftError": "Der Datensatz muss im Entwurfsstatus sein, um Änderungen vorzunehmen.",
+      "sagaInFlightError": "Der Datensatz wird gerade verarbeitet. Bitte versuche es später erneut.",
+      "sinkStillInUse": "{names} wurde gespeichert, ein entfernter Datenspeicher wird aber noch verwendet und kann nicht gelöscht werden.",
+      "sinkDeleteFailed": "{names} wurde gespeichert, ein entfernter Datenspeicher konnte aber nicht gelöscht werden.",
+      "mappingStillInUse": "Ein aus Pipeline {name} entferntes Mapping kann nicht gelöscht werden, weil es noch von einer anderen Pipeline verwendet wird.",
+      "mappingCleanupFailed": "Ein aus Pipeline {name} entferntes Mapping konnte nicht gelöscht werden."
     },
     "tabs": {
       "closeTab": "Tab schließen",
@@ -1407,7 +1592,8 @@
       "diagramUnresolvable": "„{name}“ liefert keine abbildbaren Felder: {reason}",
       "toolbar": {
         "title": "Mapping",
-        "status": "{mapped} zugeordnet · {unmapped} nicht zugeordnet"
+        "status": "{mapped} zugeordnet · {unmapped} nicht zugeordnet",
+        "errors": "{count, plural, one {# Fehler} other {# Fehler}}"
       },
       "palette": {
         "title": "Transformationen"
@@ -1425,7 +1611,8 @@
         "typeMismatchWithType": "Typen stimmen nicht überein ({type}). Konvertierungsfunktion hinzufügen.",
         "typeMismatch": "Typen stimmen nicht überein. Konvertierungsfunktion hinzufügen.",
         "outputToOutput": "Zwei Ausgänge können nicht verbunden werden.",
-        "inputToInput": "Zwei Eingänge können nicht verbunden werden."
+        "inputToInput": "Zwei Eingänge können nicht verbunden werden.",
+        "connectionsBroken": "{count, plural, one {# Verbindung passt} other {# Verbindungen passen}} nicht mehr zum neuen Typ ({type})."
       },
       "unconnectedWarning": {
         "title": "Nicht verbundene Transformationen entfernen?",
@@ -1446,12 +1633,13 @@
               "placeholder": "Typ auswählen…"
             },
             "value": {
-              "label": "Wert"
+              "label": "Wert",
+              "required": "Ein Wert ist erforderlich."
             }
           }
         },
         "concat": {
-          "description": "Zwei oder mehr Werte verketten.",
+          "description": "Kombiniert Zeichenketten.",
           "fields": {
             "separator": {
               "label": "Trennzeichen"
@@ -1462,21 +1650,44 @@
           "description": "beliebiger Skalar → str"
         },
         "toInt": {
-          "description": "str / float → int"
+          "description": "str / int / number → int"
         },
         "toFloat": {
-          "description": "str / int → float"
+          "description": "str / int / number → number"
+        },
+        "toUuid": {
+          "description": "str → uuid"
         },
         "toDate": {
-          "description": "str → date",
+          "description": "str / date → date",
           "fields": {
             "pattern": {
-              "label": "Muster"
+              "label": "Eingabeformat"
+            }
+          }
+        },
+        "toDateTime": {
+          "description": "String oder Epoch-Timestamp → DateTime",
+          "fields": {
+            "inputType": {
+              "label": "Eingabetyp",
+              "string": "String",
+              "epoch": "Epoch-Timestamp"
+            },
+            "pattern": {
+              "label": "Eingabeformat",
+              "required": "Ein Eingabeformat ist erforderlich."
+            },
+            "unit": {
+              "label": "Einheit",
+              "seconds": "Sekunden",
+              "milliseconds": "Millisekunden",
+              "required": "Wähle eine Epoch-Einheit."
             }
           }
         },
         "format": {
-          "description": "date → str",
+          "description": "date / datetime → str",
           "fields": {
             "pattern": {
               "label": "Muster"
@@ -1490,27 +1701,61 @@
     }
   },
   "umlModeler": {
+    "modelNamePlaceholder": "Modellname",
     "closeTabModal": {
       "title": "Modell wirklich verwerfen?",
       "description": "Diese Aktion löscht das Modell. Sie kann nicht rückgängig gemacht werden."
     },
     "import": {
       "title": "Importieren",
+      "file": "Diagramm importieren",
       "fromPlatform": "aus der Plattform",
-      "fromFile": "aus Datei"
-    },
-    "save": {
-      "success": "Modell erfolgreich gespeichert",
-      "error": "Modell konnte nicht gespeichert werden. Bitte versuchen Sie es erneut."
+      "fromFile": "Aus Datei …",
+      "standard": "Standardstruktur",
+      "success": "Diagramm erfolgreich importiert",
+      "added": "Die Datei wurde zum Diagramm hinzugefügt.",
+      "fileError": "Fehler beim Importieren der Datei.",
+      "overwriteModal": {
+        "title": "Bestehende Strukturdefinition ersetzen oder ergänzen?",
+        "description": "Die Datei kann die bestehenden Klassen, Attribute und Beziehungen ersetzen oder neben ihnen hinzugefügt werden. Beim Ersetzen geht die bestehende Strukturdefinition verloren; das kann nicht rückgängig gemacht werden.",
+        "add": "Hinzufügen",
+        "confirm": "Struktur ersetzen"
+      },
+      "errors": {
+        "FILE_TOO_LARGE": "Die Datei ist zu groß (maximal 5 MB erlaubt).",
+        "INVALID_JSON": "Die Datei enthält kein gültiges JSON.",
+        "INVALID_DATASTRUCTURE_DOCUMENT": "Die Datei enthält keine gültige Datenstruktur.",
+        "INVALID_DIAGRAM_SCHEMA": "Die Diagrammdaten in der Datei sind ungültig.",
+        "UNREADABLE_MODEL": "Das Modell in der Datei ist nicht lesbar."
+      }
     },
     "export": {
+      "title": "Exportieren",
+      "file": "Diagramm exportieren",
       "success": "Diagramm erfolgreich exportiert",
       "error": "Diagramm konnte nicht exportiert werden. Bitte versuchen Sie es erneut."
+    },
+    "nameValidation": {
+      "required": "Geben Sie einen Namen ein.",
+      "invalidCharacters": "Erlaubt sind nur Buchstaben (a–z, A–Z), Ziffern und Unterstriche. Das erste Zeichen muss ein Buchstabe oder ein Unterstrich sein.",
+      "duplicateElement": "Ein anderes Element im Diagramm hat bereits diesen Namen.",
+      "duplicateAttribute": "Ein anderes Attribut dieser Klasse hat bereits diesen Namen.",
+      "duplicateEnumValue": "Mehrere Werte haben denselben Namen.",
+      "invalidNames": "Mindestens ein Name eines Elements, Attributs oder Enum-Werts ist ungültig oder wird mehrfach verwendet."
     },
     "rootValidation": {
       "noRoot": "Im Diagramm lässt sich keine Wurzelklasse bestimmen — jede Klasse ist in eine andere eingebettet (zyklische Struktur).",
       "ambiguousRoot": "Das Diagramm hat mehrere mögliche Wurzelklassen ({names}). Markieren Sie die Wurzelklasse in den Klasseneigenschaften oder verbinden Sie die Klassen zu einer Hierarchie.",
-      "unreachable": "Diese Elemente sind von der Wurzelklasse „{root}“ aus nicht erreichbar: {names}. Verbinden Sie sie mit der Hierarchie oder entfernen Sie sie."
+      "misdirected": "Die Beziehung zwischen {name1} und {name2} ist falsch herum gezeichnet."
+    },
+    "loadStandard": {
+      "loaded": "Die Struktur wurde in das Diagramm geladen.",
+      "renamed": "Der Name „{from}\" war vergeben, die geladene Klasse heißt daher „{to}\".",
+      "unreadable": "Die Struktur ist nicht lesbar: sie enthält „{construct}\", das der Editor nicht kennt.",
+      "error": "Die Struktur konnte nicht geladen werden.",
+      "empty": "Keine Senke veröffentlicht eine Struktur",
+      "pinned": "Aufgebaut aus:",
+      "emptyStructure": "Die Struktur enthält keine Klassen, es wurde nichts geladen."
     }
   },
   "datapools": {

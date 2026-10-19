@@ -30,7 +30,7 @@ public class NamedApiInputDTO {
           "URL slug used as the path segment in the public route"
               + " /v1/datasets/{datasetId}/{slug}. Lowercase alphanumeric with internal hyphens,"
               + " max 32 characters, unique within a dataset, not one of the reserved platform"
-              + " names (apis, api, v1, admin), immutable while AVAILABLE.",
+              + " names (apis, usable-datasources, api, v1, admin), immutable while AVAILABLE.",
       example = "traffic",
       pattern = NamedApiAllowedSlugValidator.SHAPE_REGEX)
   private String slug;

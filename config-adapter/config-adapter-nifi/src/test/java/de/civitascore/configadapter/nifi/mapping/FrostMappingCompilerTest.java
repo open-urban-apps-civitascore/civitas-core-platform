@@ -12,32 +12,35 @@ package de.civitascore.configadapter.nifi.mapping;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
-import de.civitascore.configadapter.nifi.mapping.FrostEntityPlan.FilterTerm;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.FreeAttribute;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.FrostCompilation;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.KeyAttribute;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaEntity;
 import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaJsonType;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaTarget;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.TargetKind;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConstNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.ConvertNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.CopyNode;
 import de.civitascore.configadapter.nifi.mapping.ValueNode.GeoPointNode;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * The body templates are asserted byte-exact on purpose: they are part of the byte-deterministic
- * snapshot contract, and the EL placeholder forms are load-bearing (quoting, escapeJson, the
- * isEmpty→null fallback, the raw GeoJSON embed).
+ * The port body is pinned in two ways. Three golden documents hold the shapes a real Pipeline
+ * produces, because the body is part of the byte-deterministic snapshot contract. The tests beside
+ * them state one rule each — nesting, order, escaping, the reference block — so that a defect names
+ * itself instead of showing a diff of a whole document.
  */
 class FrostMappingCompilerTest {
 
@@ -61,6 +64,26 @@ class FrostMappingCompilerTest {
         "$.properties.reference", new CopyNode("$.ref"));
   }
 
+  /**
+   * The bag of the Observations port's published structure: the measurement's own reference is the
+   * match key, the two that name its Datastream are free attributes beside it.
+   */
+  private static final StaProperties MEASUREMENT =
+      StaProperties.ofObservation(
+          List.of(
+              new KeyAttribute("reference"),
+              new FreeAttribute("thingReference", StaJsonType.ANY),
+              new FreeAttribute("datastreamReference", StaJsonType.ANY)));
+
+  /** A mapping into the Observations port, written against the measurement as the record root. */
+  private static MappingConfig measurementMapping() {
+    return mapping(
+        "$.parameters.thingReference", new CopyNode("$.station"),
+        "$.parameters.datastreamReference", new CopyNode("$.channel"),
+        "$.result", new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.value"), null),
+        "$.phenomenonTime", new CopyNode("$.ts"));
+  }
+
   private static MappingConfig lookupOnlyWithObservationMapping() {
     return mapping(
         "$.properties.reference", new CopyNode("$.ref"),
@@ -70,21 +93,794 @@ class FrostMappingCompilerTest {
         "$.datastreams[].observations[].phenomenonTime", new CopyNode("$.ts"));
   }
 
-  // ─── Body templates ─────────────────────────────────────────────────────────
+  /** The three shapes a Pipeline produces today, as whole documents. */
+  private static final String GOLDEN_DIRECTORY = "/frost-port/";
+
+  /**
+   * Compares the rendered port body with the document beside this test.
+   *
+   * <p>The document was written from the renderer's own output, so it proves that the body did not
+   * change, not that it was right on the day it was written. What it is right against is the rule
+   * tests below and the review that accepted it.
+   */
+  private void assertBodyMatches(String resource, FrostCompilation compilation) throws Exception {
+    try (var stream = getClass().getResourceAsStream(GOLDEN_DIRECTORY + resource)) {
+      assertNotNull(stream, "no golden document at " + GOLDEN_DIRECTORY + resource);
+      String expected = new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+      assertEquals(expected.strip(), compilation.plan().body());
+    }
+  }
+
+  // ─── The shapes a Pipeline produces ──────────────────────────────────────────
 
   @Test
-  void rendersThingBodyInCatalogOrderWithKeyProperties() throws Exception {
-    FrostCompilation compilation = compiler.compile(thingOnlyMapping(), KEYS);
-
-    assertEquals(
-        "{\"name\":\"${sta_0_name:escapeJson()}\","
-            + "\"description\":\"${sta_1_description:escapeJson()}\","
-            + "\"properties\":{\"reference\":\"${sta_2_reference:escapeJson()}\"}}",
-        compilation.plan().thingBody());
-    assertNull(compilation.plan().datastreamBody());
-    assertNull(compilation.plan().observationBody());
-    assertTrue(compilation.plan().datastreamFilter().isEmpty());
+  void compile_aMetadataPipeline_rendersTheThingAlone() throws Exception {
+    assertBodyMatches(
+        "thing-only.json", compiler.compile(thingOnlyMapping(), KEYS, SinkPort.THING_TREE));
   }
+
+  @Test
+  void compile_aMeasurementPipeline_rendersTheMeasurementUnderItsDatastream() throws Exception {
+    assertBodyMatches(
+        "thing-datastream-observation.json",
+        compiler.compile(lookupOnlyWithObservationMapping(), KEYS, SinkPort.THING_TREE));
+  }
+
+  @Test
+  void compile_aFullChain_rendersSixEntitiesInOneDocument() throws Exception {
+    assertBodyMatches(
+        "full-chain.json", compiler.compile(fullChainMapping(), KEYS, SinkPort.THING_TREE));
+  }
+
+  /** A Thing with its Location, Datastream, Sensor, ObservedProperty and one measurement. */
+  private static MappingConfig fullChainMapping() {
+    return mapping(
+        "$.name", new CopyNode("$.station"),
+        "$.description", new CopyNode("$.desc"),
+        "$.properties.reference", new CopyNode("$.ref"),
+        "$.Locations[].name", new CopyNode("$.siteName"),
+        "$.Locations[].description", new CopyNode("$.siteDesc"),
+        "$.Locations[].encodingType", new ConstNode("application/geo+json", null),
+        "$.Locations[].location", new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")),
+        "$.Datastreams[].name", new CopyNode("$.dsName"),
+        "$.Datastreams[].description", new CopyNode("$.dsDesc"),
+        "$.Datastreams[].observationType", new ConstNode("OM_Measurement", null),
+        "$.Datastreams[].unitOfMeasurement.name", new ConstNode("degree Celsius", null),
+        "$.Datastreams[].unitOfMeasurement.symbol", new ConstNode("degC", null),
+        "$.Datastreams[].unitOfMeasurement.definition", new ConstNode("ucum:Cel", null),
+        "$.Datastreams[].properties.reference", new CopyNode("$.dsRef"),
+        "$.Datastreams[].Sensor.name", new CopyNode("$.sensorName"),
+        "$.Datastreams[].Sensor.description", new ConstNode("air temperature", null),
+        "$.Datastreams[].Sensor.encodingType", new ConstNode("application/pdf", null),
+        "$.Datastreams[].Sensor.metadata", new ConstNode("http://example.org/s.pdf", null),
+        "$.Datastreams[].ObservedProperty.name", new ConstNode("Temperature", null),
+        "$.Datastreams[].ObservedProperty.description", new ConstNode("air temperature", null),
+        "$.Datastreams[].ObservedProperty.definition", new ConstNode("http://example.org/t", null),
+        "$.Datastreams[].Observations[].result",
+            new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.temp"), null),
+        "$.Datastreams[].Observations[].phenomenonTime", new CopyNode("$.ts"));
+  }
+
+  // ─── The rules the shapes follow ─────────────────────────────────────────────
+
+  @Test
+  void compile_aFullChain_nestsEveryEntityUnderTheOneItBelongsTo() throws Exception {
+    // The processor writes the record in one request, so the document carries the chain. A flat
+    // body could not say which reference belongs to which entity.
+    String body = compiler.compile(fullChainMapping(), KEYS, SinkPort.THING_TREE).plan().body();
+
+    int locations = body.indexOf("\"Locations\":[{");
+    int datastreams = body.indexOf("\"Datastreams\":[{");
+    int sensor = body.indexOf("\"Sensor\":{");
+    int observations = body.indexOf("\"Observations\":[{");
+    assertTrue(locations > 0 && datastreams > locations, body);
+    assertTrue(sensor > datastreams, "the Sensor nests inside its Datastream");
+    assertTrue(observations > datastreams, "the measurement nests inside its Datastream");
+  }
+
+  @Test
+  void compile_withTheMappingInAnyOrder_rendersInCatalogOrder() throws Exception {
+    // The snapshot must be byte-stable, so the catalog decides the order, not the mapping.
+    String declared =
+        compiler
+            .compile(
+                mapping(
+                    "$.name", new CopyNode("$.station"),
+                    "$.description", new CopyNode("$.desc"),
+                    "$.properties.reference", new CopyNode("$.ref")),
+                KEYS,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+    String reversed =
+        compiler
+            .compile(
+                mapping(
+                    "$.properties.reference", new CopyNode("$.ref"),
+                    "$.description", new CopyNode("$.desc"),
+                    "$.name", new CopyNode("$.station")),
+                KEYS,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertEquals(jsonKeyOrder(declared), jsonKeyOrder(reversed));
+  }
+
+  /** The JSON keys of a body, in the order the renderer wrote them. */
+  private static List<String> jsonKeyOrder(String body) {
+    List<String> keys = new java.util.ArrayList<>();
+    java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"([A-Za-z@.]+)\":").matcher(body);
+    while (m.find()) {
+      keys.add(m.group(1));
+    }
+    return keys;
+  }
+
+  @Test
+  void compile_withAFreeBagAttribute_rendersItBesideTheMatchKey() throws Exception {
+    StaProperties properties =
+        new StaProperties(
+            List.of(new KeyAttribute("reference"), new FreeAttribute("operator", StaJsonType.ANY)),
+            List.of(),
+            List.of(new KeyAttribute("reference")),
+            List.of());
+
+    String body =
+        compiler
+            .compile(
+                mapping(
+                    "$.properties.reference", new CopyNode("$.ref"),
+                    "$.properties.operator", new CopyNode("$.op")),
+                properties,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"reference\":"), body);
+    assertTrue(body.contains("\"operator\":"), body);
+  }
+
+  @Test
+  void compile_withALowerCaseRelationshipName_rendersTheFrostCasing() throws Exception {
+    // A model commonly spells the edge 'datastreams'; the payload vocabulary is PascalCase.
+    String body =
+        compiler
+            .compile(lookupOnlyWithObservationMapping(), KEYS, SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"Datastreams\":[{"), body);
+    assertFalse(body.contains("\"datastreams\""), body);
+  }
+
+  @Test
+  void compile_withAGeometry_embedsTheGeoJsonUnquoted() throws Exception {
+    // The record chain renders GeoJSON as an object. Quoting it would make FROST read a string.
+    String body = compiler.compile(fullChainMapping(), KEYS, SinkPort.THING_TREE).plan().body();
+
+    int location = body.indexOf("\"location\":");
+    assertTrue(location > 0, body);
+    assertFalse(body.startsWith("\"location\":\"", location), "the geometry must not be quoted");
+  }
+
+  @Test
+  void compile_withoutAField_rendersNoKeyForIt() throws Exception {
+    // An unmapped catalog field must not appear as an empty value: FROST would reject the entity.
+    String body = compiler.compile(thingOnlyMapping(), KEYS, SinkPort.THING_TREE).plan().body();
+
+    assertFalse(body.contains("\"Datastreams\""), body);
+    assertFalse(body.contains("\"Locations\""), body);
+  }
+
+  @Test
+  void compile_withAnEmptyMapping_isRejected() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(mapping(), KEYS, SinkPort.THING_TREE));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+  }
+
+  @Test
+  void compile_aMeasurementPipeline_rendersTheObservationAlone() throws Exception {
+    assertBodyMatches(
+        "observations-port.json",
+        compiler.compile(measurementMapping(), MEASUREMENT, SinkPort.OBSERVATIONS));
+  }
+
+  @Test
+  void compile_intoTheObservationsPort_rendersTheMeasurementAlone() throws Exception {
+    String body =
+        compiler.compile(measurementMapping(), MEASUREMENT, SinkPort.OBSERVATIONS).plan().body();
+
+    // The record of this port is the measurement, so nothing of the tree above it is written: the
+    // port resolves the Datastream from the references the body carries.
+    assertFalse(body.contains("Datastreams"), body);
+    assertTrue(body.startsWith("{\"result\":"), body);
+    // SensorThings gives the Observation 'parameters' and rejects 'properties' on it.
+    assertTrue(body.contains("\"parameters\":{"), body);
+    assertFalse(body.contains("\"properties\""), body);
+    assertTrue(body.contains("thingReference"), body);
+    assertTrue(body.contains("datastreamReference"), body);
+  }
+
+  @Test
+  void compile_intoTheObservationsPort_withoutTheReferences_isRejected() {
+    MappingConfig mapping =
+        mapping("$.result", new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.value"), null));
+
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(mapping, MEASUREMENT, SinkPort.OBSERVATIONS));
+
+    // Without them the port has nothing to look the Datastream up by, and every measurement would
+    // land on whatever the empty filter matches.
+    assertTrue(ex.getMessage().contains("$.parameters.thingReference"), ex.getMessage());
+    assertTrue(ex.getMessage().contains("$.parameters.datastreamReference"), ex.getMessage());
+  }
+
+  @Test
+  void compile_intoTheObservationsPort_withAThingPath_namesThePortsOwnVocabulary() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(thingOnlyMapping(), MEASUREMENT, SinkPort.OBSERVATIONS));
+
+    // The message speaks the paths the author wrote, not the Thing-rooted ones the catalog keeps
+    // internally — a Thing path here is the wrong port, not a typo.
+    assertTrue(ex.getMessage().contains("'$.name'"), ex.getMessage());
+    assertTrue(ex.getMessage().contains("$.result"), ex.getMessage());
+    assertFalse(ex.getMessage().contains("$.Datastreams[].Observations[]"), ex.getMessage());
+  }
+
+  @Test
+  void compile_intoTheObservationsPort_withoutAMatchKey_isAccepted() throws Exception {
+    // A measurement without a reference of its own is appended rather than upserted, which is what
+    // a time series wants. The Thing ports demand a key; this one must not.
+    StaProperties keyless =
+        StaProperties.ofObservation(
+            List.of(
+                new FreeAttribute("thingReference", StaJsonType.ANY),
+                new FreeAttribute("datastreamReference", StaJsonType.ANY)));
+
+    String body =
+        compiler.compile(measurementMapping(), keyless, SinkPort.OBSERVATIONS).plan().body();
+
+    assertTrue(body.contains("thingReference"), body);
+  }
+
+  @Test
+  void compile_intoTheThingsPort_rendersAThingOnlyMapping() throws Exception {
+    String body = compiler.compile(thingOnlyMapping(), KEYS, SinkPort.THINGS).plan().body();
+
+    assertFalse(body.contains("Datastreams"), body);
+  }
+
+  @Test
+  void compile_intoTheThingsPort_rejectsAMeasurement() {
+    // The port writes the Thing only. Rendering the Thing alone would drop the measurement without
+    // an error, and the Pipeline would deploy and write nothing of it.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(lookupOnlyWithObservationMapping(), KEYS, SinkPort.THINGS));
+
+    assertTrue(ex.getMessage().contains("Things port writes the Thing only"), ex.getMessage());
+  }
+
+  @Test
+  void compile_withAnotherThingKey_stillRequiresTheReferenceThePortResolves() {
+    // The processor finds the Thing by properties.reference, whatever key the structure declares.
+    StaProperties keys = StaProperties.ofKeys(List.of("stationId"), List.of("reference"));
+    MappingConfig mapping =
+        mapping(
+            "$.name", new CopyNode("$.station"),
+            "$.description", new CopyNode("$.desc"),
+            "$.properties.stationId", new CopyNode("$.ref"));
+
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(mapping, keys, SinkPort.THING_TREE));
+
+    assertTrue(ex.getMessage().contains("$.properties.reference"), ex.getMessage());
+  }
+
+  @Test
+  void compile_withAnotherDatastreamKey_stillRequiresTheDatastreamReference() {
+    StaProperties keys = StaProperties.ofKeys(List.of("reference"), List.of("code"));
+    MappingConfig mapping =
+        mapping(
+            "$.properties.reference", new CopyNode("$.ref"),
+            "$.datastreams[].properties.code", new CopyNode("$.ref"),
+            "$.datastreams[].observations[].result", new CopyNode("$.temp"));
+
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(mapping, keys, SinkPort.THING_TREE));
+
+    assertTrue(ex.getMessage().contains("$.Datastreams[].properties.reference"), ex.getMessage());
+  }
+
+  // ─── The Location's properties bag ───────────────────────────────────────────
+
+  /** The bag the published ThingTree structure models: a Location reference beside the Thing's. */
+  private static final StaProperties WITH_LOCATION_BAG =
+      new StaProperties(
+          List.of(new KeyAttribute("reference")),
+          List.of(new KeyAttribute("reference"), new FreeAttribute("floor", StaJsonType.ANY)),
+          List.of(new KeyAttribute("reference")),
+          List.of());
+
+  /** A Thing with a creatable Location, extended by the given Location paths. */
+  private static MappingConfig locationMapping(Object... extraPathsAndValues) {
+    Map<String, ValueNode> fields = new LinkedHashMap<>(thingOnlyMapping().fields());
+    fields.put("$.Locations[].name", new CopyNode("$.siteName"));
+    fields.put("$.Locations[].description", new CopyNode("$.siteDesc"));
+    fields.put("$.Locations[].encodingType", new ConstNode("application/geo+json", null));
+    fields.put(
+        "$.Locations[].location", new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")));
+    for (int i = 0; i < extraPathsAndValues.length; i += 2) {
+      fields.put((String) extraPathsAndValues[i], (ValueNode) extraPathsAndValues[i + 1]);
+    }
+    return new MappingConfig(null, null, fields);
+  }
+
+  /** The rendered body from the Location on — the Thing's own bag comes before it. */
+  private static String locationOf(String body) {
+    int start = body.indexOf("\"Locations\":[{");
+    assertTrue(start > 0, body);
+    return body.substring(start);
+  }
+
+  @Test
+  void compile_withALocationReference_rendersItIntoTheLocationsBag() throws Exception {
+    String body =
+        compiler
+            .compile(
+                locationMapping("$.Locations[].properties.reference", new CopyNode("$.siteRef")),
+                WITH_LOCATION_BAG,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    // The port looks the Location up by this value under its Thing, so it must reach the bag of the
+    // Location and not the Thing's.
+    String location = locationOf(body);
+    assertTrue(location.contains("\"properties\":{\"reference\":\"${sta_7_reference"), location);
+  }
+
+  @Test
+  void compile_withALocationReferenceAlone_rendersTheLocation() throws Exception {
+    // The bag attribute alone is not a create intent, like the whole properties object today: the
+    // Location stays lookup-only, but the reference must still reach the body.
+    String body =
+        compiler
+            .compile(
+                mapping(
+                    "$.name", new CopyNode("$.station"),
+                    "$.description", new CopyNode("$.desc"),
+                    "$.properties.reference", new CopyNode("$.ref"),
+                    "$.Locations[].properties.reference", new CopyNode("$.siteRef")),
+                WITH_LOCATION_BAG,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"Locations\":[{\"properties\":{\"reference\":"), body);
+  }
+
+  @Test
+  void compile_withAFreeLocationAttribute_rendersItBesideTheReference() throws Exception {
+    String body =
+        compiler
+            .compile(
+                locationMapping(
+                    "$.Locations[].properties.reference", new CopyNode("$.siteRef"),
+                    "$.Locations[].properties.floor",
+                        new ConvertNode(ConversionOp.TO_INT, new CopyNode("$.floor"), null)),
+                WITH_LOCATION_BAG,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    String location = locationOf(body);
+    assertTrue(location.contains("\"reference\":"), location);
+    assertTrue(location.contains("\"floor\":${sta_8_floor:isEmpty()"), location);
+  }
+
+  @Test
+  void compile_withALowerCaseLocationsEdge_rendersTheLocationReference() throws Exception {
+    // A model exported from UML commonly spells the edge 'locations'; the bag below it is kept.
+    String body =
+        compiler
+            .compile(
+                mapping(
+                    "$.properties.reference", new CopyNode("$.ref"),
+                    "$.locations[].properties.reference", new CopyNode("$.siteRef")),
+                WITH_LOCATION_BAG,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"Locations\":[{\"properties\":{\"reference\":"), body);
+  }
+
+  @Test
+  void compile_withALocationReferenceTheStructureDoesNotModel_isRejected() {
+    // Without a properties class under the Location the attribute is not part of the vocabulary.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compiler.compile(
+                    locationMapping(
+                        "$.Locations[].properties.reference", new CopyNode("$.siteRef")),
+                    KEYS,
+                    SinkPort.THING_TREE));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+    assertTrue(
+        ex.getMessage()
+            .contains(
+                "unsupported FROST mapping target path: " + "'$.Locations[].properties.reference'"),
+        ex.getMessage());
+  }
+
+  @Test
+  void compile_withALocationAttributeTheStructureDoesNotModel_isRejected() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compiler.compile(
+                    locationMapping("$.Locations[].properties.room", new CopyNode("$.room")),
+                    WITH_LOCATION_BAG,
+                    SinkPort.THING_TREE));
+
+    assertTrue(ex.getMessage().contains("'$.Locations[].properties.room'"), ex.getMessage());
+  }
+
+  @Test
+  void compile_withTheWholeLocationProperties_isRejected() {
+    // A free object is no target: a structure models the bag as a class, attribute by attribute.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compiler.compile(
+                    locationMapping("$.Locations[].properties", new CopyNode("$.siteProps")),
+                    WITH_LOCATION_BAG,
+                    SinkPort.THING_TREE));
+
+    assertTrue(
+        ex.getMessage()
+            .contains("unsupported FROST mapping target path: '$.Locations[].properties'"),
+        ex.getMessage());
+  }
+
+  @Test
+  void compile_withALocationReferenceAndAPartialCreateSet_isRejected() {
+    // The reference does not lift the all-or-nothing rule of the Location's create set.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compiler.compile(
+                    mapping(
+                        "$.name", new CopyNode("$.station"),
+                        "$.description", new CopyNode("$.desc"),
+                        "$.properties.reference", new CopyNode("$.ref"),
+                        "$.Locations[].name", new CopyNode("$.siteName"),
+                        "$.Locations[].properties.reference", new CopyNode("$.siteRef")),
+                    WITH_LOCATION_BAG,
+                    SinkPort.THING_TREE));
+
+    assertTrue(ex.getMessage().contains("$.Locations[].location"), ex.getMessage());
+  }
+
+  @Test
+  void compile_intoTheThingsPort_rejectsALocationReference() {
+    // The Things port writes the Thing alone; a Location reference would be dropped silently.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compiler.compile(
+                    mapping(
+                        "$.name", new CopyNode("$.station"),
+                        "$.description", new CopyNode("$.desc"),
+                        "$.properties.reference", new CopyNode("$.ref"),
+                        "$.Locations[].properties.reference", new CopyNode("$.siteRef")),
+                    WITH_LOCATION_BAG,
+                    SinkPort.THINGS));
+
+    assertTrue(ex.getMessage().contains("Things port writes the Thing only"), ex.getMessage());
+  }
+
+  @Test
+  void rejectsALocationBagWithMoreThanOneMatchKey() {
+    IllegalArgumentException ex =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new StaProperties(
+                    List.of(new KeyAttribute("reference")),
+                    List.of(new KeyAttribute("reference"), new KeyAttribute("siteId")),
+                    List.of(),
+                    List.of()));
+    assertTrue(ex.getMessage().contains("location"), ex.getMessage());
+  }
+
+  // ─── Classes modelled under free fields ──────────────────────────────────────
+
+  private static final String OBSERVATION = "$.Datastreams[].Observations[]";
+  private static final String FEATURE = OBSERVATION + ".FeatureOfInterest";
+
+  private static StaTarget modelled(String path, StaEntity entity, StaJsonType type) {
+    return new StaTarget(path, entity, type, TargetKind.OPTIONAL);
+  }
+
+  private static StaProperties withModelled(StaTarget... targets) {
+    return new StaProperties(
+        List.of(new KeyAttribute("reference")),
+        List.of(),
+        List.of(new KeyAttribute("reference")),
+        List.of(),
+        List.of(targets));
+  }
+
+  /** A structure that models the feature of its FeatureOfInterest as a GeoJSON point. */
+  private static final StaProperties WITH_FEATURE_POINT =
+      withModelled(
+          modelled(FEATURE + ".feature", StaEntity.FEATURE_OF_INTEREST, StaJsonType.RAW_JSON));
+
+  /** A measurement with its Thing and Datastream looked up, extended by the given paths. */
+  private static MappingConfig measurementWith(Object... extraPathsAndValues) {
+    Map<String, ValueNode> fields = new LinkedHashMap<>();
+    fields.put("$.properties.reference", new CopyNode("$.ref"));
+    fields.put("$.Datastreams[].properties.reference", new CopyNode("$.dsRef"));
+    fields.put(OBSERVATION + ".result", new CopyNode("$.temp"));
+    for (int i = 0; i < extraPathsAndValues.length; i += 2) {
+      fields.put((String) extraPathsAndValues[i], (ValueNode) extraPathsAndValues[i + 1]);
+    }
+    return new MappingConfig(null, null, fields);
+  }
+
+  private static Object[] creatableFeature() {
+    return new Object[] {
+      FEATURE + ".name", new ConstNode("Pegel", null),
+      FEATURE + ".description", new ConstNode("d", null),
+      FEATURE + ".encodingType", new ConstNode("application/geo+json", null)
+    };
+  }
+
+  private static Object[] concat(Object[] first, Object... second) {
+    Object[] joined = Arrays.copyOf(first, first.length + second.length);
+    System.arraycopy(second, 0, joined, first.length, second.length);
+    return joined;
+  }
+
+  @Test
+  void compile_withAModelledSensorPropertiesClass_writesItsAttributesIntoTheSensor()
+      throws Exception {
+    StaProperties properties =
+        withModelled(
+            modelled(
+                "$.Datastreams[].Sensor.properties.vendor", StaEntity.DATASTREAM, StaJsonType.ANY));
+
+    String body =
+        compiler
+            .compile(
+                measurementWith(
+                    "$.Datastreams[].Sensor.properties.vendor", new ConstNode("acme", null)),
+                properties,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"Sensor\":{\"properties\":{\"vendor\":"), body);
+  }
+
+  @Test
+  void compile_withTheWholeSensorProperties_isRejected() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compiler.compile(
+                    measurementWith("$.Datastreams[].Sensor.properties", new CopyNode("$.props")),
+                    KEYS,
+                    SinkPort.THING_TREE));
+
+    assertTrue(ex.getMessage().contains("'$.Datastreams[].Sensor.properties'"), ex.getMessage());
+  }
+
+  @Test
+  void compile_withAClassInsideTheBag_nestsItBesideTheReference() throws Exception {
+    StaProperties properties =
+        withModelled(modelled("$.properties.site.floor", StaEntity.THING, StaJsonType.ANY));
+
+    String body =
+        compiler
+            .compile(
+                mapping(
+                    "$.properties.reference", new CopyNode("$.ref"),
+                    "$.properties.site.floor", new CopyNode("$.floor")),
+                properties,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    // One bag, holding the class and the reference: neither may overwrite the other.
+    assertTrue(body.contains("\"properties\":{\"site\":{\"floor\":"), body);
+    assertTrue(body.contains("\"reference\":"), body);
+    assertEquals(body.indexOf("\"properties\""), body.lastIndexOf("\"properties\""), body);
+  }
+
+  @Test
+  void compile_withAModelledResultQuality_writesItIntoTheMeasurement() throws Exception {
+    StaProperties properties =
+        withModelled(
+            modelled(
+                OBSERVATION + ".resultQuality.accuracy", StaEntity.OBSERVATION, StaJsonType.ANY));
+
+    String body =
+        compiler
+            .compile(
+                measurementWith(
+                    OBSERVATION + ".resultQuality.accuracy",
+                    new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.acc"), null)),
+                properties,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"resultQuality\":{\"accuracy\":${"), body);
+  }
+
+  @Test
+  void compile_withTheWholeResultQuality_isRejected() {
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compiler.compile(
+                    measurementWith(OBSERVATION + ".resultQuality", new CopyNode("$.q")),
+                    KEYS,
+                    SinkPort.THING_TREE));
+
+    assertTrue(ex.getMessage().contains("resultQuality'"), ex.getMessage());
+  }
+
+  @Test
+  void compile_withAFeatureOfInterestAndItsModelledPoint_rendersTheFeature() throws Exception {
+    String body =
+        compiler
+            .compile(
+                measurementWith(
+                    concat(
+                        creatableFeature(),
+                        FEATURE + ".feature",
+                        new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")))),
+                WITH_FEATURE_POINT,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"FeatureOfInterest\":{"), body);
+    assertTrue(body.contains("\"feature\":${"), body);
+  }
+
+  @Test
+  void compile_withAFeatureOfInterestAndAModelledFeatureClass_nestsTheClass() throws Exception {
+    StaProperties properties =
+        withModelled(
+            modelled(FEATURE + ".feature.station", StaEntity.FEATURE_OF_INTEREST, StaJsonType.ANY),
+            modelled(FEATURE + ".feature.river", StaEntity.FEATURE_OF_INTEREST, StaJsonType.ANY));
+
+    String body =
+        compiler
+            .compile(
+                measurementWith(
+                    concat(
+                        creatableFeature(),
+                        FEATURE + ".feature.station",
+                        new CopyNode("$.station"),
+                        FEATURE + ".feature.river",
+                        new CopyNode("$.river"))),
+                properties,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"feature\":{\"station\":"), body);
+    assertTrue(body.contains("\"river\":"), body);
+  }
+
+  @Test
+  void compile_withAFeatureOfInterestWithoutItsFeature_isRejected() {
+    // FROST refuses a FeatureOfInterest without its feature; refusing it here names the reason.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                compiler.compile(
+                    measurementWith(creatableFeature()), WITH_FEATURE_POINT, SinkPort.THING_TREE));
+
+    assertTrue(ex.getMessage().contains("must map its feature"), ex.getMessage());
+  }
+
+  @Test
+  void compile_withAFeatureOfInterestCreatableWithoutFeature_needsNoFeatureInItsCreateSet() {
+    // The create set is name, description and encodingType; the feature rule reports itself.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(measurementWith(creatableFeature()), KEYS, SinkPort.THING_TREE));
+
+    assertFalse(ex.getMessage().contains("partially mapped"), ex.getMessage());
+  }
+
+  @Test
+  void compile_intoTheObservationsPort_withAModelledFeature_rendersItUnderTheMeasurement()
+      throws Exception {
+    StaProperties properties =
+        new StaProperties(
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(
+                new FreeAttribute("thingReference", StaJsonType.ANY),
+                new FreeAttribute("datastreamReference", StaJsonType.ANY)),
+            List.of(
+                modelled(FEATURE + ".feature", StaEntity.FEATURE_OF_INTEREST, StaJsonType.RAW_JSON),
+                modelled(
+                    OBSERVATION + ".resultQuality.accuracy",
+                    StaEntity.OBSERVATION,
+                    StaJsonType.ANY)));
+    Map<String, ValueNode> fields = new LinkedHashMap<>(measurementMapping().fields());
+    fields.put("$.resultQuality.accuracy", new CopyNode("$.acc"));
+    fields.put("$.FeatureOfInterest.name", new ConstNode("Pegel", null));
+    fields.put("$.FeatureOfInterest.description", new ConstNode("d", null));
+    fields.put("$.FeatureOfInterest.encodingType", new ConstNode("application/geo+json", null));
+    fields.put(
+        "$.FeatureOfInterest.feature",
+        new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")));
+
+    String body =
+        compiler
+            .compile(new MappingConfig(null, null, fields), properties, SinkPort.OBSERVATIONS)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"resultQuality\":{\"accuracy\":"), body);
+    assertTrue(body.contains("\"FeatureOfInterest\":{"), body);
+    assertTrue(body.contains("\"feature\":${"), body);
+  }
+
+  @Test
+  void compile_withADatastreamReferenceAlone_rendersTheDatastream() throws Exception {
+    // A bag attribute counts as writing the entity, like any other of its paths.
+    String body =
+        compiler
+            .compile(
+                mapping(
+                    "$.properties.reference", new CopyNode("$.ref"),
+                    "$.Datastreams[].properties.reference", new CopyNode("$.dsRef")),
+                KEYS,
+                SinkPort.THING_TREE)
+            .plan()
+            .body();
+
+    assertTrue(body.contains("\"Datastreams\":[{\"properties\":{\"reference\":"), body);
+  }
+
+  // ─── Body templates ─────────────────────────────────────────────────────────
 
   @Test
   void anArraySourceFansOutEvenThoughEveryTargetPathCarriesEntityTierSelectors() throws Exception {
@@ -104,7 +900,7 @@ class FrostMappingCompilerTest {
             "$.datastreams[].observations[].phenomenonTime",
                 new CopyNode("$.measurements[].measuredValues[].ts"));
 
-    FrostCompilation compilation = compiler.compile(mapping, KEYS);
+    FrostCompilation compilation = compiler.compile(mapping, KEYS, SinkPort.THING_TREE);
 
     assertEquals("/measurements[*]/measuredValues", compilation.fork().recordPath());
     // The array-sourced fields read the forked element directly; the root-level one stays absolute.
@@ -127,7 +923,9 @@ class FrostMappingCompilerTest {
             "$.datastreams[].observations[].result", new CopyNode("$.alarms[].code"));
 
     FatalAdapterException error =
-        assertThrows(FatalAdapterException.class, () -> compiler.compile(mapping, KEYS));
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(mapping, KEYS, SinkPort.THING_TREE));
 
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
   }
@@ -143,135 +941,11 @@ class FrostMappingCompilerTest {
             "$.datastreams[].observations[].result", new CopyNode("$.temps[]"));
 
     FatalAdapterException error =
-        assertThrows(FatalAdapterException.class, () -> compiler.compile(mapping, KEYS));
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(mapping, KEYS, SinkPort.THING_TREE));
 
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
-  }
-
-  @Test
-  void lookupOnlyThingHasNoBodyButAFilter() throws Exception {
-    FrostCompilation compilation = compiler.compile(lookupOnlyWithObservationMapping(), KEYS);
-
-    assertNull(compilation.plan().thingBody());
-    assertEquals(
-        List.of(new FilterTerm("properties/reference", "sta_0_reference")),
-        compilation.plan().thingFilter());
-    assertEquals(
-        List.of(new FilterTerm("properties/reference", "sta_1_reference")),
-        compilation.plan().datastreamFilter());
-  }
-
-  @Test
-  void rendersRelatedBodiesForLookupOnlyParents() throws Exception {
-    MappingConfig mapping =
-        mapping(
-            "$.properties.reference", new CopyNode("$.thingRef"),
-            "$.Locations[].name", new ConstNode("Location", null),
-            "$.Locations[].description", new ConstNode("Station location", null),
-            "$.Locations[].encodingType", new ConstNode("application/geo+json", null),
-            "$.Locations[].location",
-                new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")),
-            "$.Datastreams[].properties.reference", new CopyNode("$.dsRef"),
-            "$.Datastreams[].Sensor.name", new ConstNode("Sensor", null),
-            "$.Datastreams[].Sensor.description", new ConstNode("Description", null),
-            "$.Datastreams[].Sensor.encodingType", new ConstNode("text/html", null),
-            "$.Datastreams[].Sensor.metadata", new ConstNode("https://example.test", null),
-            "$.Datastreams[].ObservedProperty.name", new ConstNode("Temperature", null),
-            "$.Datastreams[].ObservedProperty.definition",
-                new ConstNode("https://example.test/temperature", null),
-            "$.Datastreams[].ObservedProperty.description", new ConstNode("Temperature", null));
-
-    FrostCompilation compilation = compiler.compile(mapping, KEYS);
-
-    assertNull(compilation.plan().thingBody());
-    assertNotNull(compilation.plan().locationBody());
-    assertNull(compilation.plan().datastreamBody());
-    assertNotNull(compilation.plan().sensorBody());
-    assertNotNull(compilation.plan().observedPropertyBody());
-  }
-
-  @Test
-  void rendersObservationBodyWithDatastreamIdReference() throws Exception {
-    FrostCompilation compilation = compiler.compile(lookupOnlyWithObservationMapping(), KEYS);
-
-    assertEquals(
-        "{\"result\":${sta_2_result:isEmpty():ifElse('null', ${sta_2_result})},"
-            + "\"phenomenonTime\":${sta_3_phenomenontime:isEmpty():ifElse('null',"
-            + " ${sta_3_phenomenontime:escapeJson():prepend('\"'):append('\"')})},"
-            + "\"Datastream\":{\"@iot.id\":${frost.ds.id}}}",
-        compilation.plan().observationBody());
-  }
-
-  @Test
-  void rendersOptionalObservationFieldsResultQualityAndValidTime() throws Exception {
-    MappingConfig mapping =
-        mapping(
-            "$.properties.reference", new CopyNode("$.ref"),
-            "$.Datastreams[].properties.reference", new CopyNode("$.ref"),
-            "$.Datastreams[].Observations[].result",
-                new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.temp"), null),
-            "$.Datastreams[].Observations[].resultQuality", new CopyNode("$.quality"),
-            "$.Datastreams[].Observations[].validTime", new CopyNode("$.valid"));
-
-    FrostCompilation compilation = compiler.compile(mapping, KEYS);
-
-    assertEquals(
-        "{\"result\":${sta_2_result:isEmpty():ifElse('null', ${sta_2_result})},"
-            + "\"resultQuality\":${sta_3_resultquality:isEmpty():ifElse('null',"
-            + " ${sta_3_resultquality:escapeJson():prepend('\"'):append('\"')})},"
-            + "\"validTime\":${sta_4_validtime:isEmpty():ifElse('null',"
-            + " ${sta_4_validtime:escapeJson():prepend('\"'):append('\"')})},"
-            + "\"Datastream\":{\"@iot.id\":${frost.ds.id}}}",
-        compilation.plan().observationBody());
-  }
-
-  @Test
-  void rendersAnOptionalPropertiesBagOnALocation() throws Exception {
-    MappingConfig mapping =
-        mapping(
-            "$.name", new CopyNode("$.station"),
-            "$.description", new ConstNode("s", null),
-            "$.properties.reference", new CopyNode("$.ref"),
-            "$.Locations[].name", new ConstNode("loc", null),
-            "$.Locations[].description", new ConstNode("d", null),
-            "$.Locations[].encodingType", new ConstNode("application/geo+json", null),
-            "$.Locations[].location",
-                new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")),
-            "$.Locations[].properties", new CopyNode("$.meta"));
-
-    FrostCompilation compilation = compiler.compile(mapping, KEYS);
-
-    // The properties bag embeds verbatim (RAW_JSON), after the fixed Location fields.
-    assertTrue(compilation.plan().thingBody().contains("\"location\":${sta_6_location},"));
-    assertTrue(compilation.plan().thingBody().contains("\"properties\":${sta_7_properties}}]"));
-  }
-
-  @Test
-  void deepInsertsAMappedFeatureOfInterestIntoTheObservationBody() throws Exception {
-    MappingConfig mapping =
-        mapping(
-            "$.properties.reference", new CopyNode("$.ref"),
-            "$.Datastreams[].properties.reference", new CopyNode("$.ref"),
-            "$.Datastreams[].Observations[].result",
-                new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.temp"), null),
-            "$.Datastreams[].Observations[].featureOfInterest.name", new ConstNode("foi", null),
-            "$.Datastreams[].Observations[].featureOfInterest.description",
-                new ConstNode("d", null),
-            "$.Datastreams[].Observations[].featureOfInterest.encodingType",
-                new ConstNode("application/geo+json", null),
-            "$.Datastreams[].Observations[].featureOfInterest.feature",
-                new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")));
-
-    FrostCompilation compilation = compiler.compile(mapping, KEYS);
-
-    assertEquals(
-        "{\"result\":${sta_2_result:isEmpty():ifElse('null', ${sta_2_result})},"
-            + "\"FeatureOfInterest\":{\"name\":\"${sta_3_name:escapeJson()}\","
-            + "\"description\":\"${sta_4_description:escapeJson()}\","
-            + "\"encodingType\":\"${sta_5_encodingtype:escapeJson()}\","
-            + "\"feature\":${sta_6_feature}},"
-            + "\"Datastream\":{\"@iot.id\":${frost.ds.id}}}",
-        compilation.plan().observationBody());
   }
 
   @Test
@@ -288,7 +962,11 @@ class FrostMappingCompilerTest {
             "$.Datastreams[].Observations[].FeatureOfInterest.feature",
                 new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")));
 
-    assertThrows(FatalAdapterException.class, () -> compiler.compile(mapping, KEYS));
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compiler.compile(mapping, WITH_FEATURE_POINT, SinkPort.THING_TREE));
+    assertTrue(ex.getMessage().contains("requires a mapped Observation"), ex.getMessage());
   }
 
   @Test
@@ -300,73 +978,16 @@ class FrostMappingCompilerTest {
             "$.Datastreams[].Observations[].result", new CopyNode("$.temp"),
             "$.Datastreams[].Observations[].FeatureOfInterest.name", new ConstNode("foi", null));
 
-    assertThrows(FatalAdapterException.class, () -> compiler.compile(mapping, KEYS));
-  }
-
-  @Test
-  void rendersDeepInsertBodiesForACreatableChain() throws Exception {
-    Map<String, ValueNode> fields = new LinkedHashMap<>();
-    fields.put("$.name", new CopyNode("$.station"));
-    fields.put("$.description", new ConstNode("station", null));
-    fields.put("$.properties.reference", new CopyNode("$.ref"));
-    fields.put("$.Locations[].name", new ConstNode("loc", null));
-    fields.put("$.Locations[].description", new ConstNode("d", null));
-    fields.put("$.Locations[].encodingType", new ConstNode("application/geo+json", null));
-    fields.put(
-        "$.Locations[].location", new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat")));
-    fields.put("$.Datastreams[].name", new CopyNode("$.dsName"));
-    fields.put("$.Datastreams[].description", new ConstNode("dd", null));
-    fields.put("$.Datastreams[].observationType", new ConstNode("om", null));
-    fields.put("$.Datastreams[].unitOfMeasurement.name", new ConstNode("Degree Celsius", null));
-    fields.put("$.Datastreams[].unitOfMeasurement.symbol", new ConstNode("°C", null));
-    fields.put("$.Datastreams[].unitOfMeasurement.definition", new ConstNode("ucum:Cel", null));
-    fields.put("$.Datastreams[].sensor.name", new ConstNode("DHT22", null));
-    fields.put("$.Datastreams[].sensor.description", new ConstNode("sensor", null));
-    fields.put("$.Datastreams[].sensor.encodingType", new ConstNode("application/pdf", null));
-    fields.put("$.Datastreams[].sensor.metadata", new ConstNode("https://x/d.pdf", null));
-    fields.put("$.Datastreams[].observedProperty.name", new ConstNode("Temperature", null));
-    fields.put("$.Datastreams[].observedProperty.definition", new ConstNode("http://t", null));
-    fields.put("$.Datastreams[].observedProperty.description", new ConstNode("temp", null));
-    fields.put("$.Datastreams[].properties.reference", new CopyNode("$.ref"));
-    fields.put(
-        "$.Datastreams[].Observations[].result",
-        new ConvertNode(ConversionOp.TO_FLOAT, new CopyNode("$.temp"), null));
-
-    FrostCompilation compilation = compiler.compile(new MappingConfig(null, null, fields), KEYS);
-
-    String thingBody = compilation.plan().thingBody();
-    // Locations ride inside the Thing body (deep insert); the geometry embeds verbatim.
-    assertTrue(thingBody.contains("\"Locations\":[{\"name\":"));
-    assertTrue(thingBody.contains("\"location\":${sta_6_location}}]"));
-    assertFalse(compilation.plan().thingUpdateBody().contains("\"Locations\""));
-    assertTrue(compilation.plan().locationBody().contains("\"name\":\"${sta_3_name"));
-    assertTrue(compilation.plan().locationBody().contains("\"location\":${sta_6_location}"));
-
-    String datastreamBody = compilation.plan().datastreamBody();
-    assertTrue(datastreamBody.contains("\"unitOfMeasurement\":{\"name\":"));
-    assertTrue(datastreamBody.contains("\"Sensor\":{\"name\":"));
-    assertTrue(datastreamBody.contains("\"ObservedProperty\":{\"name\":"));
-    String datastreamUpdateBody = compilation.plan().datastreamUpdateBody();
-    assertFalse(datastreamUpdateBody.contains("\"Sensor\""));
-    assertFalse(datastreamUpdateBody.contains("\"ObservedProperty\""));
-    assertFalse(datastreamUpdateBody.contains("\"Thing\""));
-    assertTrue(datastreamUpdateBody.contains("\"unitOfMeasurement\":{\"name\":"));
-    assertTrue(compilation.plan().sensorBody().contains("\"name\":\"${sta_13_name"));
-    assertFalse(compilation.plan().sensorBody().contains("\"Sensor\""));
-    assertTrue(compilation.plan().observedPropertyBody().contains("\"name\":\"${sta_17_name"));
-    assertFalse(compilation.plan().observedPropertyBody().contains("\"ObservedProperty\""));
-    // The created datastream carries its match key and the parent Thing link.
-    assertTrue(
-        datastreamBody.contains(
-            "\"properties\":{\"reference\":\"${sta_20_reference:escapeJson()}\"}"));
-    assertTrue(datastreamBody.endsWith("\"Thing\":{\"@iot.id\":${frost.thing.id}}}"));
+    assertThrows(
+        FatalAdapterException.class, () -> compiler.compile(mapping, KEYS, SinkPort.THING_TREE));
   }
 
   // ─── Flat properties ────────────────────────────────────────────────────────
 
   @Test
   void flatKeysFollowMappingInsertionOrder() throws Exception {
-    FrostCompilation compilation = compiler.compile(lookupOnlyWithObservationMapping(), KEYS);
+    FrostCompilation compilation =
+        compiler.compile(lookupOnlyWithObservationMapping(), KEYS, SinkPort.THING_TREE);
 
     assertEquals(
         List.of("sta_0_reference", "sta_1_reference", "sta_2_result", "sta_3_phenomenontime"),
@@ -378,38 +999,21 @@ class FrostMappingCompilerTest {
   // ─── Validation ─────────────────────────────────────────────────────────────
 
   @Test
-  void acceptsUserModelledRelationshipCapitalizationAndRendersCanonicalFrostBody()
-      throws Exception {
-    MappingConfig mapping =
-        mapping(
-            "$.properties.reference", new CopyNode("$.ref"),
-            "$.datastream[].properties.reference", new CopyNode("$.ref"),
-            "$.datastream[].observation[].result", new CopyNode("$.temp"));
-
-    FrostCompilation compilation = compiler.compile(mapping, KEYS);
-
-    assertEquals(
-        List.of(new FilterTerm("properties/reference", "sta_1_reference")),
-        compilation.plan().datastreamFilter());
-    assertTrue(compilation.plan().observationBody().contains("\"Datastream\""));
-    assertEquals(
-        List.of("sta_0_reference", "sta_1_reference", "sta_2_result"),
-        compilation.plan().flatKeys());
-  }
-
-  @Test
   void preservesFreePropertiesAttributesNamedLikeNavigationEdges() throws Exception {
     StaProperties properties =
         new StaProperties(
             List.of(new KeyAttribute("reference"), new FreeAttribute("sensor", StaJsonType.ANY)),
-            List.of(new KeyAttribute("reference")));
+            List.of(),
+            List.of(new KeyAttribute("reference")),
+            List.of());
 
     FrostCompilation compilation =
         compiler.compile(
             mapping(
                 "$.properties.reference", new CopyNode("$.ref"),
                 "$.properties.sensor", new CopyNode("$.sensor")),
-            properties);
+            properties,
+            SinkPort.THING_TREE);
 
     assertEquals(List.of("sta_0_reference", "sta_1_sensor"), compilation.plan().flatKeys());
     assertEquals("/sta_1_sensor", compilation.flatProperties().get(1).recordPath());
@@ -425,7 +1029,8 @@ class FrostMappingCompilerTest {
                     mapping(
                         "$.properties.reference", new CopyNode("$.ref"),
                         "$.serialNumber", new CopyNode("$.sn")),
-                    KEYS));
+                    KEYS,
+                    SinkPort.THING_TREE));
     assertTrue(ex.getMessage().contains("$.serialNumber"));
   }
 
@@ -434,7 +1039,9 @@ class FrostMappingCompilerTest {
     FatalAdapterException ex =
         assertThrows(
             FatalAdapterException.class,
-            () -> compiler.compile(mapping("$.name", new CopyNode("$.station")), KEYS));
+            () ->
+                compiler.compile(
+                    mapping("$.name", new CopyNode("$.station")), KEYS, SinkPort.THING_TREE));
     assertTrue(ex.getMessage().contains("match key"));
   }
 
@@ -448,25 +1055,9 @@ class FrostMappingCompilerTest {
                     mapping(
                         "$.properties.reference", new CopyNode("$.ref"),
                         "$.name", new CopyNode("$.station")),
-                    KEYS));
+                    KEYS,
+                    SinkPort.THING_TREE));
     assertTrue(ex.getMessage().contains("$.description"));
-  }
-
-  @Test
-  void acceptsALocationWithALookupOnlyThing() throws Exception {
-    FrostCompilation compilation =
-        compiler.compile(
-            mapping(
-                "$.properties.reference", new CopyNode("$.ref"),
-                "$.Locations[].name", new ConstNode("loc", null),
-                "$.Locations[].description", new ConstNode("d", null),
-                "$.Locations[].encodingType", new ConstNode("e", null),
-                "$.Locations[].location",
-                    new GeoPointNode(new CopyNode("$.lon"), new CopyNode("$.lat"))),
-            KEYS);
-
-    assertNull(compilation.plan().thingBody());
-    assertNotNull(compilation.plan().locationBody());
   }
 
   @Test
@@ -480,7 +1071,8 @@ class FrostMappingCompilerTest {
                         "$.properties.reference", new CopyNode("$.ref"),
                         "$.Datastreams[].properties.reference", new CopyNode("$.ref"),
                         "$.Datastreams[].Observations[].phenomenonTime", new CopyNode("$.ts")),
-                    KEYS));
+                    KEYS,
+                    SinkPort.THING_TREE));
     assertTrue(ex.getMessage().contains("result"));
   }
 
@@ -490,7 +1082,8 @@ class FrostMappingCompilerTest {
     FatalAdapterException ex =
         assertThrows(
             FatalAdapterException.class,
-            () -> compiler.compile(lookupOnlyWithObservationMapping(), noDsKey));
+            () ->
+                compiler.compile(lookupOnlyWithObservationMapping(), noDsKey, SinkPort.THING_TREE));
     assertTrue(ex.getMessage().contains("Datastream"));
   }
 
@@ -517,125 +1110,14 @@ class FrostMappingCompilerTest {
   }
 
   @Test
-  void acceptsAMatchKeyNamedLikeAStandardStaField() throws Exception {
-    // Inside the properties bag, a key named like a top-level field ('name') no longer collides.
-    StaProperties named = StaProperties.ofKeys(List.of("name"), List.of());
-    FrostCompilation compilation =
-        compiler.compile(
-            mapping(
-                "$.name", new CopyNode("$.station"),
-                "$.description", new CopyNode("$.desc"),
-                "$.properties.name", new CopyNode("$.ref")),
-            named);
-
-    assertEquals(
-        List.of(new FilterTerm("properties/name", "sta_2_name")), compilation.plan().thingFilter());
-  }
-
-  @Test
-  void rendersFreeBagAttributesAlongsideTheMatchKeyButFiltersOnlyOnTheKey() throws Exception {
-    // Thing bag: match key 'reference' + two free attributes (a scalar 'owner', a raw-json 'meta').
-    StaProperties props =
-        new StaProperties(
-            List.of(
-                new KeyAttribute("reference"),
-                new FreeAttribute("owner", StaJsonType.ANY),
-                new FreeAttribute("meta", StaJsonType.RAW_JSON)),
-            List.of());
-    FrostCompilation compilation =
-        compiler.compile(
-            mapping(
-                "$.name", new CopyNode("$.station"),
-                "$.description", new CopyNode("$.desc"),
-                "$.properties.reference", new CopyNode("$.ref"),
-                "$.properties.owner", new CopyNode("$.owner"),
-                "$.properties.meta", new CopyNode("$.meta")),
-            props);
-
-    // All three bag attributes render under properties, in declaration order: the match key stays a
-    // plain quoted string, the free scalar 'owner' is an optional ANY (null-fallback + quoted when
-    // present), 'meta' embeds verbatim as raw json.
-    assertTrue(
-        compilation
-            .plan()
-            .thingBody()
-            .contains(
-                "\"properties\":{\"reference\":\"${sta_2_reference:escapeJson()}\","
-                    + "\"owner\":${sta_3_owner:isEmpty():ifElse('null',"
-                    + " ${sta_3_owner:escapeJson():prepend('\"'):append('\"')})},"
-                    + "\"meta\":${sta_4_meta}}"),
-        compilation.plan().thingBody());
-    // Only the match key drives the $filter — free attributes never do.
-    assertEquals(
-        List.of(new FilterTerm("properties/reference", "sta_2_reference")),
-        compilation.plan().thingFilter());
-  }
-
-  @Test
-  void freeBagAttributesAreOptional() throws Exception {
-    // A bag declaring free attributes the mapping does NOT touch is fine — only the key is
-    // required.
-    StaProperties props =
-        new StaProperties(
-            List.of(new KeyAttribute("reference"), new FreeAttribute("owner", StaJsonType.ANY)),
-            List.of());
-    FrostCompilation compilation = compiler.compile(thingOnlyMapping(), props);
-
-    assertTrue(compilation.plan().thingBody().contains("\"properties\":{\"reference\":"));
-    assertFalse(compilation.plan().thingBody().contains("owner"));
-  }
-
-  @Test
-  void rendersFreeBagAttributesOnTheDatastreamBesideTheThingLink() throws Exception {
-    // A free Datastream bag attribute renders under the datastream's properties alongside the
-    // injected Thing @iot.id link; the datastream $filter still keys only on the match key.
-    StaProperties props =
-        new StaProperties(
-            List.of(new KeyAttribute("reference")),
-            List.of(new KeyAttribute("reference"), new FreeAttribute("unit", StaJsonType.ANY)));
-    FrostCompilation compilation =
-        compiler.compile(
-            mapping(
-                "$.name", new CopyNode("$.station"),
-                "$.description", new CopyNode("$.desc"),
-                "$.properties.reference", new CopyNode("$.ref"),
-                "$.Datastreams[].name", new CopyNode("$.dsName"),
-                "$.Datastreams[].description", new ConstNode("d", null),
-                "$.Datastreams[].observationType", new ConstNode("om", null),
-                "$.Datastreams[].unitOfMeasurement.name", new ConstNode("°C", null),
-                "$.Datastreams[].unitOfMeasurement.symbol", new ConstNode("C", null),
-                "$.Datastreams[].unitOfMeasurement.definition", new ConstNode("ucum", null),
-                "$.Datastreams[].Sensor.name", new ConstNode("s", null),
-                "$.Datastreams[].Sensor.description", new ConstNode("s", null),
-                "$.Datastreams[].Sensor.encodingType", new ConstNode("application/pdf", null),
-                "$.Datastreams[].Sensor.metadata", new ConstNode("m", null),
-                "$.Datastreams[].ObservedProperty.name", new ConstNode("t", null),
-                "$.Datastreams[].ObservedProperty.definition", new ConstNode("d", null),
-                "$.Datastreams[].ObservedProperty.description", new ConstNode("d", null),
-                "$.Datastreams[].properties.reference", new CopyNode("$.ref"),
-                "$.Datastreams[].properties.unit", new CopyNode("$.unit")),
-            props);
-
-    String datastreamBody = compilation.plan().datastreamBody();
-    assertTrue(
-        datastreamBody.contains(
-            "\"properties\":{\"reference\":\"${sta_16_reference:escapeJson()}\","
-                + "\"unit\":${sta_17_unit:isEmpty():ifElse('null',"
-                + " ${sta_17_unit:escapeJson():prepend('\"'):append('\"')})}}"),
-        datastreamBody);
-    assertTrue(datastreamBody.contains("\"Thing\":{\"@iot.id\":${frost.thing.id}}"));
-    assertEquals(
-        List.of(new FilterTerm("properties/reference", "sta_16_reference")),
-        compilation.plan().datastreamFilter());
-  }
-
-  @Test
   void aFreeBagAttributeDoesNotSatisfyAPartialCreateSet() {
     // A free bag attribute is OPTIONAL — it must not make a partially-mapped Thing create set look
     // complete; the missing create field is still rejected.
     StaProperties props =
         new StaProperties(
             List.of(new KeyAttribute("reference"), new FreeAttribute("owner", StaJsonType.ANY)),
+            List.of(),
+            List.of(),
             List.of());
     FatalAdapterException ex =
         assertThrows(
@@ -646,7 +1128,8 @@ class FrostMappingCompilerTest {
                         "$.properties.reference", new CopyNode("$.ref"),
                         "$.properties.owner", new CopyNode("$.owner"),
                         "$.name", new CopyNode("$.station")),
-                    props));
+                    props,
+                    SinkPort.THING_TREE));
     assertTrue(ex.getMessage().contains("$.description"));
   }
 
@@ -673,15 +1156,9 @@ class FrostMappingCompilerTest {
                         "$.properties.reference", new CopyNode("$.ref"),
                         "$.Datastreams[].Observations[].result", new ConstNode(null, null),
                         "$.Datastreams[].properties.reference", new CopyNode("$.ref")),
-                    KEYS));
+                    KEYS,
+                    SinkPort.THING_TREE));
     assertTrue(ex.getMessage().contains("null constant"));
-  }
-
-  @Test
-  void rejectsAnEmptyMapping() {
-    assertThrows(
-        FatalAdapterException.class,
-        () -> compiler.compile(new MappingConfig(null, null, Map.of()), KEYS));
   }
 
   // ─── ANY-typed result placeholder branches ───────────────────────────────────
@@ -693,11 +1170,29 @@ class FrostMappingCompilerTest {
                 "$.properties.reference", new CopyNode("$.ref"),
                 "$.Datastreams[].properties.reference", new CopyNode("$.ref"),
                 "$.Datastreams[].Observations[].result", resultNode),
-            KEYS);
-    String body = compilation.plan().observationBody();
-    // "result":<placeholder>,"Datastream": …
+            KEYS,
+            SinkPort.THING_TREE);
+    // The measurement is nested in the one port body now, so the placeholder ends at the next key
+    // or at the end of the Observation object.
+    String body = compilation.plan().body();
     int start = body.indexOf("\"result\":") + "\"result\":".length();
-    return body.substring(start, body.indexOf(",\"Datastream\""));
+    int end = start;
+    int depth = 0;
+    while (end < body.length()) {
+      char c = body.charAt(end);
+      if (c == '{' || c == '[') {
+        depth++;
+      } else if (c == '}' || c == ']') {
+        if (depth == 0) {
+          break;
+        }
+        depth--;
+      } else if (c == ',' && depth == 0) {
+        break;
+      }
+      end++;
+    }
+    return body.substring(start, end);
   }
 
   @Test
@@ -722,6 +1217,30 @@ class FrostMappingCompilerTest {
   }
 
   @Test
+  void anyResultFromATemporalConvertRendersQuoted() throws Exception {
+    // Both temporal ops yield text; unquoted they would emit bare ISO characters into the entity
+    // body, which is invalid JSON and only surfaces when FROST rejects the ingest.
+    String quoted = "\"${sta_2_result:escapeJson()}\"";
+    assertEquals(
+        quoted,
+        observationResult(
+            new ConvertNode(ConversionOp.TO_DATE_TIME, new CopyNode("$.ts"), "yyyy-MM-dd")));
+    assertEquals(
+        quoted,
+        observationResult(
+            new ConvertNode(ConversionOp.TO_DATE, new CopyNode("$.ts"), "yyyy-MM-dd")));
+  }
+
+  @Test
+  void anyResultFromAUuidConvertRendersQuoted() throws Exception {
+    // toUuid sits beside the numeric ops in the compiler but yields text, so grouping it with them
+    // would emit a bare UUID and break the entity body.
+    assertEquals(
+        "\"${sta_2_result:escapeJson()}\"",
+        observationResult(new ConvertNode(ConversionOp.TO_UUID, new CopyNode("$.raw"), null)));
+  }
+
+  @Test
   void anyResultFromACopyRendersQuotedString() throws Exception {
     // A copy is a string source: the ANY placeholder must quote+escape it (unquoted would be
     // invalid JSON for a text result).
@@ -735,37 +1254,4 @@ class FrostMappingCompilerTest {
 
   // ─── Byte-deterministic ordering ─────────────────────────────────────────────
 
-  @Test
-  void bodyIsRenderedInCatalogOrderRegardlessOfMappingOrder() throws Exception {
-    // The Thing body must be catalog-ordered (name, description, then the key properties) even when
-    // the mapping supplies the fields in a scrambled order — the snapshot must be reproducible.
-    String scrambled =
-        compiler
-            .compile(
-                mapping(
-                    "$.description", new ConstNode("d", null),
-                    "$.properties.reference", new CopyNode("$.ref"),
-                    "$.name", new CopyNode("$.station")),
-                KEYS)
-            .plan()
-            .thingBody();
-    String ordered =
-        compiler
-            .compile(
-                mapping(
-                    "$.name", new CopyNode("$.station"),
-                    "$.description", new ConstNode("d", null),
-                    "$.properties.reference", new CopyNode("$.ref")),
-                KEYS)
-            .plan()
-            .thingBody();
-    // Field order in the rendered JSON follows the catalog, not the input map — the "name" key
-    // precedes "description" precedes the "properties" bag in both.
-    assertTrue(scrambled.indexOf("\"name\"") < scrambled.indexOf("\"description\""));
-    assertTrue(scrambled.indexOf("\"description\"") < scrambled.indexOf("\"properties\""));
-    // The two differ only by the flat-key index suffix (input order drives sta_<n>), never by
-    // JSON field order.
-    assertEquals(
-        scrambled.replaceAll("sta_\\d+_", "sta_N_"), ordered.replaceAll("sta_\\d+_", "sta_N_"));
-  }
 }

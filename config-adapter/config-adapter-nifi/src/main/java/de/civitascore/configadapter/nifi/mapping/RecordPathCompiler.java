@@ -25,10 +25,11 @@ import java.util.Map;
  * RecordPath only, never Jolt or scripting. Each target field becomes one property whose name is
  * the destination RecordPath and whose value is either a RecordPath value expression or a literal.
  *
- * <p>Numeric conversions ({@code toInt}/{@code toFloat}) are intentionally transparent here: the
- * value is copied unchanged and the actual coercion happens at the sink — PutDatabaseRecord coerces
- * to the target column types (the PostGIS adapter owns the typed table DDL). This keeps every
- * transform expressible in pure RecordPath, with no schema knowledge in this adapter.
+ * <p>Numeric and UUID conversions ({@code toInt}/{@code toFloat}/{@code toUuid}) are intentionally
+ * transparent here: the value is copied unchanged and the actual coercion happens at the sink —
+ * PutDatabaseRecord coerces to the target column types (the PostGIS adapter owns the typed table
+ * DDL). This keeps every transform expressible in pure RecordPath, with no schema knowledge in this
+ * adapter.
  */
 public class RecordPathCompiler {
 
@@ -39,6 +40,9 @@ public class RecordPathCompiler {
    * a fixed charset is always passed.
    */
   private static final String TO_STRING_CHARSET = "UTF-8";
+
+  private static final String ISO_DATE_PATTERN = "yyyy-MM-dd";
+  private static final String ISO_DATE_TIME_PATTERN = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX";
 
   /**
    * The NiFi {@code UpdateRecord} "Replacement Value Strategy" for a property. A {@code const} uses
@@ -125,13 +129,11 @@ public class RecordPathCompiler {
       // the literal-value strategy. The builder groups properties by strategy into separate
       // UpdateRecord processors.
       return new UpdateRecordProperty(
-          destination,
-          NifiExpressionLanguage.escape(String.valueOf(constant.value())),
-          ReplacementStrategy.LITERAL_VALUE);
+          destination, String.valueOf(constant.value()), ReplacementStrategy.LITERAL_VALUE);
     }
     return new UpdateRecordProperty(
         destination,
-        NifiExpressionLanguage.escape(render(node, geometryEncoding, target, fork)),
+        render(node, geometryEncoding, target, fork),
         ReplacementStrategy.RECORD_PATH_VALUE);
   }
 
@@ -239,11 +241,54 @@ public class RecordPathCompiler {
       throws FatalAdapterException {
     String inner = render(convert.input(), geometryEncoding, target, fork);
     return switch (convert.op()) {
-      case TO_DATE -> "toDate(" + inner + ", " + quote(convert.pattern()) + ")";
-      case FORMAT -> "format(" + inner + ", " + quote(convert.pattern()) + ")";
+      // RecordPath has one date parse function. The string input uses that function directly;
+      // epoch input is formatted as an ISO timestamp with a fixed UTC offset.
+      case TO_DATE_TIME ->
+          convert.unit() == null
+              ? "toDate(" + inner + ", " + quote(convert.pattern()) + ")"
+              // concat creates a STRING RecordField. format() alone retains the numeric input's
+              // field metadata, so JsonRecordSetWriter would try to parse the ISO text as LONG.
+              : "concat(format("
+                  + epochMillis(inner, convert.unit())
+                  + ", "
+                  + quote(ISO_DATE_TIME_PATTERN)
+                  + ", 'UTC'))";
+      // That time component reaches a DATE column as epoch millis and is rejected there, while the
+      // row vanishes without a deployment error. Re-formatting yields a plain string the server
+      // parses into the column's own type (see PostgisSinkStage#withStringtypeUnspecified).
+      case TO_DATE ->
+          "format(toDate("
+              + inner
+              + ", "
+              + quote(convert.pattern())
+              + "), "
+              + quote(ISO_DATE_PATTERN)
+              + ")";
+      case FORMAT -> {
+        if (convert.input() instanceof ConvertNode dateTime
+            && dateTime.op() == ConversionOp.TO_DATE_TIME
+            && dateTime.unit() != null) {
+          // An epoch toDateTime yields ISO text. NiFi's format() leaves text unchanged, so
+          // format the epoch value directly and force STRING metadata for the writer.
+          String epoch = render(dateTime.input(), geometryEncoding, target, fork);
+          yield "concat(format("
+              + epochMillis(epoch, dateTime.unit())
+              + ", "
+              + quote(convert.pattern())
+              + ", 'UTC'))";
+        }
+        yield "format(" + inner + ", " + quote(convert.pattern()) + ")";
+      }
       case TO_STRING -> "toString(" + inner + ", " + quote(TO_STRING_CHARSET) + ")";
-      case TO_INT, TO_FLOAT -> inner;
+      // RecordPath's only UUID function, uuid5(), mints a new identifier rather than converting
+      // one.
+      case TO_INT, TO_FLOAT, TO_UUID -> inner;
     };
+  }
+
+  private static String epochMillis(String input, String unit) {
+    String number = "toNumber(" + input + ")";
+    return "seconds".equals(unit) ? "multiply(" + number + ", 1000)" : number;
   }
 
   /**

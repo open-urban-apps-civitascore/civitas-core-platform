@@ -1,0 +1,75 @@
+/* Wicket's AbstractTree/NestedTree ship no default theme — everything below is ours, built on
+   the shared design tokens from BasePage.css (--mf-* custom properties on :root apply globally,
+   regardless of which stylesheet in <head> defines vs. references them).
+
+   DOM shape (from NestedTree.html/Subtree.html, unstyled by Wicket itself):
+     .mf-tree > [unclassed root subtree] > .tree-branch > .tree-node + .tree-subtree (recursive)
+   Only nested .tree-subtree occurrences carry the class, so indentation compounds naturally
+   per level without any extra bookkeeping. */
+
+.mf-tree { font-size: 0.85rem; }
+
+.tree-subtree {
+  padding-left: 0.9rem;
+  margin-left: 0.45rem;
+  border-left: 1px solid var(--mf-border-soft);
+}
+
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.35rem;
+  border-radius: var(--mf-radius-sm);
+  transition: background-color 0.1s ease;
+}
+.tree-node:hover { background: var(--mf-surface); }
+
+/* ── Junction (expand/collapse arrow) ─────────────────────────────────────── */
+.mf-tree-junction {
+  display: inline-flex; width: 1.1rem; height: 1.1rem; flex-shrink: 0;
+  align-items: center; justify-content: center; border-radius: var(--mf-radius-sm);
+  text-decoration: none; color: var(--mf-text-muted); font-size: 0.85rem;
+  transition: color 0.1s ease, background-color 0.1s ease;
+}
+.mf-tree-junction:hover { color: var(--mf-primary); background: var(--mf-accent-soft); }
+.mf-tree-junction--collapsed::before { content: "\25B8"; }
+.mf-tree-junction--expanded::before { content: "\25BE"; }
+.mf-tree-junction--leaf::before { content: ""; }
+
+/* ── Type dot ──────────────────────────────────────────────────────────────── */
+.mf-tree-dot {
+  display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 50%; flex-shrink: 0;
+  box-shadow: 0 0 0 2px var(--mf-surface-alt);
+}
+.mf-tree-dot--element { background: var(--mf-type-element); }
+.mf-tree-dot--datastructure { background: var(--mf-type-datastructure); }
+.mf-tree-dot--mapping { background: var(--mf-type-mapping); }
+.mf-tree-dot--pipeline { background: var(--mf-type-pipeline); }
+.mf-tree-dot--datasource { background: var(--mf-type-datasource); }
+.mf-tree-dot--datasink { background: var(--mf-type-datasink); }
+.mf-tree-dot--dataset { background: var(--mf-type-dataset); }
+.mf-tree-dot--other { background: var(--mf-type-other); }
+.mf-tree-dot--group { background: transparent; border: 1px solid var(--mf-text-faint); box-shadow: none; }
+
+/* ── Label ─────────────────────────────────────────────────────────────────── */
+/* inline-flex (NOT flex): the label is an <a> sibling of the colour dot. Block-level `display: flex`
+   makes it take the full row and wrap onto its own line UNDER the dot; inline-flex keeps it beside
+   the dot while still giving the text + version chip their gap/baseline layout and ellipsis. */
+.mf-tree-label {
+  display: inline-flex; align-items: baseline; gap: 0.4rem; min-width: 0; max-width: 100%;
+  vertical-align: middle;
+  text-decoration: none; color: var(--mf-text);
+}
+.mf-tree-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-tree-ver { font-size: 0.72rem; color: var(--mf-text-faint); flex-shrink: 0; }
+a.mf-tree-label:hover .mf-tree-text { text-decoration: underline; color: var(--mf-primary); }
+.mf-tree-label.active .mf-tree-text { font-weight: 700; color: var(--mf-primary); }
+.mf-tree-label.active .mf-tree-ver { color: var(--mf-accent); }
+
+.mf-tree-label--group .mf-tree-text {
+  color: var(--mf-text-muted); font-size: 0.75rem; text-transform: uppercase;
+  letter-spacing: 0.04em; font-weight: 700;
+}
+.mf-tree-label--message .mf-tree-text { color: var(--mf-text-faint); font-style: italic; font-weight: 400; }
+.mf-tree-label--cyclic .mf-tree-text { color: #a3752f; font-style: italic; }

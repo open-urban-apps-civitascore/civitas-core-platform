@@ -28,9 +28,14 @@ import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
 import de.civitascore.configadapter.nifi.flow.PipelineDeploymentRequest;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
+import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.KeyAttribute;
 import de.civitascore.configadapter.nifi.mapping.FrostMappingCompiler.StaProperties;
+import de.civitascore.configadapter.nifi.mapping.SinkPort;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaEntity;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaJsonType;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaTarget;
+import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.TargetKind;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
-import jakarta.ws.rs.core.Response;
 import java.io.File;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -38,6 +43,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
@@ -45,8 +51,12 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.StreamSupport;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.awaitility.core.ConditionTimeoutException;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
@@ -63,27 +73,29 @@ import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
 
 /**
- * DATA-CORRECTNESS integration test for the mapped FROST path (record mapping → per-entity body
- * templates → find-or-create) against a <b>real FROST-Server</b>. Two pipelines are planned through
- * the real {@link FlowDeploymentPlanner} (so the {@code FrostMappingCompiler} output is what
- * deploys) and exercised end to end:
+ * DATA-CORRECTNESS integration test for the mapped FROST path (record mapping → the body of the
+ * ThingTree port → PutFrostRecord) against a <b>real FROST-Server</b>. Two pipelines are planned
+ * through the real {@link FlowDeploymentPlanner} (so the {@code FrostMappingCompiler} output is
+ * what deploys) and exercised end to end:
  *
  * <ul>
- *   <li><b>MQTT (non-STA payload)</b>: the STA bodies are rendered from mapped record fields —
- *       Thing find-or-create stays idempotent across re-deliveries, the observation lands typed on
- *       the pre-provisioned Datastream (with an explicitly deep-inserted FeatureOfInterest and the
- *       optional {@code resultQuality}/{@code validTime} fields), and tenant values containing
- *       NiFi-EL/backreference syntax ({@code ${HOSTNAME}}, {@code $1}, {@code
- *       ${SINGLE_USER_CREDENTIALS_PASSWORD}}) arrive <i>literally</i> in FROST — the
- *       injection-hardening proof for the template path.
+ *   <li><b>MQTT (non-STA payload)</b>: the STA bodies are rendered from mapped record fields — the
+ *       Thing upsert stays idempotent across re-deliveries, the observation lands typed on the
+ *       pre-provisioned Datastream of that Thing (with an explicitly deep-inserted
+ *       FeatureOfInterest and the optional {@code resultQuality}/{@code validTime} fields), a data
+ *       value containing NiFi-EL/backreference syntax ({@code
+ *       ${NIFI_SECURITY_USER_OIDC_CLIENT_SECRET}}, {@code $1}) and a const value containing bare
+ *       {@code $} arrive <i>literally</i> in FROST — the injection-hardening proof for the template
+ *       path.
  *   <li><b>SQL (table rows)</b>: a multi-record batch is split into individual STA elements ({@code
  *       $[*]}), deduplicating the Thing across rows and re-reads.
  * </ul>
  *
  * <p>Failure paths must never drop silently: a missing source field renders a JSON {@code null}
- * result (valid body), an unmatched Datastream routes to the error sink without creating anything,
- * and a FROST-rejected observation (bad {@code phenomenonTime}) never becomes an observation while
- * the flow keeps running. Skipped when Docker is unavailable.
+ * result (valid body), a record whose Datastream does not exist writes nothing and reaches the
+ * error sink, and a FROST-rejected observation (bad {@code phenomenonTime}) never becomes an
+ * observation while the flow keeps running. The port writes a record as one unit: when one of its
+ * entities is refused, none of them is written. Skipped when Docker is unavailable.
  */
 class NifiFrostMappingIT extends AbstractNifiIT {
 
@@ -94,6 +106,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static final String CRON_EVERY_SECOND = "* * * * * ?";
 
   private static final String TOPIC = "civitas/it/frost-mapping";
+  private static final String EPOCH_TOPIC = "civitas/it/frost-epoch";
   private static final String FANOUT_TOPIC = "civitas/it/frost-fanout";
   private static final String REF_FANOUT = "REF-FANOUT-1";
   private static final String DS_FANOUT = "DS-FANOUT-1";
@@ -103,14 +116,11 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static final String CREATABLE_TOPIC = "civitas/it/frost-creatable";
   private static final String REF_CREATE = "REF-CREATE-1";
 
-  // EL/backreference-shaped tenant values: they must arrive in FROST byte-identically, never
-  // expanded against the NiFi environment or interpreted as a regex backreference. Both referenced
-  // env vars ARE set in the container (HOSTNAME always; NIFI_SECURITY_USER_OIDC_CLIENT_SECRET holds
-  // exactly the secret the assertion below forbids from leaking), so an expansion bug would be
-  // caught here.
-  private static final String INJECTION_NAME = "Station ${HOSTNAME} $1";
-  private static final String INJECTION_DESCRIPTION =
-      "unit ${NIFI_SECURITY_USER_OIDC_CLIENT_SECRET}";
+  // The container sets the referenced env var, so an EL expansion of the payload name would leak a
+  // real secret; the const description passes the deploy check because no '{' follows its '$'.
+  private static final String INJECTION_NAME =
+      "Station ${NIFI_SECURITY_USER_OIDC_CLIENT_SECRET} $1";
+  private static final String INJECTION_DESCRIPTION = "unit US$5 $1";
 
   private static final String REF_MAP = "REF-MAP-1";
   private static final String DS_MAP = "DS-MAP-1";
@@ -118,12 +128,20 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static final String DS_NULL = "DS-NULL-1";
   private static final String REF_NEVER = "REF-NEVER-1";
   private static final String DS_NEVER = "DS-NEVER-1";
+  // A station that always lands: its observation shows that the flow went on after a record it
+  // refused, so an absence is not mistaken for a flow that stopped.
+  private static final String REF_ALIVE = "REF-ALIVE-1";
+  private static final String DS_ALIVE = "DS-ALIVE-1";
   private static final String REF_BADTS = "REF-BADTS-1";
   private static final String DS_BADTS = "DS-BADTS-1";
+  private static final String REF_DATEONLY = "REF-DATEONLY-1";
+  private static final String DS_DATEONLY = "DS-DATEONLY-1";
   private static final String REF_FOI = "REF-FOI-1";
   private static final String DS_FOI = "DS-FOI-1";
   private static final String REF_SQL = "REF-SQL-1";
   private static final String DS_SQL = "DS-SQL-1";
+  private static final String REF_SQL_EPOCH = "REF-SQL-EPOCH-1";
+  private static final String DS_SQL_EPOCH = "DS-SQL-EPOCH-1";
 
   private static final String SRC_DB = "frost_src";
   private static final String SRC_USER = "reader";
@@ -138,10 +156,13 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   private static long dsMapId;
   private static long dsNullId;
   private static long dsBadTsId;
+  private static long dsDateOnlyId;
   private static long dsSqlId;
+  private static long dsSqlEpochId;
   private static long dsFoiId;
   private static long dsFanoutId;
   private static long dsPartialId;
+  private static long dsAliveId;
 
   private final HttpClient http = HttpClient.newHttpClient();
 
@@ -149,6 +170,11 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   @SuppressWarnings("resource")
   static void startStack() throws Exception {
     assumeTrue(dockerAvailable(), "Docker not available — skipping NiFi/FROST mapping IT");
+    Optional<Path> nar = frostNar();
+    assumeTrue(
+        nar.isPresent(),
+        "the PutFrostRecord NAR is not built — run 'mvn -f nifi-extensions/pom.xml package' or set"
+            + " -Dfrost.nar=<path>");
 
     network = Network.newNetwork();
 
@@ -209,19 +235,27 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     startNifi(
         HOST_PORT,
         network,
-        container ->
-            container.withCopyFileToContainer(
-                MountableFile.forHostPath(postgresDriverJar()),
-                "/opt/nifi/drivers/postgresql.jar"));
+        container -> {
+          container.withCopyFileToContainer(
+              MountableFile.forHostPath(postgresDriverJar()), "/opt/nifi/drivers/postgresql.jar");
+          // The mapped flow renders one port body and hands it to PutFrostRecord, so this path
+          // needs the NAR as much as the unmapped one does.
+          installFrostNar(container, nar.get());
+        });
 
     projectId = createProject();
-    dsMapId = createDatastream(DS_MAP, REF_MAP, "HOLDER-MAP");
-    dsNullId = createDatastream(DS_NULL, REF_NULL, "HOLDER-NULL");
-    dsBadTsId = createDatastream(DS_BADTS, REF_BADTS, "HOLDER-BADTS");
-    dsSqlId = createDatastream(DS_SQL, REF_SQL, "HOLDER-SQL");
-    dsFoiId = createDatastream(DS_FOI, REF_FOI, "HOLDER-FOI");
-    dsFanoutId = createDatastream(DS_FANOUT, REF_FANOUT, "HOLDER-FANOUT");
-    dsPartialId = createDatastream(DS_PARTIAL, REF_PARTIAL, "HOLDER-PARTIAL");
+    // Each Datastream belongs to the Thing the record names: the ThingTree port looks it up below
+    // that Thing, not across the project.
+    dsMapId = createDatastream(DS_MAP, REF_MAP);
+    dsNullId = createDatastream(DS_NULL, REF_NULL);
+    dsBadTsId = createDatastream(DS_BADTS, REF_BADTS);
+    dsDateOnlyId = createDatastream(DS_DATEONLY, REF_DATEONLY);
+    dsSqlId = createDatastream(DS_SQL, REF_SQL);
+    dsSqlEpochId = createDatastream(DS_SQL_EPOCH, REF_SQL_EPOCH);
+    dsFoiId = createDatastream(DS_FOI, REF_FOI);
+    dsFanoutId = createDatastream(DS_FANOUT, REF_FANOUT);
+    dsPartialId = createDatastream(DS_PARTIAL, REF_PARTIAL);
+    dsAliveId = createDatastream(DS_ALIVE, REF_ALIVE);
 
     deployMqttPipeline();
     deploySqlPipeline();
@@ -231,7 +265,9 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   @AfterAll
   static void stopStack() {
     stopNifi();
-    for (GenericContainer<?> container : List.of(frost, frostDb, mosquitto)) {
+    // Arrays.asList (not List.of) tolerates nulls: when Docker is absent startStack aborts via
+    // assumeTrue before these fields are assigned, and List.of would NPE here on teardown.
+    for (GenericContainer<?> container : java.util.Arrays.asList(frost, frostDb, mosquitto)) {
       if (container != null) {
         container.stop();
       }
@@ -279,14 +315,12 @@ class NifiFrostMappingIT extends AbstractNifiIT {
       assertEquals(1, countThings(REF_MAP), "re-delivered message must reuse the Thing");
     }
 
-    // Injection hardening: the tenant-supplied name (data path) and const description (mapping
-    // path) must arrive literally — no EL expansion, no $1 backreference, no leaked env secret.
     JsonNode thing = thingByReference(REF_MAP);
     assertEquals(INJECTION_NAME, thing.path("name").asText(), "EL in a data value must stay data");
     assertEquals(
         INJECTION_DESCRIPTION,
         thing.path("description").asText(),
-        "EL in a const value must stay literal (\\$ escaped as \\$\\$)");
+        "a bare $ in a const value must reach FROST unchanged");
     assertFalse(
         thing.toString().contains(OIDC_CLIENT_SECRET),
         "the NiFi OIDC client secret must never leak into FROST");
@@ -297,12 +331,33 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     // toString needs NiFi's two-arg form; a single-arg call fails RecordPath compile at deploy and
     // the flow never produces this observation. resultQuality arriving as the quoted temp proves
     // the emitted toString(subject, charset) parses and runs against a real NiFi.
-    JsonNode resultQuality = observation.path("resultQuality");
+    JsonNode resultQuality = observation.path("resultQuality").path("reading");
     assertTrue(resultQuality.isTextual(), "toString must serialize the numeric temp as a string");
     assertEquals("21.5", resultQuality.asText());
     assertTrue(
         observation.path("phenomenonTime").asText().startsWith("2026-01-01T00:00:00"),
         "phenomenonTime must survive as the mapped ISO instant");
+  }
+
+  @Test
+  void epochSecondsAndMillisecondsBecomeFrostDateTimes() throws Exception {
+    deployEpochPipeline();
+    String payload =
+        "{\"station\":\"Epoch station\",\"ref\":\""
+            + REF_MAP
+            + "\",\"temp\":77.5,\"seconds\":\"1776931200\",\"millis\":1776931200000}";
+
+    publishOnceIntoTheFlow(
+        "civitas-it-epoch", EPOCH_TOPIC, payload, () -> resultValues(dsMapId).contains(77.5));
+
+    JsonNode observation =
+        StreamSupport.stream(observations(dsMapId).spliterator(), false)
+            .filter(item -> item.path("result").asDouble() == 77.5)
+            .findFirst()
+            .orElseThrow();
+    assertTrue(observation.path("resultTime").asText().startsWith("2026-04-23T08:00:00"));
+    assertTrue(observation.path("phenomenonTime").asText().startsWith("2026-04-23T08:00:00"));
+    assertEquals("23.04.2026 08:00", observation.path("resultQuality").path("reading").asText());
   }
 
   @Test
@@ -359,13 +414,8 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         countDatastreamsByFilter(REF_FANOUT, DS_FANOUT),
         "the Datastream tier must not multiply with the array");
 
-    // The Thing tier is CREATED here (nothing carries REF_FANOUT up front), and the siblings all
-    // pass the lookup before the first create is visible in FROST — so find-or-create is not
-    // idempotent across them and the tier currently multiplies. That race belongs to the entity
-    // stage, not to the array fan-out: a SQL batch delivering several rows for one Thing hits it
-    // the same way, and resolving it needs an identity the sink can collide on (a derived
-    // @iot.id) rather than a lookup. Asserted as "at least one" so this test keeps covering the
-    // fan-out; the exact count returns once entity identity is deterministic.
+    // The Thing tier must not multiply either: the Thing exists up front, since the Datastream
+    // belongs to it, so every sibling finds it and none creates another.
     assertTrue(
         countThings(REF_FANOUT) >= 1, "the mapped Thing tier must be created for the array source");
   }
@@ -432,7 +482,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         "Point",
         observation.path("FeatureOfInterest").path("feature").path("type").asText(),
         "the FeatureOfInterest feature must be the geoPoint-rendered GeoJSON object");
-    JsonNode foiResultQuality = observation.path("resultQuality");
+    JsonNode foiResultQuality = observation.path("resultQuality").path("reading");
     assertTrue(
         foiResultQuality.isTextual(), "toString must serialize the numeric temp as a string");
     assertEquals(
@@ -503,13 +553,14 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   /** Dumps the NiFi bulletin board when the asynchronous chain does not reach FROST in time. */
   private String bulletins() throws Exception {
     String token = client.authenticate();
-    try (Response response =
-        httpClient
-            .target("https://" + dockerHost + ":" + HOST_PORT + "/nifi-api/flow/bulletin-board")
-            .request()
+    Request request =
+        new Request.Builder()
+            .url("https://" + dockerHost + ":" + HOST_PORT + "/nifi-api/flow/bulletin-board")
             .header("Authorization", "Bearer " + token)
-            .get()) {
-      return response.readEntity(String.class);
+            .get()
+            .build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      return response.body().string();
     }
   }
 
@@ -537,23 +588,17 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   }
 
   @Test
-  void unmatchedDatastreamIsRoutedToErrorSinkNotCreated() throws Exception {
-    // DS_NEVER is never provisioned: the observation leg must route to the error sink — the
-    // pipeline keeps running (the Thing leg still creates its Thing) and no Datastream appears.
-    String payload =
-        payload("Never Station", REF_NEVER, DS_NEVER, "9.9", "\"2026-01-04T00:00:00Z\"");
-
+  void aRecordWithoutItsDatastreamWritesNothing() throws Exception {
+    // DS_NEVER is never provisioned and the mapping only looks the Datastream up, so the port has
+    // no fields to create it with, and FROST refuses the create. The port writes a record as one
+    // unit, so not even its Thing appears. The station after it proves the flow went on meanwhile.
     try (MqttPublisher publisher = publisher("civitas-it-never")) {
-      await()
-          .atMost(Duration.ofSeconds(120))
-          .pollInterval(Duration.ofSeconds(3))
-          .ignoreExceptions()
-          .until(
-              () -> {
-                publisher.publish(TOPIC, payload);
-                return countThings(REF_NEVER) >= 1;
-              });
+      publisher.publishOnce(
+          TOPIC, payload("Never Station", REF_NEVER, DS_NEVER, "9.9", "\"2026-01-04T00:00:00Z\""));
     }
+    awaitTheAliveStation("civitas-it-never-alive", 9.1);
+
+    assertEquals(0, countThings(REF_NEVER), "the Thing of a waiting record must not be written");
     assertEquals(
         0,
         countDatastreamsByFilter(REF_NEVER, DS_NEVER),
@@ -562,29 +607,78 @@ class NifiFrostMappingIT extends AbstractNifiIT {
 
   @Test
   void invalidPhenomenonTimeNeverBecomesAnObservation() throws Exception {
-    // 'not-a-date' renders a valid envelope (it is a string), FROST rejects the POST with 400 →
-    // obsPost routes to the error sink. The Thing leg proves the message was fully processed.
-    String payload = payload("BadTs Station", REF_BADTS, DS_BADTS, "12.3", "\"not-a-date\"");
+    // 'not-a-date' renders a valid body (it is a string); FROST refuses the observation with 400,
+    // and the record goes to the error sink. A valid record for the same Thing follows: once its
+    // observation is there, the refused one had its turn, and it must not be there.
+    assertOnlyTheValidObservationLands(REF_BADTS, DS_BADTS, dsBadTsId, "\"not-a-date\"", 45.6);
+  }
 
-    try (MqttPublisher publisher = publisher("civitas-it-badts")) {
+  @Test
+  void dateOnlyPhenomenonTimeIsRejectedByFrost() throws Exception {
+    // A Date-typed (format:date) modeller attribute yields '2026-07-29' — no time, no zone. The
+    // adapter passes STA time targets through as plain strings (StaJsonType.STRING), so whether
+    // such a value is usable is FROST's call alone: it rejects it, exactly as it rejects
+    // 'not-a-date'. Consequence for the modeller: a Date attribute must never be mapped onto an STA
+    // time target.
+    assertOnlyTheValidObservationLands(
+        REF_DATEONLY, DS_DATEONLY, dsDateOnlyId, "\"2026-07-29\"", 46.7);
+  }
+
+  /**
+   * Sends one record FROST refuses, then valid ones for the same Thing until one lands, and asserts
+   * that only the valid observation is on the Datastream.
+   */
+  private void assertOnlyTheValidObservationLands(
+      String reference, String dsName, long datastreamId, String refusedTime, double validResult)
+      throws Exception {
+    try (MqttPublisher publisher = publisher("civitas-it-refused-" + reference)) {
+      publisher.publishOnce(
+          TOPIC, payload("Refused Station", reference, dsName, "12.3", refusedTime));
+    }
+    String valid =
+        payload(
+            "Refused Station",
+            reference,
+            dsName,
+            String.valueOf(validResult),
+            "\"2026-01-05T00:00:00Z\"");
+    try (MqttPublisher publisher = publisher("civitas-it-valid-" + reference)) {
       await()
           .atMost(Duration.ofSeconds(120))
           .pollInterval(Duration.ofSeconds(3))
           .ignoreExceptions()
           .until(
               () -> {
-                publisher.publish(TOPIC, payload);
-                return countThings(REF_BADTS) >= 1;
+                publisher.publish(TOPIC, valid);
+                return resultValues(datastreamId).contains(validResult);
               });
-      // Deliberate dwell: gives the observation leg ample time to (wrongly) post before asserting
-      // it
-      // never did — an absence has no condition that can complete early.
-      Thread.sleep(Duration.ofSeconds(10).toMillis());
     }
-    assertEquals(
-        0,
-        observations(dsBadTsId).size(),
-        "a FROST-rejected observation must go to the error sink, not into the Datastream");
+    for (double result : resultValues(datastreamId)) {
+      assertEquals(
+          validResult, result, 1e-9, "a FROST-refused observation must not reach the Datastream");
+    }
+  }
+
+  /** Delivers records of the control station until one of its observations is in FROST. */
+  private void awaitTheAliveStation(String clientId, double result) throws Exception {
+    String alive =
+        payload(
+            "Alive Station",
+            REF_ALIVE,
+            DS_ALIVE,
+            String.valueOf(result),
+            "\"2026-01-06T00:00:00Z\"");
+    try (MqttPublisher publisher = publisher(clientId)) {
+      await()
+          .atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(3))
+          .ignoreExceptions()
+          .until(
+              () -> {
+                publisher.publish(TOPIC, alive);
+                return resultValues(dsAliveId).contains(result);
+              });
+    }
   }
 
   // ─── SQL → mapping → FROST ──────────────────────────────────────────────────
@@ -635,6 +729,36 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         "a same-reference row must reuse the existing Thing instead of minting another");
   }
 
+  @Test
+  void sqlTimestampAndTimestamptzBecomeFrostPhenomenonTimes() throws Exception {
+    deploySqlEpochPipeline("plain", "$.ts_plain", 91.0);
+    deploySqlEpochPipeline("zoned", "$.ts_zoned", 92.0);
+
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(3))
+        .ignoreExceptions()
+        .until(
+            () ->
+                resultValues(dsSqlEpochId).contains(91.0)
+                    && resultValues(dsSqlEpochId).contains(92.0));
+
+    List<JsonNode> observations =
+        StreamSupport.stream(observations(dsSqlEpochId).spliterator(), false).toList();
+    JsonNode plain =
+        observations.stream()
+            .filter(item -> item.path("result").asDouble() == 91.0)
+            .findFirst()
+            .orElseThrow();
+    JsonNode zoned =
+        observations.stream()
+            .filter(item -> item.path("result").asDouble() == 92.0)
+            .findFirst()
+            .orElseThrow();
+    assertTrue(plain.path("phenomenonTime").asText().startsWith("2026-04-23T08:00:00"));
+    assertTrue(zoned.path("phenomenonTime").asText().startsWith("2026-04-23T06:00:00"));
+  }
+
   // ─── Deployment ─────────────────────────────────────────────────────────────
 
   /**
@@ -653,7 +777,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
           "$.Datastreams[].Observations[].result": { "op": "toFloat", "input": "$.temp" },
           "$.Datastreams[].Observations[].phenomenonTime": "$.ts",
           "$.Datastreams[].Observations[].validTime": { "op": "concat", "separator": "/", "inputs": ["$.ts", "$.ts"] },
-          "$.Datastreams[].Observations[].resultQuality": { "op": "toString", "input": "$.temp" },
+          "$.Datastreams[].Observations[].resultQuality.reading": { "op": "toString", "input": "$.temp" },
           "$.Datastreams[].Observations[].FeatureOfInterest.name": { "op": "const", "value": "Sampling point" },
           "$.Datastreams[].Observations[].FeatureOfInterest.description": { "op": "const", "value": "Where the reading was taken" },
           "$.Datastreams[].Observations[].FeatureOfInterest.encodingType": { "op": "const", "value": "application/geo+json" },
@@ -668,28 +792,68 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         json(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": %s } } },
-                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m" },
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
-            """
-                .formatted(mappingFields()));
+            """);
 
     Datasource source = new Datasource();
     source.setId("mqtt-frost-map");
     source.setType("MQTT");
     source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
     source.handleUnknownProperty("topics", List.of(TOPIC));
-    source.handleUnknownProperty("client_id", "civitas-frost-map");
     source.handleUnknownProperty("qos", 1);
 
-    deploy("pipeline-frost-map-mqtt-it", graph, source);
+    deploy("pipeline-frost-map-mqtt-it", graph, source, frostMapping(mappingFields()));
+  }
+
+  private static void deployEpochPipeline() throws Exception {
+    Map<String, Object> graph =
+        json(
+            """
+            { "nodes": [
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
+              "edges": [
+                { "id": "e1", "source": "s", "target": "src" },
+                { "id": "e2", "source": "src", "target": "m" },
+                { "id": "e3", "source": "m", "target": "k" },
+                { "id": "e4", "source": "k", "target": "e" } ] }
+            """);
+    Datasource source = new Datasource();
+    source.setId("mqtt-frost-epoch");
+    source.setType("MQTT");
+    source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
+    source.handleUnknownProperty("topics", List.of(EPOCH_TOPIC));
+    source.handleUnknownProperty("qos", 1);
+    String fields =
+        """
+        {
+          "$.name": "$.station",
+          "$.description": { "op": "const", "value": "Epoch station" },
+          "$.properties.reference": "$.ref",
+          "$.Datastreams[].properties.reference": "$.ref",
+          "$.Datastreams[].Observations[].result": { "op": "toFloat", "input": "$.temp" },
+          "$.Datastreams[].Observations[].resultTime":
+              { "op": "toDateTime", "input": "$.seconds", "inputType": "epoch", "unit": "seconds" },
+          "$.Datastreams[].Observations[].phenomenonTime":
+              { "op": "toDateTime", "input": "$.millis", "inputType": "epoch", "unit": "milliseconds" },
+          "$.Datastreams[].Observations[].resultQuality.reading":
+              { "op": "format", "pattern": "dd.MM.yyyy HH:mm",
+                "input": { "op": "toDateTime", "input": "$.seconds", "inputType": "epoch", "unit": "seconds" } }
+        }
+        """;
+    deploy("pipeline-frost-epoch-it", graph, source, frostMapping(fields));
   }
 
   /**
@@ -731,28 +895,26 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         json(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": %s } } },
-                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m" },
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
-            """
-                .formatted(fields));
+            """);
 
     Datasource source = new Datasource();
     source.setId("mqtt-frost-create");
     source.setType("MQTT");
     source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
     source.handleUnknownProperty("topics", List.of(CREATABLE_TOPIC));
-    source.handleUnknownProperty("client_id", "civitas-frost-create");
     source.handleUnknownProperty("qos", 1);
 
-    deploy("pipeline-frost-create-mqtt-it", graph, source);
+    deploy("pipeline-frost-create-mqtt-it", graph, source, frostMapping(fields));
   }
 
   private static void deploySqlPipeline() throws Exception {
@@ -760,12 +922,12 @@ class NifiFrostMappingIT extends AbstractNifiIT {
         json(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "c", "type": "cron", "data": { "cronExpression": "%s" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": %s } } },
-                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "c", "kind": "cron", "cronExpression": "%s" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "c" },
                 { "id": "e2", "source": "c", "target": "src" },
@@ -773,7 +935,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
                 { "id": "e4", "source": "m", "target": "k" },
                 { "id": "e5", "source": "k", "target": "e" } ] }
             """
-                .formatted(CRON_EVERY_SECOND, mappingFields()));
+                .formatted(CRON_EVERY_SECOND));
 
     byte[] key = CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
     String encryptedPassword =
@@ -791,7 +953,59 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     source.handleUnknownProperty("table", "frost_input");
     source.handleUnknownProperty("columns", List.of("*"));
 
-    deploy("pipeline-frost-map-sql-it", graph, source);
+    deploy("pipeline-frost-map-sql-it", graph, source, frostMapping(mappingFields()));
+  }
+
+  private static void deploySqlEpochPipeline(String suffix, String timestampPath, double result)
+      throws Exception {
+    Map<String, Object> graph =
+        json(
+            """
+            { "nodes": [
+                { "id": "s", "kind": "start" },
+                { "id": "c", "kind": "cron", "cronExpression": "%s" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
+              "edges": [
+                { "id": "e1", "source": "s", "target": "c" },
+                { "id": "e2", "source": "c", "target": "src" },
+                { "id": "e3", "source": "src", "target": "m" },
+                { "id": "e4", "source": "m", "target": "k" },
+                { "id": "e5", "source": "k", "target": "e" } ] }
+            """
+                .formatted(CRON_EVERY_SECOND));
+    byte[] key = CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
+    String encryptedPassword =
+        "ENC("
+            + CredentialEncryptor.encrypt(
+                SRC_PASSWORD, key, CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT)
+            + ")";
+    Datasource source = new Datasource();
+    source.setId("sql-frost-epoch-" + suffix);
+    source.setType("SQL");
+    source.handleUnknownProperty("driver", "postgres");
+    source.handleUnknownProperty("dsn", "postgres://srcdb:5432/" + SRC_DB);
+    source.handleUnknownProperty("user", SRC_USER);
+    source.handleUnknownProperty("password", encryptedPassword);
+    source.handleUnknownProperty("table", "frost_epoch_input");
+    source.handleUnknownProperty("columns", List.of("*"));
+
+    String fields =
+        """
+        {
+          "$.name": "$.station",
+          "$.description": { "op": "const", "value": "SQL epoch station" },
+          "$.properties.reference": "$.ref",
+          "$.Datastreams[].properties.reference": "$.ref",
+          "$.Datastreams[].Observations[].result": { "op": "const", "value": %s },
+          "$.Datastreams[].Observations[].phenomenonTime":
+              { "op": "toDateTime", "input": "%s", "inputType": "epoch", "unit": "milliseconds" }
+        }
+        """
+            .formatted(result, timestampPath);
+    deploy("pipeline-frost-sql-epoch-" + suffix, graph, source, frostMapping(fields));
   }
 
   /**
@@ -800,24 +1014,28 @@ class NifiFrostMappingIT extends AbstractNifiIT {
    * the source array has to be exploded before the entity bodies are rendered.
    */
   private static void deployFanoutPipeline() throws Exception {
+    String fields =
+        """
+        {
+          "$.name": "$.station",
+          "$.description": { "op": "const", "value": "Gateway with nested readings" },
+          "$.properties.reference": "$.ref",
+          "$.Datastreams[].properties.reference": "$.ref",
+          "$.Datastreams[].Observations[].result":
+              { "op": "toFloat", "input": "$.measurements[].measuredValues[].value" },
+          "$.Datastreams[].Observations[].phenomenonTime":
+              "$.measurements[].measuredValues[].ts"
+        }
+        """;
     Map<String, Object> graph =
         json(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": {
-                    "$.name": "$.station",
-                    "$.description": { "op": "const", "value": "Gateway with nested readings" },
-                    "$.properties.reference": "$.ref",
-                    "$.Datastreams[].properties.reference": "$.ref",
-                    "$.Datastreams[].Observations[].result":
-                        { "op": "toFloat", "input": "$.measurements[].measuredValues[].value" },
-                    "$.Datastreams[].Observations[].phenomenonTime":
-                        "$.measurements[].measuredValues[].ts"
-                  } } } },
-                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m" },
@@ -830,10 +1048,9 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     source.setType("MQTT");
     source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
     source.handleUnknownProperty("topics", List.of(FANOUT_TOPIC));
-    source.handleUnknownProperty("client_id", "civitas-frost-fanout");
     source.handleUnknownProperty("qos", 1);
 
-    deploy("pipeline-frost-fanout-it", graph, source);
+    deploy("pipeline-frost-fanout-it", graph, source, frostMapping(fields));
   }
 
   /**
@@ -841,25 +1058,29 @@ class NifiFrostMappingIT extends AbstractNifiIT {
    * — so a single element with an empty key is unusable while its siblings stay resolvable.
    */
   private static void deployPartialPipeline() throws Exception {
+    String fields =
+        """
+        {
+          "$.name": "$.station",
+          "$.description": { "op": "const", "value": "Partial delivery gateway" },
+          "$.properties.reference": "$.ref",
+          "$.Datastreams[].properties.reference":
+              "$.measurements[].measuredValues[].dsref",
+          "$.Datastreams[].Observations[].result":
+              { "op": "toFloat", "input": "$.measurements[].measuredValues[].value" },
+          "$.Datastreams[].Observations[].phenomenonTime":
+              "$.measurements[].measuredValues[].ts"
+        }
+        """;
     Map<String, Object> graph =
         json(
             """
             { "nodes": [
-                { "id": "s", "type": "start", "data": {} },
-                { "id": "src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "m", "type": "mapping", "data": { "mappingConfig": { "fields": {
-                    "$.name": "$.station",
-                    "$.description": { "op": "const", "value": "Partial delivery gateway" },
-                    "$.properties.reference": "$.ref",
-                    "$.Datastreams[].properties.reference":
-                        "$.measurements[].measuredValues[].dsref",
-                    "$.Datastreams[].Observations[].result":
-                        { "op": "toFloat", "input": "$.measurements[].measuredValues[].value" },
-                    "$.Datastreams[].Observations[].phenomenonTime":
-                        "$.measurements[].measuredValues[].ts"
-                  } } } },
-                { "id": "k", "type": "frost", "data": { "entityId": "sink-1" } },
-                { "id": "e", "type": "end", "data": {} } ],
+                { "id": "s", "kind": "start" },
+                { "id": "src", "kind": "source", "sourceRef": "src-1" },
+                { "id": "m", "kind": "mapping", "mappingRef": "map-1" },
+                { "id": "k", "kind": "sink", "sinkRef": "sink-1" },
+                { "id": "e", "kind": "end" } ],
               "edges": [
                 { "id": "e1", "source": "s", "target": "src" },
                 { "id": "e2", "source": "src", "target": "m" },
@@ -872,13 +1093,16 @@ class NifiFrostMappingIT extends AbstractNifiIT {
     source.setType("MQTT");
     source.handleUnknownProperty("urls", List.of("tcp://mqtt:1883"));
     source.handleUnknownProperty("topics", List.of(PARTIAL_TOPIC));
-    source.handleUnknownProperty("client_id", "civitas-frost-partial");
     source.handleUnknownProperty("qos", 1);
 
-    deploy("pipeline-frost-partial-it", graph, source);
+    deploy("pipeline-frost-partial-it", graph, source, frostMapping(fields));
   }
 
-  private static void deploy(String pipelineId, Map<String, Object> graph, Datasource source)
+  private static void deploy(
+      String pipelineId,
+      Map<String, Object> graph,
+      Datasource source,
+      Map<String, Map<String, Object>> mappings)
       throws Exception {
     byte[] key = CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
     try (CredentialResolver resolver = new CredentialResolver(key)) {
@@ -892,10 +1116,37 @@ class NifiFrostMappingIT extends AbstractNifiIT {
                   graph,
                   source,
                   new FrostSinkSpec(
-                      String.valueOf(projectId),
-                      StaProperties.ofKeys(List.of("reference"), List.of("reference")))));
+                      String.valueOf(projectId), SinkPort.THING_TREE, TARGET_STRUCTURE),
+                  mappings));
       client.deployFlow(plan);
     }
+  }
+
+  /**
+   * The target structure of every pipeline here: the references of Thing and Datastream, and the
+   * two free fields the mappings write, modelled as a class and as a geometry.
+   */
+  private static final StaProperties TARGET_STRUCTURE =
+      new StaProperties(
+          List.of(new KeyAttribute("reference")),
+          List.of(),
+          List.of(new KeyAttribute("reference")),
+          List.of(),
+          List.of(
+              new StaTarget(
+                  "$.Datastreams[].Observations[].resultQuality.reading",
+                  StaEntity.OBSERVATION,
+                  StaJsonType.ANY,
+                  TargetKind.OPTIONAL),
+              new StaTarget(
+                  "$.Datastreams[].Observations[].FeatureOfInterest.feature",
+                  StaEntity.FEATURE_OF_INTEREST,
+                  StaJsonType.RAW_JSON,
+                  TargetKind.OPTIONAL)));
+
+  /** A single-entry artifacts map keyed by {@code map-1} (the graphs' mappingRef). */
+  private static Map<String, Map<String, Object>> frostMapping(String fieldsJson) throws Exception {
+    return NifiTestFixtures.artifacts("{ \"map-1\": { \"fields\": " + fieldsJson + " } }");
   }
 
   // ─── FROST fixtures & queries ───────────────────────────────────────────────
@@ -920,15 +1171,18 @@ class NifiFrostMappingIT extends AbstractNifiIT {
    * resolve by {@code properties/reference} + {@code name}, project-linked so the {@code
    * Thing/Projects/id} filter matches.
    */
-  private static long createDatastream(String dsName, String dsReference, String holderReference)
-      throws Exception {
+  /**
+   * Creates a Thing with the given reference and a Datastream with the same reference below it —
+   * the shape the mappings of this IT write, since they map one {@code ref} onto both.
+   */
+  private static long createDatastream(String dsName, String reference) throws Exception {
     HttpClient staticHttp = HttpClient.newHttpClient();
     String thingBody =
-        "{\"name\":\"Holder "
+        "{\"name\":\"Station of "
             + dsName
             + "\",\"description\":\"mapping IT holder\","
             + "\"properties\":{\"reference\":\""
-            + holderReference
+            + reference
             + "\"},"
             + "\"Locations\":[{\"name\":\"loc\",\"description\":\"loc\","
             + "\"encodingType\":\"application/geo+json\","
@@ -950,8 +1204,13 @@ class NifiFrostMappingIT extends AbstractNifiIT {
             + "\",\"description\":\"mapping IT\","
             + "\"observationType\":\"http://www.opengis.net/def/observationType/OGC-OM/2.0/OM_Measurement\","
             + "\"unitOfMeasurement\":{\"name\":\"Celsius\",\"symbol\":\"degC\",\"definition\":\"ucum:Cel\"},"
+            // The port knows a Datastream by its own reference and by the one of its Thing, the
+            // pair
+            // it writes on every Datastream it creates.
             + "\"properties\":{\"reference\":\""
-            + dsReference
+            + reference
+            + "\",\"thingReference\":\""
+            + reference
             + "\"},"
             + "\"Sensor\":{\"name\":\"Sensor-IT\",\"description\":\"s\","
             + "\"encodingType\":\"application/pdf\",\"metadata\":\"http://example.org/s\"},"
@@ -1144,6 +1403,14 @@ class NifiFrostMappingIT extends AbstractNifiIT {
               + "', '"
               + DS_SQL
               + "', 30.5, '2026-01-02T00:00:00Z')");
+      st.execute(
+          "CREATE TABLE frost_epoch_input (station text, ref text, ts_plain timestamp,"
+              + " ts_zoned timestamptz)");
+      st.execute(
+          "INSERT INTO frost_epoch_input (station, ref, ts_plain, ts_zoned) VALUES"
+              + " ('SQL Epoch Station', '"
+              + REF_SQL_EPOCH
+              + "', '2026-04-23 08:00:00', '2026-04-23 08:00:00+02')");
     }
   }
 

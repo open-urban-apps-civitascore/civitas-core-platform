@@ -17,19 +17,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AppConfig;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
+import okhttp3.HttpUrl;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 import org.apache.commons.configuration2.MapConfiguration;
-import org.glassfish.jersey.client.HttpUrlConnectorProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,7 +43,7 @@ import org.junit.jupiter.api.Test;
 class FrostSagaHandlerIT extends AbstractFrostIT {
 
   private FrostSagaHandler handler;
-  private Client httpClient;
+  private OkHttpClient httpClient;
   private String frostBaseUrl;
   private ObjectMapper objectMapper;
 
@@ -52,7 +51,7 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
   void setUp() {
     frostBaseUrl =
         "http://" + FROST.getHost() + ":" + FROST.getMappedPort(8080) + "/FROST-Server/v1.1";
-    httpClient = ClientBuilder.newClient();
+    httpClient = new OkHttpClient();
     objectMapper = new ObjectMapper();
 
     Map<String, Object> props = new HashMap<>();
@@ -63,14 +62,6 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
 
     handler = new FrostSagaHandler();
     handler.initialize(config);
-
-    Client patchCapableClient =
-        ClientBuilder.newBuilder()
-            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build();
-    handler.setTestClient(patchCapableClient);
   }
 
   @AfterEach
@@ -79,8 +70,26 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
       handler.close();
     }
     if (httpClient != null) {
-      httpClient.close();
+      httpClient.dispatcher().executorService().shutdown();
+      httpClient.connectionPool().evictAll();
     }
+  }
+
+  private HttpUrl url(String path) {
+    return HttpUrl.get(frostBaseUrl).newBuilder().addPathSegments(path).build();
+  }
+
+  private Request.Builder jsonRequest(String path) {
+    return jsonRequest(url(path));
+  }
+
+  private Request.Builder jsonRequest(HttpUrl url) {
+    return new Request.Builder().url(url).header("Accept", "application/json");
+  }
+
+  private RequestBody jsonBody(Object value) throws Exception {
+    return RequestBody.create(
+        objectMapper.writeValueAsString(value), MediaType.get("application/json"));
   }
 
   /**
@@ -89,28 +98,20 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
    * both statuses (older cores still answer 500).
    */
   @Test
-  void frostReturnsHttp409WhenCreatingProjectWithDuplicateName() {
+  void frostReturnsHttp409WhenCreatingProjectWithDuplicateName() throws Exception {
     String projectName = "Duplicate-" + UUID.randomUUID();
     Map<String, Object> projectBody = Map.of("name", projectName, "description", "");
 
-    try (Response first =
-        httpClient
-            .target(frostBaseUrl)
-            .path("Projects")
-            .request(MediaType.APPLICATION_JSON)
-            .post(Entity.json(projectBody))) {
-      assertEquals(201, first.getStatus(), "First create should succeed");
+    Request firstRequest = jsonRequest("Projects").post(jsonBody(projectBody)).build();
+    try (Response first = httpClient.newCall(firstRequest).execute()) {
+      assertEquals(201, first.code(), "First create should succeed");
     }
 
-    try (Response second =
-        httpClient
-            .target(frostBaseUrl)
-            .path("Projects")
-            .request(MediaType.APPLICATION_JSON)
-            .post(Entity.json(projectBody))) {
+    Request secondRequest = jsonRequest("Projects").post(jsonBody(projectBody)).build();
+    try (Response second = httpClient.newCall(secondRequest).execute()) {
       assertEquals(
           409,
-          second.getStatus(),
+          second.code(),
           "FROST returns 409 for duplicate project name on core >= 2.7.0 — if this fails, FROST"
               + " behaviour changed again and the race guard in FrostSagaHandler needs revisiting");
     }
@@ -160,6 +161,68 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
         firstProjectId,
         secondResult.resultData().get("projectId"),
         "Idempotent retry must return the same projectId");
+  }
+
+  /**
+   * Reproduces GitLab #2260: a dataset released, unreleased (its FROST project survives, per
+   * design), renamed while unreleased, then re-released must reuse the SAME project — not orphan it
+   * behind a duplicate. The dataset-id lookup must match on the datasetId suffix of the name even
+   * though the display-name portion is now stale, and the reuse PATCH must bring FROST's stored
+   * name back in sync with the new display name.
+   */
+  @Test
+  void createProjectReusesExistingProjectAfterDatasetRename() {
+    String datasetId = "ds-" + UUID.randomUUID();
+    SagaCommandMessage firstRelease =
+        createProjectCommand(datasetId, "Original Name", "before rename");
+
+    SagaCommandResult firstResult = handler.handle(firstRelease);
+    assertEquals(
+        "STEP_COMPLETED",
+        firstResult.type(),
+        () -> "First CREATE_PROJECT failed: " + firstResult.error());
+    String firstProjectId = (String) firstResult.resultData().get("projectId");
+
+    // Re-release after a rename: same datasetId, new datasetName, no projectId hint — the exact
+    // scenario from the bug report (unrelease preserves projectId, but release() never passed it
+    // through before this fix, so the lookup had to fall back to matching the full, now-stale
+    // name).
+    SagaCommandResult secondResult =
+        handler.handle(createProjectCommand(datasetId, "Renamed Dataset", "after rename"));
+    assertEquals(
+        "STEP_COMPLETED",
+        secondResult.type(),
+        () -> "Re-release CREATE_PROJECT failed: " + secondResult.error());
+    assertEquals(
+        firstProjectId,
+        secondResult.resultData().get("projectId"),
+        "Re-release after a rename must reuse the same FROST project, not create a duplicate");
+
+    Request getProjectRequest = jsonRequest("Projects(" + firstProjectId + ")").get().build();
+    try (Response getProject = httpClient.newCall(getProjectRequest).execute()) {
+      JsonNode project = objectMapper.readTree(getProject.body().string());
+      assertEquals(
+          "Renamed Dataset (" + datasetId + ")",
+          project.get("name").asText(),
+          "The reuse PATCH must sync FROST's stored name to the dataset's current display name");
+    } catch (Exception e) {
+      throw new AssertionError("Failed to read back the reused project", e);
+    }
+  }
+
+  private SagaCommandMessage createProjectCommand(
+      String datasetId, String datasetName, String description) {
+    return new SagaCommandMessage(
+        "EXECUTE_STEP",
+        UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(),
+        "create-frost-project",
+        "frost",
+        "CREATE_PROJECT",
+        Map.of(
+            "datasetName", datasetName,
+            "datasetId", datasetId,
+            "description", description));
   }
 
   /**
@@ -266,16 +329,16 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
   }
 
   private int countRootThings() throws Exception {
-    try (Response response =
-        httpClient
-            .target(frostBaseUrl)
-            .path("Things")
-            .queryParam("$count", "true")
-            .queryParam("$top", "0")
-            .request(MediaType.APPLICATION_JSON)
-            .get()) {
-      assertEquals(200, response.getStatus(), "Failed to count Things");
-      return objectMapper.readTree(response.readEntity(String.class)).get("@iot.count").asInt();
+    HttpUrl url =
+        url("Things")
+            .newBuilder()
+            .addQueryParameter("$count", "true")
+            .addQueryParameter("$top", "0")
+            .build();
+    Request request = jsonRequest(url).get().build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      assertEquals(200, response.code(), "Failed to count Things");
+      return objectMapper.readTree(response.body().string()).get("@iot.count").asInt();
     }
   }
 
@@ -330,23 +393,19 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
   }
 
   private String singleId(String entityPath) throws Exception {
-    try (Response response =
-        httpClient
-            .target(frostBaseUrl)
-            .path(entityPath)
-            .queryParam("$select", "@iot.id")
-            .request(MediaType.APPLICATION_JSON)
-            .get()) {
-      assertEquals(200, response.getStatus(), "Failed to read " + entityPath);
-      return objectMapper.readTree(response.readEntity(String.class)).get("@iot.id").asText();
+    HttpUrl url = url(entityPath).newBuilder().addQueryParameter("$select", "@iot.id").build();
+    Request request = jsonRequest(url).get().build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      assertEquals(200, response.code(), "Failed to read " + entityPath);
+      return objectMapper.readTree(response.body().string()).get("@iot.id").asText();
     }
   }
 
-  private String createProject(String name) {
+  private String createProject(String name) throws Exception {
     return createEntity("Projects", Map.of("name", name, "description", "cascade delete test"));
   }
 
-  private String createPlainThing(String projectId, String name) {
+  private String createPlainThing(String projectId, String name) throws Exception {
     return createEntity(
         "Projects(" + projectId + ")/Things",
         Map.of("name", name, "description", "thing without sensor data"));
@@ -356,7 +415,8 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
    * Seeds a Thing with a deep-inserted Datastream and two Observations; the Location lets FROST
    * auto-generate the FeatureOfInterest.
    */
-  private String createThingWithDatastreamAndObservations(String projectId, String name) {
+  private String createThingWithDatastreamAndObservations(String projectId, String name)
+      throws Exception {
     Map<String, Object> thing =
         Map.of(
             "name",
@@ -401,46 +461,34 @@ class FrostSagaHandlerIT extends AbstractFrostIT {
     return createEntity("Projects(" + projectId + ")/Things", thing);
   }
 
-  private String createEntity(String path, Map<String, Object> body) {
-    try (Response response =
-        httpClient
-            .target(frostBaseUrl)
-            .path(path)
-            .request(MediaType.APPLICATION_JSON)
-            .post(Entity.json(body))) {
-      String responseBody = response.readEntity(String.class);
-      assertEquals(201, response.getStatus(), "Failed to create " + path + ": " + responseBody);
-      String location = response.getHeaderString("Location");
+  private String createEntity(String path, Map<String, Object> body) throws Exception {
+    Request request = jsonRequest(path).post(jsonBody(body)).build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      String responseBody = response.body().string();
+      assertEquals(201, response.code(), "Failed to create " + path + ": " + responseBody);
+      String location = response.header("Location");
       return location.substring(location.lastIndexOf('(') + 1, location.lastIndexOf(')'));
     }
   }
 
   private List<String> collectIds(String collectionPath) throws Exception {
-    try (Response response =
-        httpClient
-            .target(frostBaseUrl)
-            .path(collectionPath)
-            .queryParam("$select", "@iot.id")
-            .request(MediaType.APPLICATION_JSON)
-            .get()) {
-      assertEquals(200, response.getStatus(), "Failed to list " + collectionPath);
-      JsonNode value = objectMapper.readTree(response.readEntity(String.class)).get("value");
+    HttpUrl url = url(collectionPath).newBuilder().addQueryParameter("$select", "@iot.id").build();
+    Request request = jsonRequest(url).get().build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      assertEquals(200, response.code(), "Failed to list " + collectionPath);
+      JsonNode value = objectMapper.readTree(response.body().string()).get("value");
       List<String> ids = new ArrayList<>();
       value.forEach(node -> ids.add(node.get("@iot.id").asText()));
       return ids;
     }
   }
 
-  private void assertRootEntityStatus(int expectedStatus, String entityPath) {
-    try (Response response =
-        httpClient
-            .target(frostBaseUrl)
-            .path(entityPath)
-            .request(MediaType.APPLICATION_JSON)
-            .get()) {
+  private void assertRootEntityStatus(int expectedStatus, String entityPath) throws Exception {
+    Request request = jsonRequest(entityPath).get().build();
+    try (Response response = httpClient.newCall(request).execute()) {
       assertEquals(
           expectedStatus,
-          response.getStatus(),
+          response.code(),
           () -> entityPath + " expected HTTP " + expectedStatus + " at server root");
     }
   }

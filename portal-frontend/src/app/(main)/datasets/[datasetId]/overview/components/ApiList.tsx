@@ -3,16 +3,13 @@
 import { ChevronDown } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
-import { PIPELINE_NODE_TYPES } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types/pipeline'
 import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientRequests'
-import { useGetPipelines } from '@/app/services/api/pipelines/clientRequests'
-import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { DATASINK_TYPES } from '@/types/datasinks'
-import { API_STANDARDS, NamedApi } from '@/types/namedApis'
-import { hasApiType } from '@/utils/namedApis'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { NamedApi } from '@/types/namedApis'
+import { canCreateOwsApi, canCreateStaApi } from '@/utils/namedApis'
 
+import { AddApiMenuItem } from './AddApiMenuItem'
 import { ApiCard } from './ApiCard'
 
 interface ApiListProps {
@@ -20,27 +17,16 @@ interface ApiListProps {
   apis: NamedApi[]
   canEdit: boolean
   canView: boolean
-  isPublished: boolean
   isOpenDataAccess: boolean
 }
 
-export const ApiList = ({ datasetId, apis, canEdit, canView, isPublished, isOpenDataAccess }: ApiListProps) => {
+export const ApiList = ({ datasetId, apis, canEdit, canView, isOpenDataAccess }: ApiListProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.apis')
-  const hasOws = hasApiType(apis, API_STANDARDS.OWS)
-
   const { data: dataSinksData } = useGetDataSinks(datasetId)
+  const dataSinks = dataSinksData?.data ?? []
 
-  const postgisDataSinks =
-    dataSinksData?.data.filter(dataSink => dataSink.dataSinkType === DATASINK_TYPES.POSTGIS) || []
-  const hasPostgisDataSinks = postgisDataSinks.length > 0
-
-  const canCreateOwsApi = !hasOws && hasPostgisDataSinks
-
-  const { data: pipelinesData } = useGetPipelines(datasetId)
-
-  const hasPipeline = (pipelinesData?.data?.length ?? 0) > 0
-  const hasFrostPipeline =
-    pipelinesData?.data?.some(p => p.styles?.nodes?.some(n => n.type === PIPELINE_NODE_TYPES.Frost)) ?? false
+  const canCreateSta = canCreateStaApi(apis, dataSinks)
+  const canCreateOws = canCreateOwsApi(apis, dataSinks)
 
   return (
     <div className="py-3">
@@ -50,55 +36,38 @@ export const ApiList = ({ datasetId, apis, canEdit, canView, isPublished, isOpen
         {canEdit && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" disabled={!hasPipeline || isPublished}>
+              <Button variant="outline">
                 {t('addButton')}
                 <ChevronDown className="ml-2 h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem disabled={!hasFrostPipeline} asChild={hasFrostPipeline}>
-                {hasFrostPipeline ? (
-                  <GuardedLink
-                    href={`/datasets/${datasetId}/apis?type=sensorthings`}
-                    className="flex items-center gap-3"
-                  >
-                    <span>{t('sensorThings')}</span>
-                    <span className="text-xs text-muted-foreground">{t('sensorThingsSubtitle')}</span>
-                  </GuardedLink>
-                ) : (
-                  <span className="flex items-center gap-3">
-                    <span>{t('sensorThings')}</span>
-                    <span className="text-xs text-muted-foreground">{t('sensorThingsSubtitle')}</span>
-                  </span>
-                )}
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled={!canCreateOwsApi} asChild={!hasOws}>
-                {canCreateOwsApi ? (
-                  <GuardedLink href={`/datasets/${datasetId}/apis?type=ows`} className="flex items-center gap-3">
-                    <span>{t('ows')}</span>
-                    <span className="text-xs text-muted-foreground">{t('owsSubtitle')}</span>
-                  </GuardedLink>
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <span className="text-muted-foreground">{t('ows')}</span>
-                    <span className="text-xs text-muted-foreground">{t('owsSubtitle')}</span>
-                  </div>
-                )}
-              </DropdownMenuItem>
+              <AddApiMenuItem
+                href={`/datasets/${datasetId}/apis?type=sensorthings`}
+                title={t('sensorThings')}
+                subtitle={t('sensorThingsSubtitle')}
+                canCreate={canCreateSta}
+              />
+              <AddApiMenuItem
+                href={`/datasets/${datasetId}/apis?type=ows`}
+                title={t('ows')}
+                subtitle={t('owsSubtitle')}
+                canCreate={canCreateOws}
+              />
             </DropdownMenuContent>
           </DropdownMenu>
         )}
       </div>
 
       {apis.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 mt-4">
           {apis.map(api => (
             <ApiCard
               key={api.slug}
               api={api}
               datasetId={datasetId}
               existingApis={apis}
-              canEdit={canEdit && !isPublished}
+              canEdit={canEdit}
               canView={canView}
               isOpenDataAccess={isOpenDataAccess}
             />

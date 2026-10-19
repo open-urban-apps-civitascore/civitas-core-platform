@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+  <!-- The batch and port packages are immutable-by-convention value records that carry Jackson
+       node structures by reference. Defensive-copying every accessor would add noise without real
+       safety benefit: these objects live within a single onTrigger call, are never shared across
+       threads and are never mutated by a caller. (Mirrors the EI_EXPOSE exclusions in
+       config-adapter-nifi.) -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    <Package name="~de\.civitascore\.nifi\.frost(\..*)?"/>
+  </Match>
+</FindBugsFilter>

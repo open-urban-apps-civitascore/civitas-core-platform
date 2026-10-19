@@ -1,0 +1,51 @@
+meta {
+  name: 9d5. Verify Unprovisioned Slug Is Rejected
+  type: http
+  seq: 26
+}
+
+get {
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}/does-not-exist
+  body: none
+  auth: none
+}
+
+tests {
+  test("Unprovisioned slug does not reach a named-API upstream", function() {
+    // 404=no route matched at all, 401=matched the host-agnostic /v1/* management catch-all and was
+    // denied by OPA as an unknown endpoint.
+    //
+    // Both are accepted because the gateway's management catch-all is intentionally host-agnostic, so
+    // it also matches on the API vhost. `/v1/datasets/{id}/does-not-exist` has four segments and OPA's
+    // path mapper resolves it to the pattern `/v1/datasets/{id}/does-not-exist`, which is not in the
+    // portal-backend permission mappings — hence unknown_endpoint, and 401 rather than 403 because the
+    // request carries no credential. What must never happen is a 2xx: that would mean an unprovisioned
+    // slug reached a data upstream.
+    expect([401, 404]).to.include(res.getStatus());
+  });
+
+  test("No upstream payload is returned", function() {
+    const isFrostShaped = res.body && typeof res.body === 'object' && Array.isArray(res.body.value);
+    expect(isFrostShaped, 'an unprovisioned slug must not return an upstream document').to.be.false;
+  });
+}
+
+docs {
+  **An unprovisioned slug must not fall through to any upstream.**
+
+  Named APIs are explicitly provisioned per slug: the saga writes one APISIX route per named API at
+  `/v1/datasets/{id}/{slug}` and there is no dataset-level `/v1/datasets/{id}/*` wildcard. A slug that was
+  never declared on the dataset therefore has no data-plane route, and the request must be rejected before
+  it can reach FROST, the map server or any other upstream.
+
+  **Accepted statuses — 404 or 401.** 404 means no route matched. 401 means the request fell through to
+  the host-agnostic `/v1/*` management catch-all (which by design is not pinned to the API virtual host, so
+  the portal frontend can reach it on any Host) and was denied by OPA: the path resolves to no known
+  portal-backend endpoint pattern, and an anonymous deny is mapped to 401. Both outcomes satisfy the
+  contract; a 2xx or any upstream-shaped body does not.
+
+  **Precondition:** `sagaDataSetId` is set; the dataset is AVAILABLE; no named API uses the slug
+  `does-not-exist`.
+
+  **Expected Response:** 404 Not Found, or 401 Unauthorized from the management catch-all. Never a payload.
+}

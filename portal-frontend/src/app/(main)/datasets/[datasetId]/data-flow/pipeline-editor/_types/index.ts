@@ -8,6 +8,10 @@
 
 // Pipeline core types
 export {
+  type CorePipelineEdge,
+  type CorePipelineModel,
+  type CorePipelineNode,
+  type CorePipelineNodeKind,
   type NodeCreationContext,
   type Pipeline,
   PIPELINE_NODE_TYPES,

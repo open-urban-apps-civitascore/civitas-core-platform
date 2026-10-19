@@ -18,12 +18,14 @@ import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.mqttSource
 import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.planner;
 import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.postgisSink;
 import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.postgisSinkWithPk;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.req;
 import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.sqlSource;
 import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.sqlSourceBasic;
 import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.sqlSourceWith;
 import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.stretchedKey;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -37,6 +39,8 @@ import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.stage.sink.FrostSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
+import de.civitascore.configadapter.nifi.mapping.SinkPort;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.StreamSupport;
@@ -59,29 +63,6 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
-  void unsupportedRedpandaQueryFieldsAreRejected() throws Exception {
-    // #5: prefix/suffix/init_statement are Redpanda Connect concepts the NiFi mapping cannot honor
-    // —
-    // fail loud rather than silently drop them
-    for (String field : List.of("prefix", "suffix", "init_statement")) {
-      Datasource source = sqlSourceBasic();
-      source.handleUnknownProperty(field, "SELECT 1");
-      try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
-        FatalAdapterException ex =
-            assertThrows(
-                FatalAdapterException.class,
-                () ->
-                    planner(resolver)
-                        .plan(
-                            new PipelineDeploymentRequest(
-                                "p-sql-" + field, graphWithMapping(), source, postgisSinkWithPk())),
-                "must reject unsupported field: " + field);
-        assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
-      }
-    }
-  }
-
-  @Test
   void whereWithCursorPlaceholderIsRejected() throws Exception {
     // #5: the Redpanda cursor idiom (":last_id") is not bound by NiFi and would be invalid SQL
     Datasource source = sqlSourceBasic();
@@ -92,9 +73,7 @@ class FlowDeploymentPlannerTest {
               FatalAdapterException.class,
               () ->
                   planner(resolver)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              "p-sql-cursor", graphWithMapping(), source, postgisSinkWithPk())));
+                      .plan(req("p-sql-cursor", graphWithMapping(), source, postgisSinkWithPk())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
@@ -110,9 +89,7 @@ class FlowDeploymentPlannerTest {
               FatalAdapterException.class,
               () ->
                   planner(resolver)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              "p-sql-q", graphWithMapping(), source, postgisSinkWithPk())));
+                      .plan(req("p-sql-q", graphWithMapping(), source, postgisSinkWithPk())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
@@ -130,9 +107,7 @@ class FlowDeploymentPlannerTest {
               FatalAdapterException.class,
               () ->
                   planner(resolver)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              "p-sql-el", graphWithMapping(), source, postgisSinkWithPk())));
+                      .plan(req("p-sql-el", graphWithMapping(), source, postgisSinkWithPk())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
@@ -146,9 +121,7 @@ class FlowDeploymentPlannerTest {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       DeploymentPlan plan =
           planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest(
-                      "p-sql-cast", graphWithMapping(), source, postgisSinkWithPk()));
+              .plan(req("p-sql-cast", graphWithMapping(), source, postgisSinkWithPk()));
       assertTrue(
           plan.snapshotJson().contains("created_at::date >= '2024-01-01'"),
           "cast WHERE is bound, not rejected");
@@ -164,9 +137,7 @@ class FlowDeploymentPlannerTest {
     SinkSpec sink = new PostgisSinkSpec("sensor_observations", List.of("id"));
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       DeploymentPlan plan =
-          planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest("p-sql-upsert", graphWithMapping(), source, sink));
+          planner(resolver).plan(req("p-sql-upsert", graphWithMapping(), source, sink));
       String snapshot = plan.snapshotJson();
       assertTrue(snapshot.contains("\"Statement Type\":\"UPSERT\""), "UPSERT statement type");
       assertTrue(snapshot.contains("\"Update Keys\":\"id\""), "Update Keys = primary key");
@@ -185,7 +156,7 @@ class FlowDeploymentPlannerTest {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       String snapshot =
           planner(resolver)
-              .plan(new PipelineDeploymentRequest("p-sql-ckpk", graphWithMapping(), source, sink))
+              .plan(req("p-sql-ckpk", graphWithMapping(), source, sink))
               .snapshotJson();
       assertTrue(snapshot.contains("\"Update Keys\":\"tenant,id\""), "all key columns joined");
     }
@@ -200,10 +171,7 @@ class FlowDeploymentPlannerTest {
     Datasource source = mqttSource(null);
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       DeploymentPlan plan =
-          planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest(
-                      "p-mqtt-insert", graphWithMapping(), source, postgisSink()));
+          planner(resolver).plan(req("p-mqtt-insert", graphWithMapping(), source, postgisSink()));
       assertFalse(
           plan.snapshotJson().contains("\"Statement Type\":\"UPSERT\""), "no UPSERT without a PK");
     }
@@ -219,7 +187,7 @@ class FlowDeploymentPlannerTest {
       DeploymentPlan plan =
           planner(resolver)
               .plan(
-                  new PipelineDeploymentRequest(
+                  req(
                       "p-mqtt-schema",
                       graphWithMapping(),
                       source,
@@ -238,9 +206,7 @@ class FlowDeploymentPlannerTest {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       DeploymentPlan plan =
           planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest(
-                      "p-sql-time", graphWithMapping(), source, postgisSinkWithPk()));
+              .plan(req("p-sql-time", graphWithMapping(), source, postgisSinkWithPk()));
       assertTrue(
           plan.snapshotJson().contains("ts >= '2024-01-01 12:00:00'"),
           "time-literal WHERE is bound, not rejected");
@@ -255,10 +221,7 @@ class FlowDeploymentPlannerTest {
     source.handleUnknownProperty("dsn", "postgres://srcdb:5432/in?sslmode=require");
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       DeploymentPlan plan =
-          planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest(
-                      "p-sql-ssl", graphWithMapping(), source, postgisSinkWithPk()));
+          planner(resolver).plan(req("p-sql-ssl", graphWithMapping(), source, postgisSinkWithPk()));
       assertTrue(
           plan.snapshotJson().contains("jdbc:postgresql://srcdb:5432/in?sslmode=require"),
           "sslmode preserved in the JDBC URL");
@@ -278,9 +241,7 @@ class FlowDeploymentPlannerTest {
               FatalAdapterException.class,
               () ->
                   planner(resolver)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              "p-sql-mtls", graphWithMapping(), source, postgisSinkWithPk())));
+                      .plan(req("p-sql-mtls", graphWithMapping(), source, postgisSinkWithPk())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
@@ -294,9 +255,7 @@ class FlowDeploymentPlannerTest {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       DeploymentPlan plan =
           planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest(
-                      "p-sql-appname", graphWithMapping(), source, postgisSinkWithPk()));
+              .plan(req("p-sql-appname", graphWithMapping(), source, postgisSinkWithPk()));
       assertTrue(
           plan.snapshotJson().contains("jdbc:postgresql://srcdb:5432/in?applicationname=civitas"),
           "allowlisted parameter preserved in the JDBC URL");
@@ -315,9 +274,7 @@ class FlowDeploymentPlannerTest {
               FatalAdapterException.class,
               () ->
                   planner(resolver)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              "p-sql-sf", graphWithMapping(), source, postgisSinkWithPk())));
+                      .plan(req("p-sql-sf", graphWithMapping(), source, postgisSinkWithPk())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
@@ -338,8 +295,7 @@ class FlowDeploymentPlannerTest {
               FatalAdapterException.class,
               () ->
                   probing.plan(
-                      new PipelineDeploymentRequest(
-                          "p-probe", graphWithMapping(), sqlSource(null), postgisSinkWithPk())));
+                      req("p-probe", graphWithMapping(), sqlSource(null), postgisSinkWithPk())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
@@ -350,7 +306,7 @@ class FlowDeploymentPlannerTest {
       DeploymentPlan plan =
           planner(resolver)
               .plan(
-                  new PipelineDeploymentRequest(
+                  req(
                       "p-sql-cols",
                       graphWithMapping(),
                       sqlSourceWith("postgres", "events", List.of("id", "name"), "id > 10"),
@@ -371,7 +327,7 @@ class FlowDeploymentPlannerTest {
       String snapshot =
           planner(resolver)
               .plan(
-                  new PipelineDeploymentRequest(
+                  req(
                       "p-sql-allcols",
                       graphWithMapping(),
                       sqlSourceWith("postgres", "events", List.of("*"), null),
@@ -399,7 +355,7 @@ class FlowDeploymentPlannerTest {
                 () ->
                     planner(resolver)
                         .plan(
-                            new PipelineDeploymentRequest(
+                            req(
                                 "p-sql-posph",
                                 graphWithMapping(),
                                 sqlSourceWith("postgres", "events", List.of("*"), where),
@@ -420,11 +376,12 @@ class FlowDeploymentPlannerTest {
               () ->
                   planner(resolver)
                       .plan(
-                          new PipelineDeploymentRequest(
+                          req(
                               "p-frost-map",
                               graphWithMapping(),
                               mqttSource(null),
-                              new FrostSinkSpec("1", NifiTestFixtures.STA_KEYS))));
+                              new FrostSinkSpec(
+                                  "1", SinkPort.THING_TREE, NifiTestFixtures.STA_KEYS))));
       assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
       assertTrue(ex.getMessage().contains("unsupported FROST mapping target path"));
     }
@@ -441,11 +398,12 @@ class FlowDeploymentPlannerTest {
               () ->
                   planner(resolver)
                       .plan(
-                          new PipelineDeploymentRequest(
+                          req(
                               "p-frost-incomplete",
                               NifiTestFixtures.graphWithIncompleteFrostMapping(),
                               mqttSource(null),
-                              new FrostSinkSpec("1", NifiTestFixtures.STA_KEYS))));
+                              new FrostSinkSpec(
+                                  "1", SinkPort.THING_TREE, NifiTestFixtures.STA_KEYS))));
       assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
       assertTrue(
           ex.getMessage().contains("must map the thing match key(s): $.properties.reference"));
@@ -453,27 +411,46 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
-  void sqlToFrostWithoutMappingIsRejected() throws Exception {
-    // Without a mapping the find-or-create consumes the source's envelope as-is; a SQL source emits
-    // plain records, so the combination is rejected — with the hint that a mapping unlocks it
+  void sqlToFrostWithoutMappingIsPlanned() throws Exception {
+    // Without a mapping the records must already have the structure of the port. A SQL source
+    // emits records, so no ConvertRecord is added, and the split hands one record to the writer.
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
-      FatalAdapterException ex =
-          assertThrows(
-              FatalAdapterException.class,
-              () ->
-                  planner(resolver)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              "p-sql-frost-nomap",
-                              graphWithoutMapping(),
-                              sqlSource(null),
-                              new FrostSinkSpec("1", null))));
-      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
-      assertTrue(
-          ex.getMessage()
-              .contains(
-                  "FROST sink without a record mapping requires a source that emits the"
-                      + " SensorThings envelope (MQTT)"));
+      String snapshot =
+          planner(resolver)
+              .plan(
+                  req(
+                      "p-sql-frost-nomap",
+                      graphWithoutMapping(),
+                      sqlSource(null),
+                      new FrostSinkSpec("1", SinkPort.THING_TREE, null)))
+              .snapshotJson();
+      assertFalse(snapshot.contains("ConvertRecord"), "SQL already emits records");
+      processorOfType(snapshot, "PutFrostRecord");
+    }
+  }
+
+  @Test
+  void mqttToFrostWithoutMappingConvertsToRecords() throws Exception {
+    // MQTT delivers raw JSON: without a mapping the flow still converts it to records, so that the
+    // split hands PutFrostRecord one JSON object per record and never the whole message.
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(
+                  req(
+                      "p-mqtt-frost-nomap",
+                      graphWithoutMapping(),
+                      mqttSource(null),
+                      new FrostSinkSpec("1", SinkPort.THING_TREE, null)))
+              .snapshotJson();
+      processorOfType(snapshot, "ConvertRecord");
+      assertEquals(
+          "$[*]",
+          processorOfType(snapshot, "SplitJson")
+              .path("properties")
+              .path("JsonPath Expression")
+              .asText(),
+          "the record-writer array is split into records");
     }
   }
 
@@ -485,11 +462,11 @@ class FlowDeploymentPlannerTest {
       String snapshot =
           planner(resolver)
               .plan(
-                  new PipelineDeploymentRequest(
+                  req(
                       "p-mqtt-frost-map",
                       NifiTestFixtures.graphWithFrostMapping(),
                       mqttSource(null),
-                      new FrostSinkSpec("7", NifiTestFixtures.STA_KEYS)))
+                      new FrostSinkSpec("7", SinkPort.THING_TREE, NifiTestFixtures.STA_KEYS)))
               .snapshotJson();
       processorOfType(snapshot, "ConvertRecord");
       assertEquals(
@@ -514,11 +491,11 @@ class FlowDeploymentPlannerTest {
       String snapshot =
           planner(resolver)
               .plan(
-                  new PipelineDeploymentRequest(
+                  req(
                       "p-sql-frost-map",
                       NifiTestFixtures.graphWithFrostMapping(),
                       sqlSource(null),
-                      new FrostSinkSpec("7", NifiTestFixtures.STA_KEYS)))
+                      new FrostSinkSpec("7", SinkPort.THING_TREE, NifiTestFixtures.STA_KEYS)))
               .snapshotJson();
       processorOfType(snapshot, "QueryDatabaseTableRecord");
       assertFalse(snapshot.contains("ConvertRecord"), "SQL records need no convert step");
@@ -537,22 +514,20 @@ class FlowDeploymentPlannerTest {
       DeploymentPlan plan =
           planner(resolver)
               .plan(
-                  new PipelineDeploymentRequest(
+                  req(
                       "p-frost-scoped",
                       graphWithoutMapping(),
                       mqttSource(null),
-                      new FrostSinkSpec("7", null)));
+                      new FrostSinkSpec("7", SinkPort.THING_TREE, null)));
       String snapshot = plan.snapshotJson();
+      // The project scopes the writes through the processor property now, not through forty URLs.
       assertTrue(
-          snapshot.contains("/Projects(7)/Things"),
-          "Thing leg must be scoped to the saga's project");
-      assertTrue(
-          snapshot.contains("Thing/Projects/id%20eq%207"),
-          "Datastream lookup must be filtered by the saga's project");
+          snapshot.contains("\"FROST Project Id\":\"7\""),
+          "the flow must carry the saga's project");
       assertFalse(snapshot.contains("secret"), "FROST secret must not enter the snapshot");
       assertEquals(
           "secret",
-          plan.sensitivePropsByComponent().get("FrostPublish").get("Request Password"),
+          plan.sensitivePropsByComponent().get("FrostPublish").get("Basic Auth Password"),
           "the Basic Auth password must be patched onto FROST processors after upload");
     }
   }
@@ -567,7 +542,7 @@ class FlowDeploymentPlannerTest {
               () ->
                   planner(resolver)
                       .plan(
-                          new PipelineDeploymentRequest(
+                          req(
                               "p-sql-drv",
                               graphWithMapping(),
                               sqlSourceWith("mysql", "events", List.of("*"), null),
@@ -588,9 +563,7 @@ class FlowDeploymentPlannerTest {
               FatalAdapterException.class,
               () ->
                   planner(resolver)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              "p-sql-nodsn", graphWithMapping(), source, postgisSinkWithPk())));
+                      .plan(req("p-sql-nodsn", graphWithMapping(), source, postgisSinkWithPk())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
@@ -606,9 +579,7 @@ class FlowDeploymentPlannerTest {
               FatalAdapterException.class,
               () ->
                   planner(resolver)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              "p-sql-plainpw", graphWithMapping(), source, postgisSinkWithPk())));
+                      .plan(req("p-sql-plainpw", graphWithMapping(), source, postgisSinkWithPk())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
@@ -624,9 +595,7 @@ class FlowDeploymentPlannerTest {
               FatalAdapterException.class,
               () ->
                   planner(resolver)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              "p-mqtt-plainpw", graphWithMapping(), source, postgisSink())));
+                      .plan(req("p-mqtt-plainpw", graphWithMapping(), source, postgisSink())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
@@ -641,7 +610,7 @@ class FlowDeploymentPlannerTest {
               () ->
                   planner(resolver)
                       .plan(
-                          new PipelineDeploymentRequest(
+                          req(
                               "p-sql-notable",
                               graphWithMapping(),
                               sqlSourceWith("postgres", null, List.of("*"), null),
@@ -661,10 +630,7 @@ class FlowDeploymentPlannerTest {
 
     try (CredentialResolver resolver = new CredentialResolver(key)) {
       DeploymentPlan plan =
-          planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest(
-                      "b222", graphWithMapping(), mqttSource(enc), postgisSink()));
+          planner(resolver).plan(req("b222", graphWithMapping(), mqttSource(enc), postgisSink()));
 
       // process-group name is the idempotency key
       assertEquals("pipeline-b222", plan.processGroupName());
@@ -674,9 +640,11 @@ class FlowDeploymentPlannerTest {
       assertTrue(snapshot.contains("tcp://mosquitto:1883"));
       assertTrue(snapshot.contains("sensors/+/temp"));
       assertTrue(snapshot.contains("sensor_observations"));
-      // compiled RecordPath mapping is present (copied field + a toDate conversion)
+      // compiled RecordPath mapping is present (copied field + a toDateTime conversion). The
+      // date-only op renders the same call wrapped in format(), so a substring match would accept
+      // either — the full property value is what tells the two apart.
       assertTrue(snapshot.contains("station_id"));
-      assertTrue(snapshot.contains("toDate(/ts, 'yyyy-MM-dd')"));
+      assertTrue(snapshot.contains("\"toDate(/ts, 'yyyy-MM-dd')\""));
 
       // SECURITY INVARIANT: the plaintext secret never appears in the uploaded snapshot
       assertFalse(snapshot.contains(SECRET));
@@ -705,9 +673,7 @@ class FlowDeploymentPlannerTest {
     try (CredentialResolver resolver = new CredentialResolver(key)) {
       FlowDeploymentPlanner probing = planner(resolver, capturingProbe);
 
-      probing.plan(
-          new PipelineDeploymentRequest(
-              "p-sql-probe", graphWithMapping(), source, postgisSinkWithPk()));
+      probing.plan(req("p-sql-probe", graphWithMapping(), source, postgisSinkWithPk()));
     }
 
     assertEquals(SECRET, probedPassword[0], "probe must receive the decrypted password");
@@ -726,8 +692,7 @@ class FlowDeploymentPlannerTest {
             FatalAdapterException.class,
             () ->
                 noDbPlanner.plan(
-                    new PipelineDeploymentRequest(
-                        "p-nodb", graphWithMapping(), mqttSource(null), postgisSink())));
+                    req("p-nodb", graphWithMapping(), mqttSource(null), postgisSink())));
     assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }
 
@@ -740,19 +705,20 @@ class FlowDeploymentPlannerTest {
         map(
             """
             { "nodes": [
-                { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
-                    "fields": { "$.count": { "op": "toInt", "input": "$.n" } } } } },
-                { "id": "n-sink", "type": "geoPersistence", "data": { "entityId": "sink-1" } } ],
+                { "id": "n-src", "kind": "source", "sourceRef": "%s" },
+                { "id": "n-map", "kind": "mapping", "mappingRef": "%s" },
+                { "id": "n-sink", "kind": "sink", "sinkRef": "%s" } ],
               "edges": [
                 { "id": "e1", "source": "n-src", "target": "n-map" },
                 { "id": "e2", "source": "n-map", "target": "n-sink" } ] }
-            """);
+            """
+                .formatted(
+                    NifiTestFixtures.SRC_REF,
+                    NifiTestFixtures.MAP_TOINT,
+                    NifiTestFixtures.SINK_REF));
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       DeploymentPlan plan =
-          planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest("p-typed", graph, mqttSource(null), postgisSink()));
+          planner(resolver).plan(req("p-typed", graph, mqttSource(null), postgisSink()));
       // the conversion is rendered as a transparent record-path copy, no schema involved
       assertTrue(plan.snapshotJson().contains("/n"));
     }
@@ -773,11 +739,11 @@ class FlowDeploymentPlannerTest {
             FatalAdapterException.class,
             () ->
                 noFrostPlanner.plan(
-                    new PipelineDeploymentRequest(
+                    req(
                         "p-nofrost",
                         graphWithoutMapping(),
                         mqttSource(null),
-                        new FrostSinkSpec("1", null))));
+                        new FrostSinkSpec("1", SinkPort.THING_TREE, null))));
     assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }
 
@@ -792,22 +758,20 @@ class FlowDeploymentPlannerTest {
         map(
             """
             { "nodes": [
-                { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
-                { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
-                    "fields": {
-                      "$.station_id": "$.station_id",
-                      "$.unit": { "op": "const", "value": "celsius" }
-                    } } } },
-                { "id": "n-sink", "type": "geoPersistence", "data": { "entityId": "sink-1" } } ],
+                { "id": "n-src", "kind": "source", "sourceRef": "%s" },
+                { "id": "n-map", "kind": "mapping", "mappingRef": "%s" },
+                { "id": "n-sink", "kind": "sink", "sinkRef": "%s" } ],
               "edges": [
                 { "id": "e1", "source": "n-src", "target": "n-map" },
                 { "id": "e2", "source": "n-map", "target": "n-sink" } ] }
-            """);
+            """
+                .formatted(
+                    NifiTestFixtures.SRC_REF,
+                    NifiTestFixtures.MAP_MIXED,
+                    NifiTestFixtures.SINK_REF));
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       DeploymentPlan plan =
-          planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest("p-mixed", graph, mqttSource(null), postgisSink()));
+          planner(resolver).plan(req("p-mixed", graph, mqttSource(null), postgisSink()));
       String snapshot = plan.snapshotJson();
       // both fields are bound: the copy as a record-path, the const as a literal-value — across the
       // two strategy-grouped UpdateRecord processors
@@ -825,25 +789,25 @@ class FlowDeploymentPlannerTest {
         map(
             """
             { "nodes": [
-                { "id": "n-src", "type": "dataSource", "data": {} },
-                { "id": "n-geo", "type": "geoPersistence", "data": {} },
-                { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
-                    "fields": { "$.a": "$.b" } } } },
-                { "id": "n-frost", "type": "frost", "data": {} } ],
+                { "id": "n-src", "kind": "source", "sourceRef": "%s" },
+                { "id": "n-geo", "kind": "sink", "sinkRef": "%s" },
+                { "id": "n-map", "kind": "mapping", "mappingRef": "%s" },
+                { "id": "n-frost", "kind": "sink", "sinkRef": "%s" } ],
               "edges": [
                 { "id": "e1", "source": "n-src", "target": "n-map" },
                 { "id": "e2", "source": "n-map", "target": "n-frost" },
                 { "id": "e3", "source": "n-frost", "target": "n-geo" } ] }
-            """);
+            """
+                .formatted(
+                    NifiTestFixtures.SRC_REF,
+                    NifiTestFixtures.SINK_REF,
+                    NifiTestFixtures.MAP_CRON,
+                    NifiTestFixtures.SINK_REF));
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       FatalAdapterException ex =
           assertThrows(
               FatalAdapterException.class,
-              () ->
-                  planner(resolver)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              "p-real", graph, mqttSource(null), postgisSink())));
+              () -> planner(resolver).plan(req("p-real", graph, mqttSource(null), postgisSink())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
       assertTrue(
           ex.getMessage().contains("pipeline graph has 2 datasink nodes; exactly one is"),
@@ -865,7 +829,7 @@ class FlowDeploymentPlannerTest {
       DeploymentPlan plan =
           planner(resolver)
               .plan(
-                  new PipelineDeploymentRequest(
+                  req(
                       "p-sql-cron",
                       graphWithCron("0 0 6 * * ?"),
                       sqlSource(enc),
@@ -905,7 +869,7 @@ class FlowDeploymentPlannerTest {
               () ->
                   planner(resolver)
                       .plan(
-                          new PipelineDeploymentRequest(
+                          req(
                               "p-cron7",
                               graphWithCron("0 0 6 * * ? 2026"),
                               sqlSource(null),
@@ -927,9 +891,7 @@ class FlowDeploymentPlannerTest {
                 FatalAdapterException.class,
                 () ->
                     planner(resolver)
-                        .plan(
-                            new PipelineDeploymentRequest(
-                                "p-sql-nopk", graph, sqlSource(null), postgisSink())));
+                        .plan(req("p-sql-nopk", graph, sqlSource(null), postgisSink())));
         assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
       }
     }
@@ -945,7 +907,7 @@ class FlowDeploymentPlannerTest {
               () ->
                   planner(resolver)
                       .plan(
-                          new PipelineDeploymentRequest(
+                          req(
                               "p-bad-cron",
                               graphWithCron("0 0 * * *"),
                               sqlSource(null),
@@ -965,7 +927,7 @@ class FlowDeploymentPlannerTest {
               () ->
                   planner(resolver)
                       .plan(
-                          new PipelineDeploymentRequest(
+                          req(
                               "p-mqtt-cron",
                               graphWithCron("0 0 6 * * ?"),
                               mqttSource(null),
@@ -984,23 +946,21 @@ class FlowDeploymentPlannerTest {
         map(
             """
             { "nodes": [
-                { "id": "n-src", "type": "dataSource", "data": { "entityId": "a1" } },
-                { "id": "n-sink", "type": "geoPersistence", "data": { "entityId": "sk-1" } },
-                { "id": "n-map1", "type": "mapping", "data": { "mappingConfig": {
-                    "fields": { "$.a": "$.b" } } } },
-                { "id": "n-map2", "type": "mapping", "data": { "mappingConfig": {
-                    "fields": { "$.c": "$.d" } } } } ],
+                { "id": "n-src", "kind": "source", "sourceRef": "%1$s" },
+                { "id": "n-sink", "kind": "sink", "sinkRef": "%2$s" },
+                { "id": "n-map1", "kind": "mapping", "mappingRef": "%3$s" },
+                { "id": "n-map2", "kind": "mapping", "mappingRef": "%3$s" } ],
               "edges": [ { "id": "e1", "source": "n-src", "target": "n-sink" } ] }
-            """);
+            """
+                .formatted(
+                    NifiTestFixtures.SRC_REF,
+                    NifiTestFixtures.SINK_REF,
+                    NifiTestFixtures.MAP_CRON));
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       FatalAdapterException ex =
           assertThrows(
               FatalAdapterException.class,
-              () ->
-                  planner(resolver)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              "p-2map", graph, mqttSource(null), postgisSink())));
+              () -> planner(resolver).plan(req("p-2map", graph, mqttSource(null), postgisSink())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
       assertTrue(
           ex.getMessage().contains("not wired into the flow"),
@@ -1019,9 +979,7 @@ class FlowDeploymentPlannerTest {
               FatalAdapterException.class,
               () ->
                   planner(resolver)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              "p-2topic", graphWithMapping(), source, postgisSink())));
+                      .plan(req("p-2topic", graphWithMapping(), source, postgisSink())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
@@ -1034,8 +992,7 @@ class FlowDeploymentPlannerTest {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       String snapshot =
           planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest("p-tls", graphWithMapping(), source, postgisSink()))
+              .plan(req("p-tls", graphWithMapping(), source, postgisSink()))
               .snapshotJson();
       JsonNode flow = mapper.readTree(snapshot).path("flowContents");
       JsonNode mqtt = processorOfType(snapshot, "ConsumeMQTT");
@@ -1055,6 +1012,72 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
+  void mqttTlsBindsTheConfiguredTruststoreInsteadOfTheNodeOne() throws Exception {
+    Datasource source = mqttSource(null);
+    source.handleUnknownProperty("tls", Map.of("enabled", true));
+    source.handleUnknownProperty("urls", List.of("ssl://broker.example:8883"));
+    MqttTruststoreConfig dedicated =
+        new MqttTruststoreConfig(
+            "/opt/mqtt-tls/truststore.p12",
+            "PKCS12",
+            "",
+            "MQTT_TRUSTSTORE_PASSWORD",
+            "MQTT Broker CAs");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          NifiTestFixtures.planner(resolver, dedicated)
+              .plan(req("p-tls-dedicated", graphWithMapping(), source, postgisSink()))
+              .snapshotJson();
+      JsonNode root = mapper.readTree(snapshot);
+      JsonNode sslContext =
+          StreamSupport.stream(
+                  root.path("flowContents").path("controllerServices").spliterator(), false)
+              .filter(
+                  service ->
+                      "org.apache.nifi.ssl.StandardSSLContextService"
+                          .equals(service.path("type").asText()))
+              .findFirst()
+              .orElseThrow();
+      assertEquals(
+          "/opt/mqtt-tls/truststore.p12",
+          sslContext.path("properties").path("Truststore Filename").asText());
+      assertEquals(
+          "#{MQTT_TRUSTSTORE_PASSWORD}",
+          sslContext.path("properties").path("Truststore Password").asText());
+      assertEquals(
+          "MQTT Broker CAs", root.path("flowContents").path("parameterContextName").asText());
+      assertEquals(
+          "MQTT_TRUSTSTORE_PASSWORD",
+          root.path("parameterContexts")
+              .path("MQTT Broker CAs")
+              .path("parameters")
+              .path(0)
+              .path("name")
+              .asText());
+    }
+  }
+
+  @Test
+  void mqttTlsWithoutAConfiguredTruststoreIsRejected() throws Exception {
+    // Deploying a TLS source with no trust anchor would either leave the service invalid or fall
+    // back to a plaintext connection; neither may pass silently.
+    Datasource source = mqttSource(null);
+    source.handleUnknownProperty("tls", Map.of("enabled", true));
+    source.handleUnknownProperty("urls", List.of("ssl://broker.example:8883"));
+    MqttTruststoreConfig unset = new MqttTruststoreConfig("", "PKCS12", "", "", "");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  NifiTestFixtures.planner(resolver, unset)
+                      .plan(req("p-tls-no-store", graphWithMapping(), source, postgisSink())));
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
+      assertTrue(ex.getInternalMessage().contains("nifi.mqtt.truststore.path"));
+    }
+  }
+
+  @Test
   void mqttPlaintextSchemeIsNormalizedToTcp() throws Exception {
     // brokers advertise mqtt://, but NiFi's ConsumeMQTT (Paho) only accepts tcp://; no SSL Context
     // Service is built for a plaintext source
@@ -1063,15 +1086,39 @@ class FlowDeploymentPlannerTest {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       String snapshot =
           planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest(
-                      "p-mqtt-plain", graphWithMapping(), source, postgisSink()))
+              .plan(req("p-mqtt-plain", graphWithMapping(), source, postgisSink()))
               .snapshotJson();
       JsonNode mqtt = processorOfType(snapshot, "ConsumeMQTT");
       assertEquals(
           "tcp://Broker.Example:1883?q=1", mqtt.path("properties").path("Broker URI").asText());
       assertTrue(mqtt.path("properties").path("SSL Context Service").isNull());
     }
+  }
+
+  // A planner that handed the stage a constant would give every pipeline of one graph the same id.
+  @Test
+  void mqttClientIdDependsOnThePipelineId() throws Exception {
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      assertNotEquals(
+          consumeMqttClientId(resolver, "p-one"), consumeMqttClientId(resolver, "p-two"));
+    }
+  }
+
+  // A planner key that varied per deploy would open a new broker session on every redeploy.
+  @Test
+  void mqttClientIdIsTheSameOnEveryDeploy() throws Exception {
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      assertEquals(consumeMqttClientId(resolver, "p-one"), consumeMqttClientId(resolver, "p-one"));
+    }
+  }
+
+  private String consumeMqttClientId(CredentialResolver resolver, String pipelineId)
+      throws Exception {
+    String snapshot =
+        planner(resolver)
+            .plan(req(pipelineId, graphWithMapping(), mqttSource(null), postgisSink()))
+            .snapshotJson();
+    return processorOfType(snapshot, "ConsumeMQTT").path("properties").path("Client ID").asText();
   }
 
   @Test
@@ -1084,12 +1131,48 @@ class FlowDeploymentPlannerTest {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       String snapshot =
           planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest("p-to", graphWithMapping(), source, postgisSink()))
+              .plan(req("p-to", graphWithMapping(), source, postgisSink()))
               .snapshotJson();
       assertTrue(snapshot.contains("\"Connection Timeout\":\"5\""));
       assertTrue(snapshot.contains("\"Keep Alive\":\"30\""));
     }
+  }
+
+  @Test
+  void mqttProtocolVersionIsBoundToTheNifiSpecificationValue() throws Exception {
+    for (Map.Entry<String, String> version : Map.of("3", "0", "5", "5").entrySet()) {
+      Datasource source = mqttSource(null);
+      source.handleUnknownProperty("protocol_version", version.getKey());
+      try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+        String snapshot =
+            planner(resolver)
+                .plan(req("p-mqtt-v" + version.getKey(), graphWithMapping(), source, postgisSink()))
+                .snapshotJson();
+        JsonNode mqtt = processorOfType(snapshot, "ConsumeMQTT");
+        assertEquals(
+            version.getValue(),
+            mqtt.path("properties").path("MQTT Specification Version").asText());
+      }
+    }
+  }
+
+  @Test
+  void legacyMqttSourceWithoutProtocolVersionUsesV3Auto() throws Exception {
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      String snapshot =
+          planner(resolver)
+              .plan(req("p-mqtt-legacy", graphWithMapping(), mqttSource(null), postgisSink()))
+              .snapshotJson();
+      JsonNode mqtt = processorOfType(snapshot, "ConsumeMQTT");
+      assertEquals("0", mqtt.path("properties").path("MQTT Specification Version").asText());
+    }
+  }
+
+  @Test
+  void unsupportedMqttProtocolVersionIsRejected() throws Exception {
+    Datasource source = mqttSource(null);
+    source.handleUnknownProperty("protocol_version", "4");
+    assertPlanRejected(source, "p-mqtt-version-invalid");
   }
 
   @Test
@@ -1116,9 +1199,7 @@ class FlowDeploymentPlannerTest {
       source.handleUnknownProperty("urls", List.of(url));
       try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
         planner(resolver)
-            .plan(
-                new PipelineDeploymentRequest(
-                    "p-plain-" + url.substring(0, 2), graphWithMapping(), source, postgisSink()));
+            .plan(req("p-plain-" + url.substring(0, 2), graphWithMapping(), source, postgisSink()));
       }
     }
     for (String url : List.of("ssl://broker:8883", "mqtts://broker:8883", "wss://broker/mqtt")) {
@@ -1127,9 +1208,7 @@ class FlowDeploymentPlannerTest {
       source.handleUnknownProperty("urls", List.of(url));
       try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
         planner(resolver)
-            .plan(
-                new PipelineDeploymentRequest(
-                    "p-tls-" + url.substring(0, 2), graphWithMapping(), source, postgisSink()));
+            .plan(req("p-tls-" + url.substring(0, 2), graphWithMapping(), source, postgisSink()));
       }
     }
   }
@@ -1161,9 +1240,7 @@ class FlowDeploymentPlannerTest {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       String snapshot =
           planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest(
-                      "p-secure-list", graphWithMapping(), secure, postgisSink()))
+              .plan(req("p-secure-list", graphWithMapping(), secure, postgisSink()))
               .snapshotJson();
       assertEquals(
           "ssl://one:8883,ssl://two:8883",
@@ -1175,9 +1252,7 @@ class FlowDeploymentPlannerTest {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       String snapshot =
           planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest(
-                      "p-plain-list", graphWithMapping(), plain, postgisSink()))
+              .plan(req("p-plain-list", graphWithMapping(), plain, postgisSink()))
               .snapshotJson();
       assertEquals(
           "tcp://one:1883,tcp://two:1883",
@@ -1220,28 +1295,25 @@ class FlowDeploymentPlannerTest {
 
   @Test
   void mappingNodeWithoutConfigIsRejected() throws Exception {
-    // a wired mapping node with no mappingConfig is a corrupted payload — it must not deploy
+    // a wired mapping node with no mappingRef is a corrupted payload — it must not deploy
     // untransformed
     Map<String, Object> graph =
         map(
             """
             { "nodes": [
-                { "id": "n-src", "type": "dataSource", "data": {} },
-                { "id": "n-map", "type": "mapping", "data": {} },
-                { "id": "n-frost", "type": "frost", "data": {} } ],
+                { "id": "n-src", "kind": "source", "sourceRef": "%s" },
+                { "id": "n-map", "kind": "mapping" },
+                { "id": "n-frost", "kind": "sink", "sinkRef": "%s" } ],
               "edges": [
                 { "id": "e1", "source": "n-src", "target": "n-map" },
                 { "id": "e2", "source": "n-map", "target": "n-frost" } ] }
-            """);
+            """
+                .formatted(NifiTestFixtures.SRC_REF, NifiTestFixtures.SINK_REF));
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       FatalAdapterException ex =
           assertThrows(
               FatalAdapterException.class,
-              () ->
-                  planner(resolver)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              "p-nocfg", graph, mqttSource(null), postgisSink())));
+              () -> planner(resolver).plan(req("p-nocfg", graph, mqttSource(null), postgisSink())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
@@ -1253,9 +1325,7 @@ class FlowDeploymentPlannerTest {
               FatalAdapterException.class,
               () ->
                   planner(resolver)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              pipelineId, graphWithMapping(), source, postgisSink())));
+                      .plan(req(pipelineId, graphWithMapping(), source, postgisSink())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
@@ -1267,9 +1337,7 @@ class FlowDeploymentPlannerTest {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       String snapshot =
           planner(resolver)
-              .plan(
-                  new PipelineDeploymentRequest(
-                      "p-pg-geo", graphWithGeoPoint(), mqttSource(null), postgisSink()))
+              .plan(req("p-pg-geo", graphWithGeoPoint(), mqttSource(null), postgisSink()))
               .snapshotJson();
       assertTrue(snapshot.contains("concat('POINT(', /lon, ' ', /lat, ')')"));
     }
@@ -1285,11 +1353,7 @@ class FlowDeploymentPlannerTest {
       FatalAdapterException ex =
           assertThrows(
               FatalAdapterException.class,
-              () ->
-                  planner(resolver)
-                      .plan(
-                          new PipelineDeploymentRequest(
-                              "p1", graphWithMapping(), source, postgisSink())));
+              () -> planner(resolver).plan(req("p1", graphWithMapping(), source, postgisSink())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }
@@ -1302,7 +1366,7 @@ class FlowDeploymentPlannerTest {
     Map<String, Object> ghostEdgeGraph =
         map(
             """
-            { "nodes": [ { "id": "n-start", "type": "start", "data": {} } ],
+            { "nodes": [ { "id": "n-start", "kind": "start" } ],
               "edges": [ { "id": "e1", "source": "n-start", "target": "n-missing" } ] }
             """);
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
@@ -1312,8 +1376,7 @@ class FlowDeploymentPlannerTest {
               () ->
                   planner(resolver)
                       .plan(
-                          new PipelineDeploymentRequest(
-                              "p-corrupt", ghostEdgeGraph, sqlSourceBasic(), postgisSinkWithPk())));
+                          req("p-corrupt", ghostEdgeGraph, sqlSourceBasic(), postgisSinkWithPk())));
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
     }
   }

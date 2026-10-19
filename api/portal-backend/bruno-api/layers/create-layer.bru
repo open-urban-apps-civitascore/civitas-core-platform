@@ -21,7 +21,6 @@ body:json {
     "title": "Sensor Observations",
     "description": "Hourly sensor readings, location-based",
     "crs": "EPSG:25832",
-    "bboxAutoCalculate": true,
     "defaultStyleId": "{{defaultStyleId}}",
     "alternativeStyleIds": ["{{alternativeStyleId}}"]
   }
@@ -36,7 +35,7 @@ script:post-response {
 docs {
   **Precondition:** `dataSetId`, `postgisDataSinkId` (from `datasinks/create-postgis-datasink.bru`), `defaultStyleId` (from `styles/create-style.bru`), and `alternativeStyleId` (from `styles/create-alternative-style.bru`) are all set.
 
-  **Expected Response:** 201 Created, body contains `id` and the layer's resolved fields. `geometryType` and `nativeCRS` remain null until the dataset is released and the saga provisions the layer in GeoServer.
+  **Expected Response:** 201 Created, body contains `id` and the layer's resolved fields.
 
   **Post-condition:** Save `layerId` from `body.id`.
 

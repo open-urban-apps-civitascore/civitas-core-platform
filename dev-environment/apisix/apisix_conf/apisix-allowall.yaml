@@ -27,6 +27,20 @@ plugin_configs:
   - id: 1
     desc: "Allow-all auth (JWT + OPA + wildcard scope header)"
     plugins:
+      # 0. Drop a trailing slash on a dataset endpoint, so a route provisioned before the
+      # standards were told apart still reaches the same upstream resource as the bare address.
+      # Deeper paths are left alone; the route decides whether they match at all.
+      serverless-pre-function:
+        phase: rewrite
+        functions:
+          - >-
+            return function()
+              local uri = ngx.var.uri
+              if uri and ngx.re.find(uri, "^/v1/datasets/[^/]+/[^/]+/$", "jo") then
+                ngx.req.set_uri(string.sub(uri, 1, -2), false)
+              end
+            end
+
       # 1. JWT validation — same as full mode
       openid-connect:
         client_id: "apisix-validator"

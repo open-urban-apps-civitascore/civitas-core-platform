@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { PipelinePayload } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types'
 import { PipelineOutputDTO } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types/pipeline'
+import { DATASINKS_QUERY_KEY } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { apiRequest, type ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 
 const API_REQUEST_HEADER = 'x-api-request'
@@ -43,6 +44,7 @@ export const useCreatePipeline = (datasetId: string) => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [PIPELINES_QUERY_KEY, datasetId] })
+      queryClient.invalidateQueries({ queryKey: [DATASINKS_QUERY_KEY, datasetId] })
     },
     onError: error => {
       console.error('Failed to create pipeline:', error)
@@ -68,6 +70,7 @@ export const useUpdatePipeline = (datasetId: string) => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [PIPELINES_QUERY_KEY, datasetId] })
+      queryClient.invalidateQueries({ queryKey: [DATASINKS_QUERY_KEY, datasetId] })
     },
     onError: error => {
       console.error('Failed to update pipeline:', error)
@@ -92,6 +95,7 @@ export const useDeletePipeline = (datasetId: string) => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [PIPELINES_QUERY_KEY, datasetId] })
+      queryClient.invalidateQueries({ queryKey: [DATASINKS_QUERY_KEY, datasetId] })
     },
     onError: error => {
       console.error('Failed to delete pipeline:', error)

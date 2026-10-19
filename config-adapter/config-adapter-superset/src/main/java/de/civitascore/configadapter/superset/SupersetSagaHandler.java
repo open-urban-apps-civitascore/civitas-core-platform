@@ -16,12 +16,15 @@ import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.model.dataset.WorkspaceNames;
+import jakarta.ws.rs.client.Client;
+import jakarta.ws.rs.client.ClientBuilder;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.owasp.encoder.Encode;
 
 /**
@@ -114,6 +117,7 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
   private String adminUsername;
   private String adminPassword;
   private int trinoDatabaseId;
+  private Client supersetClient;
   private SupersetSession session;
   private SupersetResourceClient resourceClient;
 
@@ -134,6 +138,11 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
       throw new IllegalArgumentException(
           "superset.trino.database-id must be a valid integer, got: " + databaseIdStr);
     }
+    supersetClient =
+        ClientBuilder.newBuilder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build();
     log.info(
         "SupersetSagaHandler initialized for {}, trinoDatabaseId={}",
         Encode.forJava(baseUrl),
@@ -167,8 +176,9 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
    */
   private void ensureAuthenticated() {
     if (session == null) {
-      session = new SupersetSession(client(), baseUrl, adminUsername, adminPassword);
-      resourceClient = new SupersetResourceClient(client(), session, baseUrl, trinoDatabaseId);
+      session = new SupersetSession(supersetClient, baseUrl, adminUsername, adminPassword);
+      resourceClient =
+          new SupersetResourceClient(supersetClient, session, baseUrl, trinoDatabaseId);
     }
     if (session.isAuthenticated()) {
       return;
@@ -177,6 +187,15 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
       session.authenticate();
     } catch (FatalAdapterException | RetryableAdapterException e) {
       throw new SagaApiException("Superset authentication failed: " + e.getMessage(), 401);
+    }
+  }
+
+  @Override
+  public void close() {
+    super.close();
+    if (supersetClient != null) {
+      supersetClient.close();
+      supersetClient = null;
     }
   }
 

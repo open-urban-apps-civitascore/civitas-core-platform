@@ -21,4 +21,7 @@ public class PipelineOutputDTO extends BaseOutputDTO {
   private List<UUID> dataSinkIds = new ArrayList<>();
   private List<UUID> dataSourceIds = new ArrayList<>();
   private Map<String, Object> model;
+
+  /** Versioned CORE URN of this pipeline's model artifact in Model Forge. */
+  private String modelUrn;
 }

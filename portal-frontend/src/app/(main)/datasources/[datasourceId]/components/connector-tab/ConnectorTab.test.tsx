@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useForm } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -18,16 +18,16 @@ vi.mock('./connectorSources', () => ({
       {
         key: 'urls',
         type: 'input',
+        // Literal placeholder — exercises the non-translated path.
         placeholder: 'mqtt://localhost',
         required: true,
-        label: { label: 'URLs', labelHint: 'hint' },
+        label: { labelKey: 'URLs', hintKey: 'hint' },
       },
       {
         key: 'tls',
         type: 'checkbox',
-        placeholder: '',
         required: false,
-        label: { label: 'TLS', labelHint: null },
+        label: { labelKey: 'TLS' },
       },
       {
         key: 'qos',
@@ -35,14 +35,23 @@ vi.mock('./connectorSources', () => ({
         placeholder: 'qos',
         required: false,
         options: ['0', '1', '2'],
-        label: { label: 'QoS', labelHint: null },
+        label: { labelKey: 'QoS' },
       },
       {
-        key: 'client_id',
+        key: 'protocol_version',
+        type: 'select',
+        placeholder: 'protocol version',
+        required: true,
+        options: ['3', '5'],
+        label: { labelKey: 'Protocol Version' },
+      },
+      {
+        key: 'keepalive',
         type: 'textArea',
-        placeholder: 'client id',
+        // Translated placeholder — exercises the translation-key path.
+        placeholderKey: 'keepalive',
         required: false,
-        label: { label: 'Client ID', labelHint: null },
+        label: { labelKey: 'Keepalive' },
       },
     ],
     SQL: [
@@ -51,28 +60,28 @@ vi.mock('./connectorSources', () => ({
         type: 'input',
         placeholder: 'postgres://test:test@host:5432/db',
         required: true,
-        label: { label: 'DSN', labelHint: null },
+        label: { labelKey: 'DSN' },
       },
       {
         key: 'table',
         type: 'input',
-        placeholder: 'my_table',
+        placeholderKey: 'my_table',
         required: true,
-        label: { label: 'Table', labelHint: null },
+        label: { labelKey: 'Table' },
       },
       {
         key: 'columns',
         type: 'input',
         placeholder: 'id,name,created_at',
         required: true,
-        label: { label: 'Columns', labelHint: null },
+        label: { labelKey: 'Columns' },
       },
       {
         key: 'init_files',
         type: 'input',
-        placeholder: 'init.sql',
+        placeholderKey: 'init.sql',
         required: false,
-        label: { label: 'Init Files', labelHint: null },
+        label: { labelKey: 'Init Files' },
       },
     ],
   },
@@ -88,15 +97,19 @@ const defaultValues: DatasourceFormDraft = {
   configuration: {
     urls: '',
     topics: '',
-    client_id: '',
     qos: '0',
+    protocol_version: '3',
     connect_timeout: '',
     keepalive: '',
     tls: false,
   },
 }
 
-const renderConnectorTab = (values?: Partial<DatasourceFormDraft>, isReadOnly = false) => {
+const renderConnectorTab = (
+  values?: Partial<DatasourceFormDraft>,
+  isReadOnly = false,
+  isDatasourceReleased = false,
+) => {
   const merged = { ...defaultValues, ...values }
   const Wrapper = () => {
     const form = useForm<DatasourceFormDraft>({
@@ -106,7 +119,12 @@ const renderConnectorTab = (values?: Partial<DatasourceFormDraft>, isReadOnly = 
 
     return (
       <Form {...form}>
-        <ConnectorTab form={form} connectorType={merged.connectorType} isReadOnly={isReadOnly} />
+        <ConnectorTab
+          form={form}
+          connectorType={merged.connectorType}
+          isReadOnly={isReadOnly}
+          isDatasourceReleased={isDatasourceReleased}
+        />
       </Form>
     )
   }
@@ -150,13 +168,26 @@ describe('ConnectorTab (integration)', () => {
     expect(screen.getByRole('checkbox')).toBeInTheDocument()
     const qosSelect = screen.getByLabelText(/QoS/)
     expect(qosSelect).toBeInTheDocument()
-    expect(screen.getByLabelText('Client ID')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('client id')).toBeInTheDocument()
+    expect(screen.getByLabelText('Keepalive')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('keepalive')).toBeInTheDocument()
 
     fireEvent.click(qosSelect)
     await screen.findByText('1')
     expect(screen.getByText('1')).toBeInTheDocument()
     expect(screen.getByText('2')).toBeInTheDocument()
+  })
+
+  it('renders the protocol version select field when MQTT is selected', async () => {
+    renderConnectorTab()
+
+    const protocolVersionSelect = screen.getByLabelText(/Protocol Version/)
+    expect(protocolVersionSelect).toBeInTheDocument()
+
+    // Default configured value is '3', already shown selected in the trigger — only the other
+    // option needs opening the dropdown to become visible, mirroring the qos select test above.
+    fireEvent.click(protocolVersionSelect)
+    await screen.findByText('5')
+    expect(screen.getByText('5')).toBeInTheDocument()
   })
 
   it('renders fields for a non-default connector type', () => {
@@ -176,18 +207,80 @@ describe('ConnectorTab (integration)', () => {
     expect(screen.getByLabelText(/Columns/)).toBeInTheDocument()
     expect(screen.getByLabelText(/Init Files/)).toBeInTheDocument()
     expect(screen.queryByLabelText(/URLs/)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Protocol Version/)).not.toBeInTheDocument()
   })
 
   it('renders label hint when present', () => {
     renderConnectorTab()
 
-    expect(screen.getByText(/(info.hint)/)).toBeInTheDocument()
+    expect(screen.getByText(/\(hint\)/)).toBeInTheDocument()
   })
 
   it('works in draft mode', () => {
     renderConnectorTab()
 
     expect(screen.getByLabelText(/URLs/)).toBeInTheDocument()
+  })
+
+  describe('MQTT TLS/broker validation refresh', () => {
+    it('surfaces a broker/TLS mismatch when toggling TLS creates one, and clears it when toggling back', async () => {
+      // Start from a valid combination: a TLS-scheme URL with TLS enabled — no mismatch yet.
+      renderConnectorTab({
+        configuration: {
+          ...defaultValues.configuration,
+          urls: 'mqtts://broker.local:8883',
+          tls: true,
+        },
+      })
+
+      const tlsCheckbox = screen.getByRole('checkbox')
+      expect(screen.queryByText('datasources.errors.brokerTlsMismatch')).not.toBeInTheDocument()
+
+      // Toggle TLS off — the broker still uses a TLS-only scheme, so this is now a real mismatch.
+      fireEvent.click(tlsCheckbox)
+      await waitFor(() => {
+        expect(screen.getByText('datasources.errors.brokerTlsMismatch')).toBeInTheDocument()
+      })
+
+      // Toggle TLS back on — the mismatch is resolved, so the now-visible error must clear.
+      fireEvent.click(tlsCheckbox)
+      await waitFor(() => {
+        expect(screen.queryByText('datasources.errors.brokerTlsMismatch')).not.toBeInTheDocument()
+      })
+    })
+
+    it('does not surface a stale mismatch on mount for an already-mismatched stored configuration', async () => {
+      // The loaded configuration is already mismatched (TLS-only scheme, TLS disabled). The
+      // `isFirstRevalidationRender` guard in ConnectorTab exists specifically to stop the watch
+      // effect from firing a validation trigger on the initial mount render, so the user isn't
+      // shown an error before they've touched anything. Without the guard, the effect would run
+      // once on mount and call `form.trigger('configuration.urls')`, surfacing this error
+      // unprompted.
+      renderConnectorTab({
+        configuration: {
+          ...defaultValues.configuration,
+          urls: 'mqtts://broker.local:8883',
+          tls: false,
+        },
+      })
+
+      // Flush pending effects/microtasks so a would-be mount-triggered validation has a chance
+      // to resolve and re-render before we assert on its absence.
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 0))
+      })
+      expect(screen.queryByText('datasources.errors.brokerTlsMismatch')).not.toBeInTheDocument()
+
+      // Canary: the guard must only suppress the very first run, not the whole mechanism. Toggle
+      // TLS on (resolves the mismatch) and back off (reintroduces it) to prove validation still
+      // refreshes normally after the guarded initial render.
+      const tlsCheckbox = screen.getByRole('checkbox')
+      fireEvent.click(tlsCheckbox)
+      fireEvent.click(tlsCheckbox)
+      await waitFor(() => {
+        expect(screen.getByText('datasources.errors.brokerTlsMismatch')).toBeInTheDocument()
+      })
+    })
   })
 
   describe('Read-only mode', () => {
@@ -206,6 +299,25 @@ describe('ConnectorTab (integration)', () => {
       renderConnectorTab(undefined, false)
       expect(screen.getByTestId('connectorTypeSelectTrigger')).not.toBeDisabled()
       expect(screen.getByLabelText(/URLs/)).not.toBeDisabled()
+    })
+  })
+
+  describe('Released data source', () => {
+    it('disables the connector type and all configuration fields in edit mode', () => {
+      renderConnectorTab(undefined, false, true)
+      expect(screen.getByTestId('connectorTypeSelectTrigger')).toBeDisabled()
+      expect(screen.getByLabelText(/URLs/)).toBeDisabled()
+      expect(screen.getByRole('checkbox')).toBeDisabled()
+    })
+
+    it('shows the released info in edit mode', () => {
+      renderConnectorTab(undefined, false, true)
+      expect(screen.getByText('availableInfo')).toBeInTheDocument()
+    })
+
+    it('shows no released info for a draft data source', () => {
+      renderConnectorTab(undefined, false, false)
+      expect(screen.queryByText('availableInfo')).not.toBeInTheDocument()
     })
   })
 })

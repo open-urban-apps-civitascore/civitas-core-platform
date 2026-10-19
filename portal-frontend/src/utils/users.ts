@@ -6,7 +6,6 @@ export const mapListUsers = (users: User[]): ListUser[] =>
       id: user.id,
       fullName: `${user.firstName} ${user.lastName}`,
       email: user.email,
-      active: user.active,
     }
   })
 
@@ -26,6 +25,5 @@ export const mapUserToFormData = (userResponse: User): UserFormData => ({
   email: userResponse?.email || '',
   phone: userResponse?.phone || '',
   title: userResponse?.title || 'MR',
-  active: userResponse?.active || true,
   groupIds: userResponse?.groups?.map(group => group.id) || [],
 })

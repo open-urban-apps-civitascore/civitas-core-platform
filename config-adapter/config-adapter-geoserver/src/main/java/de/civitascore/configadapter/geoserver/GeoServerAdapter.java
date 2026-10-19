@@ -22,19 +22,19 @@ import de.civitascore.configadapter.model.Operation;
 import de.civitascore.configadapter.model.dataset.SafeNames;
 import de.civitascore.configadapter.model.geoserver.DataStoreConfig;
 import de.civitascore.configadapter.model.geoserver.GeoServerConfigValue;
-import jakarta.ws.rs.ProcessingException;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.client.WebTarget;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import de.civitascore.configadapter.util.OkHttpJson;
+import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -112,7 +112,7 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
     UNKNOWN
   }
 
-  private Client client;
+  private OkHttpClient client;
   private String serverUrl;
   private GeoServerAuth auth;
   private byte[] stretchedKey = new byte[0];
@@ -148,14 +148,14 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
         Encode.forJava(getSubscribedTopics().toString()));
   }
 
-  protected Client createClient() {
-    return ClientBuilder.newBuilder()
+  protected OkHttpClient createClient() {
+    return new OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build();
   }
 
-  void setClient(Client client) {
+  void setClient(OkHttpClient client) {
     this.client = client;
   }
 
@@ -220,16 +220,18 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
   private void handleCreate(String targetResource, ResourceType resourceType, ConfigEvent event)
       throws FatalAdapterException, RetryableAdapterException {
     Object body = extractBody(event);
-    String restPath = REST_BASE + targetResource;
+    HttpUrl url = url(REST_BASE + targetResource);
 
     executeGeoServerOperation(
         AdapterOperation.GEOSERVER_RESOURCE_CREATE,
         event,
         "GeoServer " + resourceType.name() + " created successfully",
         extractNameFromBody(body),
-        () ->
-            auth.apply(client.target(serverUrl).path(restPath).request(MediaType.APPLICATION_JSON))
-                .post(Entity.json(body)));
+        () -> {
+          Request request =
+              auth.apply(OkHttpJson.jsonRequest(url).post(OkHttpJson.jsonBody(body))).build();
+          return client.newCall(request).execute();
+        });
   }
 
   private void handleUpdate(String targetResource, ResourceType resourceType, ConfigEvent event)
@@ -240,7 +242,7 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
     }
 
     Object body = extractBody(event);
-    String restPath = REST_BASE + targetResource;
+    HttpUrl url = url(REST_BASE + targetResource);
     String resourceName = extractResourceName(targetResource);
 
     executeGeoServerOperation(
@@ -248,9 +250,11 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
         event,
         "GeoServer " + resourceType.name() + " updated successfully",
         resourceName,
-        () ->
-            auth.apply(client.target(serverUrl).path(restPath).request(MediaType.APPLICATION_JSON))
-                .put(Entity.json(body)));
+        () -> {
+          Request request =
+              auth.apply(OkHttpJson.jsonRequest(url).put(OkHttpJson.jsonBody(body))).build();
+          return client.newCall(request).execute();
+        });
   }
 
   private void handleDelete(String targetResource, ResourceType resourceType, ConfigEvent event)
@@ -263,44 +267,57 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
     String resourceName = extractResourceName(targetResource);
     boolean useRecurse = shouldUseRecurse(resourceType);
 
-    WebTarget target = client.target(serverUrl).path(REST_BASE + targetResource);
+    HttpUrl.Builder urlBuilder = url(REST_BASE + targetResource).newBuilder();
     if (useRecurse) {
-      target = target.queryParam("recurse", "true");
+      urlBuilder.addQueryParameter("recurse", "true");
     }
-    final WebTarget deleteTarget = target;
+    HttpUrl deleteUrl = urlBuilder.build();
 
     executeGeoServerOperation(
         AdapterOperation.GEOSERVER_RESOURCE_DELETE,
         event,
         "GeoServer " + resourceType.name() + " deleted successfully",
         resourceName,
-        () -> auth.apply(deleteTarget.request(MediaType.APPLICATION_JSON)).delete());
+        () -> {
+          Request request = auth.apply(OkHttpJson.jsonRequest(deleteUrl).delete()).build();
+          return client.newCall(request).execute();
+        });
+  }
+
+  /**
+   * The GeoServer REST URL for a path relative to {@link #serverUrl}, e.g. {@code
+   * /rest/workspaces}.
+   */
+  private HttpUrl url(String restPath) {
+    return OkHttpJson.url(serverUrl, restPath);
   }
 
   private void handleHttpResponse(Response response, AdapterOperation operation)
-      throws RetryableAdapterException, FatalAdapterException {
-    int status = response.getStatus();
+      throws RetryableAdapterException, FatalAdapterException, IOException {
+    int status = response.code();
 
-    if (status >= 200 && status < 300) {
+    if (response.isSuccessful()) {
       return;
     }
 
-    if (status == 409 && operation == AdapterOperation.GEOSERVER_RESOURCE_CREATE) {
+    if (status == HttpURLConnection.HTTP_CONFLICT
+        && operation == AdapterOperation.GEOSERVER_RESOURCE_CREATE) {
       logger.info(
           "GeoServer resource already exists (409), treating create as success (idempotent)");
       return;
     }
 
-    if (status == 404 && operation == AdapterOperation.GEOSERVER_RESOURCE_DELETE) {
+    if (status == HttpURLConnection.HTTP_NOT_FOUND
+        && operation == AdapterOperation.GEOSERVER_RESOURCE_DELETE) {
       logger.info(
           "GeoServer resource not found (404), treating delete as success"
               + " (already deleted, idempotent)");
       return;
     }
 
-    String body = response.readEntity(String.class);
+    String body = response.body().string();
 
-    if (status >= 500) {
+    if (status >= HttpURLConnection.HTTP_INTERNAL_ERROR) {
       logger.warn(
           "GeoServer server error during {}: {} {}",
           Encode.forJava(operation.getDescription()),
@@ -330,8 +347,9 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
       handleHttpResponse(response, operation);
 
       String resolvedName = resourceName;
-      if (operation == AdapterOperation.GEOSERVER_RESOURCE_CREATE && response.getStatus() == 201) {
-        String locationHeader = response.getHeaderString("Location");
+      if (operation == AdapterOperation.GEOSERVER_RESOURCE_CREATE
+          && response.code() == HttpURLConnection.HTTP_CREATED) {
+        String locationHeader = response.header("Location");
         resolvedName = extractNameFromLocation(locationHeader);
       }
 
@@ -339,7 +357,7 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
       publishSuccessResult(event, successMessage, resolvedName);
     } catch (FatalAdapterException | RetryableAdapterException e) {
       throw e;
-    } catch (ProcessingException e) {
+    } catch (IOException e) {
       logger.warn(
           "Network error during {}: {}",
           Encode.forJava(operation.getDescription()),
@@ -357,7 +375,7 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
 
   @FunctionalInterface
   private interface HttpRequestOperation {
-    Response execute();
+    Response execute() throws IOException;
   }
 
   // ============== HELPERS ==============
@@ -472,7 +490,8 @@ public class GeoServerAdapter extends AbstractConfigAdapter {
   @Override
   public void close() {
     if (client != null) {
-      client.close();
+      client.dispatcher().executorService().shutdown();
+      client.connectionPool().evictAll();
     }
     Arrays.fill(stretchedKey, (byte) 0);
     logger.info("GeoServer adapter closed");

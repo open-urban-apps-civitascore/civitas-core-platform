@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, createEvent, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +10,19 @@ import { ApiCard } from './ApiCard'
 const mockPatchDataset = vi.fn().mockResolvedValue(undefined)
 const mockPush = vi.fn()
 const mockRefresh = vi.fn()
+const mockRequestNavigation = vi.fn()
+
+let mockHasUnsavedChanges = false
+
+vi.mock('@/contexts/unsaved-changes/UnsavedChangesContext', () => ({
+  useUnsavedChanges: () => ({
+    hasUnsavedChanges: mockHasUnsavedChanges,
+    requestNavigation: mockRequestNavigation,
+    requestBack: vi.fn(),
+    setHasUnsavedChanges: vi.fn(),
+    setSaveHandler: vi.fn(),
+  }),
+}))
 
 vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   usePatchDataset: () => ({ mutateAsync: mockPatchDataset, isPending: false }),
@@ -51,7 +64,10 @@ const renderComponent = (props: Partial<typeof defaultProps> = {}) => render(<Ap
 describe('ApiCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockHasUnsavedChanges = false
   })
+
+  const openMenu = () => userEvent.click(screen.getByTestId('apiCardMenu-my-api'))
 
   describe('Rendering', () => {
     it('displays the api name and description', () => {
@@ -114,18 +130,48 @@ describe('ApiCard', () => {
   })
 
   describe('Navigation', () => {
-    it('pushes to the view route when "view" is clicked', async () => {
+    it('links the card to the view route', () => {
       renderComponent()
-      await userEvent.click(screen.getByTestId('apiCardMenu-my-api'))
-      await userEvent.click(screen.getByTestId('apiCardMenuView-my-api'))
-      expect(mockPush).toHaveBeenCalledWith('/datasets/dataset-123/apis/my-api')
+      expect(screen.getByTestId('apiCard-my-api')).toHaveAttribute('href', '/datasets/dataset-123/apis/my-api')
     })
 
-    it('pushes to the edit route when "edit" is clicked', async () => {
+    it('links the "view" menu item to the view route', async () => {
       renderComponent()
-      await userEvent.click(screen.getByTestId('apiCardMenu-my-api'))
+      await openMenu()
+      expect(screen.getByTestId('apiCardMenuView-my-api')).toHaveAttribute('href', '/datasets/dataset-123/apis/my-api')
+    })
+
+    it('links the "edit" menu item to the edit route', async () => {
+      renderComponent()
+      await openMenu()
+      expect(screen.getByTestId('apiCardMenuEdit-my-api')).toHaveAttribute(
+        'href',
+        '/datasets/dataset-123/apis/my-api?mode=edit',
+      )
+    })
+  })
+
+  describe('Unsaved-changes guard', () => {
+    it('navigates directly when there are no unsaved changes', async () => {
+      renderComponent()
+      await openMenu()
       await userEvent.click(screen.getByTestId('apiCardMenuEdit-my-api'))
-      expect(mockPush).toHaveBeenCalledWith('/datasets/dataset-123/apis/my-api?mode=edit')
+      expect(mockRequestNavigation).not.toHaveBeenCalled()
+    })
+
+    it('requests navigation instead of following the "edit" link when there are unsaved changes', async () => {
+      mockHasUnsavedChanges = true
+      renderComponent()
+      await openMenu()
+      await userEvent.click(screen.getByTestId('apiCardMenuEdit-my-api'))
+      expect(mockRequestNavigation).toHaveBeenCalledWith('/datasets/dataset-123/apis/my-api?mode=edit')
+    })
+
+    it('requests navigation instead of following the card link when there are unsaved changes', async () => {
+      mockHasUnsavedChanges = true
+      renderComponent()
+      await userEvent.click(screen.getByTestId('apiCard-my-api'))
+      expect(mockRequestNavigation).toHaveBeenCalledWith('/datasets/dataset-123/apis/my-api')
     })
   })
 
@@ -219,14 +265,79 @@ describe('ApiCard', () => {
 
     it('copies the backend-provided previewUrl verbatim when present', async () => {
       renderComponent({ api: makeApi({ previewUrl: 'https://api.example.com/v1/datasets/dataset-123/my-api' }) })
-      await userEvent.click(screen.getByRole('button', { name: 'Copy API path' }))
+      await userEvent.click(screen.getByTestId('apiCardCopy-my-api'))
       expect(mockWriteText).toHaveBeenCalledWith('https://api.example.com/v1/datasets/dataset-123/my-api')
     })
 
     it('falls back to the /v1 path (not the pre-#1368 /datasets scheme) when previewUrl is missing', async () => {
       renderComponent({ api: makeApi({ previewUrl: undefined }) })
-      await userEvent.click(screen.getByRole('button', { name: 'Copy API path' }))
+      await userEvent.click(screen.getByTestId('apiCardCopy-my-api'))
       expect(mockWriteText).toHaveBeenCalledWith(expect.stringContaining('/v1/datasets/dataset-123/my-api'))
+    })
+  })
+
+  describe('Copy button (issue #2206)', () => {
+    const mockWriteText = vi.fn().mockResolvedValue(undefined)
+
+    beforeEach(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: mockWriteText },
+        configurable: true,
+      })
+    })
+
+    // The button sits inside the card's <a>; without preventDefault the browser follows the
+    // anchor and the detail view opens on top of the copy.
+    it('prevents the card link default so copying does not open the detail view', async () => {
+      renderComponent()
+      const copyButton = screen.getByTestId('apiCardCopy-my-api')
+      const click = createEvent.click(copyButton, { bubbles: true, cancelable: true })
+
+      await act(async () => {
+        fireEvent(copyButton, click)
+      })
+
+      expect(click.defaultPrevented).toBe(true)
+    })
+
+    it('does not trigger the unsaved-changes navigation guard when copying', async () => {
+      mockHasUnsavedChanges = true
+      renderComponent()
+      await userEvent.click(screen.getByTestId('apiCardCopy-my-api'))
+      expect(mockRequestNavigation).not.toHaveBeenCalled()
+    })
+
+    it('prevents the card link default when opening the card menu', () => {
+      renderComponent()
+      const menuButton = screen.getByTestId('apiCardMenu-my-api')
+      const click = createEvent.click(menuButton, { bubbles: true, cancelable: true })
+
+      fireEvent(menuButton, click)
+
+      expect(click.defaultPrevented).toBe(true)
+    })
+
+    it('shows a success toast after copying', async () => {
+      renderComponent()
+
+      await userEvent.click(screen.getByTestId('apiCardCopy-my-api'))
+
+      await waitFor(() => expect(toast.success).toHaveBeenCalled())
+    })
+
+    it('stays silent when clipboard access fails', async () => {
+      mockWriteText.mockRejectedValueOnce(new Error('insecure context'))
+      renderComponent()
+
+      await userEvent.click(screen.getByTestId('apiCardCopy-my-api'))
+
+      await waitFor(() => expect(mockWriteText).toHaveBeenCalled())
+      expect(toast.success).not.toHaveBeenCalled()
+    })
+
+    it('exposes a translated accessible name', () => {
+      renderComponent()
+      expect(screen.getByTestId('apiCardCopy-my-api')).toHaveAttribute('aria-label', 'actions.copyPath')
     })
   })
 })

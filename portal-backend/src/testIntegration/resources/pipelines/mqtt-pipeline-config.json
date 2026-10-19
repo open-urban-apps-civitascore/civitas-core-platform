@@ -1,42 +1,29 @@
 {
-  "viewport": { "x": 0, "y": 0, "zoom": 1 },
-  "nodePositions": {
-    "1a2b3c4d-0001-4000-8000-000000000001": { "x": 320, "y": 0 },
-    "1a2b3c4d-0002-4000-8000-000000000002": { "x": 640, "y": 0 }
-  },
   "nodes": [
     {
       "id": "1a2b3c4d-0001-4000-8000-000000000001",
-      "type": "start",
-      "position": { "x": 320, "y": 0 },
-      "data": {
-        "nodeType": "start",
-        "label": "Start",
-        "configured": true,
-        "description": "Entry point of the pipeline. Execution begins here."
-      },
-      "measured": { "width": 32, "height": 32 }
+      "kind": "start",
+      "label": "Start",
+      "x-ui-position": {
+        "x": 320,
+        "y": 0
+      }
     },
     {
       "id": "1a2b3c4d-0002-4000-8000-000000000002",
-      "type": "end",
-      "position": { "x": 640, "y": 0 },
-      "data": {
-        "nodeType": "end",
-        "label": "End",
-        "configured": true,
-        "description": "Exit point of the pipeline. Execution completes here."
-      },
-      "measured": { "width": 32, "height": 32 }
+      "kind": "end",
+      "label": "End",
+      "x-ui-position": {
+        "x": 640,
+        "y": 0
+      }
     }
   ],
   "edges": [
     {
       "id": "1a2b3c4d-00ed-4000-8000-0000000000e1",
       "source": "1a2b3c4d-0001-4000-8000-000000000001",
-      "target": "1a2b3c4d-0002-4000-8000-000000000002",
-      "type": "smoothstep",
-      "data": { "label": "" }
+      "target": "1a2b3c4d-0002-4000-8000-000000000002"
     }
   ]
 }

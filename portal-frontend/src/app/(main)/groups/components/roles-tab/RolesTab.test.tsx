@@ -96,7 +96,6 @@ const mockGroup: Group = {
   contactUser: null,
   createdAt: '',
   modifiedAt: '',
-  roles: [],
 }
 
 const assignmentsFromGroup = (group: Group): AssignmentFormData[] =>

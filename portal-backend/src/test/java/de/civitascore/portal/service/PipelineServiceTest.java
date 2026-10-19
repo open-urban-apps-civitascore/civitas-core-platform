@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -18,19 +20,23 @@ import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.PipelineInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
-import de.civitascore.portal.security.DataSourceDatapoolScopeValidator;
-import de.civitascore.portal.security.ScopeAccessAuthorizer;
+import de.civitascore.portal.security.AllowedScopes;
+import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -39,6 +45,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 class PipelineServiceTest {
@@ -49,11 +57,23 @@ class PipelineServiceTest {
   @Mock private DataSourceRepository dataSourceRepository;
   @Mock private DataSinkService dataSinkService;
   @Mock private DataSinkRepository dataSinkRepository;
-  @Mock private ScopeAccessAuthorizer scopeAccessAuthorizer;
+
+  @Mock private ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   @Spy private DataSourceDatapoolScopeValidator datapoolScopeValidator;
 
+  @Mock private DataSetMutationGuard dataSetMutationGuard;
+  @Mock private ModelRegistryGateway modelRegistryGateway;
+
   @InjectMocks private PipelineService pipelineService;
+
+  /** A request that came through OPA. Lenient: only the datasource-reference path consults it. */
+  @BeforeEach
+  void scopeHeaderPresent() {
+    AllowedScopes scopes = new AllowedScopes();
+    scopes.setWildcard();
+    lenient().when(allowedScopesProvider.getObject()).thenReturn(scopes);
+  }
 
   private DataSet draftDataSet(UUID id) {
     DataSet ds = new DataSet();
@@ -72,12 +92,62 @@ class PipelineServiceTest {
   }
 
   @Nested
+  @DisplayName("Registry identity")
+  class RegistryIdentity {
+
+    @Test
+    @DisplayName("Stores a created pipeline's definition under the id the save assigned")
+    void create_storesTheDefinitionUnderTheSavedId() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID pipelineId = UUID.randomUUID();
+      DataSet dataSet = draftDataSet(dataSetId);
+      String logicalUrn = "urn:core:platform:civitas:pipeline:common:" + pipelineId;
+
+      PipelineInputDTO input = new PipelineInputDTO();
+      input.setName("test-pipeline");
+      input.setDataSetId(dataSetId);
+      input.setModel(Map.of("nodes", List.of(), "edges", List.of()));
+
+      Pipeline entity = new Pipeline();
+      entity.setName("test-pipeline");
+      when(pipelineMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
+      when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
+      when(pipelineRepository.save(any()))
+          .thenAnswer(
+              invocation -> {
+                Pipeline saved = invocation.getArgument(0);
+                saved.setId(pipelineId);
+                return saved;
+              });
+      when(dataSinkRepository.findByPipelineId(any())).thenReturn(List.of());
+      when(modelRegistryGateway.storePayload(any(), any(), any(), any(), any(), any(), any()))
+          .thenReturn(
+              new ModelRegistryGateway.ModelPin(logicalUrn, logicalUrn + ":1.0.0", "1.0.0"));
+
+      Pipeline result = pipelineService.create(input);
+
+      verify(modelRegistryGateway)
+          .storePayload(
+              eq(PayloadKind.PIPELINE),
+              eq(Optional.empty()),
+              eq(pipelineId),
+              any(),
+              any(),
+              any(),
+              any());
+      assertThat(result.getModelLogicalUrn()).isEqualTo(logicalUrn);
+      assertThat(result.getModelUrn()).isEqualTo(logicalUrn + ":1.0.0");
+    }
+  }
+
+  @Nested
   @DisplayName("DataSource Linking Validation")
   class DataSourceLinkingValidation {
 
     @Test
-    @DisplayName("Should reject linking a DRAFT datasource to a pipeline")
-    void shouldRejectDraftDataSource() {
+    @DisplayName("Should link a DRAFT DataSource to a Pipeline")
+    void shouldLinkDraftDataSource() {
       UUID dataSetId = UUID.randomUUID();
       UUID dataSourceId = UUID.randomUUID();
 
@@ -92,17 +162,62 @@ class PipelineServiceTest {
       input.setDataSetId(dataSetId);
       input.setDataSourceIds(Set.of(dataSourceId));
 
-      Pipeline entity = new Pipeline();
-      entity.setName("test-pipeline");
+      Pipeline entity = pipeline(UUID.randomUUID(), dataSet);
 
       when(pipelineMapper.toEntity(any())).thenReturn(entity);
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
       when(dataSourceRepository.findAllById(Set.of(dataSourceId)))
           .thenReturn(List.of(draftDataSource));
+      when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
+      when(pipelineRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+      when(dataSinkRepository.findByPipelineId(entity.getId())).thenReturn(List.of());
+
+      Pipeline result = pipelineService.create(input);
+
+      assertThat(result.getDataSources()).containsExactly(draftDataSource);
+    }
+
+    @Test
+    @DisplayName("Should reject a nonexistent datasource indistinguishably from an unusable one")
+    void shouldRejectNonexistentDataSourceLikeAnUnusableOne() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID missingId = UUID.randomUUID();
+
+      PipelineInputDTO input = new PipelineInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setDataSourceIds(Set.of(missingId));
+
+      when(pipelineMapper.toEntity(any())).thenReturn(new Pipeline());
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(draftDataSet(dataSetId)));
+      when(dataSourceRepository.findAllById(Set.of(missingId))).thenReturn(List.of());
 
       assertThatThrownBy(() -> pipelineService.create(input))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("AVAILABLE status");
+          .isInstanceOf(DataSourceScopeViolationException.class)
+          .satisfies(
+              ex ->
+                  assertThat(((DataSourceScopeViolationException) ex).getOffendingDataSourceIds())
+                      .containsExactly(missingId))
+          .hasMessageNotContaining("not found");
+    }
+
+    @Test
+    @DisplayName("Should deny referencing a datasource when no scope header is present")
+    void shouldDenyWhenScopeHeaderAbsent() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dataSourceId = UUID.randomUUID();
+
+      PipelineInputDTO input = new PipelineInputDTO();
+      input.setDataSetId(dataSetId);
+      input.setDataSourceIds(Set.of(dataSourceId));
+
+      // A request that never passed APISIX/OPA carries no scope header at all.
+      when(allowedScopesProvider.getObject()).thenReturn(new AllowedScopes());
+      when(pipelineMapper.toEntity(any())).thenReturn(new Pipeline());
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(draftDataSet(dataSetId)));
+
+      assertThatThrownBy(() -> pipelineService.create(input))
+          .isInstanceOf(AccessDeniedException.class);
+      verify(dataSourceRepository, never()).findAllById(any());
     }
 
     @Test

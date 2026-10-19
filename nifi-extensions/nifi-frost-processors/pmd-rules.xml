@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<ruleset name="NiFi FROST Processors"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0
+           https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+  <description>PMD rules for the nifi-frost-processors module.
+    Mirrors the exclusions of config-adapter-nifi; only actionable findings remain.</description>
+
+  <!-- Best Practices -->
+  <rule ref="category/java/bestpractices.xml">
+    <exclude name="GuardLogStatement"/>          <!-- SLF4J parameterized logging is lazy -->
+  </rule>
+
+  <!-- Design -->
+  <rule ref="category/java/design.xml">
+    <exclude name="LawOfDemeter"/>               <!-- Too strict for fluent builder APIs -->
+    <exclude name="CyclomaticComplexity"/>       <!-- The port builders are branchy by nature -->
+    <exclude name="TooManyMethods"/>             <!-- Small focused helpers in the batch builder -->
+    <exclude name="ExcessiveImports"/>           <!-- The processor wires many small collaborators -->
+    <exclude name="CouplingBetweenObjects"/>     <!-- The processor is the intended composition point -->
+    <exclude name="GodClass"/>                   <!-- Cohesive builders; one method per sub-request -->
+    <!-- The builder parameters are the fields of the sub-request they build. A carrier object would
+         take the same list in its own constructor and move the finding one call further. -->
+    <exclude name="UseObjectForClearerAPI"/>
+  </rule>
+
+  <!-- Error Prone -->
+  <rule ref="category/java/errorprone.xml">
+    <exclude name="NullAssignment"/>
+    <exclude name="AvoidLiteralsInIfCondition"/> <!-- HTTP status codes read clearer as literals -->
+    <exclude name="AvoidDuplicateLiterals"/>     <!-- Repeated STA entity names are clearer inline -->
+    <exclude name="AvoidFieldNameMatchingMethodName"/>
+    <exclude name="UseProperClassLoader"/>
+  </rule>
+
+  <!-- Code Style -->
+  <rule ref="category/java/codestyle.xml">
+    <exclude name="LocalVariableCouldBeFinal"/>
+    <exclude name="MethodArgumentCouldBeFinal"/>
+    <exclude name="CommentDefaultAccessModifier"/>
+    <exclude name="OnlyOneReturn"/>
+    <exclude name="AtLeastOneConstructor"/>
+    <exclude name="LongVariable"/>
+    <exclude name="ShortVariable"/>
+    <exclude name="UseExplicitTypes"/>
+    <exclude name="TooManyStaticImports"/>
+    <!-- of() and id() are the idiomatic names for a factory and for an identifier, the same reason
+         ShortVariable is excluded above. -->
+    <exclude name="ShortMethodName"/>
+  </rule>
+</ruleset>

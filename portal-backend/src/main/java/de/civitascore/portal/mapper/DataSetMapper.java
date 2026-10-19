@@ -3,6 +3,7 @@ package de.civitascore.portal.mapper;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.DataSetMetaInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.model.output.NamedApiOutputDTO;
@@ -27,11 +28,6 @@ import org.mapstruct.ReportingPolicy;
     },
     unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputDTO, DataSet> {
-  @Mapping(target = "owner", ignore = true)
-  @Mapping(target = "dataSetSeries", ignore = true)
-  @Mapping(target = "agents", ignore = true)
-  @Mapping(target = "distributions", ignore = true)
-  @Mapping(target = "catalogs", ignore = true)
   @Mapping(target = "pipelines", ignore = true)
   @Mapping(target = "projectId", ignore = true)
   @Mapping(target = "frostBaseUrl", ignore = true)
@@ -64,14 +60,28 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
     dto.setNamedApis(null);
   }
 
+  @Mapping(target = "assignments", ignore = true)
+  @Mapping(source = "dataPool.id", target = "datapoolId")
+  DataSetMetaInputDTO toMetaInput(DataSet entity);
+
+  @Mapping(target = "namedApis", ignore = true)
+  @Mapping(target = "datapoolId", ignore = true)
+  @Mapping(target = "datapoolIdPresent", ignore = true)
+  DataSetInputDTO toUpdateInput(DataSetMetaInputDTO meta);
+
+  // The datapoolId setter marks the field present, so an unconditional copy would turn an omitted
+  // datapoolId into an explicit clear.
+  @AfterMapping
+  default void copyDatapoolIdIfPresent(
+      DataSetMetaInputDTO meta, @MappingTarget DataSetInputDTO input) {
+    if (meta.isDatapoolIdPresent()) {
+      input.setDatapoolId(meta.getDatapoolId());
+    }
+  }
+
   DataSetSummaryDTO toSummary(DataSet entity);
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
-  @Mapping(target = "owner", ignore = true)
-  @Mapping(target = "dataSetSeries", ignore = true)
-  @Mapping(target = "agents", ignore = true)
-  @Mapping(target = "distributions", ignore = true)
-  @Mapping(target = "catalogs", ignore = true)
   @Mapping(target = "pipelines", ignore = true)
   @Mapping(target = "assignments", ignore = true)
   @Mapping(target = "projectId", ignore = true)
@@ -94,8 +104,6 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Mapping(target = "dataSet", ignore = true)
   @Mapping(target = "routeId", ignore = true)
   NamedApi toNamedApiEntity(NamedApiInputDTO dto);
-
-  NamedApiInputDTO toNamedApiInputDto(NamedApi entity);
 
   // previewUrl is built by DataSetAssembler since it depends on configuration.
   @Mapping(target = "previewUrl", ignore = true)

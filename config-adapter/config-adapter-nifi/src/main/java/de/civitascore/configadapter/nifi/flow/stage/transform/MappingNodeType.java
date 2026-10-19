@@ -31,17 +31,17 @@ import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import de.civitascore.configadapter.nifi.mapping.ValueNode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
- * The mapping node kind: parses each node's {@code mappingConfig} and compiles the chain to
- * RecordPath (directly for a records sink, or via the FROST mapping compiler for a mapped FROST
- * sink). For a FROST sink the intermediate mappings stay plain record transforms while the LAST
- * mapping targets the sink's Thing-shaped structure and compiles into flat intermediate fields plus
- * the entity plan the sink's build half turns into its find-or-create chain.
+ * The mapping node kind: resolves each node's {@code mappingRef} against the trigger's artifacts
+ * and compiles the chain to RecordPath (directly for a records sink, or via the FROST mapping
+ * compiler for a mapped FROST sink). For a FROST sink the intermediate mappings stay plain record
+ * transforms while the LAST mapping targets the sink's Thing-shaped structure and compiles into
+ * flat intermediate fields plus the entity plan the sink's build half turns into its find-or-create
+ * chain.
  */
 public final class MappingNodeType implements TransformNodeType {
-
-  private static final String KEY_MAPPING_CONFIG = "mappingConfig";
 
   private final ObjectMapper mapper = new ObjectMapper();
   private final MappingConfigParser mappingConfigParser;
@@ -67,9 +67,13 @@ public final class MappingNodeType implements TransformNodeType {
   }
 
   @Override
-  public Compilation compile(List<GraphNode> ownNodes, SinkStage<?> sink, SinkSpec sinkSpec)
+  public Compilation compile(
+      List<GraphNode> ownNodes,
+      SinkStage<?> sink,
+      SinkSpec sinkSpec,
+      Map<String, Map<String, Object>> artifacts)
       throws FatalAdapterException {
-    List<MappingConfig> mappingConfigs = parse(ownNodes);
+    List<MappingConfig> mappingConfigs = parse(ownNodes, artifacts);
     if (sink.mappingSupport() == MappingSupport.NONE) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR, sink.mappingRejectionMessage());
@@ -91,7 +95,7 @@ public final class MappingNodeType implements TransformNodeType {
       }
       FrostMappingCompiler.FrostCompilation compilation =
           frostMappingCompiler.compile(
-              mappingConfigs.get(mappingConfigs.size() - 1), frost.staProperties());
+              mappingConfigs.get(mappingConfigs.size() - 1), frost.staProperties(), frost.port());
       units.add(compilation.mapping());
       return new Compilation(units, compilation.plan());
     }
@@ -153,8 +157,7 @@ public final class MappingNodeType implements TransformNodeType {
    * so a stale declaration is not recoverable at runtime: paths resolve against nothing, and an
    * array selector makes the fan-out target an array the record no longer has.
    *
-   * <p>Compared on structure identity and version, not on the URN string: the name segment is a
-   * display name, so a rename leaves the shape untouched and must not fail a deploy. A version bump
+   * <p>Compared through {@link CoreUrn#sameStructureVersion}, not on the URN string. A version bump
    * is a different shape and does fail — the downstream node's paths were authored against the old
    * one.
    *
@@ -208,18 +211,22 @@ public final class MappingNodeType implements TransformNodeType {
     return side + " structure '" + structure + "'";
   }
 
-  /** Parses each node's config, in flow order. */
-  private List<MappingConfig> parse(List<GraphNode> ownNodes) throws FatalAdapterException {
+  /**
+   * Resolves each node's {@code mappingRef} against the trigger's artifacts and parses the mapping
+   * document, in flow order. A wired mapping node with no ref is a corrupted payload that would
+   * otherwise deploy untransformed.
+   */
+  private List<MappingConfig> parse(
+      List<GraphNode> ownNodes, Map<String, Map<String, Object>> artifacts)
+      throws FatalAdapterException {
     List<MappingConfig> configs = new ArrayList<>();
     for (GraphNode node : ownNodes) {
-      Object rawConfig = node.data().get(KEY_MAPPING_CONFIG);
-      if (rawConfig == null) {
-        // A wired mapping node must carry a config; a missing one is a corrupted payload that
-        // would otherwise deploy untransformed. (A pipeline with no mapping node at all is fine.)
+      String ref = node.mappingRef();
+      if (ref == null || ref.isBlank()) {
         throw new FatalAdapterException(
-            AdapterErrorCode.NIFI_TEMPLATE_ERROR, "mapping node has no mappingConfig");
+            AdapterErrorCode.NIFI_TEMPLATE_ERROR, "mapping node has no mappingRef");
       }
-      configs.add(mappingConfigParser.parse(mapper.valueToTree(rawConfig)));
+      configs.add(mappingConfigParser.parse(mapper.valueToTree(artifacts.get(ref))));
     }
     return configs;
   }

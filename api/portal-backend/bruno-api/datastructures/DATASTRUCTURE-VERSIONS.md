@@ -48,8 +48,6 @@ POST {{baseUrl}}/datastructures/:dataStructureId/versions
 Content-Type: application/json
 
 {
-  "dataStructureVersionSource": "OWN",
-  "version": "1.0.4",
   "description": "Initial version",
   "modelName": "StudentDatabaseModel1",
   "model": {
@@ -89,8 +87,6 @@ PUT {{baseUrl}}/datastructures/:dataStructureId/versions/:id
 Content-Type: application/json
 
 {
-  "dataStructureVersionSource": "OWN",
-  "version": "1.0.4",
   "description": "Updated version",
   "modelName": "StudentDatabaseModel1",
   "model": {
@@ -141,30 +137,6 @@ Content-Type: application/json
 | System | Expected Change | Verified |
 |---|---|---|
 | Backend | Version `description` updated in `portal_backend` DB; other fields unchanged | ☐ |
-| Config Adapter | — | ☐ |
-| External System | — | ☐ |
-
----
-
-## TC-DSTV-06 – Delete DataStructure Version
-
-**Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is not in released state.
-
-**Request**
-```
-DELETE {{baseUrl}}/datastructures/:dataStructureId/versions/:id
-```
-
-**Expected Response**
-- Status: `204 No Content`
-
-**Verification:** Issue TC-DSTV-02 for the same `dataStructureVersionId` and confirm a `404` response.
-
-**System Impact**
-
-| System | Expected Change | Verified |
-|---|---|---|
-| Backend | Version record removed from `portal_backend` DB | ☐ |
 | Config Adapter | — | ☐ |
 | External System | — | ☐ |
 
@@ -222,21 +194,19 @@ POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/unrelease
 
 **Request**
 ```
-PUT {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/released/meta
+PATCH {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/released/meta
 
 Content-Type: application/json
 
 {
-  "dataStructureVersionSource": "OWN",
-  "version": "1.0.1",
-  "modelName": "UpdatedModelName",
-  "styles": {}
+  "description": "Updated version description"
 }
 ```
 
 **Expected Response**
 - Status: `200 OK`
 - Released version metadata is updated
+- `model`, `styles` or `modelName` in the body: `400 Bad Request`
 
 **System Impact**
 

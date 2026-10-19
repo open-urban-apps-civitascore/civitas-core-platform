@@ -4,7 +4,7 @@ meta {
   seq: 27
 }
 
-put {
+patch {
   url: {{baseUrl}}/datasets/:id/released/meta
   body: json
   auth: inherit
@@ -43,7 +43,7 @@ script:pre-request {
     '&password=' + encodeURIComponent(bru.getEnvVar('password'));
 
   // Fail loudly if readiness can't be proven — otherwise every poll below 401s, `pending` never
-  // leaves its sentinel, and the PUT hits the very 409 race this guard exists to remove.
+  // leaves its sentinel, and the PATCH hits the very 409 race this guard exists to remove.
   let bearer = '';
   try {
     const tok = await axios.post(`${kc}/realms/${realm}/protocol/openid-connect/token`, form, {
@@ -86,7 +86,7 @@ tests {
 docs {
   **Saga step 9f of 18** — Flip a released dataset to open data access (issue #1368, journey J3).
 
-  `PUT /datasets/{id}/released/meta` with `openDataAccess: true` updates the released dataset and **persists** the flag. The route is **not** reconfigured: the DATASET_UPDATE saga re-applies the same protected route and the FROST project stays private. Anonymous read access is granted by **OPA**, which re-reads the now-`true` flag from the AuthZ Repository on the next request (after its short attribute-cache TTL) — there is no FROST `public` flag and no auth-plugin removal anymore. `assignments` and `namedApis` are omitted so the null reconciler leaves them untouched (keeps step 10 green; named APIs are immutable while released anyway).
+  `PATCH /datasets/{id}/released/meta` with `openDataAccess: true` updates the released dataset and **persists** the flag. The route is **not** reconfigured: the DATASET_UPDATE saga re-applies the same protected route and the FROST project stays private. Anonymous read access is granted by **OPA**, which re-reads the now-`true` flag from the AuthZ Repository on the next request (after its short attribute-cache TTL) — there is no FROST `public` flag and no auth-plugin removal anymore. `assignments` is omitted, so it stays as it is (keeps step 10 green). `namedApis` cannot change after release; this endpoint rejects it with 400.
 
   **Precondition:** CREATE saga (step 8) has settled (`pendingSagaType == null`, polled in pre-request); dataset is AVAILABLE.
 

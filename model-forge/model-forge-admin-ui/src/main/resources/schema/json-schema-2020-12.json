@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:model-forge:admin-ui:element-authoring-schema",
+  "title": "JSON Schema (draft 2020-12) — authoring aid",
+  "description": "Curated subset of the JSON Schema 2020-12 vocabulary, used only to drive editor completion and hover when authoring CORE Elements. Not a validator-grade meta-schema: unknown keywords are permitted (additionalProperties defaults to true), so this never flags a valid schema as wrong.",
+  "type": ["object", "boolean"],
+  "properties": {
+    "$schema": { "type": "string", "description": "Dialect URI, e.g. https://json-schema.org/draft/2020-12/schema." },
+    "$id": { "type": "string", "description": "Identifier of this schema. For a CORE Element this is its CORE URN." },
+    "$ref": { "type": "string", "description": "Reference to another schema, e.g. '#/$defs/Foo' or a CORE URN." },
+    "$defs": { "type": "object", "description": "Reusable named subschemas.", "additionalProperties": { "$ref": "#" } },
+    "$comment": { "type": "string", "description": "A comment for schema maintainers; ignored by validators." },
+    "title": { "type": "string", "description": "Human-readable name of this schema." },
+    "description": { "type": "string", "description": "Human-readable explanation." },
+    "type": {
+      "description": "The JSON type(s) a value must be.",
+      "anyOf": [
+        { "$ref": "#/$defs/simpleType" },
+        { "type": "array", "items": { "$ref": "#/$defs/simpleType" }, "minItems": 1, "uniqueItems": true }
+      ]
+    },
+    "enum": { "type": "array", "description": "The value must equal one of these.", "minItems": 1 },
+    "const": { "description": "The value must equal this single constant." },
+    "default": { "description": "Default value used by consumers/tools." },
+    "examples": { "type": "array", "description": "Sample valid values." },
+    "properties": { "type": "object", "description": "Schemas for named object properties.", "additionalProperties": { "$ref": "#" } },
+    "required": { "type": "array", "description": "Names of properties that must be present.", "items": { "type": "string" }, "uniqueItems": true },
+    "additionalProperties": { "description": "Schema (or false) for properties not otherwise covered.", "anyOf": [ { "type": "boolean" }, { "$ref": "#" } ] },
+    "patternProperties": { "type": "object", "description": "Schemas keyed by regular expressions matched against property names.", "additionalProperties": { "$ref": "#" } },
+    "propertyNames": { "description": "Schema every property name must satisfy.", "$ref": "#" },
+    "items": { "description": "Schema for array items.", "anyOf": [ { "type": "boolean" }, { "$ref": "#" } ] },
+    "prefixItems": { "type": "array", "description": "Per-position schemas for the start of an array (tuple).", "items": { "$ref": "#" } },
+    "contains": { "description": "At least one array item must match this schema.", "$ref": "#" },
+    "minItems": { "type": "integer", "minimum": 0 },
+    "maxItems": { "type": "integer", "minimum": 0 },
+    "uniqueItems": { "type": "boolean", "description": "Whether array items must all differ." },
+    "minLength": { "type": "integer", "minimum": 0 },
+    "maxLength": { "type": "integer", "minimum": 0 },
+    "pattern": { "type": "string", "description": "Regular expression the string must match." },
+    "format": { "type": "string", "description": "Semantic format annotation, e.g. date-time, date, time, email, uri, uuid, ipv4." },
+    "minimum": { "type": "number", "description": "Inclusive lower bound." },
+    "maximum": { "type": "number", "description": "Inclusive upper bound." },
+    "exclusiveMinimum": { "type": "number", "description": "Exclusive lower bound." },
+    "exclusiveMaximum": { "type": "number", "description": "Exclusive upper bound." },
+    "multipleOf": { "type": "number", "exclusiveMinimum": 0, "description": "The value must be a multiple of this." },
+    "oneOf": { "type": "array", "description": "Exactly one subschema must match.", "items": { "$ref": "#" } },
+    "anyOf": { "type": "array", "description": "At least one subschema must match.", "items": { "$ref": "#" } },
+    "allOf": { "type": "array", "description": "All subschemas must match.", "items": { "$ref": "#" } },
+    "not": { "description": "The value must NOT match this subschema.", "$ref": "#" },
+    "if": { "description": "Conditional: when this matches, 'then' applies, otherwise 'else'.", "$ref": "#" },
+    "then": { "$ref": "#" },
+    "else": { "$ref": "#" },
+    "readOnly": { "type": "boolean" },
+    "writeOnly": { "type": "boolean" },
+    "deprecated": { "type": "boolean" }
+  },
+  "$defs": {
+    "simpleType": {
+      "description": "A primitive JSON Schema type.",
+      "enum": ["string", "number", "integer", "object", "array", "boolean", "null"]
+    }
+  }
+}

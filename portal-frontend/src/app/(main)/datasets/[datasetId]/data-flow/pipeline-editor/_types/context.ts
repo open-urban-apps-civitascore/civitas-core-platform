@@ -7,6 +7,9 @@
 
 import type { Connection } from '@xyflow/react'
 
+import type { PipelineDeleteBlockReason } from '@/utils/pipelineDeleteGuard'
+
+import type { ApiSinkLockReason, DataSinkLocks, SinkLockReason } from '../_hooks/use-datasink-locks'
 import type { PipelineReducerAction } from '../_services/pipelineService'
 import type { ValidationResultWithNodeStatus } from '../_services/validationService'
 import type { PipelineNodeData } from './nodes'
@@ -90,6 +93,8 @@ export interface ActivePipelineContextValue {
   clearValidation: () => void
   /** Get validation severity for a specific node */
   getNodeValidationSeverity: (nodeId: string) => 'error' | 'warning' | 'none'
+  /** Name of the pipeline that already uses this table name in another node, or null */
+  pipelineUsingTableName: (nodeId: string, tableName: string) => string | null
   /** Whether validation is required before save (true when pipeline changed since last validation) */
   isValidationRequired: boolean
   /** Whether the pipeline can be saved (isDirty && !hasErrors && !isValidationRequired) */
@@ -100,18 +105,32 @@ export interface ActivePipelineContextValue {
   hideValidationPanel: () => void
 
   // ===== Pipeline Operations =====
+  /** Rename the active pipeline. Persisted on the next Save All, like any other edit. */
+  renamePipeline: (newName: string) => void
   /** Delete the active pipeline from backend and remove its tab */
   deletePipeline: () => void
   /** Whether a delete operation is currently in progress */
   isDeleting: boolean
-  /** Whether pipelines are being loaded from the backend */
-  isLoadingPipelines: boolean
+  /** Why the active pipeline must not be deleted; null when it can be deleted */
+  pipelineDeleteBlockReason: PipelineDeleteBlockReason | null
+  /** Whether the pipelines and the data sink locks are being loaded from the backend */
+  isLoadingEditor: boolean
   /** Save all dirty pipelines across all tabs. Returns true if all saves succeeded. */
   saveAllPipelines: () => Promise<boolean>
   /** Whether a save-all operation is currently in progress */
   isSavingAll: boolean
   /** Whether any session has unsaved changes */
   hasAnyDirtySession: boolean
+
+  // ===== Data Sink Locks =====
+  /** Locks of a saved data sink, looked up by its entityId */
+  getSinkLocks: (entityId: string | undefined) => DataSinkLocks
+  /** Why this data sink node must not be deleted, or null when it may be */
+  getSinkLockReason: (node: PipelineNode) => SinkLockReason | null
+  /** Lock reason of the first locked node among the selected ones */
+  getSelectionLockReason: (nodes: PipelineNode[]) => SinkLockReason | null
+  /** The API that deleting these nodes leaves without a sink, or null when there is none */
+  getLastApiSinkLockReason: (nodeIdsToDelete: string[]) => ApiSinkLockReason | null
 
   // ===== Session Info =====
   /** ID of the active session */

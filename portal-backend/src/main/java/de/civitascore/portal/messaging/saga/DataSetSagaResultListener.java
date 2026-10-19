@@ -77,11 +77,9 @@ public class DataSetSagaResultListener {
         }
       }
     } catch (JacksonException e) {
-      log.error("Failed to deserialize saga result: {}", e.getMessage(), e);
-      throw new IllegalStateException("Saga result deserialization failed", e);
+      throw new InvalidSagaResultException("Saga result deserialization failed", e);
     } catch (IllegalArgumentException e) {
-      log.error("Invalid saga result payload: {}", e.getMessage(), e);
-      throw new IllegalStateException("Saga result processing failed", e);
+      throw new InvalidSagaResultException("Saga result processing failed", e);
     }
   }
 
@@ -164,9 +162,6 @@ public class DataSetSagaResultListener {
         status.get("occurredAt") == null
             ? null
             : Instant.parse(String.valueOf(status.get("occurredAt"))),
-        status.get("correlationId") == null
-            ? null
-            : UUID.fromString(String.valueOf(status.get("correlationId"))),
         status.get("eventId") == null
             ? null
             : UUID.fromString(String.valueOf(status.get("eventId"))));

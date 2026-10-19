@@ -1,5 +1,5 @@
 meta {
-  name: Contract MQTT — empty configuration accepted (2/2 cleanup)
+  name: Contract MQTT — empty connector accepted (2/2 cleanup)
   type: http
   seq: 34
 }
@@ -10,9 +10,6 @@ delete {
   auth: inherit
 }
 
-headers {
-  X-Allowed-Scope-Ids: *
-}
 
 tests {
   test("Status is 204", function() {

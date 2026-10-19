@@ -51,6 +51,5 @@ public class PipelineRuntimeStatus {
   private String sanitizedStacktrace;
 
   private Instant occurredAt;
-  private UUID correlationId;
   private UUID lastEventId;
 }

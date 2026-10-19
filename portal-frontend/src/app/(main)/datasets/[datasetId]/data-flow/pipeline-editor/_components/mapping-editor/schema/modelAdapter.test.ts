@@ -47,12 +47,13 @@ describe('modelToSchemaTree', () => {
     ])
   })
 
-  it('maps scalar types and formats like the diagram adapter (date-time, uuid, number, boolean)', () => {
+  it('maps scalar types and formats like the diagram adapter (date, date-time, uuid, number, boolean)', () => {
     const tree = modelToSchemaTree(
       wrapperModel({
         Thing: {
           type: 'object',
           properties: {
+            day: { type: 'string', format: 'date' },
             ts: { type: 'string', format: 'date-time' },
             id: { type: 'string', format: 'uuid' },
             value: { type: 'number' },
@@ -62,7 +63,62 @@ describe('modelToSchemaTree', () => {
       }),
       'fallback',
     )
-    expect(tree.fields[0].children?.map(f => f.type)).toEqual(['date', 'str', 'float', 'bool'])
+    expect(tree.fields[0].children?.map(f => f.type)).toEqual(['date', 'datetime', 'uuid', 'number', 'bool'])
+  })
+
+  it('reads an inline object with no properties and no $ref as str, not an opaque object leaf', () => {
+    const tree = modelToSchemaTree(
+      wrapperModel({
+        Thing: {
+          type: 'object',
+          properties: {
+            payload: { type: 'object' },
+            empty: { type: 'object', properties: {} },
+          },
+        },
+      }),
+      'fallback',
+    )
+
+    expect(tree.fields[0].children).toEqual([
+      { path: '$.payload', name: 'payload', type: 'str', portType: 'scalar' },
+      { path: '$.empty', name: 'empty', type: 'str', portType: 'scalar' },
+    ])
+  })
+
+  it('expands an inline object that declares its fields through allOf alone', () => {
+    // The engine reads such an object as a class with the merged fields; the editor must offer the
+    // same fields instead of a single text value.
+    const tree = modelToSchemaTree(
+      wrapperModel({
+        Base: { type: 'object', properties: { code: { type: 'string' } } },
+        Thing: {
+          type: 'object',
+          properties: {
+            typed: { type: 'object', allOf: [{ $ref: '#/$defs/Base' }] },
+            untyped: { allOf: [{ $ref: '#/$defs/Base' }, { properties: { label: { type: 'string' } } }] },
+          },
+        },
+      }),
+      'fallback',
+    )
+
+    const [typed, untyped] = tree.fields[0].children ?? []
+    expect(typed.type).toBe('object')
+    expect(typed.children?.map(child => child.path)).toEqual(['$.typed.code'])
+    expect(untyped.type).toBe('object')
+    expect(untyped.children?.map(child => child.path)).toEqual(['$.untyped.code', '$.untyped.label'])
+  })
+
+  it('reads an allOf of plain values as str: it declares no field', () => {
+    const tree = modelToSchemaTree(
+      wrapperModel({
+        Thing: { type: 'object', properties: { code: { allOf: [{ type: 'string' }, { maxLength: 5 }] } } },
+      }),
+      'fallback',
+    )
+
+    expect(tree.fields[0].children).toEqual([{ path: '$.code', name: 'code', type: 'str', portType: 'scalar' }])
   })
 
   it('maps geojson $refs to concrete geometry types', () => {
@@ -104,7 +160,7 @@ describe('modelToSchemaTree', () => {
     expect(unit.children).toEqual([{ path: '$.unit.symbol', name: 'symbol', type: 'str', portType: 'scalar' }])
     expect(readings).toMatchObject({ path: '$.readings', type: 'array', portType: 'array' })
     expect(readings.children).toEqual([
-      { path: '$.readings[].value', name: 'value', type: 'float', portType: 'scalar' },
+      { path: '$.readings[].value', name: 'value', type: 'number', portType: 'scalar' },
     ])
   })
 
@@ -466,8 +522,21 @@ describe('x-core-primaryKey marker', () => {
             },
           },
           name: { type: 'string' },
+          Locations: { type: 'array', items: { $ref: '#/$defs/Location' } },
           Datastreams: { type: 'array', items: { $ref: '#/$defs/Datastream' } },
         },
+      },
+      // The Location's bag is a named class, as in the published ThingTree structure.
+      Location: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          properties: { $ref: '#/$defs/LocationProperties' },
+        },
+      },
+      LocationProperties: {
+        type: 'object',
+        properties: { reference: { type: 'string', 'x-core-primaryKey': true } },
       },
       Datastream: {
         type: 'object',
@@ -499,6 +568,11 @@ describe('x-core-primaryKey marker', () => {
       // the bag exposes every attribute as a mappable target, including the non-scalar 'tags'
       thingBag: ['$.properties.stationRef', '$.properties.tags'],
       datastreamBag: ['$.Datastreams[].properties.dsRef'],
+      locationBag: ['$.Locations[].properties.reference'],
+      // the model carries no Observation parameters
+      observation: [],
+      observationBag: [],
+      modelledPaths: [],
     })
   })
 })

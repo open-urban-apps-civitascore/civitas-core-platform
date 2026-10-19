@@ -9,8 +9,9 @@ import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
-import de.civitascore.portal.repository.PipelineRepository;
-import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
+import de.civitascore.portal.service.ArtifactUsageLookup;
+import de.civitascore.portal.service.connector.DataSourceConnectorStore;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -24,11 +25,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class DataSourceAssemblerTest {
 
   @Mock private DataSourceMapper dataSourceMapper;
-  @Mock private ConnectorHandlerRegistry connectorHandlerRegistry;
-  @Mock private PipelineRepository pipelineRepository;
+  @Mock private ArtifactUsageLookup artifactUsageLookup;
+  @Mock private DataSourceConnectorStore connectorStore;
 
   private DataSourceAssembler assembler() {
-    return new DataSourceAssembler(dataSourceMapper, connectorHandlerRegistry, pipelineRepository);
+    return new DataSourceAssembler(dataSourceMapper, artifactUsageLookup, connectorStore);
   }
 
   @Nested
@@ -42,7 +43,8 @@ class DataSourceAssemblerTest {
       entity.setId(UUID.randomUUID());
       entity.setDatapoolScopeType(DatapoolScopeType.ALL);
 
-      when(pipelineRepository.existsByDataSourcesId(entity.getId())).thenReturn(false);
+      when(artifactUsageLookup.of(entity))
+          .thenReturn(new ArtifactUsageLookup.ArtifactUsage(false, List.of()));
 
       DataSourceOutputDTO result = assembler().enrichDto(new DataSourceOutputDTO(), entity);
 
@@ -58,7 +60,8 @@ class DataSourceAssemblerTest {
       entity.setId(UUID.randomUUID());
       entity.setDatapoolScopeType(DatapoolScopeType.NONE);
 
-      when(pipelineRepository.existsByDataSourcesId(entity.getId())).thenReturn(false);
+      when(artifactUsageLookup.of(entity))
+          .thenReturn(new ArtifactUsageLookup.ArtifactUsage(false, List.of()));
 
       DataSourceOutputDTO result = assembler().enrichDto(new DataSourceOutputDTO(), entity);
 
@@ -83,7 +86,8 @@ class DataSourceAssemblerTest {
       entity.getScopedDataPools().add(pool1);
       entity.getScopedDataPools().add(pool2);
 
-      when(pipelineRepository.existsByDataSourcesId(entity.getId())).thenReturn(false);
+      when(artifactUsageLookup.of(entity))
+          .thenReturn(new ArtifactUsageLookup.ArtifactUsage(false, List.of()));
 
       DataSourceOutputDTO result = assembler().enrichDto(new DataSourceOutputDTO(), entity);
 
@@ -94,17 +98,24 @@ class DataSourceAssemblerTest {
     }
 
     @Test
-    @DisplayName("inUse flag is correctly set from PipelineRepository")
-    void inUseFlag_isSetFromPipelineRepository() {
+    @DisplayName("Both usage flags are set from the usage lookup")
+    void usageFlags_areSetFromUsageLookup() {
       DataSource entity = DataSource.builder().build();
       entity.setId(UUID.randomUUID());
       entity.setDatapoolScopeType(DatapoolScopeType.ALL);
 
-      when(pipelineRepository.existsByDataSourcesId(entity.getId())).thenReturn(true);
+      when(artifactUsageLookup.of(entity))
+          .thenReturn(
+              new ArtifactUsageLookup.ArtifactUsage(
+                  true,
+                  List.of(
+                      new ArtifactUsageLookup.ReleasedReferrer(
+                          ArtifactUsageLookup.ReferrerKind.PIPELINE, "pipeline-id"))));
 
       DataSourceOutputDTO result = assembler().enrichDto(new DataSourceOutputDTO(), entity);
 
       assertThat(result.isInUse()).isTrue();
+      assertThat(result.isInUseByReleased()).isTrue();
     }
   }
 

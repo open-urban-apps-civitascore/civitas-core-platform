@@ -1,0 +1,27 @@
+{
+  "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
+  "id":     "urn:core:platform:civitas:mapping:smartmeter:f9c11c29-89ee-8863-8583-d12aa288a5a0:1.0.0",
+  "title":  "MeterMasterData → STAThing",
+  "source": "urn:core:platform:civitas:element:smartmeter:eb20917f-cbd4-8a66-9f65-bfaa2b08c0a3:1.0.0",
+  "target": "urn:core:platform:civitas:element:sta:513c5444-b723-8341-b283-ea96fea99b16:1.0.0",
+  "fields": {
+    "name":                    { "op": "copy",   "input": "$.owner" },
+    "description": {
+      "op": "concat",
+      "inputs": ["$.meterType", "$.owner"],
+      "separator": " — "
+    },
+    "properties.meterId":     { "op": "copy",   "input": "$.meterId" },
+    "properties.operator":    { "op": "copy",   "input": "$.operator" },
+    "properties.meterType":   { "op": "copy",   "input": "$.meterType" },
+    "properties.installDate": { "op": "copy",   "input": "$.installDate" },
+
+    "Locations[0].name":         { "op": "copy",  "input": "$.owner" },
+    "Locations[0].encodingType": { "op": "const", "value": "application/geo+json" },
+    "Locations[0].location": {
+      "op":  "geoPoint",
+      "lon": "$.location.lon",
+      "lat": "$.location.lat"
+    }
+  }
+}

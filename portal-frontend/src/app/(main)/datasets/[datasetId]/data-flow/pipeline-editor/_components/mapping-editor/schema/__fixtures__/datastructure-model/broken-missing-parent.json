@@ -1,5 +1,5 @@
 {
-  "$id": "urn:core:tenant:civitas:datastructure:contract:BrokenMissingParent:0000000000:1.0.0",
+  "$id": "urn:core:tenant:civitas:datastructure:contract:e9763f94-9979-8a1a-a1f0-47ee4ba599f4:1.0.0",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "BrokenMissingParent",
   "type": "object",

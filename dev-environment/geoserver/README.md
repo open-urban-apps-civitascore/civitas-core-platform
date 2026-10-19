@@ -8,8 +8,9 @@ PostgreSQL backend (pgconfig catalog + ACL) for local development.
 ## Architecture
 
 GeoServer Cloud splits GeoServer into independent microservices that communicate
-via RabbitMQ and register with a Consul discovery service. All OGC service
-requests enter through the gateway.
+via RabbitMQ and read the shared catalog directly from PostgreSQL. All OGC
+service requests enter through the gateway. The stack runs the `standalone`
+profile production uses, which means no service discovery and no config server.
 
 ```
 Host                Docker (geoserver-internal network)
@@ -23,11 +24,8 @@ localhost:8082 ──►  gateway (civitas-geoserver)
                       ├─► restconfig
                       └─► gwc
                     acl  ◄──► geoserverdb (PostgreSQL/PostGIS)
-                    config (Spring Cloud Config)
-                    discovery (Consul)
                     rabbitmq (message bus)
 localhost:5434 ──►  geoserverdb (direct DB access)
-localhost:8500 ──►  discovery (Consul UI)
 ```
 
 The gateway is also connected to `civitas-network` so APISIX can route
@@ -41,9 +39,8 @@ The gateway is also connected to `civitas-network` so APISIX can route
 |-----------|-------------------------------------|------------|
 | `civitas-geoserver` | Gateway — single entry point        | `8082` |
 | `civitas-geoserver-db` | PostgreSQL/PostGIS (pgconfig + ACL) | `5434` |
-| *(internal)* | Consul discovery UI                 | `8500` |
 | *(internal)* | OWS, WCS, WPS, REST, WebUI, GWC     | — |
-| *(internal)* | RabbitMQ, ACL, Config server        | — |
+| *(internal)* | RabbitMQ, ACL                       | — |
 
 ---
 
@@ -62,8 +59,8 @@ cd dev-environment
 ./start-portal-dev.sh
 ```
 
-GeoServer Cloud takes ~60–90 seconds to fully start (all microservices must
-register with Consul before the gateway begins routing).
+GeoServer Cloud takes up to a minute to fully start (each microservice runs its
+catalog migrations and connects to the message bus before answering requests).
 
 ---
 
@@ -125,14 +122,6 @@ http://localhost:8082/geoserver/web
 User:     admin
 Password: geoserver
 ```
-
-### Consul Service Discovery UI
-
-```
-http://localhost:8500
-```
-
----
 
 ## Configuring a GeoServer Datastore via REST API
 

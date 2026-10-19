@@ -4,7 +4,7 @@ meta {
   seq: 29
 }
 
-put {
+patch {
   url: {{baseUrl}}/datasets/:id/released/meta
   body: json
   auth: inherit
@@ -41,7 +41,7 @@ script:pre-request {
     '&password=' + encodeURIComponent(bru.getEnvVar('password'));
 
   // Fail loudly if readiness can't be proven — otherwise every poll below 401s, `pending` never
-  // leaves its sentinel, and the PUT hits the very 409 race this guard exists to remove.
+  // leaves its sentinel, and the PATCH hits the very 409 race this guard exists to remove.
   let bearer = '';
   try {
     const tok = await axios.post(`${kc}/realms/${realm}/protocol/openid-connect/token`, form, {

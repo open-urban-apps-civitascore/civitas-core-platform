@@ -4,9 +4,6 @@ logging:
     org.hibernate: WARN
     org.flywaydb: INFO
 
-app:
-  url: http://localhost:8089
-
 spring:
   jpa:
     hibernate:
@@ -34,4 +31,3 @@ kafka:
   bootstrap-servers: kafka:9092
   acks: all
   retries: 3
-  async-publish: true  # true = async (callback), false = sync (blocking)

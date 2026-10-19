@@ -58,7 +58,7 @@ describe('DatasourcesTable', () => {
 
   it('renders the header columns correctly', () => {
     renderTable()
-    ;['Name', 'Beschreibung', 'Konnektor', 'Aktivität vor', 'Status'].forEach(headerText => {
+    ;['Name', 'Beschreibung', 'Konnektor', 'Aktivität vor', 'Verwendung', 'Status'].forEach(headerText => {
       expect(screen.getByRole('columnheader', { name: headerText })).toBeDefined()
     })
     expect(screen.queryByRole('columnheader', { name: 'id' })).toBeNull()
@@ -74,14 +74,14 @@ describe('DatasourcesTable', () => {
     expect(cells1[0]).toHaveTextContent('MQTT Sensor Data')
     expect(cells1[1]).toHaveTextContent('Temperature sensor data via MQTT')
     expect(cells1[2]).toHaveTextContent('MQTT')
-    expect(cells1[4]).toHaveTextContent('Entwurf')
+    expect(cells1[5]).toHaveTextContent('Entwurf')
 
     const dataRow2 = rows[2]
     const cells2 = within(dataRow2).getAllByRole('cell')
     expect(cells2[0]).toHaveTextContent('SQL Database Import')
     expect(cells2[1]).toHaveTextContent('Importing data from PostgreSQL')
     expect(cells2[2]).toHaveTextContent('SQL')
-    expect(cells2[4]).toHaveTextContent('Verfügbar')
+    expect(cells2[5]).toHaveTextContent('Verfügbar')
   })
 
   it('renders dash for null connectorType', () => {
@@ -90,6 +90,15 @@ describe('DatasourcesTable', () => {
     const dataRow3 = rows[3]
     const cells = within(dataRow3).getAllByRole('cell')
     expect(cells[2]).toHaveTextContent('-')
+  })
+
+  it('shows the In Use indicator only for a data source a released entity references', () => {
+    const [draftDatasource, ...rest] = mockDatasources
+    renderTable({ ...defaultProps, datasources: [{ ...draftDatasource, inUseByReleased: true }, ...rest] })
+    const rows = screen.getAllByRole('row')
+
+    expect(within(rows[1]).getByTestId('inUseIndicator')).toBeInTheDocument()
+    expect(within(rows[2]).queryByTestId('inUseIndicator')).toBeNull()
   })
 
   it('renders an action menu button for each row', () => {

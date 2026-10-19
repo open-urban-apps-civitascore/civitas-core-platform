@@ -1,0 +1,27 @@
+{
+  "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
+  "id":     "urn:core:platform:civitas:mapping:luftqualitaet:48eef3de-1c17-862c-ac3e-c5b80682eee9:1.0.0",
+  "title":  "StationMasterData → STAThing",
+  "source": "urn:core:platform:civitas:element:luftqualitaet:57efd321-5e4e-89fc-8cbd-dc3443bf2317:1.0.0",
+  "target": "urn:core:platform:civitas:element:sta:513c5444-b723-8341-b283-ea96fea99b16:1.0.0",
+  "fields": {
+    "name":                    { "op": "copy",   "input": "$.stationName" },
+    "description": {
+      "op": "concat",
+      "inputs": ["$.stationType", "$.stationName"],
+      "separator": " — "
+    },
+    "properties.stationId":   { "op": "copy",   "input": "$.stationId" },
+    "properties.operator":    { "op": "copy",   "input": "$.operator" },
+    "properties.stationType": { "op": "copy",   "input": "$.stationType" },
+    "properties.installDate": { "op": "copy",   "input": "$.installDate" },
+
+    "Locations[0].name":         { "op": "copy",  "input": "$.stationName" },
+    "Locations[0].encodingType": { "op": "const", "value": "application/geo+json" },
+    "Locations[0].location": {
+      "op":  "geoPoint",
+      "lon": "$.location.lon",
+      "lat": "$.location.lat"
+    }
+  }
+}

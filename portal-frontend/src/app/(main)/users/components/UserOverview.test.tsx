@@ -92,7 +92,6 @@ const mockUserData: User = {
   firstName: 'Test',
   lastName: 'User',
   phone: null,
-  active: true,
   groups: [],
 }
 

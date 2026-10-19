@@ -5,23 +5,14 @@ import { ItemSchema, MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, MIN_NAME_LENGTH, W
 
 export type GroupTab = 'info' | 'roles' | 'users'
 
-export const GroupRoleTypes = z.enum(['SYSTEM', 'DATA'])
-
-export const GroupRoleScheme = ItemSchema.extend({
-  roleType: GroupRoleTypes,
-})
-
 export const GroupApiResponseSchema = z.object({
   id: z.string(),
   name: z.string().min(MIN_NAME_LENGTH, {
     message: 'common.errors.nameRequired',
   }),
   description: z.string(),
-  roles: z.array(GroupRoleScheme).nullable(),
   members: z.array(ItemSchema).nullable(),
   contactUser: ItemSchema.nullable(),
-  parentGroup: ItemSchema.nullable().optional(),
-  childGroups: z.array(ItemSchema).nullable().optional(),
   assignments: z.array(AssignmentApiResponseSchema).nullable(),
   createdAt: z.string(),
   modifiedAt: z.string(),

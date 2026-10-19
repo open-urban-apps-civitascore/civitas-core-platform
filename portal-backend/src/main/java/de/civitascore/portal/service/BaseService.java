@@ -37,6 +37,7 @@ public abstract class BaseService<T, I extends BaseInputDTO> {
    *   <li>{@link #preProcessCreateInput(BaseInputDTO)} - process input before conversion
    *   <li>{@link #postConvertToEntity(Object, BaseInputDTO)} - customize entity after conversion
    *   <li>{@link #preSave(Object)} - final modifications before saving
+   *   <li>{@link #postCreate(Object, BaseInputDTO)} - actions that need the new entity's id
    *   <li>{@link #postSave(Object, BaseInputDTO)} - actions after saving
    * </ul>
    *
@@ -50,6 +51,7 @@ public abstract class BaseService<T, I extends BaseInputDTO> {
     entity = postConvertToEntity(entity, preProcessedInput);
     entity = preSave(entity);
     T saved = getRepository().save(entity);
+    saved = postCreate(saved, preProcessedInput);
     return postSave(saved, preProcessedInput);
   }
 
@@ -257,6 +259,18 @@ public abstract class BaseService<T, I extends BaseInputDTO> {
    * @return the processed entity
    */
   protected T preSave(T entity) {
+    return entity;
+  }
+
+  /**
+   * Called on create only, after the save assigned the entity's id and before {@link #postSave}.
+   * Runs in the create's transaction, so a failure here rolls the new entity back.
+   *
+   * @param entity the saved entity, carrying its id
+   * @param input the input DTO
+   * @return the processed entity
+   */
+  protected T postCreate(T entity, I input) {
     return entity;
   }
 

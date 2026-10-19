@@ -11,9 +11,7 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Button } from '@/components/ui/button'
-import { usePermissions } from '@/hooks/use-permissions'
-import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
-import { PERMISSION_NAMES } from '@/types/currentUser'
+import { useDatasetPermissions } from '@/hooks/use-dataset-permissions'
 import { Dataset } from '@/types/datasets'
 
 export type ApiConfigTab = 'basicInfo' | 'layer' | 'styles'
@@ -65,18 +63,7 @@ export const ApiConfigWrapper = (props: ApiConfigWrapperProps) => {
 
   const tCommon = useTranslations('common')
   const t = useTranslations('datasets.overview.completion.apis.config')
-
-  const { hasScopedPermission, hasPermission } = usePermissions()
-  const canUpdateDataset = hasScopedPermission(
-    PERMISSION_NAMES.DATASET_UPDATE,
-    ASSIGNMENT_SCOPE_TYPES.DATASET,
-    dataset.id,
-    dataset.datapool?.id,
-  )
-
-  const canReadDatastructures = hasPermission(PERMISSION_NAMES.DATASTRUCTURE_READ)
-
-  const canEdit = canUpdateDataset && canReadDatastructures
+  const { canEditApis } = useDatasetPermissions(dataset)
 
   const buttonGroup = isReadOnly ? (
     <div className="flex items-center gap-2 px-[var(--layout-padding)]">
@@ -103,7 +90,7 @@ export const ApiConfigWrapper = (props: ApiConfigWrapperProps) => {
       <PageHeader
         title={typeLabel}
         badgeTitle={t('protectedBadge')}
-        customElement={canEdit ? buttonGroup : undefined}
+        customElement={canEditApis ? buttonGroup : undefined}
         segmentedControlBarProps={{
           tabs,
           selectedTab,

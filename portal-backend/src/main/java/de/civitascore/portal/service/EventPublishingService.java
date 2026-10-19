@@ -58,6 +58,9 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
     entity = preSave(entity);
 
     entity = getRepository().saveAndFlush(entity);
+    if ("create".equals(operation)) {
+      entity = postCreate(entity, preProcessedInput);
+    }
 
     entity = prePublish(entity, preProcessedInput);
 
@@ -195,14 +198,6 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
    */
   protected abstract ConfigValue toConfigValuePostSave(
       T entity, I input, ConfigValue preSaveConfigValue);
-
-  /**
-   * Extracts the entity ID, used for correlation in config adapter events.
-   *
-   * @param entity the entity
-   * @return the entity's UUID
-   */
-  protected abstract UUID getEntityId(T entity);
 
   /**
    * Hook called after the entity is saved and flushed but before publishing to the external system.

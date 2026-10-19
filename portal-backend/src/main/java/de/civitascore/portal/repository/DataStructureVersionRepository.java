@@ -1,8 +1,9 @@
 package de.civitascore.portal.repository;
 
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -23,13 +24,21 @@ public interface DataStructureVersionRepository extends BaseRepository<DataStruc
   @Override
   @NonNull Optional<DataStructureVersion> findById(@NonNull UUID id);
 
+  boolean existsByDataStructure_Id(UUID dataStructureId);
+
+  boolean existsByDataStructureIdAndModelUrn(UUID dataStructureId, String modelUrn);
+
   /**
-   * Find all data structure versions matching the given data structure ID and version string. Used
-   * for uniqueness validation when creating new versions.
+   * Every version record of these structures.
    *
-   * @param id the parent data structure ID
-   * @param version the version string to match
-   * @return matching data structure versions
+   * <p>A flow pins one version, but a draft version's pin advances inside its own major whenever
+   * its model changes, so the pinned string stops naming any record. Resolving by structure and
+   * major finds the record that owns the pin, while a later major stays out of reach because it is
+   * a different record with a lifecycle of its own.
+   *
+   * @param dataStructureIds the ids of the owning structures
+   * @return every version record of those structures, parents eagerly fetched
    */
-  Set<DataStructureVersion> findAllByDataStructureIdAndVersion(UUID id, String version);
+  @EntityGraph(attributePaths = {"dataStructure"})
+  List<DataStructureVersion> findAllByDataStructure_IdIn(Collection<UUID> dataStructureIds);
 }

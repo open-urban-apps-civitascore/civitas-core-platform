@@ -374,23 +374,5 @@ class AssignmentFactoryTest {
           .isInstanceOf(ResourceNotFoundException.class)
           .hasMessageContaining("DataSet");
     }
-
-    @Test
-    @DisplayName("Should reject CATALOG scope as not available")
-    void shouldRejectCatalogScope() {
-      UUID roleId = UUID.randomUUID();
-      Role role = createRole(roleId, RoleType.DATA);
-
-      when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
-
-      AssignmentGroupInputDTO dto = new AssignmentGroupInputDTO();
-      dto.setRoleId(roleId);
-      dto.setScopeType(ScopeType.CATALOG);
-      dto.setScopeId(UUID.randomUUID());
-
-      assertThatThrownBy(() -> assignmentFactory.build(dto))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("not available in this release");
-    }
   }
 }

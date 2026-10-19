@@ -292,36 +292,6 @@ class RoleControllerIntegrationTest
       assertThat(role.getGroupCount()).as("Initial group count should be zero").isEqualTo(0);
     }
 
-    // TODO: implement in V2.1
-    // @Test
-    // @DisplayName("Should return correct group count after assignments")
-    // void shouldReturnCorrectGroupCountAfterAssignments() {
-    //   UUID roleId = createTestEntity();
-    //
-    //   // Create groups
-    //   Triple<Group, Group, Group> groups = createGroupHierarchy();
-    //
-    //   AssignmentInputDTO assignmentInput = new AssignmentInputDTO();
-    //   assignmentInput.setRoleId(roleId);
-    //   assignmentInput.setGroupId(groups.getLeft().getId());
-    //   assignmentInput.setScopeType(ScopeType.TENANT);
-    //   assignmentService.create(assignmentInput);
-    //
-    //   assignmentInput.setGroupId(groups.getMiddle().getId());
-    //   assignmentService.create(assignmentInput);
-    //
-    //   // Retrieve role and verify group count
-    //   ResponseEntity<RoleOutputDTO> response = performGetById(roleId);
-    //
-    //   assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    //   assertThat(response.getBody()).isNotNull();
-    //
-    //   RoleOutputDTO role = response.getBody();
-    //   assertThat(role.getGroupCount())
-    //       .as("Group count should reflect assigned groups")
-    //       .isEqualTo(3);
-    // }
-
     @Test
     @DisplayName("Should return user count of 0 for new role")
     void shouldReturnCorrectUserCountForRole() {
@@ -335,70 +305,6 @@ class RoleControllerIntegrationTest
       RoleOutputDTO role = response.getBody();
       assertThat(role.getUserCount()).as("Initial user count should be zero").isEqualTo(0);
     }
-
-    // TODO: implement in V2.1
-    // @Test
-    // @DisplayName("Should return correct user count after assignments")
-    // void shouldReturnCorrectUserCountAfterAssignments() {
-    //   UUID roleId = createTestEntity();
-    //
-    //   // Create groups
-    //   Triple<Group, Group, Group> groups = createGroupHierarchy();
-    //
-    //   AssignmentInputDTO assignmentInput = new AssignmentInputDTO();
-    //   assignmentInput.setRoleId(roleId);
-    //   assignmentInput.setGroupId(groups.getLeft().getId());
-    //   assignmentInput.setScopeType(ScopeType.TENANT);
-    //   assignmentService.create(assignmentInput);
-    //
-    //   assignmentInput.setGroupId(groups.getMiddle().getId());
-    //   assignmentService.create(assignmentInput);
-    //
-    //   // Retrieve role and verify user count
-    //   ResponseEntity<RoleOutputDTO> response = performGetById(roleId);
-    //
-    //   assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    //   assertThat(response.getBody()).isNotNull();
-    //
-    //   RoleOutputDTO role = response.getBody();
-    //   assertThat(role.getUserCount()).as("User count should reflect assigned
-    // users").isEqualTo(3);
-    // }
-
-    // TODO: implement in V2.1
-    // private Triple<Group, Group, Group> createGroupHierarchy() {
-    //   UserInputDTO userInput = new UserInputDTO();
-    //   userInput.setFirstName("firstName");
-    //   userInput.setLastName("lastName");
-    //   userInput.setEmail("user1@test.de");
-    //   userInput.setActive(true);
-    //   User user1 = userService.create(userInput);
-    //
-    //   userInput.setEmail("user2@test.de");
-    //   User user2 = userService.create(userInput);
-    //
-    //   userInput.setEmail("user3@test.de");
-    //   User user3 = userService.create(userInput);
-    //
-    //   GroupInputDTO parentGroupInput = new GroupInputDTO();
-    //   parentGroupInput.setName("Parent Group");
-    //   parentGroupInput.setMemberIds(List.of(user1.getId()));
-    //   Group parentGroup = groupService.create(parentGroupInput);
-    //
-    //   GroupInputDTO childGroupInput1 = new GroupInputDTO();
-    //   childGroupInput1.setName("Child Group 1");
-    //   childGroupInput1.setParentGroupId(parentGroup.getId());
-    //   childGroupInput1.setMemberIds(List.of(user1.getId()));
-    //   Group childGroup1 = groupService.create(childGroupInput1);
-    //
-    //   GroupInputDTO childGroupInput2 = new GroupInputDTO();
-    //   childGroupInput2.setName("Child Group 2");
-    //   childGroupInput2.setParentGroupId(parentGroup.getId());
-    //   childGroupInput2.setMemberIds(List.of(user2.getId(), user3.getId()));
-    //   Group childGroup2 = groupService.create(childGroupInput2);
-    //
-    //   return Triple.of(parentGroup, childGroup1, childGroup2);
-    // }
   }
 
   @Nested

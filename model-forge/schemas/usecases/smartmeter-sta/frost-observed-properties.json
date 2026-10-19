@@ -1,0 +1,35 @@
+[
+  {
+    "key":         "activePowerPlus",
+    "name":        "Wirkleistung Bezug",
+    "description": "Active power consumption (import from grid)",
+    "definition":  "http://qudt.org/vocab/quantitykind/ActivePower",
+    "unit": {
+      "name":       "Watt",
+      "symbol":     "W",
+      "definition": "http://qudt.org/vocab/unit/W"
+    }
+  },
+  {
+    "key":         "activePowerMinus",
+    "name":        "Wirkleistung Lieferung",
+    "description": "Active power feed-in (export to grid / PV generation)",
+    "definition":  "http://qudt.org/vocab/quantitykind/ActivePower",
+    "unit": {
+      "name":       "Watt",
+      "symbol":     "W",
+      "definition": "http://qudt.org/vocab/unit/W"
+    }
+  },
+  {
+    "key":         "voltage",
+    "name":        "Spannung L1",
+    "description": "RMS voltage on phase L1",
+    "definition":  "http://qudt.org/vocab/quantitykind/Voltage",
+    "unit": {
+      "name":       "Volt",
+      "symbol":     "V",
+      "definition": "http://qudt.org/vocab/unit/V"
+    }
+  }
+]

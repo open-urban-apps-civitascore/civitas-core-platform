@@ -10,16 +10,13 @@ post {
   auth: inherit
 }
 
-headers {
-  X-Allowed-Scope-Ids: *
-}
 
 body:json {
   {
     "name": "contract_sql_delete",
     "description": "contract — SQL",
-    "connectorType": "SQL",
-    "configuration": {
+    "connector": {
+      "connectorType": "SQL",
       "driver": "postgres",
       "dsn": "postgres://example:5432/db",
       "user": "alice",

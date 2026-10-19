@@ -16,8 +16,6 @@ params:path {
 
 body:json {
   {
-    "dataStructureVersionSource": "OWN",
-    "version": "1.0.0",
     "description": "Source version with scalar lon/lat for geoPoint input",
     "modelName": "GeoSensorSource",
     "model": {
@@ -38,6 +36,10 @@ body:json {
 script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('sqlSourceVersionId', res.body.id);
+  }
+
+  if (res.body && res.body.modelUrn) {
+    bru.setVar('sqlSourceModelUrn', res.body.modelUrn);
   }
 }
 

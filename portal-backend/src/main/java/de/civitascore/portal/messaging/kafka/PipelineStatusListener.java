@@ -44,7 +44,6 @@ public class PipelineStatusListener {
           event.get("occurredAt") == null
               ? null
               : Instant.parse(String.valueOf(event.get("occurredAt"))),
-          parseUuid(event.get("correlationId")),
           parseUuid(event.get("eventId")));
     } catch (JacksonException e) {
       log.error("Failed to deserialize pipeline status event: {}", Encode.forJava(e.getMessage()));

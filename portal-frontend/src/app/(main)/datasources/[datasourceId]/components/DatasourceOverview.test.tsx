@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
@@ -82,6 +83,8 @@ const mockForm = {
 }
 
 const mockSubmitDatasource = vi.fn()
+const mockHandleStatusChange = vi.fn()
+let mockCanSetDraft = true
 
 vi.mock('../hooks/useDatasourceForm', () => ({
   useDatasourceForm: () => ({
@@ -89,8 +92,9 @@ vi.mock('../hooks/useDatasourceForm', () => ({
     readyConnectorType: 'MQTT',
     dataSourceStatus: 'DRAFT',
     hasStatusChanged: false,
-    handleStatusChange: vi.fn(),
+    handleStatusChange: mockHandleStatusChange,
     canStage: false,
+    canSetDraft: mockCanSetDraft,
     completedTabs: [],
     submitDatasource: mockSubmitDatasource,
     resetToInitialState: vi.fn(),
@@ -107,8 +111,8 @@ vi.mock('./basic-info/BasicInfoTab', () => ({
 }))
 
 vi.mock('./connector-tab/ConnectorTab', () => ({
-  ConnectorTab: ({ isReadOnly }: { isReadOnly: boolean }) => (
-    <div data-testid="connectorTab" data-readonly={isReadOnly} />
+  ConnectorTab: ({ isReadOnly, isDatasourceReleased }: { isReadOnly: boolean; isDatasourceReleased: boolean }) => (
+    <div data-testid="connectorTab" data-readonly={isReadOnly} data-released={isDatasourceReleased} />
   ),
 }))
 
@@ -119,8 +123,8 @@ vi.mock('./access-management/AccessManagementTab', () => ({
 }))
 
 vi.mock('./datastructure-tab/DatastructureTab', () => ({
-  DatastructureTab: ({ isReadOnly }: { isReadOnly: boolean }) => (
-    <div data-testid="datastructureTab" data-readonly={isReadOnly} />
+  DatastructureTab: ({ isReadOnly, isDatasourceReleased }: { isReadOnly: boolean; isDatasourceReleased: boolean }) => (
+    <div data-testid="datastructureTab" data-readonly={isReadOnly} data-released={isDatasourceReleased} />
   ),
 }))
 
@@ -209,12 +213,12 @@ const datasource = {
   name: 'Test Datasource',
   description: 'A test datasource',
   dataSourceStatus: 'DRAFT' as const,
-  connectorType: 'MQTT' as const,
-  configuration: { urls: 'mqtt://localhost' },
+  connector: { connectorType: 'MQTT' as const, urls: 'mqtt://localhost' },
   createdAt: '2024-01-01',
   modifiedAt: '2024-01-01',
   dataStructureVersion: null,
   inUse: false,
+  inUseByReleased: false,
   datapoolScope: { type: DATAPOOL_SCOPE_TYPES.NONE },
 }
 
@@ -227,6 +231,7 @@ describe('DatasourceOverview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockSearchParams = new URLSearchParams()
+    mockCanSetDraft = true
     mockForm.formState.isDirty = false
     mockCurrentUser([
       PERMISSION_NAMES.DATASOURCE_UPDATE,
@@ -436,6 +441,94 @@ describe('DatasourceOverview', () => {
         render(<DatasourceOverview {...availableProps} />)
         expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
       })
+    })
+  })
+
+  describe('In Use by Released', () => {
+    const inUseDatasource = {
+      ...datasource,
+      dataSourceStatus: 'AVAILABLE' as const,
+      inUse: true,
+      inUseByReleased: true,
+    }
+
+    beforeEach(() => {
+      mockCurrentUser([PERMISSION_NAMES.DATASOURCE_UPDATE, PERMISSION_NAMES.DATASOURCE_RELEASE])
+    })
+
+    it('shows the indicator only when a released entity references the data source', () => {
+      render(<DatasourceOverview {...defaultProps} datasource={inUseDatasource} />)
+      expect(screen.getByTestId('inUseIndicator')).toBeInTheDocument()
+    })
+
+    it('hides the indicator when only a draft entity references the data source', () => {
+      render(<DatasourceOverview {...defaultProps} datasource={{ ...inUseDatasource, inUseByReleased: false }} />)
+      expect(screen.queryByTestId('inUseIndicator')).not.toBeInTheDocument()
+    })
+
+    const selectDraft = async () => {
+      const user = userEvent.setup()
+      await user.click(screen.getByTestId('statusDropdown'))
+      await user.click(await screen.findByTestId('statusOption-draft'))
+    }
+
+    it('refuses the Draft selection and explains why', async () => {
+      mockSearchParams = new URLSearchParams('mode=edit')
+      mockCanSetDraft = false
+      render(<DatasourceOverview {...defaultProps} datasource={inUseDatasource} />)
+
+      await selectDraft()
+
+      expect(await screen.findByTestId('infoModal')).toBeInTheDocument()
+      expect(mockHandleStatusChange).not.toHaveBeenCalled()
+    })
+
+    it('applies the Draft selection when no released entity references the data source', async () => {
+      mockSearchParams = new URLSearchParams('mode=edit')
+      render(<DatasourceOverview {...defaultProps} datasource={{ ...inUseDatasource, inUseByReleased: false }} />)
+
+      await selectDraft()
+
+      expect(screen.queryByTestId('infoModal')).not.toBeInTheDocument()
+      expect(mockHandleStatusChange).toHaveBeenCalledWith('DRAFT')
+    })
+  })
+
+  describe('Released data source', () => {
+    const availableProps = { ...defaultProps, datasource: { ...datasource, dataSourceStatus: 'AVAILABLE' as const } }
+
+    beforeEach(() => {
+      mockSearchParams = new URLSearchParams('mode=edit')
+      mockCurrentUser([
+        PERMISSION_NAMES.DATASOURCE_UPDATE,
+        PERMISSION_NAMES.DATASOURCE_RELEASE,
+        PERMISSION_NAMES.DATASTRUCTURE_READ,
+      ])
+    })
+
+    it('locks the connector and data structure tabs when AVAILABLE', () => {
+      render(<DatasourceOverview {...availableProps} />)
+
+      fireEvent.click(screen.getByTestId('tab-connector'))
+      expect(screen.getByTestId('connectorTab')).toHaveAttribute('data-released', 'true')
+
+      fireEvent.click(screen.getByTestId('tab-dataStructure'))
+      expect(screen.getByTestId('datastructureTab')).toHaveAttribute('data-released', 'true')
+    })
+
+    it('keeps the basic info editable when AVAILABLE', () => {
+      render(<DatasourceOverview {...availableProps} />)
+      expect(screen.getByTestId('basicInfoTab')).toHaveAttribute('data-readonly', 'false')
+    })
+
+    it('leaves the connector and data structure tabs unlocked when DRAFT', () => {
+      render(<DatasourceOverview {...defaultProps} />)
+
+      fireEvent.click(screen.getByTestId('tab-connector'))
+      expect(screen.getByTestId('connectorTab')).toHaveAttribute('data-released', 'false')
+
+      fireEvent.click(screen.getByTestId('tab-dataStructure'))
+      expect(screen.getByTestId('datastructureTab')).toHaveAttribute('data-released', 'false')
     })
   })
 })

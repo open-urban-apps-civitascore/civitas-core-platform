@@ -9,7 +9,6 @@
  */
 package de.civitascore.configadapter.apisix;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -20,79 +19,60 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.messaging.EventPublisher;
 import de.civitascore.configadapter.model.ConfigResultEvent;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.client.Invocation;
-import jakarta.ws.rs.client.WebTarget;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import java.io.IOException;
+import mockwebserver3.MockResponse;
+import mockwebserver3.MockWebServer;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.ArgumentCaptor;
 
 /**
- * Base class for ApisixAdapter unit tests that need a mocked JAX-RS Client chain. Sets up the
- * adapter with mock client, config, and publisher.
+ * Base class for ApisixAdapter unit tests. Runs the adapter's real OkHttp client against a
+ * MockWebServer instead of mocking the HTTP client.
  */
 abstract class AbstractApisixAdapterTest {
 
   protected ApisixAdapter adapter;
   protected AdapterConfig mockConfig;
-  protected Client mockClient;
-  protected WebTarget mockTarget;
-  protected WebTarget mockPathTarget;
-  protected Invocation.Builder mockBuilder;
-  protected Response mockResponse;
+  protected MockWebServer server;
   protected EventPublisher mockPublisher;
 
   @BeforeEach
-  void setUpAdapter() {
+  void setUpAdapter() throws IOException {
     adapter = new ApisixAdapter();
     mockConfig = mock(AdapterConfig.class);
+    server = new MockWebServer();
+    server.start();
 
     when(mockConfig.getProperty("apisix.topics"))
         .thenReturn(
             "de.civitascore.api.backend.created,de.civitascore.api.backend.updated,"
                 + "de.civitascore.api.backend.deleted");
     when(mockConfig.getProperty("apisix.admin.url", "http://localhost:9180"))
-        .thenReturn("http://localhost:9180");
+        .thenReturn(server.url("/").toString());
     when(mockConfig.getProperty("apisix.admin.key")).thenReturn("edd1c9f034335f136f87ad84b625c8f1");
 
-    // Mock the JAX-RS Client fluent API chain
-    mockClient = mock(Client.class);
-    mockTarget = mock(WebTarget.class);
-    mockPathTarget = mock(WebTarget.class);
-    mockBuilder = mock(Invocation.Builder.class);
-    mockResponse = mock(Response.class);
-
-    when(mockClient.target(any(String.class))).thenReturn(mockTarget);
-    when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
-    when(mockPathTarget.resolveTemplate(any(String.class), any())).thenReturn(mockPathTarget);
-    when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
-    when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
-
-    adapter.setClient(mockClient);
     adapter.initialize(mockConfig);
 
     mockPublisher = mock(EventPublisher.class);
     adapter.setEventPublisher(mockPublisher);
   }
 
+  @AfterEach
+  void tearDownServer() throws IOException {
+    server.close();
+  }
+
   protected void givenMockPostReturns(int status, String body) {
-    when(mockResponse.getStatus()).thenReturn(status);
-    when(mockResponse.readEntity(String.class)).thenReturn(body);
-    when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+    server.enqueue(new MockResponse.Builder().code(status).body(body).build());
   }
 
   protected void givenMockPutReturns(int status, String body) {
-    when(mockResponse.getStatus()).thenReturn(status);
-    when(mockResponse.readEntity(String.class)).thenReturn(body);
-    when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+    server.enqueue(new MockResponse.Builder().code(status).body(body).build());
   }
 
   protected void givenMockDeleteReturns(int status, String body) {
-    when(mockResponse.getStatus()).thenReturn(status);
-    when(mockResponse.readEntity(String.class)).thenReturn(body);
-    when(mockBuilder.delete()).thenReturn(mockResponse);
+    server.enqueue(new MockResponse.Builder().code(status).body(body).build());
   }
 
   protected ConfigResultEvent capturePublishedResult()

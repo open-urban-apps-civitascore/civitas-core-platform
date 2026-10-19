@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+           https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>de.civitascore</groupId>
+    <artifactId>core-model-forge-parent</artifactId>
+    <version>${revision}</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>core-model-forge-admin-ui</artifactId>
+  <packaging>jar</packaging>
+
+  <name>CIVITAS/CORE Model Forge - Admin UI</name>
+  <description>
+    Standalone debug/admin host application for embedded Model Forge. Not part of the
+    embedded library: it is a consumer of ModelForge, in the same role portal-backend will
+    later play, so it is free to use spring-boot-starter-webmvc and its own web UI framework.
+  </description>
+
+  <properties>
+    <!-- A runnable debug app, not a library: keep it out of the Maven registry. -->
+    <maven.deploy.skip>true</maven.deploy.skip>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>de.civitascore</groupId>
+      <artifactId>core-model-forge-contract</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>de.civitascore</groupId>
+      <artifactId>core-model-forge-spring-boot-starter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <!-- Spring Boot 4 name; `spring-boot-starter-web` only remains as a deprecated alias. -->
+      <artifactId>spring-boot-starter-webmvc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.wicket</groupId>
+      <artifactId>wicket-core</artifactId>
+      <version>${wicket.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.wicket</groupId>
+      <artifactId>wicket-spring</artifactId>
+      <version>${wicket.version}</version>
+    </dependency>
+    <!-- Runtime (not test-scoped!) dependency: wicket-spring's @SpringBean proxy factory needs
+         Objenesis to create a LazyInitProxy for a CONCRETE bean type with no default constructor
+         (SeedPage's `@SpringBean private SeedImporter seedImporter`; ModelForge elsewhere is an
+         interface, which doesn't need this). Without it, /seed throws WicketRuntimeException
+         ("Can't create proxy ... without default constructor") at runtime — invisible to the test
+         suite because mockito-core pulls Objenesis in at test scope, masking the missing runtime
+         dependency. Version pinned to what that transitive test dependency already resolves to
+         (proven compatible on this exact classpath).
+    -->
+    <dependency>
+      <groupId>org.objenesis</groupId>
+      <artifactId>objenesis</artifactId>
+      <version>3.3</version>
+    </dependency>
+    <!-- NestedTree/ITreeProvider for the lazily-expanding artifact tree (relations/dependencies). -->
+    <dependency>
+      <groupId>org.apache.wicket</groupId>
+      <artifactId>wicket-extensions</artifactId>
+      <version>${wicket.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- WicketTester: extracted out of wicket-core in Wicket 10 (JPMS can't have an optional
+         dependency on JUnit), so it now lives in its own artifact. -->
+    <dependency>
+      <groupId>org.apache.wicket</groupId>
+      <artifactId>wicket-tester</artifactId>
+      <version>${wicket.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- Boots the UI against a throwaway Postgres; skipped when no Docker daemon is present. -->
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-junit-jupiter</artifactId>
+      <version>${testcontainers.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-postgresql</artifactId>
+      <version>${testcontainers.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <!-- Wicket markup (.html) files live next to their page/panel class under src/main/java;
+         include them as resources so they land on the runtime classpath alongside the .class. -->
+    <resources>
+      <resource>
+        <directory>src/main/java</directory>
+        <excludes>
+          <exclude>**/*.java</exclude>
+        </excludes>
+      </resource>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+    </resources>
+    <plugins>
+      <!-- admin-ui is a real host application, not an embedded library module: it needs
+           spring-boot-starter-web, which the parent's global enforcer rule bans for every
+           other module. Unbind that inherited execution here (phase "none" is the standard
+           Maven trick to skip a parent-declared execution in one child). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-build-environment</id>
+            <phase>none</phase>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration>
+          <!-- Wicket's DEVELOPMENT-mode CheckingObjectOutputStream reflects into JDK internals
+               to pinpoint non-serializable page state; JPMS blocks that by default on Java 17+. -->
+          <jvmArguments>--add-opens java.base/java.io=ALL-UNNAMED</jvmArguments>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>

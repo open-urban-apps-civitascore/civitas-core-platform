@@ -21,7 +21,7 @@ import lombok.experimental.SuperBuilder;
 
 /**
  * Represents a data structure definition that contains one or more {@link DataStructureVersion
- * versions}. Tracks its own lifecycle status and whether it was auto-created from a data source.
+ * versions}. Tracks its own lifecycle status.
  *
  * @see DataStructureStatus
  */
@@ -61,9 +61,12 @@ public class DataStructure extends BaseDataEntity {
   @Builder.Default
   private DataStructureStatus dataStructureStatus = DataStructureStatus.DRAFT;
 
-  @Column(name = "created_from_data_source", nullable = false)
-  @Builder.Default
-  private Boolean createdFromDataSource = false;
+  /**
+   * Logical CORE URN of this data structure's model artifact in Model Forge. Null until the first
+   * model is stored.
+   */
+  @Column(name = "model_logical_urn")
+  private String modelLogicalUrn;
 
   @Setter(AccessLevel.NONE)
   @OneToMany(

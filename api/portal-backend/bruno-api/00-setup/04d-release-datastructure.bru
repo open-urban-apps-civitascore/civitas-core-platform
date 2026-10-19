@@ -1,0 +1,30 @@
+meta {
+  name: Setup - Release DataStructure
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:id/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{setupDataStructureId}}
+}
+
+tests {
+  test("Released", function() {
+    const status = res.getStatus();
+    // 200=released, 400=already released from a previous run (idempotent setup).
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Setup step 04d** — Releases the parent DataStructure, completing the released source a DataSink
+  and a Pipeline are configured against.
+
+  **Expected Response:** 200 OK. 400 if it was already released.
+}

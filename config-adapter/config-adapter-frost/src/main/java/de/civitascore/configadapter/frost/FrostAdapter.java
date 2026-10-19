@@ -23,12 +23,12 @@ import de.civitascore.configadapter.model.ConfigEvent;
 import de.civitascore.configadapter.model.ConfigValue;
 import de.civitascore.configadapter.model.Operation;
 import de.civitascore.configadapter.model.frost.FrostConfigValue;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.core.MediaType;
+import de.civitascore.configadapter.util.OkHttpJson;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
+import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +51,7 @@ public class FrostAdapter extends AbstractConfigAdapter {
   private static final String DEFAULT_SERVER_URL = "http://localhost:8080/v1.1";
   private static final String SERVER_URL_PROPERTY_KEY = "url";
 
-  private Client client;
+  private OkHttpClient client;
   private String serverUrl;
   private FrostAuthStrategy authStrategy;
 
@@ -77,14 +77,14 @@ public class FrostAdapter extends AbstractConfigAdapter {
         Encode.forJava(getSubscribedTopics().toString()));
   }
 
-  protected Client createClient() {
-    return ClientBuilder.newBuilder()
+  protected OkHttpClient createClient() {
+    return new OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build();
   }
 
-  void setClient(Client client) {
+  void setClient(OkHttpClient client) {
     this.client = client;
   }
 
@@ -124,20 +124,19 @@ public class FrostAdapter extends AbstractConfigAdapter {
       throws FatalAdapterException, RetryableAdapterException {
     EntityType entityType = requireEntityType(resourceInfo, event);
     Object entityConfig = extractEntityConfig(event);
-    String path = resourceInfo.collectionPath();
+    HttpUrl url = url(resourceInfo.collectionPath());
 
     String resourceId =
         FrostHttpExecutor.execute(
             AdapterOperation.FROST_ENTITY_CREATE,
             null,
-            () ->
-                authStrategy
-                    .apply(
-                        client //
-                            .target(serverUrl) //
-                            .path(path) //
-                            .request(MediaType.APPLICATION_JSON))
-                    .post(Entity.json(entityConfig)));
+            () -> {
+              Request request =
+                  authStrategy
+                      .apply(OkHttpJson.jsonRequest(url).post(OkHttpJson.jsonBody(entityConfig)))
+                      .build();
+              return client.newCall(request).execute();
+            });
     publishOutcome(event, "FROST " + entityType.name() + " created successfully", resourceId);
   }
 
@@ -154,30 +153,36 @@ public class FrostAdapter extends AbstractConfigAdapter {
     }
 
     String entityId = resourceInfo.id();
-    String entityPath = resourceInfo.collectionPath() + "(" + entityId + ")";
+    HttpUrl url = url(resourceInfo.collectionPath() + "(" + entityId + ")");
 
     if (operation == Operation.UPDATE) {
       Object entityConfig = extractEntityConfig(event);
       FrostHttpExecutor.execute(
           AdapterOperation.FROST_ENTITY_UPDATE,
           entityId,
-          () ->
-              authStrategy
-                  .apply(
-                      client.target(serverUrl).path(entityPath).request(MediaType.APPLICATION_JSON))
-                  .method("PATCH", Entity.json(entityConfig)));
+          () -> {
+            Request request =
+                authStrategy
+                    .apply(OkHttpJson.jsonRequest(url).patch(OkHttpJson.jsonBody(entityConfig)))
+                    .build();
+            return client.newCall(request).execute();
+          });
       publishOutcome(event, "FROST " + entityType.name() + " updated successfully", entityId);
     } else {
       FrostHttpExecutor.execute(
           AdapterOperation.FROST_ENTITY_DELETE,
           entityId,
-          () ->
-              authStrategy
-                  .apply(
-                      client.target(serverUrl).path(entityPath).request(MediaType.APPLICATION_JSON))
-                  .delete());
+          () -> {
+            Request request = authStrategy.apply(OkHttpJson.jsonRequest(url).delete()).build();
+            return client.newCall(request).execute();
+          });
       publishOutcome(event, "FROST " + entityType.name() + " deleted successfully", entityId);
     }
+  }
+
+  /** The FROST entity URL for a path relative to {@link #serverUrl}, e.g. {@code Things(123)}. */
+  private HttpUrl url(String path) {
+    return OkHttpJson.url(serverUrl, path);
   }
 
   private static EntityType requireEntityType(ResourceInfo resourceInfo, ConfigEvent event)
@@ -208,7 +213,8 @@ public class FrostAdapter extends AbstractConfigAdapter {
   @Override
   public void close() {
     if (client != null) {
-      client.close();
+      client.dispatcher().executorService().shutdown();
+      client.connectionPool().evictAll();
     }
     LOG.info("FROST adapter closed");
   }

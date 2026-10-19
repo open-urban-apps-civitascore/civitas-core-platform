@@ -42,8 +42,8 @@ const styles = {
   edges: [],
 } as unknown as UMLDiagram
 
-const version = (over: Partial<Pick<DatastructureVersion, 'model' | 'styles'>>) =>
-  ({ model: null, styles: null, ...over }) as Pick<DatastructureVersion, 'model' | 'styles'>
+const version = (over: Partial<Pick<DatastructureVersion, 'model' | 'styles' | 'version'>>) =>
+  ({ model: null, styles: null, version: null, ...over }) as Pick<DatastructureVersion, 'model' | 'styles' | 'version'>
 
 describe('versionToSchemaTree', () => {
   it('prefers the persisted model over the diagram when both exist', () => {
@@ -51,6 +51,14 @@ describe('versionToSchemaTree', () => {
     expect(isModelBroken).toBe(false)
     expect(tree.name).toBe('FromModel')
     expect(tree.fields[0].children?.map(f => f.name)).toEqual(['modelField'])
+  })
+
+  it('carries the version number onto the resolved tree', () => {
+    const fromModel = versionToSchemaTree(version({ model, styles, version: '4.0.0' }), 'fallback')
+    expect(fromModel.tree.version).toBe('4.0.0')
+
+    const fromDiagram = versionToSchemaTree(version({ styles, version: '1.0.0' }), 'fallback')
+    expect(fromDiagram.tree.version).toBe('1.0.0')
   })
 
   it('falls back to the diagram and flags the broken model', () => {
@@ -71,12 +79,12 @@ describe('versionToSchemaTree', () => {
 
   it('yields an empty tree when neither model nor diagram exist', () => {
     expect(versionToSchemaTree(version({}), 'fallback')).toEqual({
-      tree: { name: 'fallback', fields: [] },
+      tree: { name: 'fallback', version: null, fields: [] },
       isModelBroken: false,
       diagramFailure: null,
     })
     expect(versionToSchemaTree(undefined, 'fallback')).toEqual({
-      tree: { name: 'fallback', fields: [] },
+      tree: { name: 'fallback', version: null, fields: [] },
       isModelBroken: false,
       diagramFailure: null,
     })

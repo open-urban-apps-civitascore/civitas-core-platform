@@ -15,10 +15,18 @@ params:path {
   id: {{dataSinkId}}
 }
 
-docs {
-  **Precondition:** `dataSetId` and `dataSinkId` are set. The DataSink must not be in use by a Layer (delete dependent Layers first).
+tests {
+  test("DataSink deleted", function() {
+    const status = res.getStatus();
+    // 204=deleted, 404=already gone from a previous run.
+    expect(status === 204 || status === 404).to.be.true;
+  });
+}
 
-  **Expected Response:** 204 No Content.
+docs {
+  **Precondition:** `dataSetId` and `dataSinkId` are set. The DataSink must not be in use by a Layer (delete dependent Layers first) and must not be provisioned: a provisioned DataSink is refused with `409` and goes only together with its DataSet, whose teardown removes its storage.
+
+  **Expected Response:** 204 No Content. 409 if the DataSink is provisioned or a Layer references it.
 
   **Verification:** Issue `get-datasink-by-id` for the same `dataSinkId` and confirm 404.
 

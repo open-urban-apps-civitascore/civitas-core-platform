@@ -16,9 +16,9 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * FROST Basic Auth credentials bound to every NiFi {@code InvokeHTTP} processor of a FROST sink.
- * The password is pushed only after upload and never enters the versioned flow snapshot. Missing
- * credentials intentionally leave the processors unauthenticated for the local development FROST.
+ * FROST Basic Auth credentials bound to the {@code PutFrostRecord} processor of a FROST sink. The
+ * password is pushed only after upload and never enters the versioned flow snapshot. Missing
+ * credentials intentionally leave the processor unauthenticated for the local development FROST.
  */
 public final class FrostSinkAuth {
 
@@ -90,7 +90,8 @@ public final class FrostSinkAuth {
     }
     if (basicAuthUsername != null) {
       out.putSinkProperty(FrostSinkStage.FROST_BASIC_AUTH_USERNAME, basicAuthUsername);
-      out.putSensitive(FrostSinkStage.FROST_HTTP_PROCESSOR, "Request Password", basicAuthPassword);
+      out.putSensitive(
+          FrostSinkStage.FROST_HTTP_PROCESSOR, "Basic Auth Password", basicAuthPassword);
     }
   }
 }

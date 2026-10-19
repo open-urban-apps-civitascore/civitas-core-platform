@@ -1,0 +1,75 @@
+{
+  "$schema": "https://civitasconnect.digital/core/pipeline/v1",
+  "id": "urn:core:platform:civitas:pipeline:common:0d20c6e0-adb1-833d-87a7-e5f9f30251f8:1.0.0",
+  "title": "Air Quality Ingest",
+  "description": "Receives MQTT telemetry, maps it, and posts observations.",
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "start",
+      "label": "Start",
+      "x-ui-position": {
+        "x": 40,
+        "y": 100
+      }
+    },
+    {
+      "id": "source",
+      "kind": "source",
+      "sourceRef": "urn:core:platform:civitas:datasource:common:5c0fc674-2b5f-8744-8cc6-74d6eebe2893:1.0.0",
+      "x-ui-position": {
+        "x": 180,
+        "y": 100
+      }
+    },
+    {
+      "id": "mapping",
+      "kind": "mapping",
+      "mappingRef": "urn:core:platform:civitas:mapping:common:dc96112c-42be-8afe-8971-c8f0c378f892:1.0.0",
+      "x-ui-position": {
+        "x": 360,
+        "y": 100
+      }
+    },
+    {
+      "id": "sink",
+      "kind": "sink",
+      "sinkRef": "urn:core:platform:civitas:datasink:common:2a2dff89-9d26-8082-8eb3-9c4c6f642ced:1.0.0",
+      "x-ui-position": {
+        "x": 540,
+        "y": 100
+      }
+    },
+    {
+      "id": "end",
+      "kind": "end",
+      "label": "End",
+      "x-ui-position": {
+        "x": 700,
+        "y": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "start",
+      "target": "source"
+    },
+    {
+      "id": "e2",
+      "source": "source",
+      "target": "mapping"
+    },
+    {
+      "id": "e3",
+      "source": "mapping",
+      "target": "sink"
+    },
+    {
+      "id": "e4",
+      "source": "sink",
+      "target": "end"
+    }
+  ]
+}

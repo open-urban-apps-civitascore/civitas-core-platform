@@ -143,6 +143,9 @@ export const sessionReducer = (state: PipelineSessionState, action: PipelineSess
 
     case 'UPDATE_SESSION_NAME': {
       const { sessionId, name } = action.payload
+      const session = state.sessions.find(s => s.id === sessionId)
+      // The rename field commits on blur and Enter, also without a name change
+      if (session?.name === name) return state
 
       return {
         ...state,
@@ -171,8 +174,6 @@ export const sessionReducer = (state: PipelineSessionState, action: PipelineSess
           return {
             ...session,
             pipeline: nextPipeline,
-            isDirty: true,
-            lastModified: new Date(),
           }
         }),
       }

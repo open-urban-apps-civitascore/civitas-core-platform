@@ -14,15 +14,14 @@ body:json {
   {
     "name": "MQTT Sensor Source",
     "description": "Temperature sensor data source",
-    "connectorType": "MQTT",
-    "configuration": {
+    "connector": {
+      "connectorType": "MQTT",
       "urls": ["tcp://broker:1883"],
       "topics": ["sensor/#"],
       "qos": 1,
       "keepalive": "30s",
       "user": "mqttuser",
       "password": "secret",
-      "client_id": "civitas-client-1",
       "connect_timeout": "5s",
       "tls": {
         "enabled": false
@@ -51,8 +50,8 @@ tests {
   test("Has name", function() {
     expect(res.body.name).to.be.a('string');
   });
-  test("Has connectorType", function() {
-    expect(res.body.connectorType).to.be.a('string');
+  test("Has connector type", function() {
+    expect(res.body.connector.connectorType).to.be.a('string');
   });
 }
 

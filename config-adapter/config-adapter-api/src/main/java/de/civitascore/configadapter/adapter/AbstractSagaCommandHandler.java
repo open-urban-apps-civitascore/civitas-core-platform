@@ -10,11 +10,13 @@
 package de.civitascore.configadapter.adapter;
 
 import de.civitascore.configadapter.configuration.AdapterConfig;
-import jakarta.ws.rs.ProcessingException;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import jakarta.ws.rs.core.Response;
+import de.civitascore.configadapter.util.OkHttpJson;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.concurrent.TimeUnit;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,8 +30,9 @@ import org.slf4j.LoggerFactory;
  *   <li>Initialization lifecycle with {@link #doInitialize(AdapterConfig)}
  *   <li>Exception-dispatch boilerplate in {@link #handle(SagaCommandMessage)} that delegates to
  *       {@link #doHandle(SagaCommandMessage)}
- *   <li>Error classification and logging (including JAX-RS {@link ProcessingException})
- *   <li>JAX-RS client lifecycle ({@link #createClient()}, {@link #close()})
+ *   <li>Error classification and logging (including network errors from {@link #execute(Request)})
+ *   <li>HTTP client lifecycle ({@link #createClient()}, {@link #close()}, {@link
+ *       #execute(Request)})
  *   <li>HTTP response checking ({@link #checkResponse(Response, String)})
  *   <li>Config property helpers with adapter-name prefix
  * </ul>
@@ -42,7 +45,7 @@ public abstract class AbstractSagaCommandHandler implements SagaCommandHandler {
   protected final Logger log = LoggerFactory.getLogger(getClass());
   private final String adapterName;
   protected AdapterConfig config;
-  private Client client;
+  private OkHttpClient client;
 
   protected AbstractSagaCommandHandler(String adapterName) {
     this.adapterName = adapterName;
@@ -66,27 +69,38 @@ public abstract class AbstractSagaCommandHandler implements SagaCommandHandler {
   /** Subclass reads config properties, validates keys, etc. */
   protected abstract void doInitialize(AdapterConfig config);
 
-  // ─── JAX-RS client lifecycle ──────────────────────────────────────────────
+  // ─── HTTP client lifecycle ──────────────────────────────────────────────
 
-  protected Client client() {
+  protected OkHttpClient client() {
     return client;
   }
 
-  protected Client createClient() {
-    return ClientBuilder.newBuilder()
+  protected OkHttpClient createClient() {
+    return new OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build();
   }
 
-  protected void setClient(Client client) {
+  protected void setClient(OkHttpClient client) {
     this.client = client;
+  }
+
+  /**
+   * Executes an HTTP request. {@code doHandle(SagaCommandMessage)} declares no checked exceptions,
+   * so a network failure ({@link IOException}, checked in OkHttp) is wrapped as {@link
+   * UncheckedIOException} to propagate to {@link #classifyAndLogError}, which unwraps it back into
+   * a "Network error: ..." message.
+   */
+  protected Response execute(Request request) {
+    return OkHttpJson.execute(client, request);
   }
 
   @Override
   public void close() {
     if (client != null) {
-      client.close();
+      client.dispatcher().executorService().shutdown();
+      client.connectionPool().evictAll();
       log.info("{} closed", getClass().getSimpleName());
     }
   }
@@ -119,18 +133,20 @@ public abstract class AbstractSagaCommandHandler implements SagaCommandHandler {
   }
 
   /**
-   * Classifies the error, logs appropriately, returns the error message string. Handles JAX-RS
-   * {@link ProcessingException} as network errors; all other exceptions are logged at error level.
+   * Classifies the error, logs appropriately, returns the error message string. Handles {@link
+   * UncheckedIOException} (see {@link #execute(Request)}) as network errors; all other exceptions
+   * are logged at error level.
    */
   protected String classifyAndLogError(SagaCommandMessage command, Exception e) {
-    if (e instanceof ProcessingException) {
-      String error = "Network error: " + e.getMessage();
+    if (e instanceof UncheckedIOException uioe) {
+      String message = uioe.getCause().getMessage();
+      String error = "Network error: " + message;
       log.warn(
           "{} {} failed for saga {}: {}",
           Encode.forJava(adapterName),
           Encode.forJava(command.operation()),
           Encode.forJava(command.sagaId()),
-          Encode.forJava(e.getMessage()));
+          Encode.forJava(message));
       return error;
     }
     String error = command.operation() + " failed: " + e.getMessage();
@@ -147,12 +163,17 @@ public abstract class AbstractSagaCommandHandler implements SagaCommandHandler {
 
   /** Checks HTTP response, throws {@link SagaApiException} on non-2xx. */
   protected void checkResponse(Response response, String operationDesc) {
-    int status = response.getStatus();
-    if (status >= 200 && status < 300) {
+    if (response.isSuccessful()) {
       return;
     }
-    String body = response.readEntity(String.class);
-    throw new SagaApiException(operationDesc + " failed: HTTP " + status + " — " + body, status);
+    throw new SagaApiException(
+        operationDesc + " failed: HTTP " + response.code() + " — " + readBody(response),
+        response.code());
+  }
+
+  /** Reads the response body for an error message; an unreadable body degrades to empty. */
+  protected static String readBody(Response response) {
+    return OkHttpJson.readBody(response);
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────

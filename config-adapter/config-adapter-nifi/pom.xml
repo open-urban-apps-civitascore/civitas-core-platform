@@ -20,9 +20,9 @@
         <wiremock.version>3.9.2</wiremock.version>
         <archunit.version>1.4.2</archunit.version>
         <paho.version>1.2.5</paho.version>
-        <!-- Must track the NiFi version the flows are deployed to (apache/nifi:2.9.0), so the
-             compiler's emitted RecordPath is parse-checked against the same grammar that runs it. -->
-        <nifi-record-path.version>2.9.0</nifi-record-path.version>
+        <!-- Must track the NiFi version the flows are deployed to (apache/nifi:2.9.0), so the tests
+             parse RecordPath and Expression Language with the same grammar that runs them. -->
+        <nifi.version>2.9.0</nifi.version>
     </properties>
 
     <dependencies>
@@ -44,29 +44,10 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
-        <!-- JAX-RS Client API -->
+        <!-- OkHttp: multipart support for the NiFi process-group snapshot upload ships in the core artifact -->
         <dependency>
-            <groupId>jakarta.ws.rs</groupId>
-            <artifactId>jakarta.ws.rs-api</artifactId>
-        </dependency>
-
-        <!-- Jersey Client Implementation -->
-        <dependency>
-            <groupId>org.glassfish.jersey.core</groupId>
-            <artifactId>jersey-client</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.glassfish.jersey.inject</groupId>
-            <artifactId>jersey-hk2</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.glassfish.jersey.media</groupId>
-            <artifactId>jersey-media-json-jackson</artifactId>
-        </dependency>
-        <!-- Multipart for the NiFi process-group snapshot upload -->
-        <dependency>
-            <groupId>org.glassfish.jersey.media</groupId>
-            <artifactId>jersey-media-multipart</artifactId>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp-jvm</artifactId>
         </dependency>
 
         <dependency>
@@ -177,7 +158,16 @@
         <dependency>
             <groupId>org.apache.nifi</groupId>
             <artifactId>nifi-record-path</artifactId>
-            <version>${nifi-record-path.version}</version>
+            <version>${nifi.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- NiFi's own Expression Language parser: lets the tests assert that a value accepted as
+             literal comes out of NiFi's evaluation unchanged. -->
+        <dependency>
+            <groupId>org.apache.nifi</groupId>
+            <artifactId>nifi-expression-language</artifactId>
+            <version>${nifi.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

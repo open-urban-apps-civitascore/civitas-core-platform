@@ -4,52 +4,51 @@ import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
-import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.embedded.RoleDefault;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
-import de.civitascore.portal.model.entity.Activity;
-import de.civitascore.portal.model.entity.Agent;
 import de.civitascore.portal.model.entity.Assignment;
-import de.civitascore.portal.model.entity.Catalog;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
-import de.civitascore.portal.model.entity.DataSetSeries;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
-import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Layer;
+import de.civitascore.portal.model.entity.Permission;
 import de.civitascore.portal.model.entity.Pipeline;
-import de.civitascore.portal.model.entity.Resource;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.model.entity.User;
-import de.civitascore.portal.repository.ActivityRepository;
-import de.civitascore.portal.repository.AgentRepository;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.PayloadKind;
+import de.civitascore.portal.modelregistry.VersionBump;
 import de.civitascore.portal.repository.AssignmentRepository;
-import de.civitascore.portal.repository.CatalogRepository;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
-import de.civitascore.portal.repository.DataSetSeriesRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
-import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.LayerRepository;
+import de.civitascore.portal.repository.PermissionRepository;
 import de.civitascore.portal.repository.PipelineRepository;
-import de.civitascore.portal.repository.ResourceRepository;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.StyleRepository;
 import de.civitascore.portal.repository.UserRepository;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestComponent;
 
@@ -71,6 +70,7 @@ public class PortalTestDataFactory {
   @Autowired private UserRepository userRepository;
   @Autowired private GroupRepository groupRepository;
   @Autowired private RoleRepository roleRepository;
+  @Autowired private PermissionRepository permissionRepository;
   @Autowired private AssignmentRepository assignmentRepository;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataSinkRepository dataSinkRepository;
@@ -80,16 +80,125 @@ public class PortalTestDataFactory {
   @Autowired private LayerRepository layerRepository;
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private StyleRepository styleRepository;
-  @Autowired private CatalogRepository catalogRepository;
   @Autowired private DataPoolRepository dataPoolRepository;
-  @Autowired private DistributionRepository distributionRepository;
-  @Autowired private ResourceRepository resourceRepository;
-  @Autowired private AgentRepository agentRepository;
-  @Autowired private ActivityRepository activityRepository;
-  @Autowired private DataSetSeriesRepository dataSetSeriesRepository;
+  @Autowired private ModelRegistryGateway modelRegistryGateway;
 
   private static long nextSeq() {
     return SEQ.incrementAndGet();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Model Forge registry content (models and payloads live in the registry, not
+  // in host columns — the attach* helpers store the content and mirror the pin)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Stores the given JSON Schema as the version's model in the Model Forge registry and mirrors the
+   * assigned pin (URN + version) onto the persisted shell — what the service layer does on
+   * create/update.
+   */
+  public DataStructureVersion attachModel(DataStructureVersion version, Map<String, Object> model) {
+    return attachModel(version, model, null);
+  }
+
+  /** Variant of {@link #attachModel(DataStructureVersion, Map)} carrying UI styles. */
+  public DataStructureVersion attachModel(
+      DataStructureVersion version, Map<String, Object> model, Map<String, Object> styles) {
+    DataStructure parent = version.getDataStructure();
+    ModelRegistryGateway.ModelPin pin =
+        modelRegistryGateway.storeModel(
+            Optional.ofNullable(parent.getModelLogicalUrn()),
+            parent.getId(),
+            parent.getName(),
+            model,
+            styles,
+            // A version's first model starts its own major line and has no number to count from —
+            // the builder's placeholder version is not one the registry holds; a replacement
+            // advances the minor inside that line.
+            version.getModelUrn() == null ? VersionBump.MAJOR : VersionBump.MINOR,
+            version.getModelUrn() == null ? null : version.getVersion());
+    if (parent.getModelLogicalUrn() == null) {
+      parent.setModelLogicalUrn(pin.logicalUrn());
+      dataStructureRepository.save(parent);
+    }
+    version.setModelUrn(pin.versionedUrn());
+    version.setVersion(pin.version());
+    return dataStructureVersionRepository.save(version);
+  }
+
+  /**
+   * Stores the pipeline definition (plus optional React Flow layout) in the registry and mirrors
+   * the assigned pin onto the persisted shell.
+   */
+  public Pipeline attachPipelineDefinition(
+      Pipeline pipeline, Map<String, Object> model, Map<String, Object> styles) {
+    ModelRegistryGateway.ModelPin pin =
+        modelRegistryGateway.storePayload(
+            PayloadKind.PIPELINE,
+            Optional.ofNullable(pipeline.getModelLogicalUrn()),
+            pipeline.getId(),
+            pipeline.getName(),
+            model,
+            styles);
+    if (pipeline.getModelLogicalUrn() == null) {
+      pipeline.setModelLogicalUrn(pin.logicalUrn());
+    }
+    pipeline.setModelUrn(pin.versionedUrn());
+    return pipelineRepository.save(pipeline);
+  }
+
+  /**
+   * Stores the sink configuration in the registry and mirrors the assigned pin onto the persisted
+   * shell.
+   */
+  public DataSink attachSinkConfiguration(DataSink sink, Map<String, Object> configuration) {
+    // Mirror DataSinkService: the stored CORE payload carries connectionType (derived from the sink
+    // type); Model Forge stamps $schema + id on write and validates against datasink.schema.json.
+    Map<String, Object> payload = new LinkedHashMap<>(configuration);
+    if (sink.getDataSinkType() != null) {
+      payload.put("connectionType", sink.getDataSinkType().name().toLowerCase(Locale.ROOT));
+    }
+    ModelRegistryGateway.ModelPin pin =
+        modelRegistryGateway.storePayload(
+            PayloadKind.DATA_SINK,
+            Optional.ofNullable(sink.getConfigurationLogicalUrn()),
+            sink.getId(),
+            payload.get("tableName") instanceof String tableName ? tableName : "datasink",
+            payload,
+            null);
+    if (sink.getConfigurationLogicalUrn() == null) {
+      sink.setConfigurationLogicalUrn(pin.logicalUrn());
+    }
+    sink.setConfigurationUrn(pin.versionedUrn());
+    return dataSinkRepository.save(sink);
+  }
+
+  /**
+   * Stores the connector configuration in the registry and mirrors the assigned pin onto the
+   * persisted shell.
+   */
+  public DataSource attachSourceConfiguration(
+      DataSource dataSource, Map<String, Object> configuration) {
+    // Raw on purpose: callers store documents as an earlier release or the registry holds them
+    // (ciphertext, extra keys), which ConnectorJson.writeDocument would encrypt again or reject.
+    // Only the connectionType stamping copies writeDocument.
+    Map<String, Object> payload = new LinkedHashMap<>(configuration);
+    if (dataSource.getConnectorType() != null) {
+      payload.put("connectionType", dataSource.getConnectorType().name().toLowerCase(Locale.ROOT));
+    }
+    ModelRegistryGateway.ModelPin pin =
+        modelRegistryGateway.storePayload(
+            PayloadKind.DATA_SOURCE,
+            Optional.ofNullable(dataSource.getConfigurationLogicalUrn()),
+            dataSource.getId(),
+            dataSource.getName() != null ? dataSource.getName() : "datasource",
+            payload,
+            null);
+    if (dataSource.getConfigurationLogicalUrn() == null) {
+      dataSource.setConfigurationLogicalUrn(pin.logicalUrn());
+    }
+    dataSource.setConfigurationUrn(pin.versionedUrn());
+    return dataSourceRepository.save(dataSource);
   }
 
   // ---------------------------------------------------------------------------
@@ -106,8 +215,7 @@ public class PortalTestDataFactory {
         User.builder()
             .firstName("First" + seq)
             .lastName("Last" + seq)
-            .email("user-" + seq + "@test.local")
-            .active(true);
+            .email("user-" + seq + "@test.local");
     customizer.accept(builder);
     return userRepository.save(builder.build());
   }
@@ -126,6 +234,15 @@ public class PortalTestDataFactory {
     return groupRepository.save(builder.build());
   }
 
+  /** Creates a group whose member is the user with the given external id, created if missing. */
+  public Group groupOf(String externalId) {
+    User member =
+        userRepository
+            .findByExternalId(externalId)
+            .orElseGet(() -> user(b -> b.externalId(externalId)));
+    return group(b -> b.members(new HashSet<>(Set.of(member))));
+  }
+
   // ---------------------------------------------------------------------------
   // Role
   // ---------------------------------------------------------------------------
@@ -140,6 +257,18 @@ public class PortalTestDataFactory {
     return roleRepository.save(builder.build());
   }
 
+  /**
+   * Creates a role with the type and permissions of a default role. A fresh copy, because {@link
+   * #cleanAll()} deletes the seeded roles.
+   */
+  public Role role(RoleDefault template) {
+    Set<Permission> permissions =
+        template.getPermissions().stream()
+            .map(name -> permissionRepository.findByName(name.name()).orElseThrow())
+            .collect(Collectors.toSet());
+    return role(b -> b.roleType(template.getRoleType()).permissions(permissions));
+  }
+
   // ---------------------------------------------------------------------------
   // Assignment
   // ---------------------------------------------------------------------------
@@ -148,6 +277,11 @@ public class PortalTestDataFactory {
   public Assignment assignment(Group group, Role role) {
     Assignment a = Assignment.builder().group(group).role(role).scopeType(ScopeType.TENANT).build();
     return assignmentRepository.save(a);
+  }
+
+  /** Creates an unscoped assignment, the only kind a SYSTEM role may have. */
+  public Assignment unscopedAssignment(Group group, Role role) {
+    return assignmentRepository.save(Assignment.builder().group(group).role(role).build());
   }
 
   public Assignment assignment(Group group, Role role, DataSet scope) {
@@ -163,12 +297,6 @@ public class PortalTestDataFactory {
   }
 
   public Assignment assignment(Group group, Role role, DataStructure scope) {
-    Assignment a = Assignment.builder().group(group).role(role).build();
-    a.setScope(scope);
-    return assignmentRepository.save(a);
-  }
-
-  public Assignment assignment(Group group, Role role, Catalog scope) {
     Assignment a = Assignment.builder().group(group).role(role).build();
     a.setScope(scope);
     return assignmentRepository.save(a);
@@ -192,6 +320,7 @@ public class PortalTestDataFactory {
     var builder =
         DataSet.builder()
             .name("dataset-" + nextSeq())
+            .description("test dataset")
             .dataSetStatus(DataSetStatus.DRAFT)
             .openDataAccess(false);
     customizer.accept(builder);
@@ -215,6 +344,7 @@ public class PortalTestDataFactory {
     var builder =
         DataSource.builder()
             .name("datasource-" + nextSeq())
+            .description("test data source")
             .dataSourceStatus(DataSourceStatus.DRAFT);
     customizer.accept(builder);
     return dataSourceRepository.save(builder.build());
@@ -233,6 +363,7 @@ public class PortalTestDataFactory {
     var builder =
         DataStructure.builder()
             .name("datastructure-" + nextSeq())
+            .description("test data structure")
             .dataStructureStatus(DataStructureStatus.DRAFT);
     customizer.accept(builder);
     return dataStructureRepository.save(builder.build());
@@ -253,7 +384,6 @@ public class PortalTestDataFactory {
     var builder =
         DataStructureVersion.builder()
             .version("1.0." + seq)
-            .dataStructureVersionSource(DataStructureVersionSource.OWN)
             .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
             .dataStructure(dataStructure);
     customizer.accept(builder);
@@ -350,112 +480,26 @@ public class PortalTestDataFactory {
   }
 
   // ---------------------------------------------------------------------------
-  // Catalog
-  // ---------------------------------------------------------------------------
-
-  public Catalog catalog() {
-    return catalog(b -> {});
-  }
-
-  public Catalog catalog(Consumer<Catalog.CatalogBuilder<?, ?>> customizer) {
-    var builder = Catalog.builder().name("catalog-" + nextSeq());
-    customizer.accept(builder);
-    return catalogRepository.save(builder.build());
-  }
-
-  // ---------------------------------------------------------------------------
-  // Distribution
-  // ---------------------------------------------------------------------------
-
-  public Distribution distribution() {
-    return distribution(b -> {});
-  }
-
-  public Distribution distribution(Consumer<Distribution.DistributionBuilder<?, ?>> customizer) {
-    var builder = Distribution.builder();
-    customizer.accept(builder);
-    return distributionRepository.save(builder.build());
-  }
-
-  // ---------------------------------------------------------------------------
-  // Resource
-  // ---------------------------------------------------------------------------
-
-  public Resource resource() {
-    return resourceRepository.save(Resource.builder().build());
-  }
-
-  // ---------------------------------------------------------------------------
-  // Agent
-  // ---------------------------------------------------------------------------
-
-  public Agent agent() {
-    return agent(b -> {});
-  }
-
-  public Agent agent(Consumer<Agent.AgentBuilder<?, ?>> customizer) {
-    var builder = Agent.builder().name("agent-" + nextSeq());
-    customizer.accept(builder);
-    return agentRepository.save(builder.build());
-  }
-
-  // ---------------------------------------------------------------------------
-  // Activity
-  // ---------------------------------------------------------------------------
-
-  public Activity activity() {
-    return activity(b -> {});
-  }
-
-  public Activity activity(Consumer<Activity.ActivityBuilder<?, ?>> customizer) {
-    var builder = Activity.builder().name("activity-" + nextSeq());
-    customizer.accept(builder);
-    return activityRepository.save(builder.build());
-  }
-
-  // ---------------------------------------------------------------------------
-  // DataSetSeries
-  // ---------------------------------------------------------------------------
-
-  public DataSetSeries dataSetSeries() {
-    return dataSetSeries(b -> {});
-  }
-
-  public DataSetSeries dataSetSeries(
-      Consumer<DataSetSeries.DataSetSeriesBuilder<?, ?>> customizer) {
-    var builder = DataSetSeries.builder().name("series-" + nextSeq());
-    customizer.accept(builder);
-    return dataSetSeriesRepository.save(builder.build());
-  }
-
-  // ---------------------------------------------------------------------------
   // cleanAll — deletes all entities in FK-safe order
   // ---------------------------------------------------------------------------
 
   /**
    * Deletes all test entities in the correct order (respecting FK and join-table constraints).
    *
-   * <p>ManyToMany join tables are owned by: Catalog (catalog_datasets, catalog_children), DataSet
-   * (dataset_dataspaces, dataset_agents), Pipeline (pipeline_data_sources), Activity
-   * (activity_agents), Group (group_members), Role (role_permissions). The owning side must be
-   * deleted before the inverse side.
+   * <p>ManyToMany join tables are owned by: Pipeline (pipeline_data_sources), Group
+   * (group_members), Role (role_permissions). The owning side must be deleted before the inverse
+   * side.
    */
   public void cleanAll() {
     assignmentRepository.deleteAll();
-    distributionRepository.deleteAll();
     layerRepository.deleteAll();
     styleRepository.deleteAll();
     dataSinkRepository.deleteAll();
     pipelineRepository.deleteAll();
-    catalogRepository.deleteAll();
     dataSetRepository.deleteAll();
     dataSourceRepository.deleteAll();
     dataStructureVersionRepository.deleteAll();
     dataStructureRepository.deleteAll();
-    activityRepository.deleteAll();
-    agentRepository.deleteAll();
-    resourceRepository.deleteAll();
-    dataSetSeriesRepository.deleteAll();
     dataPoolRepository.deleteAll();
     groupRepository.deleteAll();
     roleRepository.deleteAll();

@@ -20,6 +20,7 @@ import { useQueryParams } from '@/hooks/use-query-params'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { DatastructuresListData } from '@/types/datastructures'
+import { isResourceInUseError } from '@/utils/errors'
 
 import { DatastructuresTable } from './DatastructuresTable'
 
@@ -60,8 +61,8 @@ export const DatastructuresList = (props: DatastructuresListProps) => {
           toast.success(tCommon('success.deletionSuccess', { item: tCommon('items.datastructure') }))
           router.refresh()
         },
-        onError: () => {
-          toast.error(t('errors.deletionError'))
+        onError: error => {
+          toast.error(isResourceInUseError(error) ? t('errors.inUseError') : t('errors.deletionError'))
         },
         onSettled: () => {
           setIsDeletionWarningModalOpen(false)

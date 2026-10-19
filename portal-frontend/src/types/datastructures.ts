@@ -4,7 +4,15 @@ import { UMLDiagram, UMLEdge, UMLNode } from '@/components/uml-modeler/types/dia
 import { enumFromConst } from '@/utils/common'
 
 import { AssignmentSchema, AssignmentScopedInput } from './assignments'
-import { ItemSchema, MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, MIN_NAME_LENGTH, STATUS_TYPES, WithId } from './common'
+import {
+  ItemSchema,
+  MAX_DESCRIPTION_LENGTH,
+  MAX_NAME_LENGTH,
+  MIN_DESCRIPTION_LENGTH,
+  MIN_NAME_LENGTH,
+  STATUS_TYPES,
+  WithId,
+} from './common'
 
 export const DATASTRUCTURE_STATUS_TYPES = {
   DRAFT: 'DRAFT',
@@ -37,14 +45,22 @@ export type DatastructureVersionSource =
 
 export const DatastructureVersionApiResponseSchema = z.object({
   id: z.string(),
-  version: z.string(),
+  // Assigned by the registry when the model is stored, so a version that carries no model yet
+  // — a draft whose diagram is still empty — has no number.
+  version: z.string().nullable(),
   description: z.string().nullable(),
   dataStructureVersionStatus: DatastructureStatusEnum,
   dataStructureVersionSource: DatastructureVersionSourceEnum,
   modelName: z.string().nullable(),
+  // Versioned CORE URN of this version's model (DataStructure) artifact in Model Forge.
+  modelUrn: z.string().nullable().optional(),
   model: z.record(z.string(), z.unknown()).nullable(),
   styles: z.custom<UMLDiagram>().nullable(),
+  // Versioned CORE URNs of the published structures this version was built from. The import pins
+  // the version, so a later version of a structure leaves this one untouched.
+  importedStructureUrns: z.array(z.string()).nullable().optional(),
   inUse: z.boolean().optional(),
+  inUseByReleased: z.boolean().optional(),
   dataStructure: ItemSchema,
   createdAt: z.string(),
   modifiedAt: z.string(),
@@ -52,24 +68,22 @@ export const DatastructureVersionApiResponseSchema = z.object({
 
 export const DatastructureVersionSummaryApiResponseSchema = z.object({
   id: z.string(),
-  version: z.string(),
+  version: z.string().nullable(),
   description: z.string().nullable(),
   dataStructureVersionStatus: DatastructureStatusEnum,
   dataStructureVersionSource: DatastructureVersionSourceEnum,
   createdAt: z.string(),
   modifiedAt: z.string(),
   dataStructureId: z.string(),
+  // Versioned CORE URN of this version's model in Model Forge; absent while the version has none.
+  modelUrn: z.string().nullable().optional(),
+  inUse: z.boolean().optional(),
+  inUseByReleased: z.boolean().optional(),
 })
 
-// Three-segment SemVer, mirroring the URN grammar: the version becomes the trailing
-// segment of the model's $id URN, whose validation rejects any other shape at release.
-export const VERSION_PATTERN = /^\d+\.\d+\.\d+$/
-
-const versionSchema = z
-  .string()
-  .trim()
-  .min(1, 'common.errors.required')
-  .regex(VERSION_PATTERN, 'datastructureVersions.errors.versionFormat')
+// The version is assigned by the registry on store, never authored: the form carries it only to
+// display the assigned value, so it has no shape to enforce and is empty until the first store.
+const versionSchema = z.string()
 
 export const DatastructureVersionFormDraftSchema = z.object({
   id: z.string(),
@@ -91,13 +105,12 @@ export const DatastructureVersionFormAvailableSchema = DatastructureVersionFormD
 })
 
 export const DatastructureVersionCreateSchema = z.object({
-  version: versionSchema,
   description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength').optional(),
-  dataStructureVersionSource: DatastructureVersionSourceEnum,
   dataStructureVersionStatus: DatastructureStatusEnum.optional(),
   modelName: z.string().trim().nullable().optional(),
   model: z.record(z.string(), z.unknown()).nullable().optional(),
   styles: z.custom<UMLDiagram>().nullable().optional(),
+  importedStructureUrns: z.array(z.string()).nullable().optional(),
 })
 
 export type DatastructureVersion = z.infer<typeof DatastructureVersionApiResponseSchema>
@@ -114,7 +127,8 @@ export type DatastructureVersionsListData = {
   description: string
   status: DatastructureStatusType
   source: DatastructureVersionSource
-  versionNumber: string
+  versionNumber: string | null
+  inUseByReleased?: boolean
 }
 
 // DATASTRUCTURE TYPES
@@ -124,9 +138,9 @@ export const DatastructureApiResponseSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   dataStructureStatus: DatastructureStatusEnum,
-  createdFromDataSource: z.boolean(),
   assignments: z.array(AssignmentSchema).optional(),
   inUse: z.boolean().optional(),
+  inUseByReleased: z.boolean().optional(),
   createdAt: z.string(),
   modifiedAt: z.string(),
   dataStructureVersions: z.array(DatastructureVersionSummaryApiResponseSchema),
@@ -147,16 +161,19 @@ export const DatastructureFormDraftSchema = z.object({
     .trim()
     .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
     .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
-  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
+  description: z
+    .string()
+    .trim()
+    .min(MIN_DESCRIPTION_LENGTH, 'common.errors.descriptionRequired')
+    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   dataStructureStatus: DatastructureStatusEnum,
-  dataStructureVersionIds: z.array(z.string()),
 })
 
 export const DatastructureFormAvailableSchema = DatastructureFormDraftSchema.extend({
   description: z
     .string()
     .trim()
-    .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
+    .min(MIN_DESCRIPTION_LENGTH, 'common.errors.descriptionRequired')
     .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
 })
 
@@ -169,7 +186,11 @@ export const DatastructureCreateFormSchema = z.object({
     .trim()
     .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
     .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
-  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
+  description: z
+    .string()
+    .trim()
+    .min(MIN_DESCRIPTION_LENGTH, 'common.errors.descriptionRequired')
+    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
 })
 
 export const DatastructureCreateDataSchema = z.object({
@@ -178,17 +199,18 @@ export const DatastructureCreateDataSchema = z.object({
     .trim()
     .min(MIN_NAME_LENGTH, 'common.errors.nameRequired')
     .max(MAX_NAME_LENGTH, 'common.errors.nameMaxLength'),
-  createdFromDataSource: z.boolean(),
-  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
-  dataStructureVersionIds: z.array(z.string()).optional(),
+  description: z
+    .string()
+    .trim()
+    .min(MIN_DESCRIPTION_LENGTH, 'common.errors.descriptionRequired')
+    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
   assignments: z.array(AssignmentSchema).optional(),
 })
 
 export type DatastructureCreateFormData = z.infer<typeof DatastructureCreateFormSchema>
 export type DatastructureCreateData = z.infer<typeof DatastructureCreateDataSchema>
 
-export type DatastructurePutData = DatastructureFormDraft & {
-  createdFromDataSource: boolean
+export type DatastructureMetaPatchData = Pick<DatastructureFormDraft, 'id' | 'name' | 'description'> & {
   assignments?: AssignmentScopedInput[]
 }
 export type DatastructurePatchData = Partial<DatastructureCreateData> & WithId
@@ -202,6 +224,8 @@ export type DatastructuresListData = {
   status: DatastructureStatusType
   source: DatastructureVersionSource | null
   versionNumber: string | null
+  modelUrn?: string | null
   versions: DatastructuresListData[]
   inUse?: boolean
+  inUseByReleased?: boolean
 }

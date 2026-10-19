@@ -16,9 +16,6 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class DataSetOutputDTO extends BaseOutputDTO {
 
-  @Schema(example = "traffic-count-2025")
-  private String identifier;
-
   @Schema(example = "Traffic Count 2025")
   private String name;
 
@@ -27,9 +24,6 @@ public class DataSetOutputDTO extends BaseOutputDTO {
 
   @Schema(example = "DRAFT")
   private DataSetStatus dataSetStatus;
-
-  @Schema(example = "1.0.0")
-  private String version;
 
   private List<PipelineSummaryDTO> pipelines = new ArrayList<>();
 
@@ -63,9 +57,9 @@ public class DataSetOutputDTO extends BaseOutputDTO {
 
   @Schema(
       description =
-          "Whether the data-holding sink has been physically provisioned at least once (a PostGIS"
-              + " table / FROST project exists). Stays true across an unrelease. Used to warn"
-              + " before a destructive sink change that would rebuild the table.",
+          "Whether a provisioning saga has completed successfully, so whatever sinks the dataset"
+              + " carried at release physically exist (a PostGIS table / FROST project). Stays true"
+              + " across an unrelease. Decides whether a delete needs the teardown saga.",
       accessMode = Schema.AccessMode.READ_ONLY)
   private Boolean provisioned;
 }

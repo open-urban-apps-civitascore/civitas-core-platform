@@ -19,7 +19,7 @@ body:json {
     "dataSinkType": "POSTGIS",
     "configuration": {
       "tableName": "sensor_observations",
-      "dataStructureVersionId": "{{dataStructureVersionId}}"
+      "element": "{{setupModelUrn}}"
     }
   }
 }
@@ -29,6 +29,31 @@ script:post-response {
     bru.setVar('dataSinkId', res.body.id);
     bru.setVar('postgisDataSinkId', res.body.id);
   }
+}
+
+tests {
+  test("DataSink created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("Has POSTGIS type", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.dataSinkType).to.equal('POSTGIS');
+    }
+  });
+
+  test("Configuration round-trips the table name and element URN", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.configuration.tableName).to.equal('sensor_observations');
+      expect(res.body.configuration.element).to.be.a('string');
+    }
+  });
+
+  test("Carries the registry URN a pipeline references as sinkRef", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.configurationUrn).to.contain('urn:core:');
+    }
+  });
 }
 
 docs {

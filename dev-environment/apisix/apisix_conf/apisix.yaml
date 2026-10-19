@@ -59,10 +59,20 @@ plugin_configs:
       # impersonate a user. serverless-pre-function (priority 10000) runs in the rewrite phase
       # BEFORE openid-connect (priority 2599), so the forged headers are cleared first; openid-
       # connect then re-sets the real X-Userinfo for a validly authenticated request.
+      # The second function drops a trailing slash on a dataset endpoint, so a route provisioned
+      # before the standards were told apart still reaches the same upstream resource as the bare
+      # address. Deeper paths are left alone; the route decides whether they match at all.
       serverless-pre-function:
         phase: rewrite
         functions:
           - "return function(conf, ctx) ngx.req.clear_header('X-Userinfo'); ngx.req.clear_header('X-Access-Token'); ngx.req.clear_header('X-Id-Token') end"
+          - >-
+            return function()
+              local uri = ngx.var.uri
+              if uri and ngx.re.find(uri, "^/v1/datasets/[^/]+/[^/]+/$", "jo") then
+                ngx.req.set_uri(string.sub(uri, 1, -2), false)
+              end
+            end
 
       # 1. JWT validation - validates a present token and sets X-Userinfo header.
       # unauth_action: "pass" lets ANONYMOUS requests continue to OPA instead of being

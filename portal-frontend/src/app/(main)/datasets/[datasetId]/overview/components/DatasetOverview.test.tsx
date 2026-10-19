@@ -1,9 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { AxiosError } from 'axios'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { mockApiError } from '@/__mocks__/errors/apiError.mock'
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 import { Dataset } from '@/types/datasets'
@@ -15,6 +15,7 @@ const mockStageDataset = vi.fn().mockResolvedValue(undefined)
 const mockUnstageDataset = vi.fn().mockResolvedValue(undefined)
 const mockReleaseDataset = vi.fn().mockResolvedValue(undefined)
 const mockUnreleaseDataset = vi.fn().mockResolvedValue(undefined)
+const mockUpdateReadyDatasetMeta = vi.fn().mockResolvedValue(undefined)
 const mockUpdateReleasedDatasetMeta = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@/app/services/api/datasets/clientRequests', () => ({
@@ -23,6 +24,7 @@ vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   useUnstageDataset: () => ({ mutateAsync: mockUnstageDataset, isPending: false }),
   useReleaseDataset: () => ({ mutateAsync: mockReleaseDataset, isPending: false }),
   useUnreleaseDataset: () => ({ mutateAsync: mockUnreleaseDataset, isPending: false }),
+  useUpdateReadyDatasetMeta: () => ({ mutateAsync: mockUpdateReadyDatasetMeta, isPending: false }),
   useUpdateReleasedDatasetMeta: () => ({ mutateAsync: mockUpdateReleasedDatasetMeta, isPending: false }),
   useGetDataset: () => ({ data: undefined }),
 }))
@@ -54,6 +56,20 @@ const mockCurrentUser = (permissions: PermissionName[]) => {
   } as unknown as ReturnType<typeof useGetCurrentUser>)
 }
 
+// Only TENANT scope grants DATASOURCE_READ and DATASTRUCTURE_READ; DATASET scope filters them out.
+const mockTenantPermissions = (permissions: PermissionName[]) => {
+  vi.mocked(useGetCurrentUser).mockReturnValue({
+    data: {
+      username: 'current',
+      email: 'current@test.com',
+      title: 'MR' as const,
+      firstName: 'Current',
+      lastName: 'User',
+      assignments: [{ scopeType: 'TENANT', scopeId: null, permissions }],
+    },
+  } as unknown as ReturnType<typeof useGetCurrentUser>)
+}
+
 const mockCurrentUserWithDatapoolScope = (permissions: PermissionName[], datapoolId: string) => {
   vi.mocked(useGetCurrentUser).mockReturnValue({
     data: {
@@ -77,38 +93,32 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
+  useLocale: () => 'de',
 }))
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }))
 
-vi.mock('@/components/ui/input', () => ({
-  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
+vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
+  useGetPipelines: () => ({ data: { data: [] } }),
+  useDeletePipeline: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
-vi.mock('@/components/ui/textarea', () => ({
-  Textarea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...props} />,
+vi.mock('@/app/services/api/datasources/clientRequests', () => ({
+  useGetDatasources: () => ({ data: { data: [] } }),
 }))
 
-vi.mock('../../components/CompletionStep', () => ({
-  CompletionStep: (props: { step: { title: string } }) => <div data-testid={`completionStep-${props.step.title}`} />,
-}))
-
-vi.mock('../../../utils/mappers', () => ({
-  mapDatasetToFormData: (dataset: Dataset) => ({
-    id: dataset.id,
-    name: dataset.name,
-    description: dataset.description ?? '',
-    openDataAccess: dataset.openDataAccess,
-    datapoolId: dataset.datapool?.id ?? null,
-  }),
+vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
+  useGetDataSinks: () => ({ data: { data: [{ id: 'sink-1', dataSinkType: 'POSTGIS' }] } }),
 }))
 
 vi.mock('@/contexts/unsaved-changes/UnsavedChangesContext', () => ({
   useUnsavedChanges: () => ({
     setHasUnsavedChanges: vi.fn(),
     setSaveHandler: vi.fn(),
+    hasUnsavedChanges: false,
+    requestNavigation: vi.fn(),
   }),
 }))
 
@@ -183,10 +193,22 @@ describe('DatasetOverview', () => {
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
     })
 
+    it('hides Edit button on an AVAILABLE dataset when user lacks DATASET_RELEASE permission', () => {
+      mockCurrentUser([PERMISSION_NAMES.DATASET_UPDATE])
+      renderComponent({ dataset: makeDraftDataset({ dataSetStatus: 'AVAILABLE' }) })
+      expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+    })
+
+    it('shows Edit button on a READY dataset when user has only DATASET_UPDATE permission', () => {
+      mockCurrentUser([PERMISSION_NAMES.DATASET_UPDATE])
+      renderComponent({ dataset: makeDraftDataset({ dataSetStatus: 'READY' }) })
+      expect(screen.getByTestId('editButton')).toBeInTheDocument()
+    })
+
     it('always shows access management completion card', () => {
       mockCurrentUser([])
       renderComponent()
-      expect(screen.getByTestId('completionStep-overview.completion.accessManagement.title')).toBeInTheDocument()
+      expect(screen.getByText('overview.completion.accessManagement.title')).toBeInTheDocument()
     })
   })
 
@@ -260,6 +282,21 @@ describe('DatasetOverview', () => {
         renderComponent({
           dataset: makeDraftDataset({
             description: '',
+            pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
+          }),
+          groupCount: 1,
+          roleCount: 1,
+        })
+        clickEditButton()
+        await openStatusDropdown()
+        expect(getStatusOption('READY')).toHaveAttribute('aria-disabled', 'true')
+        expect(getStatusOption('AVAILABLE')).toHaveAttribute('aria-disabled', 'true')
+      })
+
+      it('when only a named API is present (a named API is no distribution)', async () => {
+        renderComponent({
+          dataset: makeDraftDataset({
+            pipelines: [],
             namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
           }),
           groupCount: 1,
@@ -273,7 +310,7 @@ describe('DatasetOverview', () => {
     })
 
     describe('READY and AVAILABLE are enabled when canStage is true', () => {
-      it('when pipelines present, assignments set, and form passes strict schema', async () => {
+      it('when pipelines present and form passes strict schema', async () => {
         renderComponent({
           dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
           groupCount: 1,
@@ -285,21 +322,9 @@ describe('DatasetOverview', () => {
         expect(getStatusOption('AVAILABLE')).not.toHaveAttribute('aria-disabled', 'true')
       })
 
-      it('when namedApis present, assignments set, and form passes strict schema', async () => {
-        renderComponent({
-          dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
-          groupCount: 1,
-          roleCount: 1,
-        })
-        clickEditButton()
-        await openStatusDropdown()
-        expect(getStatusOption('READY')).not.toHaveAttribute('aria-disabled', 'true')
-        expect(getStatusOption('AVAILABLE')).not.toHaveAttribute('aria-disabled', 'true')
-      })
-
       it('when distribution present and form valid but no assignments (assignments not required)', async () => {
         renderComponent({
-          dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
+          dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
           groupCount: 0,
           roleCount: 0,
         })
@@ -313,7 +338,7 @@ describe('DatasetOverview', () => {
         renderComponent({
           dataset: makeDraftDataset({
             description: '',
-            namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+            pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
           }),
           groupCount: 1,
           roleCount: 1,
@@ -340,7 +365,7 @@ describe('DatasetOverview', () => {
           const { rerender } = renderComponent({
             dataset: makeDraftDataset({
               dataSetStatus,
-              namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+              pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
             }),
             groupCount: 1,
             roleCount: 1,
@@ -353,7 +378,7 @@ describe('DatasetOverview', () => {
               <DatasetOverview
                 dataset={makeDraftDataset({
                   dataSetStatus,
-                  namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+                  pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
                 })}
                 groupCount={0}
                 roleCount={0}
@@ -372,7 +397,7 @@ describe('DatasetOverview', () => {
           dataset: makeDraftDataset({
             dataSetStatus: 'READY',
             description: 'A meaningful description',
-            namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+            pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
           }),
           groupCount: 1,
           roleCount: 1,
@@ -385,7 +410,7 @@ describe('DatasetOverview', () => {
             dataset={makeDraftDataset({
               dataSetStatus: 'READY',
               description: '',
-              namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+              pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
             })}
             groupCount={1}
             roleCount={1}
@@ -429,7 +454,7 @@ describe('DatasetOverview', () => {
 
     it('calls stageDataset when status changes from DRAFT to READY', async () => {
       renderComponent({
-        dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
+        dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
         groupCount: 1,
         roleCount: 1,
       })
@@ -448,7 +473,7 @@ describe('DatasetOverview', () => {
       renderComponent({
         dataset: makeDraftDataset({
           dataSetStatus: 'READY',
-          namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+          pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
         }),
         groupCount: 1,
         roleCount: 1,
@@ -468,7 +493,7 @@ describe('DatasetOverview', () => {
       renderComponent({
         dataset: makeDraftDataset({
           dataSetStatus: 'AVAILABLE',
-          namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+          pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
         }),
         groupCount: 1,
         roleCount: 1,
@@ -488,7 +513,7 @@ describe('DatasetOverview', () => {
       renderComponent({
         dataset: makeDraftDataset({
           dataSetStatus: 'AVAILABLE',
-          namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+          pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
         }),
         groupCount: 1,
         roleCount: 1,
@@ -505,11 +530,37 @@ describe('DatasetOverview', () => {
       })
     })
 
+    it('calls updateReadyDatasetMeta when saving form changes on a READY dataset', async () => {
+      renderComponent({
+        dataset: makeDraftDataset({
+          dataSetStatus: 'READY',
+          pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
+        }),
+        groupCount: 1,
+        roleCount: 1,
+      })
+      clickEditButton()
+
+      await act(async () => {
+        fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Updated Name' } })
+      })
+
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
+
+      await waitFor(() => {
+        expect(mockUpdateReadyDatasetMeta).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'Updated Name', id: 'test-id' }),
+        )
+      })
+      expect(mockUpdateReleasedDatasetMeta).not.toHaveBeenCalled()
+      expect(mockPatchDataset).not.toHaveBeenCalled()
+    })
+
     it('calls updateReleasedDatasetMeta when saving form changes on an AVAILABLE dataset', async () => {
       renderComponent({
         dataset: makeDraftDataset({
           dataSetStatus: 'AVAILABLE',
-          namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }],
+          pipelines: [{ id: 'p1', name: 'Pipeline 1' }],
         }),
         groupCount: 1,
         roleCount: 1,
@@ -530,18 +581,11 @@ describe('DatasetOverview', () => {
     })
   })
 
-  describe('Save error handling: scope-violation vs. generic', () => {
-    const axios422 = (type?: string) =>
-      new AxiosError('request failed', undefined, undefined, undefined, {
-        status: 422,
-        statusText: '',
-        headers: {},
-        config: {} as never,
-        data: { detail: 'scope violation', type },
-      })
-
+  describe('Save error handling: scope-violation vs. saga vs. generic', () => {
     it('shows the scope-violation toast when the save fails with a DATASOURCE_SCOPE_VIOLATION 422', async () => {
-      mockPatchDataset.mockRejectedValueOnce(axios422('urn:civitas:error:DATASOURCE_SCOPE_VIOLATION'))
+      mockPatchDataset.mockRejectedValueOnce(
+        mockApiError(422, 'scope violation', 'urn:civitas:error:DATASOURCE_SCOPE_VIOLATION'),
+      )
       renderComponent()
       clickEditButton()
 
@@ -552,6 +596,24 @@ describe('DatasetOverview', () => {
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith('messages.datasourceScopeViolation')
+      })
+      expect(toast.error).not.toHaveBeenCalledWith('messages.transitionError')
+    })
+
+    it('shows the saga toast when the save is rejected because a saga is running', async () => {
+      mockPatchDataset.mockRejectedValueOnce(
+        mockApiError(409, 'Cannot release while a saga is in-flight: CREATE', 'urn:civitas:error:SAGA_IN_FLIGHT'),
+      )
+      renderComponent()
+      clickEditButton()
+
+      await act(async () => {
+        fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'Updated Name' } })
+      })
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('messages.sagaInFlightError')
       })
       expect(toast.error).not.toHaveBeenCalledWith('messages.transitionError')
     })
@@ -599,7 +661,7 @@ describe('DatasetOverview', () => {
 
     it('discarding resets form values and status to original dataset values and clears exit modal', async () => {
       renderComponent({
-        dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
+        dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
       })
       clickEditButton()
 
@@ -618,7 +680,7 @@ describe('DatasetOverview', () => {
 
     it('save-and-exit from modal calls mockStageDataset and closes modal on success', async () => {
       renderComponent({
-        dataset: makeDraftDataset({ namedApis: [{ id: 'a1', name: 'My API', slug: 'my-api', standard: 'STA' }] }),
+        dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
       })
 
       clickEditButton()
@@ -640,12 +702,172 @@ describe('DatasetOverview', () => {
   describe('Completion steps', () => {
     it('renders data flow completion card', () => {
       renderComponent()
-      expect(screen.getByTestId('completionStep-overview.completion.dataFlow.title')).toBeInTheDocument()
+      expect(screen.getByText('overview.completion.dataFlow.title')).toBeInTheDocument()
     })
 
     it('renders access management completion card', () => {
       renderComponent()
-      expect(screen.getByTestId('completionStep-overview.completion.accessManagement.title')).toBeInTheDocument()
+      expect(screen.getByText('overview.completion.accessManagement.title')).toBeInTheDocument()
+    })
+  })
+
+  describe('Data flow gating: adding and editing apis and pipelines', () => {
+    const CONTENT_PERMISSIONS: PermissionName[] = [
+      PERMISSION_NAMES.DATASET_READ,
+      PERMISSION_NAMES.DATASET_CREATE,
+      PERMISSION_NAMES.DATASET_UPDATE,
+      PERMISSION_NAMES.DATASOURCE_READ,
+      PERMISSION_NAMES.DATASTRUCTURE_READ,
+    ]
+
+    const namedApi = { id: 'api-1', name: 'My API', slug: 'my-api', standard: 'STA' as const }
+
+    const addApiButton = () => screen.queryByRole('button', { name: 'addButton' })
+    const addPipelineLink = () => screen.queryByRole('link', { name: 'addButton' })
+
+    const openApiCardMenu = () => userEvent.click(screen.getByTestId('apiCardMenu-my-api'))
+
+    it('shows the add buttons for apis and pipelines on a DRAFT dataset for a user with all necessary permissions', () => {
+      mockTenantPermissions(CONTENT_PERMISSIONS)
+      renderComponent()
+      expect(addApiButton()).toBeInTheDocument()
+      expect(addPipelineLink()).toBeInTheDocument()
+    })
+
+    it.each([{ dataSetStatus: 'READY' as const }, { dataSetStatus: 'AVAILABLE' as const }])(
+      'hides the add buttons on a $dataSetStatus dataset, even with every permission',
+      ({ dataSetStatus }) => {
+        mockTenantPermissions(CONTENT_PERMISSIONS)
+        renderComponent({ dataset: makeDraftDataset({ dataSetStatus }) })
+        expect(addApiButton()).not.toBeInTheDocument()
+        expect(addPipelineLink()).not.toBeInTheDocument()
+      },
+    )
+
+    it('hides the add buttons as soon as a non-DRAFT status is selected but not yet saved', async () => {
+      mockTenantPermissions(CONTENT_PERMISSIONS)
+      renderComponent({ dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }) })
+      expect(addApiButton()).toBeInTheDocument()
+
+      clickEditButton()
+      await openStatusDropdown()
+      await userEvent.click(getStatusOption('READY'))
+
+      expect(addApiButton()).not.toBeInTheDocument()
+      expect(addPipelineLink()).not.toBeInTheDocument()
+    })
+
+    it('keeps the add buttons hidden on a READY dataset even when DRAFT is selected', async () => {
+      mockTenantPermissions(CONTENT_PERMISSIONS)
+      renderComponent({
+        dataset: makeDraftDataset({ dataSetStatus: 'READY', pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
+      })
+
+      clickEditButton()
+      await openStatusDropdown()
+      await userEvent.click(getStatusOption('DRAFT'))
+
+      expect(addApiButton()).not.toBeInTheDocument()
+      expect(addPipelineLink()).not.toBeInTheDocument()
+    })
+
+    it('shows the view, edit and delete actions on an api card', async () => {
+      mockTenantPermissions(CONTENT_PERMISSIONS)
+      renderComponent({ dataset: makeDraftDataset({ namedApis: [namedApi] }) })
+
+      await openApiCardMenu()
+
+      expect(screen.getByTestId('apiCardMenuView-my-api')).toBeInTheDocument()
+      expect(screen.getByTestId('apiCardMenuEdit-my-api')).toBeInTheDocument()
+      expect(screen.getByTestId('apiCardMenuDelete-my-api')).toBeInTheDocument()
+    })
+
+    it('hides the view, edit and delete actions on an api card without DATASET_READ', async () => {
+      mockTenantPermissions([PERMISSION_NAMES.DATASET_UPDATE, PERMISSION_NAMES.DATASTRUCTURE_READ])
+      renderComponent({ dataset: makeDraftDataset({ namedApis: [namedApi] }) })
+
+      await openApiCardMenu()
+
+      expect(screen.queryByTestId('apiCardMenuView-my-api')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('apiCardMenuEdit-my-api')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('apiCardMenuDelete-my-api')).not.toBeInTheDocument()
+    })
+
+    it('hides the view, edit and delete actions on an api card without DATASTRUCTURE_READ', async () => {
+      mockTenantPermissions([PERMISSION_NAMES.DATASET_READ, PERMISSION_NAMES.DATASET_UPDATE])
+      renderComponent({ dataset: makeDraftDataset({ namedApis: [namedApi] }) })
+
+      await openApiCardMenu()
+
+      expect(screen.queryByTestId('apiCardMenuView-my-api')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('apiCardMenuEdit-my-api')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('apiCardMenuDelete-my-api')).not.toBeInTheDocument()
+    })
+
+    it('hides the edit and delete actions but keeps view on an api card without DATASET_UPDATE', async () => {
+      mockTenantPermissions([PERMISSION_NAMES.DATASET_READ, PERMISSION_NAMES.DATASTRUCTURE_READ])
+      renderComponent({ dataset: makeDraftDataset({ namedApis: [namedApi] }) })
+
+      await openApiCardMenu()
+
+      expect(screen.getByTestId('apiCardMenuView-my-api')).toBeInTheDocument()
+      expect(screen.queryByTestId('apiCardMenuEdit-my-api')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('apiCardMenuDelete-my-api')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('Release blocked by a draft dependency', () => {
+    const PIPELINE_CLOSURE_INVALID = 'urn:civitas:error:PIPELINE_CLOSURE_INVALID'
+
+    const releaseDraftDataset = async () => {
+      renderComponent({
+        dataset: makeDraftDataset({ pipelines: [{ id: 'p1', name: 'Pipeline 1' }] }),
+        groupCount: 1,
+        roleCount: 1,
+      })
+      clickEditButton()
+
+      await openStatusDropdown()
+      await userEvent.click(getStatusOption('AVAILABLE'))
+      fireEvent.submit(screen.getByTestId('datasetBaseInfoForm'))
+    }
+
+    it('explains the refusal and leaves the Dataset in its previous status', async () => {
+      mockStageDataset.mockRejectedValueOnce(
+        mockApiError(422, 'Pipeline closure validation failed', PIPELINE_CLOSURE_INVALID),
+      )
+
+      await releaseDraftDataset()
+
+      expect(await screen.findByTestId('infoModal')).toBeInTheDocument()
+      expect(screen.getByTestId('statusDropdown')).toHaveTextContent('DRAFT')
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('reports the refusal when the closure only fails at release, after staging succeeded', async () => {
+      mockStageDataset.mockResolvedValueOnce(undefined)
+      mockReleaseDataset.mockRejectedValueOnce(
+        mockApiError(422, 'Pipeline closure validation failed', PIPELINE_CLOSURE_INVALID),
+      )
+
+      await releaseDraftDataset()
+
+      await waitFor(() => {
+        expect(mockStageDataset).toHaveBeenCalledWith('test-id')
+        expect(mockReleaseDataset).toHaveBeenCalledWith('test-id')
+      })
+      expect(await screen.findByTestId('infoModal')).toBeInTheDocument()
+      expect(screen.getByTestId('statusDropdown')).toHaveTextContent('DRAFT')
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('falls back to the transition toast for any other failure', async () => {
+      mockStageDataset.mockRejectedValueOnce(mockApiError(500, 'Boom'))
+
+      await releaseDraftDataset()
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalled())
+      expect(screen.queryByTestId('infoModal')).not.toBeInTheDocument()
     })
   })
 })

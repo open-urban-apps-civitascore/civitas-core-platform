@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: model-forge-admin-postgres
+    environment:
+      POSTGRES_DB: model_forge_admin
+      POSTGRES_USER: model_forge
+      POSTGRES_PASSWORD: model_forge
+    ports:
+      # Host port 5439: this compose is meant to run alongside the main dev stack (see
+      # local-demo.md), so it must avoid every host port that stack already binds — 5432 is
+      # portal-backend's database (../postgres/docker-compose.yml) and 5433 is Keycloak's
+      # (../keycloak/docker-compose.yml). Point the admin-ui at this instance via
+      # SPRING_DATASOURCE_URL — see local-demo.md.
+      - "5439:5432"
+    volumes:
+      - model_forge_admin_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U model_forge -d model_forge_admin"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  model_forge_admin_data:

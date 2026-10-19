@@ -1,37 +1,31 @@
 package de.civitascore.portal.model.input;
 
-import de.civitascore.portal.model.connector.MqttConnectorConfiguration;
-import de.civitascore.portal.model.connector.SqlConnectorConfiguration;
-import de.civitascore.portal.model.embedded.ConnectorType;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import de.civitascore.portal.model.connector.ConnectorConfiguration;
+import de.civitascore.portal.model.connector.ConnectorJson;
+import de.civitascore.portal.model.connector.ConnectorSchema;
+import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
-import java.util.Map;
 import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import tools.jackson.databind.annotation.JsonDeserialize;
 
 /** Input DTO for creating and updating data source resources. */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class DataSourceInputDTO extends BaseDataEntityInputDTO {
+public class DataSourceInputDTO extends DataSourceMetaInputDTO {
 
-  @Schema(description = "Data source name (required)")
-  @NotBlank(message = "Name is required") private String name;
-
-  @Schema(description = "Data source description")
-  private String description;
-
-  @Schema(description = "Type of connector (e.g. MQTT, SQL)")
-  private ConnectorType connectorType;
-
-  @Schema(
-      oneOf = {MqttConnectorConfiguration.class, SqlConnectorConfiguration.class},
-      description = "Connector-specific configuration. Structure depends on connectorType.")
-  private Map<String, Object> configuration;
+  @Schema(implementation = ConnectorSchema.class)
+  @JsonDeserialize(using = ConnectorJson.RequestDeserializer.class)
+  private ConnectorConfiguration connector;
 
   @Schema(description = "ID of the data structure version to associate")
   private UUID dataStructureVersionId;
 
-  @Schema(description = "Datapool scope configuration. Defaults to ALL if omitted on create.")
-  private DatapoolScopeInputDTO datapoolScope;
+  /** The application mapper ignores unknown keys; a Data source write rejects them. */
+  @JsonAnySetter
+  void rejectUnknownKey(String key, Object value) {
+    throw new MalformedDataSourceRequestException("Unknown key: " + key);
+  }
 }

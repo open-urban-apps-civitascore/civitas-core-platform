@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://civitasconnect.digital/core/extensions/v1",
+  "title": "CORE JSON Schema Extensions",
+  "description": "Defines the x-* extension fields used by CORE JSON Schema documents and CORE editor metadata.",
+  "type": "object",
+  "properties": {
+    "x-core-ref": {
+      "$ref": "#/$defs/CoreRef"
+    },
+    "x-xsd-source": {
+      "$ref": "#/$defs/XsdSource"
+    },
+    "x-ui-position": {
+      "$ref": "#/$defs/UiPosition"
+    },
+    "x-ui-styles": {
+      "$ref": "#/$defs/UiStyles"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "CoreRef": {
+      "description": "Foreign-key reference metadata: the annotated string field holds the CORE URN of another artifact. 'type' names the referenced artifact and may be either a concrete artifact URN (e.g. an Element URN — a strongly-typed FK whose existence is checked against the registry) or an 'urn:core:type:<Kind>' category URN (used by the generic CORE-IR artifact meta-schemas, where the concrete target is not fixed). The URN is always global.",
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "CORE URN of the referenced artifact (a concrete artifact URN) or an 'urn:core:type:<Kind>' category URN.",
+          "pattern": "^urn:core:"
+        }
+      },
+      "additionalProperties": false
+    },
+    "XsdSource": {
+      "description": "URN of the raw XSD artifact from which a JSON Schema view was derived.",
+      "type": "string",
+      "pattern": "^urn:"
+    },
+    "UiPosition": {
+      "description": "Visual position in the pipeline canvas (x/y coordinates in pixels).",
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "UiStyles": {
+      "description": "Host UI state carried by a stored model — the editor diagram (nodes, edges, positions, labels). Opaque to the registry (host-owned, split off on read); shape is intentionally permissive.",
+      "type": "object"
+    }
+  }
+}

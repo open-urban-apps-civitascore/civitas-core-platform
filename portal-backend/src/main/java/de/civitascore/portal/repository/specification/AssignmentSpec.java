@@ -20,7 +20,6 @@ interface AssignmentGroupIdSpec extends BaseSpec<Assignment> {}
   @Spec(path = "dataStructure.id", params = "scopeId", spec = Equal.class),
   @Spec(path = "dataSource.id", params = "scopeId", spec = Equal.class),
   @Spec(path = "dataset.id", params = "scopeId", spec = Equal.class),
-  @Spec(path = "catalog.id", params = "scopeId", spec = Equal.class),
   @Spec(path = "dataPool.id", params = "scopeId", spec = Equal.class)
 })
 interface AssignmentScopeIdSpec extends BaseSpec<Assignment> {}

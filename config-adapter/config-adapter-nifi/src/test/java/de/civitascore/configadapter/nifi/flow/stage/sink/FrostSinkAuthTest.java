@@ -31,7 +31,7 @@ class FrostSinkAuthTest {
     assertEquals("nifi", out.sinkProperties().get(FrostSinkStage.FROST_BASIC_AUTH_USERNAME));
     assertEquals(
         "secret-password",
-        out.sensitive().get(FrostSinkStage.FROST_HTTP_PROCESSOR).get("Request Password"));
+        out.sensitive().get(FrostSinkStage.FROST_HTTP_PROCESSOR).get("Basic Auth Password"));
     assertFalse(out.sinkProperties().containsValue("secret-password"));
   }
 
@@ -53,7 +53,7 @@ class FrostSinkAuthTest {
     assertEquals("nifi", out.sinkProperties().get(FrostSinkStage.FROST_BASIC_AUTH_USERNAME));
     assertEquals(
         "secret-password",
-        out.sensitive().get(FrostSinkStage.FROST_HTTP_PROCESSOR).get("Request Password"));
+        out.sensitive().get(FrostSinkStage.FROST_HTTP_PROCESSOR).get("Basic Auth Password"));
     assertFalse(out.sinkProperties().containsValue("secret-password"));
   }
 
@@ -96,7 +96,7 @@ class FrostSinkAuthTest {
 
     assertEquals(
         "secret-key",
-        out.sensitive().get(FrostSinkStage.FROST_HTTP_PROCESSOR).get("Request Password"));
+        out.sensitive().get(FrostSinkStage.FROST_HTTP_PROCESSOR).get("Basic Auth Password"));
     assertFalse(out.sinkProperties().containsValue(encryptedPassword));
   }
 }

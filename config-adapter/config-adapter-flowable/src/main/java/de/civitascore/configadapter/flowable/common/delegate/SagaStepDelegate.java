@@ -114,7 +114,11 @@ public class SagaStepDelegate extends AbstractAdapterCallDelegate {
    * handler-reported failures and for a missing (conditional) handler.
    */
   private void recordFailureAndThrow(DelegateExecution execution, String step, String error) {
-    LOG.error("Saga step failed: step={}, error={}", Encode.forJava(step), Encode.forJava(error));
+    LOG.error(
+        "Saga step failed: datasetId={}, step={}, error={}",
+        Encode.forJava(String.valueOf(execution.getVariable("datasetId"))),
+        Encode.forJava(step),
+        Encode.forJava(error));
     execution.setVariable(step + "_error", error);
     // Only record the FIRST failure — subsequent failures in best-effort delete don't overwrite
     if (execution.getVariable("sagaError") == null) {

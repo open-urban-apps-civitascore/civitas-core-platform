@@ -29,7 +29,7 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-public class LayerService extends BaseService<Layer, LayerInputDTO> {
+public class LayerService extends DataSetOwnedService<Layer, LayerInputDTO> {
 
   private final LayerRepository layerRepository;
   private final LayerMapper layerMapper;
@@ -42,7 +42,9 @@ public class LayerService extends BaseService<Layer, LayerInputDTO> {
       LayerMapper layerMapper,
       DataSetRepository dataSetRepository,
       DataSinkRepository dataSinkRepository,
-      StyleRepository styleRepository) {
+      StyleRepository styleRepository,
+      DataSetMutationGuard dataSetMutationGuard) {
+    super(dataSetMutationGuard);
     this.layerRepository = layerRepository;
     this.layerMapper = layerMapper;
     this.dataSetRepository = dataSetRepository;
@@ -63,19 +65,6 @@ public class LayerService extends BaseService<Layer, LayerInputDTO> {
   @Override
   protected String getEntityName() {
     return Layer.class.getSimpleName();
-  }
-
-  /**
-   * Finds a Layer by ID and verifies that it belongs to the specified dataset.
-   *
-   * @throws ResourceNotFoundException if the Layer does not exist or belongs to a different dataset
-   */
-  public Layer findByIdAndDataSetOrThrow(UUID id, UUID dataSetId) {
-    Layer layer = findByIdOrThrow(id);
-    if (!dataSetId.equals(layer.getDataSet().getId())) {
-      throw new ResourceNotFoundException(getEntityName(), id);
-    }
-    return layer;
   }
 
   /**
@@ -104,39 +93,27 @@ public class LayerService extends BaseService<Layer, LayerInputDTO> {
     return super.preSave(entity);
   }
 
-  /** Rejects bbox fields when bboxAutoCalculate is true. */
+  /** Leaving both bounding boxes null lets GeoServer compute the extent. */
   @Override
   protected LayerInputDTO preProcessCreateInput(LayerInputDTO input) {
-    validateBboxConsistency(input);
-    return super.preProcessCreateInput(input);
+    LayerInputDTO guarded = super.preProcessCreateInput(input);
+    validateBboxConsistency(guarded);
+    return guarded;
   }
 
-  /** Validates that an update does not attempt to move a Layer to a different dataset. */
   @Override
   protected LayerInputDTO preProcessUpdateInput(LayerInputDTO input, Layer existingEntity) {
-    validateBboxConsistency(input);
-    if (input.getDataSetId() != null
-        && existingEntity.getDataSet() != null
-        && !input.getDataSetId().equals(existingEntity.getDataSet().getId())) {
-      throw new ResourceNotFoundException(getEntityName(), existingEntity.getId());
-    }
-    return super.preProcessUpdateInput(input, existingEntity);
+    LayerInputDTO guarded = super.preProcessUpdateInput(input, existingEntity);
+    validateBboxConsistency(guarded);
+    return guarded;
   }
 
   private void validateBboxConsistency(LayerInputDTO input) {
-    if (input.isBboxAutoCalculate()
-        && (input.getNativeBoundingBox() != null || input.getLatLonBoundingBox() != null)) {
+    if ((input.getNativeBoundingBox() == null) != (input.getLatLonBoundingBox() == null)) {
       throw new InvalidInputException(
           getEntityName(),
-          "bboxAutoCalculate",
-          "nativeBoundingBox and latLonBoundingBox must be null when bboxAutoCalculate is true");
-    }
-    if (!input.isBboxAutoCalculate()
-        && (input.getNativeBoundingBox() == null || input.getLatLonBoundingBox() == null)) {
-      throw new InvalidInputException(
-          getEntityName(),
-          "bboxAutoCalculate",
-          "nativeBoundingBox and latLonBoundingBox are both required when bboxAutoCalculate is false");
+          "nativeBoundingBox",
+          "nativeBoundingBox and latLonBoundingBox must be set together or both be null");
     }
   }
 

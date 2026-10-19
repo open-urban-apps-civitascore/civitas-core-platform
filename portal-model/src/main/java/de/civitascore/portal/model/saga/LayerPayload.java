@@ -39,7 +39,15 @@ import java.util.Map;
  *       trigger. {@code null} lets GeoServer fall back to its generic style.
  *   <li>{@code alternativeStyles} — optional; further {@link StylePayload} names available on the
  *       layer in addition to the default. {@code null} when none are set.
+ *   <li>{@code title} — optional; the layer title, else {@code layerName}.
+ *   <li>{@code description} — optional; the layer abstract.
+ *   <li>{@code attribute} — optional; the published columns, after the geometry column. Empty
+ *       publishes every column.
+ *   <li>{@code cqlFilter} — optional; the ECQL filter applied to every request on the layer.
  * </ul>
+ *
+ * <p>Each provisioning converges the feature type to this payload: an absent {@code description},
+ * {@code attribute} or {@code cqlFilter} clears its value in GeoServer.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record LayerPayload(
@@ -51,4 +59,8 @@ public record LayerPayload(
     Map<String, Object> nativeBoundingBox,
     Map<String, Object> latLonBoundingBox,
     String defaultStyle,
-    List<String> alternativeStyles) {}
+    List<String> alternativeStyles,
+    String title,
+    String description,
+    List<String> attribute,
+    String cqlFilter) {}

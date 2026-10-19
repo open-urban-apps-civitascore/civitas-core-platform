@@ -25,12 +25,12 @@ import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWar
 import { EditorLayout } from '@/components/node-editor/EditorLayout'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Button } from '@/components/ui/button'
+import { useDatasetPermissionsById } from '@/hooks/use-dataset-permissions'
 import { cn } from '@/lib/utils'
 
 import { LAYOUT_DIMENSIONS } from '../../_constants/pipelineStyles'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
-import { usePipelinePermissions } from '../../_hooks/use-pipeline-permissions'
-import { ReadOnlyProvider } from '../../_hooks/use-pipeline-read-only'
+import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
 import { usePipelineSession } from '../../_hooks/use-pipeline-session'
 import type { UsePipelineSessionReturn } from '../../_types/session'
 import { PipelineCanvas } from '../canvas/PipelineCanvas'
@@ -63,11 +63,11 @@ interface PipelineEditorLayoutInnerProps {
  */
 const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ className = '', sessionManager }) => {
   const t = useTranslations('pipelineEditor')
-  const { isLoadingPipelines, saveAllPipelines, isSavingAll, hasAnyDirtySession } = useActivePipeline()
-
+  const { isLoadingEditor, saveAllPipelines, isSavingAll, hasAnyDirtySession } = useActivePipeline()
+  const { isReadOnly } = useReadOnly()
   const router = useRouter()
   const params = useParams<{ datasetId: string }>()
-  const { canEditPipeline: canEdit, canCreatePipeline: canCreate } = usePipelinePermissions(params.datasetId)
+  const { canCreatePipeline: canCreate } = useDatasetPermissionsById(params.datasetId)
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
   const handleExit = useCallback(() => {
@@ -99,7 +99,7 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
       <Button onClick={handleExit} type="button" variant="secondary">
         {t('header.exit')}
       </Button>
-      <Button onClick={saveAllPipelines} disabled={!hasAnyDirtySession || isSavingAll || (!canEdit && !canCreate)}>
+      <Button onClick={saveAllPipelines} disabled={!hasAnyDirtySession || isSavingAll || isReadOnly}>
         {isSavingAll ? (
           <>
             <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -124,19 +124,12 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
     [sessionManager],
   )
 
-  const handleRenameSession = useCallback(
-    (sessionId: string, newName: string) => {
-      sessionManager.updateSessionName(sessionId, newName)
-    },
-    [sessionManager],
-  )
-
   return (
-    <ReadOnlyProvider isReadOnly={!canEdit && !canCreate}>
+    <>
       <PageHeader
         title={t('title')}
         subtitle={t('subtitle')}
-        customElement={canEdit || canCreate ? customElement : undefined}
+        customElement={!isReadOnly ? customElement : undefined}
         className="!pb-2 !gap-2"
       />
       <div className="h-full w-full overflow-hidden rounded-xl border bg-background">
@@ -147,15 +140,13 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
               sessions={sessionManager.sessions}
               activeSessionId={sessionManager.activeSessionId}
               onSelectSession={handleSelectSession}
-              onRenameSession={handleRenameSession}
               onCreateSession={handleCreateSession}
-              canEdit={canEdit}
-              canCreate={canCreate}
+              canCreate={canCreate && !isReadOnly}
             />
           </div>
 
           {/* Main Content Area */}
-          {isLoadingPipelines ? (
+          {isLoadingEditor ? (
             <div className="flex flex-1 items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               <span className="ml-2 text-sm text-muted-foreground">{t('toolbar.loading')}</span>
@@ -180,7 +171,7 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
         onConfirm={handleSaveAndExit}
         isLoading={isSavingAll}
       />
-    </ReadOnlyProvider>
+    </>
   )
 }
 

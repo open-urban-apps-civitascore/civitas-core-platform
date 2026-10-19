@@ -8,7 +8,6 @@ const defaultGroup: Group = {
   id: '',
   name: '',
   description: '',
-  roles: null,
   assignments: null,
   members: null,
   contactUser: null,

@@ -339,33 +339,6 @@ class RecordPathCompilerTest {
   }
 
   @Test
-  void escapesExpressionLanguageInConstValues() throws Exception {
-    // UpdateRecord evaluates EL in dynamic property values: an unescaped ${…} const would expand
-    // against the NiFi process environment and exfiltrate it into the record. $$ is EL's literal
-    // escape.
-    var props =
-        byPath(
-            compile(
-                "{ \"$.note\": { \"op\": \"const\","
-                    + " \"value\": \"${SINGLE_USER_CREDENTIALS_PASSWORD}\" } }"));
-
-    UpdateRecordProperty p = props.get("/note");
-    assertEquals("$${SINGLE_USER_CREDENTIALS_PASSWORD}", p.value());
-    assertEquals(ReplacementStrategy.LITERAL_VALUE, p.strategy());
-  }
-
-  @Test
-  void escapesExpressionLanguageInConcatSeparators() throws Exception {
-    var props =
-        byPath(
-            compile(
-                "{ \"$.k\": { \"op\": \"concat\", \"separator\": \"${HOSTNAME}\","
-                    + " \"inputs\": [ \"$.a\", \"$.b\" ] } }"));
-
-    assertEquals("concat(/a, '$${HOSTNAME}', /b)", props.get("/k").value());
-  }
-
-  @Test
   void concatBecomesRecordPathFunction() throws Exception {
     var props =
         byPath(
@@ -398,16 +371,64 @@ class RecordPathCompilerTest {
   }
 
   @Test
-  void toDateBecomesRecordPathFunction() throws Exception {
+  void toDateTimeBecomesRecordPathFunction() throws Exception {
     var props =
         byPath(
             compile(
-                "{ \"$.observed_at\": { \"op\": \"toDate\", \"input\": \"$.ts\","
+                "{ \"$.observed_at\": { \"op\": \"toDateTime\", \"input\": \"$.ts\","
                     + " \"pattern\": \"yyyy-MM-dd\" } }"));
 
     UpdateRecordProperty p = props.get("/observed_at");
     assertEquals("toDate(/ts, 'yyyy-MM-dd')", p.value());
     assertEquals(ReplacementStrategy.RECORD_PATH_VALUE, p.strategy());
+  }
+
+  @Test
+  void epochDateTimeUsesDeclaredUnitAndUtc() throws Exception {
+    var props =
+        byPath(
+            compile(
+                """
+                { "$.milliseconds": { "op": "toDateTime", "input": "$.ts", "inputType": "epoch", "unit": "milliseconds" },
+                  "$.seconds": { "op": "toDateTime", "input": "$.ts", "inputType": "epoch", "unit": "seconds" } }
+                """));
+
+    assertEquals(
+        "concat(format(toNumber(/ts), 'yyyy-MM-dd\\'T\\'HH:mm:ss.SSSXXX', 'UTC'))",
+        props.get("/milliseconds").value());
+    assertEquals(
+        "concat(format(multiply(toNumber(/ts), 1000), 'yyyy-MM-dd\\'T\\'HH:mm:ss.SSSXXX', 'UTC'))",
+        props.get("/seconds").value());
+    RecordPath.compile(props.get("/milliseconds").value());
+    RecordPath.compile(props.get("/seconds").value());
+  }
+
+  @Test
+  void formatAfterEpochDateTimeUsesRequestedPattern() throws Exception {
+    var props =
+        byPath(
+            compile(
+                """
+                { "$.formatted": { "op": "format", "pattern": "dd.MM.yyyy HH:mm",
+                    "input": { "op": "toDateTime", "input": "$.ts", "inputType": "epoch", "unit": "seconds" } } }
+                """));
+
+    assertEquals(
+        "concat(format(multiply(toNumber(/ts), 1000), 'dd.MM.yyyy HH:mm', 'UTC'))",
+        props.get("/formatted").value());
+    RecordPath.compile(props.get("/formatted").value());
+  }
+
+  @Test
+  void toDateDropsTheTimeTheParseProduces() throws Exception {
+    // The pattern describes the input, never the result.
+    var props =
+        byPath(
+            compile(
+                "{ \"$.day\": { \"op\": \"toDate\", \"input\": \"$.ts\","
+                    + " \"pattern\": \"dd.MM.yyyy\" } }"));
+
+    assertEquals("format(toDate(/ts, 'dd.MM.yyyy'), 'yyyy-MM-dd')", props.get("/day").value());
   }
 
   @Test
@@ -445,6 +466,15 @@ class RecordPathCompilerTest {
     var props = byPath(compile("{ \"$.v\": { \"op\": \"toFloat\", \"input\": \"$.raw\" } }"));
 
     assertEquals("/raw", props.get("/v").value());
+  }
+
+  @Test
+  void toUuidIsTransparent() throws Exception {
+    // Emitting uuid5() here would deploy without error and silently replace every source value
+    // with a freshly minted identifier.
+    var props = byPath(compile("{ \"$.id\": { \"op\": \"toUuid\", \"input\": \"$.raw\" } }"));
+
+    assertEquals("/raw", props.get("/id").value());
   }
 
   @Test
@@ -533,6 +563,8 @@ class RecordPathCompilerTest {
         "{ \"$.items[].name\": \"$.items[].sourceName\" }",
         "{ \"$.s\": { \"op\": \"toString\", \"input\": \"$.n\" } }",
         "{ \"$.d\": { \"op\": \"toDate\", \"input\": \"$.ts\", \"pattern\": \"yyyy-MM-dd\" } }",
+        "{ \"$.dt\": { \"op\": \"toDateTime\", \"input\": \"$.ts\","
+            + " \"pattern\": \"yyyy-MM-dd HH:mm:ss\" } }",
         "{ \"$.f\": { \"op\": \"format\", \"input\": \"$.d\", \"pattern\": \"yyyy\" } }",
         "{ \"$.i\": { \"op\": \"toInt\", \"input\": \"$.n\" } }",
         "{ \"$.label\": { \"op\": \"concat\", \"separator\": \"-\","

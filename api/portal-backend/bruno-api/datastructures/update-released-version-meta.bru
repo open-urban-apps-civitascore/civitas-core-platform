@@ -4,7 +4,7 @@ meta {
   seq: 14
 }
 
-put {
+patch {
   url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/released/meta
   body: json
   auth: inherit
@@ -17,17 +17,7 @@ params:path {
 
 body:json {
   {
-    "dataStructureVersionSource": "OWN",
-    "version": "1.0.1",
-    "description": "Updated version description",
-    "modelName": "UpdatedModelName",
-    "model": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "title": "UpdatedModel",
-      "type": "object",
-      "properties": {}
-    },
-    "styles": {}
+    "description": "Updated version description"
   }
 }
 

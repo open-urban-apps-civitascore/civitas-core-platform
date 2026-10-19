@@ -27,6 +27,7 @@ import de.civitascore.configadapter.nifi.graph.NodeKind;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import de.civitascore.configadapter.nifi.mapping.CompiledTransform;
 import de.civitascore.configadapter.nifi.mapping.SinkPreRegionPlan;
+import de.civitascore.configadapter.nifi.mapping.UnsafePropertyValueException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -81,7 +82,7 @@ public class FlowDeploymentPlanner {
     Optional<String> sourceCron = validatedTriggerCron(path);
     SinkSpec sink = request.sink();
     SinkStage<?> sinkStage = registry.sink(sink.type());
-    Compilation chain = compileTransforms(path, sinkStage, sink);
+    Compilation chain = compileTransforms(path, sinkStage, sink, request.artifacts());
 
     Datasource source = request.source();
     if (source == null) {
@@ -119,22 +120,26 @@ public class FlowDeploymentPlanner {
     }
 
     PlanContext out = new PlanContext();
-    sourceStage.bind(source, out);
-    bindSink(sinkStage, sink, out);
-
     String processGroupName = "pipeline-" + request.pipelineId();
-    String snapshot =
-        flowBuilder.build(
-            new FlowBuildSpec(
-                processGroupName,
-                sourceType,
-                out.sourceProperties(),
-                sink.type(),
-                out.sinkProperties(),
-                chain.units(),
-                out.controllerServiceProperties(),
-                sourceCron.orElse(null),
-                chain.sinkPreRegion()));
+    String snapshot;
+    try {
+      sourceStage.bind(source, sourceNodeKey(request.pipelineId(), path.source()), out);
+      bindSink(sinkStage, sink, out);
+      snapshot =
+          flowBuilder.build(
+              new FlowBuildSpec(
+                  processGroupName,
+                  sourceType,
+                  out.sourceProperties(),
+                  sink.type(),
+                  out.sinkProperties(),
+                  chain.units(),
+                  out.controllerServiceProperties(),
+                  sourceCron.orElse(null),
+                  chain.sinkPreRegion()));
+    } catch (UnsafePropertyValueException e) {
+      throw new FatalAdapterException(AdapterErrorCode.NIFI_TEMPLATE_ERROR, e, e.getMessage());
+    }
 
     return new DeploymentPlan(processGroupName, snapshot, Map.copyOf(out.sensitive()));
   }
@@ -145,7 +150,11 @@ public class FlowDeploymentPlanner {
    * one kind produces a sink pre-region plan — today the mapping kind's FROST entity plan for a
    * mapped FROST sink.
    */
-  private Compilation compileTransforms(FlowPath path, SinkStage<?> sinkStage, SinkSpec sinkSpec)
+  private Compilation compileTransforms(
+      FlowPath path,
+      SinkStage<?> sinkStage,
+      SinkSpec sinkSpec,
+      Map<String, Map<String, Object>> artifacts)
       throws FatalAdapterException {
     Map<NodeKind, List<GraphNode>> byKind = new LinkedHashMap<>();
     for (GraphNode node : path.transforms()) {
@@ -155,7 +164,7 @@ public class FlowDeploymentPlanner {
     SinkPreRegionPlan sinkPreRegion = null;
     for (Map.Entry<NodeKind, List<GraphNode>> entry : byKind.entrySet()) {
       TransformNodeType nodeType = registry.transformNodeType(entry.getKey());
-      Compilation compilation = nodeType.compile(entry.getValue(), sinkStage, sinkSpec);
+      Compilation compilation = nodeType.compile(entry.getValue(), sinkStage, sinkSpec, artifacts);
       // The reassembly below consumes exactly one unit per node; a miscounting kind would
       // otherwise drop surplus units silently or exhaust the iterator with a bare
       // NoSuchElementException.
@@ -194,9 +203,14 @@ public class FlowDeploymentPlanner {
     stage.bind(stage.specType().cast(spec), out);
   }
 
+  /** Node ids from API clients and the usecase files repeat across pipelines. */
+  private static String sourceNodeKey(String pipelineId, GraphNode sourceNode) {
+    return pipelineId + ":" + sourceNode.id();
+  }
+
   /** The kind of an on-path transform node; the derivation already rejected unknown kinds. */
   private static NodeKind kindOf(GraphNode node) {
-    return NodeKind.fromTypeString(node.type()).orElseThrow();
+    return NodeKind.fromKind(node.kind()).orElseThrow();
   }
 
   private Optional<String> validatedTriggerCron(FlowPath path) throws FatalAdapterException {

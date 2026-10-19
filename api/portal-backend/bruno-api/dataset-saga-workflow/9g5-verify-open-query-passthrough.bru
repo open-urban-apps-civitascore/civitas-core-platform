@@ -1,0 +1,41 @@
+meta {
+  name: 9g5. Verify Query Strings Survive the Named-API Rewrite
+  type: http
+  seq: 28
+}
+
+get {
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}/{{sagaSlug}}/Things?$top=1
+  body: none
+  auth: none
+}
+
+tests {
+  test("Anonymous sub-resource read with a query string succeeds", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Upstream honoured the query string", function() {
+    // The route rewrites the path with a capture group; a rewrite that dropped the query would
+    // still return 200 here, so assert the upstream actually applied $top=1 by pinning the page
+    // size rather than the status.
+    expect(res.body).to.be.an('object');
+    expect(res.body.value).to.be.an('array');
+    expect(res.body.value.length).to.be.at.most(1);
+  });
+}
+
+docs {
+  **Saga step 9g5 of 18** — Query strings must survive the named-API path rewrite.
+
+  A named-API route rewrites `/v1/datasets/{id}/{slug}/…` onto the upstream's own path using a capture
+  group. The query string is carried separately, so a rewrite regression drops filters and paging while
+  still answering 200 — the failure is invisible to a status-only assertion.
+
+  This step therefore pins behaviour rather than status: `$top=1` must come back as at most one element.
+  It runs anonymously to confirm the open-data grant does not degrade to a "root document only" read.
+
+  **Precondition:** the dataset is open (step 9f) and the anonymous read already succeeded (step 9g).
+
+  **Expected Response:** 200 OK with a SensorThings collection of at most one entry.
+}

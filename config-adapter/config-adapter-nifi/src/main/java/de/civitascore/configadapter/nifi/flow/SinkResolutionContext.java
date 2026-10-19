@@ -10,7 +10,7 @@
 package de.civitascore.configadapter.nifi.flow;
 
 /**
- * Saga-level values a sink stage may need when parsing its catalog entry — values that are not part
+ * Saga-level values a sink stage may need when parsing its stage input — values that are not part
  * of the datasink payload itself but of the surrounding saga run.
  *
  * @param frostProjectId the dataset's FROST project id (result of the saga's create-project step),

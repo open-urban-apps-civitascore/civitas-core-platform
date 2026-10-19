@@ -1,0 +1,57 @@
+meta {
+  name: Contract MQTT — PATCH changes connectorType (2/4 patch-sql)
+  type: http
+  seq: 54
+}
+
+patch {
+  url: {{baseUrl}}/datasources/{{contractMqttPatchTypeChangeId}}
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "connector": {
+      "connectorType": "SQL",
+      "driver": "postgres",
+      "dsn": "postgres://example:5432/db",
+      "table": "events",
+      "columns": ["*"]
+    }
+  }
+}
+
+tests {
+  test("Status is 200 — DRAFT permits connectorType change", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Connector is the SQL connector of the patch", function() {
+    expect(res.body.connector.connectorType).to.equal("SQL");
+    expect(res.body.connector.driver).to.equal("postgres");
+    expect(res.body.connector.dsn).to.equal("postgres://example:5432/db");
+    expect(res.body.connector.table).to.equal("events");
+    expect(res.body.connector.columns).to.deep.equal(["*"]);
+    expect(res.body.connector).to.have.property('where', null);
+  });
+  test("No MQTT key, user or password is carried over", function() {
+    ['urls', 'topics', 'qos', 'protocol_version', 'keepalive', 'connect_timeout', 'tls'].forEach(function(key) {
+      expect(res.body.connector).to.not.have.property(key);
+    });
+    expect(res.body.connector).to.have.property('user', null);
+    expect(res.body.connector).to.have.property('password', null);
+  });
+  test("Other members unchanged", function() {
+    expect(res.body.name).to.equal("contract_mqtt_patch_type_change");
+    expect(res.body.dataSourceStatus).to.equal("DRAFT");
+  });
+}
+
+docs {
+  Pins that a PATCH whose `connector` names another `connectorType`
+  replaces the stored connector instead of merging into it. Keys of the
+  previous type do not survive, and neither do `user` and `password`,
+  which both types have: a credential for the MQTT broker must not
+  become the credential for a database.
+}

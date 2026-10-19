@@ -135,7 +135,6 @@ public abstract class BaseEventPublishingIntegrationTest extends BaseKeycloakInt
     input.setLastName("Test" + System.currentTimeMillis());
     input.setEmail("test." + UUID.randomUUID().toString().substring(0, 8) + "@example.com");
     input.setPhone("+49123456789");
-    input.setActive(true);
     return input;
   }
 }

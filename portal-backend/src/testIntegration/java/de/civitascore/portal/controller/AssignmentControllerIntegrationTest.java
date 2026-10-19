@@ -115,15 +115,10 @@ class AssignmentControllerIntegrationTest
     return portalData.dataSet(b -> b.description("Test dataset for assignment")).getId();
   }
 
-  private UUID createTestCatalog() {
-    return portalData.catalog(b -> b.description("Test catalog for assignment")).getId();
-  }
-
   private UUID getScopeIdForType(ScopeType scopeType) {
     return switch (scopeType) {
       case TENANT -> null;
       case DATASET -> createTestDataSet();
-      case CATALOG -> createTestCatalog();
       case DATASOURCE, DATASTRUCTURE, DATAPOOL -> null;
     };
   }

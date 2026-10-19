@@ -92,9 +92,12 @@ describe('node flow declarations mirror the adapter stages', () => {
     const decl = NODE_FLOW_DECLARATIONS[PIPELINE_NODE_TYPES.Frost]
     if (decl.role !== 'sink') throw new Error('frost must declare the sink role')
 
-    it('demands the envelope in passthrough mode and records with a mapping upstream', () => {
-      expect(decl.acceptedInputs({ mappedUpstream: false })).toEqual(['STA_ENVELOPE'])
+    it('consumes records with a mapping upstream and without one', () => {
+      // The sink writes every record through its port; without a mapping the record must already
+      // have the port structure. A raw MQTT message is convertible, so the engine converts it.
+      expect(decl.acceptedInputs({ mappedUpstream: false })).toEqual(['RECORDS'])
       expect(decl.acceptedInputs({ mappedUpstream: true })).toEqual(['RECORDS'])
+      expect(isFormAccepted('STA_ENVELOPE', decl.acceptedInputs({ mappedUpstream: false }))).toBe(true)
     })
   })
 

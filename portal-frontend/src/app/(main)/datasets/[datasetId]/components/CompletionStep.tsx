@@ -59,7 +59,9 @@ export const CompletionStep = (props: CompletionStepProps) => {
       <div className={cn('flex justify-between items-center ', className)}>
         <div className="w-full flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            {step.isCompleted ? (
+            {step.isCompleted === undefined ? (
+              <div className="w-6 h-6" />
+            ) : step.isCompleted ? (
               <CircleCheckBig data-testid="circleCheck" className="w-6 h-6 text-green-600" />
             ) : (
               <CircleDashed data-testid="circle" className="w-6 h-6 text-muted-foreground" />

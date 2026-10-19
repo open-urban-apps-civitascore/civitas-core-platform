@@ -1,0 +1,21 @@
+<html xmlns:wicket="http://wicket.apache.org">
+<body>
+<wicket:extend>
+  <h2>Validate</h2>
+
+  <form wicket:id="validateForm">
+    <div class="field-row">
+      <label>Schema</label>
+      <div wicket:id="schema"></div>
+    </div>
+    <button wicket:id="validateSchema" type="submit">Validate schema</button>
+
+    <div class="field-row">
+      <label>Instance</label>
+      <div wicket:id="instance"></div>
+    </div>
+    <button wicket:id="validateInstance" type="submit">Validate instance against schema</button>
+  </form>
+</wicket:extend>
+</body>
+</html>

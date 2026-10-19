@@ -1,0 +1,45 @@
+meta {
+  name: 9d4. Verify Named-API Sub-path Resolves
+  type: http
+  seq: 26
+}
+
+get {
+  url: {{apisixApiUrl}}/v1/datasets/{{sagaDataSetId}}/{{sagaSlug}}/Things
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{sagaApiAccessToken}}
+}
+
+tests {
+  test("SensorThings sub-resource resolves through the named API (200)", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response is the SensorThings collection document", function() {
+    // FROST answers a collection request with an object carrying a `value` array.
+    expect(res.body).to.be.an('object');
+    expect(res.body.value).to.be.an('array');
+  });
+}
+
+docs {
+  **Sub-resources of a named API resolve through the same route.**
+
+  Requests `/v1/datasets/{id}/{slug}/Things` — a SensorThings collection below the named API's root — with
+  the same `api-access` bearer. The saga provisions each named-API route with two URIs, the exact path
+  `/v1/datasets/{id}/{slug}` **and** the prefix `/v1/datasets/{id}/{slug}/*`, so every sub-resource of the
+  standard (`/Things`, `/Datastreams`, `/Observations`, …) is served by the same route, the same upstream
+  and the same authorization decision. A route provisioned only for the exact path would 404 here and the
+  named API would be useless for anything but its service document.
+
+  **Precondition:** `sagaApiAccessToken` set (step 9d2); step 9d3 proved the named API's root is readable, so
+  OPA propagation has already settled — no extra poll is needed here.
+
+  **Expected Response:** 200 OK with the FROST SensorThings `Things` collection.
+
+  **Post-condition:** none — read-only.
+}

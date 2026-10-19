@@ -8,5 +8,13 @@ import net.kaczmarzyk.spring.data.jpa.web.annotation.Spec;
 @Spec(path = "dataPool.id", params = "datapoolIds", paramSeparator = ',', spec = In.class)
 interface DataSetDataPoolSpec extends NamedEntitySpec<DataSet> {}
 
+@Spec(
+    path = "pendingSagaType",
+    params = "includePendingDelete",
+    defaultVal = "false",
+    spec = PendingDeleteSpec.class)
+interface DataSetFilteringSpec extends NamedEntitySpec<DataSet> {}
+
 /** JPA Specification for filtering {@link DataSet} entities via query parameters. */
-public interface DataSetSpec extends NamedEntitySpec<DataSet>, DataSetDataPoolSpec {}
+public interface DataSetSpec
+    extends NamedEntitySpec<DataSet>, DataSetDataPoolSpec, DataSetFilteringSpec {}

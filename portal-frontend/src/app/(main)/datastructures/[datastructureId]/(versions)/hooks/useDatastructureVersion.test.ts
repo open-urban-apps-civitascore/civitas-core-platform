@@ -1,20 +1,23 @@
 import { act, renderHook } from '@testing-library/react'
 import { toast } from 'sonner'
 
+import { mockApiError } from '@/__mocks__/errors/apiError.mock'
 import {
   useCreateDatastructureVersion,
   useStatusUpdateDatastructureVersion,
   useUpdateDatastructureVersion,
-  useUpdateDatastructureVersionReleased,
 } from '@/app/services/api/datastructures/versions/clientRequests'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
+import { rel } from '@/test-support/datastructureFixtures'
 import { DATASTRUCTURE_STATUS_TYPES, type DatastructureVersion } from '@/types/datastructures'
 
 import { useDatastructureVersion } from './useDatastructureVersion'
 
+const { mockRefresh } = vi.hoisted(() => ({ mockRefresh: vi.fn() }))
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: vi.fn() }),
+  useRouter: () => ({ refresh: mockRefresh }),
 }))
 
 vi.mock('next-intl', () => ({
@@ -34,14 +37,12 @@ vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
   useCreateDatastructureVersion: vi.fn(),
   useStatusUpdateDatastructureVersion: vi.fn(),
   useUpdateDatastructureVersion: vi.fn(),
-  useUpdateDatastructureVersionReleased: vi.fn(),
 }))
 
 vi.mock('@/components/uml-modeler/hooks/use-multi-session-manager', () => ({
   useMultiSessionManager: vi.fn(),
 }))
 
-// A real UUID: buildDataStructureUrn derives the disambiguator by reading the id's hex as a BigInt.
 const DS_ID = '11111111-1111-1111-1111-111111111111'
 
 const classNode = (id: string, name: string) => ({
@@ -81,6 +82,67 @@ const validDiagram = () =>
     isDirty: false,
   }) as unknown as UMLDiagram
 
+/** validDiagram with the one class designated, rather than left to derivation. */
+const rootedSingleClassDiagram = () => {
+  const diagram = validDiagram()
+  ;(diagram.nodes[0].data.element as { isRoot?: boolean }).isRoot = true
+  return diagram
+}
+
+/** A one-Element structure whose Element is an enumeration, not a class. */
+const singleEnumDiagram = () =>
+  ({
+    id: 'diagram-1',
+    name: 'Struct',
+    nodes: [
+      {
+        id: 'node-s',
+        type: 'enumeration',
+        position: { x: 0, y: 0 },
+        data: {
+          element: {
+            id: 's',
+            name: 'Status',
+            type: 'enumeration',
+            literals: [
+              { id: 'l1', name: 'ACTIVE' },
+              { id: 'l2', name: 'INACTIVE' },
+            ],
+          },
+          label: 'Status',
+        },
+      },
+    ],
+    edges: [],
+    lastModified: new Date(0),
+    isDirty: false,
+  }) as unknown as UMLDiagram
+
+/** Two classes composing each other: every class is embedded, so the diagram has no root. */
+const rootlessDiagram = () =>
+  ({
+    id: 'diagram-1',
+    name: 'Struct',
+    nodes: [classNode('a', 'Alpha'), classNode('b', 'Beta')],
+    edges: [rel('ab', 'composition', 'a', 'b'), rel('ba', 'composition', 'b', 'a')],
+    lastModified: new Date(0),
+    isDirty: false,
+  }) as unknown as UMLDiagram
+
+/** The same two unconnected classes, but with one designated as root — a savable staged state. */
+const designatedRootDiagram = () => {
+  const alpha = classNode('a', 'Alpha')
+  ;(alpha.data.element as { isRoot?: boolean }).isRoot = true
+  return {
+    id: 'diagram-1',
+    name: 'Struct',
+    nodes: [alpha, classNode('b', 'Beta')],
+    edges: [],
+    lastModified: new Date(0),
+    isDirty: false,
+  } as unknown as UMLDiagram
+}
+
 const version = (over: Partial<DatastructureVersion> = {}): DatastructureVersion =>
   ({
     id: 'v1',
@@ -98,11 +160,9 @@ const mutation = () => ({ mutateAsync: vi.fn().mockResolvedValue({ data: version
 
 const setup = (versionData: DatastructureVersion) => {
   const updateVersion = mutation()
-  const updateReleased = mutation()
   const createVersion = mutation()
   const updateStatus = mutation()
   vi.mocked(useUpdateDatastructureVersion).mockReturnValue(updateVersion as never)
-  vi.mocked(useUpdateDatastructureVersionReleased).mockReturnValue(updateReleased as never)
   vi.mocked(useCreateDatastructureVersion).mockReturnValue(createVersion as never)
   vi.mocked(useStatusUpdateDatastructureVersion).mockReturnValue(updateStatus as never)
   // The session id must match buildSessionFromVersion(version).id (= styles.id) — otherwise the
@@ -127,12 +187,11 @@ const setup = (versionData: DatastructureVersion) => {
   const hook = renderHook(() =>
     useDatastructureVersion({
       datastructureId: DS_ID,
-      dataStructureName: 'Struct',
       version: versionData,
       isCreateMode: false,
     }),
   )
-  return { hook, updateVersion, updateReleased, updateStatus }
+  return { hook, updateVersion, updateStatus }
 }
 
 describe('useDatastructureVersion — save-flow gating for unexportable diagrams', () => {
@@ -140,8 +199,11 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     vi.clearAllMocks()
   })
 
-  it('refuses to release a version whose diagram yields no model', async () => {
-    const { hook, updateVersion, updateStatus } = setup(version())
+  it.each([
+    ['several root candidates', invalidDiagram(), 'ambiguousRoot'],
+    ['no root', rootlessDiagram(), 'noRoot'],
+  ])('refuses to release a version whose diagram has %s and names that reason', async (_label, styles, reason) => {
+    const { hook, updateVersion, updateStatus } = setup(version({ styles }))
 
     act(() => hook.result.current.handleStatusChange(DATASTRUCTURE_STATUS_TYPES.AVAILABLE))
     let saved: boolean | undefined
@@ -150,15 +212,15 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     })
 
     expect(saved).toBe(false)
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.releaseInvalidModel'))
+    expect(toast.error).toHaveBeenCalledWith(
+      `datastructureVersions.errors.saveInvalidModel|umlModeler.rootValidation.${reason}`,
+    )
     expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
     expect(updateStatus.mutateAsync).not.toHaveBeenCalled()
   })
 
   it('refuses the save even when the version is already released (status not dirty)', async () => {
-    const { hook, updateVersion, updateReleased } = setup(
-      version({ dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE }),
-    )
+    const { hook, updateVersion } = setup(version({ dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE }))
 
     act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
     let saved: boolean | undefined
@@ -167,12 +229,11 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     })
 
     expect(saved).toBe(false)
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.releaseInvalidModel'))
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.saveInvalidModel'))
     expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
-    expect(updateReleased.mutateAsync).not.toHaveBeenCalled()
   })
 
-  it('parks a draft diagram-only, silently, sending model null', async () => {
+  it('refuses a draft too, rather than parking it with a null model', async () => {
     const { hook, updateVersion } = setup(version())
 
     act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
@@ -181,26 +242,44 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
       saved = await hook.result.current.saveDatastructureVersion(DS_ID)
     })
 
-    expect(saved).toBe(true)
-    expect(toast.warning).not.toHaveBeenCalled()
-    expect(updateVersion.mutateAsync).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ model: null }) }),
-    )
+    expect(saved).toBe(false)
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.saveInvalidModel'))
+    expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
   })
 
-  it('parks a draft silently even when a model was previously persisted', async () => {
-    const { hook } = setup(version({ model: { title: 'Struct' } as never }))
+  it('refuses a draft even when a model was previously persisted', async () => {
+    const { hook, updateVersion } = setup(version({ model: { title: 'Struct' } as never }))
 
     act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
     await act(async () => {
       await hook.result.current.saveDatastructureVersion(DS_ID)
     })
 
-    expect(toast.warning).not.toHaveBeenCalled()
-    expect(toast.error).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('errors.saveInvalidModel'))
+    expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
   })
 
-  it('passes the exported model through for a resolvable diagram', async () => {
+  it('saves unconnected classes once one of them is designated as root', async () => {
+    const { hook, updateVersion } = setup(version({ styles: designatedRootDiagram() }))
+
+    act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+    let saved: boolean | undefined
+    await act(async () => {
+      saved = await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(saved).toBe(true)
+    expect(toast.error).not.toHaveBeenCalled()
+
+    // Alpha is the root referenced in $ref, Beta stays in $defs, unreferenced.
+    const payload = updateVersion.mutateAsync.mock.calls[0][0] as {
+      data: { model: { $ref?: string; $defs?: Record<string, { $id?: string }> } }
+    }
+    expect(payload.data.model.$ref).toBe('#/$defs/Alpha')
+    expect(payload.data.model.$defs).toHaveProperty('Beta')
+  })
+
+  it('sends the exported model for a single class that becomes the root by derivation', async () => {
     const { hook, updateVersion } = setup(version({ styles: validDiagram() }))
 
     act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
@@ -212,6 +291,272 @@ describe('useDatastructureVersion — save-flow gating for unexportable diagrams
     expect(saved).toBe(true)
     expect(toast.warning).not.toHaveBeenCalled()
     const payload = updateVersion.mutateAsync.mock.calls[0][0] as { data: { model: Record<string, unknown> } }
-    expect(payload.data.model).toMatchObject({ properties: { alpha: { $ref: '#/$defs/Alpha' } } })
+    // The root class sits in $defs, a top-level $ref points at it
+    const model = payload.data.model as { $ref?: string; $defs?: Record<string, { $id?: string }> }
+    expect(model.$defs?.Alpha).toBeDefined()
+    expect(model.$ref).toBe('#/$defs/Alpha')
+  })
+
+  it('marking the only class as root does not change the saved model', async () => {
+    const modelOf = async (diagram: UMLDiagram) => {
+      const { hook, updateVersion } = setup(version({ styles: diagram }))
+      act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+      let saved: boolean | undefined
+      await act(async () => {
+        saved = await hook.result.current.saveDatastructureVersion(DS_ID)
+      })
+      expect(saved).toBe(true)
+      const payload = updateVersion.mutateAsync.mock.calls[0][0] as { data: { model: Record<string, unknown> } }
+      return payload.data.model as { $ref?: string; $defs?: Record<string, { $id?: string }> }
+    }
+
+    const designated = await modelOf(rootedSingleClassDiagram())
+    vi.clearAllMocks()
+    const derived = await modelOf(validDiagram())
+
+    expect(Object.keys(designated.$defs ?? {})).toEqual(['Alpha'])
+    expect(designated.$ref).toBe('#/$defs/Alpha')
+    expect(designated).toEqual(derived)
+  })
+
+  it('sends the exported model for a one-element structure holding an enumeration', async () => {
+    const { hook, updateVersion } = setup(version({ styles: singleEnumDiagram() }))
+
+    act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+    let saved: boolean | undefined
+    await act(async () => {
+      saved = await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(saved).toBe(true)
+    const payload = updateVersion.mutateAsync.mock.calls[0][0] as { data: { model: Record<string, unknown> } }
+    const model = payload.data.model as {
+      $ref?: string
+      type?: string
+      $defs?: Record<string, { $id?: string; enum?: string[] }>
+    }
+
+    expect(Object.keys(model.$defs ?? {})).toEqual(['Status'])
+    expect(model.$defs?.Status.enum).toEqual(['ACTIVE', 'INACTIVE'])
+    expect(model.$ref).toBe('#/$defs/Status')
+    expect(model.type).toBeUndefined()
+  })
+})
+
+describe('useDatastructureVersion — class names', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('refuses the save while two classes have the same name', async () => {
+    const styles = designatedRootDiagram()
+    styles.nodes[1].data.element.name = 'Alpha'
+    const { hook, updateVersion } = setup(version({ styles }))
+
+    act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+    let saved: boolean | undefined
+    await act(async () => {
+      saved = await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(saved).toBe(false)
+    expect(toast.error).toHaveBeenCalledWith(
+      'datastructureVersions.errors.saveInvalidModel|umlModeler.nameValidation.invalidNames',
+    )
+    expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
+  })
+
+  it('refuses to release a draft while two classes have the same name', async () => {
+    const styles = designatedRootDiagram()
+    styles.nodes[1].data.element.name = 'Alpha'
+    const { hook, updateStatus } = setup(version({ styles }))
+
+    act(() => hook.result.current.handleStatusChange(DATASTRUCTURE_STATUS_TYPES.AVAILABLE))
+    let saved: boolean | undefined
+    await act(async () => {
+      saved = await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(saved).toBe(false)
+    expect(toast.error).toHaveBeenCalledWith(
+      'datastructureVersions.errors.saveInvalidModel|umlModeler.nameValidation.invalidNames',
+    )
+    expect(updateStatus.mutateAsync).not.toHaveBeenCalled()
+  })
+
+  it('unreleases an available version that still has an invalid name', async () => {
+    const styles = rootedSingleClassDiagram()
+    styles.nodes[0].data.element.name = 'Neue Klasse'
+    const { hook, updateStatus } = setup(
+      version({ dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE, styles }),
+    )
+
+    act(() => hook.result.current.handleStatusChange(DATASTRUCTURE_STATUS_TYPES.DRAFT))
+    let saved: boolean | undefined
+    await act(async () => {
+      saved = await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(saved).toBe(true)
+    expect(toast.error).not.toHaveBeenCalled()
+    expect(updateStatus.mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ endpoint: `/datastructures/${DS_ID}/versions/v1/unrelease` }),
+    )
+  })
+})
+
+describe('useDatastructureVersion — released versions take no field update', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('refuses a field update on a released version instead of sending a request', async () => {
+    const { hook, updateVersion, updateStatus } = setup(
+      version({ dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE, styles: validDiagram() }),
+    )
+
+    act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+    let saved: boolean | undefined
+    await act(async () => {
+      saved = await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(saved).toBe(false)
+    expect(toast.error).toHaveBeenCalledExactlyOnceWith('datastructureVersions.messages.isAvailableModelHint')
+    expect(updateVersion.mutateAsync).not.toHaveBeenCalled()
+    expect(updateStatus.mutateAsync).not.toHaveBeenCalled()
+  })
+})
+
+describe('useDatastructureVersion — status-dependent field validation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('flags an emptied description as required while the status is AVAILABLE', async () => {
+    const { hook } = setup(version({ dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE }))
+
+    await act(async () => {
+      hook.result.current.form.setValue('description', '', { shouldValidate: true })
+    })
+
+    expect(hook.result.current.form.getFieldState('description').error?.message).toBe('common.errors.required')
+  })
+
+  it('leaves an emptied description unflagged while the status is DRAFT', async () => {
+    const { hook } = setup(version())
+
+    await act(async () => {
+      hook.result.current.form.setValue('description', '', { shouldValidate: true })
+    })
+
+    expect(hook.result.current.form.getFieldState('description').error).toBeUndefined()
+  })
+
+  it('flags the empty description as soon as the status switches to AVAILABLE', async () => {
+    const { hook } = setup(version({ description: '' }))
+
+    expect(hook.result.current.form.getFieldState('description').error).toBeUndefined()
+
+    await act(async () => {
+      hook.result.current.handleStatusChange(DATASTRUCTURE_STATUS_TYPES.AVAILABLE)
+    })
+
+    expect(hook.result.current.form.getFieldState('description').error?.message).toBe('common.errors.required')
+  })
+
+  it('clears the required error when the status switches back to DRAFT', async () => {
+    const { hook } = setup(
+      version({ description: '', dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE }),
+    )
+
+    await act(async () => {
+      hook.result.current.form.setValue('description', '', { shouldValidate: true })
+    })
+    expect(hook.result.current.form.getFieldState('description').error?.message).toBe('common.errors.required')
+
+    await act(async () => {
+      hook.result.current.handleStatusChange(DATASTRUCTURE_STATUS_TYPES.DRAFT)
+    })
+
+    expect(hook.result.current.form.getFieldState('description').error).toBeUndefined()
+  })
+})
+
+describe('useDatastructureVersion — a version still in use', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('names the reason when a data source or data storage still uses the version', async () => {
+    const { hook, updateVersion } = setup(version({ styles: validDiagram() }))
+    updateVersion.mutateAsync.mockRejectedValue(
+      mockApiError(
+        409,
+        'Cannot modify DataStructureVersion because it is referenced by one or more DataSources or DataSinks.',
+        'urn:civitas:error:RESOURCE_IN_USE',
+      ),
+    )
+
+    act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+    await act(async () => {
+      await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(toast.error).toHaveBeenCalledWith('datastructureVersions.errors.inUseError')
+  })
+})
+
+describe('useDatastructureVersion — a stored model the backend refuses to release', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('names the missing root when the backend refuses the release', async () => {
+    const { hook, updateStatus } = setup(version({ styles: validDiagram() }))
+    updateStatus.mutateAsync.mockRejectedValue(
+      mockApiError(400, 'The model has no single root', 'urn:civitas:error:MODEL_ROOT_MISSING'),
+    )
+
+    act(() => hook.result.current.handleStatusChange(DATASTRUCTURE_STATUS_TYPES.AVAILABLE))
+    await act(async () => {
+      await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(toast.error).toHaveBeenCalledWith('datastructureVersions.errors.modelRootMissingError')
+  })
+
+  it('names the members the root does not reach when the backend refuses the release', async () => {
+    const { hook, updateStatus } = setup(version({ styles: validDiagram() }))
+    updateStatus.mutateAsync.mockRejectedValue(
+      mockApiError(400, 'Unreachable: Orphan', 'urn:civitas:error:MODEL_MEMBER_UNREACHABLE', {
+        memberNames: ['Orphan'],
+      }),
+    )
+
+    act(() => hook.result.current.handleStatusChange(DATASTRUCTURE_STATUS_TYPES.AVAILABLE))
+    await act(async () => {
+      await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    expect(toast.error).toHaveBeenCalledWith('datastructureVersions.errors.modelMemberUnreachableError')
+  })
+})
+
+describe('useDatastructureVersion — a stored model reaches the surfaces outside the form', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('reloads the route after a draft update assigns a version number', async () => {
+    const { hook } = setup(version({ styles: validDiagram(), version: null }))
+
+    act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+    await act(async () => {
+      await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    // The heading renders on the server, so it needs a reload to show the assigned number.
+    expect(mockRefresh).toHaveBeenCalled()
   })
 })

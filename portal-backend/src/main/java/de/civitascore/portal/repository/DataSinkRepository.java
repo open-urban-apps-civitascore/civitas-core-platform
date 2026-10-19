@@ -31,30 +31,15 @@ public interface DataSinkRepository extends BaseRepository<DataSink, UUID> {
 
   boolean existsByDataSetIdAndDataSinkType(UUID dataSetId, DataSinkType dataSinkType);
 
-  /**
-   * Check if any data sink references the given data structure version. Sinks (POSTGIS and FROST)
-   * store the reference under the {@code dataStructureVersionId} key of their JSONB configuration.
-   *
-   * @param versionId the data structure version ID to check
-   * @return true if at least one data sink references this version
-   */
+  /** Whether each sink's Dataset is released, keyed by the sink's logical URN. */
   @Query(
-      value =
-          "SELECT EXISTS(SELECT 1 FROM data_sinks"
-              + " WHERE (configuration ->> 'dataStructureVersionId')::uuid = :versionId)",
-      nativeQuery = true)
-  boolean existsByDataStructureVersionId(@Param("versionId") UUID versionId);
-
-  /**
-   * Check if any data sink references any of the given data structure version IDs.
-   *
-   * @param versionIds the collection of data structure version IDs to check; must be non-empty
-   * @return true if at least one data sink references any of the given versions
-   */
-  @Query(
-      value =
-          "SELECT EXISTS(SELECT 1 FROM data_sinks"
-              + " WHERE (configuration ->> 'dataStructureVersionId')::uuid IN (:versionIds))",
-      nativeQuery = true)
-  boolean existsByDataStructureVersionIdIn(@Param("versionIds") Collection<UUID> versionIds);
+      "SELECT new de.civitascore.portal.repository.ReferrerReleaseState(s.configurationLogicalUrn,"
+          + " CASE WHEN s.dataSet.dataSetStatus ="
+          + " de.civitascore.portal.model.embedded.DataSetStatus.AVAILABLE"
+          + " OR s.dataSet.pendingSagaType ="
+          + " de.civitascore.portal.model.embedded.PendingSagaType.UNRELEASE"
+          + " THEN true ELSE false END)"
+          + " FROM DataSink s WHERE s.configurationLogicalUrn IN :urns")
+  List<ReferrerReleaseState> findReleaseStatesByConfigurationLogicalUrnIn(
+      @Param("urns") Collection<String> urns);
 }

@@ -7,15 +7,27 @@
  */
 
 import { isFormAccepted, NODE_FLOW_DECLARATIONS, type NodeFlowDeclaration } from '../_config/nodeFlow'
+import type { FrostSinkPort } from '../_constants/frostPorts'
 import {
+  FEATURE_PATHS,
   isReservedStaKeyName,
   isSafeStaKeyName,
   STA_ENTITIES,
   STA_FIXED_TARGET_PATHS,
+  STA_OBSERVATION_FIXED_TARGET_PATHS,
+  STA_OBSERVATION_PORT_ENTITIES,
+  STA_OBSERVATION_REQUIRED_PATHS,
   type StaEntity,
 } from '../_constants/staTargetCatalog'
-import { isCronNodeData, isDataSourceNodeData, isGeoPersistenceNodeData, isMappingNodeData } from '../_types/nodes'
+import {
+  isCronNodeData,
+  isDataSourceNodeData,
+  isFrostNodeData,
+  isGeoPersistenceNodeData,
+  isMappingNodeData,
+} from '../_types/nodes'
 import { type Pipeline, PIPELINE_NODE_TYPES, type PipelineNode } from '../_types/pipeline'
+import { normalizeTableName, type TableNameOwners } from './dataSinkNameService'
 
 // ============================================================================
 // NiFi Cron Validation
@@ -114,10 +126,22 @@ interface ValidationRule {
   id: string
   name: string
   description: string
-  validate: (pipeline: Pipeline) => {
+  validate: (
+    pipeline: Pipeline,
+    context: PipelineValidationContext,
+  ) => {
     errors: PipelineValidationError[]
     warnings: PipelineValidationWarning[]
   }
+}
+
+/**
+ * Data a rule needs that is not part of the pipeline itself.
+ *
+ */
+export interface PipelineValidationContext {
+  /** Table names used outside this pipeline, mapped to the pipeline using them (see dataSinkNameService). */
+  tableNameOwners?: TableNameOwners
 }
 
 /**
@@ -330,27 +354,27 @@ const validateOrphanNodes: ValidationRule = {
 const validateUniqueGeoPersistenceTableNames: ValidationRule = {
   id: 'unique-geo-persistence-table-names',
   name: 'Unique Geo Persistence Table Names',
-  description: 'No two GeoPersistence nodes within a pipeline may have the same table name',
-  validate: (pipeline: Pipeline) => {
+  description: 'A geo persistence table name may be used only once per dataset',
+  validate: (pipeline: Pipeline, context: PipelineValidationContext) => {
     const errors: PipelineValidationError[] = []
-    const seen = new Map<string, string>()
+    const ownersElsewhere = context.tableNameOwners ?? {}
+    const seen = new Set<string>()
 
     pipeline.nodes.forEach(node => {
       if (!isGeoPersistenceNodeData(node.data)) return
-      const tableName = node.data.tableName.trim()
+      const tableName = normalizeTableName(node.data.tableName)
       if (!tableName) return
 
-      if (seen.has(tableName)) {
-        errors.push({
-          id: crypto.randomUUID(),
-          type: 'node',
-          elementId: node.id,
-          messageKey: 'validation.messages.duplicateTableName',
-          severity: 'error',
-        })
-      } else {
-        seen.set(tableName, node.id)
+      const owner = seen.has(tableName) ? pipeline.name : ownersElsewhere[tableName]
+      if (owner) {
+        errors.push(
+          errorAt(node, 'validation.messages.duplicateTableName', {
+            tableName: node.data.tableName.trim(),
+            pipeline: owner,
+          }),
+        )
       }
+      seen.add(tableName)
     })
 
     return { errors, warnings: [] }
@@ -430,21 +454,28 @@ const incomingAdjacency = (edges: Pipeline['edges']): Map<string, string[]> => {
  * FROST node standing unconnected elsewhere on the canvas must not flip an unrelated mapping's
  * rules.
  */
-const lastMappingsBeforeFrostSinks = (pipeline: Pick<Pipeline, 'nodes' | 'edges'>): Set<string> => {
-  const result = new Set<string>()
+const lastMappingsBeforeFrostSinks = (
+  pipeline: Pick<Pipeline, 'nodes' | 'edges'>,
+): Map<string, FrostSinkPort | undefined> => {
+  const result = new Map<string, FrostSinkPort | undefined>()
   const mappingIds = mappingNodeIds(pipeline.nodes)
   const incoming = incomingAdjacency(pipeline.edges)
 
-  const queue = pipeline.nodes.filter(node => node.type === PIPELINE_NODE_TYPES.Frost).map(node => node.id)
-  const visited = new Set(queue)
+  // The port travels with the walk: it decides which vocabulary the mapping is judged against, and
+  // a canvas may hold one sink per port.
+  const queue = pipeline.nodes
+    .filter(node => node.type === PIPELINE_NODE_TYPES.Frost)
+    .map(node => ({ id: node.id, port: isFrostNodeData(node.data) ? node.data.port : undefined }))
+  const visited = new Set(queue.map(entry => entry.id))
   while (queue.length > 0) {
-    for (const previous of incoming.get(queue.shift()!) ?? []) {
+    const current = queue.shift()!
+    for (const previous of incoming.get(current.id) ?? []) {
       if (visited.has(previous)) continue
       visited.add(previous)
       if (mappingIds.has(previous)) {
-        result.add(previous)
+        result.set(previous, current.port)
       } else {
-        queue.push(previous)
+        queue.push({ id: previous, port: current.port })
       }
     }
   }
@@ -496,9 +527,28 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
           .filter(([, value]) => isNonEmptyMappingValue(value))
           .map(([key]) => key),
       )
-      const allowed = new Set([...STA_FIXED_TARGET_PATHS, ...keys.thingBag, ...keys.datastreamBag])
+      const port = staMappingIds.get(node.id)
+      const isMeasurementPort = port === 'Observations'
+      if (isMeasurementPort && (keys.observationBag === undefined || keys.observation === undefined)) {
+        // Saved before the Observation vocabulary existed: re-saving derives it.
+        errors.push(errorAt(node, 'validation.messages.mappingNotSaved', { label }))
+        return
+      }
+      const locationBag = keys.locationBag ?? []
+      const modelledPaths = keys.modelledPaths ?? []
+      const allowed = isMeasurementPort
+        ? new Set([...STA_OBSERVATION_FIXED_TARGET_PATHS, ...keys.observationBag, ...modelledPaths])
+        : new Set([
+            ...STA_FIXED_TARGET_PATHS,
+            ...keys.thingBag,
+            ...locationBag,
+            ...keys.datastreamBag,
+            ...modelledPaths,
+          ])
       const entity = (key: StaEntity['key']): StaEntity =>
-        STA_ENTITIES.find(candidate => candidate.key === key) as StaEntity
+        (isMeasurementPort ? STA_OBSERVATION_PORT_ENTITIES : STA_ENTITIES).find(
+          candidate => candidate.key === key,
+        ) as StaEntity
 
       // The engine accepts exactly the catalog + match-key paths and fails the deploy saga for
       // anything else — surface that here instead of letting it pass edit-time.
@@ -524,6 +574,17 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
         }
       }
 
+      // FROST refuses a FeatureOfInterest without its feature, and the field is free in SensorThings:
+      // it is mappable only where the structure models it, as a class or a geometry.
+      const requireFeature = () => {
+        const hasFeature = [...assigned].some(path =>
+          FEATURE_PATHS.some(feature => path === feature || path.startsWith(`${feature}.`)),
+        )
+        if (!hasFeature) {
+          errors.push(errorAt(node, 'validation.messages.frostMappingFeatureOfInterestNeedsFeature', { label }))
+        }
+      }
+
       // The engine whitelists every bag attribute name (they reach $filter URLs and template keys)
       // and rejects one named after the 'properties' bag it lives in — surface both at edit time.
       const checkKeyNames = (bagPaths: readonly string[]) => {
@@ -536,8 +597,31 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
           }
         }
       }
-      checkKeyNames(keys.thingBag)
-      checkKeyNames(keys.datastreamBag)
+      checkKeyNames(isMeasurementPort ? keys.observationBag : keys.thingBag)
+      if (!isMeasurementPort) {
+        checkKeyNames(locationBag)
+        checkKeyNames(keys.datastreamBag)
+      }
+
+      if (isMeasurementPort) {
+        // The record of this port is the measurement. Its references name the Datastream the port
+        // resolves, and nothing above it is written — so no Thing rules apply here.
+        const missing = STA_OBSERVATION_REQUIRED_PATHS.filter(path => !assigned.has(path))
+        if (missing.length > 0) {
+          errors.push(
+            errorAt(node, 'validation.messages.frostMappingObservationPortNeedsReferences', {
+              label,
+              fields: missing.join(', '),
+            }),
+          )
+        }
+        const feature = entity('featureOfInterest')
+        if (anyAssigned([...feature.createPaths, ...feature.optionalPaths])) {
+          requireCompleteCreateSet(feature)
+          requireFeature()
+        }
+        return
+      }
 
       // Thing: the match keys are the find-or-create identity — always required.
       if (keys.thing.length === 0) {
@@ -559,7 +643,7 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
       requireCompleteCreateSet(entity('thing'))
 
       const isThingCreatable = allAssigned(entity('thing').createPaths)
-      if (anyAssigned([...entity('location').createPaths, ...entity('location').optionalPaths])) {
+      if (anyAssigned([...entity('location').createPaths, ...entity('location').optionalPaths, ...locationBag])) {
         if (!isThingCreatable) {
           errors.push(errorAt(node, 'validation.messages.frostMappingLocationNeedsCreatableThing', { label }))
         }
@@ -599,6 +683,7 @@ const validateFrostMappingCoversStaGroups: ValidationRule = {
           errors.push(errorAt(node, 'validation.messages.frostMappingFeatureOfInterestNeedsObservation', { label }))
         }
         requireCompleteCreateSet(featureOfInterest)
+        requireFeature()
       }
 
       if (keys.isFallback && keys.thing.length > 0) {
@@ -736,17 +821,13 @@ const validateEdgeCompatibility: ValidationRule = {
       const accepted = acceptedInputs({ mappedUpstream: hasMappedUpstream })
       if (isFormAccepted(offered, accepted)) return
 
-      // The only conflict reachable today is a records source feeding an unmapped FROST sink —
-      // keep the adapter's actionable wording for it instead of the generic form message.
       errors.push(
-        downstream.type === PIPELINE_NODE_TYPES.Frost && !hasMappedUpstream
-          ? errorAt(downstream, 'validation.messages.sqlSourceToFrost')
-          : errorAt(downstream, 'validation.messages.edgeFormIncompatible', {
-              label: nodeLabel(downstream),
-              upstreamLabel: nodeLabel(upstream),
-              form: offered,
-              accepted: accepted.join(', '),
-            }),
+        errorAt(downstream, 'validation.messages.edgeFormIncompatible', {
+          label: nodeLabel(downstream),
+          upstreamLabel: nodeLabel(upstream),
+          form: offered,
+          accepted: accepted.join(', '),
+        }),
       )
     })
 
@@ -1078,12 +1159,15 @@ export const VALIDATION_RULES: ValidationRule[] = [
  * Returns validation result with errors and warnings.
  *
  */
-export const validatePipeline = (pipeline: Pipeline): PipelineValidationResult => {
+export const validatePipeline = (
+  pipeline: Pipeline,
+  context: PipelineValidationContext = {},
+): PipelineValidationResult => {
   const allErrors: PipelineValidationError[] = []
   const allWarnings: PipelineValidationWarning[] = []
 
   VALIDATION_RULES.forEach(rule => {
-    const { errors, warnings } = rule.validate(pipeline)
+    const { errors, warnings } = rule.validate(pipeline, context)
     allErrors.push(...errors)
     allWarnings.push(...warnings)
   })
@@ -1100,8 +1184,11 @@ export const validatePipeline = (pipeline: Pipeline): PipelineValidationResult =
  * Used for visual indicators on canvas nodes.
  *
  */
-export const validatePipelineWithNodeStatus = (pipeline: Pipeline): ValidationResultWithNodeStatus => {
-  const result = validatePipeline(pipeline)
+export const validatePipelineWithNodeStatus = (
+  pipeline: Pipeline,
+  context: PipelineValidationContext = {},
+): ValidationResultWithNodeStatus => {
+  const result = validatePipeline(pipeline, context)
   const nodeStatuses = new Map<string, NodeValidationStatus>()
 
   // Initialize all nodes with clean status

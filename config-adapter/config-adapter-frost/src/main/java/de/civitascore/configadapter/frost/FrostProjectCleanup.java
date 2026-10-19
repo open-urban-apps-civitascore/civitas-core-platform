@@ -10,13 +10,15 @@
 package de.civitascore.configadapter.frost;
 
 import de.civitascore.configadapter.adapter.AbstractSagaCommandHandler.SagaApiException;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import de.civitascore.configadapter.util.OkHttpJson;
+import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,17 +44,22 @@ final class FrostProjectCleanup {
 
   private final Logger log = LoggerFactory.getLogger(FrostProjectCleanup.class);
 
-  private final Client client;
+  private final OkHttpClient client;
   private final FrostAuthStrategy authStrategy;
   private final String serverUrl;
   private final String sagaId;
 
   FrostProjectCleanup(
-      Client client, FrostAuthStrategy authStrategy, String serverUrl, String sagaId) {
+      OkHttpClient client, FrostAuthStrategy authStrategy, String serverUrl, String sagaId) {
     this.client = client;
     this.authStrategy = authStrategy;
     this.serverUrl = serverUrl;
     this.sagaId = sagaId;
+  }
+
+  /** The FROST entity URL for a path relative to {@link #serverUrl}, e.g. {@code Projects(42)}. */
+  private HttpUrl url(String path) {
+    return OkHttpJson.url(serverUrl, path);
   }
 
   /**
@@ -70,19 +77,17 @@ final class FrostProjectCleanup {
     List<String> thingIds = new ArrayList<>();
     int skip = 0;
     while (true) {
-      try (Response response =
-          authStrategy
-              .apply(
-                  client
-                      .target(serverUrl)
-                      .path("Projects(" + projectId + ")/Things")
-                      .queryParam("$select", "@iot.id")
-                      .queryParam("$orderby", "id asc")
-                      .queryParam("$top", String.valueOf(BATCH_SIZE))
-                      .queryParam("$skip", String.valueOf(skip))
-                      .request(MediaType.APPLICATION_JSON))
-              .get()) {
-        if (response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
+      HttpUrl url =
+          url("Projects(" + projectId + ")/Things")
+              .newBuilder()
+              .addQueryParameter("$select", "@iot.id")
+              .addQueryParameter("$orderby", "id asc")
+              .addQueryParameter("$top", String.valueOf(BATCH_SIZE))
+              .addQueryParameter("$skip", String.valueOf(skip))
+              .build();
+      Request request = authStrategy.apply(OkHttpJson.jsonRequest(url).get()).build();
+      try (Response response = OkHttpJson.execute(client, request)) {
+        if (response.code() == HttpURLConnection.HTTP_NOT_FOUND) {
           // A missing project means there is nothing left to delete — idempotent in both
           // directions. This also covers a re-release/re-delete after an earlier run already
           // removed the project (e.g. a prior failed saga's compensation), so the forward delete
@@ -96,8 +101,7 @@ final class FrostProjectCleanup {
         }
         checkResponse(response, "GET project Things for DELETE_PROJECT");
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> page = response.readEntity(Map.class);
+        Map<String, Object> page = OkHttpJson.readJsonMap(response);
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> things =
             (List<Map<String, Object>>) page.getOrDefault("value", List.of());
@@ -180,14 +184,16 @@ final class FrostProjectCleanup {
               entitySet + "(" + entityIds.get(i) + ")"));
     }
 
-    try (Response response =
+    Request request =
         authStrategy
-            .apply(client.target(serverUrl).path("$batch").request(MediaType.APPLICATION_JSON))
-            .post(Entity.json(Map.of("requests", requests)))) {
+            .apply(
+                OkHttpJson.jsonRequest(url("$batch"))
+                    .post(OkHttpJson.jsonBodyUnchecked(Map.of("requests", requests))))
+            .build();
+    try (Response response = OkHttpJson.execute(client, request)) {
       checkResponse(response, batchOperation(entitySet));
 
-      @SuppressWarnings("unchecked")
-      Map<String, Object> body = response.readEntity(Map.class);
+      Map<String, Object> body = OkHttpJson.readJsonMap(response);
       @SuppressWarnings("unchecked")
       List<Map<String, Object>> subResponses =
           (List<Map<String, Object>>) body.getOrDefault("responses", List.of());
@@ -230,7 +236,7 @@ final class FrostProjectCleanup {
     }
     int status = statusNumber.intValue();
     String entityPath = entitySet + "(" + entityIds.get(requestIndex) + ")";
-    if (status == Response.Status.NOT_FOUND.getStatusCode()) {
+    if (status == HttpURLConnection.HTTP_NOT_FOUND) {
       log.debug(
           "DELETE_PROJECT: {} already absent (404) — continuing. saga={}",
           Encode.forJava(entityPath),
@@ -279,11 +285,11 @@ final class FrostProjectCleanup {
   }
 
   private void checkResponse(Response response, String operationDesc) {
-    int status = response.getStatus();
-    if (status >= 200 && status < 300) {
+    if (response.isSuccessful()) {
       return;
     }
-    String body = response.readEntity(String.class);
-    throw new SagaApiException(operationDesc + " failed: HTTP " + status + " — " + body, status);
+    throw new SagaApiException(
+        operationDesc + " failed: HTTP " + response.code() + " — " + OkHttpJson.readBody(response),
+        response.code());
   }
 }

@@ -82,7 +82,7 @@ final class RouteAuthConfigurer {
 
     // Published-data routes are pinned to the configured API virtual host (apisix.api.host)
     // so APISIX deterministically matches them (issue #1368).
-    body.put("uris", new String[] {routePath, routePath + "/*"});
+    body.put("uris", PathRewrite.matchedUris(routePath, kind));
     body.put("hosts", new String[] {settings.apiHost()});
     body.put("upstream_id", upstreamId);
     // EVERY dataset route — STA and OWS alike — carries this single shared service_id. OPA reads
@@ -101,7 +101,7 @@ final class RouteAuthConfigurer {
     // /FROST-Server/v1.1/Projects(1)/Things. OWS: /v1/datasets/{id}/{slug}?service=WFS →
     // /geoserver/{workspace}/ows?service=WFS (query string preserved by APISIX).
     Map<String, Object> proxyRewrite = new HashMap<>();
-    proxyRewrite.put("regex_uri", new String[] {"^" + routePath + "(/.*)?$", upstreamPath + "$1"});
+    proxyRewrite.put("regex_uri", PathRewrite.pairs(routePath, upstreamPath, kind));
     Map<String, Object> plugins = new HashMap<>();
     plugins.put("proxy-rewrite", proxyRewrite);
     body.put("plugins", plugins);
@@ -155,13 +155,17 @@ final class RouteAuthConfigurer {
     if (proxyRewrite == null) {
       return;
     }
+    PathRewrite.normalize(route, proxyRewrite, kind);
+
     // STA routes inject the FROST upstream credential; OWS map-service routes carry none.
     mergeProxyRewriteHeaders(proxyRewrite, managedHeader, sta);
 
-    // OWS routes additionally rewrite GeoServer's self-referential capabilities URLs to this
-    // route's external endpoint so map clients can follow them back through the gateway.
+    // Both standards rewrite the upstream's self-referential URLs onto this route's external
+    // endpoint: GeoServer's capabilities URLs, FROST's SensorThings @iot.* links.
     if (kind == RouteUpstreamKind.OWS) {
       OwsCapabilitiesRewrite.apply(route, plugins, proxyRewrite, settings.apiHost());
+    } else {
+      StaLinkRewrite.apply(route, plugins, proxyRewrite, settings.apiHost());
     }
   }
 

@@ -189,6 +189,17 @@ export type PipelineReducerAction =
   | { type: 'NODE_CHANGES'; payload: NodeChange[] }
   | { type: 'EDGE_CHANGES'; payload: EdgeChange[] }
 
+export const isSemanticPipelineChange = (action: PipelineReducerAction): boolean => {
+  if (action.type === 'MARK_CLEAN') return false
+  if (action.type === 'NODE_CHANGES') {
+    return action.payload.some(change => change.type !== 'select' && change.type !== 'dimensions')
+  }
+  if (action.type === 'EDGE_CHANGES') {
+    return action.payload.some(change => change.type !== 'select')
+  }
+  return true
+}
+
 /**
  * Extended reducer that also handles React Flow native change events.
  *

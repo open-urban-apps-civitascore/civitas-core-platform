@@ -2,11 +2,15 @@ package de.civitascore.portal.messaging.saga;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.portal.configuration.PipelineClosureValidationProperties;
 import de.civitascore.portal.configuration.SagaProperties;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.ConnectorType;
@@ -14,15 +18,15 @@ import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
-import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Style;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DashboardRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
-import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -31,15 +35,24 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Stream;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.errors.NotLeaderOrFollowerException;
+import org.apache.kafka.common.errors.RecordTooLargeException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.kafka.KafkaException;
+import org.springframework.kafka.core.KafkaProducerException;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import tools.jackson.databind.JsonNode;
@@ -53,22 +66,29 @@ class DataSetSagaPublisherTest {
   @Mock private KafkaTemplate<String, String> kafkaTemplate;
   @Mock private DataSinkRepository dataSinkRepository;
   @Mock private DashboardRepository dashboardRepository;
-  @Mock private DataStructureVersionRepository dataStructureVersionRepository;
+  @Mock private ModelRegistryGateway modelRegistryGateway;
 
   private DataSetSagaPublisher publisher;
 
   @BeforeEach
   void setUp() {
-    publisher =
-        new DataSetSagaPublisher(
-            kafkaTemplate,
-            new JsonMapper(),
-            new SagaProperties("test.saga.trigger", 5),
-            dataSinkRepository,
-            dashboardRepository,
-            dataStructureVersionRepository);
-    // Dashboards default to none; tests that exercise dashboard payloads override this.
     lenient().when(dashboardRepository.findByDataSetId(any())).thenReturn(List.of());
+    publisher = publisher(10);
+  }
+
+  private DataSetSagaPublisher publisher(int maxDepth) {
+    return new DataSetSagaPublisher(
+        kafkaTemplate,
+        new JsonMapper(),
+        new SagaProperties("test.saga.trigger", 5),
+        dataSinkRepository,
+        dashboardRepository,
+        modelRegistryGateway,
+        new PipelineClosureValidationProperties(maxDepth));
+  }
+
+  private static String datasourceUrn(UUID id) {
+    return "urn:core:platform:civitas:datasource:common:" + id + ":1.0.0";
   }
 
   private DataSource dataSource(UUID id, ConnectorType type) {
@@ -76,6 +96,7 @@ class DataSetSagaPublisherTest {
     ds.setId(id);
     ds.setName("ds-" + id);
     ds.setConnectorType(type);
+    ds.setConfigurationUrn(datasourceUrn(id));
     return ds;
   }
 
@@ -88,13 +109,25 @@ class DataSetSagaPublisherTest {
     return p;
   }
 
+  /**
+   * Pins a registry-stored configuration document on the sink and stubs the gateway read for it.
+   * Lenient so tests that fail the publish before reading the sink don't trip strict stubbing.
+   */
+  private void stubSinkConfiguration(DataSink sink, Map<String, Object> cfg) {
+    String urn = "urn:core:platform:civitas:datasink:common:" + sink.getId() + ":1.0.0";
+    sink.setConfigurationUrn(urn);
+    lenient()
+        .when(modelRegistryGateway.fetchPayload(urn))
+        .thenReturn(Optional.of(new ModelRegistryGateway.RegistryDocument(cfg, null)));
+  }
+
   private DataSink postgisSink(UUID id, String tableName) {
     DataSink sink = new DataSink();
     sink.setId(id);
     sink.setDataSinkType(DataSinkType.POSTGIS);
     Map<String, Object> cfg = new HashMap<>();
     cfg.put("tableName", tableName);
-    sink.setConfiguration(cfg);
+    stubSinkConfiguration(sink, cfg);
     return sink;
   }
 
@@ -117,53 +150,17 @@ class DataSetSagaPublisherTest {
   }
 
   @Nested
-  @DisplayName("buildDatasources() deduplication")
-  class BuildDatasourcesTests {
-
-    @Test
-    @DisplayName("deduplicates datasources shared across multiple pipelines")
-    void deduplicatesDatasourcesAcrossPipelines() {
-      UUID dsId = UUID.randomUUID();
-      DataSource shared = dataSource(dsId, ConnectorType.MQTT);
-
-      Pipeline p1 = pipeline(UUID.randomUUID(), shared);
-      Pipeline p2 = pipeline(UUID.randomUUID(), shared);
-
-      DataSet dataSet = new DataSet();
-      dataSet.setId(UUID.randomUUID());
-      dataSet.setName("test");
-      dataSet.setOpenDataAccess(false);
-      dataSet.setPipelines(Set.of(p1, p2));
-
-      ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
-      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
-          .thenReturn(
-              CompletableFuture.completedFuture(
-                  new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
-
-      publisher.publishCreateRequested(dataSet);
-
-      ObjectMapper mapper = new JsonMapper();
-      var payload = mapper.readTree(jsonCaptor.getValue());
-      var datasources = payload.get("datasources");
-      assertThat(datasources).isNotNull();
-      assertThat(datasources.size()).as("Shared datasource should appear only once").isEqualTo(1);
-      assertThat(datasources.get(0).get("id").asString()).isEqualTo(dsId.toString());
-    }
-  }
-
-  @Nested
   @DisplayName("buildDatasinks() schema resolution")
   class BuildDatasinksTests {
 
-    private DataSink postgisSink(UUID id, UUID dsvId, String tableName) {
+    private DataSink postgisSink(UUID id, String elementUrn, String tableName) {
       DataSink sink = new DataSink();
       sink.setId(id);
       sink.setDataSinkType(DataSinkType.POSTGIS);
       Map<String, Object> cfg = new HashMap<>();
       cfg.put("tableName", tableName);
-      cfg.put("dataStructureVersionId", dsvId.toString());
-      sink.setConfiguration(cfg);
+      cfg.put("element", elementUrn);
+      stubSinkConfiguration(sink, cfg);
       return sink;
     }
 
@@ -177,26 +174,32 @@ class DataSetSagaPublisherTest {
     }
 
     @Test
-    @DisplayName("carries the referenced DSV's persisted model (JSON Schema) on the sink")
+    @DisplayName(
+        "carries the referenced element's inlined registry model (JSON Schema) on the sink")
     void carriesPersistedModelOnSink() {
-      UUID dsvId = UUID.randomUUID();
       UUID sinkId = UUID.randomUUID();
       Pipeline pipeline = pipeline(UUID.randomUUID());
-      DataSink sink = postgisSink(sinkId, dsvId, "sensor_observations");
+      String modelUrn =
+          "urn:core:platform:civitas:element:common:5cf6e9e7-fa0d-877a-bda7-df0cc339e439:2.0.0";
+      DataSink sink = postgisSink(sinkId, modelUrn, "sensor_observations");
       DataSet dataSet = datasetWithPipeline(pipeline);
 
-      DataStructureVersion version = new DataStructureVersion();
-      version.setModel(
-          Map.of(
-              "$id",
-              "urn:core:datastructure:" + dsvId,
-              "title",
-              "Observation",
-              "definitions",
-              Map.of("Observation", Map.of("type", "object"))));
+      // The gateway serves the inlined view with x-ui-styles already stripped; unknown x-*
+      // keywords like x-core-primaryKey survive verbatim (the config-adapter reads them).
+      when(modelRegistryGateway.fetchInlinedModel(modelUrn))
+          .thenReturn(
+              Optional.of(
+                  Map.of(
+                      "$id",
+                      modelUrn,
+                      "title",
+                      "Observation",
+                      "x-core-primaryKey",
+                      "observationId",
+                      "definitions",
+                      Map.of("Observation", Map.of("type", "object")))));
 
       when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
-      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
 
       ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
       when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
@@ -211,75 +214,52 @@ class DataSetSagaPublisherTest {
       assertThat(datasinks).isNotNull();
       assertThat(datasinks.size()).isEqualTo(1);
       var ds = datasinks.get(0);
-      assertThat(ds.get("id").asString()).isEqualTo(sinkId.toString());
+      assertThat(ds.get("id").asString())
+          .as("datasink is keyed by its configuration CORE URN, not its GUID")
+          .isEqualTo("urn:core:platform:civitas:datasink:common:" + sinkId + ":1.0.0");
       assertThat(ds.get("type").asString()).isEqualTo("POSTGIS");
       assertThat(ds.get("configuration").get("tableName").asString())
           .isEqualTo("sensor_observations");
+      assertThat(ds.get("configuration").get("element").asString())
+          .as(
+              "the element URN soft reference is preserved verbatim inside the shipped configuration")
+          .isEqualTo(modelUrn);
       assertThat(ds.get("dataStructure").get("title").asString()).isEqualTo("Observation");
+      assertThat(ds.get("dataStructure").get("x-core-primaryKey").asString())
+          .isEqualTo("observationId");
       assertThat(ds.get("dataStructure").get("definitions").has("Observation")).isTrue();
+      assertThat(ds.get("dataStructure").has("x-ui-styles"))
+          .as("the saga payload stays a pure schema document")
+          .isFalse();
     }
 
     @Test
-    @DisplayName("fails the publish when a referenced DSV cannot be resolved")
+    @DisplayName("fails the publish when a referenced element cannot be resolved")
     void failsWhenSchemaUnresolved() {
-      UUID dsvId = UUID.randomUUID();
       Pipeline pipeline = pipeline(UUID.randomUUID());
-      DataSink sink = postgisSink(UUID.randomUUID(), dsvId, "sensor_observations");
+      String elementUrn =
+          "urn:core:platform:civitas:element:common:5cf6e9e7-fa0d-877a-bda7-df0cc339e439:2.0.0";
+      DataSink sink = postgisSink(UUID.randomUUID(), elementUrn, "sensor_observations");
       DataSet dataSet = datasetWithPipeline(pipeline);
 
       when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
-      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.empty());
+      when(modelRegistryGateway.fetchInlinedModel(elementUrn)).thenReturn(Optional.empty());
 
       assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
           .isInstanceOf(InvalidInputException.class);
     }
 
     @Test
-    @DisplayName("fails the publish when a referenced DSV carries no model")
-    void failsWhenReferencedVersionHasNoModel() {
-      UUID dsvId = UUID.randomUUID();
+    @DisplayName("fails the publish when the registry resolves the element to an empty model")
+    void failsWhenReferencedElementResolvesToEmptyModel() {
       Pipeline pipeline = pipeline(UUID.randomUUID());
-      DataSink sink = postgisSink(UUID.randomUUID(), dsvId, "sensor_observations");
-
-      DataStructureVersion version = new DataStructureVersion(); // model is null
+      String elementUrn =
+          "urn:core:platform:civitas:element:common:5cf6e9e7-fa0d-877a-bda7-df0cc339e439:2.0.0";
+      DataSink sink = postgisSink(UUID.randomUUID(), elementUrn, "sensor_observations");
       DataSet dataSet = datasetWithPipeline(pipeline);
+
       when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
-      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
-
-      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
-          .isInstanceOf(InvalidInputException.class);
-    }
-
-    @Test
-    @DisplayName("fails the publish when a referenced DSV carries an empty model")
-    void failsWhenReferencedVersionHasEmptyModel() {
-      UUID dsvId = UUID.randomUUID();
-      Pipeline pipeline = pipeline(UUID.randomUUID());
-      DataSink sink = postgisSink(UUID.randomUUID(), dsvId, "sensor_observations");
-
-      DataStructureVersion version = new DataStructureVersion();
-      version.setModel(Map.of());
-      DataSet dataSet = datasetWithPipeline(pipeline);
-      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
-      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
-
-      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
-          .isInstanceOf(InvalidInputException.class);
-    }
-
-    @Test
-    @DisplayName("fails the publish with a controlled error when the DSV reference is not a UUID")
-    void failsWhenReferencedVersionIsMalformed() {
-      Pipeline pipeline = pipeline(UUID.randomUUID());
-      DataSink sink = new DataSink();
-      sink.setId(UUID.randomUUID());
-      sink.setDataSinkType(DataSinkType.POSTGIS);
-      Map<String, Object> cfg = new HashMap<>();
-      cfg.put("tableName", "sensor_observations");
-      cfg.put("dataStructureVersionId", "not-a-uuid");
-      sink.setConfiguration(cfg);
-      DataSet dataSet = datasetWithPipeline(pipeline);
-      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
+      when(modelRegistryGateway.fetchInlinedModel(elementUrn)).thenReturn(Optional.of(Map.of()));
 
       assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
           .isInstanceOf(InvalidInputException.class);
@@ -314,53 +294,18 @@ class DataSetSagaPublisherTest {
     }
 
     @Test
-    @DisplayName("FROST sink referencing its mapping target embeds the version's model")
-    void frostSinkWithReferenceEmbedsSchema() {
-      UUID dsvId = UUID.randomUUID();
-      UUID sinkId = UUID.randomUUID();
-      Pipeline pipeline = pipeline(UUID.randomUUID());
-      DataSink sink = new DataSink();
-      sink.setId(sinkId);
-      sink.setDataSinkType(DataSinkType.FROST);
-      sink.setConfiguration(Map.of("dataStructureVersionId", dsvId.toString()));
-      DataSet dataSet = datasetWithPipeline(pipeline);
-
-      DataStructureVersion version = new DataStructureVersion();
-      version.setModel(Map.of("title", "SensorThingsDataModel"));
-
-      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
-      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
-
-      ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
-      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
-          .thenReturn(
-              CompletableFuture.completedFuture(
-                  new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
-
-      publisher.publishCreateRequested(dataSet);
-
-      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
-      var ds = payload.get("datasinks").get(0);
-      assertThat(ds.get("type").asString()).isEqualTo("FROST");
-      assertThat(ds.get("dataStructure").get("title").asString())
-          .as("the mapping target's model rides on the FROST sink")
-          .isEqualTo("SensorThingsDataModel");
-    }
-
-    @Test
     @DisplayName("DELETE trigger carries datasinks so the saga can tear down the PostGIS sink")
     void deleteTriggerCarriesDatasinks() {
-      UUID dsvId = UUID.randomUUID();
       UUID sinkId = UUID.randomUUID();
       Pipeline pipeline = pipeline(UUID.randomUUID());
-      DataSink sink = postgisSink(sinkId, dsvId, "sensor_observations");
+      String modelUrn =
+          "urn:core:platform:civitas:element:common:5cf6e9e7-fa0d-877a-bda7-df0cc339e439:1.0.0";
+      DataSink sink = postgisSink(sinkId, modelUrn, "sensor_observations");
       DataSet dataSet = datasetWithPipeline(pipeline);
 
-      DataStructureVersion version = new DataStructureVersion();
-      version.setModel(Map.of("$id", "urn:core:datastructure:" + dsvId));
-
+      when(modelRegistryGateway.fetchInlinedModel(modelUrn))
+          .thenReturn(Optional.of(Map.of("$id", modelUrn)));
       when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(sink));
-      when(dataStructureVersionRepository.findById(dsvId)).thenReturn(Optional.of(version));
 
       ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
       when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
@@ -375,10 +320,332 @@ class DataSetSagaPublisherTest {
       assertThat(datasinks).isNotNull();
       assertThat(datasinks.size()).isEqualTo(1);
       var ds = datasinks.get(0);
-      assertThat(ds.get("id").asString()).isEqualTo(sinkId.toString());
+      assertThat(ds.get("id").asString())
+          .as("datasink is keyed by its configuration CORE URN, not its GUID")
+          .isEqualTo("urn:core:platform:civitas:datasink:common:" + sinkId + ":1.0.0");
       assertThat(ds.get("type").asString()).isEqualTo("POSTGIS");
       assertThat(ds.get("configuration").get("tableName").asString())
           .isEqualTo("sensor_observations");
+    }
+  }
+
+  @Nested
+  @DisplayName("artifacts from the dependency graph")
+  class ArtifactsTests {
+
+    private static final String PIPELINE_URN =
+        "urn:core:platform:civitas:pipeline:common:8a46d02f-0994-8f94-8b55-031414ee2859:1.0.0";
+    private static final String OTHER_PIPELINE_URN =
+        "urn:core:platform:civitas:pipeline:common:3f0c1d2e-4b5a-8c6d-9e7f-0a1b2c3d4e5f:1.0.0";
+    private static final String SOURCE_URN =
+        "urn:core:platform:civitas:datasource:common:1c9b8d42-6f3e-8a71-b2d4-5e6f7a8b9c0d:1.1.0";
+    private static final String SINK_URN =
+        "urn:core:platform:civitas:datasink:common:7d2e4f60-8a1b-8c3d-9e5f-6a7b8c9d0e1f:1.0.0";
+    private static final String MAPPING_URN =
+        "urn:core:dataset:neustadt:mapping:traffic:b539f598-2ce4-8cb9-8068-920e30194249:1.0.0";
+    private static final String SOURCE_STRUCTURE =
+        "urn:core:platform:civitas:element:common:5cf6e9e7-fa0d-877a-bda7-df0cc339e439:1.0.0";
+    private static final String TARGET_STRUCTURE =
+        "urn:core:platform:civitas:datastructure:common:0e1c3a52-9f4b-8d2e-a7c6-3b5d1f2e4a60:2.0.0";
+    private static final String NESTED_STRUCTURE =
+        "urn:core:platform:civitas:element:common:9a8b7c6d-5e4f-8a3b-9c2d-1e0f9a8b7c6d:1.0.0";
+
+    @BeforeEach
+    void readArtifactTypeFromTheUrn() {
+      lenient()
+          .when(modelRegistryGateway.artifactType(anyString()))
+          .thenAnswer(invocation -> invocation.<String>getArgument(0).split(":")[4]);
+    }
+
+    private void stored(String urn, Map<String, Object> document, String... dependencies) {
+      when(modelRegistryGateway.fetchPayload(urn))
+          .thenReturn(Optional.of(new ModelRegistryGateway.RegistryDocument(document, null)));
+      when(modelRegistryGateway.dependencyUrns(urn)).thenReturn(List.of(dependencies));
+    }
+
+    private void structure(String urn, String title) {
+      when(modelRegistryGateway.fetchInlinedModel(urn))
+          .thenReturn(Optional.of(Map.of("$id", urn, "title", title, "type", "object")));
+    }
+
+    private void storedPipeline(String urn, String... dependencies) {
+      stored(urn, Map.of("nodes", List.of()), dependencies);
+    }
+
+    private void sourceSinkAndMapping() {
+      storedPipeline(PIPELINE_URN, SOURCE_URN, SINK_URN, MAPPING_URN);
+      stored(
+          SOURCE_URN,
+          Map.of("connectionType", "mqtt", "password", "ENC(secret)", "element", SOURCE_STRUCTURE),
+          SOURCE_STRUCTURE);
+      stored(
+          SINK_URN,
+          Map.of("connectionType", "postgis", "tableName", "obs", "element", TARGET_STRUCTURE),
+          TARGET_STRUCTURE);
+      stored(
+          MAPPING_URN,
+          Map.of(
+              "source",
+              SOURCE_STRUCTURE,
+              "target",
+              TARGET_STRUCTURE,
+              "fields",
+              Map.of("$.name", "$.station")),
+          SOURCE_STRUCTURE,
+          TARGET_STRUCTURE);
+      structure(SOURCE_STRUCTURE, "Reading");
+      structure(TARGET_STRUCTURE, "Observation");
+    }
+
+    private Pipeline modelledPipeline(String modelUrn) {
+      Pipeline pipeline = pipeline(UUID.randomUUID());
+      pipeline.setModelUrn(modelUrn);
+      return pipeline;
+    }
+
+    private DataSet dataSet(Pipeline... pipelines) {
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setPipelines(Set.of(pipelines));
+      return dataSet;
+    }
+
+    private JsonNode publishCreate(DataSet dataSet) {
+      var jsonCaptor = stubKafkaSend();
+      publisher.publishCreateRequested(dataSet);
+      return new JsonMapper().readTree(jsonCaptor.getValue());
+    }
+
+    @Test
+    @DisplayName("configurations and Mappings ship as stored, keyed by the URN the graph reports")
+    void configurationsAndMappingsShipAsStored() {
+      sourceSinkAndMapping();
+
+      JsonNode artifacts = publishCreate(dataSet(modelledPipeline(PIPELINE_URN))).get("artifacts");
+
+      JsonNode source = artifacts.get(SOURCE_URN);
+      assertThat(source.get("connectionType").asString()).isEqualTo("mqtt");
+      assertThat(source.get("password").asString()).isEqualTo("ENC(secret)");
+      assertThat(source.get("element").asString()).isEqualTo(SOURCE_STRUCTURE);
+      assertThat(artifacts.get(SINK_URN).get("tableName").asString()).isEqualTo("obs");
+      assertThat(artifacts.get(MAPPING_URN).get("fields").get("$.name").asString())
+          .isEqualTo("$.station");
+      assertThat(artifacts.has(PIPELINE_URN)).isFalse();
+    }
+
+    @Test
+    @DisplayName("every referenced Data structure ships once, as its inlined view")
+    void dataStructuresShipInlinedOnce() {
+      sourceSinkAndMapping();
+
+      JsonNode artifacts = publishCreate(dataSet(modelledPipeline(PIPELINE_URN))).get("artifacts");
+
+      assertThat(artifacts.get(SOURCE_STRUCTURE).get("title").asString()).isEqualTo("Reading");
+      assertThat(artifacts.get(TARGET_STRUCTURE).get("title").asString()).isEqualTo("Observation");
+      verify(modelRegistryGateway, times(1)).fetchInlinedModel(SOURCE_STRUCTURE);
+      verify(modelRegistryGateway, times(1)).fetchInlinedModel(TARGET_STRUCTURE);
+    }
+
+    @Test
+    @DisplayName("the walk stops at a Data structure")
+    void walkStopsAtDataStructures() {
+      sourceSinkAndMapping();
+      lenient()
+          .when(modelRegistryGateway.dependencyUrns(TARGET_STRUCTURE))
+          .thenReturn(List.of(NESTED_STRUCTURE));
+
+      JsonNode artifacts = publishCreate(dataSet(modelledPipeline(PIPELINE_URN))).get("artifacts");
+
+      assertThat(artifacts.has(NESTED_STRUCTURE)).isFalse();
+      verify(modelRegistryGateway, never()).dependencyUrns(SOURCE_STRUCTURE);
+      verify(modelRegistryGateway, never()).dependencyUrns(TARGET_STRUCTURE);
+    }
+
+    @Test
+    @DisplayName("the keys are sorted")
+    void keysAreSorted() {
+      sourceSinkAndMapping();
+
+      JsonNode artifacts = publishCreate(dataSet(modelledPipeline(PIPELINE_URN))).get("artifacts");
+
+      assertThat(List.copyOf(artifacts.propertyNames()))
+          .containsExactlyInAnyOrder(
+              SOURCE_URN, SINK_URN, MAPPING_URN, SOURCE_STRUCTURE, TARGET_STRUCTURE)
+          .isSorted();
+    }
+
+    @Test
+    @DisplayName(
+        "the current configuration of an associated Data source and Data sink ships beside the"
+            + " pinned one")
+    void currentConfigurationsOfAssociatedEntitiesShip() {
+      String currentSource = SOURCE_URN.replace(":1.1.0", ":1.2.0");
+      String currentSink = SINK_URN.replace(":1.0.0", ":1.1.0");
+      String currentStructure = SOURCE_STRUCTURE.replace(":1.0.0", ":1.1.0");
+      storedPipeline(PIPELINE_URN, SOURCE_URN, SINK_URN);
+      stored(
+          SOURCE_URN,
+          Map.of("connectionType", "mqtt", "element", SOURCE_STRUCTURE),
+          SOURCE_STRUCTURE);
+      stored(
+          currentSource,
+          Map.of("connectionType", "mqtt", "element", currentStructure),
+          currentStructure);
+      stored(SINK_URN, Map.of("connectionType", "postgis", "tableName", "obs"));
+      stored(currentSink, Map.of("connectionType", "postgis", "tableName", "obs_current"));
+      structure(SOURCE_STRUCTURE, "Reading");
+      structure(currentStructure, "Reading, edited");
+      DataSource source = dataSource(UUID.randomUUID(), ConnectorType.MQTT);
+      source.setConfigurationUrn(currentSource);
+      Pipeline pipeline = pipeline(UUID.randomUUID(), source);
+      pipeline.setModelUrn(PIPELINE_URN);
+      DataSink sink = new DataSink();
+      sink.setConfigurationUrn(currentSink);
+      when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sink));
+
+      JsonNode payload = publishCreate(dataSet(pipeline));
+
+      assertThat(List.copyOf(payload.get("artifacts").propertyNames()))
+          .containsExactlyInAnyOrder(
+              SOURCE_URN, currentSource, SINK_URN, currentSink, SOURCE_STRUCTURE, currentStructure);
+      JsonNode entry = payload.get("dataPipelines").get(0);
+      assertThat(entry.get("dataSourceIds").get(0).asString()).isEqualTo(currentSource);
+      assertThat(entry.get("dataSinkIds").get(0).asString()).isEqualTo(currentSink);
+    }
+
+    @Test
+    @DisplayName("a Data source two Pipelines share is fetched and shipped once")
+    void sharedDataSourceShipsOnce() {
+      storedPipeline(PIPELINE_URN, SOURCE_URN);
+      storedPipeline(OTHER_PIPELINE_URN, SOURCE_URN);
+      stored(SOURCE_URN, Map.of("connectionType", "sql"));
+
+      JsonNode artifacts =
+          publishCreate(
+                  dataSet(modelledPipeline(PIPELINE_URN), modelledPipeline(OTHER_PIPELINE_URN)))
+              .get("artifacts");
+
+      assertThat(List.copyOf(artifacts.propertyNames())).containsExactly(SOURCE_URN);
+      verify(modelRegistryGateway, times(1)).fetchPayload(SOURCE_URN);
+      verify(modelRegistryGateway, times(1)).dependencyUrns(SOURCE_URN);
+    }
+
+    @Test
+    @DisplayName("an UPDATE trigger carries the artifacts of the current Pipelines only")
+    void updateTriggerCarriesArtifactsOfCurrentPipelines() {
+      storedPipeline(PIPELINE_URN, SOURCE_URN);
+      stored(SOURCE_URN, Map.of("connectionType", "sql"));
+      Pipeline current = modelledPipeline(PIPELINE_URN);
+      Pipeline removed = modelledPipeline(OTHER_PIPELINE_URN);
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishUpdateRequested(dataSet(current), Set.of(current, removed));
+
+      JsonNode artifacts = new JsonMapper().readTree(jsonCaptor.getValue()).get("artifacts");
+      assertThat(List.copyOf(artifacts.propertyNames())).containsExactly(SOURCE_URN);
+      verify(modelRegistryGateway, never()).dependencyUrns(OTHER_PIPELINE_URN);
+    }
+
+    @Test
+    @DisplayName("a Pipeline without a stored model contributes nothing, artifacts stays an object")
+    void pipelineWithoutModelContributesNothing() {
+      JsonNode payload = publishCreate(dataSet(pipeline(UUID.randomUUID())));
+
+      assertThat(payload.get("artifacts").isObject()).isTrue();
+      assertThat(payload.get("artifacts").isEmpty()).isTrue();
+    }
+
+    @Test
+    @DisplayName(
+        "DELETE and UNRELEASE do not walk the graph, so a dangling artifact cannot block them")
+    void teardownTriggersDoNotWalkTheGraph() {
+      DataSet dataSet = dataSet(modelledPipeline(PIPELINE_URN));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishDeleteRequested(dataSet);
+      publisher.publishUnreleaseRequested(dataSet);
+
+      assertThat(jsonCaptor.getAllValues()).hasSize(2);
+      verify(modelRegistryGateway, never()).dependencyUrns(anyString());
+    }
+
+    @Test
+    @DisplayName("fails the publish when a referenced configuration is not stored")
+    void unresolvedConfigurationFailsThePublish() {
+      storedPipeline(PIPELINE_URN, SOURCE_URN);
+      when(modelRegistryGateway.fetchPayload(SOURCE_URN)).thenReturn(Optional.empty());
+      DataSet dataSet = dataSet(modelledPipeline(PIPELINE_URN));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining(SOURCE_URN);
+      verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
+    }
+
+    @ParameterizedTest(name = "inlined view {0}")
+    @MethodSource("missingModels")
+    @DisplayName("fails the publish when a referenced Data structure has no model")
+    void unresolvedDataStructureFailsThePublish(
+        String description, Optional<Map<String, Object>> model) {
+      storedPipeline(PIPELINE_URN, SOURCE_URN);
+      stored(SOURCE_URN, Map.of("element", SOURCE_STRUCTURE), SOURCE_STRUCTURE);
+      when(modelRegistryGateway.fetchInlinedModel(SOURCE_STRUCTURE)).thenReturn(model);
+      DataSet dataSet = dataSet(modelledPipeline(PIPELINE_URN));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining(SOURCE_STRUCTURE);
+      verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
+    }
+
+    static Stream<Arguments> missingModels() {
+      return Stream.of(
+          Arguments.of("absent", Optional.empty()), Arguments.of("empty", Optional.of(Map.of())));
+    }
+
+    @Test
+    @DisplayName("fails the publish when the walk reaches an artifact type no Pipeline uses")
+    void unexpectedArtifactTypeFailsThePublish() {
+      storedPipeline(PIPELINE_URN, OTHER_PIPELINE_URN);
+      DataSet dataSet = dataSet(modelledPipeline(PIPELINE_URN));
+
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining(OTHER_PIPELINE_URN)
+          .hasMessageContaining("type pipeline");
+      verify(modelRegistryGateway, never()).fetchPayload(OTHER_PIPELINE_URN);
+      verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("fails the publish when the artifacts reach beyond the depth bound")
+    void walkPastTheDepthBoundFailsThePublish() {
+      storedPipeline(PIPELINE_URN, SOURCE_URN);
+      stored(SOURCE_URN, Map.of("element", SOURCE_STRUCTURE), SOURCE_STRUCTURE);
+      DataSet dataSet = dataSet(modelledPipeline(PIPELINE_URN));
+
+      assertThatThrownBy(() -> publisher(1).publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("beyond 1 references");
+      verify(modelRegistryGateway, never()).fetchInlinedModel(anyString());
+      verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("a walk exactly as deep as the bound publishes")
+    void walkAtTheDepthBoundPublishes() {
+      storedPipeline(PIPELINE_URN, SOURCE_URN);
+      stored(SOURCE_URN, Map.of("element", SOURCE_STRUCTURE), SOURCE_STRUCTURE);
+      structure(SOURCE_STRUCTURE, "Reading");
+      var jsonCaptor = stubKafkaSend();
+
+      publisher(2).publishCreateRequested(dataSet(modelledPipeline(PIPELINE_URN)));
+
+      JsonNode artifacts = new JsonMapper().readTree(jsonCaptor.getValue()).get("artifacts");
+      assertThat(List.copyOf(artifacts.propertyNames()))
+          .containsExactly(SOURCE_URN, SOURCE_STRUCTURE);
     }
   }
 
@@ -423,6 +690,53 @@ class DataSetSagaPublisherTest {
       assertThat(entry.get("geometryColumnRef").asString())
           .as("the geometry-column selection is forwarded so the adapter can pick the native CRS")
           .isEqualTo("geom");
+    }
+
+    @Test
+    @DisplayName("CREATE trigger carries the layer's published fields")
+    void createTriggerCarriesLayerFieldsPublishedByGeoServer() {
+      Layer l =
+          layer(UUID.randomUUID(), "layer1", "EPSG:4326", postgisSink(UUID.randomUUID(), "t"));
+      l.setTitle("Messstationen");
+      l.setDescription("Alle Stationen");
+      l.setAttribute(List.of("name", "temperature"));
+      l.setCqlFilter("temperature > 20");
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setLayers(Set.of(l));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      var entry = new JsonMapper().readTree(jsonCaptor.getValue()).get("layers").get(0);
+      assertThat(entry.get("title").asString()).isEqualTo("Messstationen");
+      assertThat(entry.get("description").asString()).isEqualTo("Alle Stationen");
+      assertThat(entry.get("attribute").get(0).asString()).isEqualTo("name");
+      assertThat(entry.get("attribute").get(1).asString()).isEqualTo("temperature");
+      assertThat(entry.get("cqlFilter").asString()).isEqualTo("temperature > 20");
+    }
+
+    @Test
+    @DisplayName("Unset layer fields are omitted from the trigger")
+    void unsetLayerFieldsAreOmitted() {
+      Layer l =
+          layer(UUID.randomUUID(), "layer1", "EPSG:4326", postgisSink(UUID.randomUUID(), "t"));
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setLayers(Set.of(l));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishCreateRequested(dataSet);
+
+      var entry = new JsonMapper().readTree(jsonCaptor.getValue()).get("layers").get(0);
+      assertThat(entry.has("title")).isFalse();
+      assertThat(entry.has("description")).isFalse();
+      assertThat(entry.has("attribute")).isFalse();
+      assertThat(entry.has("cqlFilter")).isFalse();
     }
 
     @Test
@@ -787,104 +1101,60 @@ class DataSetSagaPublisherTest {
       assertThat(hasUpdate).as("existing pipeline should be UPDATE").isTrue();
       assertThat(hasDelete).as("removed pipeline should be DELETE").isTrue();
     }
-  }
-
-  @Nested
-  @DisplayName("toPipelineEntry() per-pipeline source/sink association")
-  class PipelineAssociationTests {
 
     @Test
-    @DisplayName("pipeline entries carry their own sorted dataSourceIds and dataSinkIds")
-    void pipelineEntriesCarrySourceAndSinkIds() {
-      DataSource dsA =
-          dataSource(UUID.fromString("aaaaaaaa-0000-4000-8000-000000000001"), ConnectorType.MQTT);
-      DataSource dsB =
-          dataSource(UUID.fromString("bbbbbbbb-0000-4000-8000-000000000002"), ConnectorType.MQTT);
-      Pipeline pipeline = pipeline(UUID.randomUUID(), dsB, dsA);
-
-      DataSink sinkA =
-          postgisSink(UUID.fromString("aaaaaaaa-0000-4000-8000-000000000003"), "table_a");
-      DataSink sinkB =
-          postgisSink(UUID.fromString("bbbbbbbb-0000-4000-8000-000000000004"), "table_b");
-      when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sinkB, sinkA));
+    @DisplayName("pipeline model is served from the registry pin (layout styles stripped)")
+    void pipelineModelServedFromRegistry() {
+      Pipeline p = pipeline(UUID.randomUUID());
+      String urn =
+          "urn:core:platform:civitas:pipeline:common:8a46d02f-0994-8f94-8b55-031414ee2859:1.2.0";
+      p.setModelUrn(urn);
+      // fetchPayload returns the stored document already split: content without x-ui-styles,
+      // the React Flow layout separately. The saga ships only the content.
+      when(modelRegistryGateway.fetchPayload(urn))
+          .thenReturn(
+              Optional.of(
+                  new ModelRegistryGateway.RegistryDocument(
+                      Map.of("nodes", List.of(Map.of("id", "n1"))),
+                      Map.of("viewport", Map.of("x", 1)))));
 
       DataSet dataSet = new DataSet();
       dataSet.setId(UUID.randomUUID());
       dataSet.setName("test");
       dataSet.setOpenDataAccess(false);
-      dataSet.setPipelines(Set.of(pipeline));
+      dataSet.setPipelines(Set.of(p));
+      var jsonCaptor = stubKafkaSend();
 
-      ArgumentCaptor<String> jsonCaptor = stubKafkaSend();
+      publisher.publishCreateRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      var entry = payload.get("dataPipelines").get(0);
+      assertThat(entry.get("data").get("nodes").get(0).get("id").asString()).isEqualTo("n1");
+      assertThat(entry.get("data").has("x-ui-styles"))
+          .as("the saga payload carries the definition only, never the UI layout")
+          .isFalse();
+      assertThat(entry.get("version").asString()).isEqualTo("3");
+    }
+
+    @Test
+    @DisplayName("pipeline without a stored definition ships a null model (as before)")
+    void pipelineWithoutDefinitionShipsNullModel() {
+      DataSource ds = dataSource(UUID.randomUUID(), ConnectorType.MQTT);
+      Pipeline p = pipeline(UUID.randomUUID(), ds); // no modelUrn
+
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setPipelines(Set.of(p));
+      var jsonCaptor = stubKafkaSend();
+
       publisher.publishCreateRequested(dataSet);
 
       var entry = new JsonMapper().readTree(jsonCaptor.getValue()).get("dataPipelines").get(0);
-      var sourceIds = entry.get("dataSourceIds");
-      var sinkIds = entry.get("dataSinkIds");
-      assertThat(sourceIds).isNotNull();
-      assertThat(sinkIds).isNotNull();
-      assertThat(sourceIds.size()).isEqualTo(2);
-      assertThat(sinkIds.size()).isEqualTo(2);
-      assertThat(sourceIds.get(0).asString()).isEqualTo(dsA.getId().toString());
-      assertThat(sourceIds.get(1).asString()).isEqualTo(dsB.getId().toString());
-      assertThat(sinkIds.get(0).asString()).isEqualTo(sinkA.getId().toString());
-      assertThat(sinkIds.get(1).asString()).isEqualTo(sinkB.getId().toString());
-    }
-
-    @Test
-    @DisplayName("DELETE entries carry empty id lists")
-    void deleteEntriesCarryEmptyIdLists() {
-      Pipeline removed = pipeline(UUID.randomUUID());
-
-      DataSet dataSet = new DataSet();
-      dataSet.setId(UUID.randomUUID());
-      dataSet.setName("test");
-      dataSet.setOpenDataAccess(false);
-      dataSet.setProjectId("proj-1");
-      dataSet.setServiceId("svc-1");
-      dataSet.setPipelineIds(List.of());
-      dataSet.setPipelines(Set.of());
-
-      ArgumentCaptor<String> jsonCaptor = stubKafkaSend();
-      publisher.publishUpdateRequested(dataSet, Set.of(removed));
-
-      var entry = new JsonMapper().readTree(jsonCaptor.getValue()).get("dataPipelines").get(0);
-      assertThat(entry.get("action").asString()).isEqualTo("DELETE");
-      assertThat(entry.get("dataSourceIds").size()).isZero();
-      assertThat(entry.get("dataSinkIds").size()).isZero();
-    }
-
-    @Test
-    @DisplayName("a pipeline with no sources publishes an empty id list")
-    void emptyDataSourcesRelationPublishesEmptyIdList() {
-      Pipeline pipeline = pipeline(UUID.randomUUID());
-
-      DataSet dataSet = new DataSet();
-      dataSet.setId(UUID.randomUUID());
-      dataSet.setName("test");
-      dataSet.setOpenDataAccess(false);
-      dataSet.setPipelines(Set.of(pipeline));
-
-      ArgumentCaptor<String> jsonCaptor = stubKafkaSend();
-      publisher.publishCreateRequested(dataSet);
-
-      var entry = new JsonMapper().readTree(jsonCaptor.getValue()).get("dataPipelines").get(0);
-      assertThat(entry.get("dataSourceIds").size()).isZero();
-    }
-
-    @Test
-    @DisplayName("a null dataSources relation is an invariant violation, not a silent empty list")
-    void nullDataSourcesRelationFailsLoud() {
-      Pipeline pipeline = pipeline(UUID.randomUUID());
-      pipeline.setDataSources(null);
-
-      DataSet dataSet = new DataSet();
-      dataSet.setId(UUID.randomUUID());
-      dataSet.setName("test");
-      dataSet.setOpenDataAccess(false);
-      dataSet.setPipelines(Set.of(pipeline));
-
-      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
-          .isInstanceOf(IllegalStateException.class);
+      assertThat(entry.get("data").isNull())
+          .as("no stored definition → null data, same as before the cut")
+          .isTrue();
     }
   }
 
@@ -895,6 +1165,7 @@ class DataSetSagaPublisherTest {
     private NamedApi api(String name, String slug, String routeId) {
       NamedApi api = new NamedApi();
       api.setName(name);
+      api.setDescription(name + " description");
       api.setSlug(slug);
       api.setStandard(ApiStandard.STA);
       api.setVersion("1.1");
@@ -926,12 +1197,9 @@ class DataSetSagaPublisherTest {
       assertThat(bySlug).containsKeys("traffic", "weather");
       assertThat(bySlug.get("traffic").get("standard").asString()).isEqualTo("STA");
       assertThat(bySlug.get("traffic").get("version").asString()).isEqualTo("1.1");
-      // Saga contract carries only slug/standard/version: human-readable name and description
-      // stay portal-backend-private.
-      assertThat(bySlug.get("traffic").get("name")).as("name must not leak across saga").isNull();
-      assertThat(bySlug.get("traffic").get("description"))
-          .as("description must not leak across saga")
-          .isNull();
+      assertThat(bySlug.get("traffic").get("name").asString()).isEqualTo("Traffic Sensor Readings");
+      assertThat(bySlug.get("traffic").get("description").asString())
+          .isEqualTo("Traffic Sensor Readings description");
     }
 
     @Test
@@ -1196,10 +1464,10 @@ class DataSetSagaPublisherTest {
   }
 
   @Nested
-  @DisplayName("dashboards serialization in saga triggers")
-  class DashboardsSerializationTests {
+  @DisplayName("sendTrigger() failures")
+  class SendTriggerTests {
 
-    private DataSet emptyDataset() {
+    private DataSet emptyDataSet() {
       DataSet dataSet = new DataSet();
       dataSet.setId(UUID.randomUUID());
       dataSet.setName("test");
@@ -1208,99 +1476,60 @@ class DataSetSagaPublisherTest {
       return dataSet;
     }
 
-    private ArgumentCaptor<String> stubKafkaSend() {
-      ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
-      when(kafkaTemplate.send(anyString(), anyString(), jsonCaptor.capture()))
+    private void stubKafkaFailure(Exception cause) {
+      when(kafkaTemplate.send(anyString(), anyString(), anyString()))
           .thenReturn(
-              CompletableFuture.completedFuture(
-                  new SendResult<>(null, new RecordMetadata(null, 0, 0, 0, 0, 0))));
-      return jsonCaptor;
-    }
-
-    private de.civitascore.portal.model.entity.Dashboard dashboard(UUID id, String name) {
-      return dashboard(id, name, null);
-    }
-
-    private de.civitascore.portal.model.entity.Dashboard dashboard(
-        UUID id, String name, String externalDashboardId) {
-      var d = new de.civitascore.portal.model.entity.Dashboard();
-      d.setId(id);
-      d.setName(name);
-      d.setExternalDashboardId(externalDashboardId);
-      return d;
+              CompletableFuture.failedFuture(
+                  new KafkaProducerException(
+                      new ProducerRecord<>("test.saga.trigger", "{}"), "Failed to send", cause)));
     }
 
     @Test
-    @DisplayName("new dashboard (no engine id) omits externalDashboardId — engine creates")
-    void createTriggerOmitsExternalIdForNewDashboard() throws Exception {
-      DataSet dataSet = emptyDataset();
-      UUID dashId = UUID.randomUUID();
-      when(dashboardRepository.findByDataSetId(dataSet.getId()))
-          .thenReturn(List.of(dashboard(dashId, "Traffic Overview"))); // no externalDashboardId
-      var jsonCaptor = stubKafkaSend();
+    @DisplayName(
+        "a trigger above the producer size limit, which send() rejects synchronously, fails as"
+            + " invalid input with its UTF-8 size")
+    void tooLargeTriggerRejectedBySendFailsAsInvalidInputWithItsSize() {
+      DataSet dataSet = emptyDataSet();
+      dataSet.setName("Straßenbäume");
+      when(kafkaTemplate.send(anyString(), anyString(), anyString()))
+          .thenThrow(new KafkaException("Send failed", new RecordTooLargeException("too large")));
 
-      publisher.publishCreateRequested(dataSet);
-
-      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
-      var dashboards = payload.get("dashboards");
-      assertThat(dashboards).as("dashboards must be present in trigger payload").isNotNull();
-      assertThat(dashboards.size()).isEqualTo(1);
-      assertThat(dashboards.get(0).get("id").asString()).isEqualTo(dashId.toString());
-      assertThat(dashboards.get(0).get("name").asString()).isEqualTo("Traffic Overview");
-      // No engine id yet → field is dropped (NON_NULL) → engine treats it as a create.
-      assertThat(dashboards.get(0).has("externalDashboardId"))
-          .as("new dashboard must omit externalDashboardId so the engine creates it")
-          .isFalse();
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageStartingWith(
+              "The saga trigger of this Dataset is " + sentTriggerBytes() + " bytes, ");
     }
 
     @Test
-    @DisplayName("existing dashboard carries externalDashboardId — engine updates in place")
-    void triggerCarriesExternalIdForExistingDashboard() throws Exception {
-      DataSet dataSet = emptyDataset();
-      UUID dashId = UUID.randomUUID();
-      when(dashboardRepository.findByDataSetId(dataSet.getId()))
-          .thenReturn(List.of(dashboard(dashId, "Traffic Overview", "superset-42")));
-      var jsonCaptor = stubKafkaSend();
+    @DisplayName(
+        "a trigger above the broker size limit, which fails the send future, fails as invalid"
+            + " input with its UTF-8 size")
+    void tooLargeTriggerRejectedByBrokerFailsAsInvalidInputWithItsSize() {
+      DataSet dataSet = emptyDataSet();
+      dataSet.setName("Straßenbäume");
+      stubKafkaFailure(new RecordTooLargeException("too large"));
 
-      publisher.publishCreateRequested(dataSet);
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageStartingWith(
+              "The saga trigger of this Dataset is " + sentTriggerBytes() + " bytes, ");
+    }
 
-      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
-      var dashboard = payload.get("dashboards").get(0);
-      assertThat(dashboard.get("id").asString()).isEqualTo(dashId.toString());
-      // Engine id present → engine updates the existing dashboard in place, id stays stable.
-      assertThat(dashboard.get("externalDashboardId").asString()).isEqualTo("superset-42");
+    private int sentTriggerBytes() {
+      ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
+      verify(kafkaTemplate).send(anyString(), anyString(), jsonCaptor.capture());
+      return jsonCaptor.getValue().getBytes(StandardCharsets.UTF_8).length;
     }
 
     @Test
-    @DisplayName("UPDATE trigger carries dashboards too (post-release add)")
-    void updateTriggerCarriesDashboards() throws Exception {
-      DataSet dataSet = emptyDataset();
-      dataSet.setProjectId("proj-1");
-      dataSet.setServiceId("svc-1");
-      when(dashboardRepository.findByDataSetId(dataSet.getId()))
-          .thenReturn(List.of(dashboard(UUID.randomUUID(), "Weather Overview")));
-      var jsonCaptor = stubKafkaSend();
+    @DisplayName("any other broker failure stays an internal error")
+    void otherBrokerFailureStaysInternal() {
+      DataSet dataSet = emptyDataSet();
+      stubKafkaFailure(new NotLeaderOrFollowerException("no leader"));
 
-      publisher.publishUpdateRequested(dataSet, Set.of());
-
-      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
-      assertThat(payload.get("dashboards")).isNotNull();
-      assertThat(payload.get("dashboards").size()).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("no dashboards omits the field (NON_NULL contract)")
-    void noDashboardsOmitsField() throws Exception {
-      DataSet dataSet = emptyDataset();
-      when(dashboardRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of());
-      var jsonCaptor = stubKafkaSend();
-
-      publisher.publishCreateRequested(dataSet);
-
-      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
-      assertThat(payload.has("dashboards"))
-          .as("empty dashboards must be dropped, not sent as []")
-          .isFalse();
+      assertThatThrownBy(() -> publisher.publishCreateRequested(dataSet))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessage("Failed to send saga trigger to Kafka");
     }
   }
 }

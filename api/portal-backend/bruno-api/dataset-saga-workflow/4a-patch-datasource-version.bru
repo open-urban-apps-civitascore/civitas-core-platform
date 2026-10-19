@@ -20,6 +20,12 @@ body:json {
   }
 }
 
+script:post-response {
+  if (res.body && res.body.configurationUrn) {
+    bru.setVar('sagaDataSourceConfigurationUrn', res.body.configurationUrn);
+  }
+}
+
 tests {
   test("DataSource patched or already configured", function() {
     const status = res.getStatus();

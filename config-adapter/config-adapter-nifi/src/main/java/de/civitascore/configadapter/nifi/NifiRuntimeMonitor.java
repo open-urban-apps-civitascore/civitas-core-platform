@@ -150,7 +150,6 @@ final class NifiRuntimeMonitor implements AutoCloseable {
     event.put(
         "occurredAt",
         status.occurredAt() == null ? Instant.now().toString() : status.occurredAt().toString());
-    event.put("correlationId", null);
     return event;
   }
 

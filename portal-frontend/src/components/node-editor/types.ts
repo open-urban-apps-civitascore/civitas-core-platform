@@ -1,5 +1,9 @@
 import type { LucideIcon } from 'lucide-react'
 
+import type { GroupedOption } from '@/components/select/grouped-select/GroupedSelect'
+
+import type { PortStatus } from './PortHandle'
+
 export type PortType = 'scalar' | 'geometry' | 'array' | 'object'
 
 export interface PortDef {
@@ -8,6 +12,12 @@ export interface PortDef {
   type: PortType
   /** Optional primitive subtype (e.g. str/int/date) used for cast detection. */
   dataType?: string
+  /**
+   * Input-only: the set of source subtypes this port accepts. When present, compatibility is a
+   * membership test against this list instead of exact `dataType` equality — e.g. a numeric
+   * conversion input accepts str/int/number but rejects uuid/bool/date.
+   */
+  accepts?: readonly string[]
 }
 
 export type ConfigControl = 'text' | 'number' | 'select'
@@ -24,6 +34,8 @@ export interface ConfigField {
   default?: string | number
   placeholder?: string
   options?: ConfigOption[]
+  /** Same shape as the datastructure editor's attribute-type dropdown; renders with group headings. */
+  groupedOptions?: GroupedOption[]
 }
 
 /** A single, definition-driven node type. Renders its own node, inspector and palette item. */
@@ -45,6 +57,10 @@ export interface TransformNodeData extends Record<string, unknown> {
   config: Record<string, unknown>
   inputs?: PortDef[]
   outputs?: PortDef[]
+  /** portId → status; injected for display only, never persisted. */
+  portStatus?: Record<string, PortStatus>
+  /** Injected for display only, never persisted. */
+  hasError?: boolean
 }
 
 export interface NodeRegistry<T extends TransformDef = TransformDef> {

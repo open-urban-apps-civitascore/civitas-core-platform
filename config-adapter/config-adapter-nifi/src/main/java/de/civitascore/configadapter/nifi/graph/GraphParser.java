@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/** Parses the raw {@code data} map of a pipeline entry into a {@link PipelineGraph}. */
+/** Parses the CORE Pipeline {@code data} map of a pipeline entry into a {@link PipelineGraph}. */
 public class GraphParser {
 
   /**
@@ -43,7 +43,12 @@ public class GraphParser {
       Map<String, Object> typed = (Map<String, Object>) node;
       nodes.add(
           new GraphNode(
-              asString(typed.get("id")), asString(typed.get("type")), nodeData(typed.get("data"))));
+              asString(typed.get("id")),
+              asString(typed.get("kind")),
+              asString(typed.get("sourceRef")),
+              asString(typed.get("sinkRef")),
+              asString(typed.get("mappingRef")),
+              asString(typed.get("cronExpression"))));
     }
     return List.copyOf(nodes);
   }
@@ -86,11 +91,6 @@ public class GraphParser {
             + member
             + "' must contain only objects, got: "
             + (item == null ? "null" : item.getClass().getSimpleName()));
-  }
-
-  @SuppressWarnings("unchecked")
-  private static Map<String, Object> nodeData(Object raw) {
-    return raw instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of();
   }
 
   private static String asString(Object value) {

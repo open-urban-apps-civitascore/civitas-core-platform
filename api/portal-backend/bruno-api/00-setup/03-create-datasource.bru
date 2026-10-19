@@ -14,15 +14,14 @@ body:json {
   {
     "name": "API Test DataSource",
     "description": "Base datasource for API testing",
-    "connectorType": "MQTT",
-    "configuration": {
+    "connector": {
+      "connectorType": "MQTT",
       "urls": ["tcp://broker:1883"],
       "topics": ["test/#"],
       "qos": 1,
       "keepalive": "30s",
       "user": "test",
       "password": "test",
-      "client_id": "test-client",
       "connect_timeout": "5s",
       "tls": { "enabled": false }
     },
@@ -37,6 +36,9 @@ script:post-response {
     bru.setVar('setupDataSourceId', res.body.id);
     bru.setVar('scopeType', 'DATASOURCE');
     bru.setVar('scopeId', res.body.id);
+  }
+  if (res.body && res.body.configurationUrn) {
+    bru.setVar('setupDataSourceConfigurationUrn', res.body.configurationUrn);
   }
 }
 

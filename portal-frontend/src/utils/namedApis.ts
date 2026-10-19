@@ -2,10 +2,11 @@ import proj4 from 'proj4'
 
 import { GEOJSON_REF_BASE } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import { crsOptions } from '@/const/crs'
-import { DataSink } from '@/types/datasinks'
+import { DataSink, DATASINK_TYPES } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
 import { BoundingBox, Layer, LayerApiPayload, LayerFormData } from '@/types/layers'
 import {
+  API_STANDARDS,
   ApiStandard,
   DEFAULTS_BY_TYPE,
   NamedApi,
@@ -17,6 +18,13 @@ import { Style, StyleFormData, StyleInput } from '@/types/styles'
 
 export const hasApiType = (apis: NamedApi[], apiType: ApiStandard): boolean =>
   apis.some(api => api.standard === apiType)
+
+export const canCreateStaApi = (apis: NamedApi[], dataSinks: DataSink[]): boolean =>
+  !hasApiType(apis, API_STANDARDS.STA) &&
+  dataSinks.some(dataSink => dataSink.dataSinkType === DATASINK_TYPES.FROST && dataSink.pipelineId)
+
+export const canCreateOwsApi = (apis: NamedApi[], dataSinks: DataSink[]): boolean =>
+  !hasApiType(apis, API_STANDARDS.OWS) && dataSinks.some(dataSink => dataSink.dataSinkType === DATASINK_TYPES.POSTGIS)
 
 type BoundingBoxPayload = { minX: number; minY: number; maxX: number; maxY: number; crs: string }
 
@@ -36,7 +44,10 @@ export const toBoundingBoxFormData = (bbox: BoundingBox | null) => ({
   crs: bbox?.crs ?? '',
 })
 
-export const mapApiLayerToFormData = (layers: Layer[]): LayerFormData[] =>
+export const mapApiLayerToFormData = (
+  layers: Layer[],
+  resolveNativeCRS: (dataSinkId: string) => string,
+): LayerFormData[] =>
   layers.map(layer => ({
     id: layer.id,
     title: layer.title,
@@ -46,12 +57,10 @@ export const mapApiLayerToFormData = (layers: Layer[]): LayerFormData[] =>
     attribute: layer.attribute,
     cqlFilter: layer.cqlFilter || '',
     geometryColumnRef: layer.geometryColumnRef,
-    nativeCRS: layer.nativeCRS,
-    crs: layer.crs || layer.nativeCRS,
-    bboxAutoCalculate: false,
+    nativeCRS: resolveNativeCRS(layer.dataSinkId),
+    crs: layer.crs,
     nativeBoundingBox: toBoundingBoxFormData(layer.nativeBoundingBox),
     latLonBoundingBox: toBoundingBoxFormData(layer.latLonBoundingBox),
-    keywords: layer.keywords,
     defaultStyleId: layer.defaultStyleId || '',
     alternativeStyleIds: layer.alternativeStyleIds,
   }))
@@ -78,10 +87,8 @@ export const mapFormLayerToPayload = (layers: LayerFormData[]): LayerApiPayload[
   layers.map(({ id: _id, nativeCRS: _nativeCRS, ...layer }) => ({
     ...layer,
     defaultStyleId: layer.defaultStyleId && layer.defaultStyleId !== 'none' ? layer.defaultStyleId : null,
-    nativeBoundingBox: layer.bboxAutoCalculate ? null : toBoundingBoxPayload(layer.nativeBoundingBox),
-    latLonBoundingBox: layer.bboxAutoCalculate
-      ? null
-      : toBoundingBoxPayload(computeLatLonBoundingBox(layer.nativeBoundingBox, layer.crs)),
+    nativeBoundingBox: toBoundingBoxPayload(layer.nativeBoundingBox),
+    latLonBoundingBox: toBoundingBoxPayload(computeLatLonBoundingBox(layer.nativeBoundingBox, layer.crs)),
   }))
 
 export const buildStaPayloadData = (data: StaApiFormData): NamedApiPayload => ({

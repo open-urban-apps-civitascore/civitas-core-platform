@@ -11,7 +11,6 @@ package de.civitascore.configadapter.nifi.mapping;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
-import de.civitascore.configadapter.nifi.mapping.FrostEntityPlan.FilterTerm;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
 import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaEntity;
 import de.civitascore.configadapter.nifi.mapping.StaTargetCatalog.StaJsonType;
@@ -30,7 +29,7 @@ import java.util.stream.Collectors;
 /**
  * Compiles a FROST-targeted {@link MappingConfig} — record-anchored paths of a Thing-shaped target
  * structure — into (a) flat {@code UpdateRecord} properties, one intermediate root-level record
- * field per mapped path, and (b) a {@link FrostEntityPlan}: per-entity lookup filter terms and
+ * field per mapped path, and (b) a {@link FrostPortPlan}: the one body of the selected port and
  * create-body templates the sink's linear find-or-create chain consumes.
  *
  * <p>Validation is mandatory here, not left to the runtime error sink: the saga/API path bypasses
@@ -58,6 +57,13 @@ public class FrostMappingCompiler {
    * arbitrary.
    */
   private static final int MAX_LEAF_LENGTH = 40;
+
+  /**
+   * The path every target of the {@code Observations} port is written against: the record is one
+   * measurement, so a mapping addresses {@code $.result} and {@code $.parameters.thingReference},
+   * not the Thing above them.
+   */
+  private static final String OBSERVATION_ROOT = StaEntity.OBSERVATION.pathPrefix();
 
   private final RecordPathCompiler recordPathCompiler;
 
@@ -115,21 +121,77 @@ public class FrostMappingCompiler {
   }
 
   /**
-   * The schema-derived {@code properties} bag of the mapping's Thing-shaped target structure, per
-   * entity: every attribute the bag declares, in declaration order. SensorThings keeps identifiers
-   * in {@code properties}, and so may any number of free attributes the tenant models alongside the
-   * key. Each entity's bag holds at most one {@link KeyAttribute}.
+   * The schema-derived bag of the mapping's target structure, per entity: every attribute the bag
+   * declares, in declaration order. SensorThings keeps identifiers in the entity's bag — {@code
+   * properties} everywhere but the Observation, which has {@code parameters} — and so may any
+   * number of free attributes the tenant models alongside the key. Each entity's bag holds at most
+   * one {@link KeyAttribute}.
    *
-   * @param thing the Thing's bag attributes (its match key is required for a valid FROST target)
+   * <p>Which of them carries anything follows the sink's port: a Thing-shaped structure (the {@code
+   * Things} and {@code ThingTree} ports) fills {@code thing}, {@code location} and {@code
+   * datastream}, an Observation-shaped one (the {@code Observations} port) fills {@code
+   * observation} alone.
+   *
+   * @param thing the Thing's bag attributes (its match key is required for a Thing-shaped target)
+   * @param location the Location's bag attributes (empty when the structure has no Locations class
+   *     or no properties class under it); none is required, because the port gives a Location
+   *     without a reference of its own the Thing's
    * @param datastream the Datastream's bag attributes (empty when the structure has no Datastreams
    *     class)
+   * @param observation the Observation's {@code parameters} attributes; its match key is optional,
+   *     because a measurement without one is appended rather than upserted
+   * @param modelled one target per attribute of a class the structure models under a free
+   *     SensorThings field — {@code properties}, {@code feature}, {@code resultQuality}, and a
+   *     class nested in a bag. SensorThings leaves these fields free; the structure declares their
+   *     shape, and each attribute is written into the field it sits under. Never a key, never
+   *     required.
    */
-  public record StaProperties(List<StaBagAttribute> thing, List<StaBagAttribute> datastream) {
+  public record StaProperties(
+      List<StaBagAttribute> thing,
+      List<StaBagAttribute> location,
+      List<StaBagAttribute> datastream,
+      List<StaBagAttribute> observation,
+      List<StaTarget> modelled) {
     public StaProperties {
       thing = List.copyOf(Objects.requireNonNull(thing, "thing"));
+      location = List.copyOf(Objects.requireNonNull(location, "location"));
       datastream = List.copyOf(Objects.requireNonNull(datastream, "datastream"));
+      observation = List.copyOf(Objects.requireNonNull(observation, "observation"));
+      modelled = List.copyOf(Objects.requireNonNull(modelled, "modelled"));
       requireAtMostOneKey(thing, "thing");
+      requireAtMostOneKey(location, "location");
       requireAtMostOneKey(datastream, "datastream");
+      requireAtMostOneKey(observation, "observation");
+      for (StaTarget target : modelled) {
+        if (target.kind() != TargetKind.OPTIONAL) {
+          throw new IllegalArgumentException("a modelled target is optional: " + target.path());
+        }
+      }
+    }
+
+    /** The bags alone, for a structure that models no class under a free field. */
+    public StaProperties(
+        List<StaBagAttribute> thing,
+        List<StaBagAttribute> location,
+        List<StaBagAttribute> datastream,
+        List<StaBagAttribute> observation) {
+      this(thing, location, datastream, observation, List.of());
+    }
+
+    /** The bag attributes of one entity; the FeatureOfInterest has none of its own. */
+    List<StaBagAttribute> bagOf(StaEntity entity) {
+      return switch (entity) {
+        case THING -> thing;
+        case LOCATION -> location;
+        case DATASTREAM -> datastream;
+        case OBSERVATION -> observation;
+        case FEATURE_OF_INTEREST -> List.of();
+      };
+    }
+
+    /** The modelled targets of one entity, in declaration order. */
+    List<StaTarget> modelledOf(StaEntity entity) {
+      return modelled.stream().filter(target -> target.entity() == entity).toList();
     }
 
     private static void requireAtMostOneKey(List<StaBagAttribute> bag, String entity) {
@@ -154,9 +216,19 @@ public class FrostMappingCompiler {
       return keysOf(datastream);
     }
 
-    /** A properties bag whose only attribute per entity is the named match key. */
+    public List<String> observationKeys() {
+      return keysOf(observation);
+    }
+
+    /** A Thing-shaped bag whose only attribute per entity is the named match key. */
     public static StaProperties ofKeys(List<String> thingKeys, List<String> datastreamKeys) {
-      return new StaProperties(keyAttributes(thingKeys), keyAttributes(datastreamKeys));
+      return new StaProperties(
+          keyAttributes(thingKeys), List.of(), keyAttributes(datastreamKeys), List.of());
+    }
+
+    /** An Observation-shaped bag, for the {@code Observations} port. */
+    public static StaProperties ofObservation(List<StaBagAttribute> observation) {
+      return new StaProperties(List.of(), List.of(), List.of(), observation);
     }
 
     private static List<StaBagAttribute> keyAttributes(List<String> keys) {
@@ -169,7 +241,7 @@ public class FrostMappingCompiler {
    * the entity plan (for the sink's find-or-create chain).
    */
   public record FrostCompilation(
-      List<UpdateRecordProperty> flatProperties, FrostEntityPlan plan, ForkPlan fork) {
+      List<UpdateRecordProperty> flatProperties, FrostPortPlan plan, ForkPlan fork) {
     public FrostCompilation {
       flatProperties = List.copyOf(flatProperties);
     }
@@ -198,12 +270,15 @@ public class FrostMappingCompiler {
    * @throws FatalAdapterException if a target path is outside the catalog, a touched entity misses
    *     its match key or maps its create set partially, or a constant is {@code null}
    */
-  public FrostCompilation compile(MappingConfig mapping, StaProperties properties)
+  public FrostCompilation compile(MappingConfig mapping, StaProperties properties, SinkPort port)
       throws FatalAdapterException {
-    validateKeyNames(properties);
+    validateKeyNames(properties, port);
     Map<String, StaTarget> targetsByPath = targetsByPath(properties);
-    MappingConfig normalizedMapping = normalizeTargetPaths(mapping);
-    validate(normalizedMapping, properties, targetsByPath);
+    MappingConfig normalizedMapping = rootAtPort(normalizeTargetPaths(mapping), port);
+    validate(normalizedMapping, properties, targetsByPath, port);
+    if (port != SinkPort.OBSERVATIONS) {
+      requirePortReferences(normalizedMapping, port);
+    }
 
     Map<String, String> flatKeyByPath = new LinkedHashMap<>();
     int index = 0;
@@ -223,86 +298,133 @@ public class FrostMappingCompiler {
               "/" + flatKeyByPath.get(field.getKey()), field.getValue(), fork));
     }
 
-    boolean thingCreatable = hasCompleteCreateSet(normalizedMapping, StaEntity.THING);
-    boolean datastreamCreatable = hasCompleteCreateSet(normalizedMapping, StaEntity.DATASTREAM);
-    boolean observationMapped = touches(normalizedMapping, StaEntity.OBSERVATION);
-
-    EntityBodies thingBodies =
-        renderThingBodies(
-            thingCreatable, normalizedMapping, properties, flatKeyByPath, targetsByPath);
-    String locationBody =
-        touches(normalizedMapping, StaEntity.LOCATION)
-            ? renderEntityBody(
-                normalizedMapping, StaEntity.LOCATION, List.of(), flatKeyByPath, targetsByPath)
-            : null;
-    DatastreamBodies datastreamBodies =
-        renderDatastreamBodies(
-            datastreamCreatable, normalizedMapping, properties, flatKeyByPath, targetsByPath);
-    String observationBody =
-        observationMapped
-            ? renderObservationBody(normalizedMapping, flatKeyByPath, targetsByPath)
-            : null;
-
-    List<FilterTerm> thingFilter =
-        filterTerms(properties.thingKeys(), StaEntity.THING, flatKeyByPath);
-    List<FilterTerm> datastreamFilter =
-        touchesDatastreamTier(normalizedMapping)
-            ? filterTerms(properties.datastreamKeys(), StaEntity.DATASTREAM, flatKeyByPath)
-            : List.of();
-
     return new FrostCompilation(
         flatProperties,
-        new FrostEntityPlan(
+        new FrostPortPlan(
             List.copyOf(flatKeyByPath.values()),
-            thingFilter,
-            thingBodies.create(),
-            thingBodies.update(),
-            locationBody,
-            datastreamFilter,
-            datastreamBodies.create(),
-            datastreamBodies.update(),
-            datastreamBodies.sensor(),
-            datastreamBodies.observedProperty(),
-            observationBody),
+            renderPortBody(port, normalizedMapping, properties, flatKeyByPath, targetsByPath)),
         fork);
   }
 
-  private EntityBodies renderThingBodies(
-      boolean creatable,
+  /**
+   * The body of the selected port: the structure the processor writes for one record.
+   *
+   * <p>The generated graph rendered six bodies, one for each entity it wrote in its own request.
+   * The processor writes the record in one request and decides find-or-create on the server, so the
+   * port's structure is one document.
+   */
+  private String renderPortBody(
+      SinkPort port,
+      MappingConfig mapping,
+      StaProperties properties,
+      Map<String, String> flatKeyByPath,
+      Map<String, StaTarget> targetsByPath)
+      throws FatalAdapterException {
+    return switch (port) {
+      case THINGS -> {
+        // The port writes the Thing and nothing else. Rendering the Thing alone would drop every
+        // other field of the Mapping without an error, so such a Mapping is refused.
+        if (touches(mapping, StaEntity.LOCATION) || touchesDatastreamTier(mapping)) {
+          throw reject(
+              "the Things port writes the Thing only; map Locations, Datastreams and"
+                  + " measurements into the ThingTree port");
+        }
+        yield renderObject(
+            entityTree(mapping, StaEntity.THING, properties, flatKeyByPath, targetsByPath));
+      }
+      case THING_TREE -> renderObject(portTree(mapping, properties, flatKeyByPath, targetsByPath));
+      case OBSERVATIONS ->
+          renderObject(portObservation(mapping, properties, flatKeyByPath, targetsByPath));
+    };
+  }
+
+  /**
+   * The measurement alone: the record is one Observation, and the references it carries in its
+   * {@code parameters} bag name the Datastream it belongs to. The port resolves them; nothing here
+   * writes a Thing or a Datastream.
+   */
+  private Map<String, Object> portObservation(
       MappingConfig mapping,
       StaProperties properties,
       Map<String, String> flatKeyByPath,
       Map<String, StaTarget> targetsByPath) {
-    if (!creatable) {
-      return new EntityBodies(null, null);
+    Map<String, Object> observation =
+        entityTree(mapping, StaEntity.OBSERVATION, properties, flatKeyByPath, targetsByPath);
+    if (touches(mapping, StaEntity.FEATURE_OF_INTEREST)) {
+      observation.put(
+          "FeatureOfInterest",
+          entityTree(
+              mapping, StaEntity.FEATURE_OF_INTEREST, properties, flatKeyByPath, targetsByPath));
     }
-    return new EntityBodies(
-        renderThingBody(mapping, properties, flatKeyByPath, targetsByPath),
-        renderThingUpdateBody(mapping, properties, flatKeyByPath, targetsByPath));
+    return observation;
   }
 
-  private DatastreamBodies renderDatastreamBodies(
-      boolean creatable,
+  /** The full chain: the Thing with its Location, its Datastream and one measurement. */
+  private Map<String, Object> portTree(
       MappingConfig mapping,
       StaProperties properties,
       Map<String, String> flatKeyByPath,
       Map<String, StaTarget> targetsByPath) {
     Map<String, Object> tree =
-        entityTree(
-            mapping, StaEntity.DATASTREAM, properties.datastream(), flatKeyByPath, targetsByPath);
-    return new DatastreamBodies(
-        creatable ? renderDatastreamBody(tree) : null,
-        creatable ? renderDatastreamUpdateBody(tree) : null,
-        renderNestedBody(tree, "Sensor"),
-        renderNestedBody(tree, "ObservedProperty"));
+        entityTree(mapping, StaEntity.THING, properties, flatKeyByPath, targetsByPath);
+    if (touches(mapping, StaEntity.LOCATION)) {
+      tree.put(
+          "Locations",
+          List.of(
+              entityTree(mapping, StaEntity.LOCATION, properties, flatKeyByPath, targetsByPath)));
+    }
+    if (!touchesDatastreamTier(mapping)) {
+      return tree;
+    }
+    // entityTree nests the Sensor and the ObservedProperty of the Datastream already.
+    Map<String, Object> datastream =
+        entityTree(mapping, StaEntity.DATASTREAM, properties, flatKeyByPath, targetsByPath);
+    if (touches(mapping, StaEntity.OBSERVATION)) {
+      Map<String, Object> observation =
+          entityTree(mapping, StaEntity.OBSERVATION, properties, flatKeyByPath, targetsByPath);
+      if (touches(mapping, StaEntity.FEATURE_OF_INTEREST)) {
+        observation.put(
+            "FeatureOfInterest",
+            entityTree(
+                mapping, StaEntity.FEATURE_OF_INTEREST, properties, flatKeyByPath, targetsByPath));
+      }
+      datastream.put("Observations", List.of(observation));
+    }
+    tree.put("Datastreams", List.of(datastream));
+    return tree;
   }
 
-  private record EntityBodies(String create, String update) {}
-
-  private record DatastreamBodies(
-      String create, String update, String sensor, String observedProperty) {}
-
   // ─── Mapping normalization ──────────────────────────────────────────────────
+
+  /**
+   * Rebases a mapping written against the port's own record root onto the catalog, which is rooted
+   * at the Thing. Only the {@code Observations} port needs it: its published structure is the
+   * measurement itself, so {@code $.result} means {@code $.Datastreams[].Observations[].result}.
+   * Everything after this point — validation, the body tree, the template — sees one vocabulary.
+   */
+  private MappingConfig rootAtPort(MappingConfig mapping, SinkPort port)
+      throws FatalAdapterException {
+    if (port != SinkPort.OBSERVATIONS) {
+      return mapping;
+    }
+    Map<String, ValueNode> rebased = new LinkedHashMap<>();
+    for (Map.Entry<String, ValueNode> field : mapping.fields().entrySet()) {
+      String path = field.getKey();
+      if (!path.startsWith("$.")) {
+        throw reject("a FROST mapping target path must start with '$.', got: '" + path + "'");
+      }
+      rebased.put(OBSERVATION_ROOT + path.substring(1), field.getValue());
+    }
+    return new MappingConfig(mapping.source(), mapping.target(), rebased);
+  }
+
+  /** A target path as the mapping author wrote it — the inverse of {@link #rootAtPort}. */
+  private static String display(String path, SinkPort port) {
+    if (port != SinkPort.OBSERVATIONS || !path.startsWith(OBSERVATION_ROOT + ".")) {
+      return path;
+    }
+    return "$" + path.substring(OBSERVATION_ROOT.length());
+  }
 
   /**
    * Model schemas commonly expose relationship edges in lower camel case (for example, {@code
@@ -337,7 +459,8 @@ public class FrostMappingCompiler {
       if (!inPropertiesBag && isEdgeSegment(segment)) {
         segment = normalizeEdgeSegment(segment);
       }
-      if ("properties".equals(segment)) {
+      if ("properties".equals(segment) || "parameters".equals(segment)) {
+        // Inside a bag every segment is a tenant attribute name, never a navigation edge.
         inPropertiesBag = true;
       }
       if (!normalized.isEmpty()) {
@@ -379,7 +502,13 @@ public class FrostMappingCompiler {
 
   // ─── Validation ─────────────────────────────────────────────────────────────
 
-  private void validateKeyNames(StaProperties properties) throws FatalAdapterException {
+  private void validateKeyNames(StaProperties properties, SinkPort port)
+      throws FatalAdapterException {
+    if (port == SinkPort.OBSERVATIONS) {
+      // A measurement needs no key of its own: without one the port appends it, which is what a
+      // time series wants. A structure that declares one turns the append into an upsert.
+      return;
+    }
     // Attribute-name shape (safe identifier, not the reserved 'properties') is enforced at the
     // StaBagAttribute boundary; the only domain rule left is that the Thing must declare a key.
     if (properties.thingKeys().isEmpty()) {
@@ -391,34 +520,33 @@ public class FrostMappingCompiler {
   }
 
   /**
-   * The full targetable vocabulary: the fixed catalog paths plus one schema-derived target per
-   * {@code properties} bag attribute of the Thing and Datastream ({@code KEY} for the match key,
-   * {@code OPTIONAL} for the free attributes, each carrying its modelled JSON type).
+   * The full targetable vocabulary: the fixed catalog paths plus one schema-derived target per bag
+   * attribute of the Thing, the Location, the Datastream and the Observation ({@code KEY} for the
+   * match key, {@code OPTIONAL} for the free attributes, each carrying its modelled JSON type).
    */
   private Map<String, StaTarget> targetsByPath(StaProperties properties) {
     Map<String, StaTarget> byPath = new LinkedHashMap<>();
-    for (StaTarget target : bagTargets(StaEntity.THING, properties.thing())) {
-      byPath.put(target.path(), target);
-    }
-    for (StaTarget target : StaTargetCatalog.targetsOf(StaEntity.THING)) {
-      byPath.putIfAbsent(target.path(), target);
-    }
-    for (StaTarget target : StaTargetCatalog.targetsOf(StaEntity.LOCATION)) {
-      byPath.put(target.path(), target);
-    }
-    for (StaTarget target : bagTargets(StaEntity.DATASTREAM, properties.datastream())) {
-      byPath.put(target.path(), target);
-    }
-    for (StaTarget target : StaTargetCatalog.targetsOf(StaEntity.DATASTREAM)) {
-      byPath.putIfAbsent(target.path(), target);
-    }
-    for (StaTarget target : StaTargetCatalog.targetsOf(StaEntity.OBSERVATION)) {
-      byPath.put(target.path(), target);
-    }
-    for (StaTarget target : StaTargetCatalog.targetsOf(StaEntity.FEATURE_OF_INTEREST)) {
-      byPath.put(target.path(), target);
+    for (StaEntity entity : StaEntity.values()) {
+      addTier(byPath, entity, properties);
     }
     return byPath;
+  }
+
+  /**
+   * The targets of one entity: its schema-derived bag attributes first, then the fixed catalog
+   * paths, then the attributes of the classes modelled under its free fields — a bag attribute
+   * keeps its type, and neither the catalog nor a modelled class overwrites a path already there.
+   */
+  private void addTier(Map<String, StaTarget> byPath, StaEntity entity, StaProperties properties) {
+    for (StaTarget target : bagTargets(entity, properties.bagOf(entity))) {
+      byPath.put(target.path(), target);
+    }
+    for (StaTarget target : StaTargetCatalog.targetsOf(entity)) {
+      byPath.putIfAbsent(target.path(), target);
+    }
+    for (StaTarget target : properties.modelledOf(entity)) {
+      byPath.putIfAbsent(target.path(), target);
+    }
   }
 
   /**
@@ -438,13 +566,27 @@ public class FrostMappingCompiler {
   }
 
   private void validate(
-      MappingConfig mapping, StaProperties properties, Map<String, StaTarget> targetsByPath)
+      MappingConfig mapping,
+      StaProperties properties,
+      Map<String, StaTarget> targetsByPath,
+      SinkPort port)
       throws FatalAdapterException {
     if (mapping.fields().isEmpty()) {
-      throw reject("a FROST mapping must map at least the Thing's match key");
+      throw reject(
+          port == SinkPort.OBSERVATIONS
+              ? "a FROST mapping must map at least the measurement and its references"
+              : "a FROST mapping must map at least the Thing's match key");
     }
-    validateFieldEntries(mapping, targetsByPath);
+    validateFieldEntries(mapping, targetsByPath, port);
 
+    if (port == SinkPort.OBSERVATIONS) {
+      // The port writes the measurement and nothing else: the Thing and the Datastream are
+      // resolved from the references the record carries, so neither has a create set here.
+      requirePortTargets(mapping, port);
+      validateObservation(mapping);
+      validateFeatureOfInterest(mapping);
+      return;
+    }
     requireKeys(mapping, properties.thingKeys(), StaEntity.THING);
     requireCompleteCreateSet(mapping, StaEntity.THING);
     validateLocation(mapping);
@@ -453,15 +595,33 @@ public class FrostMappingCompiler {
     validateFeatureOfInterest(mapping);
   }
 
-  private void validateFieldEntries(MappingConfig mapping, Map<String, StaTarget> targetsByPath)
+  /** The paths the port cannot resolve a record without. */
+  private void requirePortTargets(MappingConfig mapping, SinkPort port)
+      throws FatalAdapterException {
+    String missing =
+        port.requiredTargets().stream()
+            .filter(target -> !mapping.fields().containsKey(OBSERVATION_ROOT + target.substring(1)))
+            .collect(Collectors.joining(", "));
+    if (!missing.isEmpty()) {
+      throw reject(
+          "a mapping into the "
+              + port.label()
+              + " port must map: "
+              + missing
+              + " — the port finds the Datastream of the measurement by those references");
+    }
+  }
+
+  private void validateFieldEntries(
+      MappingConfig mapping, Map<String, StaTarget> targetsByPath, SinkPort port)
       throws FatalAdapterException {
     for (Map.Entry<String, ValueNode> field : mapping.fields().entrySet()) {
       if (!targetsByPath.containsKey(field.getKey())) {
         throw reject(
             "unsupported FROST mapping target path: '"
-                + field.getKey()
+                + display(field.getKey(), port)
                 + "'; supported paths are: "
-                + supportedPaths(targetsByPath));
+                + supportedPaths(targetsByPath, port));
       }
       if (field.getValue() instanceof ConstNode constant && constant.value() == null) {
         // EvaluateJsonPath cannot distinguish a null constant from a missing value, and the
@@ -518,6 +678,43 @@ public class FrostMappingCompiler {
               + " into the observation body");
     }
     requireCompleteCreateSet(mapping, StaEntity.FEATURE_OF_INTEREST);
+    // FROST refuses a FeatureOfInterest without its feature, and the field is free in
+    // SensorThings: it is mappable only when the structure models it, as a class or a geometry.
+    String feature = StaEntity.FEATURE_OF_INTEREST.pathOf("feature");
+    boolean mapsFeature =
+        mapping.fields().keySet().stream()
+            .anyMatch(path -> path.equals(feature) || path.startsWith(feature + "."));
+    if (!mapsFeature) {
+      throw reject(
+          "a mapped FeatureOfInterest must map its feature — FROST refuses one without; model"
+              + " feature in the target structure as a class or a geometry and map it, or map no"
+              + " FeatureOfInterest and let FROST derive one from the Location of the Thing");
+    }
+  }
+
+  /**
+   * The references the port resolves. The processor finds a Thing and a Datastream by {@code
+   * properties.reference}, whatever match key the target structure declares, so a Mapping that does
+   * not write it deploys a flow that refuses every record.
+   */
+  private void requirePortReferences(MappingConfig mapping, SinkPort port)
+      throws FatalAdapterException {
+    List<String> required = new ArrayList<>(port.requiredTargets());
+    if (port == SinkPort.THING_TREE && touchesDatastreamTier(mapping)) {
+      required.add(StaTargetCatalog.keyPath(StaEntity.DATASTREAM, "reference"));
+    }
+    String missing =
+        required.stream()
+            .filter(target -> !mapping.fields().containsKey(target))
+            .collect(Collectors.joining(", "));
+    if (!missing.isEmpty()) {
+      throw reject(
+          "a mapping into the "
+              + port.label()
+              + " port must map: "
+              + missing
+              + " — the port finds the entities by those references");
+    }
   }
 
   /** Every match-key path of the entity must be mapped once the entity is touched at all. */
@@ -567,25 +764,34 @@ public class FrostMappingCompiler {
     }
   }
 
-  private boolean isDatastreamNavigationTarget(StaTarget target) {
-    return target.path().contains(".Sensor.") || target.path().contains(".ObservedProperty.");
-  }
-
-  private boolean hasCompleteCreateSet(MappingConfig mapping, StaEntity entity) {
-    List<StaTarget> createSet = createTargets(entity);
-    return !createSet.isEmpty()
-        && createSet.stream().allMatch(t -> mapping.fields().containsKey(t.path()));
-  }
-
   private List<StaTarget> createTargets(StaEntity entity) {
     return StaTargetCatalog.targetsOf(entity).stream()
         .filter(t -> t.kind() == TargetKind.CREATE)
         .toList();
   }
 
+  /**
+   * Whether the mapping writes the entity at all: any of its paths counts, a fixed one, a bag
+   * attribute or an attribute of a modelled class. A Location reference alone still selects the
+   * Location to write, and a modelled feature alone still belongs to its FeatureOfInterest.
+   */
   private boolean touches(MappingConfig mapping, StaEntity entity) {
-    return StaTargetCatalog.targetsOf(entity).stream()
-        .anyMatch(t -> mapping.fields().containsKey(t.path()));
+    return mapping.fields().keySet().stream().anyMatch(path -> entityOf(path) == entity);
+  }
+
+  /**
+   * The entity a path belongs to: the one with the longest prefix of the path. Every mapped path is
+   * a target of the vocabulary by the time this is asked, so the prefix decides it alone.
+   */
+  private static StaEntity entityOf(String path) {
+    StaEntity owner = StaEntity.THING;
+    for (StaEntity entity : StaEntity.values()) {
+      boolean under = path.startsWith(entity.pathPrefix() + ".");
+      if (under && entity.pathPrefix().length() > owner.pathPrefix().length()) {
+        owner = entity;
+      }
+    }
+    return owner;
   }
 
   /**
@@ -593,156 +799,83 @@ public class FrostMappingCompiler {
    * observation is mapped (an observation always implies its datastream must be found first). A
    * FeatureOfInterest never widens this — it may only be mapped alongside an observation.
    */
+  private boolean isDatastreamNavigationTarget(StaTarget target) {
+    return target.path().contains(".Sensor.") || target.path().contains(".ObservedProperty.");
+  }
+
   private boolean touchesDatastreamTier(MappingConfig mapping) {
     return touches(mapping, StaEntity.DATASTREAM) || touches(mapping, StaEntity.OBSERVATION);
   }
 
-  private String supportedPaths(Map<String, StaTarget> targetsByPath) {
-    return String.join(", ", targetsByPath.keySet());
-  }
-
-  // ─── Filters ────────────────────────────────────────────────────────────────
-
-  private List<FilterTerm> filterTerms(
-      List<String> keys, StaEntity entity, Map<String, String> flatKeyByPath) {
-    return keys.stream()
-        .map(
-            key ->
-                new FilterTerm(
-                    "properties/" + key, flatKeyByPath.get(StaTargetCatalog.keyPath(entity, key))))
-        .toList();
+  /**
+   * The vocabulary the message offers, written the way the author writes it. For the {@code
+   * Observations} port that is the measurement's own tier alone — a Thing path is not a typo there
+   * but a different port.
+   */
+  private String supportedPaths(Map<String, StaTarget> targetsByPath, SinkPort port) {
+    if (port != SinkPort.OBSERVATIONS) {
+      return String.join(", ", targetsByPath.keySet());
+    }
+    return targetsByPath.values().stream()
+        .filter(
+            target ->
+                target.entity() == StaEntity.OBSERVATION
+                    || target.entity() == StaEntity.FEATURE_OF_INTEREST)
+        .map(target -> display(target.path(), port))
+        .collect(Collectors.joining(", "));
   }
 
   // ─── Body templates ─────────────────────────────────────────────────────────
 
-  private String renderThingBody(
-      MappingConfig mapping,
-      StaProperties properties,
-      Map<String, String> flatKeyByPath,
-      Map<String, StaTarget> targetsByPath) {
-    Map<String, Object> tree =
-        entityTree(mapping, StaEntity.THING, properties.thing(), flatKeyByPath, targetsByPath);
-    if (touches(mapping, StaEntity.LOCATION)) {
-      Map<String, Object> location =
-          entityTree(mapping, StaEntity.LOCATION, List.of(), flatKeyByPath, targetsByPath);
-      tree.put("Locations", List.of(location));
-    }
-    return renderObject(tree);
-  }
-
-  private String renderThingUpdateBody(
-      MappingConfig mapping,
-      StaProperties properties,
-      Map<String, String> flatKeyByPath,
-      Map<String, StaTarget> targetsByPath) {
-    return renderObject(
-        entityTree(mapping, StaEntity.THING, properties.thing(), flatKeyByPath, targetsByPath));
-  }
-
-  private String renderDatastreamBody(Map<String, Object> source) {
-    Map<String, Object> tree = deepCopy(source);
-    tree.put("Thing", Map.of("@iot.id", "${" + FrostEntityPlan.THING_ID_ATTRIBUTE + "}"));
-    return renderObject(tree);
-  }
-
-  private String renderDatastreamUpdateBody(Map<String, Object> source) {
-    Map<String, Object> tree = deepCopy(source);
-    // Sensor and ObservedProperty are navigation entities. They are valid deep inserts during the
-    // Datastream POST, but FROST does not accept them as nested updates on PATCH /Datastreams(id).
-    tree.remove("Sensor");
-    tree.remove("ObservedProperty");
-    return renderObject(tree);
-  }
-
-  private String renderEntityBody(
-      MappingConfig mapping,
-      StaEntity entity,
-      List<StaBagAttribute> bag,
-      Map<String, String> flatKeyByPath,
-      Map<String, StaTarget> targetsByPath) {
-    return renderObject(entityTree(mapping, entity, bag, flatKeyByPath, targetsByPath));
-  }
-
-  @SuppressWarnings("unchecked")
-  private String renderNestedBody(Map<String, Object> tree, String name) {
-    Object nested = tree.get(name);
-    return nested instanceof Map<?, ?> map ? renderObject((Map<String, Object>) map) : null;
-  }
-
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> deepCopy(Map<String, Object> source) {
-    Map<String, Object> copy = new LinkedHashMap<>();
-    for (Map.Entry<String, Object> entry : source.entrySet()) {
-      Object value = entry.getValue();
-      copy.put(
-          entry.getKey(),
-          value instanceof Map<?, ?> map ? deepCopy((Map<String, Object>) map) : value);
-    }
-    return copy;
-  }
-
-  private String renderObservationBody(
-      MappingConfig mapping,
-      Map<String, String> flatKeyByPath,
-      Map<String, StaTarget> targetsByPath) {
-    Map<String, Object> tree =
-        entityTree(mapping, StaEntity.OBSERVATION, List.of(), flatKeyByPath, targetsByPath);
-    if (touches(mapping, StaEntity.FEATURE_OF_INTEREST)) {
-      tree.put(
-          "FeatureOfInterest",
-          entityTree(
-              mapping, StaEntity.FEATURE_OF_INTEREST, List.of(), flatKeyByPath, targetsByPath));
-    }
-    tree.put("Datastream", Map.of("@iot.id", "${" + FrostEntityPlan.DS_ID_ATTRIBUTE + "}"));
-    return renderObject(tree);
-  }
-
   /**
-   * The entity's body tree: fixed fields in catalog order, then the mapped {@code properties} bag
-   * attributes (the match key — a created entity must carry it, or the next message could never
-   * find it — plus any free attributes the tenant mapped, in declaration order). Leaves are
-   * rendered placeholders; inner nodes are the static intermediate objects (unitOfMeasurement,
-   * Sensor, …).
+   * The entity's body tree: fixed fields in catalog order, then the attributes of the classes
+   * modelled under its free fields, then the mapped bag attributes (the match key — a created
+   * entity must carry it, or the next message could never find it — plus any free attributes the
+   * tenant mapped, in declaration order). Leaves are rendered placeholders; inner nodes are the
+   * intermediate objects (unitOfMeasurement, Sensor, a modelled class, the bag).
    */
   private Map<String, Object> entityTree(
       MappingConfig mapping,
       StaEntity entity,
-      List<StaBagAttribute> bag,
+      StaProperties properties,
       Map<String, String> flatKeyByPath,
       Map<String, StaTarget> targetsByPath) {
     Map<String, Object> tree = new LinkedHashMap<>();
-    for (StaTarget target : StaTargetCatalog.targetsOf(entity)) {
+    List<StaTarget> targets = new ArrayList<>(StaTargetCatalog.targetsOf(entity));
+    targets.addAll(properties.modelledOf(entity));
+    for (StaTarget target : targets) {
       if (!mapping.fields().containsKey(target.path())) {
         continue;
       }
       String placeholder =
           placeholder(
               target, flatKeyByPath.get(target.path()), mapping.fields().get(target.path()));
-      String[] segments = target.relativePath().split("\\.");
-      Map<String, Object> node = tree;
-      for (int i = 0; i < segments.length - 1; i++) {
-        @SuppressWarnings("unchecked")
-        Map<String, Object> child =
-            (Map<String, Object>) node.computeIfAbsent(segments[i], k -> new LinkedHashMap<>());
-        node = child;
-      }
-      node.put(segments[segments.length - 1], placeholder);
+      putAt(tree, target.relativePath().split("\\."), placeholder);
     }
-    Map<String, Object> properties = new LinkedHashMap<>();
-    for (StaBagAttribute attr : bag) {
+    for (StaBagAttribute attr : properties.bagOf(entity)) {
       String path = StaTargetCatalog.keyPath(entity, attr.name());
       if (!mapping.fields().containsKey(path)) {
         continue;
       }
-      properties.put(
-          attr.name(),
+      // 'properties' on every entity but the Observation, which carries 'parameters' instead. A
+      // class modelled inside the bag may have opened it already.
+      putAt(
+          tree,
+          new String[] {StaTargetCatalog.bagOf(entity), attr.name()},
           placeholder(
               targetsByPath.get(path), flatKeyByPath.get(path), mapping.fields().get(path)));
     }
-    if (!properties.isEmpty()) {
-      tree.put("properties", properties);
-    }
     return tree;
+  }
+
+  /** Puts a leaf under the given segments, opening every inner object it does not find. */
+  @SuppressWarnings("unchecked")
+  private static void putAt(Map<String, Object> tree, String[] segments, Object leaf) {
+    Map<String, Object> node = tree;
+    for (int i = 0; i < segments.length - 1; i++) {
+      node = (Map<String, Object>) node.computeIfAbsent(segments[i], k -> new LinkedHashMap<>());
+    }
+    node.put(segments[segments.length - 1], leaf);
   }
 
   private String renderObject(Map<String, Object> tree) {
@@ -800,13 +933,13 @@ public class FrostMappingCompiler {
   /**
    * Whether an {@code any}-typed value serializes unquoted (JSON number/boolean): {@code
    * toInt}/{@code toFloat} coerce to a number, a constant carries its literal's JSON type;
-   * everything else (copy/concat/toString/format/toDate) renders as a string.
+   * everything else (copy/concat/toString/format/toDateTime/toDate/toUuid) renders as a string.
    */
   private boolean inferredUnquoted(ValueNode node) {
     if (node instanceof ConvertNode convert) {
       return switch (convert.op()) {
         case TO_INT, TO_FLOAT -> true;
-        case TO_DATE, FORMAT, TO_STRING -> false;
+        case TO_DATE_TIME, TO_DATE, FORMAT, TO_STRING, TO_UUID -> false;
       };
     }
     return node instanceof ConstNode constant

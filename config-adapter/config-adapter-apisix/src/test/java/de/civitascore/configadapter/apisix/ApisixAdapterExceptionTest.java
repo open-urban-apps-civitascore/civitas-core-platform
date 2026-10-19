@@ -13,7 +13,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -34,15 +33,12 @@ import de.civitascore.configadapter.model.Metadata;
 import de.civitascore.configadapter.model.Operation;
 import de.civitascore.configadapter.model.Payload;
 import de.civitascore.configadapter.model.apisix.ApisixConfigValue;
-import jakarta.ws.rs.ProcessingException;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.client.Invocation;
-import jakarta.ws.rs.client.WebTarget;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.Map;
+import mockwebserver3.MockResponse;
+import mockwebserver3.MockWebServer;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -57,38 +53,27 @@ class ApisixAdapterExceptionTest {
 
   private ApisixAdapter adapter;
   private AdapterConfig mockConfig;
-  private Client mockClient;
-  private WebTarget mockTarget;
-  private WebTarget mockPathTarget;
-  private Invocation.Builder mockBuilder;
-  private Response mockResponse;
+  private MockWebServer server;
 
   @BeforeEach
-  void setUp() {
+  void setUp() throws IOException {
     adapter = new ApisixAdapter();
     mockConfig = mock(AdapterConfig.class);
+    server = new MockWebServer();
+    server.start();
 
     when(mockConfig.getProperty("apisix.topics")).thenReturn("de.civitascore.api.backend.created");
     when(mockConfig.getProperty("apisix.admin.url", "http://localhost:9180"))
-        .thenReturn("http://localhost:9180");
+        .thenReturn(server.url("/").toString());
     when(mockConfig.getProperty("apisix.admin.key")).thenReturn("test-api-key");
 
-    // Mock the JAX-RS Client fluent API chain
-    mockClient = mock(Client.class);
-    mockTarget = mock(WebTarget.class);
-    mockPathTarget = mock(WebTarget.class);
-    mockBuilder = mock(Invocation.Builder.class);
-    mockResponse = mock(Response.class);
-
-    when(mockClient.target(any(String.class))).thenReturn(mockTarget);
-    when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
-    when(mockPathTarget.resolveTemplate(any(String.class), any())).thenReturn(mockPathTarget);
-    when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
-    when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
-
-    adapter.setClient(mockClient);
     adapter.initialize(mockConfig);
     adapter.setEventPublisher(mock(EventPublisher.class));
+  }
+
+  @AfterEach
+  void tearDownServer() throws IOException {
+    server.close();
   }
 
   @Nested
@@ -96,10 +81,10 @@ class ApisixAdapterExceptionTest {
   class NetworkErrorTests {
 
     @Test
-    @DisplayName("shouldThrowRetryableOnNetworkError - ProcessingException triggers retry")
-    void shouldThrowRetryableOnNetworkError() {
-      when(mockBuilder.post(any(Entity.class)))
-          .thenThrow(new ProcessingException("Connection refused"));
+    @DisplayName("shouldThrowRetryableOnNetworkError - connection failure triggers retry")
+    void shouldThrowRetryableOnNetworkError() throws IOException {
+      // Torn down before the request is even made: the connection attempt itself fails.
+      server.close();
 
       ConfigEvent event =
           createConfigEvent(Operation.CREATE, "upstreams", Map.of("type", "roundrobin"));
@@ -115,9 +100,9 @@ class ApisixAdapterExceptionTest {
 
     @Test
     @DisplayName("shouldThrowRetryableOnNetworkErrorForUpdate")
-    void shouldThrowRetryableOnNetworkErrorForUpdate() {
-      when(mockBuilder.put(any(Entity.class)))
-          .thenThrow(new ProcessingException("Connection timeout"));
+    void shouldThrowRetryableOnNetworkErrorForUpdate() throws IOException {
+      // Torn down before the request is even made: the connection attempt itself fails.
+      server.close();
 
       ConfigEvent event =
           createConfigEvent(Operation.UPDATE, "upstreams/test-id", Map.of("type", "roundrobin"));
@@ -132,8 +117,9 @@ class ApisixAdapterExceptionTest {
 
     @Test
     @DisplayName("shouldThrowRetryableOnNetworkErrorForDelete")
-    void shouldThrowRetryableOnNetworkErrorForDelete() {
-      when(mockBuilder.delete()).thenThrow(new ProcessingException("Network unreachable"));
+    void shouldThrowRetryableOnNetworkErrorForDelete() throws IOException {
+      // Torn down before the request is even made: the connection attempt itself fails.
+      server.close();
 
       ConfigEvent event = createConfigEvent(Operation.DELETE, "upstreams/test-id", null);
 
@@ -153,9 +139,7 @@ class ApisixAdapterExceptionTest {
     @Test
     @DisplayName("shouldThrowRetryableOn5xxResponse - HTTP 503 triggers retry")
     void shouldThrowRetryableOn5xxResponse() {
-      when(mockResponse.getStatus()).thenReturn(503);
-      when(mockResponse.readEntity(String.class)).thenReturn("Service Unavailable");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(503).body("Service Unavailable").build());
 
       ConfigEvent event =
           createConfigEvent(Operation.CREATE, "upstreams", Map.of("type", "roundrobin"));
@@ -172,9 +156,7 @@ class ApisixAdapterExceptionTest {
     @Test
     @DisplayName("shouldThrowRetryableOn500Response")
     void shouldThrowRetryableOn500Response() {
-      when(mockResponse.getStatus()).thenReturn(500);
-      when(mockResponse.readEntity(String.class)).thenReturn("Internal Server Error");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(500).body("Internal Server Error").build());
 
       ConfigEvent event =
           createConfigEvent(Operation.CREATE, "upstreams", Map.of("type", "roundrobin"));
@@ -190,9 +172,7 @@ class ApisixAdapterExceptionTest {
     @Test
     @DisplayName("shouldThrowRetryableOn502Response")
     void shouldThrowRetryableOn502Response() {
-      when(mockResponse.getStatus()).thenReturn(502);
-      when(mockResponse.readEntity(String.class)).thenReturn("Bad Gateway");
-      when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(502).body("Bad Gateway").build());
 
       ConfigEvent event =
           createConfigEvent(Operation.UPDATE, "routes/test-id", Map.of("uri", "/api"));
@@ -213,9 +193,7 @@ class ApisixAdapterExceptionTest {
     @Test
     @DisplayName("shouldThrowFatalOn4xxResponse - HTTP 400 goes to DLQ")
     void shouldThrowFatalOn4xxResponse() {
-      when(mockResponse.getStatus()).thenReturn(400);
-      when(mockResponse.readEntity(String.class)).thenReturn("Invalid configuration");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(400).body("Invalid configuration").build());
 
       ConfigEvent event =
           createConfigEvent(Operation.CREATE, "upstreams", Map.of("type", "invalid"));
@@ -231,9 +209,7 @@ class ApisixAdapterExceptionTest {
     @Test
     @DisplayName("shouldThrowFatalOn404Response")
     void shouldThrowFatalOn404Response() {
-      when(mockResponse.getStatus()).thenReturn(404);
-      when(mockResponse.readEntity(String.class)).thenReturn("Route not found");
-      when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(404).body("Route not found").build());
 
       ConfigEvent event =
           createConfigEvent(Operation.UPDATE, "routes/nonexistent", Map.of("uri", "/api"));
@@ -250,8 +226,7 @@ class ApisixAdapterExceptionTest {
     @DisplayName("createUpstreamWithConflictReturnsSuccess")
     void createUpstreamWithConflictReturnsSuccess()
         throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(409);
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(409).build());
 
       EventPublisher publisher = mock(EventPublisher.class);
       adapter.setEventPublisher(publisher);
@@ -269,8 +244,7 @@ class ApisixAdapterExceptionTest {
     @DisplayName("deleteUpstreamNotFoundReturnsSuccess")
     void deleteUpstreamNotFoundReturnsSuccess()
         throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(404);
-      when(mockBuilder.delete()).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(404).build());
 
       EventPublisher publisher = mock(EventPublisher.class);
       adapter.setEventPublisher(publisher);
@@ -287,8 +261,7 @@ class ApisixAdapterExceptionTest {
     @DisplayName("deleteRouteNotFoundReturnsSuccess")
     void deleteRouteNotFoundReturnsSuccess()
         throws FatalAdapterException, RetryableAdapterException {
-      when(mockResponse.getStatus()).thenReturn(404);
-      when(mockBuilder.delete()).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(404).build());
 
       EventPublisher publisher = mock(EventPublisher.class);
       adapter.setEventPublisher(publisher);
@@ -325,9 +298,9 @@ class ApisixAdapterExceptionTest {
 
     @Test
     @DisplayName("shouldThrowRetryableOnRouteNetworkError")
-    void shouldThrowRetryableOnRouteNetworkError() {
-      when(mockBuilder.post(any(Entity.class)))
-          .thenThrow(new ProcessingException("Connection refused"));
+    void shouldThrowRetryableOnRouteNetworkError() throws IOException {
+      // Torn down before the request is even made: the connection attempt itself fails.
+      server.close();
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "routes", Map.of("uri", "/api"));
 
@@ -342,9 +315,7 @@ class ApisixAdapterExceptionTest {
     @Test
     @DisplayName("shouldThrowFatalOnRouteClientError")
     void shouldThrowFatalOnRouteClientError() {
-      when(mockResponse.getStatus()).thenReturn(400);
-      when(mockResponse.readEntity(String.class)).thenReturn("Invalid route config");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(400).body("Invalid route config").build());
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "routes", Map.of("uri", "invalid"));
 
@@ -362,8 +333,9 @@ class ApisixAdapterExceptionTest {
 
     @Test
     @DisplayName("retryableExceptionShouldBeRetryable")
-    void retryableExceptionShouldBeRetryable() {
-      when(mockBuilder.post(any(Entity.class))).thenThrow(new ProcessingException("Network error"));
+    void retryableExceptionShouldBeRetryable() throws IOException {
+      // Torn down before the request is even made: the connection attempt itself fails.
+      server.close();
 
       ConfigEvent event =
           createConfigEvent(Operation.CREATE, "upstreams", Map.of("type", "roundrobin"));
@@ -378,9 +350,7 @@ class ApisixAdapterExceptionTest {
     @Test
     @DisplayName("fatalExceptionShouldNotBeRetryable")
     void fatalExceptionShouldNotBeRetryable() {
-      when(mockResponse.getStatus()).thenReturn(400);
-      when(mockResponse.readEntity(String.class)).thenReturn("Bad Request");
-      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+      server.enqueue(new MockResponse.Builder().code(400).body("Bad Request").build());
 
       ConfigEvent event =
           createConfigEvent(Operation.CREATE, "upstreams", Map.of("type", "invalid"));

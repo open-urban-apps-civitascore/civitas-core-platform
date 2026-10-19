@@ -184,32 +184,6 @@ public class ConfigEventPublisherService {
   }
 
   /**
-   * Publishes a USER_UPDATED event.
-   *
-   * @param realm the Keycloak realm name
-   * @param userConfig the user configuration payload
-   * @return a future for the config adapter result
-   */
-  public CompletableFuture<ConfigResultEvent> publishUserUpdated(
-      String realm, ConfigValue userConfig) {
-    return publishConfigEvent(
-        Topics.USER_UPDATED, "user", realm, Operation.UPDATE, "/users", userConfig);
-  }
-
-  /**
-   * Publishes a USER_DELETED event.
-   *
-   * @param realm the Keycloak realm name
-   * @param userConfig the user configuration payload
-   * @return a future for the config adapter result
-   */
-  public CompletableFuture<ConfigResultEvent> publishUserDeleted(
-      String realm, ConfigValue userConfig) {
-    return publishConfigEvent(
-        Topics.USER_DELETED, "user", realm, Operation.DELETE, "/users", userConfig);
-  }
-
-  /**
    * Publishes a GROUP_CREATED event.
    *
    * @param realm the Keycloak realm name
@@ -233,57 +207,5 @@ public class ConfigEventPublisherService {
       String realm, ConfigValue groupConfig) {
     return publishConfigEvent(
         Topics.GROUP_UPDATED, "group", realm, Operation.UPDATE, "/groups", groupConfig);
-  }
-
-  /**
-   * Publishes a GROUP_DELETED event.
-   *
-   * @param realm the Keycloak realm name
-   * @param groupConfig the group configuration payload
-   * @return a future for the config adapter result
-   */
-  public CompletableFuture<ConfigResultEvent> publishGroupDeleted(
-      String realm, ConfigValue groupConfig) {
-    return publishConfigEvent(
-        Topics.GROUP_DELETED, "group", realm, Operation.DELETE, "/groups", groupConfig);
-  }
-
-  /**
-   * Publishes a ROLE_CREATED event.
-   *
-   * @param realm the Keycloak realm name
-   * @param roleConfig the role configuration payload
-   * @return a future for the config adapter result
-   */
-  public CompletableFuture<ConfigResultEvent> publishRoleCreated(
-      String realm, ConfigValue roleConfig) {
-    return publishConfigEvent(
-        Topics.ROLE_CREATED, "role", realm, Operation.CREATE, "/roles", roleConfig);
-  }
-
-  /**
-   * Publishes a ROLE_UPDATED event.
-   *
-   * @param realm the Keycloak realm name
-   * @param roleConfig the role configuration payload
-   * @return a future for the config adapter result
-   */
-  public CompletableFuture<ConfigResultEvent> publishRoleUpdated(
-      String realm, ConfigValue roleConfig) {
-    return publishConfigEvent(
-        Topics.ROLE_UPDATED, "role", realm, Operation.UPDATE, "/roles", roleConfig);
-  }
-
-  /**
-   * Publishes a ROLE_DELETED event.
-   *
-   * @param realm the Keycloak realm name
-   * @param roleConfig the role configuration payload
-   * @return a future for the config adapter result
-   */
-  public CompletableFuture<ConfigResultEvent> publishRoleDeleted(
-      String realm, ConfigValue roleConfig) {
-    return publishConfigEvent(
-        Topics.ROLE_DELETED, "role", realm, Operation.DELETE, "/roles", roleConfig);
   }
 }

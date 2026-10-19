@@ -39,7 +39,6 @@ import org.hibernate.annotations.Formula;
             columnNames = {"email"}),
     indexes = {
       @Index(name = "idx_user_email", columnList = "email"),
-      @Index(name = "idx_user_active", columnList = "active"),
       @Index(name = "idx_user_external_id", columnList = "external_id")
     })
 @Getter
@@ -67,10 +66,6 @@ public class User extends BaseEntity {
 
   @Column(name = "external_id")
   private String externalId;
-
-  @Column(nullable = false)
-  @Builder.Default
-  private Boolean active = true;
 
   @ManyToMany(fetch = FetchType.LAZY, mappedBy = "members")
   @Setter(AccessLevel.NONE) // setGroups overwritten to handle the bidirectional relationship

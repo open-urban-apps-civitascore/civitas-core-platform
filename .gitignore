@@ -26,11 +26,14 @@ api/**/node_modules/
 # NiFi JDBC drivers (downloaded at dev startup)
 dev-environment/nifi/drivers/*.jar
 
-# bpmn-diff.py vendored viewer assets (downloaded on first run)
-config-adapter/config-adapter-flowable/scripts/.cache/
+# NiFi extensions (built from nifi-extensions/, copied in at dev startup)
+dev-environment/nifi/extensions/*.nar
 
-# Claude Code state (symlinked to private archive repo)
-**/CLAUDE.md
+# Local Claude Code state. CLAUDE.md is no longer ignored: the agent context
+# is now distributed into this repo from the agent-context project.
+# Supplemental agent context, per developer and per team. Never shared.
+per-dev-agentcontext/
+per-team-agentcontext/
 /portal-backend/CONTEXT.md
 /.claude
 /docs/claude
@@ -39,3 +42,4 @@ config-adapter/config-adapter-flowable/scripts/.cache/
 /graphify-out/
 
 .github/**
+dev-environment/e2e/artifacts/*.png

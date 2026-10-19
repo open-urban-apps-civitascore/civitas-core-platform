@@ -7,13 +7,13 @@ import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
-import de.civitascore.portal.repository.DataSinkRepository;
+import de.civitascore.portal.model.input.DataStructureMetaInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
-import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for managing {@link DataStructure} entities through their lifecycle (DRAFT to AVAILABLE).
@@ -30,14 +31,15 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class DataStructureService
-    extends BaseDataEntityService<DataStructure, DataStructureInputDTO> {
+    extends BaseDataEntityService<DataStructure, DataStructureInputDTO, DataStructureMetaInputDTO> {
 
   private final DataStructureRepository dataStructureRepository;
   private final DataStructureMapper dataStructureMapper;
-  private final DataStructureVersionRepository dataStructureVersionRepository;
   private final AssignmentFactory assignmentFactory;
+  private final AssignmentChangeAuthorizer assignmentChangeAuthorizer;
   private final DataSourceRepository dataSourceRepository;
-  private final DataSinkRepository dataSinkRepository;
+  private final ModelRegistryGateway modelRegistryGateway;
+  private final ArtifactUsageLookup artifactUsageLookup;
 
   @Override
   protected DataStructureRepository getRepository() {
@@ -60,6 +62,11 @@ public class DataStructureService
   }
 
   @Override
+  protected AssignmentChangeAuthorizer getAssignmentChangeAuthorizer() {
+    return assignmentChangeAuthorizer;
+  }
+
+  @Override
   protected ReleasableStatus getEntityStatus(DataStructure entity) {
     return entity.getDataStructureStatus();
   }
@@ -77,36 +84,6 @@ public class DataStructureService
   @Override
   protected ReleasableStatus getAvailableStatus() {
     return DataStructureStatus.AVAILABLE;
-  }
-
-  /**
-   * Resolves data structure version references after DTO-to-entity conversion. Validates that all
-   * provided version IDs exist and sets the bidirectional relationship.
-   *
-   * @param entity the data structure entity
-   * @param input the input DTO containing version IDs
-   * @return the entity with resolved version relationships and assignments
-   * @throws InvalidInputException if any version ID is not found
-   */
-  @Override
-  protected DataStructure postConvertToEntity(DataStructure entity, DataStructureInputDTO input) {
-    if (input.getDataStructureVersionIds() != null) {
-      if (input.getDataStructureVersionIds().isEmpty()) {
-        entity.setDataStructureVersions(new HashSet<>());
-      } else {
-        List<DataStructureVersion> versions =
-            dataStructureVersionRepository.findAllById(input.getDataStructureVersionIds());
-        if (versions.size() != input.getDataStructureVersionIds().size()) {
-          throw new InvalidInputException(
-              "DataStructure",
-              "dataStructureVersionIds",
-              "One or more DataStructureVersion IDs not found");
-        }
-        entity.setDataStructureVersions(new HashSet<>(versions));
-      }
-    }
-
-    return super.postConvertToEntity(entity, input); // base handles assignments
   }
 
   /**
@@ -162,6 +139,22 @@ public class DataStructureService
   }
 
   @Override
+  @Transactional
+  public DataStructure updateReleasedMeta(UUID id, DataStructureMetaInputDTO meta) {
+    DataStructure existingEntity = findByIdOrThrow(id);
+    if (existingEntity.getDataStructureStatus() == DataStructureStatus.DRAFT) {
+      throw new InvalidInputException(
+          getEntityName(), id, "Cannot update released metadata on a DRAFT entity");
+    }
+    return super.update(id, dataStructureMapper.toUpdateInput(meta));
+  }
+
+  @Override
+  public DataStructureMetaInputDTO toMetaInput(DataStructure entity) {
+    return dataStructureMapper.toMetaInput(entity);
+  }
+
+  @Override
   protected void validateRelease(DataStructure entity) {
     boolean hasReleasedVersion =
         entity.getDataStructureVersions().stream()
@@ -180,16 +173,16 @@ public class DataStructureService
 
   @Override
   protected void validateUnrelease(DataStructure entity) {
-    validateNoVersionInUse(entity);
+    artifactUsageLookup.of(entity).requireNoReleasedReferrer(getEntityName(), entity.getId());
   }
 
   /**
-   * Validates that none of the data structure's versions are in use by a data source or a data sink
-   * before allowing deletion.
+   * Validates that nothing still references any of the data structure's versions before allowing
+   * deletion.
    *
    * @param id the data structure ID to delete
    * @return the data structure entity to be deleted
-   * @throws ResourceInUseException if any version is referenced by a data source or a data sink
+   * @throws ResourceInUseException if any version is still referenced
    */
   @Override
   protected DataStructure preProcessDelete(UUID id) {
@@ -198,20 +191,47 @@ public class DataStructureService
     return dataStructure;
   }
 
+  /**
+   * After the data structure and its versions are deleted, delete the backing model artifact from
+   * Model Forge in the same transaction. No-op when no model was ever stored (logical URN null).
+   *
+   * @param entity the deleted data structure
+   */
+  @Override
+  protected void postDelete(DataStructure entity) {
+    if (entity != null && entity.getModelLogicalUrn() != null) {
+      modelRegistryGateway.deleteModel(entity.getModelLogicalUrn());
+    }
+  }
+
   private void validateNoVersionInUse(DataStructure dataStructure) {
+    Set<DataStructureVersion> versions = dataStructure.getDataStructureVersions();
     Set<UUID> versionIds =
-        dataStructure.getDataStructureVersions().stream()
-            .map(DataStructureVersion::getId)
-            .collect(Collectors.toSet());
+        versions.stream().map(DataStructureVersion::getId).collect(Collectors.toSet());
     if (versionIds.isEmpty()) {
       return;
     }
-    if (dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)
-        || dataSinkRepository.existsByDataStructureVersionIdIn(versionIds)) {
+    if (dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)) {
       throw new ResourceInUseException(
           "DataStructure",
           dataStructure.getId(),
-          "Cannot modify DataStructure because one or more of its versions is referenced by a DataSource or DataSink.");
+          "Cannot modify DataStructure because a DataSource is pinned to one of its versions.");
+    }
+    // The registry answers for every reference it holds onto a version's model — a sink's or
+    // source's element, a mapping endpoint, another model.
+    List<String> blockers =
+        versions.stream()
+            .map(DataStructureVersion::getModelUrn)
+            .map(modelRegistryGateway::referencesTo)
+            .flatMap(List::stream)
+            .distinct()
+            .toList();
+    if (!blockers.isEmpty()) {
+      throw new ResourceInUseException(
+          "DataStructure",
+          dataStructure.getId(),
+          "Cannot modify DataStructure because one or more of its versions is still referenced.",
+          blockers);
     }
   }
 }

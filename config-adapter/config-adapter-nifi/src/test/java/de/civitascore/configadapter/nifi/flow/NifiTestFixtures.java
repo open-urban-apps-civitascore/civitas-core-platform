@@ -22,6 +22,7 @@ import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.sink.SinkSpec;
 import de.civitascore.configadapter.nifi.flow.stage.source.MqttSourceStage;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import de.civitascore.configadapter.nifi.flow.stage.source.SqlSourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.transform.MappingNodeType;
 import de.civitascore.configadapter.nifi.graph.GraphParser;
@@ -35,7 +36,9 @@ import de.civitascore.configadapter.nifi.mapping.MappingConfig;
 import de.civitascore.configadapter.nifi.mapping.MappingConfigParser;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler;
 import de.civitascore.configadapter.nifi.mapping.RecordPathCompiler.UpdateRecordProperty;
+import de.civitascore.configadapter.nifi.mapping.SinkPort;
 import de.civitascore.configadapter.nifi.mapping.ValueNode;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,9 +49,84 @@ public final class NifiTestFixtures {
   static final String MASTER_KEY_HEX =
       "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
+  // Configuration CORE URNs the graph fixtures' source/sink nodes reference. The planner resolves
+  // source/sink from the request, not the graph, so their exact values are inert here — they exist
+  // only to make the graphs shaped like a real clean CORE Pipeline document.
+  static final String SRC_REF =
+      "urn:core:dataset:acme:datasource:sensors:cf6397e4-7b2e-855b-9b65-162d59762bb2:1.0.0";
+  static final String SINK_REF =
+      "urn:core:dataset:acme:datasink:sensors:a851ddf5-92e4-82ef-9941-9006a4238893:1.0.0";
+
+  // Mapping CORE URNs the graph fixtures' mapping nodes reference; resolved against MAPPINGS.
+  static final String MAP_BASIC =
+      "urn:core:dataset:acme:mapping:sensors:9fb9b546-2f6c-8444-9a4f-fece132d8f72:1.0.0";
+  static final String MAP_GEO =
+      "urn:core:dataset:acme:mapping:sensors:72e1fd6f-10d1-869a-9e2c-b9e938550f10:1.0.0";
+  static final String MAP_FROST =
+      "urn:core:dataset:acme:mapping:sensors:685e1060-77d7-87b9-861f-d460a6289898:1.0.0";
+  static final String MAP_FROST_INCOMPLETE =
+      "urn:core:dataset:acme:mapping:sensors:e918ac0f-dd1d-815d-b853-c0a9ea3da7cf:1.0.0";
+  static final String MAP_CRON =
+      "urn:core:dataset:acme:mapping:sensors:80b70441-0b85-89dd-b66b-0f7f01d5a4aa:1.0.0";
+  static final String MAP_TOINT =
+      "urn:core:dataset:acme:mapping:sensors:e9db03b4-32b2-8942-b2b8-7abb4db0d473:1.0.0";
+  static final String MAP_MIXED =
+      "urn:core:dataset:acme:mapping:sensors:e519292a-7dc6-85c6-bbc6-9d2bf792cd44:1.0.0";
+
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
+  private static final PlatformSinkConfig DEFAULT_PLATFORM_SINK =
+      new PlatformSinkConfig("jdbc:postgresql://db:5432/civitas", "nifi", "db-secret");
+
+  private static final String DEFAULT_FROST_BASE_URL = "http://frost:8080/FROST-Server/v1.1";
+
+  /**
+   * The artifacts map every planner fixture request carries — the callback-free adapter's source of
+   * a {@code mappingRef}'s {@code fields}. Keyed by the Mapping CORE URNs the graph fixtures
+   * reference; field order is preserved (LinkedHashMap) because the FROST compiler's flat {@code
+   * sta_N} indices depend on it.
+   */
+  static final Map<String, Map<String, Object>> MAPPINGS;
+
+  static {
+    try {
+      Map<String, Map<String, Object>> m = new LinkedHashMap<>();
+      m.put(
+          MAP_BASIC,
+          map(
+              "{\"fields\": {\"$.station_id\":\"$.station_id\",\"$.temperature\":\"$.temperature\","
+                  + "\"$.observed_at\":{\"op\":\"toDateTime\",\"input\":\"$.ts\",\"pattern\":\"yyyy-MM-dd\"}}}"));
+      m.put(
+          MAP_GEO,
+          map(
+              "{\"fields\": {\"$.location\":{\"op\":\"geoPoint\",\"lon\":\"$.lon\",\"lat\":\"$.lat\"}}}"));
+      m.put(
+          MAP_FROST,
+          map(
+              "{\"fields\": {\"$.name\":\"$.station\",\"$.description\":{\"op\":\"const\",\"value\":\"imported station\"},"
+                  + "\"$.properties.reference\":\"$.ref\",\"$.Datastreams[].properties.reference\":\"$.ref\","
+                  + "\"$.Datastreams[].Observations[].result\":{\"op\":\"toFloat\",\"input\":\"$.temp\"},"
+                  + "\"$.Datastreams[].Observations[].phenomenonTime\":\"$.ts\"}}"));
+      m.put(MAP_FROST_INCOMPLETE, map("{\"fields\": {\"$.name\":\"$.station\"}}"));
+      m.put(MAP_CRON, map("{\"fields\": {\"$.a\":\"$.b\"}}"));
+      m.put(MAP_TOINT, map("{\"fields\": {\"$.count\":{\"op\":\"toInt\",\"input\":\"$.n\"}}}"));
+      m.put(
+          MAP_MIXED,
+          map(
+              "{\"fields\": {\"$.station_id\":\"$.station_id\",\"$.unit\":{\"op\":\"const\",\"value\":\"celsius\"}}}"));
+      MAPPINGS = Collections.unmodifiableMap(m);
+    } catch (Exception e) {
+      throw new ExceptionInInitializerError(e);
+    }
+  }
+
   private NifiTestFixtures() {}
+
+  /** A deployment request carrying the shared {@link #MAPPINGS} as its artifacts. */
+  static PipelineDeploymentRequest req(
+      String pipelineId, Map<String, Object> graph, Datasource source, SinkSpec sink) {
+    return new PipelineDeploymentRequest(pipelineId, graph, source, sink, MAPPINGS);
+  }
 
   static byte[] stretchedKey() throws Exception {
     return CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
@@ -59,8 +137,18 @@ public final class NifiTestFixtures {
       SqlSourceProbe probe,
       PlatformSinkConfig platformSink,
       String frostBaseUrl) {
+    return stageRegistry(
+        resolver, probe, platformSink, frostBaseUrl, MqttTruststoreConfig.nodeTruststore());
+  }
+
+  public static StageRegistry stageRegistry(
+      CredentialResolver resolver,
+      SqlSourceProbe probe,
+      PlatformSinkConfig platformSink,
+      String frostBaseUrl,
+      MqttTruststoreConfig mqttTruststore) {
     return new StageRegistry(
-        List.of(new MqttSourceStage(resolver), new SqlSourceStage(resolver, probe)),
+        List.of(new MqttSourceStage(resolver, mqttTruststore), new SqlSourceStage(resolver, probe)),
         List.of(
             new PostgisSinkStage(platformSink),
             new FrostSinkStage(frostBaseUrl, FrostSinkAuth.basicAuth("frost", "secret"))),
@@ -69,7 +157,12 @@ public final class NifiTestFixtures {
 
   /** A builder over stages whose bind halves are never exercised (build-level tests). */
   public static NifiFlowBuilder flowBuilder() {
-    return new NifiFlowBuilder(stageRegistry(null, SqlSourceProbe.NO_OP, null, null));
+    return flowBuilder(MqttTruststoreConfig.nodeTruststore());
+  }
+
+  public static NifiFlowBuilder flowBuilder(MqttTruststoreConfig mqttTruststore) {
+    return new NifiFlowBuilder(
+        stageRegistry(null, SqlSourceProbe.NO_OP, null, null, mqttTruststore));
   }
 
   static FlowDeploymentPlanner planner(CredentialResolver resolver) {
@@ -77,11 +170,17 @@ public final class NifiTestFixtures {
   }
 
   static FlowDeploymentPlanner planner(CredentialResolver resolver, SqlSourceProbe probe) {
+    return planner(resolver, probe, DEFAULT_PLATFORM_SINK, DEFAULT_FROST_BASE_URL);
+  }
+
+  static FlowDeploymentPlanner planner(
+      CredentialResolver resolver, MqttTruststoreConfig mqttTruststore) {
     return planner(
         resolver,
-        probe,
-        new PlatformSinkConfig("jdbc:postgresql://db:5432/civitas", "nifi", "db-secret"),
-        "http://frost:8080/FROST-Server/v1.1");
+        SqlSourceProbe.NO_OP,
+        DEFAULT_PLATFORM_SINK,
+        DEFAULT_FROST_BASE_URL,
+        mqttTruststore);
   }
 
   public static FlowDeploymentPlanner planner(
@@ -89,7 +188,18 @@ public final class NifiTestFixtures {
       SqlSourceProbe probe,
       PlatformSinkConfig platformSink,
       String frostBaseUrl) {
-    StageRegistry registry = stageRegistry(resolver, probe, platformSink, frostBaseUrl);
+    return planner(
+        resolver, probe, platformSink, frostBaseUrl, MqttTruststoreConfig.nodeTruststore());
+  }
+
+  public static FlowDeploymentPlanner planner(
+      CredentialResolver resolver,
+      SqlSourceProbe probe,
+      PlatformSinkConfig platformSink,
+      String frostBaseUrl,
+      MqttTruststoreConfig mqttTruststore) {
+    StageRegistry registry =
+        stageRegistry(resolver, probe, platformSink, frostBaseUrl, mqttTruststore);
     return new FlowDeploymentPlanner(new GraphParser(), new NifiFlowBuilder(registry), registry);
   }
 
@@ -97,25 +207,20 @@ public final class NifiTestFixtures {
     return MAPPER.readValue(json, new TypeReference<>() {});
   }
 
-  static Map<String, Object> graphWithMapping() throws Exception {
-    return graphWithMapping("geoPersistence");
+  public static Map<String, Map<String, Object>> artifacts(String json) throws Exception {
+    return MAPPER.readValue(json, new TypeReference<>() {});
   }
 
-  static Map<String, Object> graphWithMapping(String sinkType) throws Exception {
+  static Map<String, Object> graphWithMapping() throws Exception {
     return map(
         """
         {
           "nodes": [
-            { "id": "n-start", "type": "start", "data": {} },
-            { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
-            { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
-                "fields": {
-                  "$.station_id": "$.station_id",
-                  "$.temperature": "$.temperature",
-                  "$.observed_at": { "op": "toDate", "input": "$.ts", "pattern": "yyyy-MM-dd" }
-                } } } },
-            { "id": "n-sink", "type": "%s", "data": { "entityId": "sink-1" } },
-            { "id": "n-end", "type": "end", "data": {} }
+            { "id": "n-start", "kind": "start" },
+            { "id": "n-src", "kind": "source", "sourceRef": "%s" },
+            { "id": "n-map", "kind": "mapping", "mappingRef": "%s" },
+            { "id": "n-sink", "kind": "sink", "sinkRef": "%s" },
+            { "id": "n-end", "kind": "end" }
           ],
           "edges": [
             { "id": "e1", "source": "n-start", "target": "n-src" },
@@ -125,7 +230,7 @@ public final class NifiTestFixtures {
           ]
         }
         """
-            .formatted(sinkType));
+            .formatted(SRC_REF, MAP_BASIC, SINK_REF));
   }
 
   static Map<String, Object> graphWithGeoPoint() throws Exception {
@@ -133,14 +238,11 @@ public final class NifiTestFixtures {
         """
         {
           "nodes": [
-            { "id": "n-start", "type": "start", "data": {} },
-            { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
-            { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
-                "fields": {
-                  "$.location": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" }
-                } } } },
-            { "id": "n-sink", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
-            { "id": "n-end", "type": "end", "data": {} }
+            { "id": "n-start", "kind": "start" },
+            { "id": "n-src", "kind": "source", "sourceRef": "%s" },
+            { "id": "n-map", "kind": "mapping", "mappingRef": "%s" },
+            { "id": "n-sink", "kind": "sink", "sinkRef": "%s" },
+            { "id": "n-end", "kind": "end" }
           ],
           "edges": [
             { "id": "e1", "source": "n-start", "target": "n-src" },
@@ -149,31 +251,24 @@ public final class NifiTestFixtures {
             { "id": "e4", "source": "n-sink", "target": "n-end" }
           ]
         }
-        """);
+        """
+            .formatted(SRC_REF, MAP_GEO, SINK_REF));
   }
 
   /**
    * A mapping node targeting the record-anchored FROST catalog paths (creatable Thing, lookup-only
-   * Datastream, observations, mixed strategies via the const).
+   * Datastream, observations, mixed strategies via the const) — see {@link #MAP_FROST}.
    */
   static Map<String, Object> graphWithFrostMapping() throws Exception {
     return map(
         """
         {
           "nodes": [
-            { "id": "n-start", "type": "start", "data": {} },
-            { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
-            { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
-                "fields": {
-                  "$.name": "$.station",
-                  "$.description": { "op": "const", "value": "imported station" },
-                  "$.properties.reference": "$.ref",
-                  "$.Datastreams[].properties.reference": "$.ref",
-                  "$.Datastreams[].Observations[].result": { "op": "toFloat", "input": "$.temp" },
-                  "$.Datastreams[].Observations[].phenomenonTime": "$.ts"
-                } } } },
-            { "id": "n-sink", "type": "frost", "data": { "entityId": "sink-1" } },
-            { "id": "n-end", "type": "end", "data": {} }
+            { "id": "n-start", "kind": "start" },
+            { "id": "n-src", "kind": "source", "sourceRef": "%s" },
+            { "id": "n-map", "kind": "mapping", "mappingRef": "%s" },
+            { "id": "n-sink", "kind": "sink", "sinkRef": "%s" },
+            { "id": "n-end", "kind": "end" }
           ],
           "edges": [
             { "id": "e1", "source": "n-start", "target": "n-src" },
@@ -182,21 +277,24 @@ public final class NifiTestFixtures {
             { "id": "e4", "source": "n-sink", "target": "n-end" }
           ]
         }
-        """);
+        """
+            .formatted(SRC_REF, MAP_FROST, SINK_REF));
   }
 
-  /** A mapping node targeting only {@code $.name} — misses the Thing match key. */
+  /**
+   * A mapping node targeting only {@code $.name} — misses the Thing match key ({@link
+   * #MAP_FROST_INCOMPLETE}).
+   */
   static Map<String, Object> graphWithIncompleteFrostMapping() throws Exception {
     return map(
         """
         {
           "nodes": [
-            { "id": "n-start", "type": "start", "data": {} },
-            { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
-            { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
-                "fields": { "$.name": "$.station" } } } },
-            { "id": "n-sink", "type": "frost", "data": { "entityId": "sink-1" } },
-            { "id": "n-end", "type": "end", "data": {} }
+            { "id": "n-start", "kind": "start" },
+            { "id": "n-src", "kind": "source", "sourceRef": "%s" },
+            { "id": "n-map", "kind": "mapping", "mappingRef": "%s" },
+            { "id": "n-sink", "kind": "sink", "sinkRef": "%s" },
+            { "id": "n-end", "kind": "end" }
           ],
           "edges": [
             { "id": "e1", "source": "n-start", "target": "n-src" },
@@ -205,23 +303,20 @@ public final class NifiTestFixtures {
             { "id": "e4", "source": "n-sink", "target": "n-end" }
           ]
         }
-        """);
+        """
+            .formatted(SRC_REF, MAP_FROST_INCOMPLETE, SINK_REF));
   }
 
   /** A graph with no mapping node — the source feeds the sink directly. */
   static Map<String, Object> graphWithoutMapping() throws Exception {
-    return graphWithoutMapping("geoPersistence");
-  }
-
-  static Map<String, Object> graphWithoutMapping(String sinkType) throws Exception {
     return map(
         """
         {
           "nodes": [
-            { "id": "n-start", "type": "start", "data": {} },
-            { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
-            { "id": "n-sink", "type": "%s", "data": { "entityId": "sink-1" } },
-            { "id": "n-end", "type": "end", "data": {} }
+            { "id": "n-start", "kind": "start" },
+            { "id": "n-src", "kind": "source", "sourceRef": "%s" },
+            { "id": "n-sink", "kind": "sink", "sinkRef": "%s" },
+            { "id": "n-end", "kind": "end" }
           ],
           "edges": [
             { "id": "e1", "source": "n-start", "target": "n-src" },
@@ -230,29 +325,7 @@ public final class NifiTestFixtures {
           ]
         }
         """
-            .formatted(sinkType));
-  }
-
-  /** Two chained mapping nodes in front of a PostGIS sink (rename, then derive). */
-  static Map<String, Object> graphWithChainedMappings() throws Exception {
-    return map(
-        """
-        {
-          "nodes": [
-            { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
-            { "id": "n-map1", "type": "mapping", "data": { "mappingConfig": {
-                "fields": { "$.station_id": "$.id", "$.temperature": "$.temp" } } } },
-            { "id": "n-map2", "type": "mapping", "data": { "mappingConfig": {
-                "fields": { "$.unit": { "op": "const", "value": "celsius" } } } } },
-            { "id": "n-sink", "type": "geoPersistence", "data": { "entityId": "sink-1" } }
-          ],
-          "edges": [
-            { "id": "e1", "source": "n-src", "target": "n-map1" },
-            { "id": "e2", "source": "n-map1", "target": "n-map2" },
-            { "id": "e3", "source": "n-map2", "target": "n-sink" }
-          ]
-        }
-        """);
+            .formatted(SRC_REF, SINK_REF));
   }
 
   /** A full chain with the cron trigger wired in front of the source. */
@@ -261,13 +334,12 @@ public final class NifiTestFixtures {
         """
         {
           "nodes": [
-            { "id": "n-start", "type": "start", "data": {} },
-            { "id": "n-cron", "type": "cron", "data": { "cronExpression": "%s" } },
-            { "id": "n-src", "type": "dataSource", "data": { "entityId": "src-1" } },
-            { "id": "n-map", "type": "mapping", "data": { "mappingConfig": {
-                "fields": { "$.a": "$.b" } } } },
-            { "id": "n-sink", "type": "geoPersistence", "data": { "entityId": "sink-1" } },
-            { "id": "n-end", "type": "end", "data": {} }
+            { "id": "n-start", "kind": "start" },
+            { "id": "n-cron", "kind": "cron", "cronExpression": "%s" },
+            { "id": "n-src", "kind": "source", "sourceRef": "%s" },
+            { "id": "n-map", "kind": "mapping", "mappingRef": "%s" },
+            { "id": "n-sink", "kind": "sink", "sinkRef": "%s" },
+            { "id": "n-end", "kind": "end" }
           ],
           "edges": [
             { "id": "e1", "source": "n-start", "target": "n-cron" },
@@ -278,18 +350,17 @@ public final class NifiTestFixtures {
           ]
         }
         """
-            .formatted(cronExpression));
+            .formatted(cronExpression, SRC_REF, MAP_CRON, SINK_REF));
   }
 
   static Datasource mqttSource(String encryptedPassword) {
     Datasource source = new Datasource();
     source.setId("a1");
     source.setType("MQTT");
-    // the portal connector shape: urls/topics are lists, user/client_id/qos scalars
+    // the portal connector shape: urls/topics are lists, user/qos scalars
     source.handleUnknownProperty("urls", List.of("tcp://mosquitto:1883"));
     source.handleUnknownProperty("topics", List.of("sensors/+/temp"));
     source.handleUnknownProperty("user", "mqttuser");
-    source.handleUnknownProperty("client_id", "civitas-it");
     source.handleUnknownProperty("qos", 1);
     source.handleUnknownProperty("password", encryptedPassword);
     return source;
@@ -428,7 +499,9 @@ public final class NifiTestFixtures {
             FrostSinkStage.FROST_BASE_URL,
             "http://frost:8080/FROST-Server/v1.1",
             FrostSinkStage.FROST_PROJECT_ID,
-            "7"),
+            "7",
+            FrostSinkStage.FROST_PORT,
+            SinkPort.THING_TREE.label()),
         // FROST: the source delivers the STA envelope; no record mapping (find-or-create works on
         // the raw JSON).
         List.of(),
@@ -452,7 +525,7 @@ public final class NifiTestFixtures {
     fields.put("$.description", new ValueNode.ConstNode("registered station", null));
     FrostMappingCompiler.FrostCompilation compilation =
         new FrostMappingCompiler(new RecordPathCompiler())
-            .compile(new MappingConfig(null, null, fields), STA_KEYS);
+            .compile(new MappingConfig(null, null, fields), STA_KEYS, SinkPort.THING_TREE);
     return new FlowBuildSpec(
         "pipeline-frost-thing-only",
         SourceType.MQTT,
@@ -462,7 +535,9 @@ public final class NifiTestFixtures {
             FrostSinkStage.FROST_BASE_URL,
             "http://frost:8080/FROST-Server/v1.1",
             FrostSinkStage.FROST_PROJECT_ID,
-            "7"),
+            "7",
+            FrostSinkStage.FROST_PORT,
+            SinkPort.THING_TREE.label()),
         compiled(compilation),
         Map.of(),
         null,
@@ -487,7 +562,7 @@ public final class NifiTestFixtures {
     fields.put("$.Datastreams[].properties.reference", new ValueNode.CopyNode("$.ref"));
     FrostMappingCompiler.FrostCompilation compilation =
         new FrostMappingCompiler(new RecordPathCompiler())
-            .compile(new MappingConfig(null, null, fields), STA_KEYS);
+            .compile(new MappingConfig(null, null, fields), STA_KEYS, SinkPort.THING_TREE);
     return new FlowBuildSpec(
         "pipeline-frost-mapping",
         SourceType.MQTT,
@@ -497,7 +572,9 @@ public final class NifiTestFixtures {
             FrostSinkStage.FROST_BASE_URL,
             "http://frost:8080/FROST-Server/v1.1",
             FrostSinkStage.FROST_PROJECT_ID,
-            "7"),
+            "7",
+            FrostSinkStage.FROST_PORT,
+            SinkPort.THING_TREE.label()),
         compiled(compilation),
         Map.of(),
         null,
@@ -525,7 +602,7 @@ public final class NifiTestFixtures {
         new ValueNode.CopyNode("$.measurements[].measuredValues[].ts"));
     FrostMappingCompiler.FrostCompilation compilation =
         new FrostMappingCompiler(new RecordPathCompiler())
-            .compile(new MappingConfig(null, null, fields), STA_KEYS);
+            .compile(new MappingConfig(null, null, fields), STA_KEYS, SinkPort.THING_TREE);
     return new FlowBuildSpec(
         "pipeline-frost-fanout",
         SourceType.MQTT,
@@ -535,7 +612,9 @@ public final class NifiTestFixtures {
             FrostSinkStage.FROST_BASE_URL,
             "http://frost:8080/FROST-Server/v1.1",
             FrostSinkStage.FROST_PROJECT_ID,
-            "7"),
+            "7",
+            FrostSinkStage.FROST_PORT,
+            SinkPort.THING_TREE.label()),
         compiled(compilation),
         Map.of(),
         null,
@@ -578,7 +657,7 @@ public final class NifiTestFixtures {
     fields.put("$.Datastreams[].properties.reference", new ValueNode.CopyNode("$.ref"));
     FrostMappingCompiler.FrostCompilation compilation =
         new FrostMappingCompiler(new RecordPathCompiler())
-            .compile(new MappingConfig(null, null, fields), STA_KEYS);
+            .compile(new MappingConfig(null, null, fields), STA_KEYS, SinkPort.THING_TREE);
     return new FlowBuildSpec(
         "pipeline-frost-related-updates",
         SourceType.MQTT,
@@ -588,7 +667,9 @@ public final class NifiTestFixtures {
             FrostSinkStage.FROST_BASE_URL,
             "http://frost:8080/FROST-Server/v1.1",
             FrostSinkStage.FROST_PROJECT_ID,
-            "7"),
+            "7",
+            FrostSinkStage.FROST_PORT,
+            SinkPort.THING_TREE.label()),
         compiled(compilation),
         Map.of(),
         null,

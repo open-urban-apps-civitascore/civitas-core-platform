@@ -147,6 +147,45 @@ user `nifi`, password `nifi-demo-password`, database `nifi_demo`.
 
 ---
 
+## Testing the MQTT protocol version
+
+Mosquitto negotiates whatever protocol version a client's CONNECT packet
+asks for, so one broker instance serves both MQTT 3 and MQTT 5 connections —
+no need for a second broker. It logs the negotiated level of every
+connection by default:
+
+```bash
+docker logs -f civitas-nifi-demo-mosquitto
+```
+
+A connecting client shows up as `(p2, ...)` for MQTT 3.1, `(p3, ...)` for
+3.1.1, or `(p5, ...)` for MQTT 5. Point two connector datasources at the same
+`tcp://civitas-nifi-demo-mosquitto:1883`, one with `protocol_version: 3` and
+one with `protocol_version: 5`, deploy both, and confirm the log shows one
+connection at each level once NiFi's ConsumeMQTT processors connect
+(distinguish them by client ID / timestamp — same broker, one log stream).
+
+To inject test data against a specific protocol version by hand:
+
+```bash
+docker exec civitas-nifi-demo-mosquitto mosquitto_pub -h localhost -V mqttv311 \
+  -t "sensors/sensor-001/temp" \
+  -m '{"lat":50.110,"lon":8.660,"temperature":21.3,"ts":"2026-05-21T08:00:00Z","station_id":"sensor-001"}'
+
+docker exec civitas-nifi-demo-mosquitto mosquitto_pub -h localhost -V mqttv5 \
+  -t "sensors/sensor-001/temp" \
+  -m '{"lat":50.110,"lon":8.660,"temperature":21.3,"ts":"2026-05-21T08:00:00Z","station_id":"sensor-001"}'
+```
+
+Or run a continuous stream at a specific protocol version with
+`publish-loop.sh`:
+
+```bash
+MQTT_VERSION=mqttv5 ./scripts/publish-loop.sh
+```
+
+---
+
 ## Things to watch out for
 
 - **Run the whole folder, not single requests.** Each Bruno folder has a
@@ -177,7 +216,9 @@ demo/
 ├── scripts/
 │   ├── cleanup.sh                 # robust teardown (recovery fallback)
 │   ├── publish-loop.sh            # continuous synthetic publisher
-│   └── build-snapshot.sh          # snapshot regenerator (maintenance)
+│   ├── build-snapshot.sh          # snapshot regenerator (maintenance)
+│   ├── provision-sta-datastream.sh  # FROST sink: pre-creates Datastreams (not needed for ThingTree)
+│   └── publish-sta-loop.sh        # FROST sink: ThingTree record publisher
 └── bruno/
     ├── collection.bru             # collection-level auth
     ├── environments/local.bru     # base URL, credentials, names
@@ -186,6 +227,10 @@ demo/
     ├── 02_verify/                 # check the flow is healthy
     └── 03_cleanup/                # tear down
 ```
+
+`publish-sta-loop.sh` sends records for a FROST sink on the ThingTree port. That port creates the
+Thing, its Location and its Datastream when they are missing, so no provisioning is needed first.
+A sink on the Observations port only appends measurements and needs the Datastreams to exist.
 
 ---
 

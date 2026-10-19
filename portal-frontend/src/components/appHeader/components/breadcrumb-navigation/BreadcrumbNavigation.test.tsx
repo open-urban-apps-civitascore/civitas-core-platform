@@ -168,6 +168,23 @@ describe('BreadcrumbNavigation', () => {
     })
   })
 
+  it('labels a version that has no number like the page heading, not with its id', async () => {
+    const versionId = '8f2b4c1e-0000-4a00-9000-abcdefabcdef'
+    mockUsePathname.mockReturnValue(`/datastructures/ds-1/${versionId}`)
+    mockUseParams.mockReturnValue({ datastructureId: 'ds-1', versionId })
+
+    vi.mocked(apiRequest)
+      .mockResolvedValueOnce({ data: { name: 'Datastructure A' } })
+      .mockResolvedValueOnce({ data: { version: null } })
+
+    renderWithClient()
+
+    await waitFor(() => {
+      expect(screen.getByText('status.DRAFT')).toBeInTheDocument()
+    })
+    expect(screen.queryByText(versionId)).not.toBeInTheDocument()
+  })
+
   it('does not show tooltip when dynamic breadcrumb is not truncated', async () => {
     vi.useFakeTimers()
     vi.mocked(apiRequest).mockResolvedValueOnce({

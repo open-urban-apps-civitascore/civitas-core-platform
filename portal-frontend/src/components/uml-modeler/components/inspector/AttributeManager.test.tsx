@@ -134,3 +134,37 @@ describe('AttributeManager primary key', () => {
     })
   })
 })
+
+describe('AttributeManager attribute names', () => {
+  beforeEach(() => updateNode.mockClear())
+
+  const elementWithNames = (names: string[]): UMLClass => ({
+    id: 'elem-1',
+    name: 'TrafficSensor',
+    type: 'class',
+    attributes: names.map((name, index) => ({ id: `a${index}`, name, type: 'String' })),
+    operations: [],
+  })
+
+  it('shows the duplicate error when two attributes have the same name', () => {
+    render(<AttributeManager nodeId={NODE_ID} element={elementWithNames(['value', 'value'])} />)
+    expect(screen.getAllByText('duplicateAttribute')).toHaveLength(2)
+  })
+
+  it('shows no error for unique attribute names', () => {
+    render(<AttributeManager nodeId={NODE_ID} element={elementWithNames(['value', 'unit'])} />)
+    expect(screen.queryByText('duplicateAttribute')).not.toBeInTheDocument()
+  })
+
+  it('gives a new attribute the first free default name', () => {
+    render(<AttributeManager nodeId={NODE_ID} element={elementWithNames(['neuesAttribut'])} />)
+    fireEvent.click(screen.getByText('Add Attribute'))
+
+    expect(updateNode).toHaveBeenCalledWith(NODE_ID, {
+      attributes: [
+        expect.objectContaining({ name: 'neuesAttribut' }),
+        expect.objectContaining({ name: 'neuesAttribut2' }),
+      ],
+    })
+  })
+})

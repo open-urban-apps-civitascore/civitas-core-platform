@@ -19,7 +19,7 @@ public abstract class BaseDataEntityServiceIntegrationTest<
     extends BaseServiceIntegrationTest<E, I> {
 
   @Override
-  protected abstract BaseDataEntityService<E, I> getService();
+  protected abstract BaseDataEntityService<E, I, ? super I> getService();
 
   /** Create an input DTO that includes assignment definitions. */
   protected abstract I createInputWithAssignments();

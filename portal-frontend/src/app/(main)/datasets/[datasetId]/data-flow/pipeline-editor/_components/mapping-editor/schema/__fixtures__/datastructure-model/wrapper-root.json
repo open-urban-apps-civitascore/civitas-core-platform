@@ -1,5 +1,5 @@
 {
-  "$id": "urn:core:tenant:civitas:datastructure:contract:WrapperRoot:0000000000:1.0.0",
+  "$id": "urn:core:tenant:civitas:datastructure:contract:4b544d6a-5ad8-88d2-980b-e10da4dd20c1:1.0.0",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "WrapperRoot",
   "type": "object",

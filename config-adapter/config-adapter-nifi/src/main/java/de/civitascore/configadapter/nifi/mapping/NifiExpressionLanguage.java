@@ -9,26 +9,35 @@
  */
 package de.civitascore.configadapter.nifi.mapping;
 
+import java.util.regex.Pattern;
+
 /**
- * NiFi Expression Language escaping for tenant-supplied text that lands in an EL-enabled processor
- * property.
+ * Keeps tenant text out of NiFi's Expression Language and parameter evaluation.
  *
- * <p>Several PutDatabaseRecord/UpdateRecord properties evaluate Expression Language, so a tenant
- * value carrying {@code ${ENV_VAR}} would otherwise expand against the NiFi process environment at
- * write time and exfiltrate into the tenant's data. Any tenant-controlled string that reaches such
- * a property — a mapping value, a table name, an update key — must pass through {@link #escape}
- * first. This is the single source of that escape so the value and identifier paths cannot drift.
+ * <p>NiFi evaluates {@code ${...}} against its own process environment in many properties, and
+ * {@code #{...}} against the flow's parameter context in all of them. A value without {@code $} or
+ * {@code #} directly before a <code>{</code> contains neither form, and NiFi leaves it unchanged
+ * whatever the property's EL scope. Rejecting is used rather than escaping: NiFi collapses a
+ * doubled {@code $} only in front of a <code>{</code>, so a blanket escape corrupts values such as
+ * {@code US$5}.
  */
 public final class NifiExpressionLanguage {
+
+  private static final Pattern REFERENCE_START = Pattern.compile("[$#]\\{");
 
   private NifiExpressionLanguage() {}
 
   /**
-   * Escapes {@code $} to EL's literal form {@code $$} so the value is treated as text, never
-   * evaluated. Idempotent only for already-escaped input is <em>not</em> guaranteed — apply exactly
-   * once, at the boundary where tenant text becomes a processor-property value.
+   * Returns {@code value} unchanged if NiFi takes it literally.
+   *
+   * @param property the NiFi property name, used in the error message instead of the value
+   * @throws UnsafePropertyValueException if {@code value} contains <code>${</code> or <code>#{
+   *     </code>
    */
-  public static String escape(String value) {
-    return value.replace("$", "$$");
+  public static String requireLiteral(String property, String value) {
+    if (value != null && REFERENCE_START.matcher(value).find()) {
+      throw new UnsafePropertyValueException(property);
+    }
+    return value;
   }
 }

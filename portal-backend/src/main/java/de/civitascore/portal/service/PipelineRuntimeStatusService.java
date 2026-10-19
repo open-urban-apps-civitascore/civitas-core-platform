@@ -44,7 +44,6 @@ public class PipelineRuntimeStatusService {
       String message,
       String stacktrace,
       Instant occurredAt,
-      UUID correlationId,
       UUID eventId) {
     Pipeline pipeline = pipelineRepository.findById(pipelineId).orElse(null);
     if (pipeline == null) {
@@ -69,7 +68,6 @@ public class PipelineRuntimeStatusService {
     status.setMessage(sanitize(message));
     status.setSanitizedStacktrace(sanitize(stacktrace));
     status.setOccurredAt(occurredAt == null ? Instant.now() : occurredAt);
-    status.setCorrelationId(correlationId);
     status.setLastEventId(eventId);
     statusRepository.save(status);
   }
@@ -101,11 +99,11 @@ public class PipelineRuntimeStatusService {
 
   /**
    * Replaces any existing status with a fresh state/source record carrying no error detail, so a
-   * message, stacktrace or correlation left by an earlier status does not survive the new one.
+   * message or stacktrace left by an earlier status does not survive the new one.
    */
   private void applyPlainStatus(
       UUID pipelineId, PipelineRuntimeState state, PipelineRuntimeSource source) {
-    apply(pipelineId, state, source, null, null, null, null, null);
+    apply(pipelineId, state, source, null, null, null, null);
   }
 
   private static String sanitize(String value) {

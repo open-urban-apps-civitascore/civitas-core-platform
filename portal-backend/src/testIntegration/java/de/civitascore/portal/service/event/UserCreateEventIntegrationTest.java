@@ -7,8 +7,10 @@ import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.UserInputDTO;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.keycloak.representations.idm.UserRepresentation;
+import org.springframework.test.context.TestPropertySource;
 
 @DisplayName("User Create Event Integration Tests")
 class UserCreateEventIntegrationTest extends BaseEventPublishingIntegrationTest {
@@ -39,8 +41,8 @@ class UserCreateEventIntegrationTest extends BaseEventPublishingIntegrationTest 
                   .as("emailVerified should be false for a newly created user")
                   .isFalse();
               assertThat(keycloakUser.getRequiredActions())
-                  .as("New user should be required to verify email and update password")
-                  .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD");
+                  .as("New user should be required to verify email, update password and setup OTP")
+                  .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP");
             });
   }
 
@@ -66,8 +68,34 @@ class UserCreateEventIntegrationTest extends BaseEventPublishingIntegrationTest 
                   .as("emailVerified should be false for a newly created user")
                   .isFalse();
               assertThat(keycloakUser.getRequiredActions())
-                  .as("New user should be required to verify email and update password")
-                  .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD");
+                  .as("New user should be required to verify email, update password and setup OTP")
+                  .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP");
             });
+  }
+
+  @Nested
+  @TestPropertySource(properties = "keycloak.enforce-otp=false")
+  @DisplayName("With OTP enforcement disabled (KEYCLOAK_ENFORCE_OTP=false)")
+  class OtpEnforcementDisabled {
+
+    @Test
+    @DisplayName("Should not require CONFIGURE_TOTP when OTP enforcement is disabled")
+    void shouldNotRequireConfigureTotpWhenEnforcementDisabled() {
+      UserInputDTO input = createValidUserInput();
+      String email = input.getEmail();
+
+      userService.create(input);
+
+      await()
+          .atMost(Duration.ofSeconds(10))
+          .untilAsserted(
+              () -> {
+                UserRepresentation keycloakUser = findKeycloakUserByEmail(email);
+                assertThat(keycloakUser).as("User should be created in Keycloak").isNotNull();
+                assertThat(keycloakUser.getRequiredActions())
+                    .as("New user should verify email and update password but not set up OTP")
+                    .containsExactlyInAnyOrder("VERIFY_EMAIL", "UPDATE_PASSWORD");
+              });
+    }
   }
 }

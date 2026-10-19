@@ -20,7 +20,7 @@ body:json {
     "dataSinkType": "POSTGIS",
     "configuration": {
       "tableName": "sensor_observations_v2",
-      "dataStructureVersionId": "{{dataStructureVersionId}}"
+      "element": "{{setupModelUrn}}"
     }
   }
 }
@@ -29,6 +29,18 @@ script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('dataSinkId', res.body.id);
   }
+}
+
+tests {
+  test("DataSink updated", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Table name changed", function() {
+    if (res.getStatus() === 200) {
+      expect(res.body.configuration.tableName).to.equal('sensor_observations_v2');
+    }
+  });
 }
 
 docs {

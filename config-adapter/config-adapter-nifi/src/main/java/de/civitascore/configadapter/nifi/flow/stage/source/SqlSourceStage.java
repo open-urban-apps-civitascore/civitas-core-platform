@@ -109,7 +109,8 @@ public final class SqlSourceStage implements SourceStage {
    * mis-built.
    */
   @Override
-  public void bind(Datasource source, PlanContext out) throws FatalAdapterException {
+  public void bind(Datasource source, String sourceNodeKey, PlanContext out)
+      throws FatalAdapterException {
     Map<String, Object> original = source.getAdditionalProperties();
     Map<String, Object> decrypted = credentials.decrypt(original);
     rejectUnsupportedSqlFields(decrypted);
@@ -141,8 +142,6 @@ public final class SqlSourceStage implements SourceStage {
     putIfPresent(pool::put, "Database User", decrypted.get("user"));
     pool.put("Database Driver Class Name", "org.postgresql.Driver");
     pool.put("Database Driver Locations", "/opt/nifi/drivers/postgresql.jar");
-    // The Redpanda conn_max_* fields (idle/lifetime/open) are intentionally NOT mapped: the
-    // connection pool is platform-managed (NiFi DBCPConnectionPool defaults), not tenant-tunable.
     pool.forEach((key, value) -> out.putControllerServiceProperty(SOURCE_DBCP, key, value));
 
     // A password, if present, must be encrypted: a plaintext secret must never be written into the
@@ -181,8 +180,6 @@ public final class SqlSourceStage implements SourceStage {
    * Binds the QueryDatabaseTableRecord query properties ({@code table}/{@code columns}/{@code
    * where}). Table is required; an empty/{@code *} column list means all columns (the processor
    * default); a blank {@code where} is not bound (NiFi would emit an invalid {@code WHERE ()}).
-   * Each value is checked for a NiFi Expression Language reference first (see {@link
-   * #rejectExpressionLanguage}).
    */
   private static void bindSqlQuery(Map<String, Object> decrypted, PlanContext out)
       throws FatalAdapterException {
@@ -191,19 +188,14 @@ public final class SqlSourceStage implements SourceStage {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR, "SQL source requires a non-empty 'table'");
     }
-    rejectExpressionLanguage("table", table);
     out.putSourceProperty("Table Name", table);
 
     List<String> columns = trimmedNonBlank(decrypted.get("columns"));
-    for (String column : columns) {
-      rejectExpressionLanguage("columns", column);
-    }
     if (!columns.isEmpty() && !columns.equals(List.of("*"))) {
       out.putSourceProperty("Columns to Return", String.join(",", columns));
     }
 
     String where = trimmedString(decrypted.get("where"));
-    rejectExpressionLanguage("where", where);
     if (!where.isEmpty()) {
       out.putSourceProperty("Additional WHERE Clause", where);
     }
@@ -215,22 +207,13 @@ public final class SqlSourceStage implements SourceStage {
   }
 
   /**
-   * Fails loud on SQL connector fields the NiFi mapping cannot honor — rather than silently
-   * dropping them. {@code prefix}/{@code suffix}/{@code init_statement} are Redpanda Connect (the
-   * former engine) query concepts with no QueryDatabaseTableRecord equivalent; a {@code where}
-   * carrying a bind placeholder ({@code :name} or {@code ?}) would reach NiFi as unbound, invalid
-   * SQL; and the {@code dsn} query string is restricted to an allowlist of safe parameters (see
-   * {@link #rejectUnknownDsnParams}).
+   * Fails loud on SQL connector values the NiFi mapping cannot honor — rather than silently
+   * dropping them. A {@code where} carrying a bind placeholder ({@code :name} or {@code ?}) would
+   * reach NiFi as unbound, invalid SQL, and the {@code dsn} query string is restricted to an
+   * allowlist of safe parameters (see {@link #rejectUnknownDsnParams}).
    */
   private static void rejectUnsupportedSqlFields(Map<String, Object> config)
       throws FatalAdapterException {
-    for (String field : List.of("prefix", "suffix", "init_statement")) {
-      if (!trimmedString(config.get(field)).isEmpty()) {
-        throw new FatalAdapterException(
-            AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-            "SQL source field not supported by the pipeline engine: " + field);
-      }
-    }
     if (containsBindPlaceholder(trimmedString(config.get("where")))) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR,
@@ -285,24 +268,6 @@ public final class SqlSourceStage implements SourceStage {
     return sansLiterals.indexOf('?') >= 0
         || NAMED_PLACEHOLDER.matcher(sansLiterals).find()
         || POSITIONAL_PLACEHOLDER.matcher(sansLiterals).find();
-  }
-
-  /**
-   * Rejects a NiFi Expression Language reference ({@code ${...}}) in a value bound verbatim into a
-   * QueryDatabaseTableRecord property. Those properties evaluate EL in the environment scope, so a
-   * tenant-supplied {@code table}/{@code columns}/{@code where} carrying {@code
-   * ${NIFI_SECURITY_USER_OIDC_CLIENT_SECRET}} would have NiFi's own OIDC client secret expanded and
-   * sent in the SQL to the tenant's source DB — an environment-variable exfiltration path. {@code
-   * $$} is EL's own literal escape for a {@code $}, so it is not a reference and is allowed
-   * through.
-   */
-  private static void rejectExpressionLanguage(String field, String value)
-      throws FatalAdapterException {
-    if (value != null && value.replace("$$", "").contains("${")) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          "SQL source '" + field + "' must not contain a NiFi expression reference ('${...}')");
-    }
   }
 
   /**

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -83,6 +83,22 @@ describe('DatastructuresTable', () => {
     expect(rows).toHaveLength(3) // 1 header + 2 data rows
   })
 
+  it('shows the Usage column and marks only the rows a released entity references', () => {
+    const [first, second] = mockDatastructures
+    renderTable({
+      ...defaultProps,
+      datastructures: [
+        { ...first, inUse: true, inUseByReleased: true },
+        { ...second, inUse: true, inUseByReleased: false },
+      ],
+    })
+    const rows = screen.getAllByRole('row')
+
+    expect(screen.getByRole('columnheader', { name: 'Verwendung' })).toBeDefined()
+    expect(within(rows[1]).getByTestId('inUseIndicator')).toBeInTheDocument()
+    expect(within(rows[2]).queryByTestId('inUseIndicator')).toBeNull()
+  })
+
   describe('Permission gating', () => {
     it('action menu is hidden when user lacks DELETE permission', () => {
       mockCurrentUser([])
@@ -95,6 +111,28 @@ describe('DatastructuresTable', () => {
       renderTable()
       const menuButtons = screen.getAllByRole('button', { name: 'Open menu' })
       expect(menuButtons).toHaveLength(2)
+    })
+
+    it('action menu is shown on the top-level row but not on version sub-rows', () => {
+      mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_DELETE])
+      const [datastructure] = mockDatastructures
+      renderTable({
+        ...defaultProps,
+        datastructures: [
+          {
+            ...datastructure,
+            versions: [{ ...datastructure, id: '00000000-0000-0000-0000-000000000011', versions: [] }],
+          },
+        ],
+        rowCount: 1,
+      })
+
+      const [topLevelRow] = screen.getAllByRole('row').slice(1)
+      fireEvent.click(within(within(topLevelRow).getByTestId('expanderCell')).getByRole('button'))
+
+      const [, , subRow] = screen.getAllByRole('row')
+      expect(within(topLevelRow).getByRole('button', { name: 'Open menu' })).toBeInTheDocument()
+      expect(within(subRow).queryByRole('button', { name: 'Open menu' })).toBeNull()
     })
   })
 })

@@ -19,7 +19,7 @@ body:json {
     "dataSinkType": "POSTGIS",
     "configuration": {
       "tableName": "saga_sql_observations",
-      "dataStructureVersionId": "{{sqlTargetVersionId}}"
+      "element": "{{sqlTargetModelUrn}}"
     }
   }
 }
@@ -27,6 +27,10 @@ body:json {
 script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('sqlDataSinkId', res.body.id);
+  }
+
+  if (res.body && res.body.configurationUrn) {
+    bru.setVar('sqlDataSinkConfigurationUrn', res.body.configurationUrn);
   }
 }
 
@@ -50,7 +54,7 @@ docs {
 
   Creates a POSTGIS DataSink nested under the dataset. The sink is associated with the dataset via the path `dataSetId` (the input DTO's `dataSetId` is `@JsonIgnore`/path-derived, never sent in the body). It is **not** linked via a pipeline id — the pipeline (step 7) declares this sink in its `dataSinkIds`, which is an optional convenience link; the saga discovers sinks by dataset id regardless.
 
-  The `configuration` map carries the two POSTGIS-required fields validated by the backend: `tableName` (non-blank) and `dataStructureVersionId` (must be an existing, released version). The adapter derives the sink table's columns — including `geo` as `GEOMETRY(POINT,4326)` — from that version's JSON Schema.
+  The `configuration` map carries the two POSTGIS-required fields validated by the backend: `tableName` (non-blank) and `element` (the CORE URN of an existing model in the registry). The adapter derives the sink table's columns — including `geo` as `GEOMETRY(POINT,4326)` — from that version's JSON Schema.
 
   **Expected Response:** 201 Created, body contains `id` and `dataSinkType: "POSTGIS"`. 409 if a previous run already created it.
 

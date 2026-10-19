@@ -1,6 +1,8 @@
 import { assert, describe, expect, it } from 'vitest'
 
+import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
+import { datastructureFixtures } from '@/test-support/datastructureFixtures'
 import type {
   Datastructure,
   DatastructuresListData,
@@ -12,6 +14,7 @@ import { DATASTRUCTURE_STATUS_TYPES, DATASTRUCTURE_VERSION_SOURCE } from '@/type
 
 import {
   buildSessionFromVersion,
+  getDatastructureFieldOptions,
   mapDatastructuresApiToListData,
   mapDatastructureVersionApiToFormData,
   mapDatastructureVersionFormToApiData,
@@ -36,7 +39,6 @@ const createDatastructure = (versions: string[], datastructureId = 'ds1'): Datas
   id: datastructureId,
   name: `Datastructure ${datastructureId}`,
   description: 'Datastructure Description',
-  createdFromDataSource: false,
   dataStructureStatus: 'DRAFT',
   inUse: false,
   dataStructureVersions: versions.map(version => createVersion(version, datastructureId)),
@@ -144,6 +146,18 @@ describe('mapDatastructuresApiToListData', () => {
     expect(result[0]).toMatchObject(expectedResult)
   })
 
+  it('carries the released-referrer flag onto the structure row and each version row', () => {
+    const datastructure: Datastructure = createDatastructure(['1.0', '2.0'])
+    datastructure.inUseByReleased = true
+    datastructure.dataStructureVersions[0].inUseByReleased = true
+
+    const result = mapDatastructuresApiToListData([datastructure])
+
+    expect(result[0].inUseByReleased).toBe(true)
+    expect(result[0].versions[0].inUseByReleased).toBe(true)
+    expect(result[0].versions[1].inUseByReleased).toBeUndefined()
+  })
+
   it('selects the highest numeric version', () => {
     const datastructure: Datastructure = createDatastructure(['1.0', '1.1', '2.0'])
 
@@ -186,6 +200,32 @@ describe('mapDatastructuresApiToListData', () => {
     expect(result).toHaveLength(1)
     expect(result[0].versionNumber).toBeNull()
     expect(result[0].versions).toEqual([])
+  })
+})
+
+describe('a version with no stored model', () => {
+  it('has no number to list, and is labelled rather than named after one', () => {
+    const noModel = createVersionSummary({ version: null })
+
+    const [row] = mapDatastructureVersionsApiToListData([noModel])
+
+    expect(row.versionNumber).toBeNull()
+    expect(row.name).toBe('-')
+  })
+
+  it('is skipped when picking the number a datastructure shows', () => {
+    const structure = createDatastructure(['1.0.0'])
+    structure.dataStructureVersions.push(createVersionSummary({ id: 'no-model', version: null }))
+
+    const [row] = mapDatastructuresApiToListData([structure])
+
+    expect(row.versionNumber).toBe('1.0.0')
+  })
+
+  it('maps to an empty version on the form, so the placeholder shows', () => {
+    const form = mapDatastructureVersionApiToFormData(createVersionDetail({ version: null }))
+
+    expect(form.version).toBe('')
   })
 })
 
@@ -253,16 +293,45 @@ describe('mapDatastructureVersionFormToApiData', () => {
 
     const result = mapDatastructureVersionFormToApiData(formData, diagram, model)
 
+    // The registry owns the version, so the client does not send one.
     expect(result).toEqual({
       id: formData.id,
-      version: formData.version,
       description: formData.description,
-      dataStructureVersionSource: formData.dataStructureVersionSource,
       dataStructureVersionStatus: formData.dataStructureVersionStatus,
       modelName: formData.modelName,
       model,
       styles: diagram,
+      importedStructureUrns: [],
     })
+  })
+
+  it('records the published structures the diagram was built from', () => {
+    const formData = createVersionFormData()
+    const imported = [
+      {
+        urn: 'urn:core:platform:civitas:datastructure:frost:9cc6ed95-0f8b-8ace-ab6e-83cdee87b3dd:1.0.0',
+        name: 'ThingTree',
+      },
+      {
+        urn: 'urn:core:platform:civitas:datastructure:frost:c415dee9-6cad-8a43-9ad3-1e8b3903c57a:2.1.0',
+        name: 'Things',
+      },
+    ]
+    const diagram = { ...createVersionDetail().styles!, importedStructures: imported }
+
+    const result = mapDatastructureVersionFormToApiData(formData, diagram, null)
+
+    // Derived from the diagram, like the model document — the pin carries the version, because a
+    // later version of a structure must leave this one untouched.
+    expect(result.importedStructureUrns).toEqual(imported.map(structure => structure.urn))
+  })
+
+  it('keeps the stored pins when the save carries no diagram', () => {
+    const pinned = ['urn:core:platform:civitas:datastructure:frost:9cc6ed95-0f8b-8ace-ab6e-83cdee87b3dd:1.0.0']
+
+    const result = mapDatastructureVersionFormToApiData(createVersionFormData(), null, null, pinned)
+
+    expect(result.importedStructureUrns).toEqual(pinned)
   })
 })
 
@@ -327,6 +396,101 @@ describe('parseDatastructureVersionFormData', () => {
 })
 
 describe('buildSessionFromVersion', () => {
+  it('draws the model when nobody drew a diagram', () => {
+    // A version created over the API, or generated from a Data source, carries a model and no
+    // diagram. Its content is right there, so the canvas must not open empty.
+    const version = createVersionDetail({
+      modelName: 'ThingsPortTarget',
+      styles: null,
+      model: {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        title: 'ThingsPortTarget',
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          properties: {
+            type: 'object',
+            properties: { reference: { type: 'string', 'x-core-primaryKey': true } },
+            required: ['reference'],
+          },
+        },
+        required: ['name', 'properties'],
+      },
+    })
+
+    const result = buildSessionFromVersion(version)
+
+    expect(result.diagram.nodes.map(node => node.data.element.name)).toEqual([
+      'ThingsPortTarget',
+      'ThingsPortTargetProperties',
+    ])
+    // Reading a stored model is not a change the modeller made.
+    expect(result.isDirty).toBe(false)
+  })
+
+  it('keeps the drawing when there is one', () => {
+    const drawn = {
+      id: 'diagram-id',
+      name: 'Drawn',
+      nodes: [
+        {
+          id: 'n1',
+          type: 'class',
+          position: { x: 5, y: 5 },
+          data: { element: { id: 'n1', name: 'Drawn', type: 'class', attributes: [], operations: [] }, label: 'Drawn' },
+        },
+      ],
+      edges: [],
+      lastModified: new Date('2024-02-01T10:00:00.000Z'),
+      isDirty: false,
+    }
+    const version = createVersionDetail({ modelName: 'Drawn', styles: drawn as never })
+
+    // The drawing carries the positions the modeller chose; a derived layout would move them.
+    expect(buildSessionFromVersion(version).diagram.nodes).toHaveLength(1)
+  })
+
+  it('reads the retired Json type of a stored drawing as String, in the session and in the form', () => {
+    const element = {
+      id: 'n1',
+      name: 'Observation',
+      type: 'class',
+      attributes: [{ id: 'a1', name: 'resultQuality', type: 'Json' }],
+      operations: [
+        { id: 'o1', name: 'quality', returnType: 'Json', parameters: [{ id: 'p1', name: 'raw', type: 'Json' }] },
+      ],
+    }
+    const drawn = {
+      id: 'diagram-id',
+      name: 'Drawn',
+      nodes: [{ id: 'n1', type: 'class', position: { x: 5, y: 5 }, data: { element, label: 'Observation' } }],
+      edges: [],
+    }
+    const version = createVersionDetail({ styles: drawn as never })
+
+    for (const node of [
+      buildSessionFromVersion(version).diagram.nodes[0],
+      mapDatastructureVersionApiToFormData(version).nodes[0],
+    ]) {
+      expect(node.data.element).toMatchObject({
+        attributes: [{ name: 'resultQuality', type: 'String' }],
+        operations: [{ returnType: 'String', parameters: [{ type: 'String' }] }],
+      })
+    }
+    // The stored data changes on the next save, not on reading it.
+    expect(element.attributes[0].type).toBe('Json')
+  })
+
+  it('leaves the canvas empty for a model it cannot read', () => {
+    const version = createVersionDetail({
+      modelName: 'Alien',
+      styles: null,
+      model: { $defs: { Thing: { type: 'object', title: 'Thing', properties: { when: { type: 'timestamp' } } } } },
+    })
+
+    expect(buildSessionFromVersion(version).diagram.nodes).toHaveLength(0)
+  })
+
   it('prefers explicit sessionId and modelName over diagram values', () => {
     const created = new Date('2024-01-01T10:00:00.000Z')
     const version = createVersionDetail({
@@ -440,5 +604,177 @@ describe('root designation round-trip through persisted styles', () => {
 
     const rebuilt = session.diagram.nodes.map(node => node.data.element)
     expect(rebuilt.map(element => element.isRoot)).toEqual([true, undefined])
+  })
+})
+
+describe('getDatastructureFieldOptions', () => {
+  const classNode = (id: string, name: string, attributes: string[], isRoot?: boolean) => ({
+    id: `node-${id}`,
+    type: 'class',
+    position: { x: 0, y: 0 },
+    data: {
+      element: {
+        id,
+        name,
+        type: 'class',
+        isRoot,
+        attributes: attributes.map(attribute => ({ id: `${id}-${attribute}`, name: attribute, type: 'String' })),
+        operations: [],
+      },
+      label: name,
+    },
+  })
+
+  const enumNode = (id: string, name: string) => ({
+    id: `node-${id}`,
+    type: 'enumeration',
+    position: { x: 0, y: 0 },
+    data: {
+      element: { id, name, type: 'enumeration', literals: [{ id: `${id}-l`, name: 'LITERAL' }] },
+      label: name,
+    },
+  })
+
+  const diagramOf = (nodes: unknown[], edges: unknown[] = []) =>
+    ({ id: 'diagram-1', name: 'Struct', nodes, edges }) as unknown as UMLDiagram
+
+  const versionOf = (over: Partial<Pick<DatastructureVersion, 'model' | 'styles' | 'modelName'>>) =>
+    ({ model: null, styles: null, modelName: 'Struct', ...over }) as DatastructureVersion
+
+  it('takes the attributes of the root class when an enumeration comes first in the diagram', () => {
+    const styles = diagramOf([enumNode('e1', 'Colour'), classNode('c1', 'Building', ['name', 'geom'])])
+
+    const options = getDatastructureFieldOptions(versionOf({ styles }))
+
+    expect(options).toEqual([
+      { value: 'name', label: 'name' },
+      { value: 'geom', label: 'geom' },
+    ])
+  })
+
+  it('takes the attributes of the designated root when several classes exist', () => {
+    const styles = diagramOf([classNode('c1', 'Address', ['street']), classNode('c2', 'Building', ['name'], true)])
+
+    const options = getDatastructureFieldOptions(versionOf({ styles }))
+
+    expect(options).toEqual([{ value: 'name', label: 'name' }])
+  })
+
+  it('prefers the persisted model over the diagram', () => {
+    const model = {
+      title: 'Building',
+      type: 'object',
+      properties: { modelField: { type: 'string' } },
+    }
+    const styles = diagramOf([classNode('c1', 'Building', ['diagramField'])])
+
+    const options = getDatastructureFieldOptions(versionOf({ model, styles }))
+
+    expect(options).toEqual([{ value: 'modelField', label: 'modelField' }])
+  })
+
+  it('returns no options for a diagram without a unique root', () => {
+    const styles = diagramOf([classNode('c1', 'Address', ['street']), classNode('c2', 'Building', ['name'])])
+
+    expect(getDatastructureFieldOptions(versionOf({ styles }))).toEqual([])
+  })
+
+  it('returns no options for an empty, absent or missing version instead of throwing', () => {
+    expect(getDatastructureFieldOptions(versionOf({ styles: diagramOf([]) }))).toEqual([])
+    expect(getDatastructureFieldOptions(versionOf({}))).toEqual([])
+    expect(getDatastructureFieldOptions(undefined)).toEqual([])
+  })
+})
+
+/**
+ * The editor rehydrates from `styles`, never from the stored CORE model,
+ * so the provable statement is that a rehydrated diagram exports the same model again.
+ * This is rehydration, not reload: the payload comes from the test, not from the server.
+ */
+describe('the exported model survives a save/rehydrate round-trip', () => {
+  const formOf = (): DatastructureVersionFormData =>
+    ({
+      id: 'v1',
+      version: '1.0.0',
+      description: '',
+      dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
+      dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
+      modelName: 'Struct',
+    }) as DatastructureVersionFormData
+
+  const noEdit = (diagram: UMLDiagram) => diagram
+
+  const roundTrip = (diagram: UMLDiagram, edit: (diagram: UMLDiagram) => UMLDiagram = noEdit) => {
+    const before = buildUMLModelPayload(diagram).model
+    const persisted = JSON.parse(JSON.stringify(mapDatastructureVersionFormToApiData(formOf(), diagram, before)))
+    const rehydrated = buildSessionFromVersion(persisted as DatastructureVersion).diagram
+    return { before, after: buildUMLModelPayload(edit(rehydrated)).model }
+  }
+
+  it.each(datastructureFixtures)('$label exports an equivalent model after rehydration', ({ diagram }) => {
+    const { before, after } = roundTrip(diagram)
+    expect(after).toEqual(before)
+  })
+
+  const idsOf = (model: Record<string, unknown>) =>
+    Object.entries((model.$defs ?? {}) as Record<string, { $id?: string }>).map(([key, def]) => [key, def.$id])
+
+  const refsOf = (model: Record<string, unknown>): string[] => {
+    const refs: string[] = []
+    const walk = (node: unknown) => {
+      if (Array.isArray(node)) return node.forEach(walk)
+      if (!node || typeof node !== 'object') return
+      for (const [key, value] of Object.entries(node)) {
+        if (key === '$ref' && typeof value === 'string') refs.push(value)
+        else walk(value)
+      }
+    }
+    walk(model.$defs)
+    return refs.sort()
+  }
+
+  it.each(datastructureFixtures)('$label keeps its Element identities across the round-trip', ({ diagram }) => {
+    const { before, after } = roundTrip(diagram)
+
+    expect(idsOf(after)).toEqual(idsOf(before))
+    expect(refsOf(after)).toEqual(refsOf(before))
+    expect(after.$ref).toBe(before.$ref)
+  })
+
+  it('names every member by its key and every cross-reference by a local pointer', () => {
+    const { before } = roundTrip(fixtureNamed('four cross-referencing elements under one root'))
+    const pointer = (name: string) => `#/$defs/${name}`
+
+    expect(idsOf(before)).toEqual([
+      ['Station', undefined],
+      ['Measurement', undefined],
+      ['Reading', undefined],
+      ['Alert', undefined],
+    ])
+    // Measurement appears twice: both Reading and Alert inherit it.
+    expect(refsOf(before)).toEqual([
+      pointer('Alert'),
+      pointer('Measurement'),
+      pointer('Measurement'),
+      pointer('Reading'),
+    ])
+    expect(before.$ref).toBe(pointer('Station'))
+  })
+
+  const fixtureNamed = (label: string) => {
+    const fixture = datastructureFixtures.find(candidate => candidate.label === label)
+    assert(fixture, `no fixture labelled "${label}"`)
+    return fixture.diagram
+  }
+
+  it('moving a node changes no part of the exported model', () => {
+    const moveFirstNode = (diagram: UMLDiagram): UMLDiagram => ({
+      ...diagram,
+      nodes: diagram.nodes.map((node, index) => (index === 0 ? { ...node, position: { x: 512, y: 64 } } : node)),
+      viewport: { x: 10, y: 20, zoom: 2 },
+    })
+
+    const { before, after } = roundTrip(fixtureNamed('composition'), moveFirstNode)
+    expect(after).toEqual(before)
   })
 })

@@ -258,7 +258,7 @@ test_sub_resource_paths if {
 # Test: 5-segment paths resolve correctly (both literal-tail and both-{id} variants)
 test_5_segment_paths if {
 	# Literal tail: released/meta
-	result1 := resource_mapping.path_pattern with input as portal_request("PUT", "/v1/datasets/abc/released/meta")
+	result1 := resource_mapping.path_pattern with input as portal_request("PATCH", "/v1/datasets/abc/released/meta")
 	result1 == "/v1/datasets/{id}/released/meta"
 
 	# Both-{id}: pipelines/{id}

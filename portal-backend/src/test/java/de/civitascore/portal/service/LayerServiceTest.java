@@ -44,6 +44,8 @@ class LayerServiceTest {
   @Mock private DataSinkRepository dataSinkRepository;
   @Mock private StyleRepository styleRepository;
 
+  @Mock private DataSetMutationGuard dataSetMutationGuard;
+
   @InjectMocks private LayerService layerService;
 
   private DataSet dataSet(UUID id) {
@@ -59,41 +61,6 @@ class LayerServiceTest {
     input.setDataSinkId(dataSinkId);
     input.setLayerName("test-layer");
     return input;
-  }
-
-  @Nested
-  @DisplayName("findByIdAndDataSetOrThrow()")
-  class FindByIdAndDataSetOrThrow {
-
-    @Test
-    @DisplayName("Should return Layer when it belongs to the requested dataset")
-    void shouldReturnLayerForMatchingDataset() {
-      UUID dataSetId = UUID.randomUUID();
-      UUID layerId = UUID.randomUUID();
-
-      Layer layer = new Layer();
-      layer.setId(layerId);
-      layer.setDataSet(dataSet(dataSetId));
-
-      when(layerRepository.findById(layerId)).thenReturn(Optional.of(layer));
-
-      assertThat(layerService.findByIdAndDataSetOrThrow(layerId, dataSetId)).isSameAs(layer);
-    }
-
-    @Test
-    @DisplayName("Should throw ResourceNotFoundException when Layer belongs to a different dataset")
-    void shouldThrowWhenDatasetMismatch() {
-      UUID layerId = UUID.randomUUID();
-
-      Layer layer = new Layer();
-      layer.setId(layerId);
-      layer.setDataSet(dataSet(UUID.randomUUID()));
-
-      when(layerRepository.findById(layerId)).thenReturn(Optional.of(layer));
-
-      assertThatThrownBy(() -> layerService.findByIdAndDataSetOrThrow(layerId, UUID.randomUUID()))
-          .isInstanceOf(ResourceNotFoundException.class);
-    }
   }
 
   @Nested
@@ -208,30 +175,6 @@ class LayerServiceTest {
           .thenReturn(List.of(knownStyle));
 
       assertThatThrownBy(() -> layerService.create(input))
-          .isInstanceOf(ResourceNotFoundException.class);
-    }
-  }
-
-  @Nested
-  @DisplayName("preProcessUpdateInput()")
-  class PreProcessUpdateInput {
-
-    @Test
-    @DisplayName("Should throw ResourceNotFoundException when trying to change the dataset")
-    void shouldThrowWhenDatasetChanges() {
-      UUID layerId = UUID.randomUUID();
-      DataSet original = dataSet(UUID.randomUUID());
-
-      Layer existing = new Layer();
-      existing.setId(layerId);
-      existing.setDataSet(original);
-
-      LayerInputDTO input = new LayerInputDTO();
-      input.setDataSetId(UUID.randomUUID());
-      input.setDataSinkId(UUID.randomUUID());
-      input.setLayerName("updated");
-
-      assertThatThrownBy(() -> layerService.preProcessUpdateInput(input, existing))
           .isInstanceOf(ResourceNotFoundException.class);
     }
   }
@@ -422,28 +365,18 @@ class LayerServiceTest {
     static Stream<Arguments> bboxConsistencyCases() {
       Map<String, Object> bbox = Map.of("minx", -180, "miny", -90, "maxx", 180, "maxy", 90);
       return Stream.of(
-          // autoCalculate=true: bbox fields must be absent
-          Arguments.of(true, null, null, false),
-          Arguments.of(true, bbox, null, true),
-          Arguments.of(true, null, bbox, true),
-          Arguments.of(true, bbox, bbox, true),
-          // autoCalculate=false: both bbox fields are required
-          Arguments.of(false, bbox, bbox, false),
-          Arguments.of(false, null, null, true),
-          Arguments.of(false, bbox, null, true),
-          Arguments.of(false, null, bbox, true));
+          Arguments.of(null, null, false),
+          Arguments.of(bbox, bbox, false),
+          Arguments.of(bbox, null, true),
+          Arguments.of(null, bbox, true));
     }
 
-    @ParameterizedTest(name = "autoCalculate={0}, nativeBbox={1}, latLonBbox={2} → shouldThrow={3}")
+    @ParameterizedTest(name = "nativeBbox={0}, latLonBbox={1} → shouldThrow={2}")
     @MethodSource("bboxConsistencyCases")
-    @DisplayName("Should validate bbox field combinations against bboxAutoCalculate")
+    @DisplayName("Should require both bounding boxes or neither")
     void shouldValidateBboxConsistency(
-        boolean autoCalculate,
-        Map<String, Object> nativeBbox,
-        Map<String, Object> latLonBbox,
-        boolean shouldThrow) {
+        Map<String, Object> nativeBbox, Map<String, Object> latLonBbox, boolean shouldThrow) {
       LayerInputDTO input = new LayerInputDTO();
-      input.setBboxAutoCalculate(autoCalculate);
       input.setNativeBoundingBox(nativeBbox);
       input.setLatLonBoundingBox(latLonBbox);
       input.setDataSinkId(UUID.randomUUID());
@@ -452,7 +385,7 @@ class LayerServiceTest {
       if (shouldThrow) {
         assertThatThrownBy(() -> layerService.preProcessCreateInput(input))
             .isInstanceOf(InvalidInputException.class)
-            .hasMessageContaining("bboxAutoCalculate");
+            .hasMessageContaining("latLonBoundingBox");
       } else {
         assertThatCode(() -> layerService.preProcessCreateInput(input)).doesNotThrowAnyException();
       }

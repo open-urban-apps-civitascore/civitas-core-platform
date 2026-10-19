@@ -49,11 +49,6 @@ public class KafkaCloudEventPublisher implements CloudEventPublisher {
         resultTimeoutMs);
   }
 
-  public KafkaCloudEventPublisher(
-      KafkaProducer<String, CloudEvent> kafkaProducer, String resultTopic) {
-    this(kafkaProducer, resultTopic, 30000); // Default 30 second timeout
-  }
-
   @Override
   public CompletableFuture<ConfigResultEvent> publishAsync(
       String topic, String messageId, CloudEvent cloudEvent) {
@@ -127,15 +122,6 @@ public class KafkaCloudEventPublisher implements CloudEventPublisher {
   @Override
   public String getResultTopic() {
     return resultTopic;
-  }
-
-  /**
-   * Get the number of pending requests waiting for results.
-   *
-   * @return the count of pending requests
-   */
-  public int getPendingRequestCount() {
-    return pendingRequests.size();
   }
 
   private void setupTimout(String topic, String messageId) {

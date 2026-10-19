@@ -1,0 +1,57 @@
+meta {
+  name: 00a. Create DataSink for the pipeline
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+body:json {
+  {
+    "dataSinkType": "POSTGIS",
+    "configuration": {
+      "tableName": "pipeline_crud_observations",
+      "element": "{{setupModelUrn}}"
+    }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('pipelinesDataSinkId', res.body.id);
+  }
+  if (res.body && res.body.configurationUrn) {
+    bru.setVar('pipelinesDataSinkConfigurationUrn', res.body.configurationUrn);
+  }
+}
+
+tests {
+  test("DataSink created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("Carries the URN the pipeline references as sinkRef", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.configurationUrn).to.contain('urn:core:');
+    }
+  });
+}
+
+docs {
+  **Pipelines setup 00a** — the pipeline fixtures need a sink of their own.
+
+  The `datasinks/` folder deletes the sink it creates as its last step, so a pipeline cannot reference
+  it. This sink belongs to the pipeline fixtures and is referenced by `sinkRef` in their CORE model.
+
+  **Expected Response:** 201 Created with `id` and `configurationUrn`.
+
+  **Post-condition:** Saves `pipelinesDataSinkId` and `pipelinesDataSinkConfigurationUrn`.
+}

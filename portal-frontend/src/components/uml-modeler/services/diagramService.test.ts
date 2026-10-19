@@ -1,8 +1,10 @@
+import type { Connection } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
 
 import type { UMLDiagram, UMLNode } from '../types/diagram'
-import type { UMLElement } from '../types/uml'
-import { diagramReducer } from './diagramService'
+import type { UMLElement, UMLElementType } from '../types/uml'
+import { diagramReducer, isRelationshipAllowedBetween, validateRelationshipConnection } from './diagramService'
+import { classifyStructuralEdge } from './umlContainment'
 
 const node = (id: string, name: string, isRoot?: boolean): UMLNode =>
   ({
@@ -19,6 +21,25 @@ const diagram = (nodes: UMLNode[]): UMLDiagram =>
   ({ id: 'd1', name: 'D', nodes, edges: [], lastModified: new Date(0), isDirty: false }) as unknown as UMLDiagram
 
 const rootFlags = (d: UMLDiagram): (boolean | undefined)[] => d.nodes.map(n => n.data.element.isRoot)
+
+// A node whose id is its element's id, the way createUMLNode builds it: connections carry node ids
+// and the containment rules read them as element ids, so the two must be the same value.
+const typedNode = (id: string, type: UMLElementType): UMLNode =>
+  ({
+    id,
+    type,
+    position: { x: 0, y: 0 },
+    data: {
+      element:
+        type === 'enumeration'
+          ? { id, name: id, type, literals: [{ id: `${id}-lit`, name: 'GOOD', value: 'GOOD' }] }
+          : { id, name: id, type, attributes: [], operations: [] },
+      label: id,
+    },
+  }) as unknown as UMLNode
+
+const connect = (source: string, target: string): Connection =>
+  ({ source, target, sourceHandle: null, targetHandle: null }) as Connection
 
 describe('diagramReducer SET_ROOT_NODE', () => {
   it('flags the target node and clears every other flag in one action', () => {
@@ -45,5 +66,113 @@ describe('diagramReducer SET_ROOT_NODE', () => {
 
     expect(next.nodes[1]).toBe(state.nodes[1])
     expect((next.nodes[0].data.element as UMLElement).isRoot).toBe(true)
+  })
+})
+
+describe('validateRelationshipConnection composition/aggregation direction', () => {
+  const state = diagram([
+    typedNode('Whole', 'class'),
+    typedNode('AbstractWhole', 'abstractClass'),
+    typedNode('Quality', 'enumeration'),
+    typedNode('Contract', 'interface'),
+  ])
+
+  it('accepts an enumeration as the part, drawn towards the owning class', () => {
+    expect(validateRelationshipConnection(state, connect('Quality', 'Whole'), 'composition')).toBe(true)
+    expect(validateRelationshipConnection(state, connect('Quality', 'AbstractWhole'), 'composition')).toBe(true)
+  })
+
+  it('rejects the reverse direction — an enumeration owns nothing', () => {
+    expect(validateRelationshipConnection(state, connect('Whole', 'Quality'), 'composition')).toBe(false)
+  })
+
+  it('rejects an interface as the whole', () => {
+    expect(validateRelationshipConnection(state, connect('Quality', 'Contract'), 'composition')).toBe(false)
+  })
+
+  it('applies the same direction to aggregation', () => {
+    expect(validateRelationshipConnection(state, connect('Quality', 'Whole'), 'aggregation')).toBe(true)
+    expect(validateRelationshipConnection(state, connect('Whole', 'Quality'), 'aggregation')).toBe(false)
+  })
+
+  // The regression this guards: the validation used to require the *source* to be the class, which
+  // put the diamond — and therefore the container — on the enumeration, leaving the diagram without
+  // a resolvable root and the persisted model null.
+  it('agrees with umlContainment on which side is the container', () => {
+    const accepted = connect('Quality', 'Whole')
+    expect(validateRelationshipConnection(state, accepted, 'composition')).toBe(true)
+
+    const containment = classifyStructuralEdge({
+      id: 'r1',
+      type: 'composition',
+      source: accepted.source,
+      target: accepted.target,
+    })
+
+    expect(containment).toEqual(expect.objectContaining({ containerId: 'Whole', partId: 'Quality' }))
+  })
+})
+
+describe('isRelationshipAllowedBetween', () => {
+  it('allows an enumeration as a composition part but never as a subclass or superclass', () => {
+    expect(isRelationshipAllowedBetween('enumeration', 'class', 'composition')).toBe(true)
+    expect(isRelationshipAllowedBetween('enumeration', 'class', 'inheritance')).toBe(false)
+    expect(isRelationshipAllowedBetween('class', 'enumeration', 'inheritance')).toBe(false)
+  })
+
+  it('answers without any diagram state, so retyping an existing edge is not read as a duplicate', () => {
+    const state = {
+      ...diagram([typedNode('Quality', 'enumeration'), typedNode('Whole', 'class')]),
+      edges: [{ id: 'e1', source: 'Quality', target: 'Whole' }],
+    } as unknown as UMLDiagram
+    const existing = connect('Quality', 'Whole')
+
+    // Both calls describe the same pair; only the first one sees the edge and rejects it.
+    expect(validateRelationshipConnection(state, existing, 'composition')).toBe(false)
+    expect(isRelationshipAllowedBetween('enumeration', 'class', 'composition')).toBe(true)
+  })
+})
+
+describe('diagramReducer — MERGE_STRUCTURE', () => {
+  it('adds the loaded classes, their relations and the pins in one action', () => {
+    const existing = diagram([node('n1', 'Dataset', true)])
+    const loaded = node('n2', 'Thing')
+    const edge = {
+      id: 'e1',
+      source: 'n2',
+      target: 'n1',
+      type: 'composition',
+      data: { relationship: { id: 'r1', type: 'composition', source: 'n2', target: 'n1' } },
+    } as unknown as UMLDiagram['edges'][number]
+    const pins = [
+      {
+        urn: 'urn:core:platform:civitas:datastructure:frost:68606c30-9a4a-8774-b59a-63ccfb3a0c98:1.0.0',
+        name: 'Things',
+      },
+    ]
+
+    const merged = diagramReducer(existing, {
+      type: 'MERGE_STRUCTURE',
+      payload: { nodes: [loaded], edges: [edge], importedStructures: pins },
+    })
+
+    // One action, because the provider recomputes every dispatch from the diagram of the current
+    // render — a second action in the same handler would drop what this one added.
+    expect(merged.nodes).toHaveLength(2)
+    expect(merged.edges).toHaveLength(1)
+    expect(merged.importedStructures).toEqual(pins)
+    // The change is the modeller's to save.
+    expect(merged.isDirty).toBe(true)
+  })
+
+  it('leaves the existing root designation alone', () => {
+    const existing = diagram([node('n1', 'Dataset', true)])
+
+    const merged = diagramReducer(existing, {
+      type: 'MERGE_STRUCTURE',
+      payload: { nodes: [node('n2', 'Thing')], edges: [], importedStructures: [] },
+    })
+
+    expect(rootFlags(merged)).toEqual([true, undefined])
   })
 })

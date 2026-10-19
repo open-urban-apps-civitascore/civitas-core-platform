@@ -40,7 +40,6 @@ import lombok.experimental.SuperBuilder;
               "data_structure_id",
               "data_source_id",
               "dataset_id",
-              "catalog_id",
               "datapool_id"
             }),
     indexes = {
@@ -49,12 +48,10 @@ import lombok.experimental.SuperBuilder;
       @Index(name = "idx_assignment_datastructure", columnList = "data_structure_id"),
       @Index(name = "idx_assignment_datasource", columnList = "data_source_id"),
       @Index(name = "idx_assignment_dataset", columnList = "dataset_id"),
-      @Index(name = "idx_assignment_catalog", columnList = "catalog_id"),
       @Index(name = "idx_assignment_datapool", columnList = "datapool_id"),
       @Index(
           name = "idx_assignment_scope",
-          columnList =
-              "scope_type, data_structure_id, data_source_id, dataset_id, catalog_id, datapool_id")
+          columnList = "scope_type, data_structure_id, data_source_id, dataset_id, datapool_id")
     })
 @Getter
 @Setter
@@ -87,22 +84,18 @@ public class Assignment extends BaseEntity {
   private DataSet dataset;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "catalog_id")
-  private Catalog catalog;
-
-  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "datapool_id")
   private DataPool dataPool;
 
   /**
-   * Returns the scoped entity (e.g. {@link DataStructure}, {@link DataSource}, {@link DataSet},
-   * {@link Catalog}, or {@link DataPool}) associated with this assignment, or {@code null} for
-   * unscoped (system/tenant) assignments.
+   * Returns the scoped entity (e.g. {@link DataStructure}, {@link DataSource}, {@link DataSet}, or
+   * {@link DataPool}) associated with this assignment, or {@code null} for unscoped (system/tenant)
+   * assignments.
    *
    * @return the scope entity, or {@code null}
    */
   public NamedEntity getScope() {
-    return Stream.of(dataStructure, dataSource, dataset, catalog, dataPool)
+    return Stream.of(dataStructure, dataSource, dataset, dataPool)
         .filter(Objects::nonNull)
         .findFirst()
         .orElse(null);
@@ -123,11 +116,7 @@ public class Assignment extends BaseEntity {
   protected void validateScope() {
     if (scopeType == null || scopeType == ScopeType.TENANT) {
       // no scope entity should be set
-      if (dataStructure != null
-          || dataSource != null
-          || dataset != null
-          || catalog != null
-          || dataPool != null) {
+      if (dataStructure != null || dataSource != null || dataset != null || dataPool != null) {
         throw new IllegalStateException("No scope entity should be set for SYSTEM or TENANT scope");
       }
     } else {
@@ -140,9 +129,6 @@ public class Assignment extends BaseEntity {
       }
       if (dataset != null && scopeType != ScopeType.DATASET) {
         throw new IllegalStateException("DataSet requires DATASET scope");
-      }
-      if (catalog != null && scopeType != ScopeType.CATALOG) {
-        throw new IllegalStateException("Catalog requires DATACATALOGUE scope");
       }
       if (dataPool != null && scopeType != ScopeType.DATAPOOL) {
         throw new IllegalStateException("DataPool requires DATAPOOL scope");
@@ -192,16 +178,6 @@ public class Assignment extends BaseEntity {
   public void setScope(DataSource scope) {
     this.dataSource = scope;
     this.scopeType = ScopeType.DATASOURCE;
-  }
-
-  /**
-   * Sets the scope to the given {@link Catalog} and updates the {@link #scopeType} accordingly.
-   *
-   * @param scope the catalog to scope this assignment to
-   */
-  public void setScope(Catalog scope) {
-    this.catalog = scope;
-    this.scopeType = ScopeType.CATALOG;
   }
 
   /**

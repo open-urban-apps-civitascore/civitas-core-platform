@@ -36,6 +36,12 @@ public enum AdapterErrorCode {
   MISSING_CONFIG(1003, false, "Missing config: %s", "Configuration error"),
   UNSUPPORTED_OPERATION(1004, false, "Operation %s not supported", "Operation not supported"),
   INVALID_RESOURCE_TYPE(1005, false, "Invalid resource type: %s", "Invalid resource type"),
+  UNRESOLVABLE_DATA_STRUCTURE(
+      1006,
+      false,
+      "Unresolvable data structure: %s",
+      "The data structure does not resolve to a single root class; designate a root element in the"
+          + " data structure and publish the dataset again"),
 
   // 2xxx: Connectivity/Retryable errors -> Blocking retry loop
   CONNECTION_TIMEOUT(2001, true, "Connection timeout to %s", "Service temporarily unavailable"),

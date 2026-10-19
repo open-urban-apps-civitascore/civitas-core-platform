@@ -20,7 +20,7 @@ body:json {
     "dataSinkType": "POSTGIS",
     "configuration": {
       "tableName": "sensor_observations_rebuilt",
-      "dataStructureVersionId": "{{dataStructureVersionId}}"
+      "element": "{{setupModelUrn}}"
     },
     "confirmDataLoss": true
   }
@@ -32,21 +32,36 @@ script:post-response {
   }
 }
 
+tests {
+  test("Table change accepted on a DataSink that is not provisioned", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Table name changed", function() {
+    if (res.getStatus() === 200) {
+      expect(res.body.configuration.tableName).to.equal('sensor_observations_rebuilt');
+    }
+  });
+}
+
 docs {
-  Changing `tableName` (or `dataStructureVersionId`) on a **provisioned** dataset drops and
-  recreates the backing table, discarding all stored data. The backend rejects such a change with
-  409 unless `confirmDataLoss: true` is set.
+  The dataset of this collection is never released, so the DataSink is not provisioned: it has no table yet, `confirmDataLoss` is ignored and the table change is accepted.
 
-  **Precondition:** `dataSetId`, `dataSinkId`, `dataStructureVersionId` set; the dataset has been
-  released at least once (provisioned = true).
+  | DataSink | Change of `tableName` or `element` |
+  |---|---|
+  | not provisioned | accepted |
+  | provisioned POSTGIS | 409 Conflict, also with `confirmDataLoss` — a release never replaces a table; create a new DataSink and attach it to the Pipeline instead |
+  | provisioned FROST | 409 Conflict unless `confirmDataLoss: true` |
 
-  **Expected Response:** 200 OK. Without `confirmDataLoss`, the same request returns 409 Conflict.
+  **Precondition:** `dataSetId`, `dataSinkId` and `setupModelUrn` set.
+
+  **Expected Response:** 200 OK.
 
   **System Impact:**
 
   | Layer | Effect |
   |---|---|
-  | Backend | DataSink record updated; table rebuild happens on the next re-release |
-  | Config Adapter | PostGIS table dropped + recreated on re-release |
-  | External System | Stored rows are lost |
+  | Backend | DataSink configuration updated |
+  | Config Adapter | the table is created under the new name on the first release |
+  | External System | — |
 }

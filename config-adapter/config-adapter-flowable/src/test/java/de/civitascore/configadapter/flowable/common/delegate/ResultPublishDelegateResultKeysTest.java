@@ -96,7 +96,8 @@ class ResultPublishDelegateResultKeysTest {
     vars.put("datasetName", "Test");
     vars.put("description", "A test dataset");
     vars.put("hasPipelines", false);
-    vars.put("datasources", java.util.List.of());
+    vars.put("hasFrostSink", true);
+    vars.put("artifacts", Map.of());
     vars.put("dataPipelines", java.util.List.of());
 
     processEngine.getRuntimeService().startProcessInstanceByKey("dataset-create", vars);
@@ -126,6 +127,6 @@ class ResultPublishDelegateResultKeysTest {
         results.containsKey("dataPipelines"),
         "Trigger field 'dataPipelines' must not be in results");
     assertFalse(
-        results.containsKey("datasources"), "Trigger field 'datasources' must not be in results");
+        results.containsKey("artifacts"), "Trigger field 'artifacts' must not be in results");
   }
 }

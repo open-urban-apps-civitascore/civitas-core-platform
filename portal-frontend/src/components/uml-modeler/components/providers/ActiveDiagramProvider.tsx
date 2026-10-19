@@ -5,6 +5,7 @@ import { type ReactNode, useCallback, useMemo, useState } from 'react'
 
 import { createUMLNode } from '../../constants/elementTemplates'
 import { ActiveDiagramProvider } from '../../hooks/use-active-diagram'
+import { InvalidNodeIdsProvider } from '../../hooks/use-invalid-node-ids'
 import {
   createEmptyDiagram,
   diagramReducer,
@@ -13,6 +14,7 @@ import {
   getSelectedNodes,
   validateRelationshipConnection,
 } from '../../services/diagramService'
+import { getNextElementName } from '../../services/elementNameService'
 import type { DiagramAction, NodeCreationContext, UMLDiagram, UMLEdge, UMLElementUpdate } from '../../types/diagram'
 import type { UseMultiSessionReturn } from '../../types/session'
 import type { UMLRelationship, UMLRelationshipType } from '../../types/uml'
@@ -82,10 +84,12 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
   // Node operations
   const addNode = useCallback(
     (context: NodeCreationContext) => {
-      const newNode = createUMLNode(context.elementType, context.position, context.name)
+      const takenNames = diagram.nodes.map(node => node.data.element.name)
+      const name = context.name ?? getNextElementName(context.elementType, takenNames)
+      const newNode = createUMLNode(context.elementType, context.position, name)
       dispatch({ type: 'ADD_NODE', payload: newNode })
     },
-    [dispatch],
+    [diagram.nodes, dispatch],
   )
 
   const updateNode = useCallback(
@@ -289,5 +293,9 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
     ],
   )
 
-  return <ActiveDiagramProvider value={contextValue}>{children}</ActiveDiagramProvider>
+  return (
+    <ActiveDiagramProvider value={contextValue}>
+      <InvalidNodeIdsProvider nodes={diagram.nodes}>{children}</InvalidNodeIdsProvider>
+    </ActiveDiagramProvider>
+  )
 }

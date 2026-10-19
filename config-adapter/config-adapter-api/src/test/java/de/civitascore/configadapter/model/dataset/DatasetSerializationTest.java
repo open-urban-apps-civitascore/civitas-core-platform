@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.civitascore.configadapter.util.PayloadConverter;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
@@ -46,27 +47,49 @@ class DatasetSerializationTest {
     assertEquals("Neustadt Traffic Counts 2025", dataset.name());
   }
 
+  private static final String POSTGRESQL_SOURCE_URN =
+      "urn:core:platform:civitas:datasource:common:c712b9ae-3e8d-8fc7-9a12-f0d5ba1c83b1:1.0.0";
+  private static final String MQTT_SOURCE_URN =
+      "urn:core:platform:civitas:datasource:common:1a5b119c-46af-85a3-920f-d68bb70a4b07:1.0.0";
+  private static final String MAPPING_URN =
+      "urn:core:dataset:neustadt:mapping:traffic:4af71165-ea38-8247-bc44-481a078a9b5e:1.0.0";
+  private static final String ELEMENT_URN =
+      "urn:core:dataset:neustadt:element:traffic:0396ceb8-b76a-8436-9bd5-85a9a13bd889:1.0.0";
+
   @Test
-  void shouldDeserializeTwoDatasources() {
-    assertEquals(2, dataset.datasources().size());
+  void shouldDeserializeArtifactsKeyedByUrn() {
+    assertEquals(5, dataset.artifacts().size());
+    Map<String, Object> mapping = dataset.artifacts().get(MAPPING_URN);
+    assertNotNull(mapping);
+    assertEquals(ELEMENT_URN, mapping.get("source"));
+    assertTrue(((Map<?, ?>) mapping.get("fields")).containsKey("$.name"));
+  }
+
+  @Test
+  void absentArtifactsDeserializeAsEmptyMap() throws Exception {
+    Dataset withoutArtifacts =
+        objectMapper.readValue("{\"id\":\"d1\",\"name\":\"n\"}", Dataset.class);
+    assertTrue(withoutArtifacts.artifacts().isEmpty());
   }
 
   @Test
   void shouldDeserializePostgresqlDatasource() {
-    Datasource pg = dataset.datasources().getFirst();
-    assertEquals("0a7b8c9d-1e2f-4a5b-9c0d-1e2f3a4b5c6d", pg.getId());
-    assertEquals("postgresql", pg.getType());
+    Datasource pg =
+        PayloadConverter.fromValue(
+            dataset.artifacts().get(POSTGRESQL_SOURCE_URN), Datasource.class);
     assertEquals("Neustadt Mobility DB", pg.getName());
     assertEquals("pg-mobility.neustadt.de", pg.getHost());
     assertEquals(5432, pg.getPort());
 
     // type-specific fields captured as additional properties
+    assertEquals("sql", pg.getAdditionalProperties().get("connectionType"));
     assertEquals("mobility", pg.getAdditionalProperties().get("database"));
     assertEquals("public", pg.getAdditionalProperties().get("schema"));
     assertEquals("mobility_reader", pg.getAdditionalProperties().get("username"));
     assertEquals(true, pg.getAdditionalProperties().get("ssl"));
     assertEquals("require", pg.getAdditionalProperties().get("ssl_mode"));
     assertEquals(10, pg.getAdditionalProperties().get("connect_timeout_seconds"));
+    assertEquals(ELEMENT_URN, pg.getAdditionalProperties().get("element"));
 
     // nested additional property
     @SuppressWarnings("unchecked")
@@ -78,14 +101,14 @@ class DatasetSerializationTest {
 
   @Test
   void shouldDeserializeMqttDatasource() {
-    Datasource mqtt = dataset.datasources().get(1);
-    assertEquals("5f2a1c3e-7b8d-4c9e-a1b2-3c4d5e6f7a8b", mqtt.getId());
-    assertEquals("mqtt", mqtt.getType());
+    Datasource mqtt =
+        PayloadConverter.fromValue(dataset.artifacts().get(MQTT_SOURCE_URN), Datasource.class);
     assertEquals("Neustadt IoT MQTT Broker", mqtt.getName());
     assertEquals("iot-broker.neustadt.de", mqtt.getHost());
     assertEquals(8883, mqtt.getPort());
 
     // type-specific fields
+    assertEquals("mqtt", mqtt.getAdditionalProperties().get("connectionType"));
     assertEquals(
         "mqtts://iot-broker.neustadt.de", mqtt.getAdditionalProperties().get("broker_url"));
     assertEquals("civitas-core-ingestion", mqtt.getAdditionalProperties().get("client_id"));
@@ -149,11 +172,19 @@ class DatasetSerializationTest {
         objectMapper.readValue(
             """
             {"id":"p1","version":"1","action":"ADD","data":{},
-             "dataSourceIds":["src-1"],"dataSinkIds":["sink-1","sink-2"]}
+             "dataSourceIds":["urn:core:dataset:d:datasource:c:9787c3df-5325-8a02-8722-d44c626bed38:1.0.0"],
+             "dataSinkIds":["urn:core:dataset:d:datasink:c:344d8798-87fe-8ff7-97ac-74c216a4b4e4:1.0.0",
+                            "urn:core:dataset:d:datasink:c:dbcd8f42-2446-8c5b-9686-da1e0e6b2b46:1.0.0"]}
             """,
             DataPipeline.class);
-    assertEquals(List.of("src-1"), pipeline.dataSourceIds());
-    assertEquals(List.of("sink-1", "sink-2"), pipeline.dataSinkIds());
+    assertEquals(
+        List.of("urn:core:dataset:d:datasource:c:9787c3df-5325-8a02-8722-d44c626bed38:1.0.0"),
+        pipeline.dataSourceIds());
+    assertEquals(
+        List.of(
+            "urn:core:dataset:d:datasink:c:344d8798-87fe-8ff7-97ac-74c216a4b4e4:1.0.0",
+            "urn:core:dataset:d:datasink:c:dbcd8f42-2446-8c5b-9686-da1e0e6b2b46:1.0.0"),
+        pipeline.dataSinkIds());
   }
 
   @Test
@@ -228,10 +259,8 @@ class DatasetSerializationTest {
     Dataset roundTripped = objectMapper.readValue(json, Dataset.class);
     assertEquals(dataset.id(), roundTripped.id());
     assertEquals(dataset.name(), roundTripped.name());
-    assertEquals(dataset.datasources().size(), roundTripped.datasources().size());
     assertEquals(dataset.datapipelines().size(), roundTripped.datapipelines().size());
-    assertEquals(dataset.datasources().get(0), roundTripped.datasources().get(0));
-    assertEquals(dataset.datasources().get(1), roundTripped.datasources().get(1));
+    assertEquals(dataset.artifacts(), roundTripped.artifacts());
     assertEquals(dataset.namedApis().size(), roundTripped.namedApis().size());
     assertEquals(dataset.namedApis().get(0), roundTripped.namedApis().get(0));
     assertEquals(dataset.namedApis().get(1), roundTripped.namedApis().get(1));

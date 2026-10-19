@@ -1,0 +1,26 @@
+<html xmlns:wicket="http://wicket.apache.org">
+<body>
+<wicket:extend>
+  <h2>Seed models</h2>
+
+  <h3>Bundled sets</h3>
+  <p wicket:id="noBundles" class="mf-rel-empty"></p>
+  <div wicket:id="bundles" class="mf-bundle">
+    <div>
+      <div class="mf-bundle-title" wicket:id="bundleTitle"></div>
+      <div class="mf-bundle-sub" wicket:id="bundleSub"></div>
+    </div>
+    <a wicket:id="importLink" class="button-link">Import</a>
+  </div>
+
+  <h3>Upload schemas</h3>
+  <p class="mf-bundle-sub">Select one or more <code>*.schema.json</code> Element files to import as a bundle.</p>
+  <form wicket:id="uploadForm">
+    <div class="field-row">
+      <input type="file" wicket:id="files" multiple="multiple" accept=".json,application/json"/>
+    </div>
+    <button type="submit">Import selected files</button>
+  </form>
+</wicket:extend>
+</body>
+</html>

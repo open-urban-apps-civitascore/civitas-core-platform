@@ -96,7 +96,7 @@ test_path_pattern_datastructure_assignments if {
 # =============================================================================
 
 test_path_pattern_5_segment_released_meta if {
-	result := portal_backend.path_pattern with input as portal_request("PUT", "/v1/datasets/abc-123/released/meta")
+	result := portal_backend.path_pattern with input as portal_request("PATCH", "/v1/datasets/abc-123/released/meta")
 	result == "/v1/datasets/{id}/released/meta"
 }
 
@@ -125,7 +125,7 @@ test_path_pattern_6_segment_versions_unrelease if {
 }
 
 test_path_pattern_7_segment_versions_released_meta if {
-	result := portal_backend.path_pattern with input as portal_request("PUT", "/v1/datastructures/dstr-123/versions/v-456/released/meta")
+	result := portal_backend.path_pattern with input as portal_request("PATCH", "/v1/datastructures/dstr-123/versions/v-456/released/meta")
 	result == "/v1/datastructures/{id}/versions/{id}/released/meta"
 }
 

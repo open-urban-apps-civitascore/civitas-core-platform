@@ -1,0 +1,282 @@
+# CIVITAS/CORE Model Forge — CI jobs for the mono-repo.
+#
+# Ported from the former standalone model-forge/.gitlab-ci.yml. Model Forge is a set of
+# embedded Java libraries (model-forge-contract / -runtime / -spring-boot-starter, plus the
+# model-forge-admin-ui demo host). It builds like portal-model / config-adapter: build + test
+# the Maven reactor, then publish the Maven artifacts to the project registry so consumers
+# (portal-backend) can resolve them. This reactor no longer ships an npm types module; the
+# TypeScript/Zod CORE types are generated in portal-frontend from the CORE JSON Schemas.
+#
+# Not ported (handled elsewhere or obsolete in the mono-repo):
+#   - Security templates (SAST / Secret-Detection / Dependency-Scanning): included globally in .gitlab-ci.yml
+#   - renovate:            covered by .gitlab/ci/renovate.yml
+#   - commitlint:          repo-wide concern, not run per module here
+#   - pages (Docusaurus):  the docs live in the separate documentation repo, not this mono-repo
+#   - semantic-release:    the mono-repo has its own release process
+#   - validate-schemas docs-drift guard: the docs schema copies moved to the documentation repo,
+#                          so only the JSON Schema metaschema validation is kept below
+#
+# NOTE on versioning: Model Forge uses the same ${revision} pattern as portal-model and
+# config-adapter — main/tags publish the bare version, develop publishes -SNAPSHOT, and each
+# merge request publishes its own -MR-<iid>-SNAPSHOT. portal-backend, its only consumer, is
+# built against the version this pipeline published, so it always resolves its own branch's
+# Model Forge rather than whatever last wrote a shared coordinate.
+
+# Hidden job that defines rules for model-forge changes. All model-forge jobs extend this.
+.only-model-forge-changes:
+  rules:
+    # Always run on the nightly scheduled pipeline
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
+    # Always run on tags
+    - if: $CI_COMMIT_TAG
+    # Always run on main, staging and develop branch
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    # Mirrors .only-backend-changes: every pipeline that builds portal-backend must also
+    # publish Model Forge for that branch, since the backend jobs require it.
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - model-forge/**/*
+        - portal-backend/**/*
+        - portal-model/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/model-forge.yml
+        - .gitlab/ci/backend.yml
+        - .gitlab/ci/portal-model.yml
+
+# Setup version for model-forge from pom.xml with branch-based suffixes
+# - main/tags: release version (e.g., 0.1.0)
+# - develop: snapshot version (e.g., 0.1.0-SNAPSHOT)
+# - MR: merge request version (e.g., 0.1.0-MR-123-SNAPSHOT)
+setup-version-model-forge:
+  image: maven:3.9-eclipse-temurin-25-alpine
+  stage: .pre
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: model-forge-maven
+      files:
+        - model-forge/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd model-forge
+    - BASE_VERSION=$(mvn help:evaluate -Dexpression=revision -q -DforceStdout)
+    - echo "Base version from pom.xml - $BASE_VERSION"
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ] || [ -n "$CI_COMMIT_TAG" ]; then
+        MODEL_FORGE_VERSION="$BASE_VERSION"
+      elif [ "$CI_COMMIT_BRANCH" = "develop" ]; then
+        MODEL_FORGE_VERSION="${BASE_VERSION}-SNAPSHOT"
+      elif [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
+        MODEL_FORGE_VERSION="${BASE_VERSION}-MR-${CI_MERGE_REQUEST_IID}-SNAPSHOT"
+      else
+        MODEL_FORGE_VERSION="${BASE_VERSION}-${CI_COMMIT_SHORT_SHA}"
+      fi
+    - echo "MODEL_FORGE_VERSION=$MODEL_FORGE_VERSION" > ../model-forge-version.env
+    - echo "Setting MODEL_FORGE_VERSION=$MODEL_FORGE_VERSION"
+  artifacts:
+    reports:
+      dotenv: model-forge-version.env
+
+# Generate the maven dependency graph JSON for license/dependency scanning.
+# Always runs (own rules, no `changes`) so the scanner has the graph even when the
+# build job is skipped because nothing changed.
+generate-graph-model-forge:
+  image: maven:3.9-eclipse-temurin-25-alpine
+  stage: lint
+  needs:
+    - job: setup-version-model-forge
+      artifacts: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: model-forge-maven
+      files:
+        - model-forge/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd model-forge
+    # Reactor build: writes one maven.graph.json per module (and the aggregator pom).
+    - mvn -B dependency:tree -Drevision=$MODEL_FORGE_VERSION -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - model-forge/maven.graph.json
+      - model-forge/*/maven.graph.json
+
+# Validate the CORE-IR JSON Schemas against the JSON Schema metaschema, and every document in
+# the model-forge/schemas catalogue against the CORE schema it declares. Nothing in the Maven
+# build consumes that catalogue, so without the second step a demo/use-case document can drift
+# out of the CORE contract unnoticed and only fail when a host imports it.
+# (The docs-drift half of the original job is dropped — the docs schema copies now live
+#  in the documentation repo.)
+validate-schemas-model-forge:
+  extends: .only-model-forge-changes
+  image: python:3.12-slim
+  stage: lint
+  needs: []
+  script:
+    - pip install --quiet check-jsonschema
+    - |
+      CORE_DIR=model-forge/model-forge-runtime/src/main/resources
+      CATALOGUE=model-forge/schemas
+      FAILED=0
+
+      # 1. The CORE-IR meta-schemas themselves must be well-formed JSON Schema 2020-12 documents.
+      for f in "$CORE_DIR"/*.schema.json; do
+        [ -f "$f" ] || continue
+        echo "Validating $f ..."
+        check-jsonschema --check-metaschema "$f" || FAILED=1
+      done
+
+      # 2. Resolve each catalogue document to the CORE schema its own "$schema" declares. Emits
+      #    "<core schema file> <document>" per line; "METASCHEMA" for plain JSON Schema element
+      #    documents, "PARSE_ERROR" for malformed JSON. Documents without a "$schema" (fixture
+      #    seed data) are not emitted and therefore not validated.
+      cat > /tmp/resolve-core-schema.py <<'PY'
+      import json
+      import sys
+      from pathlib import Path
+
+      CORE_MAP = {
+          "https://civitasconnect.digital/core/datasource/v1": "datasource.schema.json",
+          "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSource": "datasource.schema.json",
+          "https://civitasconnect.digital/core/datasink/v1": "datasink.schema.json",
+          "https://civitasconnect.digital/core-dataset/v1#/$defs/DataSink": "datasink.schema.json",
+          "https://civitasconnect.digital/core/mapping/v1": "mapping.schema.json",
+          "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping": "mapping.schema.json",
+          "https://civitasconnect.digital/core/pipeline/v1": "pipeline.schema.json",
+          "https://civitasconnect.digital/core-dataset/v1#/$defs/Pipeline": "pipeline.schema.json",
+          "https://civitasconnect.digital/core-dataset/v1": "dataset.schema.json",
+          "https://civitasconnect.digital/core-datastructure/v1": "datastructure.schema.json",
+          "https://civitasconnect.digital/core/artifact-envelope/v1": "artifact-envelope.schema.json",
+      }
+      METASCHEMAS = {
+          "https://json-schema.org/draft/2020-12/schema",
+          "http://json-schema.org/draft/2020-12/schema",
+      }
+
+      for path in sorted(Path(sys.argv[1]).rglob("*.json")):
+          try:
+              document = json.loads(path.read_text(encoding="utf-8"))
+          except json.JSONDecodeError:
+              print(f"PARSE_ERROR {path}")
+              continue
+          declared = document.get("$schema") if isinstance(document, dict) else None
+          if declared in CORE_MAP:
+              print(f"{CORE_MAP[declared]} {path}")
+          elif declared in METASCHEMAS:
+              print(f"METASCHEMA {path}")
+      PY
+
+      # 3. Validate every resolved document. The directory check keeps the job green if the
+      #    catalogue is ever moved, and the per-file check keeps a stale manifest entry from
+      #    being handed to the validator as a filename.
+      if [ -d "$CATALOGUE" ]; then
+        python3 /tmp/resolve-core-schema.py "$CATALOGUE" > /tmp/core-documents.txt
+        while read -r schema doc; do
+          [ -f "$doc" ] || continue
+          case "$schema" in
+            PARSE_ERROR)
+              echo "Not valid JSON: $doc"
+              FAILED=1
+              ;;
+            METASCHEMA)
+              echo "Validating $doc ..."
+              check-jsonschema --check-metaschema "$doc" || FAILED=1
+              ;;
+            *)
+              echo "Validating $doc against $schema ..."
+              check-jsonschema --schemafile "$CORE_DIR/$schema" "$doc" || FAILED=1
+              ;;
+          esac
+        done < /tmp/core-documents.txt
+      else
+        echo "No $CATALOGUE directory — skipping catalogue validation."
+      fi
+
+      exit $FAILED
+
+# Build + test the whole reactor. `mvn verify` also runs the quality gates bound to the
+# verify phase (spotless format check, spotbugs static analysis). Needs Docker-in-Docker for
+# the Testcontainers-based tests (admin-ui boot test against a real PostgreSQL).
+test-model-forge:
+  extends: .only-model-forge-changes
+  image: maven:3.9-eclipse-temurin-25
+  stage: build-package
+  needs:
+    - job: setup-version-model-forge
+      artifacts: true
+  services:
+    - name: docker:27-dind
+      alias: docker
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ''
+    DOCKER_DRIVER: overlay2
+    TESTCONTAINERS_HOST_OVERRIDE: docker
+  cache:
+    key:
+      prefix: model-forge-maven
+      files:
+        - model-forge/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd model-forge
+    - mvn $MAVEN_CLI_OPTS verify -Drevision=$MODEL_FORGE_VERSION
+  artifacts:
+    when: always
+    expire_in: 1 month
+    paths:
+      - model-forge/*/target/*.jar
+      - model-forge/*/target/surefire-reports/
+      - model-forge/*/target/site/jacoco/
+    reports:
+      junit:
+        - model-forge/*/target/surefire-reports/TEST-*.xml
+
+# Publish the Maven artifacts to this project's GitLab Maven registry so portal-backend can
+# resolve them. Skips tests/quality (already run in test-model-forge).
+# The admin UI sets maven.deploy.skip, so the console is not published.
+publish-model-forge:
+  extends: .only-model-forge-changes
+  image: maven:3.9-eclipse-temurin-25-alpine
+  stage: deploy-package
+  needs:
+    - job: setup-version-model-forge
+      artifacts: true
+    - job: test-model-forge
+      artifacts: false
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: model-forge-maven
+      files:
+        - model-forge/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd model-forge
+    - |
+      mvn deploy -DskipTests -Drevision=$MODEL_FORGE_VERSION \
+        -Dspotless.check.skip=true \
+        -Dspotbugs.skip=true \
+        -Djacoco.skip=true \
+        -DaltDeploymentRepository=gitlab-maven::default::${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/maven \
+        -s ci_settings.xml

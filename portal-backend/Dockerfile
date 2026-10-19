@@ -1,5 +1,8 @@
 # Use JRE Alpine for small image size and security
-FROM eclipse-temurin:25-jre-alpine@sha256:609c3d5184aeabe15c1a077af6d1c53d0ba65df18347c67043d00195267c4f7d
+# Pinned: eclipse-temurin:25-jre-alpine (2026-09-25), Alpine 3.24.2. Update digest on base image updates.
+# Bumps libexpat to 2.8.5-r0 (CVE-2026-93990, CVE-2026-76641, CVE-2026-66046, CVE-2026-76956, CVE-2026-76957)
+# and openssl/libssl3/libcrypto3 to 3.5.8-r0 (CVE-2026-14456).
+FROM eclipse-temurin:25-jre-alpine@sha256:3c0a9084927a221ccd1d007fcaf614465672c0af37aaa834c5184483afe56d61
 
 LABEL maintainer="CIVITAS/CORE Team"
 LABEL description="CIVITAS/CORE Portal Backend - IoT Schema Service"
@@ -11,7 +14,7 @@ WORKDIR /app
 # gcompat: snappy-java ships a glibc-linked native library; without the shim the Kafka
 # producer (compression=snappy) cannot load it on Alpine/musl and every publish fails.
 ENV TZ=Europe/Berlin
-RUN apk add --no-cache curl tzdata gcompat
+RUN apk add --no-cache "curl=8.22.0-r0" "tzdata=2026d-r0" "gcompat=1.1.0-r4"
 
 # Copy pre-built JAR from CI artifacts
 COPY target/*.jar ./app.jar

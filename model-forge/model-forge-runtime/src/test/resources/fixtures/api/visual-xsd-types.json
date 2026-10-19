@@ -1,0 +1,17 @@
+[
+  {
+    "name": "Station",
+    "properties": [
+      {
+        "name": "stationId",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "required": true
+      }
+    ]
+  }
+]

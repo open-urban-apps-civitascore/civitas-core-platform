@@ -1,0 +1,1 @@
+{"properties":{"reference":"${sta_0_reference:escapeJson()}"},"Datastreams":[{"properties":{"reference":"${sta_1_reference:escapeJson()}"},"Observations":[{"result":${sta_2_result:isEmpty():ifElse('null', ${sta_2_result})},"phenomenonTime":${sta_3_phenomenontime:isEmpty():ifElse('null', ${sta_3_phenomenontime:escapeJson():prepend('"'):append('"')})}}]}]}

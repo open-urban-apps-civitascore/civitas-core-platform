@@ -1,0 +1,80 @@
+{
+  "$id": "urn:core:platform:civitas:datastructure:frost:59fe166d-a32b-8cc8-87f1-73a72615f3e8",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Observations",
+  "type": "object",
+  "properties": {
+    "observation": {
+      "$ref": "#/$defs/Observation"
+    }
+  },
+  "$defs": {
+    "Observation": {
+      "type": "object",
+      "title": "Observation",
+      "properties": {
+        "result": { },
+        "phenomenonTime": {
+          "type": "string"
+        },
+        "resultTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "validTime": {
+          "type": "string"
+        },
+        "parameters": {
+          "$ref": "#/$defs/ObservationParameters"
+        },
+        "FeatureOfInterest": {
+          "$ref": "#/$defs/FeatureOfInterest"
+        }
+      },
+      "required": [
+        "result",
+        "parameters"
+      ]
+    },
+    "ObservationParameters": {
+      "type": "object",
+      "title": "ObservationParameters",
+      "properties": {
+        "reference": {
+          "type": "string",
+          "x-core-primaryKey": true
+        },
+        "thingReference": {
+          "type": "string"
+        },
+        "datastreamReference": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "thingReference",
+        "datastreamReference"
+      ]
+    },
+    "FeatureOfInterest": {
+      "type": "object",
+      "title": "FeatureOfInterest",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "encodingType": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "encodingType"
+      ]
+    }
+  }
+}

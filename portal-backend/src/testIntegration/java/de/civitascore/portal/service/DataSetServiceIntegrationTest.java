@@ -7,15 +7,14 @@ import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
-import de.civitascore.portal.model.entity.Catalog;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
-import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -23,11 +22,13 @@ import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.output.assembler.DataSetAssembler;
 import de.civitascore.portal.repository.AssignmentRepository;
-import de.civitascore.portal.repository.CatalogRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
+import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.security.dto.PrincipalUserDetails;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -36,10 +37,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
@@ -49,9 +53,10 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private DataSetService dataSetService;
   @Autowired private PortalTestDataFactory portalData;
   @Autowired private DataSetRepository dataSetRepository;
-  @Autowired private CatalogRepository catalogRepository;
   @Autowired private DataSinkRepository dataSinkRepository;
+  @Autowired private DataSinkService dataSinkService;
   @Autowired private LayerRepository layerRepository;
+  @Autowired private PipelineRepository pipelineRepository;
 
   @AfterEach
   void cleanup() {
@@ -71,12 +76,19 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     return styles;
   }
 
-  /** Helper method to create a sample model map for Pipeline. */
+  /**
+   * Helper method to create a sample CORE Pipeline model map. The stored model is validated against
+   * pipeline.schema.json (top-level {@code nodes}/{@code edges} required; Model Forge stamps {@code
+   * $schema}/{@code id}), so the fixture emits a clean, schema-valid document.
+   */
   private Map<String, Object> createSampleModel() {
     Map<String, Object> model = new HashMap<>();
-    model.put("input", Map.of("type", "kafka"));
-    model.put("pipeline", List.of(Map.of("processor", "transform")));
-    model.put("output", Map.of("type", "frost"));
+    model.put(
+        "nodes",
+        List.of(
+            Map.of("id", "start-1", "kind", "start", "label", "Start"),
+            Map.of("id", "end-1", "kind", "end", "label", "End")));
+    model.put("edges", List.of(Map.of("id", "edge-1", "source", "start-1", "target", "end-1")));
     return model;
   }
 
@@ -90,18 +102,6 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     Pipeline pipeline1 = createPipelineForDataSet(dataSet, "Pipeline 1");
     Pipeline pipeline2 = createPipelineForDataSet(dataSet, "Pipeline 2");
     dataSet.getPipelines().addAll(Set.of(pipeline1, pipeline2));
-
-    Distribution distribution1 = createDistributionForDataSet(dataSet, "/api/v1/traffic");
-    Distribution distribution2 = createDistributionForDataSet(dataSet, "/api/v1/weather");
-    dataSet.getDistributions().addAll(Set.of(distribution1, distribution2));
-
-    Catalog catalog1 = createInitialCatalog("Catalog 1");
-    Catalog catalog2 = createInitialCatalog("Catalog 2");
-    catalog1.getDataSets().add(dataSet);
-    catalog2.getDataSets().add(dataSet);
-    catalogRepository.save(catalog1);
-    catalogRepository.save(catalog2);
-    dataSet.getCatalogs().addAll(Set.of(catalog1, catalog2));
 
     Assignment assignment1 = createAssignmentForDataSet(dataSet, "Test Assignment 1");
     Assignment assignment2 = createAssignmentForDataSet(dataSet, "Test Assignment 2");
@@ -133,26 +133,6 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
               assertThat(pipeline.getDataSet().getId()).isEqualTo(dataSetId);
             });
 
-    assertThat(retrievedDataSet.getDistributions())
-        .isNotNull()
-        .hasSize(2)
-        .extracting(Distribution::getAccessUrl)
-        .containsExactlyInAnyOrder(distribution1.getAccessUrl(), distribution2.getAccessUrl());
-
-    retrievedDataSet
-        .getDistributions()
-        .forEach(
-            distribution -> {
-              assertThat(distribution.getDataSet()).isNotNull();
-              assertThat(distribution.getDataSet().getId()).isEqualTo(dataSetId);
-            });
-
-    assertThat(retrievedDataSet.getCatalogs())
-        .isNotNull()
-        .hasSize(2)
-        .extracting(Catalog::getName)
-        .containsExactlyInAnyOrder(catalog1.getName(), catalog2.getName());
-
     assertThat(retrievedDataSet.getAssignments())
         .isNotNull()
         .hasSize(2)
@@ -173,32 +153,28 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
    * Helper methods to create test data with relationships
    *************/
 
+  private SagaResultPayload sagaResultFor(UUID datasetId) {
+    return new SagaResultPayload(
+        datasetId.toString(), null, null, null, null, null, null, null, null, null, null);
+  }
+
   private DataSet createInitialDataSet() {
     return portalData.dataSet(b -> b.description("Test dataset for relationship testing"));
   }
 
   private Pipeline createPipelineForDataSet(DataSet dataSet, String name) {
-    DataSource ds1 = portalData.dataSource();
-    DataSource ds2 = portalData.dataSource();
-    DataSource ds3 = portalData.dataSource();
+    DataSource ds1 = portalData.dataSource(b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE));
+    DataSource ds2 = portalData.dataSource(b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE));
+    DataSource ds3 = portalData.dataSource(b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE));
 
-    return portalData.pipeline(
-        dataSet,
-        b ->
-            b.name(name + "_" + System.currentTimeMillis())
-                .description("Test pipeline for " + name)
-                .styles(createSampleStyles())
-                .dataSources(new HashSet<>(Set.of(ds1, ds2, ds3)))
-                .model(createSampleModel()));
-  }
-
-  private Distribution createDistributionForDataSet(DataSet dataSet, String apiPath) {
-    return portalData.distribution(
-        b -> b.accessUrl("http://localhost:8080" + apiPath).dataSet(dataSet));
-  }
-
-  private Catalog createInitialCatalog(String name) {
-    return portalData.catalog(b -> b.name(name + "_" + System.currentTimeMillis()));
+    Pipeline pipeline =
+        portalData.pipeline(
+            dataSet,
+            b ->
+                b.name(name + "_" + System.currentTimeMillis())
+                    .description("Test pipeline for " + name)
+                    .dataSources(new HashSet<>(Set.of(ds1, ds2, ds3))));
+    return portalData.attachPipelineDefinition(pipeline, createSampleModel(), createSampleStyles());
   }
 
   private Assignment createAssignmentForDataSet(DataSet dataSet, String roleName) {
@@ -216,6 +192,20 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     @Autowired private DataSetAssembler dataSetAssembler;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private AssignmentRepository assignmentRepository;
+
+    /** An assignment change needs a caller; the roles here carry no permissions to check. */
+    @BeforeEach
+    void authenticateCaller() {
+      PrincipalUserDetails caller =
+          PrincipalUserDetails.builder().userId(UUID.randomUUID()).build();
+      SecurityContextHolder.getContext()
+          .setAuthentication(new UsernamePasswordAuthenticationToken(caller, null, List.of()));
+    }
+
+    @AfterEach
+    void clearCaller() {
+      SecurityContextHolder.clearContext();
+    }
 
     /**
      * Faithfully reproduces the controller PATCH path: load current entity, map to input DTO, apply
@@ -289,13 +279,14 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
       patchAssignments(dataSet.getId(), group.getId(), dataRole.getId());
 
-      assertThat(assignmentRepository.findAllByGroupId(group.getId()))
+      assertThat(
+              assignmentRepository.findAllByScopeTypeAndDatasetId(
+                  ScopeType.DATASET, dataSet.getId()))
           .singleElement()
           .satisfies(
               a -> {
+                assertThat(a.getGroup().getId()).isEqualTo(group.getId());
                 assertThat(a.getRole().getId()).isEqualTo(dataRole.getId());
-                assertThat(a.getScopeType()).isEqualTo(ScopeType.DATASET);
-                assertThat(a.getDataset().getId()).isEqualTo(dataSet.getId());
               });
     }
   }
@@ -303,6 +294,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   @Nested
   @DisplayName("Stage DataSet Tests")
   class StageDataSetTests {
+
     @Test
     @Transactional
     @DisplayName("Should mark dataset as ready with pipelines")
@@ -370,7 +362,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       dataSet.setPendingSagaType(PendingSagaType.DELETE);
       dataSetRepository.save(dataSet);
 
-      dataSetService.handleSagaCompleted(dataSet.getId(), deleteResultFor(dataSet.getId()));
+      dataSetService.handleSagaCompleted(dataSet.getId(), sagaResultFor(dataSet.getId()));
 
       assertThat(layerRepository.findById(layer.getId())).isEmpty();
       assertThat(dataSinkRepository.findById(sink.getId())).isEmpty();
@@ -390,10 +382,45 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(dataSinkRepository.findById(sink.getId())).isEmpty();
       assertThat(dataSetRepository.findById(dataSet.getId())).isEmpty();
     }
+  }
 
-    private SagaResultPayload deleteResultFor(UUID datasetId) {
-      return new SagaResultPayload(
-          datasetId.toString(), null, null, null, null, null, null, null, null, null, null);
+  @Nested
+  @DisplayName("Delete With Provisioned Sinks Tests")
+  class DeleteWithProvisionedSinksTests {
+
+    /** A teardown that skips provisioned sinks leaves a table that nothing can delete. */
+    @Test
+    @DisplayName(
+        "Should remove a provisioned sink that refuses a standalone delete when its dataset is"
+            + " torn down")
+    void shouldRemoveProvisionedSinkOnSagaDeleteCompleted() {
+      DataSet dataSet = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.DRAFT));
+      Pipeline pipeline = portalData.pipeline(dataSet);
+      DataSink sink = portalData.dataSink(dataSet, pipeline);
+      UUID id = dataSet.getId();
+
+      completeSaga(id, DataSetStatus.AVAILABLE, PendingSagaType.CREATE);
+      completeSaga(id, DataSetStatus.READY, PendingSagaType.UNRELEASE);
+      dataSetService.unstage(id);
+
+      assertThatThrownBy(() -> dataSinkService.deleteById(sink.getId()))
+          .isInstanceOf(ResourceInUseException.class);
+      assertThat(dataSinkRepository.findById(sink.getId())).isPresent();
+
+      completeSaga(id, DataSetStatus.DRAFT, PendingSagaType.DELETE);
+
+      assertThat(dataSinkRepository.findById(sink.getId())).isEmpty();
+      assertThat(pipelineRepository.findById(pipeline.getId())).isEmpty();
+      assertThat(dataSetRepository.findById(id)).isEmpty();
+    }
+
+    /** Stands in for the saga trigger, which needs a message broker this context does not run. */
+    private void completeSaga(UUID id, DataSetStatus status, PendingSagaType type) {
+      DataSet dataSet = dataSetRepository.findById(id).orElseThrow();
+      dataSet.setDataSetStatus(status);
+      dataSet.setPendingSagaType(type);
+      dataSetRepository.save(dataSet);
+      dataSetService.handleSagaCompleted(id, sagaResultFor(id));
     }
   }
 }

@@ -5,7 +5,15 @@ import { useTranslations } from 'next-intl'
 import type { ConfigField } from '@/components/node-editor/types'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 import type { MappingTransformDef } from '../transforms'
 
@@ -23,11 +31,22 @@ const FieldControl = ({ field, value, onChange }: FieldControlProps) => {
           <SelectValue placeholder={field.placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {field.options?.map(option => (
-            <SelectItem key={option.label} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
+          {field.groupedOptions
+            ? field.groupedOptions.map(group => (
+                <SelectGroup key={group.label}>
+                  <SelectLabel>{group.label}</SelectLabel>
+                  {group.options.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))
+            : field.options?.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
         </SelectContent>
       </Select>
     )
@@ -48,13 +67,17 @@ interface TransformInspectorProps {
   def?: MappingTransformDef
   config: Record<string, unknown>
   onChange: (key: string, value: string) => void
+  /** fieldKey → already-translated message. */
+  errors?: Record<string, string>
 }
 
 /** Inspector body rendered entirely from the selected node's registry entry. */
-export const TransformInspector = ({ def, config, onChange }: TransformInspectorProps) => {
+export const TransformInspector = ({ def, config, onChange, errors }: TransformInspectorProps) => {
   const t = useTranslations('pipelineEditor.mappingEditor.inspector')
 
   if (!def) return null
+
+  const placeholders = def.placeholders?.(config)
 
   return (
     <div className="space-y-4 p-4">
@@ -63,16 +86,19 @@ export const TransformInspector = ({ def, config, onChange }: TransformInspector
         {def.description && <p className="text-xs text-muted-foreground">{def.description}</p>}
       </div>
 
-      {def.config.map(field => (
-        <div key={field.key} className="space-y-1.5">
-          <Label>{field.label}</Label>
-          <FieldControl
-            field={field}
-            value={String(config[field.key] ?? field.default ?? '')}
-            onChange={value => onChange(field.key, value)}
-          />
-        </div>
-      ))}
+      {def.config
+        .filter(field => !def.visibleFields || def.visibleFields(config).includes(field.key))
+        .map(field => (
+          <div key={field.key} className="space-y-1.5">
+            <Label>{field.label}</Label>
+            <FieldControl
+              field={{ ...field, placeholder: placeholders?.[field.key] ?? field.placeholder }}
+              value={String(config[field.key] ?? field.default ?? '')}
+              onChange={value => onChange(field.key, value)}
+            />
+            {errors?.[field.key] && <p className="text-xs text-destructive">{errors[field.key]}</p>}
+          </div>
+        ))}
 
       {def.config.length === 0 && <p className="text-xs text-muted-foreground">{t('noConfig')}</p>}
     </div>

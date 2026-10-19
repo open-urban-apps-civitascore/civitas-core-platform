@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder.FlowBuildSpec;
+import de.civitascore.configadapter.nifi.mapping.NifiExpressionLanguage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -107,7 +108,9 @@ public final class BuildContext {
     // stamp the friendly name so the REST client can match sensitive properties by name post-upload
     node.put("name", friendlyName);
     ObjectNode props = (ObjectNode) node.get("properties");
-    spec.controllerServiceProperties().getOrDefault(friendlyName, Map.of()).forEach(props::put);
+    spec.controllerServiceProperties()
+        .getOrDefault(friendlyName, Map.of())
+        .forEach((key, value) -> props.put(key, NifiExpressionLanguage.requireLiteral(key, value)));
     controllerServices.add(node);
     csIdByName.put(friendlyName, node.get("identifier").asText());
     return node.get("identifier").asText();
@@ -166,8 +169,40 @@ public final class BuildContext {
     }
   }
 
+  /**
+   * Sets a processor property to a value NiFi must take literally.
+   *
+   * @throws de.civitascore.configadapter.nifi.mapping.UnsafePropertyValueException if the value
+   *     holds an Expression Language or parameter reference
+   */
   public static void setProp(Processor processor, String key, String value) {
-    ((ObjectNode) processor.node().get("properties")).put(key, value);
+    setExpression(processor, key, NifiExpressionLanguage.requireLiteral(key, value));
+  }
+
+  /**
+   * Sets a processor property to platform-authored Expression Language. Any tenant text inside
+   * {@code expression} must already be restricted to characters that cannot open an expression.
+   */
+  public static void setExpression(Processor processor, String key, String expression) {
+    ((ObjectNode) processor.node().get("properties")).put(key, expression);
+  }
+
+  /**
+   * Sets a property of an already registered controller service to platform-authored text, which
+   * may hold Expression Language or a parameter reference. Tenant values go through the spec
+   * instead, where {@link #addControllerService} checks them.
+   */
+  public void setControllerServiceExpression(String friendlyName, String key, String expression)
+      throws FatalAdapterException {
+    for (JsonNode service : controllerServices) {
+      if (friendlyName.equals(service.path("name").asText())) {
+        ((ObjectNode) service.get("properties")).put(key, expression);
+        return;
+      }
+    }
+    throw new FatalAdapterException(
+        AdapterErrorCode.NIFI_FLOW_ERROR,
+        "unresolved controller-service reference: " + friendlyName);
   }
 
   /** Sets a processor property to the deterministic id of an already registered service. */

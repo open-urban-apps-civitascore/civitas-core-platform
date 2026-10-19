@@ -1,36 +1,9 @@
+import { getNextElementName } from '../services/elementNameService'
 import type { UMLNode, UMLNodeData } from '../types/diagram'
-import type { UMLAbstractClass, UMLClass, UMLElementType, UMLEnumeration, UMLInterface } from '../types/uml'
-import { DEFAULT_NAMES } from './umlTypes'
+import type { UMLAbstractClass, UMLClass, UMLElement, UMLElementType, UMLEnumeration, UMLInterface } from '../types/uml'
 
 // Helper function to generate unique IDs
 const generateId = () => crypto.randomUUID()
-
-// Counter for auto-naming
-let elementCounter = {
-  class: 1,
-  interface: 1,
-  abstractClass: 1,
-  enumeration: 1,
-}
-
-// Get next auto-generated name for element type
-export const getNextElementName = (elementType: UMLElementType): string => {
-  const baseName = DEFAULT_NAMES[elementType]
-  const count = elementCounter[elementType]
-  elementCounter[elementType]++
-
-  return count === 1 ? baseName : `${baseName}${count}`
-}
-
-// Reset element counters (useful for new diagrams)
-export const resetElementCounters = (): void => {
-  elementCounter = {
-    class: 1,
-    interface: 1,
-    abstractClass: 1,
-    enumeration: 1,
-  }
-}
 
 // Default UML Class template. Operations are unsupported for the first release and
 // hidden from the editor, so a new class starts without one.
@@ -48,23 +21,20 @@ export const createClassTemplate = (name?: string): UMLClass => ({
   operations: [],
 })
 
-// Default UML Interface template
+// Default UML Interface template. Operations are unsupported for the first release
+// and hidden from the editor; since the interface model carries no other members,
+// a new interface starts empty.
 export const createInterfaceTemplate = (name?: string): UMLInterface => ({
   id: generateId(),
   name: name || getNextElementName('interface'),
   type: 'interface',
   stereotype: '<<interface>>',
-  operations: [
-    {
-      id: generateId(),
-      name: 'operation',
-      parameters: [],
-      returnType: 'void',
-    },
-  ],
+  operations: [],
 })
 
-// Default UML Abstract Class template
+// Default UML Abstract Class template. Operations are unsupported for the first
+// release and hidden from the editor, so a new abstract class starts with a single
+// attribute and no operation.
 export const createAbstractClassTemplate = (name?: string): UMLAbstractClass => ({
   id: generateId(),
   name: name || getNextElementName('abstractClass'),
@@ -76,15 +46,7 @@ export const createAbstractClassTemplate = (name?: string): UMLAbstractClass => 
       type: 'String',
     },
   ],
-  operations: [
-    {
-      id: generateId(),
-      name: 'abstractOperation',
-      isAbstract: true,
-      parameters: [],
-      returnType: 'void',
-    },
-  ],
+  operations: [],
 })
 
 // Default UML Enumeration template
@@ -122,13 +84,12 @@ export const createElement = (elementType: UMLElementType, name?: string) => {
 }
 
 // Create UML node from element template
-export const createUMLNode = (
-  elementType: UMLElementType,
-  position: { x: number; y: number },
-  name?: string,
-): UMLNode => {
-  const element = createElement(elementType, name)
-
+/**
+ * The canvas node of an element. Every producer goes through here — the palette, and the import of
+ * a published structure — so a node a modeller draws and a node that is loaded behave the same:
+ * the same drag handle, the same minimum size.
+ */
+export const umlNodeFor = (element: UMLElement, position: { x: number; y: number }): UMLNode => {
   const nodeData: UMLNodeData = {
     element,
     label: element.name,
@@ -138,7 +99,7 @@ export const createUMLNode = (
 
   return {
     id: element.id,
-    type: elementType,
+    type: element.type,
     position,
     data: nodeData,
     dragHandle: '.node-header',
@@ -151,6 +112,12 @@ export const createUMLNode = (
     },
   }
 }
+
+export const createUMLNode = (
+  elementType: UMLElementType,
+  position: { x: number; y: number },
+  name?: string,
+): UMLNode => umlNodeFor(createElement(elementType, name), position)
 
 // Sample diagram templates for quick start
 export const SAMPLE_DIAGRAMS = {

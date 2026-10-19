@@ -25,10 +25,6 @@ import de.civitascore.configadapter.flowable.common.SagaHandlerRegistry;
 import de.civitascore.configadapter.flowable.common.kafka.FlowableResultPublisher;
 import de.civitascore.configadapter.frost.FrostSagaHandler;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -39,6 +35,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.awaitility.Awaitility;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.ProcessEngine;
@@ -106,14 +105,14 @@ class DatasetCreateFlowableIT {
   private HttpServer apisixMock;
   private List<String> apisixRequestPaths;
   private FlowableResultPublisher resultPublisher;
-  private Client httpClient;
+  private OkHttpClient httpClient;
   private String frostBaseUrl;
 
   @BeforeEach
   void setUp() throws IOException {
     frostBaseUrl =
         "http://" + frost.getHost() + ":" + frost.getMappedPort(8080) + "/FROST-Server/v1.1";
-    httpClient = ClientBuilder.newClient();
+    httpClient = new OkHttpClient();
 
     apisixRequestPaths = Collections.synchronizedList(new ArrayList<>());
     apisixMock = HttpServer.create(new InetSocketAddress(0), 0);
@@ -158,7 +157,10 @@ class DatasetCreateFlowableIT {
     if (processEngine != null) processEngine.close();
     if (apisixMock != null) apisixMock.stop(0);
     if (resultPublisher != null) resultPublisher.close();
-    if (httpClient != null) httpClient.close();
+    if (httpClient != null) {
+      httpClient.dispatcher().executorService().shutdown();
+      httpClient.connectionPool().evictAll();
+    }
   }
 
   @AfterAll
@@ -167,7 +169,7 @@ class DatasetCreateFlowableIT {
   }
 
   @Test
-  void datasetCreateSaga_completesWithRealFrostAndMockApisix() {
+  void datasetCreateSaga_completesWithRealFrostAndMockApisix() throws IOException {
     deployProcesses();
     String datasetId = "ds-flowable-e2e-" + UUID.randomUUID().toString().substring(0, 8);
 
@@ -177,7 +179,8 @@ class DatasetCreateFlowableIT {
     variables.put("datasetName", "Flowable E2E Test Dataset");
     variables.put("description", "Integration test via Flowable");
     variables.put("hasPipelines", false);
-    variables.put("datasources", List.of());
+    variables.put("hasFrostSink", true);
+    variables.put("artifacts", Map.of());
     variables.put("dataPipelines", List.of());
     // Per-NamedApi route model (#1311/#1379): CREATE_ROUTE provisions one route per named-API
     // slug and NO route (and no upstream) without one.
@@ -224,14 +227,11 @@ class DatasetCreateFlowableIT {
             .getValue();
     assertNotNull(projectId, "projectId should be set by FROST handler");
 
-    try (Response frostResponse =
-        httpClient
-            .target(frostBaseUrl)
-            .path("Projects(" + projectId + ")")
-            .request(MediaType.APPLICATION_JSON)
-            .get()) {
-      assertEquals(200, frostResponse.getStatus(), "FROST project should exist");
-      String body = frostResponse.readEntity(String.class);
+    Request frostRequest =
+        new Request.Builder().url(frostBaseUrl + "/Projects(" + projectId + ")").get().build();
+    try (Response frostResponse = httpClient.newCall(frostRequest).execute()) {
+      assertEquals(200, frostResponse.code(), "FROST project should exist");
+      String body = frostResponse.body().string();
       assertTrue(body.contains("Flowable E2E Test Dataset"));
     }
 
@@ -265,7 +265,8 @@ class DatasetCreateFlowableIT {
     variables.put("datasetName", "Flowable Fail Test");
     variables.put("description", "Should compensate");
     variables.put("hasPipelines", false);
-    variables.put("datasources", List.of());
+    variables.put("hasFrostSink", true);
+    variables.put("artifacts", Map.of());
     variables.put("dataPipelines", List.of());
     // Without a named API the APISIX step is a contract-mandated no-op (no route, no upstream),
     // so the 500-mock would never be hit and no compensation would run.

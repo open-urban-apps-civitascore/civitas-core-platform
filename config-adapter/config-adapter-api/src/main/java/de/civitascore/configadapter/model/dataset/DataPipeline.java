@@ -14,21 +14,21 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A pipeline definition within a dataset. The {@code data} field carries the engine-neutral
- * editor-built pipeline graph (the React-Flow transformation flow {@code start → … → end} with
- * inline {@code mappingConfig}), opaque to the backend. {@code dataSourceIds}/{@code dataSinkIds}
- * carry this pipeline's own source/sink association; the trigger's top-level {@code
- * datasources}/{@code datasinks} arrays are the dataset-wide configuration catalog those ids
- * resolve against. The pipeline-engine adapter (NiFi) is the only place engine specifics appear.
+ * A pipeline definition within a dataset. The {@code data} field carries the clean CORE Pipeline
+ * document (the {@code nodes}/{@code edges} graph whose nodes reference their source/sink/mapping
+ * by CORE URN — {@code sourceRef}/{@code sinkRef}/{@code mappingRef}), opaque to the backend. These
+ * refs resolve against the trigger's {@code artifacts}. {@code dataSourceIds}/{@code dataSinkIds}
+ * carry this pipeline's own source/sink association as the referenced <b>configuration URNs</b>.
+ * The pipeline-engine adapter is the only place engine specifics appear.
  *
  * @param id pipeline identifier
  * @param version pipeline version
  * @param action pipeline action (ADD, DELETE, UPDATE)
- * @param data engine-neutral editor pipeline graph (null for DELETE actions)
- * @param dataSourceIds ids of the datasources assigned to this pipeline (never null; empty for
- *     DELETE actions and for triggers that carry no per-pipeline association)
- * @param dataSinkIds ids of the datasinks assigned to this pipeline (never null; empty for DELETE
- *     actions and for triggers that carry no per-pipeline association)
+ * @param data clean CORE Pipeline graph document (null for DELETE actions)
+ * @param dataSourceIds configuration URNs of the datasources assigned to this pipeline (never null;
+ *     empty for DELETE actions and for triggers that carry no per-pipeline association)
+ * @param dataSinkIds configuration URNs of the datasinks assigned to this pipeline (never null;
+ *     empty for DELETE actions and for triggers that carry no per-pipeline association)
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record DataPipeline(

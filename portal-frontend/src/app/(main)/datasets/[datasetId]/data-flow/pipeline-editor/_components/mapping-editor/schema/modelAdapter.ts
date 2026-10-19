@@ -182,6 +182,19 @@ interface ResolvedRecordRoot {
 
 /** Mirrors `DataStructureSchema.resolveDefinition`'s precedence: wrapper → root itself → named definition. */
 const resolveRecordRoot = (root: SchemaNode, defs: Record<string, SchemaNode>): ResolvedRecordRoot => {
+  // Canonical DataStructure export: the document root carries no inline shape, only a bare top-level
+  // `$ref` designating the root member (a local `#/$defs/<Name>` pointer). Resolve it through to that
+  // member, like a wrapper root. In production the backend serves an inlined model; the raw
+  // split-ready export takes this path (e.g. the adapter↔generator consistency checks).
+  const rootRefName = localDefName(asString(root.$ref))
+  if (rootRefName) {
+    const target = defs[rootRefName]
+    if (!target || Object.keys(target).length === 0) {
+      throw new ModelResolutionError(`Root $ref references missing definition '${rootRefName}'`)
+    }
+    return { className: rootRefName, definition: mergeDefinition(target, defs) }
+  }
+
   const wrapperName = wrappedRootName(root, defs)
   if (wrapperName) {
     return { className: wrapperName, definition: mergeDefinition(defs[wrapperName], defs) }
@@ -216,11 +229,14 @@ const resolveRecordRoot = (root: SchemaNode, defs: Record<string, SchemaNode>): 
 const scalarTypeOf = (node: SchemaNode): FieldType => {
   const type = asString(node.type)
   if (type === 'integer') return 'int'
-  if (type === 'number') return 'float'
+  if (type === 'number') return 'number'
   if (type === 'boolean') return 'bool'
   if (type === 'string') {
     const format = asString(node.format)
-    return format === 'date-time' || format === 'date' ? 'date' : 'str'
+    if (format === 'uuid') return 'uuid'
+    if (format === 'date-time') return 'datetime'
+    if (format === 'date') return 'date'
+    return 'str'
   }
   // Deliberately permissive: exotic-but-valid schema constructs (type arrays, const/oneOf, "null")
   // must not block the editor, so anything unrecognized degrades to a plain string port.
@@ -270,8 +286,13 @@ const fieldFor = (
     return field(path, name, 'object', required, children)
   }
 
-  if (asString(node.type) === 'object' || asNode(node.properties)) {
+  if (asString(node.type) === 'object' || asNode(node.properties) || Array.isArray(node.allOf)) {
     const children = childrenOf(node, defs, path, visited)
+    // An object that names no fields is a free value. It reads as text, as the structure editor
+    // reads it.
+    if (!children || children.length === 0) {
+      return field(path, name, 'str', required)
+    }
     return field(path, name, 'object', required, children)
   }
 
@@ -306,7 +327,8 @@ const childrenOf = (
   }
   if (ref) return undefined
   if ('enum' in node) return undefined
-  if (!asNode(node.properties)) return undefined
+  // An inline object may declare its fields through allOf alone, the way an inherited class does.
+  if (!asNode(node.properties) && !Array.isArray(node.allOf)) return undefined
   return buildFields(mergeDefinition(node, defs), defs, base, visited)
 }
 

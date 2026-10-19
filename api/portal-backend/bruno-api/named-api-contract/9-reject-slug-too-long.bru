@@ -1,0 +1,50 @@
+meta {
+  name: 9. Reject slug longer than 32 characters
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/datasets
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "name": "Named API Contract Overlong Slug",
+    "description": "Negative fixture — the 33-character slug must be the only reason this create fails.",
+    "openDataAccess": false,
+    "namedApis": [
+      { "name": "Overlong Slug", "slug": "abcdefghijklmnopqrstuvwxyzabcdefg", "standard": "STA", "version": "1.1" }
+    ]
+  }
+}
+
+tests {
+  const body = res.body || {};
+
+  test("Status code is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Response is a problem document", function() {
+    expect(body.detail !== undefined || body.title !== undefined).to.be.true;
+  });
+}
+
+docs {
+  **Contract step 9** — Reject a slug over the 32-character cap.
+
+  The submitted slug is 33 lowercase letters: it satisfies the shape regex, so the length cap is
+  what rejects it. The cap keeps the generated public path bounded and matches the column width
+  backing the slug.
+
+  Everything else in the body is valid, so a 400 here can only come from the slug.
+
+  **Precondition:** none.
+
+  **Expected Response:** 400 Bad Request, `application/problem+json`.
+
+  **Post-condition:** none — no dataset is created, so nothing to clean up.
+}

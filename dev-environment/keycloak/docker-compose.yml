@@ -63,7 +63,7 @@ services:
   # so they can be inspected at http://localhost:8025.
   # The realm-export.json configures Keycloak SMTP to point to mailpit:1025.
   mailpit:
-    image: axllent/mailpit:v1.28
+    image: axllent/mailpit:v1.30@sha256:d5ecbb067db3705fa953d79e1b7f81ef84038df67aba6c52825d8c02a1ea748a
     container_name: civitas-mailpit
     ports:
       - "8025:8025"   # Web UI

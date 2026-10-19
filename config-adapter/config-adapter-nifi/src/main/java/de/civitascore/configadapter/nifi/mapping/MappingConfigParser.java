@@ -26,18 +26,19 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Parses the inline {@code mappingConfig} of a {@code mapping} graph node into a typed {@link
- * MappingConfig}. The grammar is closed: a field value is either a shorthand source-path string
- * (copy) or an object with a known {@code op}. Anything else — an unknown op, a malformed operand,
- * a bare literal — is rejected with {@link AdapterErrorCode#NIFI_MAPPING_ERROR}, so a tenant can
- * never smuggle an unsupported transform past this boundary.
+ * Parses a mapping document — resolved from the trigger's artifacts by the node's {@code
+ * mappingRef} — into a typed {@link MappingConfig}. The grammar is closed: a field value is either
+ * a shorthand source-path string (copy) or an object with a known {@code op}. Anything else — an
+ * unknown op, a malformed operand, a bare literal — is rejected with {@link
+ * AdapterErrorCode#NIFI_MAPPING_ERROR}, so a tenant can never smuggle an unsupported transform past
+ * this boundary.
  */
 public class MappingConfigParser {
 
   /**
-   * Parses a {@code mappingConfig} JSON object.
+   * Parses a mapping document.
    *
-   * @param root the {@code mappingConfig} node
+   * @param root the mapping document's root node
    * @return the parsed mapping
    * @throws FatalAdapterException if the structure is malformed or contains an unsupported
    *     operation
@@ -135,8 +136,11 @@ public class MappingConfigParser {
       throw reject(op + " requires an 'input'");
     }
     String pattern = optionalText(node, "pattern");
+    String unit = optionalText(node, "unit");
+    String inputType = optionalText(node, "inputType");
+    validateInputType(op, conversion.get(), pattern, unit, inputType);
     boolean requiresPattern = conversion.get().requiresPattern();
-    if (requiresPattern && (pattern == null || pattern.isBlank())) {
+    if (requiresPattern && unit == null && (pattern == null || pattern.isBlank())) {
       throw reject(op + " requires a non-blank 'pattern'");
     }
     // The converse half of the ValueNode invariant: a non-date op must not carry a pattern. Reject
@@ -145,7 +149,33 @@ public class MappingConfigParser {
       throw reject(op + " does not take a 'pattern'");
     }
     return new ConvertNode(
-        conversion.get(), requireScalarOperand(parseValue(input), op + " input"), pattern);
+        conversion.get(), requireScalarOperand(parseValue(input), op + " input"), pattern, unit);
+  }
+
+  private void validateInputType(
+      String op, ConversionOp conversion, String pattern, String unit, String inputType)
+      throws FatalAdapterException {
+    if (conversion != ConversionOp.TO_DATE_TIME) {
+      if (inputType != null || unit != null) {
+        throw reject(op + " does not take an 'inputType' or 'unit'");
+      }
+      return;
+    }
+    if (inputType == null || "string".equals(inputType)) {
+      if (unit != null) {
+        throw reject("toDateTime string input does not take a 'unit'");
+      }
+      return;
+    }
+    if (!"epoch".equals(inputType)) {
+      throw reject("unsupported toDateTime inputType: " + inputType);
+    }
+    if (pattern != null) {
+      throw reject("toDateTime epoch input does not take a 'pattern'");
+    }
+    if (!"seconds".equals(unit) && !"milliseconds".equals(unit)) {
+      throw reject("toDateTime epoch input requires unit 'seconds' or 'milliseconds'");
+    }
   }
 
   /**

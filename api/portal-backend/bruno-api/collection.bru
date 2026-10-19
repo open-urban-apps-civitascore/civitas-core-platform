@@ -2,9 +2,6 @@ auth {
   mode: oauth2
 }
 
-headers {
-  X-Allowed-Scope-Ids: *
-}
 
 auth:oauth2 {
   grant_type: password
@@ -24,8 +21,15 @@ auth:oauth2 {
 }
 
 docs {
-  Requests run directly against the backend (baseUrl), bypassing APISIX/OPA. The backend's
-  body-reference scope guard denies when no X-Allowed-Scope-Ids header is present, so the
-  collection sends the wildcard the tenant-wide test user (dev@civitas.local) would receive
-  from OPA. Individual requests that need a narrower scope override this header locally.
+  Requests run through APISIX (baseUrl), so OPA decides them and computes the scope headers
+  the backend filters by. The suite therefore exercises the real authorization path instead
+  of simulating it: APISIX strips any client-supplied X-Allowed-Scope-Ids / X-Allowed-Pool-Ids,
+  so a request cannot widen its own scope.
+
+  The tenant-wide test user (dev@civitas.local) receives the wildcard scope, which is why no
+  request needs to declare a scope of its own.
+
+  The `local-direct` environment points baseUrl at the backend port instead, bypassing the
+  gateway. Scope-guarded endpoints reject those requests, so it is only useful for the ones
+  that impose no scope filtering.
 }

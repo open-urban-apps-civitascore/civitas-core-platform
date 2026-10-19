@@ -34,22 +34,6 @@ class ConfigEventPublisherServiceTest {
   }
 
   @Test
-  void publishUserUpdated_shouldNotThrowException() {
-    UserConfig userConfig = createTestUserConfig();
-
-    assertThatNoException()
-        .isThrownBy(() -> configEventPublisher.publishUserUpdated("civitas-core", userConfig));
-  }
-
-  @Test
-  void publishUserDeleted_shouldNotThrowException() {
-    UserConfig userConfig = createTestUserConfig();
-
-    assertThatNoException()
-        .isThrownBy(() -> configEventPublisher.publishUserDeleted("civitas-core", userConfig));
-  }
-
-  @Test
   void publishConfigEvent_shouldHandleNullResultTopic() {
     UserConfig userConfig = createTestUserConfig();
 
@@ -71,14 +55,6 @@ class ConfigEventPublisherServiceTest {
 
     assertThatNoException()
         .isThrownBy(() -> configEventPublisher.publishGroupCreated("civitas-core", userConfig));
-  }
-
-  @Test
-  void publishRoleCreated_shouldNotThrowException() {
-    UserConfig userConfig = createTestUserConfig();
-
-    assertThatNoException()
-        .isThrownBy(() -> configEventPublisher.publishRoleCreated("civitas-core", userConfig));
   }
 
   private UserConfig createTestUserConfig() {

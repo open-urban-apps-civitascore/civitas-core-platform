@@ -47,7 +47,6 @@ export const UserApiSchema = z.object({
     message: 'common.errors.invalidEmail',
   }),
   phone: PhoneSchema.nullable(),
-  active: z.boolean(),
   groups: z.array(GroupSummarySchema).nullable(),
 })
 

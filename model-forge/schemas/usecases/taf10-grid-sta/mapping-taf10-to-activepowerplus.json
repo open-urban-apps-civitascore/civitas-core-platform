@@ -1,0 +1,17 @@
+{
+  "$schema": "https://civitasconnect.digital/core-dataset/v1#/$defs/Mapping",
+  "id": "urn:core:platform:civitas:mapping:taf10-grid:02804ecb-8c72-8564-99b2-6650a6241bb5:1.0.0",
+  "title": "TAF10 Active Power Plus -> STA Observation",
+  "source": "urn:core:platform:civitas:element:taf10-grid:fb8586b6-92ea-8bca-a3a7-a8e99a377b83:1.0.0",
+  "target": "urn:core:platform:civitas:element:sta:61296fa8-8cca-8d83-af42-51e12c991cd8:1.0.0",
+  "fields": {
+    "phenomenonTime": { "op": "copy", "input": "$.timestamp" },
+    "resultTime": { "op": "copy", "input": "$.timestamp" },
+    "result": { "op": "copy", "input": "$.activePowerPlus.value" },
+    "resultQuality": { "op": "copy", "input": "$.activePowerPlus.quality" },
+    "parameters.gridNodeId": { "op": "copy", "input": "$.gridNodeId" },
+    "parameters.observedProperty": { "op": "const", "value": "activePowerPlus" },
+    "parameters.unit": { "op": "copy", "input": "$.activePowerPlus.unit" },
+    "Datastream.@iot.id": { "op": "copy", "input": "$.frostDatastreamIds.activePowerPlus" }
+  }
+}

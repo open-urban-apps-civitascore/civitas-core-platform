@@ -60,7 +60,6 @@ class UserControllerIntegrationTest
     input.setLastName("User " + System.currentTimeMillis());
     input.setEmail("testuser" + UUID.randomUUID().toString().substring(0, 8) + "@example.com");
     input.setPhone("+49123456789");
-    input.setActive(true);
     return input;
   }
 
@@ -79,7 +78,6 @@ class UserControllerIntegrationTest
     input.setLastName("User");
     input.setEmail("updated.user@example.com");
     input.setPhone("+49987654321");
-    input.setActive(true);
     return input;
   }
 
@@ -379,9 +377,6 @@ class UserControllerIntegrationTest
       assertThat(response.getBody().getPhone())
           .as("Phone should remain unchanged")
           .isEqualTo(initialUser.getPhone());
-      assertThat(response.getBody().getActive())
-          .as("Active should remain unchanged")
-          .isEqualTo(initialUser.getActive());
       assertThat(response.getBody().getTitle())
           .as("Title should remain unchanged")
           .isEqualTo(initialUser.getTitle());
@@ -409,20 +404,6 @@ class UserControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should update boolean field with PATCH")
-    void shouldUpdateBooleanFieldWithPatch() {
-      UUID userId = createTestEntity();
-
-      Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("active", false);
-
-      ResponseEntity<UserOutputDTO> response = performPatch(userId, patchMap);
-
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getActive()).as("Active should be updated to false").isFalse();
-    }
-
-    @Test
     @DisplayName("Should handle PATCH with all fields")
     void shouldHandlePatchWithAllFields() {
       UUID userId = createTestEntity();
@@ -432,7 +413,6 @@ class UserControllerIntegrationTest
       patchMap.put("lastName", "PatchedLast");
       patchMap.put("email", "patched@example.com");
       patchMap.put("phone", "+49999999999");
-      patchMap.put("active", false);
       patchMap.put("title", "MS");
 
       ResponseEntity<UserOutputDTO> response = performPatch(userId, patchMap);
@@ -442,7 +422,6 @@ class UserControllerIntegrationTest
       assertThat(response.getBody().getLastName()).isEqualTo("PatchedLast");
       assertThat(response.getBody().getEmail()).isEqualTo("patched@example.com");
       assertThat(response.getBody().getPhone()).isEqualTo("+49999999999");
-      assertThat(response.getBody().getActive()).isFalse();
       assertThat(response.getBody().getTitle()).isEqualTo(UserTitleType.MS);
     }
 
@@ -547,26 +526,6 @@ class UserControllerIntegrationTest
       assertThat(response.getStatusCode())
           .as("Should return UNAUTHORIZED status")
           .isEqualTo(HttpStatus.UNAUTHORIZED);
-    }
-  }
-
-  @Nested
-  @DisplayName("Business Logic Tests")
-  class BusinessLogicTests {
-
-    @Test
-    @DisplayName("Should deactivate user")
-    void shouldDeactivateUser() {
-      UUID userId = createTestEntity();
-
-      UserInputDTO updateInput = createUpdateInput();
-      updateInput.setActive(false);
-
-      ResponseEntity<UserOutputDTO> response = performUpdate(userId, updateInput);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getActive()).isFalse();
     }
   }
 

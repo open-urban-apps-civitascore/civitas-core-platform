@@ -21,6 +21,7 @@ interface DataSourcePanelProps {
 
 export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate }) => {
   const t = useTranslations('pipelineEditor')
+  const tStatus = useTranslations('common.status')
   const { entities, isLoading, isError, canReadDatasources, getEntityById, getName } = usePipelineDatasources()
 
   const selectedEntity = data.entityId !== undefined ? getEntityById(data.entityId) : undefined
@@ -30,12 +31,16 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
       const fullEntity = getEntityById(entity.id)
       onUpdate({
         entityId: entity.id,
+        entityName: entity.name,
+        configurationUrn: fullEntity?.configurationUrn ?? undefined,
         configured: true,
-        entityMetadata: fullEntity?.connectorType ? { connector: fullEntity.connectorType } : undefined,
+        entityMetadata: fullEntity?.connector ? { connector: fullEntity.connector.connectorType } : undefined,
       })
     } else {
       onUpdate({
         entityId: undefined,
+        entityName: undefined,
+        configurationUrn: undefined,
         entityMetadata: undefined,
         configured: false,
       })
@@ -62,8 +67,8 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
           <EntityMetadata
             title={t('dataSourcePanel.details')}
             items={[
-              { label: t('dataSourcePanel.connector'), value: selectedEntity.connectorType ?? undefined },
-              { label: t('dataSourcePanel.status'), value: selectedEntity.dataSourceStatus },
+              { label: t('dataSourcePanel.connector'), value: selectedEntity.connector?.connectorType },
+              { label: t('dataSourcePanel.status'), value: tStatus(selectedEntity.dataSourceStatus) },
               { label: t('dataSourcePanel.description'), value: selectedEntity.description ?? undefined },
             ]}
           />

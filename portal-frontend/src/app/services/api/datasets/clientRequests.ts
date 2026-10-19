@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
 
+import { DATASINKS_QUERY_KEY } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useDataQuery } from '@/hooks/use-data-query'
@@ -106,8 +107,10 @@ const useDatasetTransition = (action: 'stage' | 'unstage' | 'release' | 'unrelea
         headers: { 'x-api-request': 'true' },
         errorMessage: `An error occurred while trying to ${action} dataset`,
       }),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: [key] })
+      // After provisioning and back in DRAFT the pipeline editor needs the final `provisioned` flag of the sinks.
+      if (action === 'unstage') queryClient.invalidateQueries({ queryKey: [DATASINKS_QUERY_KEY, id] })
     },
     onError: error => {
       console.error(`Error during ${action}:`, (error as Error).message)
@@ -120,15 +123,35 @@ export const useUnstageDataset = () => useDatasetTransition('unstage')
 export const useReleaseDataset = () => useDatasetTransition('release')
 export const useUnreleaseDataset = () => useDatasetTransition('unrelease')
 
+export const useUpdateReadyDatasetMeta = () => {
+  const queryClient = useQueryClient()
+  return useMutation<ApiServiceResponse<Dataset>, unknown, DatasetUpdateApiData>({
+    mutationFn: ({ id, ...body }: DatasetUpdateApiData) =>
+      apiRequest<Dataset>({
+        method: 'PATCH',
+        endpoint: `/datasets/${id}/ready/meta`,
+        headers: { 'x-api-request': 'true' },
+        data: body,
+        errorMessage: 'An error occurred while updating ready dataset metadata',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [key] })
+    },
+    onError: error => {
+      console.error('Error updating ready dataset metadata:', (error as Error).message)
+    },
+  })
+}
+
 export const useUpdateReleasedDatasetMeta = () => {
   const queryClient = useQueryClient()
   return useMutation<ApiServiceResponse<Dataset>, unknown, DatasetUpdateApiData>({
-    mutationFn: (data: DatasetUpdateApiData) =>
+    mutationFn: ({ id, ...body }: DatasetUpdateApiData) =>
       apiRequest<Dataset>({
-        method: 'PUT',
-        endpoint: `/datasets/${data.id}/released/meta`,
+        method: 'PATCH',
+        endpoint: `/datasets/${id}/released/meta`,
         headers: { 'x-api-request': 'true' },
-        data,
+        data: body,
         errorMessage: 'An error occurred while updating released dataset metadata',
       }),
     onSuccess: () => {

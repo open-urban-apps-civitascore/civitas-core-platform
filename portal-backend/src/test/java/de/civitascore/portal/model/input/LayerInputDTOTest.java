@@ -92,10 +92,4 @@ class LayerInputDTOTest {
     assertThat(violations).hasSize(1);
     assertThat(violations.iterator().next().getPropertyPath().toString()).isEqualTo("layerName");
   }
-
-  @Test
-  @DisplayName("bboxAutoCalculate should default to true")
-  void bboxAutoCalculateShouldDefaultToTrue() {
-    assertThat(new LayerInputDTO().isBboxAutoCalculate()).isTrue();
-  }
 }

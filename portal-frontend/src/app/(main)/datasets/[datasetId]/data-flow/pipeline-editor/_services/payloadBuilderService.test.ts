@@ -1,9 +1,30 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
+import { CONTRACT_URIS, contractErrors, type ContractKind } from '@/test-support/coreContracts'
+import {
+  everyNodeTypePipeline,
+  type FixtureNode,
+  mappingNode as mappingFixture,
+  pipeline,
+} from '@/test-support/pipelineFixtures'
 import { DATASINK_TYPES, type DataSinkPayload } from '@/types/datasinks'
 
-import type { Pipeline, PipelineEdge, PipelineNode } from '../_types/pipeline'
-import { buildDataSinkPayloads, type DataSinkSnapshot, isDestructiveDataSinkChange } from './payloadBuilderService'
+import type { Pipeline } from '../_types/pipeline'
+import {
+  buildDataSinkPayloads,
+  buildMappingArtifacts,
+  buildPipelinePayload,
+  createDataSinkSnapshot,
+  createMappingSnapshot,
+  type DataSinkSnapshot,
+  getRemovedMappingUrns,
+  hasMappingChanged,
+  isDestructiveDataSinkChange,
+  MappingDocumentValidationError,
+  MissingDataStructureUrnError,
+  PipelineModelValidationError,
+  updateNodeData,
+} from './payloadBuilderService'
 
 /**
  * Pins the FROST sink payload derivation — the seam that lets the deploy engine resolve the
@@ -11,34 +32,21 @@ import { buildDataSinkPayloads, type DataSinkSnapshot, isDestructiveDataSinkChan
  * structure and every mapped deploy fails.
  */
 
-type TestNode = { id: string; type: string; data: Record<string, unknown> }
-
-const pipeline = (nodes: TestNode[], edges: { source: string; target: string }[]): Pipeline => ({
-  id: 'p-1',
-  name: 'P',
-  description: '',
-  nodes: nodes as unknown as PipelineNode[],
-  edges: edges.map((edge, index) => ({ ...edge, id: `e-${index}` })) as unknown as PipelineEdge[],
-  viewport: { x: 0, y: 0, zoom: 1 },
-  createdAt: new Date(0),
-  updatedAt: new Date(0),
-  isDirty: false,
-})
-
-const frostNode: TestNode = {
+const frostNode: FixtureNode = {
   id: 'frost-1',
   type: 'frost',
   data: { label: 'FROST', configured: true, entityType: 'frost', entityId: 'sink-1' },
 }
 
-const mappingNode = (id: string, targetVersionId?: string): TestNode => ({
+const mappingNode = (id: string, targetUrn?: string): FixtureNode => ({
   id,
   type: 'mapping',
   data: {
     label: 'Mapping',
     configured: true,
-    mappingConfig: { fields: {}, positions: {} },
-    ...(targetVersionId === undefined ? {} : { targetVersionId }),
+    // The FROST sink references the final mapping's target DataStructure by its versioned CORE URN,
+    // taken from the mapping's saved config (`mappingConfig.target`).
+    mappingConfig: { fields: {}, positions: {}, ...(targetUrn === undefined ? {} : { target: targetUrn }) },
   },
 })
 
@@ -46,13 +54,25 @@ const frostPayload = (p: Pipeline) =>
   buildDataSinkPayloads(p).find(entry => entry.payload.dataSinkType === 'FROST')?.payload
 
 describe('buildDataSinkPayloads — FROST target structure reference', () => {
+  // The FROST sink's `element` is validated against the CORE datasink schema before send, so the
+  // mapping target must be a real versioned CORE :datastructure: URN (not a placeholder).
+  const DSV_URN = 'urn:core:platform:civitas:datastructure:common:40d62719-abbf-8678-b20d-76f1ab99a2eb:1.0.0'
+  const DSV_UPSTREAM_URN = 'urn:core:platform:civitas:datastructure:common:88df0945-4249-8fb0-9c7c-42f7a0c37129:1.0.0'
+  const DSV_FINAL_URN = 'urn:core:platform:civitas:datastructure:common:f7147762-78bb-88ee-96b6-4a38421ee03c:1.0.0'
+
   it('references the final mapping target of a mapped pipeline', () => {
-    const p = pipeline([mappingNode('map-1', 'dsv-1'), frostNode], [{ source: 'map-1', target: 'frost-1' }])
-    expect(frostPayload(p)?.configuration).toEqual({ dataStructureVersionId: 'dsv-1' })
+    const p = pipeline([mappingNode('map-1', DSV_URN), frostNode], [{ source: 'map-1', target: 'frost-1' }])
+    expect(frostPayload(p)?.configuration).toEqual({ element: DSV_URN })
+  })
+
+  it('sends the selected port with the target structure', () => {
+    const ported: FixtureNode = { ...frostNode, data: { ...frostNode.data, port: 'Observations' } }
+    const p = pipeline([mappingNode('map-1', DSV_URN), ported], [{ source: 'map-1', target: 'frost-1' }])
+    expect(frostPayload(p)?.configuration).toEqual({ port: 'Observations', element: DSV_URN })
   })
 
   it('sends an empty configuration for a passthrough pipeline (no mapping)', () => {
-    const source: TestNode = {
+    const source: FixtureNode = {
       id: 'src-1',
       type: 'dataSource',
       data: { label: 'MQTT', configured: true, entityType: 'datasource', entityId: 'ds-1' },
@@ -63,24 +83,24 @@ describe('buildDataSinkPayloads — FROST target structure reference', () => {
 
   it('picks the nearest mapping of a chain (the one whose target the sink consumes)', () => {
     const p = pipeline(
-      [mappingNode('map-1', 'dsv-upstream'), mappingNode('map-2', 'dsv-final'), frostNode],
+      [mappingNode('map-1', DSV_UPSTREAM_URN), mappingNode('map-2', DSV_FINAL_URN), frostNode],
       [
         { source: 'map-1', target: 'map-2' },
         { source: 'map-2', target: 'frost-1' },
       ],
     )
-    expect(frostPayload(p)?.configuration).toEqual({ dataStructureVersionId: 'dsv-final' })
+    expect(frostPayload(p)?.configuration).toEqual({ element: DSV_FINAL_URN })
   })
 
   it('terminates on a cyclic graph', () => {
     const p = pipeline(
-      [mappingNode('map-1', 'dsv-1'), frostNode],
+      [mappingNode('map-1', DSV_URN), frostNode],
       [
         { source: 'map-1', target: 'frost-1' },
         { source: 'frost-1', target: 'map-1' },
       ],
     )
-    expect(frostPayload(p)?.configuration).toEqual({ dataStructureVersionId: 'dsv-1' })
+    expect(frostPayload(p)?.configuration).toEqual({ element: DSV_URN })
   })
 
   it('sends an empty configuration when the mapping has no target version yet', () => {
@@ -91,16 +111,368 @@ describe('buildDataSinkPayloads — FROST target structure reference', () => {
   })
 })
 
+describe('buildDataSinkPayloads — PostGIS configuration', () => {
+  const postgisNode: FixtureNode = {
+    id: 'postgis-1',
+    type: 'geoPersistence',
+    data: {
+      label: 'PostGIS',
+      configured: true,
+      entityType: 'persistence',
+      entityId: 'sink-guid-1',
+      dataStructureVersionId: 'dsv-1',
+      tableName: 'my_table',
+    },
+  }
+
+  const NODE_URN = 'urn:core:platform:civitas:datastructure:common:dc29f6f0-2d65-8f3e-9abb-7c5071436148:1.0.0'
+  const OTHER_NODE_URN = 'urn:core:platform:civitas:datastructure:common:dc29f6f0-2d65-8f3e-9abb-7c5071436148:2.0.0'
+  const MAPPING_TARGET_URN = 'urn:core:platform:civitas:datastructure:common:ae5de07c-5ce2-8186-833e-9806abf0dc4b:1.0.0'
+
+  const postgisNodeWithUrn = (dataStructureUrn: string): FixtureNode => ({
+    ...postgisNode,
+    data: { ...postgisNode.data, dataStructureUrn },
+  })
+
+  const postgisPayload = (p: Pipeline) =>
+    buildDataSinkPayloads(p).find(entry => entry.payload.dataSinkType === DATASINK_TYPES.POSTGIS)?.payload
+
+  it('sends the node data structure as element when no mapping precedes the sink', () => {
+    const p = pipeline([postgisNodeWithUrn(NODE_URN)], [])
+    expect(postgisPayload(p)?.configuration).toEqual({ tableName: 'my_table', element: NODE_URN })
+  })
+
+  it('sends the node data structure as element when a mapping precedes the sink', () => {
+    const p = pipeline(
+      [mappingNode('map-1', MAPPING_TARGET_URN), postgisNodeWithUrn(NODE_URN)],
+      [{ source: 'map-1', target: 'postgis-1' }],
+    )
+    expect(postgisPayload(p)?.configuration).toEqual({ tableName: 'my_table', element: NODE_URN })
+  })
+
+  it('rejects a node without a stored data structure URN even when a mapping precedes the sink', () => {
+    const p = pipeline(
+      [mappingNode('map-1', MAPPING_TARGET_URN), postgisNode],
+      [{ source: 'map-1', target: 'postgis-1' }],
+    )
+    expect(() => buildDataSinkPayloads(p)).toThrow(MissingDataStructureUrnError)
+  })
+
+  it('flags a version change on a saved sink without mapping as destructive', () => {
+    const snapshot = createDataSinkSnapshot(pipeline([postgisNodeWithUrn(NODE_URN)], []))
+    const [{ payload }] = buildDataSinkPayloads(pipeline([postgisNodeWithUrn(OTHER_NODE_URN)], []))
+    expect(isDestructiveDataSinkChange('postgis-1', payload, snapshot)).toBe(true)
+  })
+})
+
+// ============================================================================
+// buildPipelinePayload — clean CORE Pipeline document
+// ============================================================================
+
+const DS_URN = 'urn:core:platform:civitas:datasource:common:56c71886-6233-8eb0-9033-d69d254841d1:1.0.0'
+const SINK_URN = 'urn:core:platform:civitas:datasink:common:4994500e-ec45-8637-87f5-79a658893245:1.0.0'
+const MAPPING_URN = 'urn:core:platform:civitas:mapping:common:f7628c46-674f-829e-9732-40bd589ed5a6:1.0.0'
+const SRC_STRUCT_URN = 'urn:core:platform:civitas:datastructure:common:18d96956-ef2a-88c1-8dd9-92b256c70a93:1.0.0'
+const TGT_STRUCT_URN = 'urn:core:platform:civitas:datastructure:common:995f411c-3be9-8ec2-8159-55f9d0c50168:1.0.0'
+
+const startNode: FixtureNode = { id: 'start-1', type: 'start', data: { label: 'Start', configured: true } }
+const endNode: FixtureNode = { id: 'end-1', type: 'end', data: { label: 'End', configured: true } }
+const sourceNode = (urn?: string): FixtureNode => ({
+  id: 'src-1',
+  type: 'dataSource',
+  position: { x: 10, y: 20 },
+  data: { label: 'MQTT', configured: true, entityType: 'datasource', entityId: 'ds-guid-1', configurationUrn: urn },
+})
+const sinkNode = (urn?: string): FixtureNode => ({
+  id: 'sink-1',
+  type: 'geoPersistence',
+  position: { x: 30, y: 40 },
+  data: {
+    label: 'PostGIS',
+    configured: true,
+    entityType: 'persistence',
+    entityId: 'sink-guid-1',
+    configurationUrn: urn,
+  },
+})
+const mappingRefNode = (ref?: string): FixtureNode => ({
+  id: 'map-1',
+  type: 'mapping',
+  position: { x: 50, y: 60 },
+  data: { label: 'Mapping', configured: true, mappingConfig: { fields: {}, positions: {} }, mappingRef: ref },
+})
+const cronNode: FixtureNode = {
+  id: 'cron-1',
+  type: 'cron',
+  data: { label: 'Cron', configured: true, cronExpression: '0 0 * * *' },
+}
+
+describe('buildPipelinePayload — clean CORE Pipeline document', () => {
+  it('emits URN-native nodes keyed by kind (no React-Flow type/data)', () => {
+    const p = pipeline(
+      [startNode, sourceNode(DS_URN), mappingRefNode(MAPPING_URN), sinkNode(SINK_URN), endNode],
+      [
+        { source: 'start-1', target: 'src-1' },
+        { source: 'src-1', target: 'map-1', label: 'flow' },
+        { source: 'map-1', target: 'sink-1' },
+        { source: 'sink-1', target: 'end-1' },
+      ],
+    )
+
+    const { model } = buildPipelinePayload(p)
+
+    expect(model.nodes.map(n => n.kind)).toEqual(['start', 'source', 'mapping', 'sink', 'end'])
+    // No React-Flow specifics leak into the CORE model.
+    for (const node of model.nodes) {
+      expect(node).not.toHaveProperty('type')
+      expect(node).not.toHaveProperty('data')
+    }
+
+    const src = model.nodes.find(n => n.id === 'src-1')
+    expect(src).toMatchObject({ kind: 'source', 'x-ui-position': { x: 10, y: 20 } })
+    expect(src).not.toHaveProperty('sinkRef')
+
+    expect(model.nodes.find(n => n.id === 'sink-1')).toMatchObject({ kind: 'sink', sinkRef: SINK_URN })
+    expect(model.nodes.find(n => n.id === 'map-1')).toMatchObject({ kind: 'mapping', mappingRef: MAPPING_URN })
+  })
+
+  it('names the data source by its latest configuration, so the pipeline follows later edits', () => {
+    const { model } = buildPipelinePayload(pipeline([sourceNode(DS_URN)], []))
+    expect(model.nodes.find(n => n.id === 'src-1')?.sourceRef).toBe(
+      'urn:core:platform:civitas:datasource:common:56c71886-6233-8eb0-9033-d69d254841d1:latest',
+    )
+  })
+
+  it('maps cron nodes to a cron kind carrying the cron expression', () => {
+    const p = pipeline([cronNode, sourceNode(DS_URN)], [{ source: 'cron-1', target: 'src-1' }])
+    const { model } = buildPipelinePayload(p)
+    expect(model.nodes.find(n => n.id === 'cron-1')).toMatchObject({ kind: 'cron', cronExpression: '0 0 * * *' })
+  })
+
+  it('maps every editor node type onto its CORE kind, both sink types included', () => {
+    const { model } = buildPipelinePayload(everyNodeTypePipeline())
+    expect(model.nodes.map(n => [n.id, n.kind])).toEqual([
+      ['start-1', 'start'],
+      ['cron-1', 'cron'],
+      ['src-1', 'source'],
+      ['map-1', 'mapping'],
+      ['sink-1', 'sink'],
+      ['frost-1', 'sink'],
+      ['end-1', 'end'],
+    ])
+  })
+
+  it('emits CORE edges (id/source/target + optional label) mirroring the graph', () => {
+    const p = pipeline([sourceNode(DS_URN), sinkNode(SINK_URN)], [{ source: 'src-1', target: 'sink-1', label: 'data' }])
+    const { model } = buildPipelinePayload(p)
+    expect(model.edges).toEqual([{ id: 'e-0', source: 'src-1', target: 'sink-1', label: 'data' }])
+  })
+
+  it('omits a ref when the node is unconfigured (draft pipeline stays valid)', () => {
+    const p = pipeline([sourceNode(undefined), sinkNode(undefined)], [])
+    const { model } = buildPipelinePayload(p)
+    expect(model.nodes.find(n => n.id === 'src-1')).not.toHaveProperty('sourceRef')
+    expect(model.nodes.find(n => n.id === 'sink-1')).not.toHaveProperty('sinkRef')
+  })
+
+  it('keeps styles as the full React-Flow graph and preserves FK id lists', () => {
+    const p = pipeline([sourceNode(DS_URN), sinkNode(SINK_URN)], [{ source: 'src-1', target: 'sink-1' }])
+    const payload = buildPipelinePayload(p)
+
+    // styles round-trips the RF graph unchanged (LOAD path hydrates from styles).
+    expect(payload.styles.nodes).toBe(p.nodes)
+    expect(payload.styles.edges).toBe(p.edges)
+    expect(payload.styles.viewport).toEqual({ x: 0, y: 0, zoom: 1 })
+
+    // FK wiring ids (portal GUIDs) are still sent.
+    expect(payload.dataSourceIds).toEqual(['ds-guid-1'])
+    expect(payload.dataSinkIds).toEqual(['sink-guid-1'])
+  })
+
+  it('validates the CORE model and throws on an unknown node kind', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const bogus = { id: 'x-1', type: 'bogus', data: { label: 'X' } } as unknown as FixtureNode
+    expect(() => buildPipelinePayload(pipeline([bogus], []))).toThrow(PipelineModelValidationError)
+    consoleError.mockRestore()
+  })
+})
+
+// ============================================================================
+// buildMappingArtifacts — POST/PUT /v1/mappings extraction + validation
+// ============================================================================
+
+const configuredMappingNode = (overrides?: Record<string, unknown>): FixtureNode => ({
+  id: 'map-1',
+  type: 'mapping',
+  data: {
+    label: 'Mapping',
+    configured: true,
+    sourceName: 'Src',
+    targetName: 'Tgt',
+    mappingConfig: {
+      source: SRC_STRUCT_URN,
+      target: TGT_STRUCT_URN,
+      fields: { '$.name': '$.n' },
+      positions: { a: { x: 1, y: 2 } },
+    },
+    ...overrides,
+  },
+})
+
+describe('buildMappingArtifacts', () => {
+  it('extracts a POST request for a configured mapping node', () => {
+    const artifacts = buildMappingArtifacts(pipeline([configuredMappingNode()], []))
+    expect(artifacts).toHaveLength(1)
+    expect(artifacts[0]).toEqual({
+      nodeId: 'map-1',
+      logicalUrn: undefined,
+      body: {
+        source: SRC_STRUCT_URN,
+        target: TGT_STRUCT_URN,
+        fields: { '$.name': '$.n' },
+        title: 'Src-to-Tgt',
+        positions: { a: { x: 1, y: 2 } },
+      },
+    })
+  })
+
+  it('carries the prior logical URN so an existing mapping is PUT-versioned', () => {
+    const artifacts = buildMappingArtifacts(
+      pipeline(
+        [
+          configuredMappingNode({
+            mappingLogicalUrn: 'urn:core:platform:civitas:mapping:common:00000000-0000-4000-8000-000000000045',
+          }),
+        ],
+        [],
+      ),
+    )
+    expect(artifacts[0].logicalUrn).toBe(
+      'urn:core:platform:civitas:mapping:common:00000000-0000-4000-8000-000000000045',
+    )
+  })
+
+  it('skips unconfigured mapping nodes (no source/target → no mappingRef)', () => {
+    const unconfigured: FixtureNode = {
+      id: 'map-2',
+      type: 'mapping',
+      data: { label: 'Mapping', configured: false, mappingConfig: { fields: {}, positions: {} } },
+    }
+    expect(buildMappingArtifacts(pipeline([unconfigured], []))).toEqual([])
+  })
+
+  it('throws when a mapping document is not schema-valid', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const invalid = configuredMappingNode({
+      mappingConfig: { source: 'not-a-urn', target: TGT_STRUCT_URN, fields: {}, positions: {} },
+    })
+    expect(() => buildMappingArtifacts(pipeline([invalid], []))).toThrow(MappingDocumentValidationError)
+    consoleError.mockRestore()
+  })
+
+  it('accepts toUuid and toDateTime field operations from the mapping editor transform palette', () => {
+    const node = configuredMappingNode({
+      mappingConfig: {
+        source: SRC_STRUCT_URN,
+        target: TGT_STRUCT_URN,
+        fields: {
+          '$.id': { op: 'toUuid', input: '$.sourceId' },
+          '$.ts': { op: 'toDateTime', input: '$.sourceTs', pattern: "yyyy-MM-dd'T'HH:mm:ssXXX" },
+        },
+        positions: {},
+      },
+    })
+    expect(() => buildMappingArtifacts(pipeline([node], []))).not.toThrow()
+  })
+})
+
+describe('createMappingSnapshot / hasMappingChanged', () => {
+  const mappingBody = {
+    source: SRC_STRUCT_URN,
+    target: TGT_STRUCT_URN,
+    fields: { '$.name': '$.n' },
+    title: 'Src-to-Tgt',
+    positions: { a: { x: 1, y: 2 } },
+  }
+
+  it('flags a mapping as changed when its body differs from the snapshot', () => {
+    const snapshot = createMappingSnapshot(pipeline([configuredMappingNode()], []))
+    const changedBody = { ...mappingBody, fields: { '$.name': '$.other' } }
+    expect(hasMappingChanged('map-1', changedBody, snapshot)).toBe(true)
+  })
+
+  it('does not flag an unchanged mapping', () => {
+    const snapshot = createMappingSnapshot(pipeline([configuredMappingNode()], []))
+    expect(hasMappingChanged('map-1', mappingBody, snapshot)).toBe(false)
+  })
+
+  it('flags a mapping not present in the snapshot as changed (new node)', () => {
+    expect(hasMappingChanged('map-1', mappingBody, {})).toBe(true)
+  })
+
+  it('omits unconfigured mapping nodes from the snapshot', () => {
+    const unconfigured: FixtureNode = {
+      id: 'map-2',
+      type: 'mapping',
+      data: { label: 'Mapping', configured: false, mappingConfig: { fields: {}, positions: {} } },
+    }
+    expect(createMappingSnapshot(pipeline([unconfigured], []))).toEqual({})
+  })
+
+  it('keeps the logical URN so a removed node can still be deleted', () => {
+    const snapshot = createMappingSnapshot(
+      pipeline(
+        [
+          configuredMappingNode({
+            mappingLogicalUrn: 'urn:core:platform:civitas:mapping:common:00000000-0000-4000-8000-000000000045',
+          }),
+        ],
+        [],
+      ),
+    )
+    expect(snapshot['map-1'].logicalUrn).toBe(
+      'urn:core:platform:civitas:mapping:common:00000000-0000-4000-8000-000000000045',
+    )
+  })
+
+  it('records a null URN for a mapping node that was never saved', () => {
+    const snapshot = createMappingSnapshot(pipeline([configuredMappingNode()], []))
+    expect(snapshot['map-1'].logicalUrn).toBeNull()
+  })
+})
+
+describe('getRemovedMappingUrns', () => {
+  const savedMappingNode = () =>
+    configuredMappingNode({
+      mappingLogicalUrn: 'urn:core:platform:civitas:mapping:common:00000000-0000-4000-8000-000000000045',
+    })
+
+  it('returns the URN of a mapping whose node was removed', () => {
+    const snapshot = createMappingSnapshot(pipeline([savedMappingNode()], []))
+    expect(getRemovedMappingUrns(pipeline([], []), snapshot)).toEqual([
+      'urn:core:platform:civitas:mapping:common:00000000-0000-4000-8000-000000000045',
+    ])
+  })
+
+  it('ignores a mapping whose node is still in the pipeline', () => {
+    const current = pipeline([savedMappingNode()], [])
+    expect(getRemovedMappingUrns(current, createMappingSnapshot(current))).toEqual([])
+  })
+
+  it('ignores a removed node that was never saved (no artifact to delete)', () => {
+    const snapshot = createMappingSnapshot(pipeline([configuredMappingNode()], []))
+    expect(getRemovedMappingUrns(pipeline([], []), snapshot)).toEqual([])
+  })
+})
+
 describe('isDestructiveDataSinkChange', () => {
-  const postgisPayload = (tableName: string, dataStructureVersionId: string): DataSinkPayload => ({
-    id: 'sink-1',
+  const postgisPayload = (tableName: string, element: string): DataSinkPayload => ({
     dataSinkType: DATASINK_TYPES.POSTGIS,
-    configuration: { tableName, dataStructureVersionId },
+    configuration: { tableName, element },
   })
 
   const snapshotFor = (payload: DataSinkPayload, entityId: string | null): DataSinkSnapshot => {
-    const { id: _id, ...comparable } = payload
-    return { 'node-1': { entityId, configJson: JSON.stringify(comparable) } }
+    return { 'node-1': { entityId, configJson: JSON.stringify(payload) } }
   }
 
   it('flags a tableName change on an existing sink', () => {
@@ -108,7 +480,7 @@ describe('isDestructiveDataSinkChange', () => {
     expect(isDestructiveDataSinkChange('node-1', postgisPayload('new', 'v1'), snapshot)).toBe(true)
   })
 
-  it('flags a dataStructureVersionId change on an existing sink', () => {
+  it('flags an element change on an existing sink', () => {
     const snapshot = snapshotFor(postgisPayload('t', 'v1'), 'sink-1')
     expect(isDestructiveDataSinkChange('node-1', postgisPayload('t', 'v2'), snapshot)).toBe(true)
   })
@@ -126,5 +498,178 @@ describe('isDestructiveDataSinkChange', () => {
   it('does not flag a sink whose snapshot entry has no entityId', () => {
     const snapshot = snapshotFor(postgisPayload('old', 'v1'), null)
     expect(isDestructiveDataSinkChange('node-1', postgisPayload('new', 'v1'), snapshot)).toBe(false)
+  })
+})
+
+// ============================================================================
+// CORE-IR conformance — AC 1, create half
+// ============================================================================
+
+/**
+ * The gates inside the builders validate against the generated Zod copy of the CORE contracts.
+ * These cases hold the same artifacts against the published contract files instead.
+ * `$schema`/`id` are stamped here because Model Forge adds them on ingest and the builders
+ * deliberately leave them out.
+ */
+describe('CORE-IR conformance of the artifacts sent to Model Forge', () => {
+  const PIPELINE_URN = 'urn:core:platform:civitas:pipeline:common:87af81dc-2829-8053-a6cc-3f302c48ba6b:1.0.0'
+
+  const stamped = (kind: ContractKind, id: string, document: object) => ({
+    $schema: CONTRACT_URIS[kind],
+    id,
+    ...document,
+  })
+
+  // The backend derives connectionType from dataSinkType; buildDataSinkPayloads validates that same
+  // projection internally without returning it.
+  const sinkDocument = (payload: DataSinkPayload) =>
+    stamped('datasink', SINK_URN, { connectionType: payload.dataSinkType.toLowerCase(), ...payload.configuration })
+
+  const sinkPayloadOf = (p: Pipeline, type: string) =>
+    buildDataSinkPayloads(p).find(entry => entry.payload.dataSinkType === type)!.payload
+
+  const postgisNode: FixtureNode = {
+    id: 'sink-1',
+    type: 'geoPersistence',
+    position: { x: 30, y: 40 },
+    data: {
+      label: 'PostGIS',
+      configured: true,
+      entityType: 'persistence',
+      entityId: 'sink-guid-1',
+      configurationUrn: SINK_URN,
+      dataStructureVersionId: 'dsv-1',
+      dataStructureUrn: TGT_STRUCT_URN,
+      tableName: 'my_table',
+    },
+  }
+
+  const configuredMapping: FixtureNode = {
+    id: 'map-1',
+    type: 'mapping',
+    position: { x: 50, y: 60 },
+    data: {
+      label: 'Mapping',
+      configured: true,
+      mappingRef: MAPPING_URN,
+      mappingConfig: { source: SRC_STRUCT_URN, target: TGT_STRUCT_URN, fields: { '$.a': '$.b' }, positions: {} },
+    },
+  }
+
+  it('a Pipeline covering every node kind, with a copy-only mapping, satisfies the published pipeline contract', () => {
+    const model = buildPipelinePayload(everyNodeTypePipeline()).model
+    expect(contractErrors('pipeline', stamped('pipeline', PIPELINE_URN, model))).toEqual([])
+  })
+
+  it('a Pipeline without a cron node satisfies the published pipeline contract', () => {
+    const p = pipeline(
+      [startNode, sourceNode(DS_URN), configuredMapping, postgisNode, endNode],
+      [
+        { source: 'start-1', target: 'src-1' },
+        { source: 'src-1', target: 'map-1' },
+        { source: 'map-1', target: 'sink-1' },
+        { source: 'sink-1', target: 'end-1' },
+      ],
+    )
+    expect(contractErrors('pipeline', stamped('pipeline', PIPELINE_URN, buildPipelinePayload(p).model))).toEqual([])
+  })
+
+  it('a Pipeline without a mapping node satisfies the published pipeline contract', () => {
+    const p = pipeline(
+      [startNode, cronNode, sourceNode(DS_URN), postgisNode, endNode],
+      [
+        { source: 'start-1', target: 'src-1' },
+        { source: 'cron-1', target: 'src-1' },
+        { source: 'src-1', target: 'sink-1' },
+        { source: 'sink-1', target: 'end-1' },
+      ],
+    )
+    expect(contractErrors('pipeline', stamped('pipeline', PIPELINE_URN, buildPipelinePayload(p).model))).toEqual([])
+  })
+
+  // Both sink types, each with and without an upstream mapping
+  const sinkCases: [string, FixtureNode, FixtureNode, string][] = [
+    ['copy-only mapped PostGIS', configuredMapping, postgisNode, DATASINK_TYPES.POSTGIS],
+    ['copy-only mapped FROST', configuredMapping, frostNode, DATASINK_TYPES.FROST],
+    ['passthrough PostGIS', sourceNode(DS_URN), postgisNode, DATASINK_TYPES.POSTGIS],
+    ['passthrough FROST', sourceNode(DS_URN), frostNode, DATASINK_TYPES.FROST],
+  ]
+
+  it.each(sinkCases)('a %s sink satisfies the published datasink contract', (_label, upstream, sink, sinkType) => {
+    const p = pipeline([upstream, sink], [{ source: upstream.id, target: sink.id }])
+    expect(contractErrors('datasink', sinkDocument(sinkPayloadOf(p, sinkType)))).toEqual([])
+  })
+
+  it('a Mapping document with a single copy field satisfies the published mapping contract', () => {
+    const [artifact] = buildMappingArtifacts(pipeline([configuredMapping], []))
+    expect(contractErrors('mapping', stamped('mapping', MAPPING_URN, artifact.body))).toEqual([])
+  })
+
+  // One case per operation the mapping editor's transform palette offers, plus the copy shorthand it
+  // writes for a direct edge
+  const mappingOperations: [string, unknown][] = [
+    ['copy written as a path string', '$.source'],
+    ['copy written as an object with sourcePath', { op: 'copy', sourcePath: '$.source' }],
+    ['const', { op: 'const', value: 'fixed' }],
+    ['concat', { op: 'concat', inputs: ['$.first', '$.second'], separator: ' ' }],
+    ['geoPoint', { op: 'geoPoint', lon: '$.lon', lat: '$.lat' }],
+    ['toString', { op: 'toString', input: '$.source' }],
+    ['toInt', { op: 'toInt', input: '$.source' }],
+    ['toFloat', { op: 'toFloat', input: '$.source' }],
+    ['toDate', { op: 'toDate', input: '$.source', pattern: 'yyyy-MM-dd' }],
+    ['format', { op: 'format', input: '$.source', pattern: '%.2f' }],
+    ['toUuid', { op: 'toUuid', input: '$.source' }],
+    ['toDateTime', { op: 'toDateTime', input: '$.source', pattern: "yyyy-MM-dd'T'HH:mm:ssXXX" }],
+    ['toDateTime epoch', { op: 'toDateTime', input: '$.source', inputType: 'epoch', unit: 'seconds' }],
+  ]
+
+  it.each(mappingOperations)('a Mapping using %s satisfies the published mapping contract', (_label, operation) => {
+    const node: FixtureNode = {
+      ...configuredMapping,
+      data: {
+        ...configuredMapping.data,
+        mappingConfig: {
+          source: SRC_STRUCT_URN,
+          target: TGT_STRUCT_URN,
+          fields: { '$.target': operation },
+          positions: {},
+        },
+      },
+    }
+    const [artifact] = buildMappingArtifacts(pipeline([node], []))
+    expect(contractErrors('mapping', stamped('mapping', MAPPING_URN, artifact.body))).toEqual([])
+  })
+})
+
+// ============================================================================
+// The Mapping reference the Pipeline carries
+// ============================================================================
+
+describe('the Mapping reference the Pipeline carries', () => {
+  const VERSIONED = 'urn:core:platform:civitas:mapping:common:f7628c46-674f-829e-9732-40bd589ed5a6:1.0.0'
+  const LOGICAL = 'urn:core:platform:civitas:mapping:common:f7628c46-674f-829e-9732-40bd589ed5a6'
+
+  // Mirrors the save step: the mapping response returns both URNs and both are stashed on the node.
+  const afterMappingSave = () => {
+    const unsaved = pipeline([mappingFixture({ data: { mappingRef: undefined } })], [])
+    return updateNodeData(unsaved, 'map-1', { mappingRef: VERSIONED, mappingLogicalUrn: LOGICAL })
+  }
+
+  it('names the Mapping by its versioned URN', () => {
+    const { model } = buildPipelinePayload(afterMappingSave())
+    expect(model.nodes.find(n => n.id === 'map-1')).toMatchObject({ mappingRef: VERSIONED })
+  })
+
+  it('leaves the logical URN out of the CORE model', () => {
+    const { model } = buildPipelinePayload(afterMappingSave())
+    const node = model.nodes.find(n => n.id === 'map-1')
+    expect(node).not.toHaveProperty('mappingLogicalUrn')
+    expect(node).toEqual({
+      id: 'map-1',
+      kind: 'mapping',
+      label: 'Mapping',
+      mappingRef: VERSIONED,
+      'x-ui-position': { x: 50, y: 60 },
+    })
   })
 })

@@ -1,7 +1,12 @@
 import type { Edge, Node } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
 
-import type { MappingConfig, SchemaTree } from './_types'
+import type { TransformNodeData } from '@/components/node-editor/types'
+import { CONTRACT_URIS, contractErrors, readContract } from '@/test-support/coreContracts'
+import type { ContractOperation } from '@/test-support/mappingFixtures'
+import { mappingFixtures, nestedFixtures, sourceTree as fixtureSourceTree } from '@/test-support/mappingFixtures'
+
+import type { MappingConfig, SchemaTree, ValueNode } from './_types'
 import {
   compileCanvas,
   decompileConfig,
@@ -9,7 +14,7 @@ import {
   SOURCE_NODE_ID,
   TARGET_NODE_ID,
 } from './compile'
-import { concatInputPorts, mappingRegistry } from './transforms'
+import { concatInputPorts, mappingRegistry, transformDef } from './transforms'
 
 const sourceTree: SchemaTree = {
   name: 'src',
@@ -17,8 +22,8 @@ const sourceTree: SchemaTree = {
     { path: '$.id', name: 'id', type: 'int', portType: 'scalar' },
     { path: '$.suffix', name: 'suffix', type: 'str', portType: 'scalar' },
     { path: '$.name', name: 'name', type: 'str', portType: 'scalar' },
-    { path: '$.longitude', name: 'longitude', type: 'float', portType: 'scalar' },
-    { path: '$.latitude', name: 'latitude', type: 'float', portType: 'scalar' },
+    { path: '$.longitude', name: 'longitude', type: 'number', portType: 'scalar' },
+    { path: '$.latitude', name: 'latitude', type: 'number', portType: 'scalar' },
   ],
 }
 
@@ -31,8 +36,8 @@ const targetTree: SchemaTree = {
   ],
 }
 
-const toString = mappingRegistry.byType.toString
-const concat = mappingRegistry.byType.concat
+const toStringDef = transformDef('toString')
+const concat = transformDef('concat')
 
 const nodes: Node[] = [
   { id: SOURCE_NODE_ID, type: 'mega', position: { x: 0, y: 0 }, data: { role: 'source', fields: sourceTree.fields } },
@@ -41,7 +46,7 @@ const nodes: Node[] = [
     id: 'i',
     type: 'transform',
     position: { x: 300, y: 40 },
-    data: { defType: 'toString', config: {}, inputs: toString.inputs, outputs: toString.outputs },
+    data: { defType: 'toString', config: {}, inputs: toStringDef.inputs, outputs: toStringDef.outputs },
   },
   {
     id: 'c',
@@ -72,7 +77,7 @@ describe('mapping editor compile', () => {
   })
 
   it('compiles a geoPoint node from longitude + latitude', () => {
-    const geoPointDef = mappingRegistry.byType.geoPoint
+    const geoPointDef = transformDef('geoPoint')
 
     const geoNodes: Node[] = [
       {
@@ -110,7 +115,7 @@ describe('mapping editor compile', () => {
   })
 
   it('keeps geoPoint inputs positionally aligned when only latitude is wired', () => {
-    const geoPointDef = mappingRegistry.byType.geoPoint
+    const geoPointDef = transformDef('geoPoint')
 
     const geoNodes: Node[] = [
       {
@@ -145,8 +150,8 @@ describe('mapping editor compile', () => {
     // Reopening the editor must keep the wire on the latitude port, not longitude.
     const config: MappingConfig = {
       $schema: 'https://civitasconnect.digital/core/mapping/v1',
-      source: 'urn:core:datastructure:a:b',
-      target: 'urn:core:datastructure:c:d',
+      source: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000041:1.0.0',
+      target: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000042:1.0.0',
       fields,
       positions: {},
     }
@@ -156,7 +161,7 @@ describe('mapping editor compile', () => {
   })
 
   it('keeps geoPoint inputs positionally aligned when only longitude is wired', () => {
-    const geoPointDef = mappingRegistry.byType.geoPoint
+    const geoPointDef = transformDef('geoPoint')
 
     const geoNodes: Node[] = [
       {
@@ -191,7 +196,7 @@ describe('mapping editor compile', () => {
   it('drops an unconnected interior concat port instead of persisting an empty input', () => {
     // in0 and in2 are wired, in1 is left empty — the compiled inputs must be compacted so the
     // backend never receives a bare '' (which it rejects as a blank copy source path).
-    const concatDef = mappingRegistry.byType.concat
+    const concatDef = transformDef('concat')
 
     const cNodes: Node[] = [
       {
@@ -227,8 +232,8 @@ describe('mapping editor compile', () => {
   it('does not wire an unconnected conversion input to the source node', () => {
     const config: MappingConfig = {
       $schema: 'https://civitasconnect.digital/core/mapping/v1',
-      source: 'urn:core:datastructure:a:b',
-      target: 'urn:core:datastructure:c:d',
+      source: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000041:1.0.0',
+      target: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000042:1.0.0',
       fields: { '$.title': { op: 'toString', input: '' } },
       positions: {},
     }
@@ -241,8 +246,8 @@ describe('mapping editor compile', () => {
   it('restores a single shared node when one transform feeds multiple target ports', () => {
     const config: MappingConfig = {
       $schema: 'https://civitasconnect.digital/core/mapping/v1',
-      source: 'urn:core:datastructure:a:b',
-      target: 'urn:core:datastructure:c:d',
+      source: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000041:1.0.0',
+      target: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000042:1.0.0',
       fields: {
         '$.title': { op: 'const', value: 'x', valueType: 'String' },
         '$.fullCode': { op: 'const', value: 'x', valueType: 'String' },
@@ -256,6 +261,25 @@ describe('mapping editor compile', () => {
     expect(targetEdges).toHaveLength(2)
     expect(targetEdges.every(e => e.source === transformNodes[0].id)).toBe(true)
     expect(targetEdges.map(e => e.targetHandle).sort()).toEqual(['$.fullCode', '$.title'])
+  })
+
+  it('reads a Literal saved with the retired Json type as String, and saves it as String', () => {
+    const config: MappingConfig = {
+      $schema: 'https://civitasconnect.digital/core/mapping/v1',
+      source: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000041:1.0.0',
+      target: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000042:1.0.0',
+      fields: { '$.title': { op: 'const', value: '{"key": "value"}', valueType: 'Json' } },
+      positions: {},
+    }
+    const built = decompileConfig(config, sourceTree, targetTree)
+    const literal = built.nodes.find(n => n.type === 'transform')
+    expect(literal?.data).toMatchObject({
+      config: { type: 'String', value: '{"key": "value"}' },
+      outputs: [{ type: 'scalar', dataType: 'str' }],
+    })
+
+    const recompiled = compileCanvas(built.nodes, built.edges)
+    expect(recompiled.fields['$.title']).toEqual({ op: 'const', value: '{"key": "value"}', valueType: 'String' })
   })
 
   it('flags a transform whose output is not wired to the target', () => {
@@ -273,18 +297,241 @@ describe('mapping editor compile', () => {
     expect(findUnconnectedTransformNodes(nodes, edges)).toHaveLength(0)
   })
 
+  it('round-trips a toDateTime node, keeping it distinct from toDate', () => {
+    const toDateTime = transformDef('toDateTime')
+    const dtTarget: SchemaTree = {
+      name: 'tgt',
+      fields: [{ path: '$.observedAt', name: 'observedAt', type: 'datetime', portType: 'scalar' }],
+    }
+    const dtNodes: Node[] = [
+      {
+        id: SOURCE_NODE_ID,
+        type: 'mega',
+        position: { x: 0, y: 0 },
+        data: { role: 'source', fields: sourceTree.fields },
+      },
+      {
+        id: TARGET_NODE_ID,
+        type: 'mega',
+        position: { x: 700, y: 0 },
+        data: { role: 'target', fields: dtTarget.fields },
+      },
+      {
+        id: 'dt',
+        type: 'transform',
+        position: { x: 300, y: 40 },
+        data: {
+          defType: 'toDateTime',
+          config: { pattern: "yyyy-MM-dd'T'HH:mm:ssXXX" },
+          inputs: toDateTime.inputs,
+          outputs: toDateTime.outputs,
+        },
+      },
+    ]
+    const dtEdges: Edge[] = [
+      { id: 'd1', source: SOURCE_NODE_ID, sourceHandle: '$.name', target: 'dt', targetHandle: 'in' },
+      { id: 'd2', source: 'dt', sourceHandle: 'out', target: TARGET_NODE_ID, targetHandle: '$.observedAt' },
+    ]
+
+    const compiled = compileCanvas(dtNodes, dtEdges)
+    expect(compiled.fields['$.observedAt']).toEqual({
+      op: 'toDateTime',
+      input: '$.name',
+      pattern: "yyyy-MM-dd'T'HH:mm:ssXXX",
+    })
+
+    const built = decompileConfig({ ...compiled }, sourceTree, dtTarget)
+    const restored = built.nodes.find(n => n.type === 'transform')
+    expect(restored?.data.defType).toBe('toDateTime')
+    expect(compileCanvas(built.nodes, built.edges).fields).toEqual(compiled.fields)
+  })
+
+  it.each(['milliseconds', 'seconds'] as const)('round-trips an epoch toDateTime node with %s unit', unit => {
+    const source: SchemaTree = {
+      name: 'src',
+      fields: [{ path: '$.timestamp', name: 'timestamp', type: 'int', portType: 'scalar' }],
+    }
+    const target: SchemaTree = {
+      name: 'tgt',
+      fields: [{ path: '$.observedAt', name: 'observedAt', type: 'datetime', portType: 'scalar' }],
+    }
+    const config: MappingConfig = {
+      fields: {
+        '$.observedAt': { op: 'toDateTime', input: '$.timestamp', inputType: 'epoch', unit },
+      },
+      positions: {},
+    }
+
+    const built = decompileConfig(config, source, target)
+    const transform = built.nodes.find(node => node.type === 'transform')
+    expect((transform?.data as TransformNodeData).inputs?.[0].accepts).toContain('int')
+    expect(compileCanvas(built.nodes, built.edges).fields).toEqual(config.fields)
+  })
+
   it('round-trips: compile → decompile → compile is stable', () => {
     const compiled = compileCanvas(nodes, edges)
 
     const config: MappingConfig = {
       $schema: 'https://civitasconnect.digital/core/mapping/v1',
-      source: 'urn:core:datastructure:a:b',
-      target: 'urn:core:datastructure:c:d',
+      source: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000041:1.0.0',
+      target: 'urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000042:1.0.0',
       ...compiled,
     }
     const built = decompileConfig(config, sourceTree, targetTree)
     const recompiled = compileCanvas(built.nodes, built.edges)
     expect(recompiled.fields).toEqual(compiled.fields)
     expect(Object.keys(recompiled.positions).sort()).toEqual(Object.keys(compiled.positions).sort())
+  })
+})
+
+const documentOf = (fields: Record<string, ValueNode>) => ({
+  $schema: CONTRACT_URIS.mapping,
+  id: 'urn:core:platform:civitas:mapping:common:2e01b235-7928-8608-863f-5f7123472030:1.0.0',
+  source: 'urn:core:platform:civitas:datastructure:common:531147d0-9580-8544-8601-804d11141d60:1.0.0',
+  target: 'urn:core:platform:civitas:datastructure:common:45074f30-2cfc-8d5e-8e70-95366202ba43:1.0.0',
+  fields,
+})
+
+describe('The operation the Mapping editor offers', () => {
+  const expectedOperation: Record<ContractOperation, ValueNode> = {
+    copy: '$.source',
+    concat: { op: 'concat', separator: '-', inputs: ['$.id', '$.suffix'] },
+    const: { op: 'const', value: 'fixed', valueType: 'String' },
+    toString: { op: 'toString', input: '$.id' },
+    toInt: { op: 'toInt', input: '$.id' },
+    toFloat: { op: 'toFloat', input: '$.id' },
+    toDate: { op: 'toDate', input: '$.day', pattern: 'yyyy-MM-dd' },
+    format: { op: 'format', input: '$.when', pattern: 'yyyy-MM-dd' },
+    geoPoint: { op: 'geoPoint', lon: '$.longitude', lat: '$.latitude' },
+  }
+
+  it.each(mappingFixtures)('$operation compiles to its CORE operation', fixture => {
+    const { fields } = compileCanvas(fixture.nodes, fixture.edges)
+    expect(fields[fixture.targetPath]).toEqual(expectedOperation[fixture.operation])
+  })
+
+  it.each(mappingFixtures)('$operation produces a contract-valid mapping document', fixture => {
+    const { fields } = compileCanvas(fixture.nodes, fixture.edges)
+    expect(contractErrors('mapping', documentOf(fields))).toEqual([])
+  })
+
+  it.each(mappingFixtures)('$operation is unchanged after rehydration', fixture => {
+    const fields = { [fixture.targetPath]: expectedOperation[fixture.operation] }
+    const built = decompileConfig({ fields, positions: {} }, fixtureSourceTree, fixture.targetTree)
+
+    const restored = built.nodes.find(node => node.type === 'transform')
+    expect(restored?.data.defType).toBe(fixture.operation === 'copy' ? undefined : fixture.operation)
+    expect(compileCanvas(built.nodes, built.edges).fields).toEqual(fields)
+  })
+
+  it('compiles a direct edge to the bare path, not a copy object', () => {
+    const copy = mappingFixtures.find(fixture => fixture.operation === 'copy')!
+    const { fields } = compileCanvas(copy.nodes, copy.edges)
+    expect(typeof fields[copy.targetPath]).toBe('string')
+  })
+
+  it('offers the same operations the mapping contract defines', () => {
+    const defs = readContract('mapping').$defs as Record<
+      string,
+      { properties?: { op?: { const?: string } }; oneOf?: { properties?: { op?: { const?: string } } }[] }
+    >
+    const defined = Object.values(defs)
+      .map(def => def.properties?.op?.const ?? def.oneOf?.[0]?.properties?.op?.const)
+      .filter(Boolean)
+      .sort()
+
+    // 'copy' is the direct edge, it is not offered in the palette.
+    expect([...Object.keys(mappingRegistry.byType), 'copy'].sort()).toEqual(defined)
+  })
+
+  it('offers typed controls for the date-time input type and epoch unit', () => {
+    const configFields = Object.fromEntries(
+      mappingRegistry.list.map(def => [
+        def.type,
+        Object.fromEntries(def.config.map(field => [field.key, field.control])),
+      ]),
+    )
+
+    expect(configFields).toEqual({
+      const: { type: 'select', value: 'text' },
+      concat: { separator: 'text' },
+      geoPoint: {},
+      toString: {},
+      toInt: {},
+      toFloat: {},
+      toUuid: {},
+      toDate: { pattern: 'text' },
+      toDateTime: { inputType: 'select', pattern: 'text', unit: 'select' },
+      format: { pattern: 'text' },
+    })
+  })
+})
+
+describe('nested operations', () => {
+  const dateChain: ValueNode = {
+    op: 'format',
+    input: { op: 'toDate', input: '$.day', pattern: 'yyyy-MM-dd' },
+    pattern: 'yyyy-MM-dd',
+  }
+
+  const expectedFields: Record<string, Record<string, ValueNode>> = {
+    'three levels': {
+      '$.fullCode': { op: 'concat', separator: '-', inputs: [dateChain, '$.suffix'] },
+    },
+    'both fixed inputs of geoPoint': {
+      '$.geometry': {
+        op: 'geoPoint',
+        lon: { op: 'toFloat', input: '$.longitude' },
+        lat: { op: 'toFloat', input: '$.latitude' },
+      },
+    },
+    'one transform chain feeding two target fields': { '$.printed': dateChain, '$.text': dateChain },
+  }
+
+  it.each(nestedFixtures)('$label compiles to a nested CORE operation', fixture => {
+    expect(compileCanvas(fixture.nodes, fixture.edges).fields).toEqual(expectedFields[fixture.label])
+  })
+
+  it.each(nestedFixtures)('$label produces a contract-valid mapping document', fixture => {
+    const { fields } = compileCanvas(fixture.nodes, fixture.edges)
+    expect(contractErrors('mapping', documentOf(fields))).toEqual([])
+  })
+
+  it.each(nestedFixtures)('$label is unchanged after rehydration', fixture => {
+    const fields = expectedFields[fixture.label]
+    const built = decompileConfig({ fields, positions: {} }, fixtureSourceTree, fixture.targetTree)
+    expect(compileCanvas(built.nodes, built.edges).fields).toEqual(fields)
+  })
+
+  it('restores a transform chain feeding two target fields as one set of nodes', () => {
+    const shared = nestedFixtures.find(fixture => fixture.label === 'one transform chain feeding two target fields')!
+    const compiled = compileCanvas(shared.nodes, shared.edges)
+
+    const built = decompileConfig({ ...compiled }, fixtureSourceTree, shared.targetTree)
+    expect(built.nodes.filter(node => node.type === 'transform')).toHaveLength(2)
+  })
+})
+
+describe('a copy operation written as an object with sourcePath', () => {
+  const copy = mappingFixtures.find(fixture => fixture.operation === 'copy')!
+  const objectForm: ValueNode = { op: 'copy', sourcePath: '$.source' }
+
+  const reopened = (value: ValueNode) =>
+    decompileConfig({ ...documentOf({ '$.target': value }), positions: {} }, fixtureSourceTree, copy.targetTree)
+
+  const savedAgain = (value: ValueNode) => {
+    const built = reopened(value)
+    return compileCanvas(built.nodes, built.edges).fields
+  }
+
+  it('builds an edge from the source field it names', () => {
+    const edge = reopened(objectForm).edges.find(e => e.target === TARGET_NODE_ID && e.targetHandle === '$.target')
+    expect(edge?.source).toBe(SOURCE_NODE_ID)
+    expect(edge?.sourceHandle).toBe('$.source')
+  })
+
+  it('means the same as the shorthand path once saved again', () => {
+    expect(savedAgain(objectForm)).toEqual(savedAgain('$.source'))
+    expect(savedAgain(objectForm)['$.target']).toBe('$.source')
   })
 })

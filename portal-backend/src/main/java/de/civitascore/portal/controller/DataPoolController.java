@@ -7,6 +7,7 @@ import de.civitascore.portal.model.output.DataPoolOutputDTO;
 import de.civitascore.portal.model.output.assembler.DataPoolAssembler;
 import de.civitascore.portal.repository.specification.DataPoolSpec;
 import de.civitascore.portal.service.DataPoolService;
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -26,8 +27,10 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
 
 /** REST controller for managing datapool resources. */
 @RestController
@@ -35,7 +38,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(name = "DataPools", description = "Datapool management endpoints")
 public class DataPoolController
-    extends BaseDataEntityController<DataPoolInputDTO, DataPoolOutputDTO, DataPool, DataPoolSpec> {
+    extends BaseDataEntityController<
+        DataPoolInputDTO, DataPoolInputDTO, DataPoolOutputDTO, DataPool, DataPoolSpec> {
 
   private final DataPoolService dataPoolService;
   private final DataPoolAssembler dataPoolAssembler;
@@ -80,6 +84,25 @@ public class DataPoolController
   @Override
   protected ScopeType getScopeType() {
     return ScopeType.DATAPOOL;
+  }
+
+  @Override
+  @Hidden
+  public ResponseEntity<DataPoolOutputDTO> release(@PathVariable UUID id) {
+    return super.release(id);
+  }
+
+  @Override
+  @Hidden
+  public ResponseEntity<DataPoolOutputDTO> unrelease(@PathVariable UUID id) {
+    return super.unrelease(id);
+  }
+
+  @Override
+  @Hidden
+  public ResponseEntity<DataPoolOutputDTO> updateReleasedMeta(
+      @PathVariable UUID id, @RequestBody JsonNode updates) {
+    return super.updateReleasedMeta(id, updates);
   }
 
   @Override

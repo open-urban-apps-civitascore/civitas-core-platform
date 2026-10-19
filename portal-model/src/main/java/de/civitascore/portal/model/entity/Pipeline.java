@@ -1,6 +1,6 @@
 package de.civitascore.portal.model.entity;
 
-import de.civitascore.portal.model.entity.base.NamedEntity;
+import de.civitascore.portal.model.entity.base.DataSetOwnedEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -9,24 +9,22 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 /**
- * Represents a data ingestion pipeline belonging to a {@link DataSet}. Holds the editor-built
- * pipeline definition and the associated {@link DataSource DataSources}.
+ * Represents a data ingestion pipeline belonging to a {@link DataSet}. The pipeline is a thin
+ * shell: name, dataset FK and datasource links live here, while the editor-built pipeline
+ * definition (including the React Flow layout under the {@code x-ui-styles} keyword) lives in the
+ * Model Forge registry, pinned by {@link #modelUrn}.
  */
 @Entity
 @Table(
@@ -36,16 +34,27 @@ import org.hibernate.type.SqlTypes;
 @Setter
 @SuperBuilder
 @NoArgsConstructor
-public class Pipeline extends NamedEntity {
+public class Pipeline extends DataSetOwnedEntity {
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "dataset_id", nullable = false)
-  @NotNull private DataSet dataSet;
+  @NotBlank @Column(nullable = false)
+  private String name;
 
-  /** React Flow visual layout stored as JSON (nodes/edges/viewport). */
-  @JdbcTypeCode(SqlTypes.JSON)
-  @Column(name = "styles", columnDefinition = "jsonb")
-  private Map<String, Object> styles;
+  @Column(columnDefinition = "TEXT")
+  private String description;
+
+  /**
+   * Logical CORE URN of this pipeline's definition artifact in Model Forge. Null until a definition
+   * is stored.
+   */
+  @Column(name = "model_logical_urn")
+  private String modelLogicalUrn;
+
+  /**
+   * Versioned CORE URN pinning the current pipeline definition (editor-built graph plus the React
+   * Flow layout under {@code x-ui-styles}) in Model Forge. Null while no definition is stored.
+   */
+  @Column(name = "model_urn")
+  private String modelUrn;
 
   /** Data sources associated with this pipeline. */
   @ManyToMany(fetch = FetchType.LAZY)
@@ -55,11 +64,6 @@ public class Pipeline extends NamedEntity {
       inverseJoinColumns = @JoinColumn(name = "data_source_id"))
   @Builder.Default
   private Set<DataSource> dataSources = new HashSet<>();
-
-  /** Editor-built pipeline definition (opaque JSON); forwarded to the config-adapter as-is. */
-  @JdbcTypeCode(SqlTypes.JSON)
-  @Column(name = "model", columnDefinition = "jsonb")
-  private Map<String, Object> model;
 
   /** Auto-incremented on each update, passed through to saga triggers. */
   @Column(name = "version", nullable = false)

@@ -19,7 +19,38 @@ body:json {
   }
 }
 
+script:pre-request {
+  // The request block covers POST; PUT, PATCH and DELETE are probed here against the same URL so one
+  // file pins the whole write surface. A policy regression rarely re-opens every verb at once — a rule
+  // that matches "not GET" incorrectly typically leaks a single one. QuickJS axios throws on non-2xx,
+  // so each verb is wrapped and the status read off e.response; a rejected promise IS the expectation.
+  const axios = require('axios');
+  const url = `${bru.getEnvVar('apisixApiUrl')}/v1/datasets/${bru.getVar('sagaDataSetId')}/${bru.getVar('sagaSlug')}/Things`;
+  const body = { name: 'anon-write-attempt' };
+
+  const statusOf = async (call) => {
+    try { return (await call()).status; }
+    catch (e) { return e.response ? e.response.status : 0; }
+  };
+
+  bru.setVar('sagaAnonPutStatus', await statusOf(() => axios.put(url, body, { timeout: 10000 })));
+  bru.setVar('sagaAnonPatchStatus', await statusOf(() => axios.patch(url, body, { timeout: 10000 })));
+  bru.setVar('sagaAnonDeleteStatus', await statusOf(() => axios.delete(url, { timeout: 10000 })));
+}
+
 tests {
+  test("Anonymous PUT is denied with exactly 401", function() {
+    expect(bru.getVar('sagaAnonPutStatus')).to.equal(401);
+  });
+
+  test("Anonymous PATCH is denied with exactly 401", function() {
+    expect(bru.getVar('sagaAnonPatchStatus')).to.equal(401);
+  });
+
+  test("Anonymous DELETE is denied with exactly 401", function() {
+    expect(bru.getVar('sagaAnonDeleteStatus')).to.equal(401);
+  });
+
   test("Anonymous WRITE to an open dataset is denied with exactly 401 (no credentials)", function() {
     // Open data grants anonymous READ only (OPA allows GET on the open-data flag). A write has no
     // matching permission/grant, so OPA denies it — proving the bypass-free model never opens writes.
@@ -37,4 +68,7 @@ docs {
 
   This is the universal counterpart to the old route-level method gate (GET/HEAD/OPTIONS), now enforced
   centrally by OPA rather than by stripping the auth plugin at the gateway.
+
+  All four write verbs are checked — POST as the request itself, PUT/PATCH/DELETE probed in the
+  pre-request — so the grant is proven **verb-scoped rather than route-scoped**.
 }

@@ -4,9 +4,6 @@ logging:
     org.hibernate: WARN
     org.flywaydb: INFO
 
-app:
-  url: http://localhost:8089
-
 civitas:
   master-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
   api:

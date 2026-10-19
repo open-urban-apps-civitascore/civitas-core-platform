@@ -18,7 +18,19 @@ public class DataSinkOutputDTO extends BaseOutputDTO {
   private UUID dataSetId;
   private UUID pipelineId;
   private DataSinkType dataSinkType;
-  private boolean inUse;
+
+  @Schema(description = "True if this DataSink is linked to a Pipeline")
+  private boolean inUseByPipeline;
+
+  @Schema(description = "True if any Layer publishes this DataSink")
+  private boolean inUseByLayer;
+
+  @Schema(
+      description =
+          "True if this DataSink's storage physically exists. Set once a provisioning saga has"
+              + " completed; never reset to false.",
+      accessMode = Schema.AccessMode.READ_ONLY)
+  private boolean provisioned;
 
   @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
   @JsonSubTypes({
@@ -27,4 +39,8 @@ public class DataSinkOutputDTO extends BaseOutputDTO {
   })
   @Schema(oneOf = {PostgisConfigurationOutput.class, FrostConfigurationOutput.class})
   private DataSinkConfigurationOutput configuration;
+
+  @Schema(
+      description = "Versioned CORE URN of this DataSink's configuration artifact in Model Forge")
+  private String configurationUrn;
 }

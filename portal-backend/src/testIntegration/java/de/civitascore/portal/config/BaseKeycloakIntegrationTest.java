@@ -30,7 +30,11 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @ActiveProfiles("test-integration")
 @AutoConfigureTestRestTemplate
 @Testcontainers
-@Import({PortalTestDataFactory.class, InfraTestDataFactory.class})
+@Import({
+  PortalTestDataFactory.class,
+  InfraTestDataFactory.class,
+  OmitNullRequestFieldsConfiguration.class
+})
 @Slf4j(access = AccessLevel.PROTECTED)
 public abstract class BaseKeycloakIntegrationTest {
 
@@ -79,7 +83,9 @@ public abstract class BaseKeycloakIntegrationTest {
     registry.add("spring.security.oauth2.resourceserver.jwt.issuer-uri", () -> issuerUri);
     registry.add("spring.security.oauth2.resourceserver.jwt.jwk-set-uri", () -> jwkSetUri);
 
-    registry.add("keycloak.auth-server-url", () -> authServerUrl);
+    // KeycloakProperties (@NotBlank authServerUrl/realm) is required at context load; wire it from
+    // the started container so the Keycloak integration tests are self-contained locally.
+    registry.add("keycloak.auth-server-url", KEYCLOAK::getAuthServerUrl);
     registry.add("keycloak.realm", () -> REALM_NAME);
   }
 

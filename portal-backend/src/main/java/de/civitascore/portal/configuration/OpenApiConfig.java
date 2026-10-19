@@ -42,9 +42,12 @@ import org.springframework.core.annotation.Order;
 public class OpenApiConfig {
 
   private final KeycloakProperties keycloakProperties;
+  private final OpenApiProperties openApiProperties;
 
-  public OpenApiConfig(final KeycloakProperties keycloakProperties) {
+  public OpenApiConfig(
+      final KeycloakProperties keycloakProperties, final OpenApiProperties openApiProperties) {
     this.keycloakProperties = keycloakProperties;
+    this.openApiProperties = openApiProperties;
   }
 
   private static final String APPLICATION_JSON = "application/json";
@@ -53,7 +56,9 @@ public class OpenApiConfig {
 
   /**
    * Creates the base OpenAPI definition with info metadata, license, contact, external docs, and
-   * OAuth2 security scheme derived from Keycloak configuration.
+   * OAuth2 security scheme derived from Keycloak configuration. The scheme uses {@code
+   * openapi.oauth-server-url} as the Keycloak base URL when it is set, else {@code
+   * keycloak.auth-server-url}.
    *
    * @return the configured OpenAPI specification object
    */
@@ -80,7 +85,10 @@ public class OpenApiConfig {
                     .description("CIVITAS/CORE Developer Documentation")
                     .url("https://docs.core.civitasconnect.digital/docs_v2/Development/intro"));
 
-    String authServerUrl = keycloakProperties.authServerUrl();
+    String authServerUrl =
+        openApiProperties.oauthServerUrl() != null && !openApiProperties.oauthServerUrl().isBlank()
+            ? openApiProperties.oauthServerUrl()
+            : keycloakProperties.authServerUrl();
     String realm = keycloakProperties.realm();
     if (authServerUrl != null && !authServerUrl.isBlank() && realm != null && !realm.isBlank()) {
       String authUrl = authServerUrl + "/realms/" + realm + "/protocol/openid-connect/auth";
@@ -392,8 +400,9 @@ public class OpenApiConfig {
   }
 
   /**
-   * Replaces the opaque {@code JsonNode} request body on PATCH endpoints with the same InputDTO
-   * schema used by PUT, but with all fields optional (no {@code required} array).
+   * Replaces the request body of PATCH endpoints with a copy of the InputDTO schema that has all
+   * fields optional (no {@code required} array). The InputDTO is the one used by PUT on the same
+   * path, or, without a PUT, the one the PATCH declares itself.
    */
   @Bean
   public OpenApiCustomizer patchSchemaCustomizer() {
@@ -410,13 +419,14 @@ public class OpenApiConfig {
     var opsMap = pathItem.readOperationsMap();
     var putOp = opsMap.get(PathItem.HttpMethod.PUT);
     var patchOp = opsMap.get(PathItem.HttpMethod.PATCH);
-    if (putOp == null || patchOp == null) return;
-    if (putOp.getRequestBody() == null || patchOp.getRequestBody() == null) return;
+    if (patchOp == null || patchOp.getRequestBody() == null) return;
 
-    String putRef = extractSchemaRef(putOp);
-    if (putRef == null) return;
+    var sourceOp = putOp != null && putOp.getRequestBody() != null ? putOp : patchOp;
+    String sourceRef = extractSchemaRef(sourceOp);
+    if (sourceRef == null) return;
 
-    String inputName = putRef.substring(putRef.lastIndexOf('/') + 1);
+    String inputName = sourceRef.substring(sourceRef.lastIndexOf('/') + 1);
+    if (inputName.equals("JsonNode")) return;
     String patchName = "Patch" + inputName;
 
     Schema<?> originalSchema = openApi.getComponents().getSchemas().get(inputName);
@@ -655,7 +665,30 @@ public class OpenApiConfig {
                   "validation_failed",
                   problemExample(400, "VALIDATION_FAILED", "Request body validation failed", path),
                   "malformed_request",
-                  problemExample(400, "MALFORMED_REQUEST", "Failed to read request body", path)));
+                  problemExample(400, "MALFORMED_REQUEST", "Failed to read request body", path),
+                  "dataset_not_editable",
+                  problemExample(
+                      400,
+                      "DATASET_NOT_EDITABLE",
+                      "A dataset and its sub-entities can only be changed while the dataset is "
+                          + "DRAFT. Unstage or unrelease the dataset first.",
+                      path),
+                  "model_root_missing",
+                  problemExample(
+                      400,
+                      "MODEL_ROOT_MISSING",
+                      "DataStructureVersion model must designate exactly one root Element before"
+                          + " releasing",
+                      path),
+                  "model_member_unreachable",
+                  problemExample(
+                      400,
+                      "MODEL_MEMBER_UNREACHABLE",
+                      "DataStructureVersion model has members that its root Element does not"
+                          + " reach: Orphan",
+                      path,
+                      "memberNames",
+                      List.of("Orphan"))));
       case "404" ->
           problemExamples(
               orderedMap(
@@ -679,6 +712,20 @@ public class OpenApiConfig {
                       409,
                       "RESOURCE_IN_USE",
                       "Cannot delete: resource is referenced by other entities",
+                      path),
+                  "saga_in_flight",
+                  problemExample(
+                      409,
+                      "SAGA_IN_FLIGHT",
+                      "Cannot write while a saga is in-flight: CREATE",
+                      path,
+                      "pendingSagaType",
+                      "CREATE"),
+                  "model_missing",
+                  problemExample(
+                      409,
+                      "MODEL_MISSING",
+                      "DataStructureVersion model is missing from the model registry",
                       path),
                   "foreign_key_violation",
                   problemExample(
@@ -720,6 +767,18 @@ public class OpenApiConfig {
     map.put("status", status);
     map.put("detail", detail);
     map.put("instance", instance);
+    return map;
+  }
+
+  private Map<String, Object> problemExample(
+      int status,
+      String errorCode,
+      String detail,
+      String instance,
+      String propertyName,
+      Object propertyValue) {
+    Map<String, Object> map = problemExample(status, errorCode, detail, instance);
+    map.put(propertyName, propertyValue);
     return map;
   }
 

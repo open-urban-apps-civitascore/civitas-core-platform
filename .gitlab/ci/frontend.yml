@@ -6,13 +6,17 @@
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
     # Always run on tags
     - if: $CI_COMMIT_TAG
-    # Always run on main and develop branch
+    # Always run on main, staging and develop branch
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
     - if: $CI_COMMIT_BRANCH == "develop"
     # Run on MR only when frontend files change
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - portal-frontend/**/*
+        # The CORE contracts the frontend validates against and generates its Zod copy from; a
+        # change here must run the conformance and drift tests in the MR that causes it.
+        - model-forge/model-forge-runtime/src/main/resources/*.schema.json
         - .gitlab-ci.yml
         - .gitlab/ci/frontend.yml
 
@@ -177,6 +181,7 @@ build-frontend-image:
       docker buildx build \
         --platform linux/amd64,linux/arm64 \
         --tag $SCAN_IMAGE_TAG \
+        --provenance=false \
         --push \
         .
   after_script:

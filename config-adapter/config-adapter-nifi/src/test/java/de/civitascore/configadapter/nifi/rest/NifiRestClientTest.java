@@ -33,9 +33,9 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.nifi.auth.NifiTokenProvider;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
+import de.civitascore.configadapter.nifi.flow.stage.source.MqttTruststoreConfig;
 import java.util.Map;
+import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,22 +43,35 @@ import org.junit.jupiter.api.Test;
 class NifiRestClientTest {
 
   private WireMockServer server;
-  private Client httpClient;
+  private OkHttpClient httpClient;
   private FakeTokenProvider tokenProvider;
   private NifiRestClient client;
+
+  /**
+   * Revisions used by the delete tests. The process-group listing carries the revision as it stood
+   * BEFORE the group was stopped; the read that observes it stopped carries a newer one. They must
+   * differ, or the assertion on the delete's version parameter cannot tell which of the two the
+   * client locked on — and the stale one is what produced the 409 this guards.
+   */
+  private static final int LISTING_REVISION = 2;
+
+  private static final int STOPPED_REVISION = 7;
 
   @BeforeEach
   void setUp() {
     server = new WireMockServer(WireMockConfiguration.options().dynamicPort());
     server.start();
-    httpClient = ClientBuilder.newClient();
+    httpClient = new OkHttpClient();
     tokenProvider = new FakeTokenProvider();
-    client = new NifiRestClient(server.baseUrl(), tokenProvider, httpClient);
+    client =
+        new NifiRestClient(
+            server.baseUrl(), tokenProvider, httpClient, MqttTruststoreConfig.nodeTruststore());
   }
 
   @AfterEach
   void tearDown() {
-    httpClient.close();
+    httpClient.dispatcher().executorService().shutdown();
+    httpClient.connectionPool().evictAll();
     server.stop();
   }
 
@@ -138,6 +151,54 @@ class NifiRestClientTest {
         putRequestedFor(urlEqualTo("/nifi-api/controller-services/cs-1"))
             .withRequestBody(containing("db-secret"))
             .withRequestBody(containing("\"version\":3")));
+  }
+
+  @Test
+  void deployFlowPinsTheOwnProcessorsToTheBundleNifiCarries() throws Exception {
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .willReturn(json("{ \"id\": \"root-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/root-1"))
+            .willReturn(json("{ \"processGroupFlow\": { \"flow\": { \"processGroups\": [] } } }")));
+    // The NAR image is versioned on its own: NiFi carries another version than the fragment names.
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/processor-types?bundleGroupFilter=de.civitas-core"))
+            .willReturn(
+                json(
+                    "{ \"processorTypes\": [ { \"type\": \"de.civitascore.nifi.frost.PutFrostRecord\","
+                        + " \"bundle\": { \"group\": \"de.civitas-core\","
+                        + " \"artifact\": \"nifi-frost-nar\", \"version\": \"2.0.0\" } } ] }")));
+    server.stubFor(
+        post(urlPathEqualTo("/nifi-api/process-groups/root-1/process-groups/upload"))
+            .willReturn(json("{ \"id\": \"pg-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(
+                json(
+                    "{ \"controllerServices\": [ { \"id\": \"cs-1\","
+                        + " \"component\": { \"name\": \"FrostWebClient\", \"state\": \"ENABLED\" },"
+                        + " \"revision\": { \"version\": 1 } } ] }")));
+    stubRunningProcessors();
+    server.stubFor(
+        put(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(json("{}")));
+    server.stubFor(put(urlEqualTo("/nifi-api/flow/process-groups/pg-1")).willReturn(json("{}")));
+
+    DeploymentPlan plan =
+        new DeploymentPlan(
+            "pipeline-frost",
+            "{ \"flowContents\": { \"name\": \"pipeline-frost\", \"processors\": [ {"
+                + " \"type\": \"de.civitascore.nifi.frost.PutFrostRecord\", \"bundle\": {"
+                + " \"group\": \"de.civitas-core\", \"artifact\": \"nifi-frost-nar\","
+                + " \"version\": \"1.0.0\" } } ] } }",
+            Map.of());
+
+    client.deployFlow(plan);
+
+    server.verify(
+        postRequestedFor(urlPathEqualTo("/nifi-api/process-groups/root-1/process-groups/upload"))
+            .withRequestBody(containing("\"version\":\"2.0.0\"")));
   }
 
   @Test
@@ -708,7 +769,9 @@ class NifiRestClientTest {
                 json(
                     "{ \"processGroupFlow\": { \"flow\": { \"processGroups\": [ { \"id\": \"pg-1\","
                         + " \"component\": { \"name\": \"pipeline-x\" }, \"revision\": { \"version\":"
-                        + " 2 } } ] } } }")));
+                        + " "
+                        + LISTING_REVISION
+                        + " } } ] } } }")));
     server.stubFor(put(urlEqualTo("/nifi-api/flow/process-groups/pg-1")).willReturn(json("{}")));
 
     // Stopping is asynchronous: the first status poll still reports a running processor with an
@@ -720,8 +783,10 @@ class NifiRestClientTest {
             .whenScenarioStateIs("Started")
             .willReturn(
                 json(
-                    "{ \"runningCount\": 1, \"status\": { \"aggregateSnapshot\": {"
-                        + " \"activeThreadCount\": 1 } } }"))
+                    "{ \"runningCount\": 1, \"revision\": { \"version\": "
+                        + STOPPED_REVISION
+                        + " }, \"status\": {"
+                        + " \"aggregateSnapshot\": { \"activeThreadCount\": 1 } } }"))
             .willSetStateTo("stopped"));
     server.stubFor(
         get(urlEqualTo("/nifi-api/process-groups/pg-1"))
@@ -729,9 +794,12 @@ class NifiRestClientTest {
             .whenScenarioStateIs("stopped")
             .willReturn(
                 json(
-                    "{ \"runningCount\": 0, \"status\": { \"aggregateSnapshot\": {"
-                        + " \"activeThreadCount\": 0 } } }")));
+                    "{ \"runningCount\": 0, \"revision\": { \"version\": "
+                        + STOPPED_REVISION
+                        + " }, \"status\": {"
+                        + " \"aggregateSnapshot\": { \"activeThreadCount\": 0 } } }")));
 
+    stubEmptyAllQueues();
     server.stubFor(
         put(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
             .willReturn(json("{}")));
@@ -745,6 +813,200 @@ class NifiRestClientTest {
     // Polled until stopped (two status reads) before the single delete was issued.
     server.verify(2, getRequestedFor(urlPathEqualTo("/nifi-api/process-groups/pg-1")));
     server.verify(1, deleteRequestedFor(urlPathEqualTo("/nifi-api/process-groups/pg-1")));
+    // The delete locks on the revision observed together with the stop, not the one the listing
+    // carried before it.
+    server.verify(
+        1,
+        deleteRequestedFor(urlPathEqualTo("/nifi-api/process-groups/pg-1"))
+            .withQueryParam("version", equalTo(String.valueOf(STOPPED_REVISION))));
+  }
+
+  /**
+   * The queues are emptied between "stopped" and "controller services disabled". NiFi answers the
+   * drop asynchronously, so the delete must wait for the request to report finished — otherwise it
+   * runs into the very HTTP 409 ("Queue not empty") the step exists to prevent.
+   */
+  @Test
+  void deleteEmptiesQueuesAndWaitsForTheDropToFinish() throws Exception {
+    stubStoppedProcessGroupForDelete();
+    server.stubFor(
+        post(urlEqualTo("/nifi-api/process-groups/pg-1/empty-all-connections-requests"))
+            .willReturn(json("{ \"dropRequest\": { \"id\": \"drop-1\", \"finished\": false } }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/pg-1/empty-all-connections-requests/drop-1"))
+            .inScenario("dropping")
+            .whenScenarioStateIs("Started")
+            .willReturn(json("{ \"dropRequest\": { \"id\": \"drop-1\", \"finished\": false } }"))
+            .willSetStateTo("dropped"));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/pg-1/empty-all-connections-requests/drop-1"))
+            .inScenario("dropping")
+            .whenScenarioStateIs("dropped")
+            .willReturn(
+                json(
+                    "{ \"dropRequest\": { \"id\": \"drop-1\", \"finished\": true,"
+                        + " \"droppedCount\": 30 } }")));
+    server.stubFor(
+        delete(urlEqualTo("/nifi-api/process-groups/pg-1/empty-all-connections-requests/drop-1"))
+            .willReturn(json("{}")));
+
+    client.deleteFlowByName("pipeline-x");
+
+    server.verify(
+        1,
+        postRequestedFor(
+            urlPathEqualTo("/nifi-api/process-groups/pg-1/empty-all-connections-requests")));
+    // Polled until the drop reported finished (two reads) before the group was deleted.
+    server.verify(
+        2,
+        getRequestedFor(
+            urlPathEqualTo("/nifi-api/process-groups/pg-1/empty-all-connections-requests/drop-1")));
+    server.verify(1, deleteRequestedFor(urlPathEqualTo("/nifi-api/process-groups/pg-1")));
+    // The finished request is released so it does not linger in NiFi.
+    server.verify(
+        1,
+        deleteRequestedFor(
+            urlPathEqualTo("/nifi-api/process-groups/pg-1/empty-all-connections-requests/drop-1")));
+  }
+
+  /**
+   * NiFi reports a failed drop in-band with HTTP 200 through {@code failureReason}. Deleting anyway
+   * would hit the 409 and loop, so the teardown stops here — retryably, because a redelivery can
+   * succeed once whatever held the queue is gone.
+   */
+  @Test
+  void deleteFailsRetryablyWhenTheDropReportsAFailureReason() {
+    stubStoppedProcessGroupForDelete();
+    server.stubFor(
+        post(urlEqualTo("/nifi-api/process-groups/pg-1/empty-all-connections-requests"))
+            .willReturn(json("{ \"dropRequest\": { \"id\": \"drop-1\", \"finished\": false } }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/pg-1/empty-all-connections-requests/drop-1"))
+            .willReturn(
+                json(
+                    "{ \"dropRequest\": { \"id\": \"drop-1\", \"finished\": true,"
+                        + " \"failureReason\": \"Cannot drop while a processor is running\" } }")));
+    server.stubFor(
+        delete(urlEqualTo("/nifi-api/process-groups/pg-1/empty-all-connections-requests/drop-1"))
+            .willReturn(json("{}")));
+
+    RetryableAdapterException thrown =
+        assertThrows(RetryableAdapterException.class, () -> client.deleteFlowByName("pipeline-x"));
+
+    assertTrue(thrown.getMessage().contains("Cannot drop while a processor is running"));
+    server.verify(0, deleteRequestedFor(urlPathEqualTo("/nifi-api/process-groups/pg-1")));
+    // Released even though the drop failed — the cleanup must not depend on the outcome.
+    server.verify(
+        1,
+        deleteRequestedFor(
+            urlPathEqualTo("/nifi-api/process-groups/pg-1/empty-all-connections-requests/drop-1")));
+  }
+
+  /** Resolves pipeline-x to pg-1 and reports it already stopped, so a delete reaches the queues. */
+  private void stubStoppedProcessGroupForDelete() {
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .willReturn(json("{ \"id\": \"root-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/root-1"))
+            .willReturn(
+                json(
+                    "{ \"processGroupFlow\": { \"flow\": { \"processGroups\": [ { \"id\": \"pg-1\","
+                        + " \"component\": { \"name\": \"pipeline-x\" }, \"revision\": {"
+                        + " \"version\": "
+                        + LISTING_REVISION
+                        + " } } ] } } }")));
+    server.stubFor(put(urlEqualTo("/nifi-api/flow/process-groups/pg-1")).willReturn(json("{}")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/pg-1"))
+            .willReturn(
+                json(
+                    "{ \"runningCount\": 0, \"revision\": { \"version\": "
+                        + STOPPED_REVISION
+                        + " }, \"status\": {"
+                        + " \"aggregateSnapshot\": { \"activeThreadCount\": 0 } } }")));
+    server.stubFor(
+        put(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(json("{}")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(json("{ \"controllerServices\": [] }")));
+    server.stubFor(delete(urlPathEqualTo("/nifi-api/process-groups/pg-1")).willReturn(json("{}")));
+  }
+
+  /** A drop request that finishes immediately, for tests that are not about the drop itself. */
+  private void stubEmptyAllQueues() {
+    server.stubFor(
+        post(urlEqualTo("/nifi-api/process-groups/pg-1/empty-all-connections-requests"))
+            .willReturn(json("{ \"dropRequest\": { \"id\": \"drop-1\", \"finished\": false } }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/pg-1/empty-all-connections-requests/drop-1"))
+            .willReturn(
+                json(
+                    "{ \"dropRequest\": { \"id\": \"drop-1\", \"finished\": true,"
+                        + " \"droppedCount\": 0 } }")));
+    server.stubFor(
+        delete(urlEqualTo("/nifi-api/process-groups/pg-1/empty-all-connections-requests/drop-1"))
+            .willReturn(json("{}")));
+  }
+
+  /** One VALID, Running processor so the inspection reports nothing and the bulletin decides. */
+  private void stubHealthyProcessorsForBulletinTests() {
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/processors"))
+            .willReturn(
+                json(
+                    "{ \"processors\": [ { \"id\": \"proc-1\", \"component\": { \"name\":"
+                        + " \"LogMessage\", \"validationStatus\": \"VALID\" },"
+                        + " \"status\": { \"runStatus\": \"Running\" },"
+                        + " \"revision\": { \"version\": 1 } } ] }")));
+  }
+
+  private static com.fasterxml.jackson.databind.JsonNode bulletin(String level, String message)
+      throws Exception {
+    return new com.fasterxml.jackson.databind.ObjectMapper()
+        .readTree(
+            "[ { \"bulletin\": { \"groupId\": \"pg-1\", \"sourceId\": \"proc-1\","
+                + " \"sourceName\": \"LogMessage\", \"level\": \""
+                + level
+                + "\", \"message\": \""
+                + message
+                + "\", \"timestamp\": \"\" } } ]");
+  }
+
+  @Test
+  void recordsReachingTheErrorSinkMakeThePipelineUnhealthy() throws Exception {
+    // NiFi raises the error-sink bulletin at its warn level, which it spells WARNING. Reporting the
+    // pipeline healthy here is what let a flow discard every record while looking fine.
+    stubHealthyProcessorsForBulletinTests();
+
+    NifiRestClient.RuntimeStatus status =
+        client.readRuntimeStatus(
+            "pg-1", bulletin("WARNING", "Pipeline record dropped: httpStatus=400 exception="));
+
+    assertEquals(false, status.healthy());
+    assertTrue(status.message().contains("Pipeline record dropped"));
+  }
+
+  @Test
+  void theShortWarnSpellingIsStillTreatedAsAFailure() throws Exception {
+    stubHealthyProcessorsForBulletinTests();
+
+    NifiRestClient.RuntimeStatus status =
+        client.readRuntimeStatus("pg-1", bulletin("WARN", "connection refused"));
+
+    assertEquals(false, status.healthy());
+  }
+
+  @Test
+  void aWarningThatNamesNoFailureLeavesThePipelineHealthy() throws Exception {
+    // The level alone must not condemn a pipeline — NiFi warns about plenty of benign things.
+    stubHealthyProcessorsForBulletinTests();
+
+    NifiRestClient.RuntimeStatus status =
+        client.readRuntimeStatus("pg-1", bulletin("WARNING", "queue is 80 percent full"));
+
+    assertEquals(true, status.healthy());
   }
 
   private static com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder json(

@@ -9,7 +9,6 @@
  */
 package de.civitascore.configadapter.apisix;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,12 +36,6 @@ final class OwsCapabilitiesRewrite {
   /** OWS service endpoints GeoServer emits in its capabilities self-URLs ({@code .../{ws}/wfs}). */
   private static final String OWS_SERVICE_ALTERNATION = "wfs|wms|wcs|wps|wmts|ows|gwc";
 
-  private static final String HEADERS_KEY = "headers";
-  private static final String REMOVE_KEY = "remove";
-
-  /** {@code regex_uri} is a {@code [match, replacement]} pair; the replacement is at index 1. */
-  private static final int REGEX_URI_PAIR_SIZE = 2;
-
   private static final String OWS_PATH_SUFFIX = "/ows";
 
   private OwsCapabilitiesRewrite() {}
@@ -57,80 +50,35 @@ final class OwsCapabilitiesRewrite {
       Map<String, Object> plugins,
       Map<String, Object> proxyRewrite,
       String apiHost) {
-    String externalPath = firstUri(route);
+    String externalPath = PathRewrite.routePathOf(route);
     String workspacePath = upstreamWorkspacePath(proxyRewrite);
     if (externalPath == null || workspacePath == null) {
       return;
     }
 
-    Map<String, Object> filter = new HashMap<>();
-    filter.put(
-        "regex",
-        "https?://[^/]+" + regexEscape(workspacePath) + "/(" + OWS_SERVICE_ALTERNATION + ")");
-    filter.put("scope", "global");
-    filter.put("replace", "https://" + apiHost + externalPath);
+    ResponseRewrites.install(
+        plugins,
+        List.of(
+            ResponseRewrites.filter(
+                "https?://[^/]+"
+                    + ResponseRewrites.regexEscape(workspacePath)
+                    + "/("
+                    + OWS_SERVICE_ALTERNATION
+                    + ")",
+                "https://" + apiHost + externalPath)));
 
-    Map<String, Object> responseRewrite = new HashMap<>();
-    responseRewrite.put("filters", new Object[] {filter});
-    plugins.put("response-rewrite", responseRewrite);
-
-    stripRequestBodyEncoding(proxyRewrite);
+    ResponseRewrites.stripRequestBodyEncoding(proxyRewrite);
   }
 
   /**
-   * First URI a route matches — its external path (e.g. {@code /v1/datasets/{id}/{slug}}). Reads
-   * {@code uris} (what CREATE writes) and falls back to a singular {@code uri} (APISIX may return
-   * either form on read-back).
-   */
-  private static String firstUri(Map<String, Object> route) {
-    List<String> uris = RouteAuthConfigurer.readStringList(route.get("uris"));
-    if (!uris.isEmpty()) {
-      return uris.get(0);
-    }
-    Object uri = route.get("uri");
-    return uri instanceof String s && !s.isBlank() ? s : null;
-  }
-
-  /**
-   * The workspace OWS path without the trailing {@code /ows}, read from the route's {@code
-   * proxy-rewrite.regex_uri} replacement (e.g. {@code /geoserver-cloud/{ws}/ows$1} → {@code
-   * /geoserver-cloud/{ws}}). Null when the route carries no such OWS mapping.
+   * The workspace path behind the route's OWS mapping (e.g. {@code /geoserver-cloud/{ws}/ows} →
+   * {@code /geoserver-cloud/{ws}}). Null when the route carries no such mapping.
    */
   private static String upstreamWorkspacePath(Map<String, Object> proxyRewrite) {
-    List<String> regexUri = RouteAuthConfigurer.readStringList(proxyRewrite.get("regex_uri"));
-    if (regexUri.size() < REGEX_URI_PAIR_SIZE) {
-      return null;
-    }
-    String upstreamPath = regexUri.get(1);
-    int marker = upstreamPath.indexOf('$');
-    if (marker >= 0) {
-      upstreamPath = upstreamPath.substring(0, marker);
-    }
-    if (!upstreamPath.endsWith(OWS_PATH_SUFFIX)) {
+    String upstreamPath = PathRewrite.upstreamPathOf(proxyRewrite);
+    if (upstreamPath == null || !upstreamPath.endsWith(OWS_PATH_SUFFIX)) {
       return null;
     }
     return upstreamPath.substring(0, upstreamPath.length() - OWS_PATH_SUFFIX.length());
-  }
-
-  /**
-   * Add {@code Accept-Encoding} to {@code proxy-rewrite.headers.remove} (idempotent union) so the
-   * upstream returns an uncompressed body the {@code response-rewrite} filter can match.
-   */
-  @SuppressWarnings("unchecked")
-  private static void stripRequestBodyEncoding(Map<String, Object> proxyRewrite) {
-    Object existing = proxyRewrite.get(HEADERS_KEY);
-    Map<String, Object> headers =
-        existing instanceof Map ? new HashMap<>((Map<String, Object>) existing) : new HashMap<>();
-    List<String> remove = RouteAuthConfigurer.readStringList(headers.get(REMOVE_KEY));
-    if (!remove.contains("Accept-Encoding")) {
-      remove.add("Accept-Encoding");
-    }
-    headers.put(REMOVE_KEY, remove);
-    proxyRewrite.put(HEADERS_KEY, headers);
-  }
-
-  /** Escape PCRE metacharacters in a literal path used inside a {@code response-rewrite} regex. */
-  private static String regexEscape(String literal) {
-    return literal.replaceAll("([.^$*+?()\\[\\]{}|\\\\])", "\\\\$1");
   }
 }

@@ -1,4 +1,5 @@
 import { type MappingConfig } from '../_components/mapping-editor/_types'
+import type { FrostSinkPort } from '../_constants/frostPorts'
 import type { StaTargetVocabulary } from '../_constants/staTargetCatalog'
 import { PIPELINE_NODE_TYPES } from './pipeline'
 
@@ -78,6 +79,13 @@ export interface EntityNodeData extends BasePipelineNodeData {
 export interface DataSourceNodeData extends BasePipelineNodeData {
   entityType: typeof ENTITY_TYPES.Datasource
   entityId?: string
+  entityName?: string
+  /**
+   * Versioned CORE URN of the selected DataSource's configuration artifact (the entity's
+   * `configurationUrn`), resolved from the picker's fetched list at selection time. Its `:latest` form
+   * is the CORE pipeline node's `sourceRef`. Round-trips via `styles`; absent until a source is selected.
+   */
+  configurationUrn?: string
   entityMetadata?: {
     connector?: string
     connection?: string
@@ -95,6 +103,16 @@ export interface DataSourceNodeData extends BasePipelineNodeData {
 export interface FrostNodeData extends BasePipelineNodeData {
   entityType: typeof ENTITY_TYPES.Frost
   entityId?: string
+  /**
+   * Versioned CORE URN of the created DataSink's configuration artifact, stashed after the sink is
+   * saved and emitted as the CORE pipeline node's `sinkRef`. Round-trips via `styles`.
+   */
+  configurationUrn?: string
+  /**
+   * The write logic the modeller selected. Absent means the node is not configured: the platform
+   * must not decide what a Pipeline writes.
+   */
+  port?: FrostSinkPort
   /** Fixed FROST server display name */
   serverName: string
   /** Fixed FROST server URL */
@@ -111,12 +129,19 @@ export interface FrostNodeData extends BasePipelineNodeData {
 export interface GeoPersistenceNodeData extends BasePipelineNodeData {
   entityType: typeof ENTITY_TYPES.Persistence
   entityId?: string
+  /**
+   * Versioned CORE URN of the created DataSink's configuration artifact, stashed after the sink is
+   * saved and emitted as the CORE pipeline node's `sinkRef`. Round-trips via `styles`.
+   */
+  configurationUrn?: string
   /** Table name for geo data storage */
   tableName: string
   /**
    * "datastructureId/versionId" composite key of the selected data structure version
    */
   dataStructureVersionId?: string
+  /** Versioned CORE URN of the selected data structure version */
+  dataStructureUrn?: string
 }
 
 // ============================================================================
@@ -150,6 +175,17 @@ export interface MappingNodeData extends BasePipelineNodeData {
   targetVersionId?: string
   /** The single saved artifact produced by the mapping editor. */
   mappingConfig: MappingConfig
+  /**
+   * Versioned CORE URN of the Mapping artifact created for this node (the POST/PUT `/v1/mappings`
+   * response `versionedUrn`), emitted as the CORE pipeline node's `mappingRef`. Round-trips via
+   * `styles`; absent until the mapping has been saved at least once.
+   */
+  mappingRef?: string
+  /**
+   * Logical (unversioned) URN of the Mapping artifact. Present after the first save; a subsequent
+   * save PUT-versions the same logical mapping instead of creating a new one.
+   */
+  mappingLogicalUrn?: string
   /**
    * Snapshot of the required target-field paths (e.g. {@code $.name}) at mapping-save time. Lets the
    * synchronous, pure pipeline validation check that every required target field is assigned without

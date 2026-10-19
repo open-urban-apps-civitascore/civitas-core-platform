@@ -15,7 +15,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
@@ -28,8 +27,7 @@ import de.civitascore.configadapter.model.Operation;
 import de.civitascore.configadapter.model.Payload;
 import de.civitascore.configadapter.model.apisix.ApisixConfigValue;
 import de.civitascore.configadapter.model.apisix.UpstreamNodes;
-import jakarta.ws.rs.ProcessingException;
-import jakarta.ws.rs.client.Entity;
+import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -73,9 +71,9 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
   }
 
   @Test
-  void testCreateFailureException() {
-    when(mockBuilder.post(any(Entity.class)))
-        .thenThrow(new ProcessingException("Connection refused"));
+  void testCreateFailureException() throws IOException {
+    // Torn down before the request is even made: the connection attempt itself fails.
+    server.close();
 
     ApisixConfigValue upstreamConfig = new ApisixConfigValue();
     upstreamConfig.setType("roundrobin");

@@ -13,13 +13,14 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.AdapterOperation;
-import jakarta.ws.rs.ProcessingException;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.client.Invocation;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import de.civitascore.configadapter.util.OkHttpJson;
+import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.util.function.Supplier;
+import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +30,7 @@ import org.slf4j.LoggerFactory;
  * framework's error classification:
  *
  * <ul>
- *   <li>Network errors ({@link ProcessingException}) → {@link RetryableAdapterException} ({@code
+ *   <li>Network errors ({@link IOException}) → {@link RetryableAdapterException} ({@code
  *       NETWORK_ERROR})
  *   <li>HTTP 5xx → {@link RetryableAdapterException} ({@code SERVICE_UNAVAILABLE})
  *   <li>HTTP 409 on CREATE / 404 on DELETE → success (idempotent)
@@ -39,8 +40,8 @@ import org.slf4j.LoggerFactory;
  *   <li>Other HTTP 4xx and unexpected runtime failures → {@link FatalAdapterException}
  * </ul>
  *
- * <p>The JAX-RS {@link Client} is read through a {@link Supplier} on every call because the adapter
- * may swap it after construction (test seam).
+ * <p>The OkHttp {@link OkHttpClient} is read through a {@link Supplier} on every call because the
+ * adapter may swap it after construction (test seam).
  */
 final class ApisixAdminOperations {
 
@@ -90,42 +91,52 @@ final class ApisixAdminOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(ApisixAdminOperations.class);
   private static final String X_API_KEY = "X-API-KEY";
-  private static final String ID_TEMPLATE = "id";
 
-  private final Supplier<Client> client;
+  private final Supplier<OkHttpClient> client;
   private final String adminApiUrl;
   private final String adminApiKey;
 
-  ApisixAdminOperations(Supplier<Client> client, String adminApiUrl, String adminApiKey) {
+  ApisixAdminOperations(Supplier<OkHttpClient> client, String adminApiUrl, String adminApiKey) {
     this.client = client;
     this.adminApiUrl = adminApiUrl;
     this.adminApiKey = adminApiKey;
   }
 
+  /**
+   * Builds the request. Declares {@link IOException} so a JSON serialization failure (via Jackson)
+   * and OkHttp's checked network-failure exception both flow into the same {@code catch} in {@link
+   * #execute}.
+   */
+  @FunctionalInterface
+  private interface RequestSupplier {
+    Request get() throws IOException;
+  }
+
   void create(ResourceKind kind, Object config)
       throws FatalAdapterException, RetryableAdapterException {
-    execute(kind, kind.createOp, () -> request(kind, null).post(Entity.json(config)));
+    execute(
+        kind, kind.createOp, () -> request(kind, null).post(OkHttpJson.jsonBody(config)).build());
   }
 
   void update(ResourceKind kind, String id, Object config)
       throws FatalAdapterException, RetryableAdapterException {
-    execute(kind, kind.updateOp, () -> request(kind, id).put(Entity.json(config)));
+    execute(kind, kind.updateOp, () -> request(kind, id).put(OkHttpJson.jsonBody(config)).build());
   }
 
   void delete(ResourceKind kind, String id)
       throws FatalAdapterException, RetryableAdapterException {
-    execute(kind, kind.deleteOp, () -> request(kind, id).delete());
+    execute(kind, kind.deleteOp, () -> request(kind, id).delete().build());
   }
 
   /** Executes the HTTP request with the framework's standardized error classification. */
   // The RuntimeException catch is a deliberate boundary: an unexpected failure must surface as a
   // classified FatalAdapterException (failure result + DLQ), not crash the consumer loop.
   @SuppressWarnings("PMD.AvoidCatchingGenericException")
-  private void execute(ResourceKind kind, AdapterOperation operation, Supplier<Response> request)
+  private void execute(ResourceKind kind, AdapterOperation operation, RequestSupplier request)
       throws FatalAdapterException, RetryableAdapterException {
-    try (Response response = request.get()) {
+    try (Response response = client.get().newCall(request.get()).execute()) {
       handleHttpResponse(response, kind.errorCode, operation);
-    } catch (ProcessingException e) {
+    } catch (IOException e) {
       LOG.warn(
           "Network error during {}: {}",
           operation.getDescription(),
@@ -139,16 +150,14 @@ final class ApisixAdminOperations {
     }
   }
 
-  private Invocation.Builder request(ResourceKind kind, String id) {
-    var target =
-        id == null
-            ? client.get().target(adminApiUrl).path(kind.collectionPath)
-            : client
-                .get()
-                .target(adminApiUrl)
-                .path(kind.collectionPath + "/{id}")
-                .resolveTemplate(ID_TEMPLATE, id);
-    return target.request(MediaType.APPLICATION_JSON).header(X_API_KEY, adminApiKey);
+  private Request.Builder request(ResourceKind kind, String id) {
+    String path = id == null ? kind.collectionPath : kind.collectionPath + "/" + id;
+    HttpUrl url =
+        HttpUrl.get(adminApiUrl).newBuilder().addPathSegments(path.replaceFirst("^/", "")).build();
+    return new Request.Builder()
+        .url(url)
+        .header("Accept", "application/json")
+        .header(X_API_KEY, adminApiKey);
   }
 
   /**
@@ -158,14 +167,13 @@ final class ApisixAdminOperations {
    */
   private void handleHttpResponse(
       Response response, AdapterErrorCode errorCode, AdapterOperation operation)
-      throws RetryableAdapterException, FatalAdapterException {
-    int status = response.getStatus();
-    if (Response.Status.Family.familyOf(status) == Response.Status.Family.SUCCESSFUL
-        || isIdempotentNoOp(status, operation)) {
+      throws RetryableAdapterException, FatalAdapterException, IOException {
+    int status = response.code();
+    if (response.isSuccessful() || isIdempotentNoOp(status, operation)) {
       return;
     }
 
-    String body = response.readEntity(String.class);
+    String body = response.body().string();
     if (operation == AdapterOperation.UPSTREAM_DELETE
         && UpstreamReferenceCheck.isStaleRouteReference(status, body)) {
       // Not a client error: the referencing route may already be deleted and merely still visible
@@ -179,7 +187,7 @@ final class ApisixAdminOperations {
       throw new RetryableAdapterException(
           AdapterErrorCode.SERVICE_UNAVAILABLE, ApisixAdapter.ADAPTER_NAME, status);
     }
-    if (status >= Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()) {
+    if (status >= HttpURLConnection.HTTP_INTERNAL_ERROR) {
       LOG.warn(
           "APISIX server error during {}: {} {}",
           operation.getDescription(),
@@ -197,13 +205,13 @@ final class ApisixAdminOperations {
   }
 
   private static boolean isIdempotentNoOp(int status, AdapterOperation operation) {
-    if (status == Response.Status.CONFLICT.getStatusCode()
+    if (status == HttpURLConnection.HTTP_CONFLICT
         && (operation == AdapterOperation.UPSTREAM_CREATE
             || operation == AdapterOperation.ROUTE_CREATE)) {
       LOG.info("APISIX resource already exists (409), treating create as success (idempotent)");
       return true;
     }
-    if (status == Response.Status.NOT_FOUND.getStatusCode()
+    if (status == HttpURLConnection.HTTP_NOT_FOUND
         && (operation == AdapterOperation.UPSTREAM_DELETE
             || operation == AdapterOperation.ROUTE_DELETE)) {
       LOG.info(

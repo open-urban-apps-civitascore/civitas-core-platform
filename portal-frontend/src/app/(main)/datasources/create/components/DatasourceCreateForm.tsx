@@ -11,6 +11,7 @@ import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
+import { FooterElement } from '@/components/form/FooterElement'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
@@ -92,7 +93,7 @@ export const DatasourceCreateForm = () => {
     <PageContainer testId="createDatasourcePage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">
       <PageHeader title={t('create.title')} subtitle={t('create.subtitle')} customElement={customElementCreateMode} />
       <PageBackground className="overflow-y-auto" hasBackground>
-        <ContentCard className={cn('overflow-auto')}>
+        <ContentCard className={cn('overflow-auto')} footerElement={<FooterElement areAllFieldsRequired />}>
           <Form {...form}>
             <form
               id="datasource-create-form"
@@ -135,6 +136,7 @@ export const DatasourceCreateForm = () => {
                       maxLength={150}
                       hasCharacterCount
                       className="min-h-[100px] resize-none"
+                      required
                     />
                   </DetailsFieldContainer>
                 </>

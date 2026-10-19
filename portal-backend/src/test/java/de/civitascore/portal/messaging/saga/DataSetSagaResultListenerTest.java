@@ -89,10 +89,10 @@ class DataSetSagaResultListenerTest {
     }
 
     @Test
-    @DisplayName("throws IllegalStateException for malformed JSON so DLQ handler picks it up")
+    @DisplayName("throws InvalidSagaResultException for malformed JSON")
     void throwsOnMalformedJson() {
       assertThatThrownBy(() -> listener.handleSagaResult("not-json"))
-          .isInstanceOf(IllegalStateException.class)
+          .isInstanceOf(InvalidSagaResultException.class)
           .hasMessageContaining("Saga result deserialization failed");
     }
   }

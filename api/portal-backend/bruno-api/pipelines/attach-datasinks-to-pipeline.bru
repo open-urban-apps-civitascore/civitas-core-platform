@@ -1,7 +1,7 @@
 meta {
   name: Attach DataSinks to Pipeline
   type: http
-  seq: 7
+  seq: 9
 }
 
 patch {
@@ -17,7 +17,7 @@ params:path {
 
 body:json {
   {
-    "dataSinkIds": ["{{postgisDataSinkId}}"]
+    "dataSinkIds": ["{{pipelinesDataSinkId}}"]
   }
 }
 

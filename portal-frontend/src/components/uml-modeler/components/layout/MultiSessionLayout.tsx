@@ -2,26 +2,53 @@
 
 import { ReactFlowProvider } from '@xyflow/react'
 import { useTranslations } from 'next-intl'
-import { JSX, useCallback, useMemo, useState } from 'react'
+import { JSX, ReactNode, useCallback, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 
 import { useMultiSessionManager } from '../../hooks/use-multi-session-manager'
-import { UseMultiSessionReturn } from '../../types/session'
+import {
+  buildDiagramExport,
+  buildDiagramFileName,
+  DiagramImportError,
+  type DiagramImportFile,
+  downloadDiagramFile,
+  readImportFile,
+} from '../../services/diagramFileService'
+import { DEFAULT_DIAGRAM_NAME } from '../../services/diagramService'
+import { SchemaExportError } from '../../services/jsonSchemaExportService'
+import { SchemaImportError } from '../../services/jsonSchemaImportService'
+import { rootFailureMessage } from '../../services/rootFailureMessage'
+import { mergeStructureIntoDiagram } from '../../services/structureMergeService'
+import type { UMLDiagram } from '../../types/diagram'
+import type { DirtyField, UseMultiSessionReturn } from '../../types/session'
 import { PropertyInspector } from '../inspector/PropertyInspector'
 import { ElementPalette } from '../palette/ElementPalette'
 import { ActiveDiagramProviderComponent } from '../providers/ActiveDiagramProvider'
 import { TabBar } from '../tabs/TabBar'
 import { TabContent } from '../tabs/TabContent'
 import { Toolbar } from '../tabs/Toolbar'
+import { ImportChoiceModal } from './ImportChoiceModal'
 
 interface MultiSessionLayoutProps {
   className?: string
   externalSessionManager?: UseMultiSessionReturn
   isMultiSessionMode: boolean
-  canExportModel: boolean
   placeHolder?: JSX.Element
+  toolbarContent?: ReactNode
   onImportFromDatastructure?: () => void
+  dataStructureName?: string
+  versionName?: string | null
+  datastructureId?: string
+  canExportDiagram?: boolean
+}
+
+const getImportErrorMessage = (error: unknown, t: (key: string) => string): string => {
+  if (error instanceof DiagramImportError) {
+    return t(`import.errors.${error.code}`)
+  }
+  return t('import.fileError')
 }
 
 export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
@@ -29,20 +56,28 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
     className,
     externalSessionManager,
     isMultiSessionMode,
-    canExportModel,
     placeHolder,
+    toolbarContent,
     onImportFromDatastructure,
+    dataStructureName,
+    versionName,
+    datastructureId,
+    canExportDiagram,
   } = props
+  const shouldAllowExport = canExportDiagram ?? Boolean(datastructureId)
   const t = useTranslations('umlModeler')
   const tCommon = useTranslations('common')
   const sessionManager = useMultiSessionManager({ sessionManager: externalSessionManager })
-  const isControlledExternally = !!externalSessionManager
   const [isWarningModalOpen, setIsWarningModalOpen] = useState(false)
+  const [isOverwriteModalOpen, setIsOverwriteModalOpen] = useState(false)
+  const [pendingImport, setPendingImport] = useState<DiagramImportFile | null>(null)
+  const tLoad = useTranslations('umlModeler.loadStandard')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const activeSessionId = useMemo(() => sessionManager.activeSessionId || '', [sessionManager.activeSessionId])
   // Tab management handlers
   const handleCreateSession = useCallback(() => {
-    sessionManager.createSession('Untitled Diagram')
+    sessionManager.createSession(DEFAULT_DIAGRAM_NAME)
   }, [sessionManager])
 
   const handleCloseSession = () => {
@@ -73,17 +108,140 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
     [sessionManager],
   )
 
-  // Toolbar handlers
-  const handleSave = useCallback(() => {
-    const activeSession = sessionManager.getActiveSession()
-    if (activeSession) {
-      sessionManager.markSessionClean(activeSession.id)
-    }
-  }, [sessionManager])
-
   const activeSession = sessionManager.getActiveSession()
 
-  const shouldShowToolBar = !isControlledExternally || canExportModel || !!onImportFromDatastructure
+  // The toolbar says which published structures the diagram was built from, so a diagram with pins
+  // shows it even when it owns nothing else.
+  const hasImportedStructures = (activeSession?.diagram.importedStructures?.length ?? 0) > 0
+  const shouldShowToolBar = !!onImportFromDatastructure || hasImportedStructures || !!toolbarContent
+
+  const applyImportedDiagram = useCallback(
+    (importedDiagram: UMLDiagram) => {
+      const currentActiveSession = sessionManager.getActiveSession()
+      if (!currentActiveSession) return
+
+      const hasCustomName = Boolean(currentActiveSession.name) && currentActiveSession.name !== DEFAULT_DIAGRAM_NAME
+      const targetName = hasCustomName ? currentActiveSession.name : importedDiagram.name || currentActiveSession.name
+      const hasNameChanged = targetName !== currentActiveSession.name
+
+      const dirtyFields = new Set<DirtyField>(['model'])
+      if (hasNameChanged) {
+        dirtyFields.add('modelName')
+      }
+
+      sessionManager.setSession(currentActiveSession.id, {
+        ...currentActiveSession,
+        name: targetName,
+        diagram: importedDiagram,
+        isDirty: true,
+        dirtyFields,
+        lastModified: new Date(),
+      })
+      toast.success(t('import.success'))
+    },
+    [sessionManager, t],
+  )
+
+  /**
+   * Adds the file's classes beside the ones the diagram has, the way a standard structure is loaded:
+   * a taken name gets a suffix, and the file's root becomes a part of the diagram's root. The layout
+   * of the file is not kept — its classes are placed below what is drawn.
+   */
+  const addImportedDocument = useCallback(
+    (imported: DiagramImportFile) => {
+      const currentActiveSession = sessionManager.getActiveSession()
+      if (!currentActiveSession) return
+
+      let result
+      try {
+        result = mergeStructureIntoDiagram(
+          currentActiveSession.diagram,
+          imported.document,
+          imported.diagram.importedStructures ?? [],
+        )
+      } catch (error) {
+        if (!(error instanceof SchemaImportError)) throw error
+        toast.error(tLoad('unreadable', { construct: error.construct }))
+        return
+      }
+      if (result.nodes.length === 0) {
+        toast.warning(tLoad('emptyStructure'))
+        return
+      }
+
+      sessionManager.setSession(currentActiveSession.id, {
+        ...currentActiveSession,
+        diagram: {
+          ...currentActiveSession.diagram,
+          nodes: [...currentActiveSession.diagram.nodes, ...result.nodes],
+          edges: [...currentActiveSession.diagram.edges, ...result.edges],
+          importedStructures: result.importedStructures,
+          isDirty: true,
+          lastModified: new Date(),
+        },
+        isDirty: true,
+        dirtyFields: new Set<DirtyField>([...currentActiveSession.dirtyFields, 'model']),
+        lastModified: new Date(),
+      })
+      for (const renamed of result.renamed) {
+        toast.warning(tLoad('renamed', { from: renamed.from, to: renamed.to }))
+      }
+      toast.success(t('import.added'))
+    },
+    [sessionManager, t, tLoad],
+  )
+
+  const handleImportClick = useCallback(() => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+      fileInputRef.current.click()
+    }
+  }, [])
+
+  const handleFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      if (!file) return
+
+      try {
+        const imported = await readImportFile(file)
+        const currentActiveSession = sessionManager.getActiveSession()
+        const hasExistingNodes = (currentActiveSession?.diagram.nodes.length || 0) > 0
+
+        if (hasExistingNodes) {
+          setPendingImport(imported)
+          setIsOverwriteModalOpen(true)
+        } else {
+          applyImportedDiagram(imported.diagram)
+        }
+      } catch (error) {
+        if (!(error instanceof DiagramImportError)) {
+          console.error('Diagram import failed', error)
+        }
+        toast.error(getImportErrorMessage(error, t))
+      }
+    },
+    [sessionManager, applyImportedDiagram, t],
+  )
+
+  const handleExportClick = useCallback(() => {
+    const currentActiveSession = sessionManager.getActiveSession()
+    if (!currentActiveSession) return
+
+    try {
+      const fileName = buildDiagramFileName(dataStructureName || currentActiveSession.name, versionName)
+      const exportDoc = buildDiagramExport(currentActiveSession.diagram)
+      downloadDiagramFile(exportDoc, fileName)
+      toast.success(t('export.success'))
+    } catch (error) {
+      if (error instanceof SchemaExportError) {
+        toast.error(rootFailureMessage(t, error.failure))
+        return
+      }
+      console.error('Diagram export failed', error)
+      toast.error(t('export.error'))
+    }
+  }, [sessionManager, dataStructureName, versionName, t])
 
   return (
     <ActiveDiagramProviderComponent sessionManager={sessionManager}>
@@ -103,16 +261,13 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
               onRenameSession={handleRenameSession}
               onCreateSession={handleCreateSession}
               isMultiSessionMode={isMultiSessionMode}
+              onImportClick={handleImportClick}
+              onExportClick={shouldAllowExport ? handleExportClick : undefined}
             />
 
             {/* Toolbar */}
             {shouldShowToolBar && (
-              <Toolbar
-                onSave={isControlledExternally ? undefined : handleSave}
-                hasUnsavedChanges={activeSession?.isDirty || false}
-                canExportModel={canExportModel}
-                onImportFromDatastructure={onImportFromDatastructure}
-              />
+              <Toolbar onImportFromDatastructure={onImportFromDatastructure} content={toolbarContent} />
             )}
 
             {/* Tab Content Area */}
@@ -132,6 +287,15 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
           <PropertyInspector className="flex-shrink-0" />
         </div>
       </ReactFlowProvider>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept=".json,application/json"
+        className="hidden"
+        aria-hidden="true"
+        data-testid="diagram-file-input"
+      />
       <WarningModal
         title={t('closeTabModal.title')}
         description={t('closeTabModal.description')}
@@ -140,6 +304,23 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
         onOpenChange={() => setIsWarningModalOpen(false)}
         onDiscard={handleDiscardCloseSession}
         onConfirm={handleConfirmCloseSession}
+      />
+      <ImportChoiceModal
+        isOpen={isOverwriteModalOpen}
+        onCancel={() => {
+          setIsOverwriteModalOpen(false)
+          setPendingImport(null)
+        }}
+        onAdd={() => {
+          if (pendingImport) addImportedDocument(pendingImport)
+          setPendingImport(null)
+          setIsOverwriteModalOpen(false)
+        }}
+        onReplace={() => {
+          if (pendingImport) applyImportedDiagram(pendingImport.diagram)
+          setPendingImport(null)
+          setIsOverwriteModalOpen(false)
+        }}
       />
     </ActiveDiagramProviderComponent>
   )

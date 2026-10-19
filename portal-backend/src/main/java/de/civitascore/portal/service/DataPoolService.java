@@ -9,6 +9,7 @@ import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.UserRepository;
+import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.UUID;
@@ -20,7 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
  * be deleted while datasets are still assigned to it or while datasources are still scoped to it.
  */
 @Service
-public class DataPoolService extends BaseDataEntityService<DataPool, DataPoolInputDTO> {
+public class DataPoolService
+    extends BaseDataEntityService<DataPool, DataPoolInputDTO, DataPoolInputDTO> {
 
   private final DataPoolRepository dataPoolRepository;
   private final DataPoolMapper dataPoolMapper;
@@ -28,6 +30,7 @@ public class DataPoolService extends BaseDataEntityService<DataPool, DataPoolInp
   private final DataSourceRepository dataSourceRepository;
   private final UserRepository userRepository;
   private final AssignmentFactory assignmentFactory;
+  private final AssignmentChangeAuthorizer assignmentChangeAuthorizer;
 
   public DataPoolService(
       DataPoolRepository dataPoolRepository,
@@ -35,13 +38,15 @@ public class DataPoolService extends BaseDataEntityService<DataPool, DataPoolInp
       DataSetRepository dataSetRepository,
       DataSourceRepository dataSourceRepository,
       UserRepository userRepository,
-      AssignmentFactory assignmentFactory) {
+      AssignmentFactory assignmentFactory,
+      AssignmentChangeAuthorizer assignmentChangeAuthorizer) {
     this.dataPoolRepository = dataPoolRepository;
     this.dataPoolMapper = dataPoolMapper;
     this.dataSetRepository = dataSetRepository;
     this.dataSourceRepository = dataSourceRepository;
     this.userRepository = userRepository;
     this.assignmentFactory = assignmentFactory;
+    this.assignmentChangeAuthorizer = assignmentChangeAuthorizer;
   }
 
   @Override
@@ -65,6 +70,11 @@ public class DataPoolService extends BaseDataEntityService<DataPool, DataPoolInp
   }
 
   @Override
+  protected AssignmentChangeAuthorizer getAssignmentChangeAuthorizer() {
+    return assignmentChangeAuthorizer;
+  }
+
+  @Override
   protected ReleasableStatus getEntityStatus(DataPool entity) {
     throw new UnsupportedOperationException("DataPool does not support release lifecycle");
   }
@@ -81,6 +91,16 @@ public class DataPoolService extends BaseDataEntityService<DataPool, DataPoolInp
 
   @Override
   protected ReleasableStatus getAvailableStatus() {
+    throw new UnsupportedOperationException("DataPool does not support release lifecycle");
+  }
+
+  @Override
+  public DataPool updateReleasedMeta(UUID id, DataPoolInputDTO meta) {
+    throw new UnsupportedOperationException("DataPool does not support release lifecycle");
+  }
+
+  @Override
+  public DataPoolInputDTO toMetaInput(DataPool entity) {
     throw new UnsupportedOperationException("DataPool does not support release lifecycle");
   }
 

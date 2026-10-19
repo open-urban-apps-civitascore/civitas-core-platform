@@ -53,13 +53,6 @@ class AssignmentTest {
     return ds;
   }
 
-  private static Catalog newCatalog() {
-    Catalog c = new Catalog();
-    c.setId(UUID.randomUUID());
-    c.setName("TestCatalog");
-    return c;
-  }
-
   private static Assignment baseAssignment(RoleType roleType) {
     Assignment a = new Assignment();
     a.setGroup(newGroup());
@@ -116,16 +109,6 @@ class AssignmentTest {
       Assignment a = baseAssignment(RoleType.DATA);
       a.setScopeType(ScopeType.DATASTRUCTURE);
       a.setDataStructure(newDataStructure());
-
-      assertThatNoException().isThrownBy(a::validateScope);
-    }
-
-    @Test
-    @DisplayName("Should pass for CATALOG scopeType with catalog set")
-    void shouldPassForCatalogScopeWithCatalog() {
-      Assignment a = baseAssignment(RoleType.DATA);
-      a.setScopeType(ScopeType.CATALOG);
-      a.setCatalog(newCatalog());
 
       assertThatNoException().isThrownBy(a::validateScope);
     }
@@ -283,16 +266,6 @@ class AssignmentTest {
     }
 
     @Test
-    @DisplayName("Should return Catalog when catalog is set")
-    void shouldReturnCatalog() {
-      Assignment a = new Assignment();
-      Catalog catalog = newCatalog();
-      a.setCatalog(catalog);
-
-      assertThat(a.getScope()).isSameAs(catalog);
-    }
-
-    @Test
     @DisplayName("Should return null when no scope entity is set")
     void shouldReturnNullWhenNoScopeEntity() {
       Assignment a = new Assignment();
@@ -341,18 +314,6 @@ class AssignmentTest {
 
       assertThat(a.getDataSource()).isSameAs(ds);
       assertThat(a.getScopeType()).isEqualTo(ScopeType.DATASOURCE);
-    }
-
-    @Test
-    @DisplayName("setScope(Catalog) should set entity and CATALOG scopeType")
-    void shouldSetCatalogScope() {
-      Assignment a = new Assignment();
-      Catalog c = newCatalog();
-
-      a.setScope(c);
-
-      assertThat(a.getCatalog()).isSameAs(c);
-      assertThat(a.getScopeType()).isEqualTo(ScopeType.CATALOG);
     }
   }
 

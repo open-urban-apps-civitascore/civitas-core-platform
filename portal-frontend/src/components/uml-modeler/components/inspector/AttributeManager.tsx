@@ -1,10 +1,11 @@
 'use client'
 
 import { Plus, Trash2 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useCallback } from 'react'
 
 import { BasicSelect } from '@/components/select/basicSelect/BasicSelect'
-import { GroupedOption, GroupedSelect } from '@/components/select/grouped-select/GroupedSelect'
+import { GroupedSelect } from '@/components/select/grouped-select/GroupedSelect'
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 
@@ -13,29 +14,36 @@ import {
   cardinalityForStorage,
   PROPERTY_CARDINALITY_VALUES,
   UML_GEOMETRY_TYPES,
-  UML_PRIMITIVE_TYPES,
+  UML_TYPE_GROUPED_OPTIONS,
 } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
+import { getAttributeNameError, getNextAttributeName, getOtherMemberNames } from '../../services/elementNameService'
 import { canMultiplicityBePrimaryKey } from '../../services/jsonSchemaExportService'
 import { type UMLAttribute, type UMLElement, type UMLGeometryType, type UMLPrimitiveType } from '../../types/uml'
 
 interface AttributeManagerProps {
   nodeId: string
   element: UMLElement
+  /** Off until the static modifier is supported end to end. */
+  isStaticVisible?: boolean
+  /** Off until attribute default values are supported end to end. */
+  isDefaultValueVisible?: boolean
 }
 
 export const AttributeManager: React.FC<AttributeManagerProps> = props => {
-  const { nodeId, element } = props
+  const { nodeId, element, isStaticVisible = false, isDefaultValueVisible = false } = props
   const { isReadOnly } = useReadOnly()
+  const t = useTranslations('umlModeler.nameValidation')
 
   const { updateNode } = useActiveDiagram()
 
   const addAttribute = useCallback(() => {
     if ('attributes' in element) {
+      const takenNames = element.attributes.map(attribute => attribute.name)
       const newAttribute: UMLAttribute = {
         id: crypto.randomUUID(),
-        name: 'neuesAttribut',
+        name: getNextAttributeName(takenNames),
         type: 'String',
         isId: false,
       }
@@ -84,14 +92,6 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
     return options
   }
 
-  const primitiveTypeOptions = Object.keys(UML_PRIMITIVE_TYPES) as UMLPrimitiveType[]
-  const geometryTypeOptions = Object.keys(UML_GEOMETRY_TYPES) as UMLGeometryType[]
-
-  const typeOptions: GroupedOption[] = [
-    { label: 'Primitive Types', options: primitiveTypeOptions.map(type => ({ label: type, value: type })) },
-    { label: 'Geometry Types', options: geometryTypeOptions.map(type => ({ label: type, value: type })) },
-  ]
-
   const crsOptions = [
     {
       label: 'EPSG:4326  – WGS84 (Standard)',
@@ -115,7 +115,7 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
     },
   ]
 
-  const isGeometryType = (type: string) => !!UML_GEOMETRY_TYPES[type as UMLGeometryType]
+  const isGeometryType = (type: string) => UML_GEOMETRY_TYPES.includes(type as UMLGeometryType)
 
   const allGeomAttributes = element.attributes.filter(attr => isGeometryType(attr.type as string))
 
@@ -148,6 +148,12 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
     )
     updateNode(nodeId, { attributes: updatedAttributes })
   }
+
+  const duplicateAttributeIds = new Set(
+    element.attributes
+      .filter(attribute => getAttributeNameError(attribute.name, getOtherMemberNames(element.attributes, attribute.id)))
+      .map(attribute => attribute.id),
+  )
 
   return (
     <div className="space-y-3">
@@ -187,17 +193,24 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
                 type="text"
                 value={attribute.name}
                 onChange={e => updateAttribute(attribute.id, { name: e.target.value })}
-                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className={cn(
+                  'w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500',
+                  duplicateAttributeIds.has(attribute.id) ? 'border-destructive' : 'border-gray-300',
+                )}
                 placeholder="attributeName"
                 disabled={isReadOnly}
+                aria-invalid={duplicateAttributeIds.has(attribute.id)}
               />
+              {duplicateAttributeIds.has(attribute.id) && (
+                <p className="mt-1 text-xs text-destructive">{t('duplicateAttribute')}</p>
+              )}
             </div>
 
             {/* Type */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
               <GroupedSelect
-                groupedOptions={typeOptions}
+                groupedOptions={UML_TYPE_GROUPED_OPTIONS}
                 onValueChange={e => handleTypeChange(e, attribute)}
                 disabled={isReadOnly}
                 value={typeof attribute.type === 'string' ? attribute.type : attribute.type.name}
@@ -239,32 +252,36 @@ export const AttributeManager: React.FC<AttributeManagerProps> = props => {
             </div>
 
             {/* Default Value */}
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Default Value</label>
-              <input
-                type="text"
-                value={attribute.defaultValue || ''}
-                onChange={e => updateAttribute(attribute.id, { defaultValue: e.target.value || undefined })}
-                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="Optional default value"
-                disabled={isReadOnly}
-              />
-            </div>
+            {isDefaultValueVisible && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Default Value</label>
+                <input
+                  type="text"
+                  value={attribute.defaultValue || ''}
+                  onChange={e => updateAttribute(attribute.id, { defaultValue: e.target.value || undefined })}
+                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="Optional default value"
+                  disabled={isReadOnly}
+                />
+              </div>
+            )}
 
             {/* Static checkbox */}
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id={`static-${attribute.id}`}
-                checked={attribute.isStatic || false}
-                onChange={e => updateAttribute(attribute.id, { isStatic: e.target.checked })}
-                className="mr-2"
-                disabled={isReadOnly}
-              />
-              <label htmlFor={`static-${attribute.id}`} className="text-xs text-gray-600">
-                Static (underlined)
-              </label>
-            </div>
+            {isStaticVisible && (
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id={`static-${attribute.id}`}
+                  checked={attribute.isStatic || false}
+                  onChange={e => updateAttribute(attribute.id, { isStatic: e.target.checked })}
+                  className="mr-2"
+                  disabled={isReadOnly}
+                />
+                <label htmlFor={`static-${attribute.id}`} className="text-xs text-gray-600">
+                  Static (underlined)
+                </label>
+              </div>
+            )}
 
             {canMultiplicityBePrimaryKey(attribute.multiplicity) && (
               <div className="flex items-center">

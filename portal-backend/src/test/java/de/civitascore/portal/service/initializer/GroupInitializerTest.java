@@ -46,7 +46,9 @@ class GroupInitializerTest {
   private static final String TARGET_REALM = "test-realm";
   private static final String AUTH_SERVER_URL = "http://keycloak:8080";
   private static final KeycloakProperties KEYCLOAK_PROPERTIES =
-      new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM);
+      new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM, true, false);
+  private static final KeycloakProperties KEYCLOAK_PROPERTIES_BACKFILL_ON =
+      new KeycloakProperties(TARGET_REALM, AUTH_SERVER_URL, TARGET_REALM, true, true);
   private static final int CONFIG_ADAPTER_TIMEOUT_SECONDS = 1;
 
   private GroupInitializer initializer;
@@ -276,49 +278,125 @@ class GroupInitializerTest {
           .as("Timed-out future must be cancelled to free the publisher's correlation entry")
           .isTrue();
     }
+  }
 
-    @Test
-    @DisplayName("syncs parents before children across separate depth layers")
-    void shouldSyncParentBeforeChild() {
-      Group parent = group("Parent");
-      Group child = group("Child");
-      child.setParentGroup(parent);
+  @Nested
+  @DisplayName("backfillMemberships")
+  class BackfillMemberships {
 
-      // Order in the repository result is intentionally child-first to verify the initializer
-      // does NOT rely on the input order.
-      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of(child, parent));
-      when(configEventPublisher.publishGroupCreated(eq("test-realm"), any(GroupConfig.class)))
-          .thenReturn(CompletableFuture.completedFuture(successResult("kc-parent")))
-          .thenReturn(CompletableFuture.completedFuture(successResult("kc-child")));
+    private GroupInitializer backfillOnInitializer() {
+      return new GroupInitializer(
+          groupRepository,
+          roleRepository,
+          assignmentRepository,
+          configEventPublisher,
+          Optional.empty(),
+          KEYCLOAK_PROPERTIES_BACKFILL_ON,
+          new EventProperties(CONFIG_ADAPTER_TIMEOUT_SECONDS),
+          transactionManager);
+    }
 
-      initializer.initialize();
-
-      ArgumentCaptor<GroupConfig> captor = ArgumentCaptor.forClass(GroupConfig.class);
-      verify(configEventPublisher, times(2))
-          .publishGroupCreated(eq("test-realm"), captor.capture());
-      assertThat(captor.getAllValues().get(0).getName())
-          .as("Parent must be published first so its externalId exists for the child layer")
-          .isEqualTo("Parent");
-      assertThat(captor.getAllValues().get(1).getName()).isEqualTo("Child");
+    private Group syncedGroup(String name, String externalId) {
+      Group g = group(name);
+      g.setExternalId(externalId);
+      return g;
     }
 
     @Test
-    @DisplayName("depth() returns a finite value even when the parent chain has a cycle")
-    void shouldGuardAgainstCyclicParentChain() {
-      // Synthetic cycle: a → b → a. FK constraints prevent this in production, but the guard
-      // means a corrupt DB row cannot wedge initialize() in an infinite loop.
-      Group a = group("a");
-      Group b = group("b");
-      a.setParentGroup(b);
-      b.setParentGroup(a);
+    @DisplayName("publishes GROUP_UPDATED once per already-synced group when the flag is on")
+    void shouldPublishUpdatePerSyncedGroupWhenEnabled() {
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of());
+      when(groupRepository.findByExternalIdIsNotNull())
+          .thenReturn(List.of(syncedGroup("Engineers", "kc-eng"), syncedGroup("Ops", "kc-ops")));
+      when(configEventPublisher.publishGroupUpdated(eq("test-realm"), any(GroupConfig.class)))
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-eng")))
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-ops")));
 
-      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of(a));
-      when(configEventPublisher.publishGroupCreated(eq("test-realm"), any(GroupConfig.class)))
-          .thenReturn(CompletableFuture.completedFuture(successResult("kc-a")));
+      backfillOnInitializer().initialize();
 
-      // If the cycle guard is missing, this call hangs in depth() and the test times out.
-      org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
-          java.time.Duration.ofSeconds(2), () -> initializer.initialize());
+      verify(configEventPublisher, times(2))
+          .publishGroupUpdated(eq("test-realm"), any(GroupConfig.class));
+      verify(configEventPublisher, never()).publishGroupCreated(any(), any());
+    }
+
+    @Test
+    @DisplayName("never persists an externalId — these groups already have one")
+    void shouldNotPersistExternalIdDuringBackfill() {
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of());
+      when(groupRepository.findByExternalIdIsNotNull())
+          .thenReturn(List.of(syncedGroup("Engineers", "kc-eng")));
+      when(configEventPublisher.publishGroupUpdated(eq("test-realm"), any(GroupConfig.class)))
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-eng")));
+
+      backfillOnInitializer().initialize();
+
+      verify(groupRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("is a no-op when the flag is off")
+    void shouldNotBackfillWhenDisabled() {
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of());
+
+      // Default `initializer` is built with the flag off.
+      initializer.initialize();
+
+      verify(configEventPublisher, never()).publishGroupUpdated(any(), any());
+      verify(groupRepository, never()).findByExternalIdIsNotNull();
+    }
+
+    @Test
+    @DisplayName("continues to the next group when one backfill publish times out")
+    void shouldContinueAfterTimeout() {
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of());
+      when(groupRepository.findByExternalIdIsNotNull())
+          .thenReturn(List.of(syncedGroup("Slow", "kc-slow"), syncedGroup("Fast", "kc-fast")));
+
+      CompletableFuture<ConfigResultEvent> hanging = new CompletableFuture<>();
+      when(configEventPublisher.publishGroupUpdated(eq("test-realm"), any(GroupConfig.class)))
+          .thenReturn(hanging)
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-fast")));
+
+      backfillOnInitializer().initialize();
+
+      // Both groups are still published (parallel), and the hung one is cancelled on timeout.
+      verify(configEventPublisher, times(2))
+          .publishGroupUpdated(eq("test-realm"), any(GroupConfig.class));
+      assertThat(hanging.isCancelled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("skips a corrupt group (blank name) and still backfills the rest")
+    void shouldSkipCorruptGroupAndContinue() {
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of());
+      when(groupRepository.findByExternalIdIsNotNull())
+          .thenReturn(List.of(syncedGroup("", "kc-blank"), syncedGroup("Ok", "kc-ok")));
+      // buildGroupConfig throws for the blank-named group, so only the valid one is published.
+      when(configEventPublisher.publishGroupUpdated(eq("test-realm"), any(GroupConfig.class)))
+          .thenReturn(CompletableFuture.completedFuture(successResult("kc-ok")));
+
+      backfillOnInitializer().initialize();
+
+      verify(configEventPublisher, times(1))
+          .publishGroupUpdated(eq("test-realm"), any(GroupConfig.class));
+    }
+
+    @Test
+    @DisplayName("does not fail when a backfill result is FAILURE or null")
+    void shouldTolerateFailureAndNullResults() {
+      when(groupRepository.findByExternalIdIsNull()).thenReturn(List.of());
+      when(groupRepository.findByExternalIdIsNotNull())
+          .thenReturn(List.of(syncedGroup("Failing", "kc-fail"), syncedGroup("Null", "kc-null")));
+      when(configEventPublisher.publishGroupUpdated(eq("test-realm"), any(GroupConfig.class)))
+          .thenReturn(CompletableFuture.completedFuture(failureResult("KEYCLOAK_GROUP_ERROR")))
+          .thenReturn(CompletableFuture.completedFuture(null));
+
+      backfillOnInitializer().initialize();
+
+      // Both are attempted; neither a FAILURE status nor a null result throws or persists anything.
+      verify(configEventPublisher, times(2))
+          .publishGroupUpdated(eq("test-realm"), any(GroupConfig.class));
+      verify(groupRepository, never()).save(any());
     }
   }
 

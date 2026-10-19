@@ -1,35 +1,25 @@
 package de.civitascore.portal.model.input;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-/** Input DTO for creating and updating data structure version resources. */
+/**
+ * Input DTO for creating and updating data structure version resources.
+ *
+ * <p>The version string is not a client input: Model Forge is the sole version authority and
+ * assigns it when the model is stored.
+ */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class DataStructureVersionInputDTO extends BaseInputDTO {
+public class DataStructureVersionInputDTO extends DataStructureVersionMetaInputDTO {
 
   @JsonIgnore private DataStructureVersionStatus dataStructureVersionStatus;
-
-  @Schema(description = "How this version was created (required)")
-  @NotNull(message = "DataStructureVersionSource is required") private DataStructureVersionSource dataStructureVersionSource;
-
-  // Mirrors the version segment of the CORE URN grammar (CoreUrn.VERSION) and the frontend's
-  // VERSION_PATTERN: any other shape would only fail later, opaquely, at release.
-  @NotBlank(message = "Version is required") @Pattern(
-      regexp = "\\d+\\.\\d+\\.\\d+",
-      message = "Version must follow the format X.Y.Z (e.g. 1.0.0)")
-  private String version;
-
-  private String description;
 
   private String modelName;
 
@@ -37,6 +27,12 @@ public class DataStructureVersionInputDTO extends BaseInputDTO {
   private Map<String, Object> model;
 
   private Map<String, Object> styles;
+
+  /**
+   * The published structures the diagram was built from, each pinned at the version it was loaded
+   * at. The editor derives them from the diagram, like the model document.
+   */
+  private List<String> importedStructureUrns;
 
   @JsonIgnore
   // The dataStructureId is required for the service layer to associate the version with the correct

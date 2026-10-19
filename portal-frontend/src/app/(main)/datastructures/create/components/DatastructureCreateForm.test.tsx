@@ -1,18 +1,33 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { toast } from 'sonner'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { DatastructureCreateForm } from './DatastructureCreateForm'
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}))
 
 const mockPush = vi.fn()
 const mockSaveDatastructure = vi.fn()
 
 const mockForm = {
-  formState: { isDirty: false, errors: {} },
+  formState: { isDirty: false, errors: {} as Record<string, unknown> },
   control: {},
-  handleSubmit: vi.fn((callback: () => Promise<void> | void) => async (event?: Event) => {
-    event?.preventDefault?.()
-    return callback()
-  }),
+  handleSubmit: vi.fn(
+    (onValid: () => Promise<void> | void, onInvalid?: (errors: Record<string, unknown>) => void) =>
+      async (event?: Event) => {
+        event?.preventDefault?.()
+        if (Object.keys(mockForm.formState.errors).length > 0) {
+          onInvalid?.(mockForm.formState.errors)
+          return
+        }
+        return onValid()
+      },
+  ),
 }
 
 const mockHookState = {
@@ -61,6 +76,7 @@ describe('DatastructureCreateForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockForm.formState.isDirty = false
+    mockForm.formState.errors = {}
     mockHookState.isLoading = false
     mockHookState.saveDatastructure = mockSaveDatastructure
   })
@@ -136,6 +152,19 @@ describe('DatastructureCreateForm', () => {
     })
 
     expect(mockPush).not.toHaveBeenCalled()
+  })
+
+  test('shows a validation error toast and does not submit when description is missing', async () => {
+    mockForm.formState.isDirty = true
+    mockForm.formState.errors = { description: { type: 'too_small', message: 'Required' } }
+
+    setup()
+    fireEvent.click(screen.getByRole('button', { name: 'actions.saveAndContinue' }))
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('errors.formInvalid')
+    })
+    expect(mockSaveDatastructure).not.toHaveBeenCalled()
   })
 })
 

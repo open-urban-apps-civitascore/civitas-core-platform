@@ -25,15 +25,7 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
    * @return the assignment with eagerly fetched group, role, and scope entities
    */
   @EntityGraph(
-      attributePaths = {
-        "group",
-        "role",
-        "dataset",
-        "catalog",
-        "dataSource",
-        "dataStructure",
-        "dataPool"
-      })
+      attributePaths = {"group", "role", "dataset", "dataSource", "dataStructure", "dataPool"})
   @Override
   @NonNull Optional<Assignment> findById(@NonNull UUID id);
 
@@ -47,17 +39,6 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
   @EntityGraph(attributePaths = {"group"})
   @Query("SELECT a FROM Assignment a WHERE a.role.id = :roleId")
   List<Assignment> findAllByRoleId(@Param("roleId") UUID roleId);
-
-  /**
-   * Find all assignments for the given group ID with groups eagerly fetched. This prevents N+1
-   * query problems when loading assignments with their groups.
-   *
-   * @param groupId the group ID
-   * @return the assignments with eagerly fetched roles
-   */
-  @EntityGraph(attributePaths = {"role"})
-  @Query("SELECT a FROM Assignment a WHERE a.group.id = :groupId")
-  List<Assignment> findAllByGroupId(@Param("groupId") UUID groupId);
 
   /**
    * Find all assignments for a data source with the given scope type.
@@ -78,16 +59,6 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
    */
   @EntityGraph(attributePaths = {"group", "role", "dataset"})
   List<Assignment> findAllByScopeTypeAndDatasetId(ScopeType scopeType, UUID datasetId);
-
-  /**
-   * Find all assignments for a catalog with the given scope type.
-   *
-   * @param scopeType the scope type to filter by
-   * @param catalogId the catalog ID
-   * @return assignments with eagerly fetched group, role, and catalog
-   */
-  @EntityGraph(attributePaths = {"group", "role", "catalog"})
-  List<Assignment> findAllByScopeTypeAndCatalogId(ScopeType scopeType, UUID catalogId);
 
   /**
    * Find all assignments for a data structure with the given scope type.
@@ -143,7 +114,6 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
         "dataStructure",
         "dataSource",
         "dataset",
-        "catalog",
         "dataPool"
       })
   @Query(
@@ -168,7 +138,6 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
         "dataStructure",
         "dataSource",
         "dataset",
-        "catalog",
         "dataPool"
       })
   @Query(
@@ -193,7 +162,6 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
         "dataStructure",
         "dataSource",
         "dataset",
-        "catalog",
         "dataPool"
       })
   @Query("SELECT a FROM Assignment a WHERE a.group.id = :groupId AND a.scopeType = :scopeType")
@@ -215,7 +183,6 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
         "dataStructure",
         "dataSource",
         "dataset",
-        "catalog",
         "dataPool"
       })
   @Query("SELECT a FROM Assignment a WHERE a.role.id = :roleId AND a.scopeType = :scopeType")

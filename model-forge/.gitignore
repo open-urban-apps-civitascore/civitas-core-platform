@@ -1,0 +1,32 @@
+# Build output
+**/target/
+dependency-reduced-pom.xml
+.flattened-pom.xml
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+.factorypath
+
+# Test results
+test-results/
+surefire-reports/
+
+# Environment secrets
+.env
+*.env.local
+
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+core-model-forge-types/dist/
+core-model-forge-types/.npmrc
+/TODOs.md

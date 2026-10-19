@@ -50,6 +50,9 @@ class ApisixSagaHandlerIT extends AbstractApisixIT {
   // ("data"); the route id is the deterministic NamedApiHelper.derive(datasetId, slug).
   private static final String SLUG = "data";
 
+  /** Path part of the stub upstream this suite provisions routes against. */
+  private static final String UPSTREAM_PATH = "/FROST-Server/v1.1/Projects(1)";
+
   private ApisixSagaHandler sagaHandler;
 
   private static String routeId(String datasetId) {
@@ -121,8 +124,15 @@ class ApisixSagaHandlerIT extends AbstractApisixIT {
         uris.contains("/v1/datasets/" + datasetId + "/" + SLUG + "/*"),
         "uris must contain the /v1/datasets/{id}/{slug}/* wildcard — got: " + uris);
 
-    String regex = value.get("plugins").get("proxy-rewrite").get("regex_uri").get(0).asText();
-    assertEquals("^/v1/datasets/" + datasetId + "/" + SLUG + "(/.*)?$", regex);
+    JsonNode regexUri = value.get("plugins").get("proxy-rewrite").get("regex_uri");
+    assertEquals(
+        List.of(
+            "^/v1/datasets/" + datasetId + "/" + SLUG + "/?$",
+            UPSTREAM_PATH,
+            "^/v1/datasets/" + datasetId + "/" + SLUG + "(/.+)$",
+            UPSTREAM_PATH + "$1"),
+        textValues(regexUri),
+        "both rewrite pairs must be present — the first alone would drop every sub-path");
   }
 
   @Test
@@ -182,11 +192,14 @@ class ApisixSagaHandlerIT extends AbstractApisixIT {
                 .encodeToString((FROST_USER + ":" + FROST_PASS).getBytes(StandardCharsets.UTF_8));
     assertEquals(expected, proxyRewrite.get("headers").get("set").get("Authorization").asText());
 
-    String regex = proxyRewrite.get("regex_uri").get(0).asText();
     assertEquals(
-        "^/v1/datasets/" + datasetId + "/" + SLUG + "(/.*)?$",
-        regex,
-        "UPDATE must preserve the existing regex_uri (Finding 1 — PATCH would have wiped it)");
+        List.of(
+            "^/v1/datasets/" + datasetId + "/" + SLUG + "/?$",
+            UPSTREAM_PATH,
+            "^/v1/datasets/" + datasetId + "/" + SLUG + "(/.+)$",
+            UPSTREAM_PATH + "$1"),
+        textValues(proxyRewrite.get("regex_uri")),
+        "UPDATE must keep the whole path rewrite mapping this route — a PATCH would have wiped it");
   }
 
   private SagaCommandMessage updateRouteCommand(String datasetId, boolean openDataAccess) {
@@ -220,6 +233,14 @@ class ApisixSagaHandlerIT extends AbstractApisixIT {
             openDataAccess,
             "namedApis",
             List.of(Map.of("slug", SLUG, "standard", "STA"))));
+  }
+
+  private static List<String> textValues(JsonNode arrayNode) {
+    List<String> values = new ArrayList<>();
+    if (arrayNode != null && arrayNode.isArray()) {
+      arrayNode.forEach(v -> values.add(v.asText()));
+    }
+    return values;
   }
 
   private static List<String> extractUris(JsonNode routeValue) {

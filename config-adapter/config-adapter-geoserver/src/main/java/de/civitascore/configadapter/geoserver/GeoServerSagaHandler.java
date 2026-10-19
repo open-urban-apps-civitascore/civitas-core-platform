@@ -14,13 +14,12 @@ import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.crypto.CryptoKeyLoader;
+import de.civitascore.configadapter.model.dataset.ApiStandards;
 import de.civitascore.configadapter.model.dataset.DataStructureSchema;
 import de.civitascore.configadapter.model.dataset.SafeNames;
 import de.civitascore.configadapter.model.dataset.WorkspaceNames;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import de.civitascore.configadapter.util.OkHttpJson;
+import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -33,6 +32,12 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import okhttp3.HttpUrl;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 import org.owasp.encoder.Encode;
 
 /**
@@ -43,7 +48,7 @@ import org.owasp.encoder.Encode;
  * <ul>
  *   <li>{@code CREATE_WORKSPACE} — creates the dataset workspace (idempotent)
  *   <li>{@code CREATE_DATASTORE} — creates the PostGIS datastore inside the workspace (idempotent)
- *   <li>{@code PROVISION_LAYERS} — publishes a feature type per {@code layers} entry (idempotent)
+ *   <li>{@code PROVISION_LAYERS} — publishes or converges a feature type per {@code layers} entry
  *   <li>{@code PROVISION_WORKSPACE} — coarse alias that runs the three create steps in one call
  *   <li>{@code UPDATE_WORKSPACE} — idempotently ensures the workspace and PostGIS datastore exist
  *       (UPDATE may be the first time geo is provisioned for a dataset), then upserts feature types
@@ -53,25 +58,26 @@ import org.owasp.encoder.Encode;
  *       a deleted feature type, so this must run after the last failable step
  *   <li>{@code DELETE_WORKSPACE} — deletes the workspace recursively (compensation for the create
  *       steps and the teardown step in the delete saga)
- *   <li>{@code RESTORE_WORKSPACE} — restores the previous feature type state (compensation for
- *       {@code UPDATE_WORKSPACE}). Styles are not snapshotted: a failed update that uploaded or
- *       overwrote styles leaves them in place — only a full {@code DELETE_WORKSPACE} (recursive)
- *       removes them.
+ *   <li>{@code RESTORE_WORKSPACE} — restores which feature types exist, not their definitions or
+ *       the WMS service settings (compensation for {@code UPDATE_WORKSPACE}). Styles are not
+ *       snapshotted: a failed update that uploaded or overwrote styles leaves them in place — only
+ *       a full {@code DELETE_WORKSPACE} (recursive) removes them.
  * </ul>
  *
  * <p>Input contract (process variables forwarded from the saga trigger): {@code datasetId} (the
  * workspace name is derived from it), an optional {@code datasinks} list whose {@code POSTGIS}
  * sinks carry {@code configuration.tableName} and the referenced {@code dataStructure} (JSON
- * Schema), and a {@code layers} list of {@code {layerName, nativeName?, crs?, geometryColumnRef?}}
- * describing the feature types to publish. A layer's native PostGIS table is its {@code
- * nativeName}; if omitted it defaults to the single {@code POSTGIS} sink table (or the layer name
- * when no sink is given), and {@code nativeName} is required when multiple table sinks exist. The
- * declared SRS is {@code crs}; the native CRS is read from the matching sink's {@code
- * dataStructure} geometry (the same {@code crs} the PostGIS adapter turns into the geometry
- * column's SRID), with {@code geometryColumnRef} selecting the geometry when the structure has more
- * than one. Connection parameters for the PostGIS datastore are read from adapter config: {@code
- * geoserver.postgis.host}, {@code .port}, {@code .database}, {@code .schema}, {@code .user}, {@code
- * .password}.
+ * Schema), a {@code layers} list of {@code {layerName, nativeName?, crs?, geometryColumnRef?,
+ * title?, description?, attribute?, cqlFilter?}} describing the feature types to publish, and an
+ * optional {@code namedApis} list whose {@code OWS} entry titles and describes the workspace's WMS
+ * service. A layer's native PostGIS table is its {@code nativeName}; if omitted it defaults to the
+ * single {@code POSTGIS} sink table (or the layer name when no sink is given), and {@code
+ * nativeName} is required when multiple table sinks exist. The declared SRS is {@code crs}; the
+ * native CRS is read from the matching sink's {@code dataStructure} geometry (the same {@code crs}
+ * the PostGIS adapter turns into the geometry column's SRID), with {@code geometryColumnRef}
+ * selecting the geometry when the structure has more than one. Connection parameters for the
+ * PostGIS datastore are read from adapter config: {@code geoserver.postgis.host}, {@code .port},
+ * {@code .database}, {@code .schema}, {@code .user}, {@code .password}.
  */
 public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
@@ -93,6 +99,26 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   private static final String DEFAULT_CRS = "EPSG:4326";
   private static final String DEFAULT_PROJECTION_POLICY = "REPROJECT_TO_DECLARED";
+
+  // JSON fields of the trigger payload and the GeoServer REST bodies.
+  private static final String NAME = "name";
+  private static final String TITLE = "title";
+  private static final String DESCRIPTION = "description";
+  private static final String ABSTRACT = "abstract";
+  private static final String CQL_FILTER = "cqlFilter";
+  private static final String ATTRIBUTE = "attribute";
+  private static final String ATTRIBUTES = "attributes";
+  private static final String GEOMETRY_COLUMN_REF = "geometryColumnRef";
+  private static final String DATASET_NAME = "datasetName";
+  private static final String NAMED_APIS = "namedApis";
+  private static final String STANDARD = "standard";
+  private static final String WORKSPACE = "workspace";
+  private static final String ENABLED = "enabled";
+  private static final String WMS_SERVICE = "wms";
+  private static final String WMS_SERVICE_NAME = "WMS";
+
+  /** GeoServer's spelling of the service abstract field. */
+  private static final String SERVICE_ABSTRACT = "abstrct";
 
   /** Content type for SLD 1.0.0 style uploads; GeoServer rejects styles posted as plain XML. */
   private static final String STYLE_SLD_CONTENT_TYPE = "application/vnd.ogc.sld+xml";
@@ -145,8 +171,16 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     log.info("GeoServerSagaHandler initialized for: {}", Encode.forJava(serverUrl));
   }
 
-  void setTestClient(Client client) {
+  void setTestClient(OkHttpClient client) {
     super.setClient(client);
+  }
+
+  /**
+   * The GeoServer REST URL for a path relative to {@link #serverUrl}, e.g. {@code
+   * /rest/workspaces}.
+   */
+  private HttpUrl url(String restPath) {
+    return OkHttpJson.url(serverUrl, restPath);
   }
 
   @Override
@@ -166,7 +200,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   private SagaCommandResult handleCreateWorkspace(SagaCommandMessage command) {
     String workspaceName = resolveWorkspaceName(command);
-    createWorkspace(workspaceName, resolveServiceTitle(command, workspaceName));
+    createWorkspace(command, workspaceName);
 
     log.info(
         "GeoServer workspace created: workspaceName={}, saga={}",
@@ -196,7 +230,7 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   private SagaCommandResult handleProvisionLayers(SagaCommandMessage command) {
     String workspaceName = resolveWorkspaceName(command);
-    processLayers(command, workspaceName, datastoreName(workspaceName), false);
+    processLayers(command, workspaceName, datastoreName(workspaceName));
 
     log.info(
         "GeoServer layers provisioned: workspaceName={}, saga={}",
@@ -210,9 +244,9 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     String workspaceName = resolveWorkspaceName(command);
     String datastoreName = datastoreName(workspaceName);
 
-    createWorkspace(workspaceName, resolveServiceTitle(command, workspaceName));
+    createWorkspace(command, workspaceName);
     createDatastore(workspaceName, datastoreName);
-    processLayers(command, workspaceName, datastoreName, false);
+    processLayers(command, workspaceName, datastoreName);
 
     log.info(
         "GeoServer workspace provisioned: workspaceName={}, saga={}",
@@ -234,11 +268,11 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     // be the first time geo is provisioned for a dataset (e.g. a geo sink added on a later update),
     // in which case neither exists yet and a plain feature-type POST would 404. Both creates are
     // idempotent (HTTP 409 = already exists).
-    createWorkspace(workspaceName, resolveServiceTitle(command, workspaceName));
+    createWorkspace(command, workspaceName);
     createDatastore(workspaceName, datastoreName);
 
     // Create or update feature types from the new layers
-    processLayers(command, workspaceName, datastoreName, true);
+    processLayers(command, workspaceName, datastoreName);
 
     String wfsUrl = wfsUrl(workspaceName);
     String wmsUrl = wmsUrl(workspaceName);
@@ -258,17 +292,16 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   private SagaCommandResult handleDeleteWorkspace(SagaCommandMessage command) {
     String workspaceName = resolveWorkspaceName(command);
 
-    try (Response response =
-        auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path("/rest/workspaces/" + workspaceName)
-                    .queryParam("recurse", "true")
-                    .request(MediaType.APPLICATION_JSON))
-            .delete()) {
-      int status = response.getStatus();
-      if (status != 200 && status != 404) {
-        String body = truncateBody(response.readEntity(String.class));
+    HttpUrl url =
+        url("/rest/workspaces/" + workspaceName)
+            .newBuilder()
+            .addQueryParameter("recurse", "true")
+            .build();
+    Request request = auth.apply(OkHttpJson.jsonRequest(url).delete()).build();
+    try (Response response = execute(request)) {
+      int status = response.code();
+      if (status != HttpURLConnection.HTTP_OK && status != HttpURLConnection.HTTP_NOT_FOUND) {
+        String body = truncateBody(readBody(response));
         throw new SagaApiException(
             "DELETE_WORKSPACE failed: HTTP " + status + " — " + body, status);
       }
@@ -319,20 +352,20 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       }
     }
 
-    // Restore the previous state of feature types that existed before the update.
+    // Put back the snapshot entries; they carry names only, not definitions.
     for (Map<String, Object> ft : previousFeatureTypes) {
       String ftName = (String) ft.get("name");
       if (ftName == null) {
         continue;
       }
       requireSafeName(ftName, "featureType name");
-      try (Response response =
+      HttpUrl url = url(featureTypesPath(workspaceName, datastoreName) + "/" + ftName);
+      Request request =
           auth.apply(
-                  client()
-                      .target(serverUrl)
-                      .path(featureTypesPath(workspaceName, datastoreName) + "/" + ftName)
-                      .request(MediaType.APPLICATION_JSON))
-              .put(Entity.json(Map.of("featureType", ft)))) {
+                  OkHttpJson.jsonRequest(url)
+                      .put(OkHttpJson.jsonBodyUnchecked(Map.of("featureType", ft))))
+              .build();
+      try (Response response = execute(request)) {
         checkResponse(response, "RESTORE_WORKSPACE/featuretype/" + ftName);
       }
     }
@@ -347,27 +380,25 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   // ============== HELPERS ==============
 
-  /** Creates the workspace idempotently: an already-existing one is treated as success. */
-  private void createWorkspace(String workspaceName, String serviceTitle) {
+  /** Creates the workspace (an existing one counts as success), then writes its WMS settings. */
+  private void createWorkspace(SagaCommandMessage command, String workspaceName) {
     // Create the workspace isolated: its content is reachable only through the per-workspace
     // virtual OWS services (matching geoserver.web.globalServices=false) and it gets its own
     // namespace. This is what makes the WMS service resolve the workspace's layers for
     // (APISIX-gated) anonymous requests — a non-isolated workspace shares the global namespace,
     // where the WMS layer-by-name lookup fails to resolve/hides the layer and same-named layers
     // across datasets collide. WFS is unaffected either way; WMS needs the isolation.
-    int status;
-    try (Response response =
+    Request createRequest =
         auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path("/rest/workspaces")
-                    .request(MediaType.APPLICATION_JSON))
-            .post(
-                Entity.json(
-                    Map.of("workspace", Map.of("name", workspaceName, "isolated", true))))) {
-      status = response.getStatus();
+                OkHttpJson.jsonRequest(url("/rest/workspaces"))
+                    .post(
+                        OkHttpJson.jsonBodyUnchecked(
+                            Map.of("workspace", Map.of("name", workspaceName, "isolated", true)))))
+            .build();
+    try (Response response = execute(createRequest)) {
+      int status = response.code();
       if (status != 201) {
-        String body = truncateBody(response.readEntity(String.class));
+        String body = truncateBody(readBody(response));
         if (!alreadyExists(status, body)) {
           throw new SagaApiException(
               "CREATE_WORKSPACE/" + workspaceName + " failed: HTTP " + status + " — " + body,
@@ -375,55 +406,49 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
         }
       }
     }
-    // On fresh creation, enable the per-workspace WMS virtual service so a map client (QGIS, …)
-    // shows the dataset as the named service (the capabilities root layer) above the layers.
-    if (status == 201) {
-      enableWorkspaceWmsService(workspaceName, serviceTitle);
-    }
+    enableWorkspaceWmsService(
+        command.sagaId(),
+        workspaceName,
+        resolveServiceTitle(command, workspaceName),
+        resolveServiceAbstract(command));
   }
 
   /**
-   * Enables the per-workspace WMS virtual service, titled with {@code serviceTitle} (the dataset's
-   * display name), so the workspace surfaces as a named service in clients (consistent with {@code
-   * globalServices=false} + isolated workspaces). Best-effort: a failure is logged but does not
-   * fail workspace provisioning — the layer stays reachable, only the service title would be unset.
+   * Enables the per-workspace WMS virtual service, titled and described from the dataset's OWS API,
+   * so a map client shows the dataset as the named service above the layers. Best-effort: a failure
+   * is logged but does not fail the step; the layer stays reachable with the previous service title
+   * and abstract.
    *
    * <p>WFS is deliberately NOT enabled per-workspace: a WFS capabilities document has a flat
    * feature type list (no root-layer node to title, unlike WMS), so it gains nothing in a client;
    * and a workspace-local {@code WFSInfo} created via REST has a null {@code serviceLevel}, which
    * makes WFS GetCapabilities fail with a 500/400. WFS keeps using the global service defaults.
    */
-  private void enableWorkspaceWmsService(String workspaceName, String serviceTitle) {
-    putWorkspaceServiceSettings(workspaceName, serviceTitle, "wms", "WMS");
-  }
-
-  /**
-   * Upserts the workspace-local settings for a single OWS service ({@code wms}/{@code wfs}):
-   * enables it and sets its title to {@code serviceTitle} via {@code PUT
-   * /rest/services/{service}/workspaces/{workspace}/settings}.
-   */
-  private void putWorkspaceServiceSettings(
-      String workspaceName, String serviceTitle, String service, String serviceName) {
+  private void enableWorkspaceWmsService(
+      String sagaId, String workspaceName, String serviceTitle, String serviceAbstract) {
     Map<String, Object> settings = new LinkedHashMap<>();
-    settings.put("workspace", Map.of("name", workspaceName));
-    settings.put("enabled", true);
-    settings.put("name", serviceName);
-    settings.put("title", serviceTitle);
-    try (Response response =
+    settings.put(WORKSPACE, Map.of(NAME, workspaceName));
+    settings.put(ENABLED, true);
+    settings.put(NAME, WMS_SERVICE_NAME);
+    settings.put(TITLE, serviceTitle);
+    settings.put(SERVICE_ABSTRACT, serviceAbstract);
+    HttpUrl url =
+        url("/rest/services/" + WMS_SERVICE + "/workspaces/" + workspaceName + "/settings");
+    Request request =
         auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(
-                        "/rest/services/" + service + "/workspaces/" + workspaceName + "/settings")
-                    .request(MediaType.APPLICATION_JSON))
-            .put(Entity.json(Map.of(service, settings)))) {
-      if (response.getStatus() != 200 && response.getStatus() != 201) {
+                OkHttpJson.jsonRequest(url)
+                    .put(OkHttpJson.jsonBodyUnchecked(Map.of(WMS_SERVICE, settings))))
+            .build();
+    try (Response response = execute(request)) {
+      if (response.code() != HttpURLConnection.HTTP_OK
+          && response.code() != HttpURLConnection.HTTP_CREATED) {
         log.warn(
-            "Could not enable {} service for workspace {} (status {}); the layer stays reachable,"
-                + " only the workspace service title is unset",
-            serviceName,
+            "Could not write the WMS service settings of workspace {} (status {}, saga {}): {};"
+                + " the previous title and abstract stay",
             Encode.forJava(workspaceName),
-            response.getStatus());
+            response.code(),
+            Encode.forJava(sagaId),
+            Encode.forJava(truncateBody(readBody(response))));
       }
     }
   }
@@ -444,32 +469,31 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     // The datastore's schema is the workspace name: both derive from datasetId, so GeoServer reads
     // exactly the schema PostGIS created the table in.
     Map<String, Object> datastoreBody = buildDatastoreBody(datastoreName, workspaceName);
-    try (Response createResponse =
+    Request createRequest =
         auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path("/rest/workspaces/" + workspaceName + "/datastores")
-                    .request(MediaType.APPLICATION_JSON))
-            .post(Entity.json(datastoreBody))) {
-      int status = createResponse.getStatus();
-      if (status == 201) {
+                OkHttpJson.jsonRequest(url("/rest/workspaces/" + workspaceName + "/datastores"))
+                    .post(OkHttpJson.jsonBodyUnchecked(datastoreBody)))
+            .build();
+    try (Response createResponse = execute(createRequest)) {
+      int status = createResponse.code();
+      if (status == HttpURLConnection.HTTP_CREATED) {
         return;
       }
       // The body is single-read, so buffer it once and branch on it: an "already exists" signal
       // (409, or a 500 whose body says so) falls through to the PUT; anything else is a real error.
-      String body = truncateBody(createResponse.readEntity(String.class));
+      String body = truncateBody(readBody(createResponse));
       if (!alreadyExists(status, body)) {
         throw new SagaApiException(
             "CREATE_DATASTORE/" + datastoreName + " failed: HTTP " + status + " — " + body, status);
       }
     }
-    try (Response updateResponse =
+    Request updateRequest =
         auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path("/rest/workspaces/" + workspaceName + "/datastores/" + datastoreName)
-                    .request(MediaType.APPLICATION_JSON))
-            .put(Entity.json(datastoreBody))) {
+                OkHttpJson.jsonRequest(
+                        url("/rest/workspaces/" + workspaceName + "/datastores/" + datastoreName))
+                    .put(OkHttpJson.jsonBodyUnchecked(datastoreBody)))
+            .build();
+    try (Response updateResponse = execute(updateRequest)) {
       checkResponse(updateResponse, "CREATE_DATASTORE/update/" + datastoreName);
     }
   }
@@ -481,21 +505,20 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
    * schema holding the data.
    */
   private static boolean alreadyExists(int status, String body) {
-    return status == Response.Status.CONFLICT.getStatusCode()
-        || (status == Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()
+    return status == HttpURLConnection.HTTP_CONFLICT
+        || (status == HttpURLConnection.HTTP_INTERNAL_ERROR
             && body != null
             && body.toLowerCase(Locale.ROOT).contains("already exists"));
   }
 
   /**
    * Iterates the command's {@code layers}, provisioning a GeoServer feature type for each. The
-   * native PostGIS table is taken from the layer's {@code nativeName}, falling back to the first
-   * {@code POSTGIS} data sink's {@code tableName}, then to the layer name. When {@code upsert} is
-   * true an existing feature type is converged to the command's definition (used by {@code
-   * UPDATE_WORKSPACE}); otherwise it is left unchanged (idempotent provisioning).
+   * native PostGIS table is taken from the layer's {@code nativeName}, falling back to the single
+   * {@code POSTGIS} data sink's {@code tableName}, then to the layer name. An existing feature type
+   * is converged to the command's definition.
    */
   private void processLayers(
-      SagaCommandMessage command, String workspaceName, String datastoreName, boolean upsert) {
+      SagaCommandMessage command, String workspaceName, String datastoreName) {
     // Upload the dataset's styles before publishing layers; a layer can only reference a style that
     // already exists in the workspace.
     upsertStyles(command, workspaceName);
@@ -521,8 +544,8 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       // the geometry column's SRID), not auto-detected by GeoServer — its REST feature-type
       // creation does not read the native CRS from the store, so without this the layer stays
       // invalid under REPROJECT_TO_DECLARED.
-      String nativeCrs =
-          resolveNativeCrs(layer, layerName, crs, sinkDataStructures.get(nativeName));
+      Map<String, String> geometryCrs = geometryCrsOf(sinkDataStructures.get(nativeName));
+      String nativeCrs = resolveNativeCrs(layer, layerName, crs, geometryCrs);
       // Forward the portal's native bounding box (tagged with the native CRS) so the published
       // layer has a usable extent; absent → GeoServer computes it itself.
       Map<String, Object> nativeBBox =
@@ -538,13 +561,16 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       for (String alternativeStyle : alternativeStyles) {
         requireSafeName(alternativeStyle, "alternativeStyle");
       }
-      if (upsert) {
-        upsertFeatureType(
-            workspaceName, datastoreName, layerName, nativeName, crs, nativeCrs, nativeBBox);
-      } else {
-        createFeatureType(
-            workspaceName, datastoreName, layerName, nativeName, crs, nativeCrs, nativeBBox);
-      }
+      Map<String, Object> payload =
+          featureTypePayload(
+              layerName,
+              nativeName,
+              crs,
+              nativeCrs,
+              nativeBBox,
+              publishedFields(layer, layerName, geometryCrs));
+      upsertFeatureType(
+          workspaceName, datastoreName, layerName, payload, recalculateFor(nativeBBox));
       if ((defaultStyle != null && !defaultStyle.isBlank()) || !alternativeStyles.isEmpty()) {
         assignLayerStyles(workspaceName, layerName, defaultStyle, alternativeStyles);
       }
@@ -563,9 +589,8 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
    * portal builds the field from the dataset's full layer set — so an empty desired set
    * legitimately prunes everything the workspace still serves.
    *
-   * <p>A feature type that cannot be deleted is reported as {@code staleFeatureTypes} rather than
-   * failing the step: it keeps being served, which the portal must be able to see, but the update
-   * it follows did apply.
+   * <p>A feature type that cannot be deleted fails the step, but only after every other one was
+   * tried: the step cannot succeed while a deleted layer is still served.
    */
   private SagaCommandResult handlePruneFeatureTypes(SagaCommandMessage command) {
     String workspaceName = resolveWorkspaceName(command);
@@ -601,12 +626,14 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       }
     }
 
-    Map<String, Object> resultData = new LinkedHashMap<>();
-    resultData.put("workspaceName", workspaceName);
     if (!stale.isEmpty()) {
-      resultData.put("staleFeatureTypes", stale);
+      return SagaCommandResult.failure(
+          command.sagaId(),
+          command.stepId(),
+          "PRUNE_FEATURE_TYPES left feature types served: " + String.join(", ", stale));
     }
-    return SagaCommandResult.success(command.sagaId(), command.stepId(), resultData, Map.of());
+    return SagaCommandResult.success(
+        command.sagaId(), command.stepId(), Map.of("workspaceName", workspaceName), Map.of());
   }
 
   /**
@@ -673,16 +700,25 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       Map<String, Object> layer,
       String layerName,
       String declaredCrs,
-      Map<String, Object> dataStructure) {
-    if (dataStructure == null || dataStructure.isEmpty()) {
-      return declaredCrs;
-    }
-    Map<String, String> geometryCrs = DataStructureSchema.geometryCrsByColumn(dataStructure);
+      Map<String, String> geometryCrs) {
     if (geometryCrs.isEmpty()) {
       return declaredCrs;
     }
-    String geometryColumnRef = stringValue(layer, "geometryColumnRef");
-    String selected;
+    String crs = geometryCrs.get(selectGeometryColumn(layer, layerName, geometryCrs));
+    return (crs != null && !crs.isBlank()) ? crs : declaredCrs;
+  }
+
+  /** The sink data structure's geometry columns with their CRS; empty without a data structure. */
+  private static Map<String, String> geometryCrsOf(Map<String, Object> dataStructure) {
+    return dataStructure == null || dataStructure.isEmpty()
+        ? Map.of()
+        : DataStructureSchema.geometryCrsByColumn(dataStructure);
+  }
+
+  /** The layer's {@code geometryColumnRef} if it names a geometry, else the only geometry. */
+  private static String selectGeometryColumn(
+      Map<String, Object> layer, String layerName, Map<String, String> geometryCrs) {
+    String geometryColumnRef = stringValue(layer, GEOMETRY_COLUMN_REF);
     if (geometryColumnRef != null && !geometryColumnRef.isBlank()) {
       if (!geometryCrs.containsKey(geometryColumnRef)) {
         throw new IllegalArgumentException(
@@ -692,19 +728,63 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
                 + geometryColumnRef
                 + "' is not a geometry property of the sink's data structure");
       }
-      selected = geometryColumnRef;
-    } else if (geometryCrs.size() == 1) {
-      selected = geometryCrs.keySet().iterator().next();
-    } else {
-      throw new IllegalArgumentException(
-          "layer '"
-              + layerName
-              + "' must specify geometryColumnRef: the data structure has "
-              + geometryCrs.size()
-              + " geometry columns");
+      return geometryColumnRef;
     }
-    String crs = geometryCrs.get(selected);
-    return (crs != null && !crs.isBlank()) ? crs : declaredCrs;
+    if (geometryCrs.size() == 1) {
+      return geometryCrs.keySet().iterator().next();
+    }
+    throw new IllegalArgumentException(
+        "layer '"
+            + layerName
+            + "' must specify geometryColumnRef: the data structure has "
+            + geometryCrs.size()
+            + " geometry columns");
+  }
+
+  /** The geometry column of a restricted attribute list; fails rather than publish all columns. */
+  private static String resolveGeometryColumn(
+      Map<String, Object> layer, String layerName, Map<String, String> geometryCrs) {
+    if (!geometryCrs.isEmpty()) {
+      return selectGeometryColumn(layer, layerName, geometryCrs);
+    }
+    String geometryColumnRef = stringValue(layer, GEOMETRY_COLUMN_REF);
+    if (geometryColumnRef != null && !geometryColumnRef.isBlank()) {
+      return geometryColumnRef;
+    }
+    throw new IllegalArgumentException(
+        "layer '"
+            + layerName
+            + "' restricts its attributes but its geometry column cannot be determined");
+  }
+
+  /**
+   * Title (else the layer name), abstract, CQL filter and the geometry column followed by the
+   * selected attributes; always sent, empty when cleared, because a feature-type PUT keeps omitted
+   * fields.
+   */
+  private static Map<String, Object> publishedFields(
+      Map<String, Object> layer, String layerName, Map<String, String> geometryCrs) {
+    String title = stringValue(layer, TITLE);
+    List<String> attributes = new ArrayList<>();
+    for (String attribute : stringList(layer, ATTRIBUTE)) {
+      if (!attribute.isBlank() && !attributes.contains(attribute)) {
+        attributes.add(attribute);
+      }
+    }
+    if (!attributes.isEmpty()) {
+      // GeoServer draws the first geometry attribute, so the layer's geometry column leads.
+      String geometryColumn = resolveGeometryColumn(layer, layerName, geometryCrs);
+      attributes.remove(geometryColumn);
+      attributes.add(0, geometryColumn);
+    }
+    Map<String, Object> fields = new LinkedHashMap<>();
+    fields.put(TITLE, title != null && !title.isBlank() ? title : layerName);
+    fields.put(ABSTRACT, blankToEmpty(stringValue(layer, DESCRIPTION)));
+    fields.put(CQL_FILTER, blankToEmpty(stringValue(layer, CQL_FILTER)));
+    fields.put(
+        ATTRIBUTES,
+        Map.of(ATTRIBUTE, attributes.stream().map(name -> Map.of(NAME, name)).toList()));
+    return fields;
   }
 
   // ── Payload type guards ─────────────────────────────────────────────────────
@@ -791,24 +871,25 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
    * Builds the GeoServer {@code featureType} REST body. The published layer is named {@code name};
    * {@code nativeName} is the underlying PostGIS table. GeoServer derives columns, primary key and
    * geometry from the table itself, so only naming, the declared SRS, the native CRS, the native
-   * bounding box and the projection policy are mapped. The native CRS is set explicitly (read from
-   * the data structure's geometry) rather than relying on GeoServer to auto-detect it on REST
-   * creation — which it does not do, leaving the feature type invalid under {@code
-   * REPROJECT_TO_DECLARED}. When {@code nativeBBox} is present it is sent so the layer advertises a
-   * usable extent (GeoServer would otherwise compute it against the still-empty sink table at
-   * provisioning time and never refresh it); the lat/lon box is left to GeoServer to reproject (see
-   * the {@code recalculate} parameter on the request).
+   * bounding box, the projection policy and the {@link #publishedFields} are mapped. The native CRS
+   * is set explicitly (read from the data structure's geometry) rather than relying on GeoServer to
+   * auto-detect it on REST creation — which it does not do, leaving the feature type invalid under
+   * {@code REPROJECT_TO_DECLARED}. When {@code nativeBBox} is present it is sent so the layer
+   * advertises a usable extent (GeoServer would otherwise compute it against the still-empty sink
+   * table at provisioning time and never refresh it); the lat/lon box is left to GeoServer to
+   * reproject (see the {@code recalculate} parameter on the request).
    */
   private static Map<String, Object> featureTypePayload(
       String name,
       String nativeName,
       String crs,
       String nativeCrs,
-      Map<String, Object> nativeBBox) {
+      Map<String, Object> nativeBBox,
+      Map<String, Object> fields) {
     Map<String, Object> featureType = new LinkedHashMap<>();
     featureType.put("name", name);
     featureType.put("nativeName", nativeName);
-    featureType.put("title", name);
+    featureType.putAll(fields);
     featureType.put("srs", crs);
     featureType.put("nativeCRS", nativeCrs);
     featureType.put("projectionPolicy", DEFAULT_PROJECTION_POLICY);
@@ -828,79 +909,44 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
     return nativeBBox != null ? "latlonbbox" : "nativebbox,latlonbbox";
   }
 
-  /** Creates a feature type idempotently: an already-published one is treated as success. */
-  private void createFeatureType(
-      String workspaceName,
-      String datastoreName,
-      String name,
-      String nativeName,
-      String crs,
-      String nativeCrs,
-      Map<String, Object> nativeBBox) {
-    try (Response response =
-        auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(featureTypesPath(workspaceName, datastoreName))
-                    .queryParam("recalculate", recalculateFor(nativeBBox))
-                    .request(MediaType.APPLICATION_JSON))
-            .post(Entity.json(featureTypePayload(name, nativeName, crs, nativeCrs, nativeBBox)))) {
-      int status = response.getStatus();
-      if (status == 201) {
-        return;
-      }
-      String body = truncateBody(response.readEntity(String.class));
-      if (!alreadyExists(status, body)) {
-        throw new SagaApiException(
-            "create-featuretype/" + name + " failed: HTTP " + status + " — " + body, status);
-      }
-    }
-  }
-
   /**
-   * Creates a feature type, or updates it via PUT if it already exists. A plain POST leaves an
-   * existing feature type unchanged, so {@code UPDATE_WORKSPACE} would report success without
-   * applying any change.
-   *
-   * <p>An update re-publishes every layer of the dataset, so hitting an already-published feature
-   * type is the ordinary case, not an error.
+   * Creates a feature type, or updates it via PUT if it already exists, because a POST leaves an
+   * existing one unchanged.
    */
   private void upsertFeatureType(
       String workspaceName,
       String datastoreName,
       String name,
-      String nativeName,
-      String crs,
-      String nativeCrs,
-      Map<String, Object> nativeBBox) {
-    Map<String, Object> payload = featureTypePayload(name, nativeName, crs, nativeCrs, nativeBBox);
-    String recalculate = recalculateFor(nativeBBox);
-    try (Response createResponse =
-        auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(featureTypesPath(workspaceName, datastoreName))
-                    .queryParam("recalculate", recalculate)
-                    .request(MediaType.APPLICATION_JSON))
-            .post(Entity.json(payload))) {
-      int status = createResponse.getStatus();
-      if (status == 201) {
+      Map<String, Object> payload,
+      String recalculate) {
+    HttpUrl createUrl =
+        url(featureTypesPath(workspaceName, datastoreName))
+            .newBuilder()
+            .addQueryParameter("recalculate", recalculate)
+            .build();
+    Request createRequest =
+        auth.apply(OkHttpJson.jsonRequest(createUrl).post(OkHttpJson.jsonBodyUnchecked(payload)))
+            .build();
+    try (Response createResponse = execute(createRequest)) {
+      int status = createResponse.code();
+      if (status == HttpURLConnection.HTTP_CREATED) {
         return;
       }
-      String body = truncateBody(createResponse.readEntity(String.class));
+      String body = truncateBody(readBody(createResponse));
       if (!alreadyExists(status, body)) {
         throw new SagaApiException(
             "update-featuretype/create/" + name + " failed: HTTP " + status + " — " + body, status);
       }
     }
-    try (Response updateResponse =
-        auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(featureTypesPath(workspaceName, datastoreName) + "/" + name)
-                    .queryParam("recalculate", recalculate)
-                    .request(MediaType.APPLICATION_JSON))
-            .put(Entity.json(payload))) {
+    HttpUrl updateUrl =
+        url(featureTypesPath(workspaceName, datastoreName) + "/" + name)
+            .newBuilder()
+            .addQueryParameter("recalculate", recalculate)
+            .build();
+    Request updateRequest =
+        auth.apply(OkHttpJson.jsonRequest(updateUrl).put(OkHttpJson.jsonBodyUnchecked(payload)))
+            .build();
+    try (Response updateResponse = execute(updateRequest)) {
       checkResponse(updateResponse, "update-featuretype/" + name);
     }
   }
@@ -929,35 +975,28 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   /**
    * Creates a style from its SLD, or updates it via PUT if one of that name already exists. An
-   * existing style returns 403 (not 409) on GeoServer Cloud 2.28.3.0, so the upsert branches on 403
-   * and refreshes the SLD; a genuine auth 403 falls through to the same PUT and surfaces via {@link
+   * existing style returns 403 (not 409) on GeoServer Cloud, so the upsert branches on 403 and
+   * refreshes the SLD; a genuine auth 403 falls through to the same PUT and surfaces via {@link
    * #checkResponse}.
    */
   private void upsertStyle(String workspaceName, String name, String sld) {
-    Entity<String> sldEntity = Entity.entity(sld, STYLE_SLD_CONTENT_TYPE);
-    try (Response createResponse =
-        auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(stylesPath(workspaceName))
-                    .queryParam("name", name)
-                    .request(MediaType.APPLICATION_JSON))
-            .post(sldEntity)) {
-      if (createResponse.getStatus() == 201) {
+    RequestBody sldBody = RequestBody.create(sld, MediaType.get(STYLE_SLD_CONTENT_TYPE));
+    HttpUrl createUrl =
+        url(stylesPath(workspaceName)).newBuilder().addQueryParameter("name", name).build();
+    Request createRequest = auth.apply(OkHttpJson.jsonRequest(createUrl).post(sldBody)).build();
+    try (Response createResponse = execute(createRequest)) {
+      if (createResponse.code() == HttpURLConnection.HTTP_CREATED) {
         return;
       }
-      if (createResponse.getStatus() != 403) {
+      if (createResponse.code() != HttpURLConnection.HTTP_FORBIDDEN) {
         checkResponse(createResponse, "create-style/" + name);
         return;
       }
     }
-    try (Response updateResponse =
-        auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(stylePath(workspaceName, name))
-                    .request(MediaType.APPLICATION_JSON))
-            .put(sldEntity)) {
+    Request updateRequest =
+        auth.apply(OkHttpJson.jsonRequest(url(stylePath(workspaceName, name))).put(sldBody))
+            .build();
+    try (Response updateResponse = execute(updateRequest)) {
       checkResponse(updateResponse, "update-style/" + name);
     }
   }
@@ -987,13 +1026,12 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
       }
       layerBody.put("styles", Map.of("@class", "linked-hash-set", "style", styleRefs));
     }
-    try (Response response =
+    Request request =
         auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(layerPath(workspaceName, layerName))
-                    .request(MediaType.APPLICATION_JSON))
-            .put(Entity.json(Map.of("layer", layerBody)))) {
+                OkHttpJson.jsonRequest(url(layerPath(workspaceName, layerName)))
+                    .put(OkHttpJson.jsonBodyUnchecked(Map.of("layer", layerBody))))
+            .build();
+    try (Response response = execute(request)) {
       checkResponse(response, "assign-layer-styles/" + layerName);
     }
     verifyLayerStylesApplied(workspaceName, layerName, defaultStyle, alternativeStyles);
@@ -1040,15 +1078,12 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
 
   @SuppressWarnings("unchecked")
   private Map<String, Object> readLayer(String workspaceName, String layerName) {
-    try (Response response =
-        auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(layerPath(workspaceName, layerName) + ".json")
-                    .request(MediaType.APPLICATION_JSON))
-            .get()) {
+    Request request =
+        auth.apply(OkHttpJson.jsonRequest(url(layerPath(workspaceName, layerName) + ".json")).get())
+            .build();
+    try (Response response = execute(request)) {
       checkResponse(response, "read-layer/" + layerName);
-      Object layer = response.readEntity(Map.class).get("layer");
+      Object layer = OkHttpJson.readJsonMap(response).get("layer");
       if (!(layer instanceof Map)) {
         throw new IllegalStateException("read-layer/" + layerName + ": unexpected response shape");
       }
@@ -1097,16 +1132,15 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   private void deleteFeatureType(
       String workspaceName, String datastoreName, String ftName, String step) {
     requireSafeName(ftName, "featureType name");
-    try (Response response =
-        auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(featureTypesPath(workspaceName, datastoreName) + "/" + ftName)
-                    .queryParam("recurse", "true")
-                    .request(MediaType.APPLICATION_JSON))
-            .delete()) {
-      int status = response.getStatus();
-      if (status != 200 && status != 404) {
+    HttpUrl url =
+        url(featureTypesPath(workspaceName, datastoreName) + "/" + ftName)
+            .newBuilder()
+            .addQueryParameter("recurse", "true")
+            .build();
+    Request request = auth.apply(OkHttpJson.jsonRequest(url).delete()).build();
+    try (Response response = execute(request)) {
+      int status = response.code();
+      if (status != HttpURLConnection.HTTP_OK && status != HttpURLConnection.HTTP_NOT_FOUND) {
         checkResponse(response, step + "/delete-featuretype/" + ftName);
       }
     }
@@ -1180,42 +1214,48 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   @SuppressWarnings("unchecked")
   private List<Map<String, Object>> readCurrentFeatureTypes(
       String workspaceName, String datastoreName, String step) {
-    try (Response response =
-        auth.apply(
-                client()
-                    .target(serverUrl)
-                    .path(
-                        "/rest/workspaces/"
-                            + workspaceName
-                            + "/datastores/"
-                            + datastoreName
-                            + "/featuretypes.json")
-                    .request(MediaType.APPLICATION_JSON))
-            .get()) {
-      int status = response.getStatus();
-      if (status == 404) {
+    HttpUrl url =
+        url(
+            "/rest/workspaces/"
+                + workspaceName
+                + "/datastores/"
+                + datastoreName
+                + "/featuretypes.json");
+    Request request = auth.apply(OkHttpJson.jsonRequest(url).get()).build();
+    try (Response response = execute(request)) {
+      int status = response.code();
+      if (status == HttpURLConnection.HTTP_NOT_FOUND) {
         // Datastore/workspace has no feature types yet — an empty snapshot is correct here.
         return List.of();
       }
-      if (status != 200) {
+      if (status != HttpURLConnection.HTTP_OK) {
         // Auth/server errors must not be mistaken for "zero feature types": that would let the
         // caller proceed with an empty compensation snapshot and lose restore state.
-        String body = truncateBody(response.readEntity(String.class));
+        String body = truncateBody(readBody(response));
         throw new SagaApiException(
             step + "/read-featuretypes failed: HTTP " + status + " — " + body, status);
       }
-      Map<String, Object> result = response.readEntity(Map.class);
-      // GeoServer serializes an empty featureTypes collection as "" (a bare string), not {} or
-      // null — same empty-collection quirk it has elsewhere in the REST API. Only cast when it's
-      // actually the expected object shape.
-      if (!(result.get("featureTypes") instanceof Map<?, ?> featureTypes)) {
+      Map<String, Object> result = OkHttpJson.readJsonMap(response);
+      Object value = result.get("featureTypes");
+      // A workspace serving no feature type answers {"featureTypes":""}: GeoServer serialises an
+      // empty collection as an empty string.
+      if (value instanceof String text && text.isEmpty()) {
         return List.of();
+      }
+      if (!(value instanceof Map<?, ?> featureTypes)) {
+        // Same rule as the non-200 branch: a listing we cannot read is not an empty workspace. An
+        // empty snapshot is not merely lost restore state — compensation deletes every feature type
+        // absent from it, so a wrong empty here unpublishes the dataset's layers.
+        throw new SagaApiException(
+            step + "/read-featuretypes: unexpected featureTypes shape " + typeName(value), status);
       }
       Object ftList = featureTypes.get("featureType");
       if (ftList instanceof List) {
         return (List<Map<String, Object>>) ftList;
       }
-      return List.of();
+      // Same reasoning: a wrapper without a readable entry list is not an empty workspace either.
+      throw new SagaApiException(
+          step + "/read-featuretypes: unexpected featureType shape " + typeName(ftList), status);
     }
   }
 
@@ -1260,13 +1300,33 @@ public class GeoServerSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /**
-   * Human-facing title for the workspace-local OWS services: the dataset's display name from the
-   * saga trigger ({@code datasetName}), falling back to the workspace name when it is absent or
-   * blank (e.g. a step that carries only {@code datasetId}).
+   * Title of the workspace-local WMS service: the OWS API name, else {@code datasetName}, else the
+   * workspace name.
    */
   private static String resolveServiceTitle(SagaCommandMessage command, String workspaceName) {
-    String datasetName = stringValue(command.payload(), "datasetName");
+    String apiName = stringValue(owsNamedApi(command), NAME);
+    if (apiName != null && !apiName.isBlank()) {
+      return apiName;
+    }
+    String datasetName = stringValue(command.payload(), DATASET_NAME);
     return datasetName != null && !datasetName.isBlank() ? datasetName : workspaceName;
+  }
+
+  /** The OWS API description; empty clears the service abstract. */
+  private static String resolveServiceAbstract(SagaCommandMessage command) {
+    return blankToEmpty(stringValue(owsNamedApi(command), DESCRIPTION));
+  }
+
+  /** The dataset's OWS named API (at most one exists), or an empty map. */
+  private static Map<String, Object> owsNamedApi(SagaCommandMessage command) {
+    return mapList(command, NAMED_APIS).stream()
+        .filter(api -> ApiStandards.OWS.equals(stringValue(api, STANDARD)))
+        .findFirst()
+        .orElse(Map.of());
+  }
+
+  private static String blankToEmpty(String value) {
+    return value == null || value.isBlank() ? "" : value;
   }
 
   static String toWorkspaceName(String datasetId) {

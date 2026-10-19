@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
+import { UML_PRIMITIVE_TYPES } from '@/components/uml-modeler/constants/umlTypes'
 import type { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 
-import { umlDiagramToSchemaTree } from './adapter'
+import { PRIMITIVE, umlDiagramToSchemaTree } from './adapter'
 import { requiredFieldPaths } from './fieldTree'
 
 const treeOf = (diagram: UMLDiagram | null, fallbackName: string) => umlDiagramToSchemaTree(diagram, fallbackName).tree
@@ -342,5 +343,39 @@ describe('umlDiagramToSchemaTree', () => {
 
     // An enumeration is a scalar value at runtime — there is no record to map fields against.
     expect(treeOf(enumOnly, 'MyStructure')).toEqual({ name: 'Status', fields: [] })
+  })
+
+  it('keeps Date and DateTime apart as distinct scalar subtypes', () => {
+    const diagram = {
+      nodes: [
+        classNode('thing', 'Thing', [
+          { name: 'day', type: 'Date' },
+          { name: 'ts', type: 'DateTime' },
+        ]),
+      ],
+      edges: [],
+    } as unknown as UMLDiagram
+
+    expect(treeOf(diagram, 'Thing').fields.map(f => f.type)).toEqual(['date', 'datetime'])
+  })
+})
+
+describe('PRIMITIVE', () => {
+  // A primitive added to UML_PRIMITIVE_TYPES without a PRIMITIVE entry would fall through
+  // scalarType()'s `PRIMITIVE[type] ?? 'str'` and be silently mistyped as a plain string everywhere
+  // PRIMITIVE is consulted (schema trees, the Literal node's output port).
+  it('has an explicit engine subtype for every UML primitive type', () => {
+    for (const type of UML_PRIMITIVE_TYPES) {
+      expect(Object.hasOwn(PRIMITIVE, type), `PRIMITIVE is missing an entry for '${type}'`).toBe(true)
+    }
+  })
+
+  it('reads an attribute stored with the retired Json type as str', () => {
+    const diagram = {
+      nodes: [classNode('thing', 'Thing', [{ name: 'payload', type: 'Json' }])],
+      edges: [],
+    } as unknown as UMLDiagram
+
+    expect(treeOf(diagram, 'Thing').fields.map(f => f.type)).toEqual(['str'])
   })
 })

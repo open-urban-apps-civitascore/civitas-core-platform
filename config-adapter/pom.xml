@@ -48,35 +48,47 @@
 		<argLine />
 
 		<kafka.version>4.1.2</kafka.version>
-		<keycloak.version>26.0.7</keycloak.version>
+		<keycloak.version>26.0.12</keycloak.version>
 		<cloudevents.version>3.0.0</cloudevents.version>
-		<slf4j.version>2.0.9</slf4j.version>
-		<jackson.version>2.16.1</jackson.version>
-		<jakarta.ws.rs.version>3.1.0</jakarta.ws.rs.version>
-		<jersey.version>3.1.5</jersey.version>
-		<commons.configuration2.version>2.11.0</commons.configuration2.version>
-		<junit.version>5.14.2</junit.version>
-		<mockito.version>5.21.0</mockito.version>
-		<testcontainers.version>2.0.4</testcontainers.version>
-		<awaitility.version>4.2.2</awaitility.version>
-		<jacoco.version>0.8.14</jacoco.version>
+		<slf4j.version>2.0.18</slf4j.version>
+		<jackson.version>2.22.3</jackson.version>
+		<okhttp.version>5.3.2</okhttp.version>
+		<jersey.version>3.1.12</jersey.version>
+		<commons.configuration2.version>2.15.1</commons.configuration2.version>
+		<junit.version>5.14.4</junit.version>
+		<mockito.version>5.23.0</mockito.version>
+		<testcontainers.version>2.0.5</testcontainers.version>
+		<awaitility.version>4.3.0</awaitility.version>
+		<jacoco.version>0.8.15</jacoco.version>
 		<spotless.version>3.4.0</spotless.version>
 		<commons.beanutils.version>1.11.0</commons.beanutils.version>
-		<commons.io.version>2.21.0</commons.io.version>
+		<commons.io.version>2.22.0</commons.io.version>
 		<commons.lang.version>3.20.0</commons.lang.version>
 		<commons.compress.version>1.28.0</commons.compress.version>
-		<lz4.version>1.8.1</lz4.version>
-		<at.yawk.lz4.version>1.10.1</at.yawk.lz4.version>
+		<at.yawk.lz4.version>1.11.4</at.yawk.lz4.version>
 		<owasp.encoder.version>1.4.0</owasp.encoder.version>
 		<flowable.version>7.1.0</flowable.version>
+		<spring.version>6.2.19</spring.version>
 		<hikaricp.version>6.2.1</hikaricp.version>
-		<postgresql.version>42.7.11</postgresql.version>
-		<h2.version>2.3.232</h2.version>
-		<cyclonedx-maven-plugin.version>2.9.0</cyclonedx-maven-plugin.version>
+		<postgresql.version>42.7.13</postgresql.version>
+		<h2.version>2.4.240</h2.version>
+		<cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
 	</properties>
 
 	<dependencyManagement>
 		<dependencies>
+			<dependency>
+				<groupId>org.glassfish.jersey</groupId>
+				<artifactId>jersey-bom</artifactId>
+				<version>${jersey.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<dependency>
+				<groupId>jakarta.ws.rs</groupId>
+				<artifactId>jakarta.ws.rs-api</artifactId>
+				<version>3.1.0</version>
+			</dependency>
 			<!-- CloudEvents -->
 			<dependency>
 				<groupId>io.cloudevents</groupId>
@@ -108,48 +120,38 @@
 				<version>${keycloak.version}</version>
 			</dependency>
 
-			<!-- Jackson -->
+			<!--
+				Flowable 7.1.0 drags in Spring Framework 6.1.13 transitively; the BOM lifts the
+				whole family to a line that carries no advisory.
+			-->
 			<dependency>
-				<groupId>com.fasterxml.jackson.core</groupId>
-				<artifactId>jackson-databind</artifactId>
-				<version>${jackson.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>com.fasterxml.jackson.datatype</groupId>
-				<artifactId>jackson-datatype-jsr310</artifactId>
-				<version>${jackson.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>com.fasterxml.jackson.dataformat</groupId>
-				<artifactId>jackson-dataformat-yaml</artifactId>
-				<version>${jackson.version}</version>
+				<groupId>org.springframework</groupId>
+				<artifactId>spring-framework-bom</artifactId>
+				<version>${spring.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
 			</dependency>
 
-			<!-- JAX-RS / Jersey -->
+			<!-- Jackson: the BOM also pulls transitives (cloudevents, keycloak) onto one version -->
 			<dependency>
-				<groupId>jakarta.ws.rs</groupId>
-				<artifactId>jakarta.ws.rs-api</artifactId>
-				<version>${jakarta.ws.rs.version}</version>
+				<groupId>com.fasterxml.jackson</groupId>
+				<artifactId>jackson-bom</artifactId>
+				<version>${jackson.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+
+			<!-- OkHttp -->
+			<dependency>
+				<groupId>com.squareup.okhttp3</groupId>
+				<artifactId>okhttp-jvm</artifactId>
+				<version>${okhttp.version}</version>
 			</dependency>
 			<dependency>
-				<groupId>org.glassfish.jersey.core</groupId>
-				<artifactId>jersey-client</artifactId>
-				<version>${jersey.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>org.glassfish.jersey.inject</groupId>
-				<artifactId>jersey-hk2</artifactId>
-				<version>${jersey.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>org.glassfish.jersey.media</groupId>
-				<artifactId>jersey-media-json-jackson</artifactId>
-				<version>${jersey.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>org.glassfish.jersey.media</groupId>
-				<artifactId>jersey-media-multipart</artifactId>
-				<version>${jersey.version}</version>
+				<groupId>com.squareup.okhttp3</groupId>
+				<artifactId>mockwebserver3</artifactId>
+				<version>${okhttp.version}</version>
+				<scope>test</scope>
 			</dependency>
 
 			<!-- Apache Commons -->
@@ -179,12 +181,11 @@
 				<version>${commons.compress.version}</version>
 			</dependency>
 
-			<!-- lz4 -->
-			<dependency>
-				<groupId>org.lz4</groupId>
-				<artifactId>lz4-java</artifactId>
-				<version>${lz4.version}</version>
-			</dependency>
+			<!--
+				Drop once kafka-clients ships lz4-java >= 1.11.2 itself: kafka-clients 4.3.0
+				still pins 1.10.2, which is affected by CVE-2026-59949 (fixed 1.11.1) plus
+				GHSA-6cx8-rjf8-pr8g and GHSA-4v53-57pg-c464 (both fixed 1.11.2).
+			-->
 			<dependency>
 				<groupId>at.yawk.lz4</groupId>
 				<artifactId>lz4-java</artifactId>
@@ -333,7 +334,49 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
-				<version>3.9.0</version>
+				<version>3.10.0</version>
+				<configuration>
+					<!-- Runtime-wired by design: ServiceLoader registrations, JDBC drivers, Jersey
+					     providers, test-runner engines, shaded sibling adapters and BOM aggregators.
+					     None of them is referenced from bytecode. -->
+					<ignoredUnusedDeclaredDependencies>
+						<ignoredUnusedDeclaredDependency>de.civitas-core:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>io.cloudevents:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.glassfish.jersey.*:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.testcontainers:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.junit.jupiter:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.mockito:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>com.tngtech.archunit:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.awaitility:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>com.fasterxml.jackson.*:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.apache.commons:*</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>commons-beanutils:commons-beanutils</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>org.postgresql:postgresql</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>com.h2database:h2</ignoredUnusedDeclaredDependency>
+					</ignoredUnusedDeclaredDependencies>
+					<!-- Required at runtime by the adapters' REST clients and JSON mapping;
+					     the analyzer sees direct imports only in test code. -->
+					<ignoredNonTestScopedDependencies>
+						<ignoredNonTestScopedDependency>org.glassfish.jersey.core:jersey-client</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>com.fasterxml.jackson.core:*</ignoredNonTestScopedDependency>
+						<!-- Flowable's job service is driven by the embedded engine at runtime -->
+						<ignoredNonTestScopedDependency>org.flowable:*</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>org.postgresql:postgresql</ignoredNonTestScopedDependency>
+						<!-- The application bundles adapters and the event handler into the shade
+						     JAR for ServiceLoader discovery; it imports none of them directly. -->
+						<ignoredNonTestScopedDependency>de.civitas-core:*</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>org.apache.commons:commons-configuration2</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>io.cloudevents:*</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>org.apache.kafka:*</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>org.keycloak:*</ignoredNonTestScopedDependency>
+						<ignoredNonTestScopedDependency>com.squareup.okio:okio-jvm</ignoredNonTestScopedDependency>
+					</ignoredNonTestScopedDependencies>
+					<!-- The used-undeclared check is off: compiling against a starter's or aggregator's
+					     transitive closure is deliberate here, so every finding is a false positive. -->
+					<ignoredUsedUndeclaredDependencies>
+						<ignoredUsedUndeclaredDependency>*:*</ignoredUsedUndeclaredDependency>
+					</ignoredUsedUndeclaredDependencies>
+				</configuration>
 				<executions>
 					<execution>
 						<id>generate-dependency-tree</id>

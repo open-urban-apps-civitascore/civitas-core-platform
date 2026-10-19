@@ -99,6 +99,14 @@ public interface SqlDialect {
   String readSchemaGrantsQuery();
 
   /**
+   * Returns a parameterised query (binds: schema, table) that yields a row iff the table exists.
+   */
+  String tableExistsQuery();
+
+  /** Returns a parameterised query (bind: schema) that yields a row iff the schema exists. */
+  String schemaExistsQuery();
+
+  /**
    * Returns true if the SQL exception indicates the target object already exists (duplicate table,
    * schema, index, or role) — used to absorb CREATE conflicts as idempotent successes.
    */

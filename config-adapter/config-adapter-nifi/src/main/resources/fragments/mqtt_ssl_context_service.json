@@ -1,6 +1,6 @@
 {
   "name": "MQTT SSL Context Service",
-  "comments": "Uses the NiFi node truststore for MQTT server authentication.",
+  "comments": "Server authentication for an MQTT broker. The truststore is supplied by the adapter configuration; no keystore, so the broker is not offered a client certificate. TLS Protocol stays at the JVM-negotiated default so the highest version both ends support is used.",
   "type": "org.apache.nifi.ssl.StandardSSLContextService",
   "bundle": {
     "group": "org.apache.nifi",
@@ -12,9 +12,9 @@
     "Keystore Password": null,
     "key-password": null,
     "Keystore Type": null,
-    "Truststore Filename": "${TRUSTSTORE_PATH}",
-    "Truststore Password": "#{TRUSTSTORE_PASSWORD}",
-    "Truststore Type": "PKCS12",
+    "Truststore Filename": null,
+    "Truststore Password": null,
+    "Truststore Type": null,
     "TLS Protocol": "TLS"
   },
   "propertyDescriptors": {

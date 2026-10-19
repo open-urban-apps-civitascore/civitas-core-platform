@@ -1,7 +1,11 @@
+import { MISMATCH_COLOR } from '@/components/node-editor'
 import type { PortType } from '@/components/node-editor/types'
 
 /** Visual style applied to edges that carry array (one-to-many) values. */
 export const ARRAY_EDGE_STYLE = { strokeWidth: 3, stroke: 'hsl(var(--primary))' }
+
+/** Overlaid on edges whose endpoints no longer type-match; same red as a mismatched port. */
+export const INVALID_EDGE_STYLE = { stroke: MISMATCH_COLOR }
 
 // ---------------------------------------------------------------------------
 // Field tree (produced by the schema adapter, consumed by the MegaNodes)
@@ -20,7 +24,17 @@ export type GeometryType =
   | 'MultiPolygon'
   | 'GeometryCollection'
 
-export type FieldType = 'str' | 'int' | 'float' | 'bool' | 'date' | GeometryType | 'array' | 'object'
+export type FieldType =
+  | 'str'
+  | 'int'
+  | 'number'
+  | 'bool'
+  | 'date'
+  | 'datetime'
+  | 'uuid'
+  | GeometryType
+  | 'array'
+  | 'object'
 
 export const GEOMETRY: ReadonlySet<GeometryType> = new Set<GeometryType>([
   'Point',
@@ -47,6 +61,13 @@ export interface FieldNode {
   primaryKey?: boolean
   children?: FieldNode[]
 }
+
+/**
+ * Source subtypes a numeric conversion input (toInt/toNumber) accepts. Everything else — uuid, bool,
+ * date, datetime, geometry — has no meaningful numeric coercion and is rejected. Used as a port's
+ * `accepts` set.
+ */
+export const NUMERIC_SUBTYPES: readonly FieldType[] = ['str', 'int', 'number']
 
 /** The port category is a pure function of the field type. */
 export const portTypeFor = (type: FieldType): PortType => {
@@ -78,6 +99,8 @@ export const field = (
 
 export interface SchemaTree {
   name: string
+  /** data structure version, e.g. "4.0.0"; null for a draft. */
+  version?: string | null
   fields: FieldNode[]
 }
 
@@ -88,35 +111,40 @@ export interface SchemaTree {
 /**
  * Conversion ops aligned with Apache NiFi RecordPath functions:
  *  toString  → NiFi toString(field, charset)   — any scalar → string
- *  toInt     → NiFi type coercion to INT        — str/float → int
- *  toFloat   → NiFi type coercion to FLOAT      — str/int → float
- *  toDate    → NiFi toDate(field, format)       — str → date
- *  format    → NiFi format(field, format)       — date → str
+ *  toInt     → NiFi type coercion to INT        — str/number → int
+ *  toFloat   → NiFi type coercion to FLOAT      — str/int → number
+ *  toUuid    → no RecordPath call; the sink parses               — str → uuid
+ *  toDate    → NiFi format(toDate(field, format), 'yyyy-MM-dd')  — str / date → date
+ *  toDateTime→ NiFi toDate(field, format) or epoch formatting     — str / datetime / int / number → datetime
+ *  format    → NiFi format(field, format)                        — date / datetime → str
  */
-export type ConversionOp = 'toString' | 'toInt' | 'toFloat' | 'toDate' | 'format'
+export type ConversionOp = 'toString' | 'toInt' | 'toFloat' | 'toUuid' | 'toDate' | 'toDateTime' | 'format'
 
 export type OpNode =
   | { op: 'copy'; sourcePath: string }
   | { op: 'const'; value: unknown; valueType?: string }
   | { op: 'concat'; separator?: string; inputs: ValueNode[] }
-  | { op: ConversionOp; input: ValueNode; pattern?: string }
+  | {
+      op: ConversionOp
+      input: ValueNode
+      pattern?: string
+      inputType?: 'string' | 'epoch'
+      unit?: 'seconds' | 'milliseconds'
+    }
   | { op: 'geoPoint'; lon: ValueNode; lat: ValueNode }
 
 /** A path string is shorthand for a copy. */
 export type ValueNode = string | OpNode
 
+/** Ops with their own canvas node; 'copy' is the direct edge. */
+export type TransformOp = Exclude<OpNode['op'], 'copy'>
+
 export interface MappingConfig {
   /** JSON Schema URI — always "https://civitasconnect.digital/core/mapping/v1" */
   $schema?: string
-  /**
-   * Versioned CORE URN of the source DataStructure, built via
-   * `buildDataStructureUrn` from `@/utils/urn`.
-   */
+  /** Versioned CORE URN of the source DataStructure, as the registry pinned the version. */
   source?: string
-  /**
-   * Versioned CORE URN of the target DataStructure, built via
-   * `buildDataStructureUrn` from `@/utils/urn`.
-   */
+  /** Versioned CORE URN of the target DataStructure, as the registry pinned the version. */
   target?: string
   fields: Record<string, ValueNode>
   positions: Record<string, { x: number; y: number }>

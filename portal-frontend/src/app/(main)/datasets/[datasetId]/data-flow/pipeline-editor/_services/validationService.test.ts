@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Pipeline, PipelineNode } from '../_types/pipeline'
 import { createEmptyPipeline } from './pipelineService'
-import { isValidNifiCron, validatePipeline } from './validationService'
+import { isValidNifiCron, type PipelineValidationContext, validatePipeline } from './validationService'
 
 interface TestNode {
   id: string
@@ -285,6 +285,51 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
     expect(errors[0].messageParams?.path).toBe('$.serialNumber')
   })
 
+  const creatableLocationFields = {
+    '$.Locations[].name': '$.loc',
+    '$.Locations[].description': '$.d',
+    '$.Locations[].encodingType': '$.e',
+    '$.Locations[].location': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
+  }
+  const WITH_LOCATION_BAG = { ...MATCH_KEYS, locationBag: ['$.Locations[].properties.reference'] }
+
+  it('accepts the Location reference once the structure models the Location bag', () => {
+    const result = validatePipeline(
+      wiredToFrost(
+        staMapping(
+          {
+            ...creatableThingFields,
+            ...creatableLocationFields,
+            '$.Locations[].properties.reference': '$.siteRef',
+          },
+          WITH_LOCATION_BAG,
+        ),
+      ),
+    )
+    expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
+  })
+
+  it('rejects the Location reference on a snapshot without the Location bag', () => {
+    const result = validatePipeline(
+      wiredToFrost(staMapping({ ...creatableThingFields, '$.Locations[].properties.reference': '$.siteRef' })),
+    )
+    const errors = result.errors.filter(e => e.messageKey === UNKNOWN_KEY)
+    expect(errors.map(error => error.messageParams?.path)).toEqual(['$.Locations[].properties.reference'])
+  })
+
+  it('rejects the whole Location properties: a free object is no target', () => {
+    const result = validatePipeline(
+      wiredToFrost(
+        staMapping(
+          { ...creatableThingFields, ...creatableLocationFields, '$.Locations[].properties': '$.siteProps' },
+          WITH_LOCATION_BAG,
+        ),
+      ),
+    )
+    const errors = result.errors.filter(e => e.messageKey === UNKNOWN_KEY)
+    expect(errors.map(error => error.messageParams?.path)).toEqual(['$.Locations[].properties'])
+  })
+
   it('accepts a full creatable chain including optional observation paths', () => {
     const result = validatePipeline(
       wiredToFrost(
@@ -313,40 +358,56 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
     expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
   })
 
-  it('accepts the optional properties bags and extra observation fields', () => {
+  it('accepts the attributes of modelled classes and extra observation fields', () => {
+    const modelled = {
+      ...MATCH_KEYS,
+      modelledPaths: [
+        '$.Datastreams[].Sensor.properties.vendor',
+        '$.Datastreams[].Observations[].resultQuality.accuracy',
+      ],
+    }
     const result = validatePipeline(
       wiredToFrost(
-        staMapping({
-          ...creatableThingFields,
-          '$.Locations[].name': '$.loc',
-          '$.Locations[].description': '$.d',
-          '$.Locations[].encodingType': '$.e',
-          '$.Locations[].location': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
-          '$.Locations[].properties': '$.meta',
-          '$.Datastreams[].properties.reference': '$.ref',
-          '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
-          '$.Datastreams[].Observations[].resultQuality': '$.q',
-          '$.Datastreams[].Observations[].validTime': '$.valid',
-        }),
+        staMapping(
+          {
+            ...creatableThingFields,
+            ...creatableLocationFields,
+            '$.Datastreams[].properties.reference': '$.ref',
+            '$.Datastreams[].Sensor.properties.vendor': '$.vendor',
+            '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
+            '$.Datastreams[].Observations[].resultQuality.accuracy': '$.q',
+            '$.Datastreams[].Observations[].validTime': '$.valid',
+          },
+          modelled,
+        ),
       ),
     )
     expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
   })
 
   const FEATURE_OF_INTEREST_KEY = 'validation.messages.frostMappingFeatureOfInterestNeedsObservation'
+  const FEATURE_KEY = 'validation.messages.frostMappingFeatureOfInterestNeedsFeature'
+  const WITH_FEATURE = { ...MATCH_KEYS, modelledPaths: ['$.Datastreams[].Observations[].FeatureOfInterest.feature'] }
 
   it('rejects a FeatureOfInterest without a mapped Observation', () => {
     expect(
       has(
         wiredToFrost(
-          staMapping({
-            '$.properties.reference': '$.ref',
-            '$.Datastreams[].properties.reference': '$.ref',
-            '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
-            '$.Datastreams[].Observations[].FeatureOfInterest.description': '$.d',
-            '$.Datastreams[].Observations[].FeatureOfInterest.encodingType': '$.e',
-            '$.Datastreams[].Observations[].FeatureOfInterest.feature': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
-          }),
+          staMapping(
+            {
+              '$.properties.reference': '$.ref',
+              '$.Datastreams[].properties.reference': '$.ref',
+              '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
+              '$.Datastreams[].Observations[].FeatureOfInterest.description': '$.d',
+              '$.Datastreams[].Observations[].FeatureOfInterest.encodingType': '$.e',
+              '$.Datastreams[].Observations[].FeatureOfInterest.feature': {
+                op: 'geoPoint',
+                lon: '$.lon',
+                lat: '$.lat',
+              },
+            },
+            WITH_FEATURE,
+          ),
         ),
         FEATURE_OF_INTEREST_KEY,
       ),
@@ -369,21 +430,43 @@ describe.skip('validateFrostMappingCoversStaGroups', () => {
     ).toBe(true)
   })
 
-  it('accepts an Observation with a fully mapped FeatureOfInterest', () => {
+  it('accepts an Observation with a fully mapped FeatureOfInterest and its modelled feature', () => {
     const result = validatePipeline(
       wiredToFrost(
-        staMapping({
-          '$.properties.reference': '$.ref',
-          '$.Datastreams[].properties.reference': '$.ref',
-          '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
-          '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
-          '$.Datastreams[].Observations[].FeatureOfInterest.description': '$.d',
-          '$.Datastreams[].Observations[].FeatureOfInterest.encodingType': '$.e',
-          '$.Datastreams[].Observations[].FeatureOfInterest.feature': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
-        }),
+        staMapping(
+          {
+            '$.properties.reference': '$.ref',
+            '$.Datastreams[].properties.reference': '$.ref',
+            '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
+            '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
+            '$.Datastreams[].Observations[].FeatureOfInterest.description': '$.d',
+            '$.Datastreams[].Observations[].FeatureOfInterest.encodingType': '$.e',
+            '$.Datastreams[].Observations[].FeatureOfInterest.feature': { op: 'geoPoint', lon: '$.lon', lat: '$.lat' },
+          },
+          WITH_FEATURE,
+        ),
       ),
     )
     expect(result.errors.filter(e => e.messageKey.startsWith('validation.messages.frostMapping'))).toEqual([])
+  })
+
+  it('rejects a FeatureOfInterest without its feature', () => {
+    // FROST refuses a FeatureOfInterest without one.
+    expect(
+      has(
+        wiredToFrost(
+          staMapping({
+            '$.properties.reference': '$.ref',
+            '$.Datastreams[].properties.reference': '$.ref',
+            '$.Datastreams[].Observations[].result': { op: 'toFloat', input: '$.temp' },
+            '$.Datastreams[].Observations[].FeatureOfInterest.name': '$.n',
+            '$.Datastreams[].Observations[].FeatureOfInterest.description': '$.d',
+            '$.Datastreams[].Observations[].FeatureOfInterest.encodingType': '$.e',
+          }),
+        ),
+        FEATURE_KEY,
+      ),
+    ).toBe(true)
   })
 
   it('exempts the FROST-final mapping from the unconditional required-fields rule', () => {
@@ -806,10 +889,9 @@ describe('validateMappingDataShape', () => {
 })
 
 describe('validateEdgeCompatibility', () => {
-  it('rejects a records source feeding an unmapped FROST sink, anchored at the sink', () => {
+  it('accepts a records source feeding an unmapped FROST sink (its records carry the port structure)', () => {
     const pipeline = graph([sourceAt('src-1', 'SQL'), frostAt('frost-1')], [{ source: 'src-1', target: 'frost-1' }])
-    const errors = errorsFor(pipeline, 'sqlSourceToFrost').filter(error => error.elementId === 'frost-1')
-    expect(errors).toHaveLength(1)
+    expect(errorsFor(pipeline, 'edgeFormIncompatible')).toEqual([])
   })
 
   it('accepts a records source feeding a FROST sink through a wired mapping', () => {
@@ -820,22 +902,11 @@ describe('validateEdgeCompatibility', () => {
         { source: 'map-1', target: 'frost-1' },
       ],
     )
-    expect(errorsFor(pipeline, 'sqlSourceToFrost')).toEqual([])
     expect(errorsFor(pipeline, 'edgeFormIncompatible')).toEqual([])
   })
 
-  it('judges mapped-upstream by wiring, not by a mapping existing elsewhere on the canvas', () => {
-    const pipeline = graph(
-      [sourceAt('src-1', 'SQL'), mappingAt('map-1'), frostAt('frost-1')],
-      [{ source: 'src-1', target: 'frost-1' }],
-    )
-    const errors = errorsFor(pipeline, 'sqlSourceToFrost').filter(error => error.elementId === 'frost-1')
-    expect(errors).toHaveLength(1)
-  })
-
-  it('accepts an envelope source feeding an unmapped FROST sink (passthrough)', () => {
+  it('accepts an MQTT source feeding an unmapped FROST sink (the engine inserts the convert)', () => {
     const pipeline = graph([sourceAt('src-1', 'MQTT'), frostAt('frost-1')], [{ source: 'src-1', target: 'frost-1' }])
-    expect(errorsFor(pipeline, 'sqlSourceToFrost')).toEqual([])
     expect(errorsFor(pipeline, 'edgeFormIncompatible')).toEqual([])
   })
 
@@ -846,8 +917,40 @@ describe('validateEdgeCompatibility', () => {
 
   it('skips the check when the source form cannot be determined (unknown connector)', () => {
     const pipeline = graph([sourceAt('src-1'), frostAt('frost-1')], [{ source: 'src-1', target: 'frost-1' }])
-    expect(errorsFor(pipeline, 'sqlSourceToFrost')).toEqual([])
     expect(errorsFor(pipeline, 'edgeFormIncompatible')).toEqual([])
+  })
+})
+
+describe('a pipeline without a mapping', () => {
+  const sinks = { FROST: frostAt('sink-1'), PostGIS: geoAt('sink-1') }
+
+  const withoutMapping = (connector: 'MQTT' | 'SQL', sink: TestNode) =>
+    connector === 'SQL'
+      ? graph(
+          [startNode, cronAt('cron-1'), sourceAt('src-1', connector), sink, endNode],
+          [
+            { source: 'start-1', target: 'cron-1' },
+            { source: 'cron-1', target: 'src-1' },
+            { source: 'src-1', target: 'sink-1' },
+            { source: 'sink-1', target: 'end-1' },
+          ],
+        )
+      : graph(
+          [startNode, sourceAt('src-1', connector), sink, endNode],
+          [
+            { source: 'start-1', target: 'src-1' },
+            { source: 'src-1', target: 'sink-1' },
+            { source: 'sink-1', target: 'end-1' },
+          ],
+        )
+
+  it.each([
+    ['MQTT', 'FROST'],
+    ['MQTT', 'PostGIS'],
+    ['SQL', 'FROST'],
+    ['SQL', 'PostGIS'],
+  ] as const)('accepts a %s source connected directly to a %s sink', (connector, sink) => {
+    expect(validatePipeline(withoutMapping(connector, sinks[sink])).errors).toEqual([])
   })
 })
 
@@ -932,5 +1035,63 @@ describe('validateCronAndMappingWired', () => {
       ],
     )
     expect(validatePipeline(pipeline).errors.some(error => error.messageKey === NOT_WIRED_KEY)).toBe(false)
+  })
+})
+
+describe('validateUniqueGeoPersistenceTableNames', () => {
+  const DUPLICATE_KEY = 'validation.messages.duplicateTableName'
+
+  const geoWithTable = (id: string, tableName: string): TestNode => ({
+    id,
+    type: 'geoPersistence',
+    data: { label: id, configured: true, entityType: 'persistence', tableName },
+  })
+
+  const duplicateErrors = (pipeline: Pipeline, context?: PipelineValidationContext) =>
+    validatePipeline(pipeline, context).errors.filter(error => error.messageKey === DUPLICATE_KEY)
+
+  it('flags the second node of a duplicate pair with its own pipeline name', () => {
+    const pipeline = pipelineWith([geoWithTable('geo-1', 'roads'), geoWithTable('geo-2', 'roads')])
+    const errors = duplicateErrors(pipeline)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('geo-2')
+    expect(errors[0].messageParams).toEqual({ tableName: 'roads', pipeline: pipeline.name })
+  })
+
+  it('compares trimmed and case-insensitively, like the backend', () => {
+    const pipeline = pipelineWith([geoWithTable('geo-1', 'roads'), geoWithTable('geo-2', ' Roads ')])
+    expect(duplicateErrors(pipeline)).toHaveLength(1)
+  })
+
+  it('accepts distinct names and ignores nodes without a name', () => {
+    const pipeline = pipelineWith([
+      geoWithTable('geo-1', 'roads'),
+      geoWithTable('geo-2', 'rivers'),
+      geoWithTable('geo-3', ''),
+      geoWithTable('geo-4', '  '),
+    ])
+    expect(duplicateErrors(pipeline)).toEqual([])
+  })
+
+  it('names the other pipeline for a name used outside this one', () => {
+    const pipeline = pipelineWith([geoWithTable('geo-1', 'Roads')])
+    const errors = duplicateErrors(pipeline, { tableNameOwners: { roads: 'Water' } })
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('geo-1')
+    expect(errors[0].messageParams).toEqual({ tableName: 'Roads', pipeline: 'Water' })
+  })
+
+  it('reports every node of a name used twice here and elsewhere', () => {
+    const pipeline = pipelineWith([geoWithTable('geo-1', 'roads'), geoWithTable('geo-2', 'roads')])
+    const errors = duplicateErrors(pipeline, { tableNameOwners: { roads: 'Water' } })
+    expect(errors.map(error => [error.elementId, error.messageParams?.pipeline])).toEqual([
+      ['geo-1', 'Water'],
+      ['geo-2', pipeline.name],
+    ])
+  })
+
+  it('accepts a pipeline whose names are not used elsewhere', () => {
+    const pipeline = pipelineWith([geoWithTable('geo-1', 'roads')])
+    expect(duplicateErrors(pipeline, { tableNameOwners: { rivers: 'Water' } })).toEqual([])
   })
 })

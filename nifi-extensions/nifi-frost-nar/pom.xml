@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>de.civitas-core</groupId>
+		<artifactId>nifi-extensions-parent</artifactId>
+		<version>${revision}</version>
+	</parent>
+
+	<artifactId>nifi-frost-nar</artifactId>
+	<packaging>nar</packaging>
+
+	<name>Civitas NiFi FROST NAR</name>
+	<description>NiFi archive that carries the FROST processors into a NiFi installation</description>
+
+	<properties>
+		<!-- The NAR carries no sources of its own; the processors module is the code. -->
+		<maven.javadoc.skip>true</maven.javadoc.skip>
+		<source.skip>true</source.skip>
+	</properties>
+
+	<dependencies>
+		<dependency>
+			<groupId>de.civitas-core</groupId>
+			<artifactId>nifi-frost-processors</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+
+		<!-- The parent NAR. It supplies the controller-service API the processor declares
+		     (WebClientServiceProvider) from a classloader both sides share; bundling a second copy
+		     inside this NAR would make every cast across the service boundary fail. -->
+		<dependency>
+			<groupId>org.apache.nifi</groupId>
+			<artifactId>nifi-standard-services-api-nar</artifactId>
+			<version>${nifi.version}</version>
+			<type>nar</type>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.nifi</groupId>
+				<artifactId>nifi-nar-maven-plugin</artifactId>
+				<extensions>true</extensions>
+			</plugin>
+		</plugins>
+	</build>
+</project>

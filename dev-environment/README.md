@@ -18,8 +18,7 @@ dev-environment/
 ├── frost/      # FROST IoT Server
 ├── trino-superset/ # Dashboard stack (Trino + Superset)
 ├── geoserver/  # GeoServer OGC Services (OWS)
-├── nifi/       # Apache NiFi (data integration / pipeline engine)
-└── modelatlas/ # Model Atlas
+└── nifi/       # Apache NiFi (data integration / pipeline engine)
 ```
 
 ---

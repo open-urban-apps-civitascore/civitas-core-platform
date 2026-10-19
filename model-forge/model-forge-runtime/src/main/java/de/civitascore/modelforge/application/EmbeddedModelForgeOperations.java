@@ -1,0 +1,858 @@
+package de.civitascore.modelforge.application;
+
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
+import de.civitascore.modelforge.facade.ModelForge;
+import de.civitascore.modelforge.contract.ArtifactId;
+import de.civitascore.modelforge.contract.ArtifactSearchQuery;
+import de.civitascore.modelforge.contract.ArtifactSummary;
+import de.civitascore.modelforge.contract.ArtifactKind;
+import de.civitascore.modelforge.contract.ArtifactView;
+import de.civitascore.modelforge.contract.ArtifactWriteResult;
+import de.civitascore.modelforge.contract.BumpVersionCommand;
+import de.civitascore.modelforge.contract.CreateArtifactCommand;
+import de.civitascore.modelforge.contract.DependencyClosureView;
+import de.civitascore.modelforge.contract.DependencyGraphView;
+import de.civitascore.modelforge.contract.DependencyQuery;
+import de.civitascore.modelforge.contract.Diagnostic;
+import de.civitascore.modelforge.contract.DiagnosticSeverity;
+import de.civitascore.modelforge.contract.ImportResult;
+import de.civitascore.modelforge.contract.ImportSchemaCommand;
+import de.civitascore.modelforge.contract.ImportSmartDataModelCommand;
+import de.civitascore.modelforge.contract.ImportXRepositoryCommand;
+import de.civitascore.modelforge.contract.NonConformingArtifact;
+import de.civitascore.modelforge.contract.RootCheck;
+import de.civitascore.modelforge.contract.SaveArtifactCommand;
+import de.civitascore.modelforge.contract.SchemaViewQuery;
+import de.civitascore.modelforge.contract.ValidateInstanceCommand;
+import de.civitascore.modelforge.contract.ValidateSchemaCommand;
+import de.civitascore.modelforge.contract.ValidationFailedException;
+import de.civitascore.modelforge.contract.ValidationResult;
+import de.civitascore.modelforge.contract.VersionBump;
+import de.civitascore.modelforge.contract.XRepositoryHit;
+import de.civitascore.modelforge.contract.XRepositorySearchQuery;
+import de.civitascore.modelforge.graph.DependencyGraphService;
+import de.civitascore.modelforge.graph.SchemaRefExtractor;
+import de.civitascore.modelforge.core.port.ArtifactRegistry;
+import de.civitascore.modelforge.util.JsonSchema;
+import de.civitascore.modelforge.core.port.ArtifactSearchCriteria;
+import de.civitascore.modelforge.urn.UrnParser;
+import de.civitascore.modelforge.urn.UrnService;
+import de.civitascore.modelforge.validation.CoreSchemaValidator;
+import de.civitascore.modelforge.validation.ModelValidator;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+public class EmbeddedModelForgeOperations implements ModelForge {
+
+    private static final org.slf4j.Logger LOG =
+        org.slf4j.LoggerFactory.getLogger(EmbeddedModelForgeOperations.class);
+
+    private static final SchemaRefExtractor REF_EXTRACTOR = new SchemaRefExtractor();
+
+    private final SchemaImportService schemaImportService;
+    private final ElementQueryService elementQueryService;
+    private final ElementCommandService elementCommandService;
+    private final ViewService viewService;
+    private final ModelValidator modelValidator;
+    private final CoreSchemaValidator coreSchemaValidator;
+    private final ReferenceExistenceValidator referenceExistenceValidator;
+    private final DependencyGraphService dependencyGraph;
+    private final ArtifactRegistry registry;
+    private final SmartDataModelsService smartDataModelsService;
+    private final XRepositoryService xRepositoryService;
+    private final UrnService urns;
+
+    public EmbeddedModelForgeOperations(
+        SchemaImportService schemaImportService,
+        ElementQueryService elementQueryService,
+        ElementCommandService elementCommandService,
+        ViewService viewService,
+        ModelValidator modelValidator,
+        CoreSchemaValidator coreSchemaValidator,
+        ReferenceExistenceValidator referenceExistenceValidator,
+        DependencyGraphService dependencyGraph,
+        ArtifactRegistry registry,
+        SmartDataModelsService smartDataModelsService,
+        XRepositoryService xRepositoryService,
+        UrnService urns
+    ) {
+        this.schemaImportService = schemaImportService;
+        this.elementQueryService = elementQueryService;
+        this.elementCommandService = elementCommandService;
+        this.viewService = viewService;
+        this.modelValidator = modelValidator;
+        this.coreSchemaValidator = coreSchemaValidator;
+        this.referenceExistenceValidator = referenceExistenceValidator;
+        this.dependencyGraph = dependencyGraph;
+        this.registry = registry;
+        this.smartDataModelsService = smartDataModelsService;
+        this.xRepositoryService = xRepositoryService;
+        this.urns = urns;
+    }
+
+    @Override
+    public ImportResult importSchema(ImportSchemaCommand command) {
+        JsonNode schema = command.dataStructureId() == null
+            ? command.schema()
+            : underHostId(command.schema(), command.dataStructureId());
+        var response = schemaImportService.importSchema(new SchemaImportRequest(
+            schema, command.version(), command.preserveVersion(), command.bump(),
+            command.bumpFromVersion()));
+        return toImportResult(response, "Schema import validation failed");
+    }
+
+    /**
+     * The document with a URN of {@code id} as its {@code $id} and no {@code $id} on its members, so
+     * the import derives every member's URN from {@code id}. A member keeping an authored {@code $id}
+     * could name an Element of another DataStructure and overwrite it.
+     *
+     * <p>Only a pure {@code $defs} library is folded into the DataStructure; the fold keeps no root
+     * shape.
+     */
+    private JsonNode underHostId(JsonNode schema, UUID id) {
+        if (!(schema instanceof ObjectNode object)) {
+            return schema;
+        }
+        ObjectNode copy = object.deepCopy();
+        String urn = SchemaImportService.isDefsLibrary(object) ? urns.dataStructure(id) : urns.element(id);
+        copy.put("$id", UrnParser.logicalUrn(urn));
+        if (copy.get("$defs") instanceof ObjectNode defs) {
+            dropEmbeddedCopies(defs);
+            defs.properties().forEach(member -> {
+                if (member.getValue() instanceof ObjectNode def) {
+                    def.remove("$id");
+                }
+            });
+        }
+        return copy;
+    }
+
+    /**
+     * Removes the members that are copies of an Element another member references, as a bundled view
+     * embeds them. Without its {@code $id}, such a copy would become a member of its own.
+     */
+    private static void dropEmbeddedCopies(ObjectNode defs) {
+        Set<String> referenced = new LinkedHashSet<>();
+        defs.properties().forEach(member -> {
+            String ref = SchemaImportService.bareReference(member.getValue());
+            if (ref != null) {
+                referenced.add(UrnParser.logicalUrn(ref));
+            }
+        });
+        List<String> copies = defs.properties().stream()
+            .filter(member -> member.getValue().size() > 1
+                && referenced.contains(UrnParser.logicalUrn(member.getValue().path("$id").asText(""))))
+            .map(Map.Entry::getKey)
+            .toList();
+        copies.forEach(defs::remove);
+    }
+
+    @Override
+    public ImportResult importFromSmartDataModels(ImportSmartDataModelCommand command) {
+        var response = smartDataModelsService.importModel(command.subject(), command.dataModel());
+        return toImportResult(response, "Smart Data Model import validation failed");
+    }
+
+    @Override
+    public List<XRepositoryHit> searchXRepository(XRepositorySearchQuery query) {
+        var page = xRepositoryService.search(query.query(), query.page(), query.size());
+        return page.items().stream()
+            .map(hit -> new XRepositoryHit(
+                hit.identifier(),
+                hit.parentIdentifier(),
+                hit.name(),
+                hit.version(),
+                hit.description(),
+                hit.kind(),
+                hit.status()
+            ))
+            .toList();
+    }
+
+    @Override
+    public ImportResult importFromXRepository(ImportXRepositoryCommand command) {
+        var response = xRepositoryService.importArtifact(new XRepositoryImportCommand(
+            command.identifier(),
+            command.version(),
+            command.scope(),
+            command.owner(),
+            command.importAsXsd(),
+            command.preserveUpstreamVersion()
+        ));
+        return toImportResult(response, "XRepository import validation failed");
+    }
+
+    /**
+     * Maps a {@link SchemaImportResult} to the facade's {@link ImportResult}, shared by every
+     * import entry point ({@link #importSchema}, {@link #importFromSmartDataModels},
+     * {@link #importFromXRepository}) — same failure handling, same
+     * root-plus-every-created-Element shape.
+     *
+     * @throws ValidationFailedException when the import reported any error diagnostic
+     */
+    private ImportResult toImportResult(SchemaImportResult response, String failureMessage) {
+        if (hasErrors(response.diagnostics())) {
+            throw new ValidationFailedException(failureMessage, response.diagnostics());
+        }
+        var root = pinFromResult(response.resourceId());
+        var imported = response.importedResourceIds().stream().map(this::pinFromResult).toList();
+        return new ImportResult(root, imported, dependenciesOf(root));
+    }
+
+    @Override
+    public Optional<ArtifactView> getArtifact(ArtifactId artifactId) {
+        return elementQueryService.rawJsonSchema(artifactId.value())
+            .map(content -> new ArtifactView(artifactId, content));
+    }
+
+    @Override
+    public Optional<ArtifactView> getBundledView(SchemaViewQuery query) {
+        var content = query.maxDepth() != null
+            ? viewService.bundle(query.artifactId().value(), query.maxDepth())
+            : viewService.bundle(query.artifactId().value());
+        return content.map(c -> new ArtifactView(query.artifactId(), c));
+    }
+
+    @Override
+    public Optional<ArtifactView> getInlinedView(SchemaViewQuery query) {
+        var content = query.maxDepth() != null
+            ? viewService.inline(query.artifactId().value(), query.maxDepth())
+            : viewService.inline(query.artifactId().value());
+        return content.map(c -> new ArtifactView(query.artifactId(), c));
+    }
+
+    @Override
+    public ValidationResult validateSchema(ValidateSchemaCommand command) {
+        return validationResult(modelValidator.validateSchema(command.schema()));
+    }
+
+    @Override
+    public ValidationResult validateInstance(ValidateInstanceCommand command) {
+        return validationResult(modelValidator.validateData(command.schema(), command.instance()));
+    }
+
+    @Override
+    public RootCheck checkRoot(ArtifactId artifactId) {
+        String urn = artifactId.value();
+        String type = UrnParser.artifactTypeFromUrn(urn);
+        if ("element".equals(type)) {
+            if (!registry.heldUrns(List.of(urn)).contains(urn)) {
+                throw new IllegalArgumentException("No Element " + urn + " in the registry");
+            }
+            return new RootCheck.Rooted();
+        }
+        if (!"datastructure".equals(type)) {
+            throw new IllegalArgumentException(
+                "Only an Element or a DataStructure has a root; " + urn + " is a " + type);
+        }
+        JsonNode dataStructure = elementQueryService.rawJsonSchema(urn)
+            .orElseThrow(() -> new IllegalArgumentException("No DataStructure " + urn + " in the registry"));
+        return rootCheckOf(dataStructure);
+    }
+
+    private RootCheck rootCheckOf(JsonNode dataStructure) {
+        Map<String, Member> membersByLogicalUrn = new LinkedHashMap<>();
+        dataStructure.path("$defs").properties().forEach(def -> {
+            String member = def.getValue().path("$ref").asText(null);
+            if (UrnParser.isUrn(member)) {
+                membersByLogicalUrn.put(UrnParser.logicalUrn(member), new Member(def.getKey(), member));
+            }
+        });
+        String root = dataStructure.path("$ref").asText(null);
+        if (!UrnParser.isUrn(root) || !membersByLogicalUrn.containsKey(UrnParser.logicalUrn(root))) {
+            return new RootCheck.NoRoot();
+        }
+        Set<String> reached = membersReachedFrom(UrnParser.logicalUrn(root), membersByLogicalUrn);
+        List<String> unreachable = membersByLogicalUrn.entrySet().stream()
+            .filter(member -> !reached.contains(member.getKey()))
+            .map(member -> member.getValue().name())
+            .toList();
+        return unreachable.isEmpty() ? new RootCheck.Rooted() : new RootCheck.UnreachableMembers(unreachable);
+    }
+
+    private Set<String> membersReachedFrom(String rootLogicalUrn, Map<String, Member> membersByLogicalUrn) {
+        Set<String> reached = new LinkedHashSet<>(List.of(rootLogicalUrn));
+        Deque<String> pending = new ArrayDeque<>(reached);
+        while (!pending.isEmpty()) {
+            Member member = membersByLogicalUrn.get(pending.pop());
+            elementQueryService.rawJsonSchema(member.urn()).ifPresent(content -> {
+                for (String ref : REF_EXTRACTOR.extractRefs(content)) {
+                    String target = UrnParser.logicalUrn(ref);
+                    if (membersByLogicalUrn.containsKey(target) && reached.add(target)) {
+                        pending.push(target);
+                    }
+                }
+            });
+        }
+        return reached;
+    }
+
+    private record Member(String name, String urn) {}
+
+    @Override
+    public DependencyGraphView dependencies(DependencyQuery query) {
+        var source = query.artifactId();
+        var targetUrns = query.maxDepth() != null
+            ? dependencyGraph.getTransitiveDependencies(source.value(), query.maxDepth())
+            : dependencyGraph.getDependencies(source.value());
+        var targets = targetUrns.stream().map(ArtifactId::new).toList();
+        var ids = new ArrayList<ArtifactId>();
+        ids.add(source);
+        ids.addAll(targets);
+        var nodes = labelled(ids);
+        var edges = targets.stream()
+            .map(target -> new DependencyGraphView.Edge(source, target, "depends-on"))
+            .toList();
+        return new DependencyGraphView(nodes, edges);
+    }
+
+    @Override
+    public DependencyGraphView dependents(DependencyQuery query) {
+        var source = query.artifactId();
+        var originUrns = query.maxDepth() != null
+            ? dependencyGraph.getTransitiveDependents(source.value(), query.maxDepth())
+            : dependencyGraph.getDependents(source.value());
+        var origins = originUrns.stream().map(ArtifactId::new).toList();
+        var ids = new ArrayList<ArtifactId>();
+        ids.add(source);
+        ids.addAll(origins);
+        var nodes = labelled(ids);
+        var edges = origins.stream()
+            .map(origin -> new DependencyGraphView.Edge(origin, source, "depends-on"))
+            .toList();
+        return new DependencyGraphView(nodes, edges);
+    }
+
+    @Override
+    public Set<ArtifactId> existing(Collection<ArtifactId> artifactIds) {
+        if (artifactIds == null || artifactIds.isEmpty()) {
+            return Set.of();
+        }
+        Set<String> held = registry.heldUrns(artifactIds.stream()
+            .filter(Objects::nonNull)
+            .map(ArtifactId::value)
+            .toList());
+        return artifactIds.stream()
+            .filter(id -> id != null && held.contains(id.value()))
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    /** Publishes a write's edges under its pin; only a registry double returns none. */
+    private void registerWritten(String pin, String requestUrn) {
+        dependencyGraph.registerFromRegistry(pin != null && !pin.isBlank() ? pin : requestUrn);
+    }
+
+    @Override
+    public DependencyClosureView closure(DependencyQuery query) {
+        if (query.maxDepth() == null) {
+            throw new IllegalArgumentException("A closure query must state its maxDepth");
+        }
+        ArtifactId root = query.artifactId();
+        String rootLogical = UrnParser.logicalUrn(root.value());
+        // The walk surfaces the root itself when a cycle leads back to it, and a cycle may reach a
+        // different version of it. The closure is what the root participates in, so drop the whole
+        // root artifact by logical identity.
+        var walk = dependencyGraph.getTransitiveDependenciesBounded(root.value(), query.maxDepth());
+        List<String> members = walk.visited()
+            .stream()
+            .filter(urn -> !rootLogical.equals(UrnParser.logicalUrn(urn)))
+            .toList();
+        // The graph hands back a pinned target without looking it up, so a pin whose version was
+        // never stored reaches here unverified. One probe answers for the whole closure.
+        Set<String> held = registry.heldUrns(members);
+        return new DependencyClosureView(
+            root,
+            members.stream().map(ArtifactId::new).toList(),
+            members.stream().filter(urn -> !held.contains(urn)).map(ArtifactId::new).toList(),
+            walk.truncated());
+    }
+
+    @Override
+    public DependencyGraphView mapsTo(DependencyQuery query) {
+        return mappingEdges(query.artifactId(), "source", "target", "maps-to");
+    }
+
+    @Override
+    public DependencyGraphView mappedFrom(DependencyQuery query) {
+        return mappingEdges(query.artifactId(), "target", "source", "mapped-from");
+    }
+
+    /**
+     * Builds a small two-hop graph around {@code artifactId}'s mapping relations: an edge to each
+     * mapping that references it in the given {@code role}, and — when the mapping also names the
+     * other side — an edge from that mapping to the other artifact, so the visible graph shows the
+     * actual data flow ({@code Element -> Mapping -> Element}) rather than just "used in a mapping".
+     */
+    private DependencyGraphView mappingEdges(ArtifactId artifactId, String role, String otherKey, String mappingRelation) {
+        List<Map<String, String>> rows = registry.mappingsForElement(artifactId.value(), role);
+        var ids = new ArrayList<ArtifactId>();
+        var edges = new ArrayList<DependencyGraphView.Edge>();
+        ids.add(artifactId);
+        for (Map<String, String> row : rows) {
+            String mappingUrn = row.get("mapping");
+            if (mappingUrn == null) continue;
+            var mappingId = new ArtifactId(mappingUrn);
+            ids.add(mappingId);
+            edges.add("source".equals(role)
+                ? new DependencyGraphView.Edge(artifactId, mappingId, "source-of")
+                : new DependencyGraphView.Edge(mappingId, artifactId, "target-of"));
+            String otherUrn = row.get(otherKey);
+            if (otherUrn != null) {
+                var otherId = new ArtifactId(otherUrn);
+                ids.add(otherId);
+                edges.add("source".equals(role)
+                    ? new DependencyGraphView.Edge(mappingId, otherId, mappingRelation)
+                    : new DependencyGraphView.Edge(otherId, mappingId, mappingRelation));
+            }
+        }
+        return new DependencyGraphView(labelled(ids), edges);
+    }
+
+    /**
+     * Graph nodes labelled with each artifact's display name. The URN carries none, so the names are
+     * read from the registry in one lookup; an artifact it does not hold is labelled with its URN.
+     */
+    private List<DependencyGraphView.Node> labelled(List<ArtifactId> ids) {
+        Map<String, String> names = registry.displayNames(
+            ids.stream().map(id -> UrnParser.logicalUrn(id.value())).toList());
+        return ids.stream()
+            .map(id -> new DependencyGraphView.Node(id,
+                names.getOrDefault(UrnParser.logicalUrn(id.value()), id.value())))
+            .toList();
+    }
+
+    @Override
+    public List<ArtifactSummary> search(ArtifactSearchQuery query) {
+        var criteria = new ArtifactSearchCriteria(
+            query.text(),
+            false,
+            query.type(),
+            query.format(),
+            null,
+            null,
+            query.limit() > 0 ? query.limit() : 50,
+            Math.max(query.offset(), 0)
+        );
+        return registry.searchArtifacts(criteria).stream()
+            .map(hit -> new ArtifactSummary(
+                new ArtifactId(hit.id()),
+                                hit.type(),
+                hit.title(),
+                hit.version(),
+                hit.format()
+            ))
+            .toList();
+    }
+
+    @Override
+    public ArtifactWriteResult createArtifact(CreateArtifactCommand command) {
+        if (command.kind() == ArtifactKind.ELEMENT) {
+            throw new IllegalArgumentException(
+                "Elements are created through importSchema, which mints the URN and splits $defs "
+                + "into their own Elements.");
+        }
+        String urn = urns.urn(typeSegmentFor(command.kind()),
+            command.id() != null ? command.id() : UUID.randomUUID());
+        var content = command.content();
+        if (content.isObject()) {
+            tools.jackson.databind.node.ObjectNode stamped =
+                (tools.jackson.databind.node.ObjectNode) content.deepCopy();
+            stamped.put("id", urn);
+            content = stamped;
+        }
+        JsonNode created = content;
+        return registry.inTransaction(() -> {
+            ArtifactWriteResult result = saveArtifact(
+                new SaveArtifactCommand(
+                    new ArtifactId(urn), command.kind(), created, VersionBump.PATCH, command.dataSet()));
+            // The URN carries no name, so the display name a search and the graph show is recorded
+            // beside it.
+            if (JsonSchema.usableTitle(created) == null) {
+                registry.nameArtifact(urn, command.name());
+            }
+            return result;
+        });
+    }
+
+    @Override
+    public ArtifactWriteResult saveArtifact(SaveArtifactCommand command) {
+        String urn = command.artifactId().value();
+        // Stamp the CORE $schema for the opaque payload kinds (Mapping/Pipeline/DataSource/DataSink)
+        // so the stored document self-describes and satisfies its schema's required:["$schema"].
+        // DataStructure/DataSet keep the JSON-Schema meta-schema $schema they already carry; Element
+        // is never stamped. All non-Element writes flow through here, so this is the single choke point.
+        JsonNode content = command.content();
+        String schemaUri = CoreSchemaValidator.schemaUriToStamp(command.kind());
+        if (schemaUri != null && content != null && content.isObject()) {
+            // Model Forge owns identity + self-description: stamp $schema AND id on EVERY write of an
+            // opaque payload kind (create and re-version), so the host never stamps either. (Create
+            // also stamps id in createArtifact; re-version relies on this.)
+            tools.jackson.databind.node.ObjectNode stamped =
+                (tools.jackson.databind.node.ObjectNode) content.deepCopy();
+            stamped.put("$schema", schemaUri);
+            stamped.put("id", urn);
+            content = stamped;
+        }
+        // Mandatory structural validation: every artifact must satisfy the CORE schema for its kind
+        // (Element excepted — it is an arbitrary JSON Schema validated on import). No more opt-in.
+        List<Diagnostic> violations = coreSchemaValidator.validate(command.kind(), content);
+        if (violations.stream().anyMatch(d -> d.severity() == DiagnosticSeverity.ERROR)) {
+            LOG.warn("Artifact {} ({}) rejected by its CORE schema: {}", urn, command.kind(), violations);
+            throw new ValidationFailedException(
+                "Artifact does not satisfy its CORE schema", violations);
+        }
+        // x-core-ref foreign keys are existence-checked on every write, not just on import: a save
+        // may introduce a new reference, so the target must resolve now too. The check keys off the
+        // content (it only does work when the document actually carries x-core-ref), so it needs no
+        // artifact-kind branch; a lone save has no co-imported corpus beyond the artifact itself.
+        List<Diagnostic> unresolvedRefs = referenceExistenceValidator.checkForeignKeys(
+            content, Set.of(UrnParser.logicalUrn(urn)));
+        if (!unresolvedRefs.isEmpty()) {
+            throw new ValidationFailedException(
+                "Artifact has unresolved x-core-ref foreign keys", unresolvedRefs);
+        }
+        var bump = command.versionBump() == null ? VersionBump.PATCH : command.versionBump();
+        // Every write returns the concrete versioned URN (pin) the registry assigned INSIDE the
+        // write itself — no read-back, so the pin is correct even when the write runs inside a
+        // surrounding, not-yet-committed host transaction.
+        String assigned = switch (command.kind()) {
+            // An Element is stored as JSON Schema or as XSD depending on its representation format,
+            // recognised from the content: a textual node carries a raw XSD document, a JSON object
+            // is a JSON Schema. Both share the format-agnostic :element: URN and register their graph
+            // edges inside ElementCommandService. storeJsonSchema() only backfills $id when the
+            // content has none, so content round-tripped from a fetched (pinned-version) artifact
+            // would keep its stale versioned $id and silently defeat the version bump; the caller's
+            // urn is the authoritative target identity, so always re-point $id at it (withoutId).
+            case ELEMENT -> content.isTextual()
+                ? elementCommandService.storeXsd(urn, content.asText(), bump)
+                : elementCommandService.storeJsonSchema(urn, withoutId(content), bump,
+                    command.bumpFromVersion());
+            // The non-Element kinds store straight through the registry, which extracts and
+            // persists their per-type reference edges (Mapping source/target, Pipeline nodes,
+            // DataStructure/DataSet *Refs). registerFromRegistry() then mirrors those durable
+            // edges into the in-memory graph so dependencies()/dependents() see them. It is given
+            // the pin the write returned, never the request URN.
+            case DATA_STRUCTURE -> { String p = registry.storeDataStructure(urn, content, bump); registerWritten(p, urn); yield p; }
+            case MAPPING -> { String p = registry.storeMapping(urn, content, bump); registerWritten(p, urn); yield p; }
+            case PIPELINE -> { String p = registry.storePipeline(urn, content, bump); registerWritten(p, urn); yield p; }
+            case DATA_SOURCE -> { String p = registry.storeDataSource(urn, content, bump); registerWritten(p, urn); yield p; }
+            case DATA_SINK -> { String p = registry.storeDataSink(urn, content, bump); registerWritten(p, urn); yield p; }
+            case DATA_SET -> { String p = registry.storeDataSet(urn, content, bump); registerWritten(p, urn); yield p; }
+        };
+        // Defensive fallback (a registry double may return nothing): the honest unversioned
+        // logical URN — deliberately NOT a resolveReference read-back.
+        var pin = new ArtifactId(assigned != null && !assigned.isBlank()
+            ? assigned : UrnParser.logicalUrn(urn));
+        // DataSet membership: when the write requested it, link this artifact into the DataSet's
+        // manifest (dataset-ref edges). A Pipeline drags its whole reference closure in too — the
+        // sources/sinks/mappings it uses and, transitively, their DataStructures. A DataSet manifest
+        // is never itself linked into a DataSet.
+        if (command.dataSet() != null && command.kind() != ArtifactKind.DATA_SET) {
+            java.util.Map<String, ArtifactKind> members = new java.util.LinkedHashMap<>();
+            members.put(pin.value(), command.kind());
+            if (command.kind() == ArtifactKind.PIPELINE) {
+                collectMemberDeps(pin.value(), members);
+            }
+            linkMembersIntoDataSet(command.dataSet(), members);
+        }
+        return new ArtifactWriteResult(pin, dependenciesOf(pin));
+    }
+
+    /**
+     * Recursively collects the DataSet-member artifacts that {@code urn} references (via the stored
+     * reference edges), classifying each by its CORE artifact type. Used to drag a Pipeline's whole
+     * reference closure (sources/sinks/mappings and, transitively, their DataStructures) into a
+     * DataSet. Non-member kinds (e.g. Element) are skipped.
+     */
+    private void collectMemberDeps(String urn, java.util.Map<String, ArtifactKind> out) {
+        for (String dep : registry.fetchArtifactRefUrns(urn)) {
+            ArtifactKind kind = memberKindOf(dep);
+            if (kind == null || out.containsKey(dep)) {
+                continue;
+            }
+            out.put(dep, kind);
+            collectMemberDeps(dep, out);
+        }
+    }
+
+    /** The DataSet-member ArtifactKind for a CORE URN, or {@code null} for a non-member kind. */
+    private static ArtifactKind memberKindOf(String urn) {
+        return switch (UrnParser.artifactTypeFromUrn(urn) == null ? "" : UrnParser.artifactTypeFromUrn(urn)) {
+            case "pipeline" -> ArtifactKind.PIPELINE;
+            case "mapping" -> ArtifactKind.MAPPING;
+            case "datasource" -> ArtifactKind.DATA_SOURCE;
+            case "datasink" -> ArtifactKind.DATA_SINK;
+            case "datastructure" -> ArtifactKind.DATA_STRUCTURE;
+            default -> null;
+        };
+    }
+
+    /** The DataSet manifest {@code *Refs} field for a member kind, or {@code null} if not a member. */
+    private static String refFieldFor(ArtifactKind kind) {
+        return switch (kind) {
+            case PIPELINE -> "pipelineRefs";
+            case DATA_SOURCE -> "dataSourceRefs";
+            case DATA_SINK -> "dataSinkRefs";
+            case MAPPING -> "mappingRefs";
+            case DATA_STRUCTURE -> "datastructureRefs";
+            case DATA_SET, ELEMENT -> null;
+        };
+    }
+
+    /**
+     * Adds each member (by its logical URN, in the {@code *Refs} array matching its kind) to
+     * {@code dataSetUrn}'s manifest and re-stores it once — the {@code dataset-ref} edges that make
+     * them DataSet members. Members already listed are skipped; the manifest is re-stored only when it
+     * actually changed (so re-saving an existing member mints no new manifest version). A no-op
+     * (logged) when the DataSet manifest does not exist.
+     */
+    private void linkMembersIntoDataSet(String dataSetUrn, java.util.Map<String, ArtifactKind> members) {
+        Optional<ArtifactView> manifest = getArtifact(new ArtifactId(dataSetUrn));
+        if (manifest.isEmpty() || manifest.get().content() == null || !manifest.get().content().isObject()) {
+            LOG.warn("DataSet {} not found (or not an object); cannot link members {}", dataSetUrn, members.keySet());
+            return;
+        }
+        tools.jackson.databind.node.ObjectNode doc =
+            (tools.jackson.databind.node.ObjectNode) manifest.get().content().deepCopy();
+        boolean changed = false;
+        for (var entry : members.entrySet()) {
+            String field = refFieldFor(entry.getValue());
+            if (field == null) {
+                continue;
+            }
+            String memberLogical = UrnParser.logicalUrn(entry.getKey());
+            tools.jackson.databind.node.ArrayNode refs =
+                doc.get(field) instanceof tools.jackson.databind.node.ArrayNode a ? a : doc.putArray(field);
+            boolean present = false;
+            for (JsonNode existing : refs) {
+                if (memberLogical.equals(UrnParser.logicalUrn(existing.asText()))) {
+                    present = true;
+                    break;
+                }
+            }
+            if (!present) {
+                requireOwnMapping(dataSetUrn, entry.getValue(), memberLogical);
+                refs.add(memberLogical);
+                changed = true;
+            }
+        }
+        if (changed) {
+            saveArtifact(new SaveArtifactCommand(
+                new ArtifactId(UrnParser.logicalUrn(dataSetUrn)), ArtifactKind.DATA_SET, doc, VersionBump.MINOR));
+        }
+    }
+
+    /**
+     * A Mapping belongs to one Data Set — membership is the only condition that lets a caller read
+     * one, so a second link would grant that read. A Mapping that does not exist is refused in the
+     * same words, or the difference would tell a caller which URNs are taken.
+     */
+    private void requireOwnMapping(String dataSetUrn, ArtifactKind kind, String memberLogical) {
+        if (kind != ArtifactKind.MAPPING) {
+            return;
+        }
+        String own = UrnParser.logicalUrn(dataSetUrn);
+        boolean ours = registry.fetch(memberLogical).isPresent()
+            && registry.dataSetMemberships(memberLogical).stream()
+                .allMatch(holder -> own.equals(UrnParser.logicalUrn(holder)));
+        if (!ours) {
+            throw new ValidationFailedException(
+                "Mapping " + memberLogical + " is not a Mapping of this Data Set", List.of());
+        }
+    }
+
+    /**
+     * The pin for an import result: when the service carried the registry-assigned versioned URN
+     * through (the write itself returned it), use it verbatim. Only a version-less resource id —
+     * e.g. from a registry double that returned no pin — falls back to {@link #pinnedId}.
+     */
+    private ArtifactId pinFromResult(String resourceId) {
+        String version = resourceId == null ? null : UrnParser.versionFromUrn(resourceId);
+        if (version != null && !UrnParser.LATEST.equals(version)) {
+            return new ArtifactId(resourceId);
+        }
+        return pinnedId(resourceId);
+    }
+
+    /**
+     * Fallback pin resolution for results that carry no registry-assigned versioned URN: reads
+     * the current version back via {@link ArtifactRegistry#resolveReference}. Note this read-back
+     * may not see a write made in a surrounding, not-yet-committed host transaction — which is
+     * exactly why the write paths return their pin directly and this is a fallback only.
+     * Falls back to the logical URN when resolution yields nothing.
+     */
+    private ArtifactId pinnedId(String urnHint) {
+        String logical = UrnParser.logicalUrn(urnHint);
+        return new ArtifactId(registry.resolveReference(logical).orElse(logical));
+    }
+
+    /**
+     * The written version's outgoing reference edges, grouped by stored reference type in
+     * document order — the HAL-link-style dependency lists a host mirrors into its own
+     * persistence. Read back from the registry after the write, so the lists reflect exactly
+     * what the reference extraction persisted for this version.
+     */
+    private Map<String, List<ArtifactId>> dependenciesOf(ArtifactId pin) {
+        Map<String, List<ArtifactId>> byType = new java.util.LinkedHashMap<>();
+        registry.referencesByType(pin.value()).forEach((rel, targets) ->
+            byType.put(rel, targets.stream().map(ArtifactId::new).toList()));
+        return byType;
+    }
+
+    @Override
+    public ArtifactWriteResult bumpVersion(BumpVersionCommand command) {
+        String urn = command.artifactId().value();
+        // A pinned identity is refused rather than reinterpreted: bumping from a version that is not
+        // current has no sound answer, and bumping from the current one instead would quietly ignore
+        // the version the caller named. :latest names the current version and is accepted.
+        if (!UrnParser.isLatest(urn) && UrnParser.versionFromUrn(urn) != null) {
+            throw new IllegalArgumentException(
+                "bumpVersion needs a logical URN; " + urn + " pins a version. "
+                + "Bump the artifact, then store the pin the bump returns.");
+        }
+        String logical = UrnParser.logicalUrn(urn);
+        String assigned = registry.bumpVersion(logical, command.bump());
+        registerWritten(assigned, logical);
+        var pin = new ArtifactId(assigned != null && !assigned.isBlank() ? assigned : logical);
+        return new ArtifactWriteResult(pin, dependenciesOf(pin));
+    }
+
+    @Override
+    public void deleteArtifact(ArtifactId artifactId, boolean cascade, boolean force) {
+        elementCommandService.delete(artifactId.value(), cascade, force);
+    }
+
+    @Override
+    public List<String> deletionBlockers(ArtifactId artifactId) {
+        String root = artifactId.value();
+        // Every artifact this one would take with it, each kept as the owner pinned it so a member's
+        // version is known. A caller naming one version asks about that version alone.
+        Set<String> removedTogether = deleteClosure(root);
+        Set<String> logicalOfSet = removedTogether.stream()
+            .map(UrnParser::logicalUrn)
+            .collect(Collectors.toCollection(HashSet::new));
+        boolean dataStructure = ElementCommandService.isDataStructure(root);
+        // An Element another version contains is part of the same Data Structure, not a user of it:
+        // its $ref names no version, so it holds this version's member as much as its own.
+        if (dataStructure) {
+            logicalOfSet.addAll(registry.dataStructureMembersOfAnyVersion(root));
+        }
+        // A reference held from inside the set is removed by the same delete, so only a referrer
+        // outside it stands in the way — a grouping does not block the Elements it owns.
+        List<String> blockers = removedTogether.stream()
+            .flatMap(member -> registry
+                .nonDataSetBlockingDependents(member, UrnParser.versionFromUrn(member)).stream())
+            .filter(blocker -> !logicalOfSet.contains(UrnParser.logicalUrn(blocker)))
+            .distinct()
+            .toList();
+        // A Data Structure's Data Set memberships are not counted, see ElementCommandService#delete.
+        if (!blockers.isEmpty() || dataStructure) {
+            return blockers;
+        }
+        List<String> memberships = registry.dataSetMemberships(root);
+        return memberships.size() >= 2 ? memberships : List.of();
+    }
+
+    /**
+     * The artifact and, transitively, the artifacts it owns — what one cascading delete removes.
+     * Each entry keeps the version the owner pinned, so a blocker query can ask about that version.
+     */
+    private Set<String> deleteClosure(String rootUrn) {
+        Set<String> closure = new LinkedHashSet<>();
+        Deque<String> pending = new ArrayDeque<>();
+        pending.add(rootUrn);
+        while (!pending.isEmpty()) {
+            String current = pending.poll();
+            if (closure.add(current)) {
+                pending.addAll(
+                    registry.ownedMemberUrns(current, UrnParser.versionFromUrn(current)));
+            }
+        }
+        return closure;
+    }
+
+    @Override
+    public List<ArtifactSummary> orphans(ArtifactKind kind) {
+        // Artifacts of this kind with no dataset-ref in-edge — search by type, then keep only those
+        // the registry reports as members of zero DataSets.
+        return search(new ArtifactSearchQuery(null, typeSegmentFor(kind), null, Integer.MAX_VALUE, 0)).stream()
+            .filter(summary -> registry.dataSetMemberships(summary.artifactId().value()).isEmpty())
+            .toList();
+    }
+
+    @Override
+    public List<NonConformingArtifact> nonConformingElements() {
+        // Only the stored JSON Schema representation can be meta-validated; an XSD Element has no
+        // JSON Schema to check, and fetch() returns nothing for it, so it drops out here.
+        return search(new ArtifactSearchQuery(null, typeSegmentFor(ArtifactKind.ELEMENT), null, Integer.MAX_VALUE, 0))
+            .stream()
+            .flatMap(summary -> elementQueryService.rawJsonSchema(summary.artifactId().value())
+                .map(schema -> modelValidator.validateSchema(schema).stream()
+                    .filter(d -> d.severity() == DiagnosticSeverity.ERROR)
+                    .toList())
+                .filter(diagnostics -> !diagnostics.isEmpty())
+                .map(diagnostics -> new NonConformingArtifact(
+                    summary.artifactId(), summary.title(), diagnostics))
+                .stream())
+            .toList();
+    }
+
+    @Override
+    public void linkToDataSet(ArtifactId dataSet, ArtifactId member) {
+        ArtifactKind kind = memberKindOf(member.value());
+        if (kind == null) {
+            throw new IllegalArgumentException("Not a DataSet-member artifact: " + member.value());
+        }
+        linkMembersIntoDataSet(dataSet.value(), java.util.Map.of(member.value(), kind));
+    }
+
+    @Override
+    public void unlinkFromDataSet(ArtifactId dataSet, ArtifactId member) {
+        elementCommandService.unlinkFromDataSet(
+            UrnParser.logicalUrn(dataSet.value()), UrnParser.logicalUrn(member.value()));
+    }
+
+    /** The registry {@code artifact_type} segment for a kind (matches the CORE URN's type segment). */
+    private static String typeSegmentFor(ArtifactKind kind) {
+        return switch (kind) {
+            case MAPPING -> "mapping";
+            case PIPELINE -> "pipeline";
+            case DATA_SOURCE -> "datasource";
+            case DATA_SINK -> "datasink";
+            case DATA_STRUCTURE -> "datastructure";
+            case DATA_SET -> "dataset";
+            case ELEMENT -> "element";
+        };
+    }
+
+    private static JsonNode withoutId(JsonNode content) {
+        if (content instanceof tools.jackson.databind.node.ObjectNode object) {
+            var copy = object.deepCopy();
+            copy.remove("$id");
+            return copy;
+        }
+        return content;
+    }
+
+    private static ValidationResult validationResult(List<Diagnostic> diagnostics) {
+        return ValidationResult.of(diagnostics);
+    }
+
+    private static boolean hasErrors(List<Diagnostic> diagnostics) {
+        return diagnostics.stream()
+            .anyMatch(diagnostic -> diagnostic.severity() == DiagnosticSeverity.ERROR);
+    }
+}

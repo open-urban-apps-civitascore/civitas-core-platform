@@ -1,0 +1,28 @@
+<html xmlns:wicket="http://wicket.apache.org">
+<body>
+<wicket:extend>
+  <h2>Artifact dependency graph</h2>
+  <div class="mf-graph-toolbar">
+    <input type="search" id="mf-graph-search" class="mf-graph-search" placeholder="Filter by name or URN…"
+           aria-label="Filter graph by name or URN" autocomplete="off" />
+    <div class="mf-graph-legend">
+      <label class="mf-graph-type"><input type="checkbox" data-group="element" checked />
+        <span class="legend-dot legend-dot--element">&#9679;</span> Element</label>
+      <label class="mf-graph-type"><input type="checkbox" data-group="datastructure" checked />
+        <span class="legend-dot legend-dot--datastructure">&#9679;</span> DataStructure</label>
+      <label class="mf-graph-type"><input type="checkbox" data-group="mapping" checked />
+        <span class="legend-dot legend-dot--mapping">&#9679;</span> Mapping</label>
+      <label class="mf-graph-type"><input type="checkbox" data-group="pipeline" checked />
+        <span class="legend-dot legend-dot--pipeline">&#9679;</span> Pipeline</label>
+      <label class="mf-graph-type"><input type="checkbox" data-group="datasource" checked />
+        <span class="legend-dot legend-dot--datasource">&#9679;</span> DataSource</label>
+      <label class="mf-graph-type"><input type="checkbox" data-group="datasink" checked />
+        <span class="legend-dot legend-dot--datasink">&#9679;</span> DataSink</label>
+      <label class="mf-graph-type"><input type="checkbox" data-group="dataset" checked />
+        <span class="legend-dot legend-dot--dataset">&#9679;</span> DataSet</label>
+    </div>
+  </div>
+  <div id="modelforge-graph" class="graph-canvas"></div>
+</wicket:extend>
+</body>
+</html>

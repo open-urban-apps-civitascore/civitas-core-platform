@@ -120,6 +120,9 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
     if (isNewUser) {
       requiredActions.add("VERIFY_EMAIL");
       requiredActions.add("UPDATE_PASSWORD");
+      if (keycloakProperties.enforceOtp()) {
+        requiredActions.add("CONFIGURE_TOTP");
+      }
     }
 
     boolean hasEmailChanged = !Objects.equals(entity.getEmail(), input.getEmail());
@@ -225,16 +228,5 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   @Override
   protected String getConfigPath() {
     return "/users";
-  }
-
-  /**
-   * Extracts the entity ID from the user, used for correlation in config adapter events.
-   *
-   * @param entity the user entity
-   * @return the user's UUID
-   */
-  @Override
-  protected UUID getEntityId(User entity) {
-    return entity.getId();
   }
 }

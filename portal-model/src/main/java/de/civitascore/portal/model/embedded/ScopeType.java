@@ -20,9 +20,6 @@ public enum ScopeType {
   /** Dataset scope for data roles. Requires scope ID. */
   DATASET,
 
-  /** Datacatalogue scope for data roles. Requires scope ID. */
-  CATALOG,
-
   /** DataPool scope for data roles. Requires scope ID. */
   DATAPOOL,
 }

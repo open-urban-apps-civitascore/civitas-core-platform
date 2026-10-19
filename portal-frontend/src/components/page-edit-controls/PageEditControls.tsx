@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { StatusTypes } from '@/types/common'
 
 import { ActionButtons, ActionButtonsProps } from '../action-buttons/ActionButtons'
+import { InUseIndicator } from '../in-use-indicator/InUseIndicator'
 import { StatusDropdown } from '../status-dropdown/StatusDropdown'
 import { Button } from '../ui/button'
 
@@ -15,6 +16,7 @@ type PageEditControlsProps<T extends StatusTypes> = ActionButtonsProps & {
   isReadOnly: boolean
   formId?: string
   canEdit?: boolean
+  isInUseByReleased?: boolean
   statusProps?: {
     status: T
     onStatusChange: (status: T) => void
@@ -36,6 +38,7 @@ const PageEditControls = <T extends StatusTypes>(props: PageEditControlsProps<T>
     isReadOnly = true,
     formId,
     canEdit = true,
+    isInUseByReleased = false,
     statusProps,
     ...actionButtonsProps
   } = props
@@ -49,7 +52,10 @@ const PageEditControls = <T extends StatusTypes>(props: PageEditControlsProps<T>
         wrapperClassname,
       )}
     >
-      {statusProps && <StatusDropdown {...statusProps} isReadOnly={isReadOnly} />}
+      <div className="flex items-center gap-2">
+        <InUseIndicator isInUseByReleased={isInUseByReleased} />
+        {statusProps && <StatusDropdown {...statusProps} isReadOnly={isReadOnly} />}
+      </div>
 
       <div>
         {!isReadOnly ? (

@@ -29,11 +29,11 @@ VALUES
   ('c2222222-2222-2222-2222-222222222222', 'Editors Group', 'Group for data editors', NOW());
 
 -- Create test users
-INSERT INTO users (id, external_id, email, first_name, last_name, active, created_at)
+INSERT INTO users (id, external_id, email, first_name, last_name, created_at)
 VALUES
-  ('d1111111-1111-1111-1111-111111111111', 'e0000001-0000-0000-0000-000000000001', 'reader@test.com', 'Test', 'Reader', true, NOW()),
-  ('d2222222-2222-2222-2222-222222222222', 'e0000002-0000-0000-0000-000000000002', 'editor@test.com', 'Test', 'Editor', true, NOW()),
-  ('d3333333-3333-3333-3333-333333333333', 'e0000003-0000-0000-0000-000000000003', 'nogroups@test.com', 'No', 'Groups', true, NOW());
+  ('d1111111-1111-1111-1111-111111111111', 'e0000001-0000-0000-0000-000000000001', 'reader@test.com', 'Test', 'Reader', NOW()),
+  ('d2222222-2222-2222-2222-222222222222', 'e0000002-0000-0000-0000-000000000002', 'editor@test.com', 'Test', 'Editor', NOW()),
+  ('d3333333-3333-3333-3333-333333333333', 'e0000003-0000-0000-0000-000000000003', 'nogroups@test.com', 'No', 'Groups', NOW());
 
 -- Add users to groups
 INSERT INTO group_members (user_id, group_id)
@@ -66,18 +66,18 @@ VALUES
   ('c3333333-3333-3333-3333-333333333333', 'Empty Assignments Group', 'Group with no role assignments', NOW());
 
 -- User in group with no assignments
-INSERT INTO users (id, external_id, email, first_name, last_name, active, created_at)
+INSERT INTO users (id, external_id, email, first_name, last_name, created_at)
 VALUES
-  ('d4444444-4444-4444-4444-444444444444', 'e0000004-0000-0000-0000-000000000004', 'empty-assignments@test.com', 'Empty', 'Assignments', true, NOW());
+  ('d4444444-4444-4444-4444-444444444444', 'e0000004-0000-0000-0000-000000000004', 'empty-assignments@test.com', 'Empty', 'Assignments', NOW());
 
 INSERT INTO group_members (user_id, group_id)
 VALUES
   ('d4444444-4444-4444-4444-444444444444', 'c3333333-3333-3333-3333-333333333333');
 
 -- User with role that has no permissions
-INSERT INTO users (id, external_id, email, first_name, last_name, active, created_at)
+INSERT INTO users (id, external_id, email, first_name, last_name, created_at)
 VALUES
-  ('d5555555-5555-5555-5555-555555555555', 'e0000005-0000-0000-0000-000000000005', 'empty-perms@test.com', 'Empty', 'Permissions', true, NOW());
+  ('d5555555-5555-5555-5555-555555555555', 'e0000005-0000-0000-0000-000000000005', 'empty-perms@test.com', 'Empty', 'Permissions', NOW());
 
 INSERT INTO groups (id, name, description, created_at)
 VALUES
@@ -122,9 +122,9 @@ VALUES
   ('b5555555-5555-5555-5555-555555555555', 'accccccc-cccc-cccc-cccc-cccccccccccc'),
   ('b5555555-5555-5555-5555-555555555555', 'addddddd-dddd-dddd-dddd-dddddddddddd');
 
-INSERT INTO users (id, external_id, email, first_name, last_name, active, created_at)
+INSERT INTO users (id, external_id, email, first_name, last_name, created_at)
 VALUES
-  ('d6666666-6666-6666-6666-666666666666', 'e0000006-0000-0000-0000-000000000006', 'many-perms@test.com', 'Many', 'Permissions', true, NOW());
+  ('d6666666-6666-6666-6666-666666666666', 'e0000006-0000-0000-0000-000000000006', 'many-perms@test.com', 'Many', 'Permissions', NOW());
 
 INSERT INTO groups (id, name, description, created_at)
 VALUES
@@ -139,9 +139,9 @@ VALUES
   ('e5555555-5555-5555-5555-555555555555', 'c5555555-5555-5555-5555-555555555555', 'b5555555-5555-5555-5555-555555555555', 'TENANT', NOW());
 
 -- User with same role at different scopes
-INSERT INTO users (id, external_id, email, first_name, last_name, active, created_at)
+INSERT INTO users (id, external_id, email, first_name, last_name, created_at)
 VALUES
-  ('d7777777-7777-7777-7777-777777777777', 'e0000007-0000-0000-0000-000000000007', 'multi-scope@test.com', 'Multi', 'Scope', true, NOW());
+  ('d7777777-7777-7777-7777-777777777777', 'e0000007-0000-0000-0000-000000000007', 'multi-scope@test.com', 'Multi', 'Scope', NOW());
 
 INSERT INTO groups (id, name, description, created_at)
 VALUES

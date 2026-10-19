@@ -25,7 +25,7 @@
       "addLabels": ["cop frontend", "team data mgmt"]
     },
     {
-      "description": "Backend dependencies (Spring Boot)",
+      "description": "Backend dependencies (Spring Boot). The OpenAPI bot (.gitlab/ci/scripts/update-openapi-spec.mjs) also takes its reviewers from this rule.",
       "matchFileNames": ["portal-backend/**"],
       "dependencyDashboardApproval": false,
       "commitMessagePrefix": "chore(backend):",

@@ -8,9 +8,8 @@ import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
 import de.civitascore.portal.model.output.DatapoolScopeOutputDTO;
-import de.civitascore.portal.repository.PipelineRepository;
-import de.civitascore.portal.service.connector.ConnectorHandler;
-import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
+import de.civitascore.portal.service.ArtifactUsageLookup;
+import de.civitascore.portal.service.connector.DataSourceConnectorStore;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -25,8 +24,8 @@ import org.springframework.stereotype.Component;
 public class DataSourceAssembler implements BaseAssembler<DataSource, DataSourceOutputDTO, UUID> {
 
   private final DataSourceMapper dataSourceMapper;
-  private final ConnectorHandlerRegistry connectorHandlerRegistry;
-  private final PipelineRepository pipelineRepository;
+  private final ArtifactUsageLookup artifactUsageLookup;
+  private final DataSourceConnectorStore connectorStore;
 
   /** {@inheritDoc} Delegates to the {@link DataSourceMapper} for basic field mapping. */
   @Override
@@ -35,31 +34,25 @@ public class DataSourceAssembler implements BaseAssembler<DataSource, DataSource
   }
 
   /**
-   * {@inheritDoc} Sets the {@code inUse} flag and populates the {@code datapoolScope} from the
-   * entity's scope type and associated Datapools.
+   * {@inheritDoc} Sets the {@code inUse} and {@code inUseByReleased} flags, populates the {@code
+   * datapoolScope} from the entity's scope type and associated Datapools, and serves the stored
+   * connector.
    */
   @Override
   public DataSourceOutputDTO enrichDto(DataSourceOutputDTO dto, DataSource entity) {
-    dto.setInUse(pipelineRepository.existsByDataSourcesId(entity.getId()));
+    ArtifactUsageLookup.ArtifactUsage usage = artifactUsageLookup.of(entity);
+    dto.setInUse(usage.inUse());
+    dto.setInUseByReleased(usage.inUseByReleased());
     dto.setDatapoolScope(buildDatapoolScopeOutput(entity));
+    dto.setConnector(connectorStore.read(entity));
+    dto.setConfigurationUrn(entity.getConfigurationUrn());
     return dto;
   }
 
   /**
-   * {@inheritDoc} Redacts sensitive connector configuration fields via the appropriate {@link
-   * ConnectorHandler}.
+   * {@inheritDoc} Converts a data source entity back to its input DTO for PATCH operations. The
+   * connector is left out: the controller derives it from the patch and the stored connector.
    */
-  @Override
-  public DataSourceOutputDTO postProcessOutput(DataSourceOutputDTO dto, DataSource entity) {
-    if (dto.getConfiguration() != null && entity.getConnectorType() != null) {
-      ConnectorHandler handler =
-          connectorHandlerRegistry.getHandlerOrThrow(entity.getConnectorType());
-      dto.setConfiguration(handler.prepareForOutput(dto.getConfiguration()));
-    }
-    return dto;
-  }
-
-  /** {@inheritDoc} Converts a data source entity back to its input DTO for PATCH operations. */
   @Override
   @SuppressWarnings("unchecked")
   public <I> I toInput(DataSource entity) {

@@ -12,6 +12,7 @@ import {
   useUpdateDatasourceReleased,
 } from '@/app/services/api/datasources/clientRequests'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
+import { DataSourceDraftSchema } from '@/generated/core'
 import { useError } from '@/hooks/use-error'
 import { ConnectorFormToApiSchema, ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
 import { Datapool } from '@/types/datapools'
@@ -24,13 +25,15 @@ import {
   DatasourceFormAvailableSchema,
   DatasourceFormDraft,
   DatasourceFormDraftSchema,
+  DatasourceMetaPatchData,
   DatasourcePatchData,
   DatasourceStatusType,
   DatasourceTab,
 } from '@/types/datasources'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
 import { getConnectorDefaults } from '@/utils/connectors'
-import { pickDirtyValues } from '@/utils/form'
+import { isDatastructureNotAvailableError, isResourceInUseError } from '@/utils/errors'
+import { hasDirtyField, pickDirtyValues } from '@/utils/form'
 
 export const useDatasourceForm = (
   datasource: Datasource,
@@ -110,6 +113,13 @@ export const useDatasourceForm = (
   const isDraftMode = dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
   const hasStatusChanged = dataSourceStatus !== datasource.dataSourceStatus
 
+  // A data source a released dataset's pipeline still reads from cannot be unreleased — the backend
+  // rejects POST /unrelease with 409 RESOURCE_IN_USE (requireNoReleasedReferrer). Draft referrers do
+  // not block it. Gate the option here so the transition is refused before the user stages an
+  // unsaveable change.
+  const isInUseByReleased = datasource.inUseByReleased
+  const canSetDraft = !isInUseByReleased
+
   // Zod v4 discriminatedUnion safeParse can throw on stale keys
   const canStage = useMemo(() => {
     try {
@@ -134,14 +144,14 @@ export const useDatasourceForm = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectorTypeWatch, isDraftMode])
 
-  // Revert to draft when required fields become empty
+  // Revert to draft when required fields become empty — but never for an in-use data source
   useEffect(() => {
-    if (dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE && !canStage) {
+    if (dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE && !canStage && canSetDraft) {
       form.setValue('dataSourceStatus', DATASOURCE_STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canStage, dataSourceStatus, form])
+  }, [canStage, canSetDraft, dataSourceStatus, form])
 
   const completedTabs = useMemo((): DatasourceTab[] => {
     const completed: DatasourceTab[] = []
@@ -176,9 +186,20 @@ export const useDatasourceForm = (
       toast.success(tCommon('success.statusChangeSuccess'))
       return response.data
     } catch (error) {
-      toast.error(tCommon('errors.statusChangeError'))
+      if (isResourceInUseError(error)) {
+        toast.error(t('errors.inUseError'))
+      } else if (isDatastructureNotAvailableError(error)) {
+        toast.error(t('errors.datastructureNotAvailableError'))
+      } else {
+        toast.error(tCommon('errors.statusChangeError'))
+      }
       throw error
     }
+  }
+
+  const toReleasedPayload = (values: DatasourcePatchData): DatasourceMetaPatchData => {
+    const { id, description, datapoolScope, assignments } = values
+    return { id, name: nameWatch, description, datapoolScope, assignments }
   }
 
   const handleUpdateValues = async (values: DatasourcePatchData) => {
@@ -187,7 +208,7 @@ export const useDatasourceForm = (
     try {
       const response =
         datasource.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
-          ? await updateReleasedDatasource.mutateAsync({ ...values, name: nameWatch })
+          ? await updateReleasedDatasource.mutateAsync(toReleasedPayload(values))
           : await updateDatasource.mutateAsync(values)
 
       toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.datasource') }))
@@ -212,13 +233,33 @@ export const useDatasourceForm = (
     }
 
     const dirtyFields = form.formState.dirtyFields
-    const dirtyValues = pickDirtyValues(parsed.data as Record<string, unknown>, dirtyFields)
+    const {
+      connectorType: _connectorType,
+      configuration: _configuration,
+      dataSourceStatus: _dataSourceStatus,
+      ...dirtyValues
+    } = pickDirtyValues(parsed.data as Record<string, unknown>, dirtyFields)
 
-    // Transform configuration to API format (needs full values for discriminated union)
-    const connectorParsed = ConnectorFormToApiSchema.safeParse(parsed.data)
-    const configuration = connectorParsed.success
-      ? connectorParsed.data.configuration
-      : (dirtyValues as Record<string, unknown>).configuration
+    // The backend replaces the stored connector when the type differs and merges it otherwise, so
+    // sending every field of the selected type is correct in both cases.
+    const isConnectorDirty = hasDirtyField(dirtyFields.connectorType) || hasDirtyField(dirtyFields.configuration)
+    const connectorParsed = isConnectorDirty ? ConnectorFormToApiSchema.safeParse(parsed.data) : null
+    const connector = connectorParsed?.success ? connectorParsed.data : undefined
+
+    // Validate the outbound CORE DataSource document against the generated schema before sending —
+    // the frontend guarantees a schema-valid payload to the (schema-agnostic) backend, mirroring the
+    // pipeline/mapping editor. Model Forge stamps $schema/id; the backend adds connectionType from the
+    // connectorType, so validate that projection ({connectionType, ...connectorConfig}) here.
+    if (connector) {
+      const { connectorType, ...connectorFields } = connector
+      const coreDoc = { connectionType: connectorType.toLowerCase(), ...connectorFields }
+      const coreValid = DataSourceDraftSchema.safeParse(coreDoc)
+      if (!coreValid.success) {
+        console.error('DataSource configuration failed CORE schema validation:', coreValid.error.issues, coreDoc)
+        handleFormValidationError(coreValid.error)
+        return false
+      }
+    }
 
     const assignmentsPayload = mapGroupRoleAssignmentsToApiPayload(assignedGroups)
     const areAssignmentsDirty = hasAssignmentChanges(assignedGroups, initialAssignments)
@@ -235,14 +276,14 @@ export const useDatasourceForm = (
 
     const apiPayload = {
       ...dirtyValues,
-      ...(dirtyFields.configuration ? { configuration } : {}),
+      ...(connector ? { connector } : {}),
       ...(areAssignmentsDirty ? { assignments: assignmentsPayload } : {}),
       ...datapoolScopePayload,
       id: datasource.id,
     } as DatasourcePatchData
 
     const shouldUpdateValues =
-      Object.keys(dirtyValues).some(key => key !== 'dataSourceStatus') || areAssignmentsDirty || areDatapoolsDirty
+      Object.keys(dirtyValues).length > 0 || !!connector || areAssignmentsDirty || areDatapoolsDirty
     const shouldRelease = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
     const shouldUnrelease = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
 
@@ -282,6 +323,7 @@ export const useDatasourceForm = (
     handleStatusChange,
     isDraftMode,
     canStage,
+    canSetDraft,
     completedTabs,
     submitDatasource,
     resetToInitialState,

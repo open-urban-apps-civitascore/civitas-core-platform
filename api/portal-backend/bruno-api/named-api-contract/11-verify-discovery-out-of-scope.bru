@@ -1,0 +1,58 @@
+meta {
+  name: 11. Verify unknown dataset discovery returns 404
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id/apis
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 00000000-0000-4000-8000-0000000000ff
+}
+
+headers {
+  X-Allowed-Scope-Ids: 00000000-0000-4000-8000-0000000000aa
+}
+
+tests {
+  test("Status code is 404", function() {
+    expect(res.getStatus()).to.equal(404);
+  });
+
+  test("An unreachable dataset is not distinguished by a 403", function() {
+    // 403 would confirm the id exists and merely sits outside the caller's scope.
+    expect(res.getStatus()).to.not.equal(403);
+  });
+
+  test("Client-supplied scope header does not reach the backend", function() {
+    // The header above claims a scope the caller was never granted. The gateway strips it and
+    // substitutes what OPA computed, so it cannot influence the answer — this request resolves
+    // purely on the dataset not existing. Were the header honoured, a caller could forge its own
+    // scope and the 404/403 distinction below would stop meaning anything.
+    expect(res.getStatus()).to.not.equal(200);
+  });
+}
+
+docs {
+  **Contract step 11** — A dataset the caller cannot reach is indistinguishable from one that does
+  not exist.
+
+  The contract is **404, not 403**. A 403 would answer a question the caller is not entitled to ask:
+  it would confirm the id exists and has named APIs, letting an unauthorised caller enumerate valid
+  dataset ids and map the platform's public route surface purely from the difference between the two
+  codes. The scope filter is applied as part of the lookup rather than as a check after it, so the
+  dataset is simply not found.
+
+  The request also carries a forged `X-Allowed-Scope-Ids`. Requests run through the gateway, which
+  strips any client-supplied scope header and replaces it with the one OPA computed, so a caller
+  cannot widen or narrow its own scope. That is asserted here because every other scope-dependent
+  expectation in the collection rests on it.
+
+  **Expected Response:** 404 Not Found, `application/problem+json`.
+
+  **Post-condition:** none.
+}

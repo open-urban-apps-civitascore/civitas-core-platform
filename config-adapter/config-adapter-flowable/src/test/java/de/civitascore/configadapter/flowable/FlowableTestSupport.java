@@ -135,6 +135,25 @@ public final class FlowableTestSupport {
   }
 
   /**
+   * Returns the IDs of the result-publishing tasks the instance reached ({@code publish-success} /
+   * {@code publish-failure}). Distinguishes a saga that reported failure from one that silently
+   * finished or reported success — {@link #assertProcessFinished} cannot.
+   */
+  public static List<String> getPublishedResultTaskIds(
+      HistoryService historyService, String processInstanceId) {
+    return historyService
+        .createHistoricActivityInstanceQuery()
+        .processInstanceId(processInstanceId)
+        .activityType("serviceTask")
+        .finished()
+        .list()
+        .stream()
+        .map(HistoricActivityInstance::getActivityId)
+        .filter(id -> id.startsWith("publish-"))
+        .toList();
+  }
+
+  /**
    * Creates a mock SagaCommandHandler for the given adapter name, pre-stubbed with the field
    * aliases the real adapter would declare. Keeps tests realistic — payload field renaming (e.g.
    * baseUrl→upstreamUrl) happens just like in production.

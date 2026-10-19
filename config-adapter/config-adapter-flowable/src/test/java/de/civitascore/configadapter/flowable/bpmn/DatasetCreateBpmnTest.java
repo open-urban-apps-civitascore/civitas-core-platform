@@ -23,6 +23,7 @@ import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.flowable.FlowableTestSupport;
 import de.civitascore.configadapter.flowable.common.SagaHandlerRegistry;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,9 +58,14 @@ class DatasetCreateBpmnTest {
     geoserverHandler = FlowableTestSupport.mockHandler("geoserver");
     postgisHandler = FlowableTestSupport.mockHandler("postgis");
     supersetHandler = FlowableTestSupport.mockHandler("superset");
+    when(supersetHandler.handle(any()))
+        .thenAnswer(
+            invocation -> {
+              SagaCommandMessage command = invocation.getArgument(0);
+              return SagaCommandResult.success(command.sagaId(), command.stepId(), Map.of(), Map.of());
+            });
     stubGeoserverSuccess();
     stubPostgisSuccess();
-    stubSupersetSuccess();
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);
@@ -118,6 +124,66 @@ class DatasetCreateBpmnTest {
     inOrder.verify(frostHandler).handle(any());
     inOrder.verify(apisixHandler).handle(any());
     verify(pipelineHandler, never()).handle(any());
+  }
+
+  @Test
+  void shouldSkipFrostProjectWhenDatasetHasNoFrostSink() {
+    stubApisixSuccess();
+
+    ProcessInstance instance = startProcessWithGeo(false, false, false, false);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+
+    // A dataset with no FROST sink gets no FROST project — and the route step must still run
+    // without the upstream URL that project would have supplied.
+    verify(frostHandler, never()).handle(any());
+    verify(apisixHandler).handle(any());
+  }
+
+  @Test
+  void shouldSkipFrostCompensationWhenDatasetHasNoFrostSink() {
+    stubApisixFailure("APISIX connection refused");
+
+    ProcessInstance instance = startProcessWithGeo(false, false, false, false);
+    executeAllJobs();
+
+    assertProcessFinished(instance.getId());
+
+    // The route failure routes through the compensation gateway straight to publish-failure: there
+    // is no project to delete, so FROST is never called in either direction. The saga must still
+    // report the failure — skipping compensation is not the same as succeeding.
+    verify(frostHandler, never()).handle(any());
+    assertEquals(
+        List.of("publish-failure"),
+        FlowableTestSupport.getPublishedResultTaskIds(historyService, instance.getId()));
+  }
+
+  @Test
+  void shouldSkipFrostCompensationOnPipelineFailureWithoutFrostSink() {
+    stubApisixSuccess();
+    stubPipelineFailure("Pipeline deployment failed");
+    stubPipelineCompensationSuccess();
+    stubApisixCompensationSuccess();
+
+    ProcessInstance instance = startProcessWithGeo(true, false, false, false);
+    executeAllJobs();
+
+    assertProcessFinished(instance.getId());
+
+    // The route is still rolled back; only the FROST leg is skipped.
+    ArgumentCaptor<SagaCommandMessage> apisixCaptor =
+        ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(apisixHandler, times(2)).handle(apisixCaptor.capture());
+    assertEquals(
+        "DELETE_ROUTE",
+        apisixCaptor.getAllValues().stream()
+            .filter(c -> "COMPENSATE_STEP".equals(c.type()))
+            .findFirst()
+            .orElseThrow()
+            .operation());
+
+    verify(frostHandler, never()).handle(any());
   }
 
   @Test
@@ -236,33 +302,108 @@ class DatasetCreateBpmnTest {
     // Assert execution order via the handlers' actual invocation order (deterministic). Sorting
     // HistoricActivityInstances by start time is flaky: sequential synchronous tasks can share a
     // millisecond timestamp, so workspace/datastore can appear swapped.
-    // PostGIS sink is provisioned first (so the table exists), then the GeoServer steps run,
-    // then Superset registers the table last in the branch.
-    var inOrder =
-        inOrder(frostHandler, apisixHandler, postgisHandler, geoserverHandler, supersetHandler);
+    // PostGIS sink is provisioned first (so the table exists), then the GeoServer steps run.
+    var inOrder = inOrder(frostHandler, apisixHandler, postgisHandler, geoserverHandler);
     inOrder.verify(frostHandler).handle(any());
     inOrder.verify(apisixHandler).handle(any());
     inOrder.verify(postgisHandler).handle(any());
-    inOrder.verify(geoserverHandler, times(3)).handle(any());
-    inOrder.verify(supersetHandler).handle(any());
+    inOrder.verify(geoserverHandler, times(4)).handle(any());
+    verify(supersetHandler).handle(any());
 
     ArgumentCaptor<SagaCommandMessage> sink = ArgumentCaptor.forClass(SagaCommandMessage.class);
     verify(postgisHandler).handle(sink.capture());
     assertEquals("PROVISION_SINK", sink.getValue().operation());
 
     ArgumentCaptor<SagaCommandMessage> geo = ArgumentCaptor.forClass(SagaCommandMessage.class);
-    verify(geoserverHandler, times(3)).handle(geo.capture());
+    verify(geoserverHandler, times(4)).handle(geo.capture());
     assertEquals(
-        List.of("CREATE_WORKSPACE", "CREATE_DATASTORE", "PROVISION_LAYERS"),
+        List.of("CREATE_WORKSPACE", "CREATE_DATASTORE", "PROVISION_LAYERS", "PRUNE_FEATURE_TYPES"),
         geo.getAllValues().stream().map(SagaCommandMessage::operation).toList());
-
     ArgumentCaptor<SagaCommandMessage> superset = ArgumentCaptor.forClass(SagaCommandMessage.class);
     verify(supersetHandler).handle(superset.capture());
     assertEquals("REGISTER_DATASET", superset.getValue().operation());
   }
 
   @Test
-  void shouldSkipLayerProvisioningWhenNoLayers() {
+  void shouldPruneFeatureTypesAfterTheLastFailableStep() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+    stubPipelineSuccess();
+
+    ProcessInstance instance = startProcessWithGeo(true, true, true);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+
+    var inOrder = inOrder(pipelineHandler, geoserverHandler);
+    inOrder.verify(pipelineHandler).handle(any());
+    inOrder
+        .verify(geoserverHandler)
+        .handle(argThat(cmd -> cmd != null && "PRUNE_FEATURE_TYPES".equals(cmd.operation())));
+  }
+
+  @Test
+  void shouldFailAndDeleteTheWorkspaceWhenTheFeatureTypePruneFails() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+    stubApisixCompensationSuccess();
+    stubFrostCompensationSuccess();
+    stubPruneFailure();
+
+    ProcessInstance instance = startProcessWithGeo(false, true, true);
+    executeAllJobs();
+
+    assertProcessFinished(instance.getId());
+    assertEquals(
+        List.of("publish-failure"),
+        FlowableTestSupport.getPublishedResultTaskIds(historyService, instance.getId()));
+    verify(geoserverHandler)
+        .handle(
+            argThat(
+                cmd ->
+                    cmd != null
+                        && "COMPENSATE_STEP".equals(cmd.type())
+                        && "DELETE_WORKSPACE".equals(cmd.operation())));
+    verify(pipelineHandler, never()).handle(any());
+  }
+
+  @Test
+  void shouldCompensatePipelinesFirstWhenTheFeatureTypePruneFails() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+    stubApisixCompensationSuccess();
+    stubFrostCompensationSuccess();
+    stubPipelineSuccess();
+    stubPipelineCompensationSuccess();
+    stubPruneFailure();
+
+    ProcessInstance instance = startProcessWithGeo(true, true, true);
+    executeAllJobs();
+
+    assertProcessFinished(instance.getId());
+    var inOrder = inOrder(pipelineHandler, geoserverHandler);
+    inOrder
+        .verify(pipelineHandler)
+        .handle(argThat(cmd -> cmd != null && "DELETE_PIPELINES".equals(cmd.operation())));
+    inOrder
+        .verify(geoserverHandler)
+        .handle(argThat(cmd -> cmd != null && "DELETE_WORKSPACE".equals(cmd.operation())));
+  }
+
+  @Test
+  void shouldNotCallGeoServerWhenDatasetHasNoGeoSink() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+
+    ProcessInstance instance = startProcess(false);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+    verify(geoserverHandler, never()).handle(any());
+  }
+
+  @Test
+  void shouldPruneEveryFeatureTypeWhenReleasedWithoutLayers() {
     stubFrostSuccess();
     stubApisixSuccess();
 
@@ -276,12 +417,11 @@ class DatasetCreateBpmnTest {
     inOrder.verify(apisixHandler).handle(any());
     inOrder.verify(postgisHandler).handle(any());
 
-    // Only workspace + datastore run; provision-layers is skipped — so exactly 2 geoserver calls,
-    // in invocation order (deterministic, unlike a HistoricActivityInstance start-time sort).
+    // Guards against layers deleted before a re-release staying served.
     ArgumentCaptor<SagaCommandMessage> geo = ArgumentCaptor.forClass(SagaCommandMessage.class);
-    verify(geoserverHandler, times(2)).handle(geo.capture());
+    verify(geoserverHandler, times(3)).handle(geo.capture());
     assertEquals(
-        List.of("CREATE_WORKSPACE", "CREATE_DATASTORE"),
+        List.of("CREATE_WORKSPACE", "CREATE_DATASTORE", "PRUNE_FEATURE_TYPES"),
         geo.getAllValues().stream().map(SagaCommandMessage::operation).toList());
   }
 
@@ -306,15 +446,6 @@ class DatasetCreateBpmnTest {
     SagaCommandMessage compensation = captor.getAllValues().get(3);
     assertEquals("COMPENSATE_STEP", compensation.type());
     assertEquals("DELETE_WORKSPACE", compensation.operation());
-
-    // Superset registered (it ran before the pipeline step), so the pipeline failure must
-    // deregister it too.
-    ArgumentCaptor<SagaCommandMessage> supersetCaptor =
-        ArgumentCaptor.forClass(SagaCommandMessage.class);
-    verify(supersetHandler, times(2)).handle(supersetCaptor.capture());
-    assertEquals(
-        List.of("REGISTER_DATASET", "DEREGISTER_DATASET"),
-        supersetCaptor.getAllValues().stream().map(SagaCommandMessage::operation).toList());
   }
 
   @Test
@@ -352,6 +483,9 @@ class DatasetCreateBpmnTest {
     assertEquals(
         List.of("PROVISION_SINK", "DEPROVISION_SINK"),
         sink.getAllValues().stream().map(SagaCommandMessage::operation).toList());
+    Map<String, Object> deprovision = sink.getAllValues().get(1).payload();
+    assertEquals(List.of("t1"), deprovision.get("createdTables"));
+    assertEquals(true, deprovision.get("createdSchema"));
   }
 
   private SagaCommandMessage captureCompensation(SagaCommandHandler handler) {
@@ -369,6 +503,11 @@ class DatasetCreateBpmnTest {
 
   private ProcessInstance startProcessWithGeo(
       boolean hasPipelines, boolean hasGeoSink, boolean hasLayers) {
+    return startProcessWithGeo(hasPipelines, hasGeoSink, hasLayers, true);
+  }
+
+  private ProcessInstance startProcessWithGeo(
+      boolean hasPipelines, boolean hasGeoSink, boolean hasLayers, boolean hasFrostSink) {
     Map<String, Object> variables = new HashMap<>();
     variables.put("sagaId", "saga-test-123");
     variables.put("datasetId", "ds-456");
@@ -376,15 +515,22 @@ class DatasetCreateBpmnTest {
     variables.put("description", "A test dataset");
     variables.put("hasPipelines", hasPipelines);
     variables.put("hasGeoSink", hasGeoSink);
+    variables.put("hasFrostSink", hasFrostSink);
     variables.put("hasLayers", hasLayers);
     if (hasPipelines) {
       variables.put("dataPipelines", List.of(Map.of("id", "p-1", "data", "{}")));
-      variables.put("datasources", List.of(Map.of("id", "src-1", "type", "postgresql")));
+      variables.put("artifacts", Map.of());
     }
+    // Keep the sink list consistent with the flags the consumer would have derived from it.
+    List<Map<String, Object>> datasinks = new ArrayList<>();
     if (hasGeoSink) {
-      variables.put(
-          "datasinks",
-          List.of(Map.of("type", "POSTGIS", "configuration", Map.of("tableName", "t1"))));
+      datasinks.add(Map.of("type", "POSTGIS", "configuration", Map.of("tableName", "t1")));
+    }
+    if (hasFrostSink) {
+      datasinks.add(Map.of("type", "FROST", "configuration", Map.of()));
+    }
+    if (!datasinks.isEmpty()) {
+      variables.put("datasinks", datasinks);
     }
     if (hasLayers) {
       variables.put("layers", List.of(Map.of("layerName", "t1", "crs", "EPSG:4326")));
@@ -444,6 +590,13 @@ class DatasetCreateBpmnTest {
         .thenReturn(SagaCommandResult.failure("saga-test-123", "deploy-pipelines", error));
   }
 
+  private void stubPruneFailure() {
+    when(geoserverHandler.handle(
+            argThat(cmd -> cmd != null && "PRUNE_FEATURE_TYPES".equals(cmd.operation()))))
+        .thenReturn(
+            SagaCommandResult.failure("saga-test-123", "prune-featuretypes", "GeoServer 503"));
+  }
+
   private void stubFrostCompensationSuccess() {
     when(frostHandler.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
         .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "create-project"));
@@ -467,7 +620,7 @@ class DatasetCreateBpmnTest {
                 "saga-test-123",
                 "provision-sink",
                 Map.of("provisionedSinks", List.of(Map.of("schema", "ds_456", "table", "t1"))),
-                Map.of("provisionedSinks", List.of(Map.of("schema", "ds_456", "table", "t1")))));
+                Map.of("createdTables", List.of("t1"), "createdSchema", true)));
     when(postgisHandler.handle(argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
         .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "provision-sink"));
   }
@@ -483,16 +636,6 @@ class DatasetCreateBpmnTest {
     when(geoserverHandler.handle(
             argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
         .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "create-workspace"));
-  }
-
-  private void stubSupersetSuccess() {
-    when(supersetHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
-        .thenReturn(
-            SagaCommandResult.success(
-                "saga-test-123", "register-superset", Map.of(), Map.of("dashboardId", 1)));
-    when(supersetHandler.handle(
-            argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
-        .thenReturn(SagaCommandResult.compensationSuccess("saga-test-123", "register-superset"));
   }
 
   private void stubGeoserverDatastoreFailure() {

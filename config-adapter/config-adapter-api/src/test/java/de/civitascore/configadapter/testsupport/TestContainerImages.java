@@ -26,7 +26,7 @@ public final class TestContainerImages {
   public static final String KEYCLOAK = "quay.io/keycloak/keycloak:26.6.4";
 
   // renovate: datasource=docker
-  public static final String MAILPIT = "axllent/mailpit:v1.28";
+  public static final String MAILPIT = "axllent/mailpit:v1.30";
 
   // renovate: datasource=docker
   public static final String ETCD = "quay.io/coreos/etcd:v3.6.6";
@@ -43,6 +43,9 @@ public final class TestContainerImages {
   // Distinct image required for GeoServer Cloud compatibility.
   // renovate: datasource=docker
   public static final String POSTGIS_GEOSERVER = "imresamu/postgis:17-3.5";
+
+  // renovate: datasource=docker
+  public static final String GEOSERVER_CLOUD_REST = "geoservercloud/geoserver-cloud-rest:3.0.1.1";
 
   // renovate: datasource=docker
   public static final String FROST = "fraunhoferiosb/frost-server-http:2.7.3";

@@ -9,7 +9,7 @@
  */
 package de.civitascore.configadapter.apisix;
 
-import jakarta.ws.rs.core.Response;
+import java.net.HttpURLConnection;
 import java.util.regex.Pattern;
 
 /**
@@ -41,7 +41,7 @@ final class UpstreamReferenceCheck {
 
   /** True if the response is APISIX rejecting an upstream delete for a still-referencing route. */
   static boolean isStaleRouteReference(int status, String body) {
-    return status == Response.Status.BAD_REQUEST.getStatusCode()
+    return status == HttpURLConnection.HTTP_BAD_REQUEST
         && body != null
         && ROUTE_STILL_REFERENCING.matcher(body).find();
   }

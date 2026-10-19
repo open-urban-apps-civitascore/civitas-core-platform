@@ -9,20 +9,17 @@
  */
 package de.civitascore.configadapter.nifi.graph;
 
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
 /**
- * The parsed engine-neutral pipeline graph carried in {@code dataPipelines[].data} — the React-Flow
- * editor graph, the authoritative description of the pipeline's data flow. Construction enforces
- * only payload integrity (node ids, edge endpoints); the flow semantics — source/sink/transform
- * extraction, positions, trigger binding — are derived by {@link FlowPath} over the {@link
- * NodeKind} vocabulary.
+ * The parsed CORE Pipeline graph carried in {@code dataPipelines[].data} — the clean {@code
+ * nodes}/{@code edges} document, the authoritative description of the pipeline's data flow.
+ * Construction enforces only payload integrity (node ids, edge endpoints); the flow semantics —
+ * source/sink/transform extraction, positions, trigger binding — are derived by {@link FlowPath}
+ * over the {@link NodeKind} vocabulary.
  *
  * @param nodes the graph nodes
  * @param edges the graph edges
@@ -39,19 +36,27 @@ public record PipelineGraph(List<GraphNode> nodes, List<GraphEdge> edges) {
   }
 
   /**
-   * A graph node.
+   * A CORE Pipeline graph node: its {@code kind} plus the CORE-URN reference carried by that kind
+   * (all references optional — a draft pipeline may omit them). A {@code source} node carries a
+   * {@code sourceRef}, a {@code sink} node a {@code sinkRef}, a {@code mapping} node a {@code
+   * mappingRef}, a {@code cron} node a {@code cronExpression}; {@code start}/{@code end} carry
+   * none.
    *
    * @param id the node id
-   * @param type the node kind (e.g. {@code start}, {@code mapping}, {@code end})
-   * @param data the node payload (e.g. {@code mappingConfig} for a mapping node)
+   * @param kind the CORE node kind (e.g. {@code start}, {@code source}, {@code mapping}, {@code
+   *     sink}, {@code end})
+   * @param sourceRef the referenced DataSource configuration CORE URN, or null
+   * @param sinkRef the referenced DataSink configuration CORE URN, or null
+   * @param mappingRef the referenced Mapping CORE URN, or null
+   * @param cronExpression the cron schedule expression (cron nodes only), or null
    */
-  public record GraphNode(String id, String type, Map<String, Object> data) {
-    public GraphNode {
-      // Not Map.copyOf: a JSON node payload may carry null values. The unmodifiable copy keeps
-      // the record's value semantics real instead of aliasing the parser's mutable map.
-      data = data == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(data));
-    }
-  }
+  public record GraphNode(
+      String id,
+      String kind,
+      String sourceRef,
+      String sinkRef,
+      String mappingRef,
+      String cronExpression) {}
 
   /**
    * A directed graph edge.

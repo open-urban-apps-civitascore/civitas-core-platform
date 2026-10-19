@@ -1,6 +1,6 @@
 package de.civitascore.portal.model.entity;
 
-import de.civitascore.portal.model.entity.base.BaseEntity;
+import de.civitascore.portal.model.entity.base.DataSetOwnedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -29,11 +29,7 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "layers")
 @Getter
 @Setter
-public class Layer extends BaseEntity {
-
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "dataset_id", nullable = false)
-  @NotNull private DataSet dataSet;
+public class Layer extends DataSetOwnedEntity {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "datasink_id", nullable = false)
@@ -47,9 +43,6 @@ public class Layer extends BaseEntity {
 
   @Column(name = "description", columnDefinition = "TEXT")
   private String description;
-
-  @Column(name = "keywords", columnDefinition = "text[]")
-  private List<String> keywords;
 
   @Column(name = "attribute", columnDefinition = "text[]")
   private List<String> attribute;
@@ -73,9 +66,6 @@ public class Layer extends BaseEntity {
 
   @Column(name = "crs")
   private String crs;
-
-  @Column(name = "bbox_auto_calculate", nullable = false)
-  private boolean bboxAutoCalculate = true;
 
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "native_bounding_box", columnDefinition = "jsonb")

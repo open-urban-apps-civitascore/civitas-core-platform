@@ -31,7 +31,6 @@ class UserUpdateEventIntegrationTest extends BaseEventPublishingIntegrationTest 
     updateInput.setFirstName("Updated");
     updateInput.setLastName("Name");
     updateInput.setEmail(existingUser.getEmail());
-    updateInput.setActive(true);
 
     User updatedUser = userService.update(existingUser.getId(), updateInput);
 
@@ -73,7 +72,6 @@ class UserUpdateEventIntegrationTest extends BaseEventPublishingIntegrationTest 
     updateInput.setFirstName(existingUser.getFirstName());
     updateInput.setLastName(existingUser.getLastName());
     updateInput.setEmail(newEmail);
-    updateInput.setActive(true);
 
     userService.update(existingUser.getId(), updateInput);
 

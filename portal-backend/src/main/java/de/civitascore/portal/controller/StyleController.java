@@ -33,7 +33,7 @@ import tools.jackson.databind.JsonNode;
 @RequiredArgsConstructor
 @Tag(name = "Styles", description = "Style management endpoints")
 public class StyleController
-    extends BaseController<StyleInputDTO, StyleOutputDTO, Style, StyleSpec> {
+    extends DataSetSubEntityController<StyleInputDTO, StyleOutputDTO, Style, StyleSpec> {
 
   private final StyleService styleService;
   private final StyleAssembler styleAssembler;
@@ -49,6 +49,11 @@ public class StyleController
   }
 
   @Override
+  protected Class<Style> getEntityClass() {
+    return Style.class;
+  }
+
+  @Override
   @Operation(operationId = "listStyles", summary = "List all Styles for a dataset")
   public ResponseEntity<Page<StyleOutputDTO>> getAll(
       @ParameterObject StyleSpec spec,
@@ -61,9 +66,7 @@ public class StyleController
   @Override
   @Operation(operationId = "getStyle", summary = "Get Style by ID")
   public ResponseEntity<StyleOutputDTO> getById(@PathVariable UUID id) {
-    UUID dataSetId = extractDataSetId();
-    Style style = styleService.findByIdAndDataSetOrThrow(id, dataSetId);
-    return ResponseEntity.ok(styleAssembler.toOutput(style));
+    return super.getById(id);
   }
 
   @Override
@@ -76,16 +79,12 @@ public class StyleController
   @Operation(operationId = "updateStyle", summary = "Replace a Style")
   public ResponseEntity<StyleOutputDTO> update(
       @PathVariable UUID id, @Valid @RequestBody StyleInputDTO input) {
-    UUID dataSetId = extractDataSetId();
-    styleService.findByIdAndDataSetOrThrow(id, dataSetId);
     return super.update(id, input);
   }
 
   @Override
   @Operation(operationId = "deleteStyle", summary = "Delete a Style")
   public void delete(@PathVariable UUID id) {
-    UUID dataSetId = extractDataSetId();
-    styleService.findByIdAndDataSetOrThrow(id, dataSetId);
     super.delete(id);
   }
 
@@ -94,15 +93,5 @@ public class StyleController
   public ResponseEntity<StyleOutputDTO> patch(@PathVariable UUID id, @RequestBody JsonNode updates)
       throws IOException {
     throw new MethodNotAllowedException(HttpMethod.PATCH, Collections.emptySet());
-  }
-
-  @Override
-  protected StyleInputDTO preProcessInput(StyleInputDTO input) {
-    input.setDataSetId(extractDataSetId());
-    return super.preProcessInput(input);
-  }
-
-  private UUID extractDataSetId() {
-    return extractUUIDFromPathVariable("dataSetId", Style.class);
   }
 }

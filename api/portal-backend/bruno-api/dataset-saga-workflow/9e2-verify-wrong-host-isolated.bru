@@ -1,0 +1,47 @@
+meta {
+  name: 9e2. Verify Named-API Route Is Host-Isolated
+  type: http
+  seq: 26
+}
+
+get {
+  url: {{apisixGatewayHost}}/v1/datasets/{{sagaDataSetId}}/{{sagaSlug}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("Named-API data route is not reachable on the management vhost", function() {
+    // The saga pins named-API routes to the API vhost via the route's `hosts` filter, so on
+    // apisixGatewayHost this path can only fall through to the host-agnostic /v1/* management
+    // catch-all, which OPA rejects (unknown endpoint, anonymous → 401). A 200 here would mean the
+    // host pinning was lost and the data plane is served on the management host.
+    expect(res.getStatus()).to.not.equal(200);
+  });
+
+  test("No FROST payload is served on the management vhost", function() {
+    const isFrostShaped = res.body && typeof res.body === 'object' && Array.isArray(res.body.value);
+    expect(isFrostShaped, 'management vhost must not serve the named API upstream').to.be.false;
+  });
+}
+
+docs {
+  **Named-API data routes are host-scoped to the API virtual host.**
+
+  Requests the same path as step 9c/9d3 but through `apisixGatewayHost` — a Host that is **not** the API
+  virtual host. The saga pins every named-API route to the API vhost with a `hosts` filter, so this
+  request cannot match it and must not reach FROST. It can only fall through to the host-agnostic `/v1/*`
+  management catch-all, where the path is not a known portal-backend endpoint and is denied.
+
+  This is the **inverse** of the management-catch-all check: that test proves the management API stays
+  reachable on any Host (the portal frontend's server-side proxy strips the Host header and calls APISIX
+  as plain `localhost`), while this test proves the published data plane does **not** leak onto that same
+  host. Together they pin the two halves of the virtual-host split — management everywhere, data only on
+  the API vhost.
+
+  **Precondition:** `sagaDataSetId` and `sagaSlug` are set; the named-API route exists on the API vhost
+  (step 9b); `apisixGatewayHost` points at the same APISIX instance under a different Host.
+
+  **Expected Response:** any non-200 (401 from the management catch-all in the standard dev setup), and
+  never an upstream document.
+}

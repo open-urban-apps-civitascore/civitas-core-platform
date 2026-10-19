@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:core:platform:civitas:element:common:0062782c-5353-87ad-b8d4-c1b90ed9b00a:1.0.0",
+  "title": "SensorReading",
+  "description": "Telemetry emitted by an urban air-quality sensor.",
+  "type": "object",
+  "required": ["sensorId", "timestamp", "temperature", "pm25"],
+  "properties": {
+    "sensorId": {
+      "type": "string",
+      "description": "Stable sensor identifier."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "temperature": {
+      "type": "number"
+    },
+    "pm25": {
+      "type": "number"
+    },
+    "location": {
+      "$ref": "urn:core:platform:civitas:element:common:da736e5f-bb91-88a6-abaa-761d911af81a:1.0.0",
+      "description": "Sensor position."
+    }
+  }
+}

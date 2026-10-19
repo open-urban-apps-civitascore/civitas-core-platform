@@ -8,6 +8,7 @@ import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
+import { FooterElement } from '@/components/form/FooterElement'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
@@ -15,6 +16,7 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
+import { useError } from '@/hooks/use-error'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
 
@@ -26,6 +28,7 @@ export const DatastructureCreateForm = () => {
 
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { handleFormValidationError } = useError()
 
   const { form, isLoading, saveDatastructure } = useDatastructureCreation()
 
@@ -40,9 +43,15 @@ export const DatastructureCreateForm = () => {
   const handleSave = async (): Promise<boolean> => {
     let isSaved = false
 
-    await form.handleSubmit(async () => {
-      isSaved = await handleCreateDatastructure()
-    })()
+    await form.handleSubmit(
+      async () => {
+        isSaved = await handleCreateDatastructure()
+      },
+      errors => {
+        handleFormValidationError(errors)
+        isSaved = false
+      },
+    )()
 
     return isSaved
   }
@@ -74,7 +83,7 @@ export const DatastructureCreateForm = () => {
     <PageContainer testId="createDatastructurePage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">
       <PageHeader title={t('create.title')} subtitle={t('create.subtitle')} customElement={customElementCreateMode} />
       <PageBackground className="overflow-y-auto" hasBackground>
-        <ContentCard className={cn('overflow-auto')}>
+        <ContentCard className={cn('overflow-auto')} footerElement={<FooterElement areAllFieldsRequired />}>
           <Form {...form}>
             <form
               id="datastructure-create-form"
@@ -114,6 +123,7 @@ export const DatastructureCreateForm = () => {
                       maxLength={150}
                       hasCharacterCount
                       className="min-h-[100px] resize-none"
+                      required
                     />
                   </DetailsFieldContainer>
                 </>

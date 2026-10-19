@@ -18,8 +18,6 @@ import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.adapter.ConfigAdapter;
 import de.civitascore.configadapter.configuration.AppConfig;
 import de.civitascore.configadapter.configuration.ApplicationConfig;
-import de.civitascore.configadapter.exception.FatalAdapterException;
-import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.messaging.EventPublisher;
 import de.civitascore.configadapter.model.Config;
 import de.civitascore.configadapter.model.ConfigEvent;
@@ -28,11 +26,6 @@ import de.civitascore.configadapter.model.Metadata;
 import de.civitascore.configadapter.model.Operation;
 import de.civitascore.configadapter.model.Payload;
 import de.civitascore.configadapter.model.frost.FrostConfigValue;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -40,9 +33,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
+import okhttp3.HttpUrl;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 import org.apache.commons.configuration2.MapConfiguration;
-import org.glassfish.jersey.client.HttpUrlConnectorProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,14 +53,14 @@ class FrostProjectsIT extends AbstractFrostIT {
   private FrostAdapter adapter;
   private TestEventPublisher eventPublisher;
   private String frostBaseUrl;
-  private Client httpClient;
+  private OkHttpClient httpClient;
   private ObjectMapper objectMapper;
 
   @BeforeEach
   void setUp() {
     frostBaseUrl =
         "http://" + FROST.getHost() + ":" + FROST.getMappedPort(8080) + "/FROST-Server/v1.1";
-    httpClient = ClientBuilder.newClient();
+    httpClient = new OkHttpClient();
     objectMapper = new ObjectMapper();
 
     Map<String, Object> props = new HashMap<>();
@@ -83,15 +80,6 @@ class FrostProjectsIT extends AbstractFrostIT {
     adapter = new FrostAdapter();
     adapter.initialize(config);
 
-    // Replace the adapter's client with one that supports HTTP PATCH on JDK 21+
-    Client patchCapableClient =
-        ClientBuilder.newBuilder()
-            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build();
-    adapter.setClient(patchCapableClient);
-
     eventPublisher = new TestEventPublisher();
     adapter.setEventPublisher(eventPublisher);
   }
@@ -102,7 +90,8 @@ class FrostProjectsIT extends AbstractFrostIT {
       adapter.close();
     }
     if (httpClient != null) {
-      httpClient.close();
+      httpClient.dispatcher().executorService().shutdown();
+      httpClient.connectionPool().evictAll();
     }
   }
 
@@ -156,8 +145,7 @@ class FrostProjectsIT extends AbstractFrostIT {
   }
 
   @Test
-  void deleteProjectReturnsSuccessAndEntityIsRemoved()
-      throws FatalAdapterException, RetryableAdapterException {
+  void deleteProjectReturnsSuccessAndEntityIsRemoved() throws Exception {
     String projectId =
         createEntityDirectly(
             "Projects", Map.of("name", "Project To Delete", "description", "Will be deleted"));
@@ -170,13 +158,9 @@ class FrostProjectsIT extends AbstractFrostIT {
     ConfigResultEvent result = eventPublisher.getPublishedEvents().getFirst();
     assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
 
-    try (Response response =
-        httpClient
-            .target(frostBaseUrl)
-            .path("Projects(" + projectId + ")")
-            .request(MediaType.APPLICATION_JSON)
-            .get()) {
-      assertEquals(404, response.getStatus());
+    Request request = jsonRequest("Projects(" + projectId + ")").get().build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      assertEquals(404, response.code());
     }
   }
 
@@ -228,17 +212,17 @@ class FrostProjectsIT extends AbstractFrostIT {
 
   // --- Helper methods ---
 
-  private String createEntityDirectly(String entityType, Map<String, Object> data) {
-    try (Response response =
-        httpClient
-            .target(frostBaseUrl)
-            .path(entityType)
-            .request(MediaType.APPLICATION_JSON)
-            .post(Entity.json(data))) {
-      String body = response.readEntity(String.class);
+  private String createEntityDirectly(String entityType, Map<String, Object> data)
+      throws Exception {
+    RequestBody body =
+        RequestBody.create(
+            objectMapper.writeValueAsString(data), MediaType.get("application/json"));
+    Request request = jsonRequest(entityType).post(body).build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      String responseBody = response.body().string();
       assertEquals(
-          201, response.getStatus(), "Failed to create " + entityType + " directly: " + body);
-      String locationHeader = response.getHeaderString("Location");
+          201, response.code(), "Failed to create " + entityType + " directly: " + responseBody);
+      String locationHeader = response.header("Location");
       int start = locationHeader.lastIndexOf('(');
       int end = locationHeader.lastIndexOf(')');
       String id = locationHeader.substring(start + 1, end);
@@ -247,16 +231,16 @@ class FrostProjectsIT extends AbstractFrostIT {
   }
 
   private JsonNode getEntityFromFrost(String entityType, String id) throws Exception {
-    try (Response response =
-        httpClient
-            .target(frostBaseUrl)
-            .path(entityType + "(" + id + ")")
-            .request(MediaType.APPLICATION_JSON)
-            .get()) {
-      assertEquals(200, response.getStatus(), "Entity not found: " + entityType + "(" + id + ")");
-      String body = response.readEntity(String.class);
-      return objectMapper.readTree(body);
+    Request request = jsonRequest(entityType + "(" + id + ")").get().build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      assertEquals(200, response.code(), "Entity not found: " + entityType + "(" + id + ")");
+      return objectMapper.readTree(response.body().string());
     }
+  }
+
+  private Request.Builder jsonRequest(String path) {
+    HttpUrl url = HttpUrl.get(frostBaseUrl).newBuilder().addPathSegments(path).build();
+    return new Request.Builder().url(url).header("Accept", "application/json");
   }
 
   private ConfigEvent createConfigEvent(

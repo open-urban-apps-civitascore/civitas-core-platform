@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nimbusds.jwt.JWTParser;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataSet;
@@ -45,6 +46,7 @@ class UserMeIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private AssignmentRepository assignmentRepository;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private ObjectMapper objectMapper;
+  @Autowired private PortalTestDataFactory portalData;
 
   private String accessToken;
   private String externalId;
@@ -57,11 +59,7 @@ class UserMeIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @AfterEach
   void cleanup() {
-    assignmentRepository.deleteAll();
-    groupRepository.deleteAll();
-    roleRepository.deleteAll();
-    dataSetRepository.deleteAll();
-    userRepository.deleteAll();
+    portalData.cleanAll();
   }
 
   private HttpHeaders createAuthHeaders() {

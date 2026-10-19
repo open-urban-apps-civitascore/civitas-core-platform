@@ -6,7 +6,7 @@ import type { MappingConfig, SchemaTree, ValueNode } from './_types'
 import { ARRAY_EDGE_STYLE, isOpNode } from './_types'
 import type { MegaNodeData } from './nodes/MegaNode'
 import { flattenTree } from './schema/fieldTree'
-import { concatInputPorts, LITERAL_DEFAULT_TYPE, literalOutputPort, mappingRegistry } from './transforms'
+import { concatInputPorts, literalOutputPort, literalTypeOf, mappingRegistry, toDateTimeInputPorts } from './transforms'
 
 export const SOURCE_NODE_ID = 'source'
 export const TARGET_NODE_ID = 'target'
@@ -102,7 +102,7 @@ const megaNode = (
   type: 'mega',
   position,
   deletable: false,
-  data: { role, schemaName: tree.name, fields: tree.fields } as MegaNodeData,
+  data: { role, schemaName: tree.name, version: tree.version, fields: tree.fields } as MegaNodeData,
 })
 
 export const decompileConfig = (
@@ -155,9 +155,15 @@ export const decompileConfig = (
 
     const childVns = def?.opInputs(vn) ?? []
     // concat keeps a spare trailing port so users can add inputs without replacing wires
-    const inputs = vn.op === 'concat' ? concatInputPorts(childVns.length + 1) : (def?.inputs ?? [])
+    const inputs =
+      vn.op === 'concat'
+        ? concatInputPorts(childVns.length + 1)
+        : vn.op === 'toDateTime'
+          ? toDateTimeInputPorts(vn.inputType)
+          : (def?.inputs ?? [])
     // For literal (const) nodes: restore the typed output port from the saved valueType (UML name)
-    const outputs = vn.op === 'const' ? [literalOutputPort(vn.valueType ?? LITERAL_DEFAULT_TYPE)] : (def?.outputs ?? [])
+    const outputs =
+      vn.op === 'const' ? [literalOutputPort(literalTypeOf(vn.valueType), vn.value)] : (def?.outputs ?? [])
 
     nodes.push({
       id: derivedId,

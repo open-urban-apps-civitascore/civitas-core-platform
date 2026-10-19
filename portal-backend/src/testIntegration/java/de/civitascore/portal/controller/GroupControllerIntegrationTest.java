@@ -438,30 +438,6 @@ class GroupControllerIntegrationTest
           .isEqualTo(initialGroup.getName());
     }
 
-    // TODO: implement in V2.1
-    // @Test
-    // @DisplayName("Should set parentGroup to null with PATCH")
-    // void shouldSetParentGroupToNullWithPatch() {
-    //   UUID parentGroupId = createTestEntity();
-    //   UUID childGroupId = createTestEntity();
-    //
-    //   // Set parent
-    //   Map<String, Object> setParentMap = new HashMap<>();
-    //   setParentMap.put("parentGroupId", parentGroupId);
-    //   performPatch(childGroupId, setParentMap);
-    //
-    //   // Remove parent
-    //   Map<String, Object> patchMap = new HashMap<>();
-    //   patchMap.put("parentGroupId", null);
-    //
-    //   ResponseEntity<GroupOutputDTO> response = performPatch(childGroupId, patchMap);
-    //
-    //   assertThat(response.getBody()).isNotNull();
-    //   assertThat(response.getBody().getParentGroup())
-    //       .as("ParentGroup should be set to null")
-    //       .isNull();
-    // }
-
     @Test
     @DisplayName("Should handle empty PATCH (no changes)")
     void shouldHandleEmptyPatch() {
@@ -611,47 +587,6 @@ class GroupControllerIntegrationTest
   @Nested
   @DisplayName("Business Logic Tests")
   class BusinessLogicTests {
-
-    // TODO: implement in V2.1
-    // @Test
-    // @DisplayName("Should create group with parent group relationship")
-    // void shouldCreateGroupWithParentGroup() {
-    //   UUID parentId = createTestEntity();
-    //
-    //   GroupInputDTO childInput = createValidInput();
-    //   childInput.setName("Child Group");
-    //   childInput.setParentGroupId(parentId);
-    //
-    //   ResponseEntity<GroupOutputDTO> response = performCreate(childInput);
-    //
-    //   assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-    //   assertThat(response.getBody()).isNotNull();
-    //   assertThat(response.getBody().getParentGroup()).as("Parent group should be
-    // set").isNotNull();
-    //   assertThat(response.getBody().getParentGroup().getId())
-    //       .as("Parent group ID should match")
-    //       .isEqualTo(parentId);
-    // }
-
-    // TODO: implement in V2.1
-    // @Test
-    // @DisplayName("Should handle group hierarchy correctly")
-    // void shouldHandleGroupHierarchyCorrectly() {
-    //   GroupInputDTO parentInput = createValidInput();
-    //   parentInput.setName("Parent Group");
-    //   ResponseEntity<GroupOutputDTO> parentResponse = performCreate(parentInput);
-    //   UUID parentId = parentResponse.getBody().getId();
-    //   assertThat(parentResponse.getBody()).isNotNull();
-    //
-    //   GroupInputDTO childInput = createValidInput();
-    //   childInput.setName("Child Group");
-    //   childInput.setParentGroupId(parentId);
-    //   ResponseEntity<GroupOutputDTO> childResponse = performCreate(childInput);
-    //
-    //   assertThat(childResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-    //   assertThat(childResponse.getBody().getParentGroup()).isNotNull();
-    //   assertThat(childResponse.getBody()).isNotNull();
-    // }
 
     @Test
     @DisplayName("Should update group members list")

@@ -19,6 +19,8 @@
    - [Logging](#25-logging)
    - [OpenAPI / Swagger UI](#26-openapi--swagger-ui)
    - [Security Permit Paths](#27-security-permit-paths)
+   - [Group-Member Backfill (one-shot)](#28-group-member-backfill-one-shot)
+   - [Dataset Staging & Release](#29-dataset-staging--release)
 3. [Seed Data Profile (init)](#3-seed-data-profile-init)
 4. [Local Development Only](#4-local-development-only)
    - [Local Defaults](#41-local-defaults)
@@ -51,6 +53,7 @@
 | `KEYCLOAK_ISSUER_URI` | `https://keycloak.example.com` | JWT `iss` claim validation. **Can differ from `KEYCLOAK_AUTH_SERVER_URL`** when the container reaches Keycloak on an internal hostname but tokens carry an external issuer. |
 | `KEYCLOAK_REALM` | `civitas-core` | Realm name |
 | `KEYCLOAK_TARGET_REALM` | `civitas-core` | Realm used when provisioning users/groups/roles via config-adapter |
+| `KEYCLOAK_ENFORCE_OTP` | `true` | When `true` (default), newly created users get the `CONFIGURE_TOTP` required action and must set up TOTP on first login. Set to `false` to disable enforced OTP setup. |
 
 ---
 
@@ -241,7 +244,6 @@ Defaults are tuned for production. Only adjust for specific throughput/latency r
 
 | Property / Env Var | Default | Description |
 |---|---|---|
-| `APP_URL` | `http://localhost:8089` | Server URL shown in Swagger UI — set to the external-facing URL |
 | `SPRINGDOC_SWAGGER_UI_ENABLED` | `true` | Set to `false` in production to hide API docs |
 | `SPRINGDOC_API_DOCS_PATH` | `/v1/api-docs` | OpenAPI JSON path |
 | `SPRINGDOC_SWAGGER_UI_PATH` | `/swagger-ui.html` | Swagger UI path |
@@ -265,6 +267,30 @@ SECURITY_PERMIT_PATHS_0=/actuator/health/**
 SECURITY_PERMIT_PATHS_1=/actuator/info
 SECURITY_PERMIT_PATHS_2=/api-docs/**
 ```
+
+---
+
+### 2.8 Group-Member Backfill (one-shot)
+
+One-time migration switch that reconciles the members of already-synced groups (those with a Keycloak `externalId`) into Keycloak, covering groups whose `group_members` rows predate the group-side member sync. On startup, after the catch-up sync, it re-emits `GROUP_UPDATED` per already-synced group; the config-adapter reconciles membership diff-based.
+
+| Property / Env Var | Default | Description |
+|---|---|---|
+| `KEYCLOAK_GROUP_MEMBER_BACKFILL` | `false` | When `true`, reconcile already-synced groups' members into Keycloak on startup |
+
+Enable for a single rollout deploy, then check the completion log — `Group-member backfill completed: N succeeded, M failed, K skipped (of T candidates)` — and re-run while the flag is on if `M > 0` (failures are also logged individually at `ERROR`). Once it reports `0 failed`, set the flag back to `false`. The reconcile is idempotent; there is no run-once marker, so the flag must be turned off after rollout.
+
+---
+
+### 2.9 Dataset Staging & Release
+
+Before a dataset is released, the backend walks out from each of its pipelines over the references the model registry recorded and refuses the transition while an artifact the flow reaches cannot carry a release. The walk follows a bounded number of hops.
+
+| Property / Env Var | Default | Description |
+|---|---|---|
+| `DATASET_CLOSUREVALIDATION_MAXDEPTH` | `10` | Reference hops the walk follows out from a pipeline. A flow reaching further is **refused**, not passed unchecked — everything past the bound goes unexamined |
+
+Raise it only when real models legitimately nest deeper: observed flows reach two to three hops, so the default leaves roughly threefold headroom. Lowering it below what a deployment's models need makes those datasets unreleasable, with a 422 naming the offending pipelines and the log recording that the bound cut the walk short. The walk visits each artifact once and terminates on reference cycles, but resolves every unpinned reference against the registry, so raising the bound does add reads.
 
 ---
 
@@ -318,6 +344,7 @@ Set by `application-local.yaml` and `application-postgres.yaml`. Override via en
 | `KEYCLOAK_ISSUER_URI` | `http://localhost:8080` | `KEYCLOAK_ISSUER_URI` |
 | `KEYCLOAK_REALM` | `civitas-core` | `KEYCLOAK_REALM` |
 | `KEYCLOAK_TARGET_REALM` | `civitas-core` | `KEYCLOAK_TARGET_REALM` |
+| `KEYCLOAK_ENFORCE_OTP` | `true` | `KEYCLOAK_ENFORCE_OTP` |
 | `SPRING_JPA_HIBERNATE_DDL_AUTO` | `validate` | — |
 | `SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL` | `true` | — |
 
@@ -358,12 +385,12 @@ environment:
   KEYCLOAK_ISSUER_URI: https://keycloak.example.com
   KEYCLOAK_REALM: civitas-core
   KEYCLOAK_TARGET_REALM: civitas-core
+  KEYCLOAK_ENFORCE_OTP: "true"
 
   # Kafka
   KAFKA_BOOTSTRAP_SERVERS: kafka:9092
   KAFKA_ENABLED: "true"
 
   # Optional
-  APP_URL: https://api.example.com
   SERVER_PORT: "8089"
 ```

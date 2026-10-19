@@ -1,23 +1,36 @@
 import type { LucideIcon } from 'lucide-react'
-import { Binary, Calendar, CalendarClock, Combine, Hash, MapPin, Type } from 'lucide-react'
+import { Binary, Calendar, CalendarClock, Clock, Combine, Fingerprint, Hash, MapPin, Type } from 'lucide-react'
 
 import type { ConfigField, PortDef, TransformDef } from '@/components/node-editor/types'
 import { buildRegistry } from '@/components/node-editor/types'
-import { UML_GEOMETRY_TYPES, UML_PRIMITIVE_TYPES } from '@/components/uml-modeler/constants/umlTypes'
+import { UML_TYPE_GROUPED_OPTIONS } from '@/components/uml-modeler/constants/umlTypes'
+import { readStoredType } from '@/components/uml-modeler/services/legacyTypes'
 
-import type { ConversionOp, OpNode, ValueNode } from '../_types'
+import type { ConversionOp, OpNode, TransformOp, ValueNode } from '../_types'
+import { NUMERIC_SUBTYPES } from '../_types'
 import { GEOMETRY, PRIMITIVE } from '../schema/adapter'
 
 /** A registry entry: the single source of truth for a node's ports, config and compiled op. */
 export interface MappingTransformDef extends TransformDef {
-  op: string
+  type: TransformOp
+  op: TransformOp
   toValueNode: (inputs: ValueNode[], config: Record<string, unknown>) => ValueNode
   opInputs: (op: OpNode) => ValueNode[]
   opConfig: (op: OpNode) => Record<string, unknown>
+  /** Per-field config errors as i18n keys, relative to `pipelineEditor.mappingEditor`. */
+  validate?: (config: Record<string, unknown>) => Record<string, string> | undefined
+  /** Per-field placeholder overrides driven by the current config, e.g. a format hint that
+   *  depends on another field's value (the Literal node's value hint depends on its type). */
+  placeholders?: (config: Record<string, unknown>) => Record<string, string> | undefined
+  visibleFields?: (config: Record<string, unknown>) => readonly string[]
 }
 
 const scalar = (id: string, label: string, dataType?: string): PortDef => ({ id, label, type: 'scalar', dataType })
 const geometry = (id: string, label: string, dataType?: string): PortDef => ({ id, label, type: 'geometry', dataType })
+
+/** Port label for a conversion input, derived from what the port actually accepts. */
+const inputLabel = (inSubtype?: string, accepts?: readonly string[]): string =>
+  accepts?.join(' / ') ?? inSubtype ?? 'any scalar'
 
 /** stringConcat is variadic; ports are grown on demand and persisted on the node. */
 export const concatInputPorts = (count: number): PortDef[] =>
@@ -30,26 +43,36 @@ const patternField: ConfigField = {
   default: 'yyyy-MM-dd',
 }
 
+export const toDateTimeInputPorts = (inputType: unknown): PortDef[] => {
+  // A PostgreSQL timestamp can be declared DateTime but arrive from NiFi as epoch text.
+  const accepts = inputType === 'epoch' ? ['str', 'int', 'number', 'datetime'] : ['str', 'datetime']
+  return [{ ...scalar('in', inputLabel(undefined, accepts)), accepts }]
+}
+
 /**
  * Build a conversion node definition.
- * @param inLabel  Human-readable label for the input port (e.g. "str/float")
  * @param inSubtype  The actual primitive subtype for type-matching (undefined = accepts any scalar)
  * @param outSubtype The actual primitive subtype produced
+ * @param label  Display label for the node; defaults to the op name. Decoupled from `op` so the
+ *   UI can show a different name (e.g. "toNumber") while the wire op stays the backend contract token.
+ * @param accepts  When set, the input port accepts exactly these source subtypes (membership test)
+ *   instead of the exact-match on `inSubtype` — e.g. numeric conversions accept str/int/number only.
  */
 const conversion = (
   type: ConversionOp,
-  inLabel: string,
   inSubtype: string | undefined,
   outSubtype: string,
   icon: LucideIcon,
   config: ConfigField[] = [],
+  label: string = type,
+  accepts?: readonly string[],
 ): MappingTransformDef => ({
   type,
   category: 'categories.conversionFunctions',
-  label: type,
+  label,
   description: `transforms.${type}.description`,
   icon,
-  inputs: [scalar('in', inLabel, inSubtype)],
+  inputs: [{ ...scalar('in', inputLabel(inSubtype, accepts), inSubtype), ...(accepts ? { accepts } : {}) }],
   outputs: [scalar('out', outSubtype, outSubtype)],
   config,
   op: type,
@@ -62,17 +85,14 @@ const conversion = (
   opConfig: op => ('pattern' in op && op.pattern != null ? { pattern: op.pattern } : {}),
 })
 
-/**
- * Dropdown options for the Literal node — derived directly from the UML modeler's
- * type constants so the two stay in sync automatically.
- * Each option uses the UML type name as its unique value.
- */
-export const LITERAL_TYPE_OPTIONS = [...Object.keys(UML_PRIMITIVE_TYPES), ...Object.keys(UML_GEOMETRY_TYPES)].map(
-  name => ({ label: name, value: name }),
-)
-
 /** Default UML type name for a freshly-dropped Literal node. */
 export const LITERAL_DEFAULT_TYPE = 'String'
+
+/**
+ * The UML type of a saved Literal node. A mapping saved before a type was retired still names it,
+ * and the node reads it as the type that replaced it, as the structure editor does.
+ */
+export const literalTypeOf = (valueType?: string): string => readStoredType(valueType ?? LITERAL_DEFAULT_TYPE)
 
 /**
  * Given a UML type name, returns the output PortDef for a literal node.
@@ -80,11 +100,42 @@ export const LITERAL_DEFAULT_TYPE = 'String'
  * Geometries are first-class typed ports: their `dataType` is the concrete
  * geometry name (e.g. 'Point') so Point vs Polygon is matched by exact type;
  * other primitives → scalar port with the matching subtype.
+ * The port label shows the configured value; while the value is empty it falls back to
+ * the subtype, matching the conversion nodes.
  */
-export const literalOutputPort = (umlType: string): PortDef => {
+export const literalOutputPort = (umlType: string, value?: unknown): PortDef => {
   const isGeom = (GEOMETRY as Set<string>).has(umlType)
   const dataType = isGeom ? umlType : (PRIMITIVE[umlType] ?? 'str')
-  return { id: 'out', label: 'value', type: isGeom ? 'geometry' : 'scalar', dataType }
+  const label = value == null || value === '' ? dataType : String(value)
+  return { id: 'out', label, type: isGeom ? 'geometry' : 'scalar', dataType }
+}
+
+/**
+ * Example WKT value shown as the Literal node's value field placeholder for each geometry type.
+ * Coordinates are `lon lat`, like geoPoint.
+ */
+const LITERAL_GEOMETRY_EXAMPLES: Partial<Record<string, string>> = {
+  Point: 'POINT(7.641 51.952)',
+  LineString: 'LINESTRING(7.646 51.951, 7.64 51.952)',
+  Polygon: 'POLYGON((7.641 51.952, 7.646 51.952, 7.646 51.951, 7.641 51.951, 7.641 51.952))',
+  MultiPoint: 'MULTIPOINT((7.641 51.952), (7.646 51.951))',
+  MultiLineString: 'MULTILINESTRING((7.646 51.951, 7.64 51.952))',
+  MultiPolygon: 'MULTIPOLYGON(((7.641 51.952, 7.646 51.952, 7.646 51.951, 7.641 51.951, 7.641 51.952)))',
+  GeometryCollection: 'GEOMETRYCOLLECTION(POINT(7.641 51.952))',
+}
+
+/**
+ * Example value shown as the Literal node's value field placeholder
+ */
+const LITERAL_VALUE_HINTS: Partial<Record<string, string>> = {
+  String: 'Münster',
+  Integer: '42',
+  Number: '3.14',
+  Boolean: 'true',
+  Date: '2024-01-31',
+  DateTime: '2024-01-31T14:30:00+01:00',
+  Uuid: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+  ...LITERAL_GEOMETRY_EXAMPLES,
 }
 
 const literal: MappingTransformDef = {
@@ -104,7 +155,7 @@ const literal: MappingTransformDef = {
       control: 'select',
       default: LITERAL_DEFAULT_TYPE,
       placeholder: 'transforms.literal.fields.type.placeholder',
-      options: LITERAL_TYPE_OPTIONS,
+      groupedOptions: UML_TYPE_GROUPED_OPTIONS,
     },
     { key: 'value', label: 'transforms.literal.fields.value.label', control: 'text', default: '' },
   ],
@@ -115,7 +166,13 @@ const literal: MappingTransformDef = {
     ...(cfg.type ? { valueType: String(cfg.type) } : {}),
   }),
   opInputs: () => [],
-  opConfig: op => (op.op === 'const' ? { value: op.value, type: op.valueType ?? LITERAL_DEFAULT_TYPE } : {}),
+  opConfig: op => (op.op === 'const' ? { value: op.value, type: literalTypeOf(op.valueType) } : {}),
+  validate: cfg =>
+    String(cfg.value ?? '').trim() === '' ? { value: 'transforms.literal.fields.value.required' } : undefined,
+  placeholders: cfg => {
+    const hint = LITERAL_VALUE_HINTS[String(cfg.type ?? LITERAL_DEFAULT_TYPE)]
+    return hint ? { value: hint } : undefined
+  },
 }
 
 const concat: MappingTransformDef = {
@@ -125,7 +182,7 @@ const concat: MappingTransformDef = {
   description: 'transforms.concat.description',
   icon: Combine,
   inputs: concatInputPorts(2),
-  outputs: [scalar('out', 'out', 'str')],
+  outputs: [scalar('out', 'str', 'str')],
   config: [
     {
       key: 'separator',
@@ -151,7 +208,7 @@ const geoPoint: MappingTransformDef = {
   label: 'geoPoint',
   description: 'transforms.geoPoint.description',
   icon: MapPin,
-  inputs: [scalar('lon', 'longitude', 'float'), scalar('lat', 'latitude', 'float')],
+  inputs: [scalar('lon', 'longitude', 'number'), scalar('lat', 'latitude', 'number')],
   outputs: [geometry('out', 'Point', 'Point')],
   config: [],
   op: 'geoPoint',
@@ -168,21 +225,83 @@ const geoPoint: MappingTransformDef = {
  * Conversion nodes
  */
 const conversions: MappingTransformDef[] = [
-  // toString: accepts any scalar (no subtype restriction on input), produces str
-  conversion('toString', 'any scalar', undefined, 'str', Type),
-  // toInt: accepts str or float (no subtype restriction — conversion node wires freely), produces int
-  conversion('toInt', 'str / float', undefined, 'int', Binary),
-  // toFloat: accepts str or int, produces float
-  conversion('toFloat', 'str / int', undefined, 'float', Binary),
-  // toDate: accepts str, produces date
-  conversion('toDate', 'str', 'str', 'date', Calendar, [patternField]),
-  // format: accepts date, produces str — reuse patternField but with the format-specific translation key
-  conversion('format', 'date', 'date', 'str', CalendarClock, [
-    {
-      ...patternField,
-      label: 'transforms.format.fields.pattern.label',
+  conversion('toString', undefined, 'str', Type),
+  conversion('toInt', undefined, 'int', Binary, [], 'toInt', NUMERIC_SUBTYPES),
+  // Wire op stays 'toFloat' (backend contract); only the display label is 'toNumber'.
+  conversion('toFloat', undefined, 'number', Binary, [], 'toNumber', NUMERIC_SUBTYPES),
+  // No RecordPath function backs toUuid — the value is passed through and the sink parses it.
+  // A uuid source needs no transform; it matches a uuid target directly.
+  conversion('toUuid', 'str', 'uuid', Fingerprint),
+  conversion('toDate', undefined, 'date', Calendar, [patternField], 'toDate', ['str', 'date']),
+  {
+    ...conversion('toDateTime', undefined, 'datetime', Clock, [], 'toDateTime', ['str', 'datetime']),
+    config: [
+      {
+        key: 'inputType',
+        label: 'transforms.toDateTime.fields.inputType.label',
+        control: 'select',
+        default: 'string',
+        options: [
+          { value: 'string', label: 'transforms.toDateTime.fields.inputType.string' },
+          { value: 'epoch', label: 'transforms.toDateTime.fields.inputType.epoch' },
+        ],
+      },
+      { ...patternField, label: 'transforms.toDateTime.fields.pattern.label', default: "yyyy-MM-dd'T'HH:mm:ssXXX" },
+      {
+        key: 'unit',
+        label: 'transforms.toDateTime.fields.unit.label',
+        control: 'select',
+        default: 'milliseconds',
+        options: [
+          { value: 'seconds', label: 'transforms.toDateTime.fields.unit.seconds' },
+          { value: 'milliseconds', label: 'transforms.toDateTime.fields.unit.milliseconds' },
+        ],
+      },
+    ],
+    inputs: toDateTimeInputPorts('string'),
+    visibleFields: cfg => (cfg.inputType === 'epoch' ? ['inputType', 'unit'] : ['inputType', 'pattern']),
+    toValueNode: (inputs, cfg) =>
+      cfg.inputType === 'epoch'
+        ? {
+            op: 'toDateTime',
+            input: inputs[0] ?? '',
+            inputType: 'epoch',
+            unit: cfg.unit === 'seconds' ? 'seconds' : 'milliseconds',
+          }
+        : { op: 'toDateTime', input: inputs[0] ?? '', pattern: String(cfg.pattern ?? "yyyy-MM-dd'T'HH:mm:ssXXX") },
+    opConfig: op =>
+      op.op === 'toDateTime'
+        ? {
+            inputType: op.inputType ?? 'string',
+            pattern: op.pattern ?? "yyyy-MM-dd'T'HH:mm:ssXXX",
+            unit: op.unit ?? 'milliseconds',
+          }
+        : {},
+    validate: (cfg): Record<string, string> | undefined => {
+      if (cfg.inputType === 'epoch') {
+        return cfg.unit === 'seconds' || cfg.unit === 'milliseconds'
+          ? undefined
+          : { unit: 'transforms.toDateTime.fields.unit.required' }
+      }
+      return String(cfg.pattern ?? '').trim() ? undefined : { pattern: 'transforms.toDateTime.fields.pattern.required' }
     },
-  ]),
+  },
+  conversion(
+    'format',
+    undefined,
+    'str',
+    CalendarClock,
+    [
+      {
+        ...patternField,
+        label: 'transforms.format.fields.pattern.label',
+      },
+    ],
+    'format',
+    ['date', 'datetime'],
+  ),
 ]
 
 export const mappingRegistry = buildRegistry<MappingTransformDef>([literal, concat, geoPoint, ...conversions])
+
+export const transformDef = (op: TransformOp) => mappingRegistry.byType[op]

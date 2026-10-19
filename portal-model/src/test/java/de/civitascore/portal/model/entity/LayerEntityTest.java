@@ -35,30 +35,20 @@ class LayerEntityTest {
       layer.setLayerName("traffic_layer");
       layer.setTitle("Traffic Layer");
       layer.setDescription("Displays traffic data");
-      layer.setKeywords(List.of("traffic", "transport"));
       layer.setAttribute(List.of("speed", "count"));
       layer.setGeometryColumnRef("geom");
       layer.setCqlFilter("speed > 50");
       layer.setDefaultStyle(defaultStyle);
       layer.setCrs("EPSG:4326");
-      layer.setBboxAutoCalculate(false);
       layer.setNativeBoundingBox(Map.of("minx", -180, "miny", -90, "maxx", 180, "maxy", 90));
       layer.setLatLonBoundingBox(Map.of("minx", -180, "miny", -90, "maxx", 180, "maxy", 90));
 
       assertThat(layer.getDataSet()).isSameAs(dataSet);
       assertThat(layer.getDataSink()).isSameAs(dataSink);
       assertThat(layer.getLayerName()).isEqualTo("traffic_layer");
-      assertThat(layer.getKeywords()).containsExactly("traffic", "transport");
       assertThat(layer.getAttribute()).containsExactly("speed", "count");
       assertThat(layer.getDefaultStyle()).isSameAs(defaultStyle);
-      assertThat(layer.isBboxAutoCalculate()).isFalse();
       assertThat(layer.getNativeBoundingBox()).containsKey("minx");
-    }
-
-    @Test
-    @DisplayName("bboxAutoCalculate should default to true")
-    void bboxAutoCalculateShouldDefaultToTrue() {
-      assertThat(new Layer().isBboxAutoCalculate()).isTrue();
     }
 
     @Test
