@@ -99,7 +99,7 @@ export const useDatasourceForm = (
   const hasDirtyFieldOutsideConfiguration = Object.entries(dirtyFields).some(
     ([key, value]) => key !== 'configuration' && hasDirtyField(value),
   )
-  const connectorPayloadKey = toConnectorPayloadKey(formValues)
+  const connectorPayloadKey = useMemo(() => toConnectorPayloadKey(formValues), [formValues])
   const initialConnectorPayloadKey = useMemo(() => toConnectorPayloadKey(initialFormValues), [initialFormValues])
   const isConnectorChanged =
     !connectorPayloadKey || !initialConnectorPayloadKey || connectorPayloadKey !== initialConnectorPayloadKey

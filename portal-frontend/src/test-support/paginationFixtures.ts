@@ -1,3 +1,4 @@
+import { HttpPageNumberPagination } from '@/generated/core'
 import { HttpPaginationForm } from '@/types/connectors'
 
 export const PAGINATION_FORM: HttpPaginationForm = {
@@ -10,7 +11,7 @@ export const PAGINATION_FORM: HttpPaginationForm = {
   endPage: '10',
 }
 
-export const PAGINATION_API = {
+export const PAGINATION_API: HttpPageNumberPagination = {
   type: 'PAGE_NUMBER',
   pageParameter: 'page',
   pageSizeParameter: 'size',

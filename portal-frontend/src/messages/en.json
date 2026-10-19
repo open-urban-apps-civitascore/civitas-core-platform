@@ -1010,6 +1010,7 @@
       "credentialHeader": "Use the authentication for credentials.",
       "headerValueLineBreak": "The header value must not contain a line break.",
       "pageNumberInteger": "Enter a whole number of 0 or more.",
+      "pageNumberMax": "Enter a number up to 2147483647.",
       "pageSizeMin": "The page size must be at least 1.",
       "endPageBeforeStartPage": "The end page must not be lower than the start page.",
       "creationError": "An error occurred while creating the Data source.",

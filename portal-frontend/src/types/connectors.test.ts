@@ -500,11 +500,26 @@ describe('HTTP API call schemas', () => {
       ['a negative start page', { startPage: '-1' }, 'startPage', 'pageNumberInteger'],
       ['a text end page', { endPage: 'ten' }, 'endPage', 'pageNumberInteger'],
       ['the page size 0', { pageSize: '0' }, 'pageSize', 'pageSizeMin'],
+      ['a page size above the maximum', { pageSize: '2147483648' }, 'pageSize', 'pageNumberMax'],
+      ['a start page above the maximum', { startPage: '3000000000' }, 'startPage', 'pageNumberMax'],
+      ['an end page above the maximum', { endPage: '99999999999' }, 'endPage', 'pageNumberMax'],
       ['an end page before the start page', { startPage: '5', endPage: '4' }, 'endPage', 'endPageBeforeStartPage'],
     ])('rejects %s', (_name, pagination, field, error) => {
       expect(issues(HttpLooseSchema, [withPagination(pagination)])).toContainEqual(
         expect.objectContaining({ path: [0, 'pagination', field], message: `datasources.errors.${error}` }),
       )
+    })
+
+    it('does not compare the end page with a start page above the maximum', () => {
+      const result = issues(HttpLooseSchema, [withPagination({ startPage: '3000000000', endPage: '5' })])
+      expect(result).toEqual([
+        expect.objectContaining({ path: [0, 'pagination', 'startPage'], message: 'datasources.errors.pageNumberMax' }),
+      ])
+    })
+
+    it('accepts the maximum page number', () => {
+      const pagination = { pageSize: '2147483647', startPage: '2147483647', endPage: '2147483647' }
+      expect(issues(HttpLooseSchema, [withPagination(pagination)])).toEqual([])
     })
 
     it('accepts an end page equal to the start page', () => {

@@ -353,6 +353,7 @@ const HTTP_HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/
 const CREDENTIAL_HEADERS = new Set(['authorization', 'proxy-authorization', 'cookie'])
 const LINE_BREAK = /[\r\n]/
 const NON_NEGATIVE_INTEGER = /^\d+$/
+const MAX_PAGE_NUMBER = 2147483647
 
 const HttpPathSchema = z
   .string()
@@ -410,13 +411,17 @@ export const EMPTY_PAGINATION: HttpPaginationForm = {
 
 const PAGE_NUMBER_FIELDS = ['pageSize', 'startPage', 'endPage'] as const
 
+const getPageNumberError = (value: string) => {
+  if (!NON_NEGATIVE_INTEGER.test(value)) return 'datasources.errors.pageNumberInteger'
+  if (Number(value) > MAX_PAGE_NUMBER) return 'datasources.errors.pageNumberMax'
+  return undefined
+}
+
 const validatePagination = (pagination: HttpPaginationForm, ctx: z.RefinementCtx) => {
   if (!pagination.isEnabled) return
-  const invalidFields = PAGE_NUMBER_FIELDS.filter(
-    field => pagination[field] && !NON_NEGATIVE_INTEGER.test(pagination[field]),
-  )
+  const invalidFields = PAGE_NUMBER_FIELDS.filter(field => pagination[field] && getPageNumberError(pagination[field]))
   for (const field of invalidFields) {
-    ctx.addIssue({ code: 'custom', path: [field], message: 'datasources.errors.pageNumberInteger' })
+    ctx.addIssue({ code: 'custom', path: [field], message: getPageNumberError(pagination[field]) })
   }
   if (!invalidFields.includes('pageSize') && pagination.pageSize && Number(pagination.pageSize) === 0) {
     ctx.addIssue({ code: 'custom', path: ['pageSize'], message: 'datasources.errors.pageSizeMin' })
