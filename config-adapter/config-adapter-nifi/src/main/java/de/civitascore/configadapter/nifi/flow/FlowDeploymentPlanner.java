@@ -102,6 +102,25 @@ public class FlowDeploymentPlanner {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR, sourceStage.cronRejectionMessage());
     }
+    if (sourceCron.isEmpty() && sourceStage.requiresSchedule()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "source node '"
+              + path.source().id()
+              + "' has no cron node, and a source of type "
+              + sourceType
+              + " runs only on the schedule of one");
+    }
+    String apiCallName = path.source().apiCallName();
+    if (apiCallName != null && !apiCallName.isBlank() && !sourceStage.selectsApiCall()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+          "source node '"
+              + path.source().id()
+              + "' names an API call, but a source of type "
+              + sourceType
+              + " has no API calls");
+    }
 
     // A SQL source ALWAYS re-reads the whole table on a recurring schedule — an explicit cron, or
     // the QueryDatabaseTableRecord fragment's built-in default (every 5 min) when no cron node is
@@ -123,7 +142,8 @@ public class FlowDeploymentPlanner {
     String processGroupName = "pipeline-" + request.pipelineId();
     String snapshot;
     try {
-      sourceStage.bind(source, sourceNodeKey(request.pipelineId(), path.source()), out);
+      sourceStage.bind(
+          source, path.source(), sourceNodeKey(request.pipelineId(), path.source()), out);
       bindSink(sinkStage, sink, out);
       snapshot =
           flowBuilder.build(

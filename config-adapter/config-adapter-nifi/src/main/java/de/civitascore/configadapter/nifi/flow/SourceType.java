@@ -15,7 +15,8 @@ import java.util.Optional;
 /** The datasource connector kinds the curated NiFi templates support as a pipeline input. */
 public enum SourceType {
   MQTT,
-  SQL;
+  SQL,
+  HTTP;
 
   /**
    * Leniently resolves a raw datasource {@code type} (case-insensitive, common aliases) to a source
@@ -31,6 +32,7 @@ public enum SourceType {
     return switch (raw.toLowerCase(Locale.ROOT)) {
       case "mqtt" -> Optional.of(MQTT);
       case "sql", "postgresql", "postgres", "jdbc" -> Optional.of(SQL);
+      case "http" -> Optional.of(HTTP);
       default -> Optional.empty();
     };
   }

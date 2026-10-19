@@ -134,7 +134,7 @@ class NifiDataFlowIT extends AbstractNifiIT {
               .withEnv("TRUSTSTORE_PATH", "/opt/certs/mqtt-truststore.p12")
               .withEnv("TRUSTSTORE_TYPE", "PKCS12")
               .withEnv("TRUSTSTORE_PASSWORD", MQTT_TRUSTSTORE_PASSWORD);
-          installFrostNar(container, nar.get());
+          installExtensionNars(container);
         });
   }
 

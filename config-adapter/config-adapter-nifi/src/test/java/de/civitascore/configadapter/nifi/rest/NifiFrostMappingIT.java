@@ -240,7 +240,7 @@ class NifiFrostMappingIT extends AbstractNifiIT {
               MountableFile.forHostPath(postgresDriverJar()), "/opt/nifi/drivers/postgresql.jar");
           // The mapped flow renders one port body and hands it to PutFrostRecord, so this path
           // needs the NAR as much as the unmapped one does.
-          installFrostNar(container, nar.get());
+          installExtensionNars(container);
         });
 
     projectId = createProject();

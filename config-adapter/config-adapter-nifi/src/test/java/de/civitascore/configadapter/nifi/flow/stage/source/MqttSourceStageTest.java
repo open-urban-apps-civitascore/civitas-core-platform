@@ -17,6 +17,7 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
+import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,8 +55,12 @@ class MqttSourceStageTest {
 
   private String clientId(String sourceNodeKey) throws FatalAdapterException {
     PlanContext out = new PlanContext();
-    stage.bind(mqttSource(), sourceNodeKey, out);
+    stage.bind(mqttSource(), sourceNode(), sourceNodeKey, out);
     return out.sourceProperties().get("Client ID");
+  }
+
+  private static GraphNode sourceNode() {
+    return new GraphNode("n-source", "source", null, null, null, null, null);
   }
 
   private static Datasource mqttSource() {
