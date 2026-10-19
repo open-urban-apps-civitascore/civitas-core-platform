@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { vi } from 'vitest'
 
 import { Form } from '@/components/ui/form'
-import { DatasourceBaseFormData, DatasourceFormDraft, DatasourceFormDraftSchema } from '@/types/datasources'
+import { DatastructureFormData, DatastructureFormSchema } from '@/types/datastructures'
 
 import { BasicInfoTab } from './BasicInfoTab'
 
@@ -16,23 +16,21 @@ vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: () => false,
 }))
 
-const defaultFormValues: DatasourceBaseFormData = {
+const defaultFormValues: DatastructureFormData = {
   id: '1',
   name: '',
   description: '',
-  dataSourceStatus: 'DRAFT',
-  dataStructureVersionId: null,
 }
 
 interface WrapperProps {
   isReadOnly?: boolean
   isDraftMode?: boolean
-  initialValues?: Partial<DatasourceBaseFormData>
+  initialValues?: Partial<DatastructureFormData>
 }
 
 const TestWrapper = ({ isReadOnly = false, initialValues = {} }: WrapperProps) => {
-  const form = useForm<DatasourceFormDraft>({
-    resolver: zodResolver(DatasourceFormDraftSchema),
+  const form = useForm<DatastructureFormData>({
+    resolver: zodResolver(DatastructureFormSchema),
     defaultValues: { ...defaultFormValues, ...initialValues },
   })
 

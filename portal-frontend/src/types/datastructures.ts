@@ -3,7 +3,7 @@ import z from 'zod'
 import { UMLDiagram, UMLEdge, UMLNode } from '@/components/uml-modeler/types/diagram'
 import { enumFromConst } from '@/utils/common'
 
-import { AssignmentSchema, AssignmentScopedInput } from './assignments'
+import { AssignmentSchema } from './assignments'
 import {
   ItemSchema,
   MAX_DESCRIPTION_LENGTH,
@@ -137,7 +137,6 @@ export const DatastructureApiResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string().nullable(),
-  dataStructureStatus: DatastructureStatusEnum,
   assignments: z.array(AssignmentSchema).optional(),
   inUse: z.boolean().optional(),
   inUseByReleased: z.boolean().optional(),
@@ -154,7 +153,7 @@ export const DatastructureApiResponseSummarySchema = z.object({
   description: z.string().nullable(),
 })
 
-export const DatastructureFormDraftSchema = z.object({
+export const DatastructureFormSchema = z.object({
   id: z.string(),
   name: z
     .string()
@@ -166,19 +165,9 @@ export const DatastructureFormDraftSchema = z.object({
     .trim()
     .min(MIN_DESCRIPTION_LENGTH, 'common.errors.descriptionRequired')
     .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
-  dataStructureStatus: DatastructureStatusEnum,
 })
 
-export const DatastructureFormAvailableSchema = DatastructureFormDraftSchema.extend({
-  description: z
-    .string()
-    .trim()
-    .min(MIN_DESCRIPTION_LENGTH, 'common.errors.descriptionRequired')
-    .max(MAX_DESCRIPTION_LENGTH, 'common.errors.descriptionMaxLength'),
-})
-
-export type DatastructureFormDraft = z.infer<typeof DatastructureFormDraftSchema>
-export type DatastructureFormAvailable = z.infer<typeof DatastructureFormAvailableSchema>
+export type DatastructureFormData = z.infer<typeof DatastructureFormSchema>
 
 export const DatastructureCreateFormSchema = z.object({
   name: z
@@ -210,9 +199,6 @@ export const DatastructureCreateDataSchema = z.object({
 export type DatastructureCreateFormData = z.infer<typeof DatastructureCreateFormSchema>
 export type DatastructureCreateData = z.infer<typeof DatastructureCreateDataSchema>
 
-export type DatastructureMetaPatchData = Pick<DatastructureFormDraft, 'id' | 'name' | 'description'> & {
-  assignments?: AssignmentScopedInput[]
-}
 export type DatastructurePatchData = Partial<DatastructureCreateData> & WithId
 
 // DATASTRUCTURE LIST DATA
@@ -221,7 +207,7 @@ export type DatastructuresListData = {
   id: string
   name: string
   description: string
-  status: DatastructureStatusType
+  status: DatastructureStatusType | null
   source: DatastructureVersionSource | null
   versionNumber: string | null
   modelUrn?: string | null

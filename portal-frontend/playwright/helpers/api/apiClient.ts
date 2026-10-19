@@ -344,14 +344,6 @@ export class ApiClient {
     )
   }
 
-  async releaseDatastructure(datastructureId: string) {
-    return this.post<{ id: string; dataStructureStatus: string }>(`/datastructures/${datastructureId}/release`, {})
-  }
-
-  async unreleaseDatastructure(datastructureId: string) {
-    return this.post<{ id: string; dataStructureStatus: string }>(`/datastructures/${datastructureId}/unrelease`, {})
-  }
-
   async deleteDatastructure(datastructureId: string) {
     return this.delete(`/datastructures/${datastructureId}`)
   }

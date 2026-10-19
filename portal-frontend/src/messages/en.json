@@ -1006,7 +1006,7 @@
       "creationError": "An error occurred while creating the Data source.",
       "updateError": "An error occurred while updating the Data source.",
       "inUseError": "This Data source is still used by a pipeline.",
-      "datastructureNotAvailableError": "The Data source could not be set to \"Available\". Set the Data structure and its version to \"Available\" first.",
+      "datastructureNotAvailableError": "The Data source could not be set to \"Available\". Set the Data structure version to \"Available\" first.",
       "groupsWithoutRoles": "Groups with no assigned Roles have not been saved."
     },
     "connection": {
@@ -1212,8 +1212,7 @@
     },
     "messages": {
       "createSuccess": "Data structure has been successfully created.",
-      "updateSuccess": "Data structure  has been successfully updated.",
-      "isInUseStatusHint": "Can not be set to draft since this Data structure is already in use."
+      "updateSuccess": "Data structure  has been successfully updated."
     },
     "errors": {
       "deletionError": "An error occurred while deleting the Data structure.",
@@ -1255,8 +1254,7 @@
     "messages": {
       "createSuccess": "The version of the Data structure has been successfully created.",
       "updateSuccess": "The version of the data has been successfully updated.",
-      "isAvailableModelHint": "The version information and the structure definition can not be edited since this version already has the status 'Available'.",
-      "isLastAvailableVersion": "Can not be set to draft because this is the last available version in an available Data structure. Set the Data structure to draft first."
+      "isAvailableModelHint": "The version information and the structure definition can not be edited since this version already has the status 'Available'."
     },
     "errors": {
       "creationError": "An error occurred while creating the Data structure version.",
