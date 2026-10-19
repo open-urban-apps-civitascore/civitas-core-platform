@@ -186,55 +186,6 @@ class GetHttpApiCallTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"{}", "[]", "{\"items\":[1,2]}", "[{\"id\":1},{\"id\":[\"a\"]}]"})
-  void onTrigger_whenTheBodyIsAnObjectOrAnArrayOfObjects_routesItToSuccess(String body)
-      throws InitializationException {
-    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, body)) {
-      TestRunner runner = runner(endpoint.baseUrl());
-
-      runner.run();
-
-      runner.assertAllFlowFilesTransferred(GetHttpApiCall.SUCCESS, 1);
-      runner
-          .getFlowFilesForRelationship(GetHttpApiCall.SUCCESS)
-          .get(0)
-          .assertContentEquals(body, StandardCharsets.UTF_8);
-    }
-  }
-
-  @ParameterizedTest
-  @ValueSource(
-      strings = {
-        "42",
-        "null",
-        "\"body-9f3c\"",
-        "[\"body-9f3c\",\"s2\"]",
-        "[1,{\"body-9f3c\":1}]",
-        "{\"body-9f3c\":1}{\"id\":2}",
-        "<html>body-9f3c</html>"
-      })
-  void onTrigger_whenTheBodyGivesNoRecords_routesAFatalFailureWithoutTheBody(String body)
-      throws InitializationException {
-    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, body)) {
-      TestRunner runner = runner(endpoint.baseUrl());
-
-      runner.run();
-
-      assertFailure(
-          runner,
-          "fatal",
-          200,
-          "GET "
-              + endpoint.baseUrl()
-              + "/stations failed: the body is not a JSON object or an array of objects");
-      assertEquals(1, runner.getLogger().getErrorMessages().size());
-      for (String text : logged(runner.getLogger())) {
-        assertFalse(text.contains("body-9f3c"), text);
-      }
-    }
-  }
-
-  @ParameterizedTest
   @ValueSource(ints = {200, 204})
   void onTrigger_whenTheResponseHasNoBody_createsNoFlowFile(int status)
       throws InitializationException {

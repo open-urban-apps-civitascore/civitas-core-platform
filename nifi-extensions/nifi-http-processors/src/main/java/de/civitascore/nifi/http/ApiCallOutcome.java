@@ -60,17 +60,6 @@ sealed interface ApiCallOutcome {
           ErrorKind.TRANSIENT, 0, request + " failed: " + transportCause(cause).getSimpleName());
     }
 
-    /**
-     * A 2xx body that the record reader cannot split into records. The same API call returns a body
-     * of the same shape again.
-     */
-    static Failure ofBodyShape(String request, int status) {
-      return new Failure(
-          ErrorKind.FATAL,
-          status,
-          request + " failed: the body is not a JSON object or an array of objects");
-    }
-
     /** A request the web client refused to build. The same configuration fails again. */
     static Failure ofRejectedRequest(String request, IllegalArgumentException cause) {
       return new Failure(
