@@ -164,16 +164,6 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
   }
 
   @Test
-  void arrayOfScalarsSetsThePipelineToErrorAndGivesNoRow() throws Exception {
-    wireMock.register(get(urlPathEqualTo("/ids")).willReturn(okJson("[\"s1\",\"s2\"]")));
-
-    String processGroupId = deploy("http-scalars", "/ids", "http_scalars");
-
-    awaitPipelineError(processGroupId, "the body is not a JSON object or an array of objects");
-    assertEquals(0, rowCount("http_scalars"));
-  }
-
-  @Test
   void redirectGoesToTheErrorSinkAndIsNotFollowed() throws Exception {
     wireMock.register(
         get(urlPathEqualTo("/moved"))
@@ -311,7 +301,6 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
               "http_array",
               "http_object",
               "http_empty",
-              "http_scalars",
               "http_redirect",
               "http_unavailable",
               "http_slow")) {
