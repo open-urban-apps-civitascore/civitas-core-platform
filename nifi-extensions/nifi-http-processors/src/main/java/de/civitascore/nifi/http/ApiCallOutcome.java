@@ -60,7 +60,10 @@ sealed interface ApiCallOutcome {
           ErrorKind.TRANSIENT, 0, request + " failed: " + transportCause(cause).getSimpleName());
     }
 
-    /** A body that gives no records. The same API call returns a body of the same shape again. */
+    /**
+     * A 2xx body that the record reader cannot split into records. The same API call returns a body
+     * of the same shape again.
+     */
     static Failure ofBodyShape(String request, int status) {
       return new Failure(
           ErrorKind.FATAL,
