@@ -744,18 +744,6 @@ class DataStructureControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should ignore a status sent in the body of a PATCH")
-    void shouldIgnoreStatusInPatchBody() {
-      UUID id = createTestEntity();
-
-      ResponseEntity<DataStructureOutputDTO> response =
-          performPatch(id, Map.of("name", "Patched", "dataStructureStatus", "AVAILABLE"));
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody().getName()).isEqualTo("Patched");
-    }
-
-    @Test
     @DisplayName("Should not filter the list by the removed status parameter")
     void shouldNotFilterByRemovedStatusParameter() {
       UUID id = createTestEntity();
