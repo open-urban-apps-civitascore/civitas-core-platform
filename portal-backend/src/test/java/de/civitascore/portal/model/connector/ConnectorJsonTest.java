@@ -134,6 +134,7 @@ class ConnectorJsonTest {
         "{'dsn':'postgres://db/x'} | Missing connector.connectorType",
         "{'connectorType':'MQTT','qos':'high'} | Invalid value: connector.qos",
         "{'connectorType':'MQTT','qos':1.5} | Invalid value: connector.qos",
+        "{'connectorType':'MQTT','qos':'1'} | Invalid value: connector.qos",
         "{'connectorType':'MQTT','urls':['tcp://u:pw@broker:1883','no url']}"
             + " | Invalid value: connector.urls[1]",
         "{'connectorType':'SQL','dsn':'postgres://u:pw@ bad'} | Invalid value: connector.dsn",
@@ -147,6 +148,10 @@ class ConnectorJsonTest {
             + " | Invalid value: connector.apiCalls[0].pagination.pageSize",
         "{'connectorType':'HTTP','apiCalls':[{'pagination':{'type':'PAGE_NUMBER','startPage':'abc'}}]}"
             + " | Invalid value: connector.apiCalls[0].pagination.startPage",
+        "{'connectorType':'HTTP','apiCalls':[{'pagination':{'type':'PAGE_NUMBER','startPage':'5'}}]}"
+            + " | Invalid value: connector.apiCalls[0].pagination.startPage",
+        "{'connectorType':'HTTP','apiCalls':[{'pagination':{'type':'PAGE_NUMBER','pageSize':''}}]}"
+            + " | Invalid value: connector.apiCalls[0].pagination.pageSize",
         "{'connectorType':'HTTP','apiCalls':[{},{'headers':[{'name':'a'},null]}]}"
             + " | Invalid value: connector.apiCalls[1].headers[1]",
         "{'connectorType':'HTTP','baseUrl':'ftp://api.example.org'} | Invalid value: connector.baseUrl"

@@ -4,11 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ApiCall;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Authentication;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Basic;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.PageNumber;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Parameter;
+import de.civitascore.portal.model.connector.Secret;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class HttpConnectorRulesTest {
@@ -51,6 +55,35 @@ class HttpConnectorRulesTest {
                     new Parameter("Accept", "application/json"), new Parameter(header, ""))))
         .extracting(ConnectorViolation::path)
         .containsExactly("connector.apiCalls[0].headers[1].name");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"Host", "connection", "Content-Length", "EXPECT", "Upgrade"})
+  void validate_withHeaderTheHttpClientSets_reportsItsName(String header) {
+    assertThat(validate(withHeaders(new Parameter(header, "x"))))
+        .extracting(ConnectorViolation::path)
+        .containsExactly("connector.apiCalls[0].headers[0].name");
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "http://api.example.org, true, connector.baseUrl",
+    "HTTP://api.example.org, true, connector.baseUrl",
+    "https://api.example.org, true, ",
+    "http://api.example.org, false, "
+  })
+  void validate_withBasicAuthentication_requiresHttps(
+      String baseUrl, boolean basic, String expectedPath) {
+    Authentication authentication = basic ? new Basic("reader", Secret.of("secret")) : null;
+
+    List<ConnectorViolation> violations =
+        rules.validate(
+            new HttpConnectorConfiguration(baseUrl, authentication, List.of(named("a"))),
+            ConnectorValidator.Stage.DRAFT);
+
+    assertThat(violations)
+        .extracting(ConnectorViolation::path)
+        .isEqualTo(expectedPath == null ? List.of() : List.of(expectedPath));
   }
 
   @Test

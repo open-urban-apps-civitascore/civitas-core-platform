@@ -80,7 +80,7 @@ class ConnectorValidatorTest {
                     "stations",
                     parameters,
                     parameters,
-                    new PageNumber("p-1", null, 0, -1, -1))));
+                    new PageNumber("page", null, 0, -1, -1))));
 
     assertThat(validator.validate(connector, ConnectorValidator.Stage.DRAFT))
         .extracting(ConnectorViolation::path)
@@ -88,7 +88,6 @@ class ConnectorValidatorTest {
             "connector.apiCalls[0].headers[0].name",
             "connector.apiCalls[0].headers[0].value",
             "connector.apiCalls[0].pagination.endPage",
-            "connector.apiCalls[0].pagination.pageParameter",
             "connector.apiCalls[0].pagination.pageSize",
             "connector.apiCalls[0].pagination.startPage",
             "connector.apiCalls[0].path",
@@ -149,18 +148,21 @@ class ConnectorValidatorTest {
         arguments("path", "/a b", false),
         arguments("path", "/a%2Fb", false),
         arguments("path", "/a#b", false),
-        arguments("pagination.pageParameter", "page.Number_@", true),
-        arguments("pagination.pageParameter", "page1", false),
-        arguments("pagination.pageParameter", "page-number", false),
         arguments("headers[0].name", "!#$%&'*+.^_`|~09AZaz-", true),
         arguments("headers[0].name", "X:Y", false),
-        arguments("headers[0].name", "X(Y)", false));
+        arguments("headers[0].name", "X(Y)", false),
+        arguments("headers[0].value", "text/plain; q=0.5\tMünster ~", true),
+        arguments("headers[0].value", "", true),
+        arguments("headers[0].value", "a\r\nX-Injected: y", false),
+        arguments("headers[0].value", "a\u0000b", false),
+        arguments("headers[0].value", "a\u007Fb", false),
+        arguments("headers[0].value", "price in €", false));
   }
 
   private static HttpConnectorConfiguration httpConnectorWith(String key, String value) {
     String path = key.equals("path") ? value : "/stations";
-    String pageParameter = key.equals("pagination.pageParameter") ? value : "page";
     String headerName = key.equals("headers[0].name") ? value : "Accept";
+    String headerValue = key.equals("headers[0].value") ? value : "v";
     return new HttpConnectorConfiguration(
         "https://api.example.org",
         null,
@@ -170,8 +172,8 @@ class ConnectorValidatorTest {
                 null,
                 path,
                 List.of(),
-                List.of(new Parameter(headerName, "v")),
-                new PageNumber(pageParameter, "size", 1, 0, null))));
+                List.of(new Parameter(headerName, headerValue)),
+                new PageNumber("page", "size", 1, 0, null))));
   }
 
   @Test

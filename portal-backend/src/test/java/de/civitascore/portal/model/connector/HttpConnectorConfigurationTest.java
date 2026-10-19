@@ -32,7 +32,10 @@ class HttpConnectorConfigurationTest {
     "https://api.example.org/v1, https://api.example.org/v1",
     "HTTP://api.example.org:8080/v1/, HTTP://api.example.org:8080/v1",
     "https://api.example.org//, https://api.example.org",
-    "https://reader:secret@api.example.org/v1, https://api.example.org/v1"
+    "https://reader:secret@api.example.org/v1, https://api.example.org/v1",
+    "https://oauth2:tok@gitlab.example.org/projects/group%2Fproject,"
+        + " https://gitlab.example.org/projects/group%2Fproject",
+    "https://reader:secret@[2001:db8::1]:8443/v1, https://[2001:db8::1]:8443/v1"
   })
   void constructor_withHttpBaseUrl_removesUserInfoAndTrailingSlash(String baseUrl, String kept) {
     assertThat(withBaseUrl(baseUrl).baseUrl()).isEqualTo(kept);

@@ -594,8 +594,6 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
           "null | [{'headers':[{'name':'X','value':'a\\nb'}]}] | connector.apiCalls[0].headers[0].value",
           "null | [{'headers':[{'name':'Cookie','value':'v'}]}] | connector.apiCalls[0].headers[0].name",
           "null | [{'name':'a'},{'name':'a'}] | connector.apiCalls[1].name",
-          "null | [{'pagination':{'type':'PAGE_NUMBER','pageParameter':'p-1'}}]"
-              + " | connector.apiCalls[0].pagination.pageParameter",
           "null | [{'pagination':{'type':'PAGE_NUMBER','pageSize':0}}]"
               + " | connector.apiCalls[0].pagination.pageSize",
           "null | [{'pagination':{'type':'PAGE_NUMBER','startPage':-1}}]"
@@ -682,6 +680,8 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
         quoteCharacter = '"',
         value = {
           "'startPage':'abc' | startPage",
+          "'startPage':'5' | startPage",
+          "'pageSize':'' | pageSize",
           "'endPage':1.5 | endPage",
           "'pageSize':1.5 | pageSize"
         })

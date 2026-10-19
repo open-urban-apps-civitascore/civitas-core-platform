@@ -94,20 +94,21 @@ final class ConnectorUris {
   }
 
   private static URI withoutUserInfo(URI uri, String key) {
-    if (uri.getUserInfo() == null) {
+    if (uri.getRawUserInfo() == null) {
       return uri;
     }
-    try {
-      return new URI(
-          uri.getScheme(),
-          null,
-          uri.getHost(),
-          uri.getPort(),
-          uri.getPath(),
-          uri.getQuery(),
-          uri.getFragment());
-    } catch (URISyntaxException e) {
-      throw new InvalidConnectorValueException(key, e);
+    String authority = uri.getRawAuthority();
+    StringBuilder cleaned =
+        new StringBuilder(uri.getScheme())
+            .append("://")
+            .append(authority, authority.lastIndexOf('@') + 1, authority.length())
+            .append(uri.getRawPath());
+    if (uri.getRawQuery() != null) {
+      cleaned.append('?').append(uri.getRawQuery());
     }
+    if (uri.getRawFragment() != null) {
+      cleaned.append('#').append(uri.getRawFragment());
+    }
+    return parse(cleaned.toString(), key);
   }
 }

@@ -13,12 +13,15 @@ import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ValueDeserializer;
+import tools.jackson.databind.cfg.CoercionAction;
+import tools.jackson.databind.cfg.CoercionInputShape;
 import tools.jackson.databind.exc.InvalidTypeIdException;
 import tools.jackson.databind.exc.UnrecognizedPropertyException;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.jsontype.TypeDeserializer;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.type.LogicalType;
 
 /**
  * Converts a {@link ConnectorConfiguration} between its three JSON forms:
@@ -49,6 +52,12 @@ public final class ConnectorJson {
       JsonMapper.builder()
           .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
           .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
+          .withCoercionConfig(
+              LogicalType.Integer,
+              config -> {
+                config.setCoercion(CoercionInputShape.String, CoercionAction.Fail);
+                config.setCoercion(CoercionInputShape.EmptyString, CoercionAction.Fail);
+              })
           .build();
   private static final JsonMapper LENIENT =
       JsonMapper.builder().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();

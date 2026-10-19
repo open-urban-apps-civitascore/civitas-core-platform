@@ -22,7 +22,8 @@ public record HttpConnectorConfiguration(
             description =
                 "API host: an http or https URL, which every API call path extends. Embedded"
                     + " credentials and a trailing '/' are removed; a query or fragment is"
-                    + " rejected. Use authentication for credentials.",
+                    + " rejected. Use authentication for credentials; any authentication other than"
+                    + " NONE needs an https URL.",
             example = "https://api.example.org/v1")
         @NotNull(groups = OnRelease.class, message = "'baseUrl' is required") String baseUrl,
     @Schema(
@@ -51,7 +52,7 @@ public record HttpConnectorConfiguration(
   /** How the connector authenticates against the API. */
   @JsonTypeInfo(
       use = JsonTypeInfo.Id.NAME,
-      include = JsonTypeInfo.As.PROPERTY,
+      include = JsonTypeInfo.As.EXISTING_PROPERTY,
       property = JsonMergePatch.NESTED_TYPE_PROPERTY)
   @JsonSubTypes({
     @JsonSubTypes.Type(value = None.class, name = None.TYPE),
@@ -64,19 +65,28 @@ public record HttpConnectorConfiguration(
         @DiscriminatorMapping(value = None.TYPE, schema = None.class),
         @DiscriminatorMapping(value = Basic.TYPE, schema = Basic.class),
       })
-  public sealed interface Authentication permits None, Basic {}
+  public sealed interface Authentication permits None, Basic {
+    @JsonProperty(JsonMergePatch.NESTED_TYPE_PROPERTY)
+    String type();
+  }
 
   /** No authentication. */
   @Schema(name = "HttpConnectorNoAuthentication", description = "No authentication.")
   public record None() implements Authentication {
     static final String TYPE = "NONE";
+
+    @Override
+    @Schema(allowableValues = TYPE, requiredMode = Schema.RequiredMode.REQUIRED)
+    public String type() {
+      return TYPE;
+    }
   }
 
   /** HTTP basic authentication. */
   @Schema(name = "HttpConnectorBasicAuthentication", description = "HTTP basic authentication.")
   public record Basic(
       @Schema(description = "Basic auth username. Must not contain ':'.", example = "reader")
-          @NotNull(groups = OnRelease.class, message = "'username' is required") @Pattern(regexp = "[^:]*", message = "'username' must not contain ':'") String username,
+          @NotNull(groups = OnRelease.class, message = "'username' is required") @Pattern(regexp = "^[^:]*$", message = "'username' must not contain ':'") String username,
       @Schema(
               description =
                   "Basic auth password. Responses show \"********\" for a stored password.",
@@ -90,6 +100,12 @@ public record HttpConnectorConfiguration(
 
     public Basic {
       username = ConnectorValues.blankToNull(username);
+    }
+
+    @Override
+    @Schema(allowableValues = TYPE, requiredMode = Schema.RequiredMode.REQUIRED)
+    public String type() {
+      return TYPE;
     }
   }
 
@@ -115,7 +131,7 @@ public record HttpConnectorConfiguration(
                       + " letters, digits and '-', '_', '.', '~', ':', '/'.",
               example = "/stations")
           @NotNull(groups = OnRelease.class, message = "'path' is required") @Pattern(
-              regexp = "/[A-Za-z0-9._~:/-]*",
+              regexp = "^/[A-Za-z0-9._~:/-]*$",
               message =
                   "'path' must start with '/' and contain only letters, digits and '-', '_', '.',"
                       + " '~', ':', '/'")
@@ -128,9 +144,11 @@ public record HttpConnectorConfiguration(
           List<@Valid Parameter> queryParameters,
       @Schema(
               description =
-                  "Request headers. Name and value are plain text, sent as given and"
-                      + " percent-encoded by the processor. Values are stored and returned in"
-                      + " clear text, so they must not hold secrets; use authentication for"
+                  "Request headers, sent as given. A name is a header token and not"
+                      + " Authorization, Proxy-Authorization, Cookie, Connection, Content-Length,"
+                      + " Expect, Host or Upgrade. A value holds only printable ISO-8859-1"
+                      + " characters, spaces and tabs. Values are stored and returned in clear"
+                      + " text, so they must not hold secrets; use authentication for"
                       + " credentials.")
           List<
                   @Valid @ConvertGroup(from = Default.class, to = Parameter.HeaderRules.class)
@@ -167,8 +185,8 @@ public record HttpConnectorConfiguration(
       @Schema(description = "Value, as plain text. Can be empty.", example = "active")
           @Pattern(
               groups = HeaderRules.class,
-              regexp = "[^\\r\\n]*",
-              message = "'value' must not contain a line break")
+              regexp = "[\\t\\x20-\\x7E\\x{80}-\\x{FF}]*",
+              message = "'value' must hold only printable ISO-8859-1 characters, spaces and tabs")
           String value) {
 
     public Parameter {
@@ -182,7 +200,7 @@ public record HttpConnectorConfiguration(
   /** How the connector requests the pages of a paged API call. */
   @JsonTypeInfo(
       use = JsonTypeInfo.Id.NAME,
-      include = JsonTypeInfo.As.PROPERTY,
+      include = JsonTypeInfo.As.EXISTING_PROPERTY,
       property = JsonMergePatch.NESTED_TYPE_PROPERTY)
   @JsonSubTypes({@JsonSubTypes.Type(value = PageNumber.class, name = PageNumber.TYPE)})
   @Schema(
@@ -190,22 +208,18 @@ public record HttpConnectorConfiguration(
       discriminatorProperty = JsonMergePatch.NESTED_TYPE_PROPERTY,
       discriminatorMapping =
           @DiscriminatorMapping(value = PageNumber.TYPE, schema = PageNumber.class))
-  public sealed interface Pagination permits PageNumber {}
+  public sealed interface Pagination permits PageNumber {
+    @JsonProperty(JsonMergePatch.NESTED_TYPE_PROPERTY)
+    String type();
+  }
 
   /** Page-number pagination, with page number and page size as query parameters. */
   @Schema(
       name = "HttpConnectorPageNumberPagination",
       description = "Page-number pagination, with page number and page size as query parameters.")
   public record PageNumber(
-      @Schema(
-              description =
-                  "Query parameter that carries the page number. Contains only letters and '.',"
-                      + " '_', '@'.",
-              example = "page")
-          @NotNull(groups = OnRelease.class, message = "'pageParameter' is required") @Pattern(
-              regexp = "[A-Za-z._@]+",
-              message = "'pageParameter' must contain only letters and '.', '_', '@'")
-          String pageParameter,
+      @Schema(description = "Query parameter that carries the page number.", example = "page")
+          @NotNull(groups = OnRelease.class, message = "'pageParameter' is required") String pageParameter,
       @Schema(description = "Query parameter that carries the page size.", example = "size")
           @NotNull(groups = OnRelease.class, message = "'pageSizeParameter' is required") String pageSizeParameter,
       @Schema(description = "Number of records per page. At least 1.", example = "100")
@@ -227,6 +241,12 @@ public record HttpConnectorConfiguration(
       pageParameter = ConnectorValues.blankToNull(pageParameter);
       pageSizeParameter = ConnectorValues.blankToNull(pageSizeParameter);
       startPage = startPage == null ? DEFAULT_START_PAGE : startPage;
+    }
+
+    @Override
+    @Schema(allowableValues = TYPE, requiredMode = Schema.RequiredMode.REQUIRED)
+    public String type() {
+      return TYPE;
     }
   }
 }
