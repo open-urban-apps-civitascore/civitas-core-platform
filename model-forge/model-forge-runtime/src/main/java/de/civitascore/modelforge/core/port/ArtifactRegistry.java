@@ -184,6 +184,12 @@ public interface ArtifactRegistry {
     /** Logical URNs of the Elements any version of the Data Structure contains. */
     List<String> dataStructureMembersOfAnyVersion(String urn);
 
+    /** Logical URNs of the Data Structures that any of their versions lists the Element as a member of. */
+    List<String> dataStructuresListing(String elementUrn);
+
+    /** The {@code $defs} keys any version of the Data Structure holds. */
+    Set<String> dataStructureMemberKeys(String dataStructureUrn);
+
     Optional<JsonNode> fetch(String urn);
 
     List<String> fetchArtifactRefUrns(String urn);

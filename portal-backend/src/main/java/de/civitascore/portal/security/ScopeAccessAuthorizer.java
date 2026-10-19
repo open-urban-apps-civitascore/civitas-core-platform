@@ -94,6 +94,28 @@ public class ScopeAccessAuthorizer {
       return;
     }
 
+    authorizeFromAssignments(scopeType, requestedIds, externalId);
+  }
+
+  /**
+   * Authorizes that the current caller may read every given entity of the given scope type, decided
+   * from the caller's assignments alone. Unlike {@link #authorizeReferences}, neither the scope
+   * header nor its wildcard counts: the header is computed for the route's own permission, so a
+   * wildcard on a write route proves tenant-wide write access, not read access.
+   *
+   * @param scopeType the scope type of the entities (e.g. {@link ScopeType#DATASTRUCTURE})
+   * @param requestedIds the entity IDs to be read
+   * @throws AccessDeniedException if the caller is unauthenticated or may not read one of them
+   */
+  public void authorizeReadAccess(ScopeType scopeType, Collection<UUID> requestedIds) {
+    if (requestedIds == null || requestedIds.isEmpty()) {
+      return;
+    }
+    authorizeFromAssignments(scopeType, requestedIds, currentUserExternalId());
+  }
+
+  private void authorizeFromAssignments(
+      ScopeType scopeType, Collection<UUID> requestedIds, String externalId) {
     PermissionName readPermission = READ_PERMISSIONS.get(scopeType);
     if (readPermission == null) {
       // Fail closed: an unmapped scope type is a wiring error, but a security guard must never

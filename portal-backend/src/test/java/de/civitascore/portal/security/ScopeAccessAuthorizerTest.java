@@ -10,6 +10,7 @@ import de.civitascore.portal.model.embedded.PermissionName;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.Permission;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.security.dto.PrincipalUserDetails;
@@ -205,6 +206,70 @@ class ScopeAccessAuthorizerTest {
         .thenReturn(List.of(dataSourceAssignment(id, roleWith(PermissionName.DATASOURCE_READ))));
 
     assertThatThrownBy(() -> authorizer.authorizeReferences(ScopeType.DATAPOOL, Set.of(id)))
+        .isInstanceOf(AccessDeniedException.class);
+  }
+
+  private Assignment dataStructureAssignment(UUID dataStructureId, Role role) {
+    DataStructure structure = new DataStructure();
+    structure.setId(dataStructureId);
+    Assignment a = new Assignment();
+    a.setScope(structure);
+    a.setRole(role);
+    return a;
+  }
+
+  @Test
+  @DisplayName("Read access ignores a wildcard header, which proves the route's permission only")
+  void readAccessIgnoresTheWildcard() {
+    allowedScopes.setWildcard();
+    authenticateAs(userId);
+    when(assignmentService.findAllByUserExternalId(userId.toString()))
+        .thenReturn(List.of(tenantAssignment(roleWith(PermissionName.DATASTRUCTURE_UPDATE))));
+
+    assertThatThrownBy(
+            () ->
+                authorizer.authorizeReadAccess(ScopeType.DATASTRUCTURE, Set.of(UUID.randomUUID())))
+        .isInstanceOf(AccessDeniedException.class);
+  }
+
+  @Test
+  @DisplayName("Read access needs no scope header; a tenant-wide READ assignment grants it")
+  void readAccessGrantedByTenantWideRead() {
+    authenticateAs(userId);
+    when(assignmentService.findAllByUserExternalId(userId.toString()))
+        .thenReturn(List.of(tenantAssignment(roleWith(PermissionName.DATASTRUCTURE_READ))));
+
+    assertThatCode(
+            () ->
+                authorizer.authorizeReadAccess(ScopeType.DATASTRUCTURE, Set.of(UUID.randomUUID())))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("Read access needs a READ assignment on every data structure")
+  void readAccessNeedsEveryDataStructure() {
+    authenticateAs(userId);
+    UUID readable = UUID.randomUUID();
+    UUID other = UUID.randomUUID();
+    when(assignmentService.findAllByUserExternalId(userId.toString()))
+        .thenReturn(
+            List.of(
+                dataStructureAssignment(readable, roleWith(PermissionName.DATASTRUCTURE_READ)),
+                dataStructureAssignment(other, roleWith(PermissionName.DATASTRUCTURE_UPDATE))));
+
+    assertThatCode(() -> authorizer.authorizeReadAccess(ScopeType.DATASTRUCTURE, Set.of(readable)))
+        .doesNotThrowAnyException();
+    assertThatThrownBy(
+            () -> authorizer.authorizeReadAccess(ScopeType.DATASTRUCTURE, Set.of(readable, other)))
+        .isInstanceOf(AccessDeniedException.class);
+  }
+
+  @Test
+  @DisplayName("Read access without a principal denies")
+  void readAccessWithoutPrincipalDenies() {
+    assertThatThrownBy(
+            () ->
+                authorizer.authorizeReadAccess(ScopeType.DATASTRUCTURE, Set.of(UUID.randomUUID())))
         .isInstanceOf(AccessDeniedException.class);
   }
 }

@@ -11,6 +11,8 @@ import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
+import de.civitascore.modelforge.contract.ForeignReference;
+import de.civitascore.modelforge.contract.ForeignReferencesQuery;
 import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.ImportSmartDataModelCommand;
@@ -140,6 +142,26 @@ public interface ModelForge {
      *     Element nor a DataStructure
      */
     RootCheck checkRoot(ArtifactId artifactId);
+
+    /**
+     * The artifacts a DataStructure model references that are not the DataStructure's own, each
+     * with the DataStructure that minted it. A reference is a CORE-URN {@code $ref} at any depth,
+     * including a bare {@code $defs} member and the top-level {@code $ref}, or a concrete
+     * {@code x-core-ref}; an {@code $id} is none. The DataStructure's own artifacts are its
+     * grouping, its root Element, the members its {@code $defs} keys derive, and the Elements any
+     * of its versions lists that no other DataStructure minted.
+     *
+     * <p>Asked about a document before it is stored, the answer covers both ways the host stores a
+     * model: imported under the DataStructure's id, or saved as its root Element. Asked about a
+     * stored version, it also covers the DataStructure's own Elements that version reaches.
+     *
+     * <p>Answered from the stored references, not the in-memory graph. Model Forge decides nothing
+     * here: whether a reference is allowed is the caller's question.
+     *
+     * @throws IllegalArgumentException when only a stored version is asked about and the registry
+     *     does not hold it
+     */
+    List<ForeignReference> foreignReferences(ForeignReferencesQuery query);
 
     // ── Dependency graph ─────────────────────────────────────────────────────
 

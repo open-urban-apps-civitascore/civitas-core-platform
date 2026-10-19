@@ -12,9 +12,11 @@ import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.VersionBump;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.security.ModelReferenceAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ModelMemberUnreachableException;
 import de.civitascore.portal.util.ModelMissingException;
+import de.civitascore.portal.util.ModelReferenceNotAvailableException;
 import de.civitascore.portal.util.ModelRootMissingException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
@@ -51,6 +53,8 @@ public class DataStructureVersionService
   private final ModelRegistryGateway modelRegistryGateway;
 
   private final ArtifactUsageLookup artifactUsageLookup;
+
+  private final ModelReferenceAuthorizer modelReferenceAuthorizer;
 
   @Override
   protected DataStructureVersionRepository getRepository() {
@@ -135,6 +139,9 @@ public class DataStructureVersionService
       return;
     }
     DataStructure parent = entity.getDataStructure();
+    // Before anything is written: a refused write must leave no trace in the registry.
+    modelReferenceAuthorizer.authorizeWrite(
+        parent.getId(), input.getModel(), input.getStyles(), entity.getModelUrn());
     ModelRegistryGateway.ModelPin pin =
         modelRegistryGateway.storeModel(
             Optional.ofNullable(parent.getModelLogicalUrn()),
@@ -246,6 +253,8 @@ public class DataStructureVersionService
    * @throws ModelMemberUnreachableException if members of the version's model are not reachable
    *     from its root Element
    * @throws ModelMissingException if the model registry no longer holds the version's model
+   * @throws ModelReferenceNotAvailableException if the version's model references a model the
+   *     caller may not use
    */
   @Transactional
   public DataStructureVersion release(UUID id) {
@@ -265,6 +274,8 @@ public class DataStructureVersionService
     }
 
     modelRegistryGateway.requireSingleRoot(version.getModelUrn());
+    modelReferenceAuthorizer.authorizeStored(
+        version.getDataStructure().getId(), version.getModelUrn());
 
     version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
     return dataStructureVersionRepository.save(version);
