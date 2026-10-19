@@ -24,6 +24,7 @@ import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.auth.NifiTokenProvider;
 import de.civitascore.configadapter.nifi.auth.OidcClientCredentialsTokenProvider;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
+import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import de.civitascore.configadapter.nifi.flow.FlowDeploymentPlanner;
 import de.civitascore.configadapter.nifi.flow.JdbcSqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.NifiFlowBuilder;
@@ -306,18 +307,18 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       Map<String, Map<String, Object>> artifacts = extractArtifacts(command);
       String projectId = optionalProjectId(command);
       String datasetId = optionalDatasetId(command);
-      List<PipelineDeploymentRequest> requests = new ArrayList<>();
+      List<PreparedPipeline> prepared = new ArrayList<>();
       for (Map<String, Object> pipeline : extractMaps(command, FIELD_DATA_PIPELINES)) {
         currentPipelineId = requireString(pipeline, FIELD_ID);
-        requests.add(prepare(pipeline, artifacts, projectId, datasetId));
+        prepared.add(prepare(pipeline, artifacts, projectId, datasetId));
       }
       List<String> pipelineIds = new ArrayList<>();
       List<String> processGroupIds = new ArrayList<>();
 
-      for (PipelineDeploymentRequest request : requests) {
-        currentPipelineId = request.pipelineId();
-        processGroupIds.add(deploy(request, datasetId));
-        pipelineIds.add(request.pipelineId());
+      for (PreparedPipeline pipeline : prepared) {
+        currentPipelineId = pipeline.pipelineId();
+        processGroupIds.add(deploy(pipeline, datasetId));
+        pipelineIds.add(pipeline.pipelineId());
       }
 
       Map<String, Object> data =
@@ -345,7 +346,7 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       for (PipelineStep step : steps) {
         currentPipelineId = step.pipelineId();
         switch (step) {
-          case Deployment deployment -> deploy(deployment.request(), datasetId);
+          case Deployment deployment -> deploy(deployment.pipeline(), datasetId);
           case Removal removal -> remove(removal.pipelineId());
         }
         processedIds.add(step.pipelineId());
@@ -363,10 +364,10 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
     String pipelineId();
   }
 
-  private record Deployment(PipelineDeploymentRequest request) implements PipelineStep {
+  private record Deployment(PreparedPipeline pipeline) implements PipelineStep {
     @Override
     public String pipelineId() {
-      return request.pipelineId();
+      return pipeline.pipelineId();
     }
   }
 
@@ -424,14 +425,14 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
       Map<String, Map<String, Object>> artifacts = extractArtifacts(command);
       String projectId = optionalProjectId(command);
       String datasetId = optionalDatasetId(command);
-      List<PipelineDeploymentRequest> requests = new ArrayList<>();
+      List<PreparedPipeline> prepared = new ArrayList<>();
       for (Map<String, Object> pipeline : extractMaps(command, FIELD_DATA_PIPELINES)) {
         currentPipelineId = requireString(pipeline, FIELD_ID);
-        requests.add(prepare(pipeline, artifacts, projectId, datasetId));
+        prepared.add(prepare(pipeline, artifacts, projectId, datasetId));
       }
-      for (PipelineDeploymentRequest request : requests) {
-        currentPipelineId = request.pipelineId();
-        deploy(request, datasetId);
+      for (PreparedPipeline pipeline : prepared) {
+        currentPipelineId = pipeline.pipelineId();
+        deploy(pipeline, datasetId);
       }
       return SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId());
     } catch (FatalAdapterException | RetryableAdapterException e) {
@@ -441,12 +442,14 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
 
   // ─── Deployment ─────────────────────────────────────────────────────────────
 
+  private record PreparedPipeline(String pipelineId, DeploymentPlan plan) {}
+
   /**
-   * Resolves everything one pipeline deploys from without a REST call. Every handler prepares all
-   * of its pipelines first, so a defect in a later pipeline does not leave the earlier ones
-   * deployed.
+   * Resolves and plans one pipeline, which runs every check its deployment makes short of a REST
+   * call. Every handler prepares all of its pipelines before the first REST call, so a defect in a
+   * later pipeline does not leave the earlier ones deployed.
    */
-  private PipelineDeploymentRequest prepare(
+  private PreparedPipeline prepare(
       Map<String, Object> pipeline,
       Map<String, Map<String, Object>> artifacts,
       String projectId,
@@ -475,20 +478,22 @@ public class NifiSagaHandler extends AbstractSagaCommandHandler {
             artifacts,
             projectId,
             datasetId);
+    PipelineDeploymentRequest request;
     try {
-      return new PipelineDeploymentRequest(id, parsed.graphData(), source, sink, artifacts);
+      request = new PipelineDeploymentRequest(id, parsed.graphData(), source, sink, artifacts);
     } catch (IllegalArgumentException e) {
       // e.g. a blank pipeline id; keep the raw detail internal and publish only the safe
       // external message for the error code.
       throw new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, e, e.getMessage());
     }
+    return new PreparedPipeline(id, planner.plan(request));
   }
 
-  private String deploy(PipelineDeploymentRequest request, String datasetId)
+  private String deploy(PreparedPipeline pipeline, String datasetId)
       throws FatalAdapterException, RetryableAdapterException {
-    String processGroupId = nifiClient.deployFlow(planner.plan(request));
+    String processGroupId = nifiClient.deployFlow(pipeline.plan());
     if (runtimeMonitor != null) {
-      runtimeMonitor.register(request.pipelineId(), datasetId, processGroupId);
+      runtimeMonitor.register(pipeline.pipelineId(), datasetId, processGroupId);
     }
     return processGroupId;
   }

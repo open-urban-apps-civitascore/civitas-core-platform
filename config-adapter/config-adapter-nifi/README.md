@@ -30,9 +30,11 @@ Each Data structure is an inlined view: Model Forge inlines every CORE-URN `$ref
 
 ### Rejected — every rejection below is fatal and happens before the first REST call
 
+The adapter checks every pipeline of a deploy, update or restore before the first REST call for any of them, so a rejected pipeline also leaves the other pipelines of the command unchanged.
+
 - **Graph** — a missing or duplicate node id, an edge to an undeclared node, a `nodes`/`edges` member that is not a list of objects.
 - **Topology** — not exactly one source and one sink; an unknown node kind wired into the flow; a branch; a cycle; a source with an incoming or a sink with an outgoing data edge; no path from source to sink; a transform or cron node wired off the derived flow path; more than one trigger binding; a cron node without an expression.
-- **Payload** — a pipeline whose graph member is present but not an object, a blank pipeline id or action, a list member of the wrong element type, a deploy, update or restore without the `artifacts` object, an artifact that is not an object, a mapping or sink node URN, a current configuration URN or a sink `element` that is not a key of `artifacts`. The adapter resolves every pipeline that the command deploys before the first pipeline deploys.
+- **Payload** — a pipeline whose graph member is present but not an object, a blank pipeline id or action, a list member of the wrong element type, a deploy, update or restore without the `artifacts` object, an artifact that is not an object, a mapping or sink node URN, a current configuration URN or a sink `element` that is not a key of `artifacts`.
 - **Association** — a source or sink node with no configured entity id, an entity id that is not in the pipeline's `dataSourceIds` or `dataSinkIds`, or a pipeline carrying no association ids at all (reported as its own condition).
 - **Combination** — an unsupported source or sink type; a source payload form the sink can neither consume nor have converted; a cron on a push-based source; a cron expression that is not exactly six whitespace-separated fields; a SQL source writing to PostGIS with no resolvable primary key.
 - **Source configuration** — a plaintext password (secrets MUST arrive encrypted); an MQTT broker scheme that is unsupported or disagrees with the datasource's TLS switch; a path on a `tcp`/`ssl` broker URL; brokers spread over more than one transport; more than one MQTT topic filter; a timeout that is not a plain seconds duration; a SQL source the pre-deploy JDBC probe cannot reach with the resolved credentials.

@@ -41,6 +41,7 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedConstruction;
@@ -515,6 +516,45 @@ class NifiSagaHandlerTest {
 
     assertEquals("COMPENSATION_FAILED", result.type());
     assertEquals("RESTORE_PIPELINES failed: Validation failed", result.error());
+    verify(restClient, never()).deployFlow(any());
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "EXECUTE_STEP, DEPLOY_PIPELINES, STEP_FAILED",
+    "EXECUTE_STEP, UPDATE_PIPELINES, STEP_FAILED",
+    "COMPENSATE_STEP, RESTORE_PIPELINES, COMPENSATION_FAILED"
+  })
+  void planningErrorInALaterPipelineDeploysNothing(String type, String operation, String failedType)
+      throws Exception {
+    Map<String, Object> payload = deployPayload();
+    payload.put("type", type);
+    payload.put("operation", operation);
+    artifacts(payload)
+        .put(
+            "map-el",
+            map("{ \"fields\": { \"$.id\": { \"op\": \"const\", \"value\": \"${HOSTNAME}\" } } }"));
+    Map<String, Object> second =
+        map(
+            """
+            { "id": "p-2", "version": "1", "action": "ADD",
+              "dataSourceIds": ["ds-1"], "dataSinkIds": ["sk-1"],
+              "data": { "nodes": [
+                  { "id": "src", "kind": "source", "sourceRef": "ds-1" },
+                  { "id": "m", "kind": "mapping", "mappingRef": "map-el" },
+                  { "id": "sink", "kind": "sink", "sinkRef": "sk-1" } ],
+                "edges": [
+                  { "id": "e1", "source": "src", "target": "m" },
+                  { "id": "e2", "source": "m", "target": "sink" } ] } }
+            """);
+    @SuppressWarnings("unchecked")
+    List<Object> pipelines = (List<Object>) payload.get("dataPipelines");
+    pipelines.add(second);
+
+    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+
+    assertEquals(failedType, result.type());
+    assertEquals(operation + " failed: Unsupported pipeline combination", result.error());
     verify(restClient, never()).deployFlow(any());
   }
 
