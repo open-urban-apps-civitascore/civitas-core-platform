@@ -682,6 +682,8 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
         quoteCharacter = '"',
         value = {
           "'startPage':'abc' | startPage",
+          "'startPage':'5' | startPage",
+          "'pageSize':'' | pageSize",
           "'endPage':1.5 | endPage",
           "'pageSize':1.5 | pageSize"
         })
