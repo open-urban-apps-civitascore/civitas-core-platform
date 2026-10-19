@@ -2,7 +2,6 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.output.DataStructureOutputDTO;
@@ -200,7 +199,6 @@ class DataStructureScopeFilteringIntegrationTest
     DataStructure entity = new DataStructure();
     entity.setName(name);
     entity.setDescription("Test data structure");
-    entity.setDataStructureStatus(DataStructureStatus.DRAFT);
     entity = dataStructureRepository.save(entity);
     return entity.getId();
   }

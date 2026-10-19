@@ -57,7 +57,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 public class DataSetService
-    extends BaseDataEntityService<DataSet, DataSetInputDTO, DataSetMetaInputDTO> {
+    extends ReleasableDataEntityService<DataSet, DataSetInputDTO, DataSetMetaInputDTO> {
 
   // Stable identifiers for drift events emitted by applyInfrastructureResult.
   private static final String DRIFT_ORPHAN_SLUGS = "orphan-slugs";

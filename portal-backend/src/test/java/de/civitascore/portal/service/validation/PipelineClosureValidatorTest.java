@@ -21,7 +21,6 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.civitascore.portal.configuration.PipelineClosureValidationProperties;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSource;
@@ -122,10 +121,9 @@ class PipelineClosureValidatorTest {
   }
 
   private static DataStructureVersion version(
-      String modelUrn, DataStructureVersionStatus versionStatus, DataStructureStatus parentStatus) {
+      String modelUrn, DataStructureVersionStatus versionStatus) {
     DataStructure parent = new DataStructure();
     parent.setId(UUID.randomUUID());
-    parent.setDataStructureStatus(parentStatus);
     parent.setModelLogicalUrn(logicalOf(modelUrn));
     DataStructureVersion version = new DataStructureVersion();
     version.setId(UUID.randomUUID());
@@ -151,7 +149,7 @@ class PipelineClosureValidatorTest {
   }
 
   private static DataStructureVersion released(String modelUrn) {
-    return version(modelUrn, DataStructureVersionStatus.AVAILABLE, DataStructureStatus.AVAILABLE);
+    return version(modelUrn, DataStructureVersionStatus.AVAILABLE);
   }
 
   private static List<UUID> blockedPipelinesOf(Throwable thrown) {
@@ -187,7 +185,6 @@ class PipelineClosureValidatorTest {
     void readabilityIsDecidedOncePerStructure() {
       DataStructure shared = new DataStructure();
       shared.setId(UUID.randomUUID());
-      shared.setDataStructureStatus(DataStructureStatus.AVAILABLE);
       shared.setModelLogicalUrn(logicalOf(STRUCTURE_URN));
       DataStructureVersion first = released(STRUCTURE_URN);
       first.setDataStructure(shared);
@@ -280,8 +277,8 @@ class PipelineClosureValidatorTest {
     }
 
     @Test
-    @DisplayName("a released, readable data structure passes")
-    void aReleasedStructurePasses() {
+    @DisplayName("a released, readable data structure version passes")
+    void aReleasedVersionPasses() {
       closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
       when(governingVersions.governingAll(any()))
           .thenReturn(governedBy(List.of(released(STRUCTURE_URN))));
@@ -317,34 +314,12 @@ class PipelineClosureValidatorTest {
     }
 
     @Test
-    @DisplayName("a data structure still in draft blocks the flow")
-    void aDraftStructureBlocks() {
+    @DisplayName("a data structure version still in draft blocks the flow")
+    void aDraftVersionBlocks() {
       closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
       when(governingVersions.governingAll(any()))
           .thenReturn(
-              governedBy(
-                  List.of(
-                      version(
-                          STRUCTURE_URN,
-                          DataStructureVersionStatus.DRAFT,
-                          DataStructureStatus.AVAILABLE))));
-
-      assertThatThrownBy(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
-          .satisfies(thrown -> assertThat(blockedPipelinesOf(thrown)).containsExactly(pipelineId));
-    }
-
-    @Test
-    @DisplayName("a released version of a data structure still in draft blocks the flow")
-    void aReleasedVersionOfADraftStructureBlocks() {
-      closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
-      when(governingVersions.governingAll(any()))
-          .thenReturn(
-              governedBy(
-                  List.of(
-                      version(
-                          STRUCTURE_URN,
-                          DataStructureVersionStatus.AVAILABLE,
-                          DataStructureStatus.DRAFT))));
+              governedBy(List.of(version(STRUCTURE_URN, DataStructureVersionStatus.DRAFT))));
 
       assertThatThrownBy(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
           .satisfies(thrown -> assertThat(blockedPipelinesOf(thrown)).containsExactly(pipelineId));
@@ -358,10 +333,7 @@ class PipelineClosureValidatorTest {
           .thenReturn(
               governedBy(
                   List.of(
-                      version(
-                          STRUCTURE_URN,
-                          DataStructureVersionStatus.DRAFT,
-                          DataStructureStatus.DRAFT),
+                      version(STRUCTURE_URN, DataStructureVersionStatus.DRAFT),
                       released(STRUCTURE_URN))));
 
       assertThatCode(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))
@@ -389,8 +361,7 @@ class PipelineClosureValidatorTest {
     @Test
     @DisplayName("a data structure a data source names still blocks the flow while in draft")
     void aDraftStructureOfADataSourceBlocks() {
-      DataStructureVersion version =
-          version(STRUCTURE_URN, DataStructureVersionStatus.DRAFT, DataStructureStatus.AVAILABLE);
+      DataStructureVersion version = version(STRUCTURE_URN, DataStructureVersionStatus.DRAFT);
       Pipeline pipeline = pipelineWithDataSourceOf(version);
       closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
       when(governingVersions.governingAll(any())).thenReturn(governedBy(List.of(version)));
@@ -472,12 +443,7 @@ class PipelineClosureValidatorTest {
       closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
       when(governingVersions.governingAll(any()))
           .thenReturn(
-              governedBy(
-                  List.of(
-                      version(
-                          STRUCTURE_URN,
-                          DataStructureVersionStatus.DRAFT,
-                          DataStructureStatus.AVAILABLE))));
+              governedBy(List.of(version(STRUCTURE_URN, DataStructureVersionStatus.DRAFT))));
 
       assertThat(blockedPipelinesOf(catchThrowable(() -> validator().validate(pipelines()))))
           .containsExactly(pipelineId);
@@ -523,12 +489,7 @@ class PipelineClosureValidatorTest {
       closureOf(PIPELINE_URN, Set.of(STRUCTURE_URN), Set.of());
       when(governingVersions.governingAll(any()))
           .thenReturn(
-              governedBy(
-                  List.of(
-                      version(
-                          STRUCTURE_URN,
-                          DataStructureVersionStatus.DRAFT,
-                          DataStructureStatus.DRAFT))));
+              governedBy(List.of(version(STRUCTURE_URN, DataStructureVersionStatus.DRAFT))));
       denyEveryStructure();
 
       assertThatThrownBy(() -> validator().validate(List.of(pipeline(pipelineId, PIPELINE_URN))))

@@ -6,7 +6,6 @@ import com.jayway.jsonpath.JsonPath;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.ConnectorType;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
@@ -89,7 +88,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
   }
 
   private UUID createAvailableDataStructureVersionId() {
-    var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+    var ds = portalData.dataStructure();
     DataStructureVersion dsv =
         portalData.dataStructureVersion(
             ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
@@ -397,8 +396,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
                   b.connectorType(ConnectorType.MQTT)
                       .dataStructureVersion(
                           portalData.dataStructureVersion(
-                              portalData.dataStructure(
-                                  d -> d.dataStructureStatus(DataStructureStatus.AVAILABLE)),
+                              portalData.dataStructure(),
                               v ->
                                   v.dataStructureVersionStatus(
                                       DataStructureVersionStatus.AVAILABLE))));

@@ -2,7 +2,6 @@ package de.civitascore.portal.service.validation;
 
 import de.civitascore.portal.configuration.PipelineClosureValidationProperties;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSource;
@@ -216,12 +215,8 @@ public class PipelineClosureValidator {
     }
   }
 
-  /**
-   * Whether a version counts as released. Both it and the structure carrying it must be: a released
-   * version of a draft structure is not something a flow may publish.
-   */
+  /** Whether a version counts as released: its own status decides. */
   private static boolean isReleased(DataStructureVersion version) {
-    return version.getDataStructureVersionStatus() == DataStructureVersionStatus.AVAILABLE
-        && version.getDataStructure().getDataStructureStatus() == DataStructureStatus.AVAILABLE;
+    return version.getDataStructureVersionStatus() == DataStructureVersionStatus.AVAILABLE;
   }
 }

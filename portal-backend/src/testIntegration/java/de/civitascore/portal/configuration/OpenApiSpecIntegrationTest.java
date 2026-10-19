@@ -51,7 +51,6 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
     "/datasets/{id}/released/meta, name",
     "/datasets/{id}/ready/meta, openDataAccess",
     "/datasources/{id}/released/meta, datapoolScope",
-    "/datastructures/{id}/released/meta, name",
     "/datastructures/{dataStructureId}/versions/{versionId}/released/meta, description"
   })
   @DisplayName("Should describe the metadata patch body with only optional metadata fields")
@@ -63,6 +62,30 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
     assertThat(schema.path("properties").has("connectorType")).isFalse();
     assertThat(schema.path("properties").has("model")).isFalse();
     assertThat(schema.has("required")).isFalse();
+  }
+
+  @Test
+  @DisplayName("Should describe data structures without a lifecycle of their own")
+  void shouldDescribeDataStructuresWithoutLifecycle() {
+    JsonNode paths = spec.path("paths");
+    assertThat(paths.has("/datastructures/{id}/release")).isFalse();
+    assertThat(paths.has("/datastructures/{id}/unrelease")).isFalse();
+    assertThat(paths.has("/datastructures/{id}/released/meta")).isFalse();
+    assertThat(
+            spec.path("components")
+                .path("schemas")
+                .path("DataStructureOutputDTO")
+                .path("properties")
+                .has("dataStructureStatus"))
+        .isFalse();
+    List<String> filterNames = new ArrayList<>();
+    paths
+        .path("/datastructures")
+        .path("get")
+        .path("parameters")
+        .values()
+        .forEach(parameter -> filterNames.add(parameter.path("name").asString()));
+    assertThat(filterNames).isNotEmpty().doesNotContain("dataStructureStatus");
   }
 
   @ParameterizedTest

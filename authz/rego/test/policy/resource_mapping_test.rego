@@ -245,14 +245,20 @@ test_sub_resource_paths if {
 		["/v1/datasets/abc/pipelines", "/v1/datasets/{id}/pipelines"],
 		["/v1/datasources/abc/release", "/v1/datasources/{id}/release"],
 		["/v1/datasources/abc/unrelease", "/v1/datasources/{id}/unrelease"],
-		["/v1/datastructures/abc/release", "/v1/datastructures/{id}/release"],
-		["/v1/datastructures/abc/unrelease", "/v1/datastructures/{id}/unrelease"],
 		["/v1/datastructures/abc/versions", "/v1/datastructures/{id}/versions"],
 	]
 	every pattern in patterns {
 		actual := resource_mapping.path_pattern with input as portal_request("POST", pattern[0])
 		actual == pattern[1]
 	}
+}
+
+# Test: A data structure has no lifecycle endpoints of its own
+test_datastructure_lifecycle_paths_unmapped if {
+	every path in ["/v1/datastructures/abc/release", "/v1/datastructures/abc/unrelease"] {
+		resource_mapping.path_pattern == "" with input as portal_request("POST", path)
+	}
+	resource_mapping.path_pattern == "" with input as portal_request("PATCH", "/v1/datastructures/abc/released/meta")
 }
 
 # Test: 5-segment paths resolve correctly (both literal-tail and both-{id} variants)

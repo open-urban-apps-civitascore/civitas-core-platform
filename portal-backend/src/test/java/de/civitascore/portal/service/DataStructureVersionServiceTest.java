@@ -15,7 +15,6 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
@@ -103,7 +102,6 @@ class DataStructureVersionServiceTest {
     void shouldBlockUnreleaseWhenInUseByReleased() {
       UUID versionId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
-      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
 
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
@@ -123,7 +121,6 @@ class DataStructureVersionServiceTest {
     void shouldAllowUnreleaseWhenInUseByDraftsOnly() {
       UUID versionId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
-      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
 
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
@@ -146,25 +143,18 @@ class DataStructureVersionServiceTest {
     }
 
     @Test
-    @DisplayName("Should allow unrelease when version is not in use")
-    void shouldAllowUnreleaseWhenNotInUse() {
+    @DisplayName("Should unrelease the only released version when it is not in use")
+    void shouldUnreleaseOnlyReleasedVersionWhenNotInUse() {
       UUID versionId = UUID.randomUUID();
-      UUID otherVersionId = UUID.randomUUID();
 
       DataStructure ds = new DataStructure();
-      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
 
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       version.setDataStructure(ds);
 
-      DataStructureVersion otherVersion = new DataStructureVersion();
-      otherVersion.setId(otherVersionId);
-      otherVersion.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-      otherVersion.setDataStructure(ds);
-
-      ds.setDataStructureVersions(Set.of(version, otherVersion));
+      ds.setDataStructureVersions(Set.of(version));
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.save(version)).thenReturn(version);
@@ -184,7 +174,6 @@ class DataStructureVersionServiceTest {
     void shouldBlockDeleteWhenInUse() {
       UUID versionId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
-      ds.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
@@ -204,7 +193,6 @@ class DataStructureVersionServiceTest {
     void shouldBlockDeleteWhenStillReferenced() {
       UUID versionId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
-      ds.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
@@ -225,7 +213,6 @@ class DataStructureVersionServiceTest {
     void shouldAllowDeleteWhenNotInUse() {
       UUID versionId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
-      ds.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
@@ -418,7 +405,6 @@ class DataStructureVersionServiceTest {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
-      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureId(dataStructureId);
@@ -460,7 +446,6 @@ class DataStructureVersionServiceTest {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
-      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
       dataStructure.setModelLogicalUrn(
           "urn:core:platform:civitas:element:common:00000000-0000-4000-8000-000000000016");
 
@@ -497,7 +482,6 @@ class DataStructureVersionServiceTest {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
-      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
       dataStructure.setModelLogicalUrn(
           "urn:core:platform:civitas:element:common:00000000-0000-4000-8000-000000000016");
 
@@ -528,7 +512,6 @@ class DataStructureVersionServiceTest {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
-      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
       dataStructure.setModelLogicalUrn(
           "urn:core:platform:civitas:element:common:00000000-0000-4000-8000-000000000016");
 
@@ -560,7 +543,6 @@ class DataStructureVersionServiceTest {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
-      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureId(dataStructureId);
@@ -607,7 +589,6 @@ class DataStructureVersionServiceTest {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
-      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureId(dataStructureId);
@@ -630,7 +611,6 @@ class DataStructureVersionServiceTest {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
-      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureId(dataStructureId);

@@ -69,5 +69,5 @@ Test case documentation is embedded in each `.bru` file's `docs` block (visible 
 | DataSources | `datasources/` | CRUD + Release / Unrelease + Released Meta + Assignments |
 | DataSets | `datasets/` | CRUD + Stage / Unstage + Release / Unrelease + Released Meta + Assignments |
 | Pipelines | `pipelines/` | CRUD (nested under DataSet) |
-| DataStructures | `datastructures/` | CRUD + Release / Unrelease + Released Meta + Assignments |
+| DataStructures | `datastructures/` | CRUD + Assignments + Versions (Release / Unrelease + Released Meta) |
 | DataStructure Versions | `datastructures/versions/` | CRUD + Release / Unrelease + Released Meta |

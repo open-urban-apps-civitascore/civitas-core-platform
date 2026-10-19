@@ -13,7 +13,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
@@ -86,11 +85,9 @@ class ArtifactUsageLookupTest {
     return dataSource;
   }
 
-  private static DataStructureVersion version(
-      DataStructureStatus structureStatus, DataStructureVersionStatus versionStatus) {
+  private static DataStructureVersion version(DataStructureVersionStatus versionStatus) {
     DataStructure structure = new DataStructure();
     structure.setId(UUID.randomUUID());
-    structure.setDataStructureStatus(structureStatus);
     DataStructureVersion version = new DataStructureVersion();
     version.setId(UUID.randomUUID());
     version.setModelUrn(MODEL_URN);
@@ -101,7 +98,7 @@ class ArtifactUsageLookupTest {
   }
 
   private static DataStructureVersion releasedVersion() {
-    return version(DataStructureStatus.AVAILABLE, DataStructureVersionStatus.AVAILABLE);
+    return version(DataStructureVersionStatus.AVAILABLE);
   }
 
   @Nested
@@ -171,8 +168,7 @@ class ArtifactUsageLookupTest {
     @Test
     @DisplayName("A DRAFT version a data source pins is in use and asks the registry nothing")
     void draftPinned_asksNoRegistry() {
-      DataStructureVersion version =
-          version(DataStructureStatus.AVAILABLE, DataStructureVersionStatus.DRAFT);
+      DataStructureVersion version = version(DataStructureVersionStatus.DRAFT);
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(version.getId())))
           .thenReturn(true);
 
@@ -181,20 +177,6 @@ class ArtifactUsageLookupTest {
       assertThat(usage.inUse()).isTrue();
       assertThat(usage.inUseByReleased()).isFalse();
       verifyNoInteractions(modelRegistryGateway);
-    }
-
-    @Test
-    @DisplayName("An AVAILABLE version of a DRAFT structure classifies no referrer")
-    void releasedVersionOfDraftStructure_classifiesNoReferrer() {
-      DataStructureVersion version =
-          version(DataStructureStatus.DRAFT, DataStructureVersionStatus.AVAILABLE);
-      when(modelRegistryGateway.isReferenced(MODEL_URN)).thenReturn(true);
-
-      ArtifactUsage usage = lookup.of(version);
-
-      assertThat(usage.inUse()).isTrue();
-      assertThat(usage.inUseByReleased()).isFalse();
-      verify(modelRegistryGateway, never()).referencesTo(any());
     }
 
     @Test
@@ -301,14 +283,14 @@ class ArtifactUsageLookupTest {
     }
 
     @Test
-    @DisplayName("An element of an AVAILABLE structure counts as released through its structure")
+    @DisplayName("An element of a structure with a released version counts as released through it")
     void elementOfReleasedStructure_isInUseByReleased() {
       DataStructureVersion version = releasedVersion();
       when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(ELEMENT_URN));
       when(modelRegistryGateway.hostModelUrnsOf(ELEMENT_URN))
           .thenReturn(Set.of(ELEMENT_URN, STRUCTURE_URN));
       when(dataStructureRepository.findReleaseStatesByModelLogicalUrnIn(
-              Set.of(ELEMENT_URN, STRUCTURE_URN), DataStructureStatus.AVAILABLE))
+              Set.of(ELEMENT_URN, STRUCTURE_URN), DataStructureVersionStatus.AVAILABLE))
           .thenReturn(List.of(new ReferrerReleaseState(STRUCTURE_URN, true)));
 
       ArtifactUsage usage = lookup.of(version);
@@ -317,16 +299,17 @@ class ArtifactUsageLookupTest {
           .containsExactly(new ReleasedReferrer(ReferrerKind.DATA_STRUCTURE, ELEMENT_URN));
     }
 
-    // Without this a DRAFT host found under one candidate URN would still block the unrelease.
+    // Without this a host without a released version, found under one candidate URN, would still
+    // block the unrelease.
     @Test
-    @DisplayName("An element whose only host row is DRAFT is not released")
-    void elementOfDraftStructure_isNotReleased() {
+    @DisplayName("An element whose only host row has no released version is not released")
+    void elementOfUnreleasedStructure_isNotReleased() {
       DataStructureVersion version = releasedVersion();
       when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(ELEMENT_URN));
       when(modelRegistryGateway.hostModelUrnsOf(ELEMENT_URN))
           .thenReturn(Set.of(ELEMENT_URN, STRUCTURE_URN));
       when(dataStructureRepository.findReleaseStatesByModelLogicalUrnIn(
-              Set.of(ELEMENT_URN, STRUCTURE_URN), DataStructureStatus.AVAILABLE))
+              Set.of(ELEMENT_URN, STRUCTURE_URN), DataStructureVersionStatus.AVAILABLE))
           .thenReturn(List.of(new ReferrerReleaseState(ELEMENT_URN, false)));
 
       ArtifactUsage usage = lookup.of(version);
@@ -375,10 +358,10 @@ class ArtifactUsageLookupTest {
   class StructureUsage {
 
     @Test
-    @DisplayName("A DRAFT structure is answered without classifying a referrer")
-    void draftStructure_classifiesNoReferrer() {
-      DataStructureVersion version =
-          version(DataStructureStatus.DRAFT, DataStructureVersionStatus.DRAFT);
+    @DisplayName(
+        "A structure without a released version is answered without classifying a referrer")
+    void structureWithoutReleasedVersion_classifiesNoReferrer() {
+      DataStructureVersion version = version(DataStructureVersionStatus.DRAFT);
       when(modelRegistryGateway.isReferenced(MODEL_URN)).thenReturn(true);
 
       ArtifactUsage usage = lookup.of(version.getDataStructure());
@@ -392,7 +375,6 @@ class ArtifactUsageLookupTest {
     @DisplayName("A structure is released-used when a released entity references one version")
     void releasedReferrerOfOneVersion_isInUseByReleased() {
       DataStructure structure = new DataStructure();
-      structure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
       DataStructureVersion released = new DataStructureVersion();
       released.setId(UUID.randomUUID());
       released.setModelUrn(MODEL_URN);
@@ -420,7 +402,6 @@ class ArtifactUsageLookupTest {
     @DisplayName("Each version is answered by its own referrers")
     void ofEachVersion_answersEachVersionSeparately() {
       DataStructure structure = new DataStructure();
-      structure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
       DataStructureVersion released = new DataStructureVersion();
       released.setId(UUID.randomUUID());
       released.setModelUrn(MODEL_URN);

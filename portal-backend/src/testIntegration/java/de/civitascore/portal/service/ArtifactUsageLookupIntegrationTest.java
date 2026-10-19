@@ -6,7 +6,6 @@ import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -70,8 +69,7 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
 
   private DataStructureVersion releasedVersion(String title) {
     return releasedVersionOf(
-        portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE)),
-        portalData.dataStructureVersionModel(title));
+        portalData.dataStructure(), portalData.dataStructureVersionModel(title));
   }
 
   private DataStructureVersion releasedVersionOf(
@@ -150,9 +148,8 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
       DataStructure structure =
           portalData.dataStructure(
               b ->
-                  b.dataStructureStatus(DataStructureStatus.DRAFT)
-                      .modelLogicalUrn(
-                          "urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000024"));
+                  b.modelLogicalUrn(
+                      "urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000024"));
 
       assertThat(
               dataSetRepository.findReleaseStatesByManifestLogicalUrnIn(
@@ -172,8 +169,32 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
           .containsExactly(new ReferrerReleaseState(source.getConfigurationLogicalUrn(), true));
       assertThat(
               dataStructureRepository.findReleaseStatesByModelLogicalUrnIn(
-                  Set.of(structure.getModelLogicalUrn()), DataStructureStatus.AVAILABLE))
+                  Set.of(structure.getModelLogicalUrn()), DataStructureVersionStatus.AVAILABLE))
           .containsExactly(new ReferrerReleaseState(structure.getModelLogicalUrn(), false));
+    }
+
+    @Test
+    @DisplayName("a data structure reports released once any of its versions is AVAILABLE")
+    void dataStructureReportsReleasedThroughAnyVersion() {
+      String logicalUrn =
+          "urn:core:platform:civitas:datastructure:common:00000000-0000-4000-8000-000000000025";
+      DataStructure structure = portalData.dataStructure(b -> b.modelLogicalUrn(logicalUrn));
+      portalData.dataStructureVersion(structure);
+
+      assertThat(
+              dataStructureRepository.findReleaseStatesByModelLogicalUrnIn(
+                  Set.of(logicalUrn), DataStructureVersionStatus.AVAILABLE))
+          .as("only a DRAFT version")
+          .containsExactly(new ReferrerReleaseState(logicalUrn, false));
+
+      portalData.dataStructureVersion(
+          structure, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
+
+      assertThat(
+              dataStructureRepository.findReleaseStatesByModelLogicalUrnIn(
+                  Set.of(logicalUrn), DataStructureVersionStatus.AVAILABLE))
+          .as("one DRAFT and one AVAILABLE version")
+          .containsExactly(new ReferrerReleaseState(logicalUrn, true));
     }
 
     @Test
@@ -262,7 +283,8 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
 
     @Test
     @DisplayName(
-        "a structure referencing a version from a nested element releases it only when AVAILABLE")
+        "a structure referencing a version from a nested element uses it as released work once"
+            + " one of its versions is released")
     void structureReferencingFromNestedElement_followsItsStatus() {
       DataStructureVersion version = releasedVersion("Reading");
       Map<String, Object> model = portalData.dataStructureVersionModel("NestedHost");
@@ -276,12 +298,12 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
                   "object",
                   "properties",
                   Map.of("reading", Map.of("$ref", version.getModelUrn())))));
-      DataStructure referrer = structureWithModel(DataStructureStatus.DRAFT, model);
+      DataStructureVersion referrer = structureWithModel(model);
 
       assertThat(usageOf(version).inUse()).isTrue();
       assertThat(usageOf(version).inUseByReleased()).isFalse();
 
-      withStatus(referrer, DataStructureStatus.AVAILABLE);
+      released(referrer);
 
       assertThat(usageOf(version).releasedReferrers())
           .extracting(ArtifactUsageLookup.ReleasedReferrer::kind)
@@ -290,17 +312,18 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
 
     @Test
     @DisplayName(
-        "a structure referencing a version from its root element releases it only when AVAILABLE")
+        "a structure referencing a version from its root element uses it as released work once one"
+            + " of its versions is released")
     void structureReferencingFromRootElement_followsItsStatus() {
       DataStructureVersion version = releasedVersion("Reading");
       Map<String, Object> model = portalData.dataStructureVersionModel("RootHost");
       model.put("properties", Map.of("reading", Map.of("$ref", version.getModelUrn())));
-      DataStructure referrer = structureWithModel(DataStructureStatus.DRAFT, model);
+      DataStructureVersion referrer = structureWithModel(model);
 
       assertThat(usageOf(version).inUse()).isTrue();
       assertThat(usageOf(version).inUseByReleased()).isFalse();
 
-      withStatus(referrer, DataStructureStatus.AVAILABLE);
+      released(referrer);
 
       assertThat(usageOf(version).releasedReferrers())
           .extracting(ArtifactUsageLookup.ReleasedReferrer::kind)
@@ -308,17 +331,17 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
     }
   }
 
-  private DataStructure structureWithModel(DataStructureStatus status, Map<String, Object> model) {
-    DataStructure structure = portalData.dataStructure(b -> b.dataStructureStatus(status));
-    DataStructureVersion version = portalData.dataStructureVersion(structure);
-    portalData.attachModel(version, model);
-    return dataStructureRepository.findById(structure.getId()).orElseThrow();
+  /** A DRAFT version of a new structure, holding the given model. */
+  private DataStructureVersion structureWithModel(Map<String, Object> model) {
+    DataStructureVersion version = portalData.dataStructureVersion(portalData.dataStructure());
+    return portalData.attachModel(version, model);
   }
 
-  private DataStructure withStatus(DataStructure structure, DataStructureStatus status) {
-    DataStructure reloaded = dataStructureRepository.findById(structure.getId()).orElseThrow();
-    reloaded.setDataStructureStatus(status);
-    return dataStructureRepository.save(reloaded);
+  private DataStructureVersion released(DataStructureVersion version) {
+    DataStructureVersion reloaded =
+        dataStructureVersionRepository.findById(version.getId()).orElseThrow();
+    reloaded.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+    return dataStructureVersionRepository.save(reloaded);
   }
 
   @Nested
@@ -328,8 +351,7 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
     @Test
     @DisplayName("a class another version adds does not use the version it references")
     void classOfAnotherVersion_doesNotUseTheVersion() {
-      DataStructure structure =
-          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructure structure = portalData.dataStructure();
       DataStructureVersion first = releasedVersionOf(structure, modeledAs("NeueKlasse"));
       DataStructureVersion second =
           releasedVersionOf(structure, modeledAs("NeueKlasse", "NeueKlasse2"));
@@ -342,8 +364,7 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
     @Test
     @DisplayName("a class an earlier version had does not use the later version")
     void classOfAnEarlierVersion_doesNotUseTheLaterVersion() {
-      DataStructure structure =
-          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructure structure = portalData.dataStructure();
       DataStructureVersion first =
           releasedVersionOf(structure, modeledAs("NeueKlasse", "NeueKlasse2"));
       DataStructureVersion second = releasedVersionOf(structure, modeledAs("NeueKlasse"));
@@ -356,14 +377,13 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
     @Test
     @DisplayName("a class of another structure still uses the version it references")
     void classOfAnotherStructure_usesTheVersion() {
-      DataStructure structure =
-          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructure structure = portalData.dataStructure();
       DataStructureVersion version = releasedVersionOf(structure, modeledAs("NeueKlasse"));
       Map<String, Object> other = modeledAs("Fremd");
       defOf(other, "Fremd")
           .put(
               "properties", Map.of("neueKlasse", Map.of("$ref", memberUrn(version, "NeueKlasse"))));
-      structureWithModel(DataStructureStatus.DRAFT, other);
+      structureWithModel(other);
 
       assertThat(usageOf(version).inUse()).isTrue();
     }
@@ -371,14 +391,11 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
     @Test
     @DisplayName("a structure that two datasets list is not used by the listing")
     void structureListedByTwoDataSets_isNotUsedByTheListing() {
-      DataStructure sourceStructure =
-          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructure sourceStructure = portalData.dataStructure();
       DataStructureVersion source = releasedVersionOf(sourceStructure, modeledAs("Quelle"));
       DataStructureVersion unused = releasedVersionOf(sourceStructure, modeledAs("Andere"));
       DataStructureVersion target =
-          releasedVersionOf(
-              portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE)),
-              modeledAs("Ziel"));
+          releasedVersionOf(portalData.dataStructure(), modeledAs("Ziel"));
       List<String> pipelines =
           List.of(
               pipelineMapping(dataSetWithManifest(), source, target),

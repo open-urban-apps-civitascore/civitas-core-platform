@@ -3,7 +3,6 @@ package de.civitascore.portal.config;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.RoleDefault;
 import de.civitascore.portal.model.embedded.RoleType;
@@ -363,8 +362,7 @@ public class PortalTestDataFactory {
     var builder =
         DataStructure.builder()
             .name("datastructure-" + nextSeq())
-            .description("test data structure")
-            .dataStructureStatus(DataStructureStatus.DRAFT);
+            .description("test data structure");
     customizer.accept(builder);
     return dataStructureRepository.save(builder.build());
   }

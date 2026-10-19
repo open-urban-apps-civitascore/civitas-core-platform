@@ -1,12 +1,9 @@
 package de.civitascore.portal.model.entity;
 
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.entity.base.BaseDataEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
@@ -21,9 +18,7 @@ import lombok.experimental.SuperBuilder;
 
 /**
  * Represents a data structure definition that contains one or more {@link DataStructureVersion
- * versions}. Tracks its own lifecycle status.
- *
- * @see DataStructureStatus
+ * versions}. It carries no lifecycle status of its own; each version does.
  */
 @Entity
 @Table(name = "data_structures")
@@ -55,11 +50,6 @@ public class DataStructure extends BaseDataEntity {
       return new DataStructure(this);
     }
   }
-
-  @Enumerated(EnumType.STRING)
-  @Column(name = "data_structure_status", nullable = false)
-  @Builder.Default
-  private DataStructureStatus dataStructureStatus = DataStructureStatus.DRAFT;
 
   /**
    * Logical CORE URN of this data structure's model artifact in Model Forge. Null until the first

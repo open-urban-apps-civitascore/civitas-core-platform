@@ -13,7 +13,6 @@ import de.civitascore.portal.configuration.SagaProperties;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
@@ -236,7 +235,7 @@ class DataSetSagaPublisherIntegrationTest extends BaseKeycloakIntegrationTest {
     DataStructureVersion released =
         portalData.attachModel(
             portalData.dataStructureVersion(
-                portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE)),
+                portalData.dataStructure(),
                 b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)),
             portalData.dataStructureVersionModel("Reading, released"));
     DataSet dataSet = portalData.dataSet();

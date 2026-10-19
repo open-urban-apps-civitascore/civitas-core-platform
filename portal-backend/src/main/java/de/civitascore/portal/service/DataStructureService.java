@@ -1,13 +1,9 @@
 package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.DataStructureMapper;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
-import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
-import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
-import de.civitascore.portal.model.input.DataStructureMetaInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
@@ -21,17 +17,15 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Service for managing {@link DataStructure} entities through their lifecycle (DRAFT to AVAILABLE).
- * Handles version relationship resolution, release/unrelease status transitions, and validates that
- * no referenced versions are in use before allowing structural changes.
+ * Service for managing {@link DataStructure} entities: logical containers of their versions, which
+ * carry the lifecycle. Validates that no version is in use before the data structure is deleted.
  */
 @Service
 @RequiredArgsConstructor
 public class DataStructureService
-    extends BaseDataEntityService<DataStructure, DataStructureInputDTO, DataStructureMetaInputDTO> {
+    extends BaseDataEntityService<DataStructure, DataStructureInputDTO> {
 
   private final DataStructureRepository dataStructureRepository;
   private final DataStructureMapper dataStructureMapper;
@@ -39,7 +33,6 @@ public class DataStructureService
   private final AssignmentChangeAuthorizer assignmentChangeAuthorizer;
   private final DataSourceRepository dataSourceRepository;
   private final ModelRegistryGateway modelRegistryGateway;
-  private final ArtifactUsageLookup artifactUsageLookup;
 
   @Override
   protected DataStructureRepository getRepository() {
@@ -66,39 +59,6 @@ public class DataStructureService
     return assignmentChangeAuthorizer;
   }
 
-  @Override
-  protected ReleasableStatus getEntityStatus(DataStructure entity) {
-    return entity.getDataStructureStatus();
-  }
-
-  @Override
-  protected void setEntityStatus(DataStructure entity, ReleasableStatus status) {
-    entity.setDataStructureStatus((DataStructureStatus) status);
-  }
-
-  @Override
-  protected ReleasableStatus getDraftStatus() {
-    return DataStructureStatus.DRAFT;
-  }
-
-  @Override
-  protected ReleasableStatus getAvailableStatus() {
-    return DataStructureStatus.AVAILABLE;
-  }
-
-  /**
-   * Sets initial DRAFT status for newly created data structures.
-   *
-   * @param input the creation input
-   * @return the input with DRAFT status set
-   */
-  @Override
-  protected DataStructureInputDTO preProcessCreateInput(DataStructureInputDTO input) {
-    // Set DRAFT status for newly created data structures
-    input.setDataStructureStatus(DataStructureStatus.DRAFT);
-    return super.preProcessCreateInput(input);
-  }
-
   /**
    * Validates that the name is not blank before updating the data structure.
    *
@@ -115,65 +75,6 @@ public class DataStructureService
           "name", existingEntity.getId(), "Name cannot be null or blank");
     }
     return input;
-  }
-
-  /**
-   * Override update to ensure it can only be called for DRAFT data structures. For released data
-   * structures, use updateReleasedMeta instead.
-   *
-   * @param id the data structure ID
-   * @param input the update input
-   * @return the updated data structure
-   * @throws InvalidInputException if trying to update a non-DRAFT data structure
-   */
-  @Override
-  public DataStructure update(UUID id, DataStructureInputDTO input) {
-    DataStructure existingEntity = findByIdOrThrow(id);
-    if (existingEntity.getDataStructureStatus() != DataStructureStatus.DRAFT) {
-      throw new InvalidInputException(
-          "dataStructureStatus",
-          id,
-          "Cannot update a released DataStructure. Use the released/meta endpoint instead.");
-    }
-    return super.update(id, input);
-  }
-
-  @Override
-  @Transactional
-  public DataStructure updateReleasedMeta(UUID id, DataStructureMetaInputDTO meta) {
-    DataStructure existingEntity = findByIdOrThrow(id);
-    if (existingEntity.getDataStructureStatus() == DataStructureStatus.DRAFT) {
-      throw new InvalidInputException(
-          getEntityName(), id, "Cannot update released metadata on a DRAFT entity");
-    }
-    return super.update(id, dataStructureMapper.toUpdateInput(meta));
-  }
-
-  @Override
-  public DataStructureMetaInputDTO toMetaInput(DataStructure entity) {
-    return dataStructureMapper.toMetaInput(entity);
-  }
-
-  @Override
-  protected void validateRelease(DataStructure entity) {
-    boolean hasReleasedVersion =
-        entity.getDataStructureVersions().stream()
-            .anyMatch(
-                version ->
-                    version.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT);
-
-    if (!hasReleasedVersion) {
-      throw new InvalidInputException(
-          "dataStructureVersions",
-          entity.getId(),
-          "DataStructure must contain at least one released DataStructureVersion before"
-              + " releasing");
-    }
-  }
-
-  @Override
-  protected void validateUnrelease(DataStructure entity) {
-    artifactUsageLookup.of(entity).requireNoReleasedReferrer(getEntityName(), entity.getId());
   }
 
   /**

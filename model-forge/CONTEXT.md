@@ -19,8 +19,8 @@ _Avoid_: type, class, model, definition
 
 **Data Structure**:
 An artifact that groups Elements as its members. A different concept from the Portal Backend's
-**Data Structure**, despite the shared name: that one is a tenant-curated asset with a release
-lifecycle, this one is the grouping in the registry it is translated into.
+**Data Structure**, despite the shared name: that one is a tenant-curated asset whose versions
+carry a release lifecycle, this one is the grouping in the registry it is translated into.
 _Avoid_: schema set, model group, bundle
 
 **Root**:

@@ -10,7 +10,6 @@ import de.civitascore.portal.model.connector.SqlConnectorConfiguration;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.entity.DataPool;
@@ -79,7 +78,7 @@ class DataSourceControllerIntegrationTest
   }
 
   private UUID createAvailableDataStructureVersionId() {
-    var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+    var ds = portalData.dataStructure();
     DataStructureVersion dsv =
         portalData.dataStructureVersion(
             ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
@@ -269,7 +268,7 @@ class DataSourceControllerIntegrationTest
   }
 
   private DataStructureVersion dataStructureVersionWithModel(DataStructureVersionStatus status) {
-    var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+    var ds = portalData.dataStructure();
     DataStructureVersion dsv =
         portalData.dataStructureVersion(ds, b -> b.dataStructureVersionStatus(status));
     // attachModel sets the pin on dsv; its result holds a lazy parent outside any session, which
@@ -279,18 +278,10 @@ class DataSourceControllerIntegrationTest
   }
 
   private UUID createDraftDataStructureVersionId() {
-    var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+    var ds = portalData.dataStructure();
     DataStructureVersion dsv =
         portalData.dataStructureVersion(
             ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.DRAFT));
-    return dsv.getId();
-  }
-
-  private UUID createDsvWithDraftParentDataStructure() {
-    var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.DRAFT));
-    DataStructureVersion dsv =
-        portalData.dataStructureVersion(
-            ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
     return dsv.getId();
   }
 
@@ -1157,21 +1148,6 @@ class DataSourceControllerIntegrationTest
     @DisplayName("Should save a DRAFT DataSource with a DRAFT DataStructureVersion")
     void shouldSaveDraftDataSourceWithDraftDataStructureVersion() {
       UUID dsvId = createDraftDataStructureVersionId();
-      DataSourceInputDTO input = createValidInput();
-      input.setDataStructureVersionId(dsvId);
-
-      ResponseEntity<DataSourceOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody().getDataStructureVersion().getId()).isEqualTo(dsvId);
-      assertThat(performReleaseExpectingError(response.getBody().getId()).getStatusCode())
-          .isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName("Should save a DRAFT DataSource when the parent DataStructure is DRAFT")
-    void shouldSaveDraftDataSourceWithDraftParentDataStructure() {
-      UUID dsvId = createDsvWithDraftParentDataStructure();
       DataSourceInputDTO input = createValidInput();
       input.setDataStructureVersionId(dsvId);
 

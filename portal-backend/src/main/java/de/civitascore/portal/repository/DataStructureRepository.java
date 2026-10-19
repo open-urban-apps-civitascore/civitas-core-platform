@@ -1,6 +1,6 @@
 package de.civitascore.portal.repository;
 
-import de.civitascore.portal.model.embedded.DataStructureStatus;
+import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import java.util.Collection;
 import java.util.List;
@@ -27,11 +27,16 @@ public interface DataStructureRepository extends NamedEntityRepository<DataStruc
   @Override
   @NonNull Optional<DataStructure> findById(@NonNull UUID id);
 
-  /** Whether each data structure has the given status, keyed by its model's logical URN. */
+  /**
+   * Whether each data structure holds a version with the given status, keyed by its model's logical
+   * URN.
+   */
   @Query(
       "SELECT new de.civitascore.portal.repository.ReferrerReleaseState(s.modelLogicalUrn,"
-          + " CASE WHEN s.dataStructureStatus = :status THEN true ELSE false END)"
+          + " CASE WHEN EXISTS (SELECT 1 FROM DataStructureVersion v"
+          + " WHERE v.dataStructure = s AND v.dataStructureVersionStatus = :status)"
+          + " THEN true ELSE false END)"
           + " FROM DataStructure s WHERE s.modelLogicalUrn IN :urns")
   List<ReferrerReleaseState> findReleaseStatesByModelLogicalUrnIn(
-      @Param("urns") Collection<String> urns, @Param("status") DataStructureStatus status);
+      @Param("urns") Collection<String> urns, @Param("status") DataStructureVersionStatus status);
 }
