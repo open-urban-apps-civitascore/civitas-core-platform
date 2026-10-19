@@ -156,6 +156,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   // Field ids change on every form reset, indexes do not.
   const [editingApiCalls, setEditingApiCalls] = useState<ApiCallSnapshots>(new Map())
   const [collapsedRequestIndexes, setCollapsedRequestIndexes] = useState<ReadonlySet<number>>(new Set())
+  const [collapsedPaginationIndexes, setCollapsedPaginationIndexes] = useState<ReadonlySet<number>>(new Set())
   // Index of each API call at the last save, null for a new API call. Undefined: no change since then.
   const [initialApiCallIndexes, setInitialApiCallIndexes] = useState<ReadonlyArray<number | null>>()
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
@@ -191,6 +192,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   useEffect(() => {
     setEditingApiCalls(new Map())
     setCollapsedRequestIndexes(new Set())
+    setCollapsedPaginationIndexes(new Set())
     setInitialApiCallIndexes(undefined)
   }, [selectedConnectorType])
 
@@ -228,10 +230,13 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
         ? []
         : [[initialIndex, structuredClone(initialApiCalls[initialIndex] ?? null)] as const]
     })
-    const initialCollapsedIndexes = [...collapsedRequestIndexes].map(toInitialIndex)
-    const collapsedIndexes = initialCollapsedIndexes.filter(index => index !== null)
+    const toInitialIndexes = (indexes: ReadonlySet<number>) => {
+      const initialIndexes = [...indexes].map(toInitialIndex)
+      return new Set(initialIndexes.filter(index => index !== null))
+    }
     setEditingApiCalls(new Map(editingEntries))
-    setCollapsedRequestIndexes(new Set(collapsedIndexes))
+    setCollapsedRequestIndexes(toInitialIndexes(collapsedRequestIndexes))
+    setCollapsedPaginationIndexes(toInitialIndexes(collapsedPaginationIndexes))
     setInitialApiCallIndexes(undefined)
   }
 
@@ -343,10 +348,12 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             dataStructureName={selectedDatastructureName}
             editingApiCalls={editingApiCalls}
             collapsedRequestIndexes={collapsedRequestIndexes}
+            collapsedPaginationIndexes={collapsedPaginationIndexes}
             onEditingApiCallsChange={setEditingApiCalls}
             onApiCallAdd={handleApiCallAdd}
             onApiCallRemove={handleApiCallRemove}
             onCollapsedRequestIndexesChange={setCollapsedRequestIndexes}
+            onCollapsedPaginationIndexesChange={setCollapsedPaginationIndexes}
           />
         )
       case 'datapools':

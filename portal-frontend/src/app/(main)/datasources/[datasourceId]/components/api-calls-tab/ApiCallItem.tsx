@@ -1,4 +1,4 @@
-import { ChevronDown, Copy, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronsDownUp, ChevronsUpDown, Copy, Trash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { get, useFieldArray, UseFormReturn, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
 import { HttpApiCallsForm } from '@/types/connectors'
 import { buildApiCallUrl, formatPathWithQuery } from '@/utils/connectors'
 
+import { ApiCallPagination } from './ApiCallPagination'
 import { ApiCallParameterRows } from './ApiCallParameterRows'
 
 const EMPTY_PARAMETER = { name: '', value: '' }
@@ -25,10 +26,12 @@ interface ApiCallItemProps {
   index: number
   isEditing: boolean
   isRequestOpen: boolean
+  isPaginationOpen: boolean
   isDisabled: boolean
   dataStructureName?: string
   onEdit: () => void
   onRequestOpenChange: (isRequestOpen: boolean) => void
+  onPaginationOpenChange: (isPaginationOpen: boolean) => void
   onDelete: () => void
   onClose: () => void
   onCancel: () => void
@@ -40,10 +43,12 @@ export const ApiCallItem = (props: ApiCallItemProps) => {
     index,
     isEditing,
     isRequestOpen,
+    isPaginationOpen,
     isDisabled,
     dataStructureName,
     onEdit,
     onRequestOpenChange,
+    onPaginationOpenChange,
     onDelete,
     onClose,
     onCancel,
@@ -61,7 +66,14 @@ export const ApiCallItem = (props: ApiCallItemProps) => {
   const pathWithQuery = formatPathWithQuery(apiCall?.path ?? '', apiCall?.queryParameters ?? [])
   const hasParameters = queryParameters.fields.length > 0 || headers.fields.length > 0
   const hasError = !!get(form.formState.errors, apiCallPath)
+  const isAnySectionOpen = isRequestOpen || isPaginationOpen
+  const toggleAllLabel = isAnySectionOpen ? t('collapseAll') : t('expandAll')
   const borderClassName = cn('rounded-md border py-3', hasError ? 'border-destructive' : 'border-transparent')
+
+  const handleToggleAll = () => {
+    onRequestOpenChange(!isAnySectionOpen)
+    onPaginationOpenChange(!isAnySectionOpen)
+  }
 
   const handleCopyUrl = async () => {
     try {
@@ -96,7 +108,17 @@ export const ApiCallItem = (props: ApiCallItemProps) => {
 
   return (
     <div className={cn('flex flex-col gap-4', borderClassName)}>
-      <span className="font-semibold">{displayName}</span>
+      <div className="flex items-center justify-between">
+        <span className="font-semibold">{displayName}</span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button type="button" variant="outline" size="icon" aria-label={toggleAllLabel} onClick={handleToggleAll}>
+              {isAnySectionOpen ? <ChevronsDownUp /> : <ChevronsUpDown />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{toggleAllLabel}</TooltipContent>
+        </Tooltip>
+      </div>
 
       <Collapsible open={isRequestOpen} onOpenChange={onRequestOpenChange} className="group/request">
         <div className="group/request-row flex items-center">
@@ -232,7 +254,15 @@ export const ApiCallItem = (props: ApiCallItemProps) => {
         </CollapsibleContent>
       </Collapsible>
 
-      <div className={cn('flex gap-2', isDisabled && 'mt-4')}>
+      <ApiCallPagination
+        form={form}
+        index={index}
+        isOpen={isPaginationOpen}
+        isDisabled={isDisabled}
+        onOpenChange={onPaginationOpenChange}
+      />
+
+      <div className="flex gap-2 mt-4">
         {isDisabled ? (
           <Button type="button" onClick={onClose}>
             {tActions('close')}

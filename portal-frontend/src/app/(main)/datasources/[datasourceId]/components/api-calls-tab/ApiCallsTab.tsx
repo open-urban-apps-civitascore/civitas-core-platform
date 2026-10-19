@@ -57,8 +57,10 @@ interface ApiCallsTabProps {
   dataStructureName?: string
   editingApiCalls: ApiCallSnapshots
   collapsedRequestIndexes: ReadonlySet<number>
+  collapsedPaginationIndexes: ReadonlySet<number>
   onEditingApiCallsChange: (editingApiCalls: ApiCallSnapshots) => void
   onCollapsedRequestIndexesChange: (collapsedRequestIndexes: ReadonlySet<number>) => void
+  onCollapsedPaginationIndexesChange: (collapsedPaginationIndexes: ReadonlySet<number>) => void
   onApiCallAdd: () => void
   onApiCallRemove: (index: number) => void
 }
@@ -71,8 +73,10 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
     dataStructureName,
     editingApiCalls,
     collapsedRequestIndexes,
+    collapsedPaginationIndexes,
     onEditingApiCallsChange,
     onCollapsedRequestIndexesChange,
+    onCollapsedPaginationIndexesChange,
     onApiCallAdd,
     onApiCallRemove,
   } = props
@@ -97,11 +101,13 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
   const openEditView = (index: number, snapshot: HttpApiCallForm | null) => {
     onEditingApiCallsChange(new Map(editingApiCalls).set(index, snapshot))
     onCollapsedRequestIndexesChange(removeIndex(collapsedRequestIndexes, index))
+    onCollapsedPaginationIndexesChange(removeIndex(collapsedPaginationIndexes, index))
   }
 
   const removeApiCall = (index: number) => {
     onEditingApiCallsChange(removeSnapshotAndShift(editingApiCalls, index))
     onCollapsedRequestIndexesChange(removeIndexAndShift(collapsedRequestIndexes, index))
+    onCollapsedPaginationIndexesChange(removeIndexAndShift(collapsedPaginationIndexes, index))
     onApiCallRemove(index)
     remove(index)
   }
@@ -127,6 +133,13 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
       ? removeIndex(collapsedRequestIndexes, index)
       : addIndex(collapsedRequestIndexes, index)
     onCollapsedRequestIndexesChange(nextCollapsedRequestIndexes)
+  }
+
+  const handlePaginationOpenChange = (index: number, isPaginationOpen: boolean) => {
+    const nextCollapsedPaginationIndexes = isPaginationOpen
+      ? removeIndex(collapsedPaginationIndexes, index)
+      : addIndex(collapsedPaginationIndexes, index)
+    onCollapsedPaginationIndexesChange(nextCollapsedPaginationIndexes)
   }
 
   const handleAdd = () => {
@@ -176,10 +189,12 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
                 index={index}
                 isEditing={editingApiCalls.has(index)}
                 isRequestOpen={!collapsedRequestIndexes.has(index)}
+                isPaginationOpen={!collapsedPaginationIndexes.has(index)}
                 isDisabled={isDisabled}
                 dataStructureName={dataStructureName}
                 onEdit={() => handleEdit(index)}
                 onRequestOpenChange={isRequestOpen => handleRequestOpenChange(index, isRequestOpen)}
+                onPaginationOpenChange={isPaginationOpen => handlePaginationOpenChange(index, isPaginationOpen)}
                 onDelete={() => setDeleteIndex(index)}
                 onClose={() => handleClose(index)}
                 onCancel={() => handleCancel(index)}
