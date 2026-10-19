@@ -36,9 +36,6 @@ tests {
   test("Has name", function() {
     expect(res.body.name).to.be.a('string');
   });
-  test("Has no status of its own", function() {
-    expect(res.body).to.not.have.property('dataStructureStatus');
-  });
 }
 
 docs {

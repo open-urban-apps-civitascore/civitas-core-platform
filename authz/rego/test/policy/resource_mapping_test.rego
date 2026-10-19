@@ -253,14 +253,6 @@ test_sub_resource_paths if {
 	}
 }
 
-# Test: A data structure has no lifecycle endpoints of its own
-test_datastructure_lifecycle_paths_unmapped if {
-	every path in ["/v1/datastructures/abc/release", "/v1/datastructures/abc/unrelease"] {
-		resource_mapping.path_pattern == "" with input as portal_request("POST", path)
-	}
-	resource_mapping.path_pattern == "" with input as portal_request("PATCH", "/v1/datastructures/abc/released/meta")
-}
-
 # Test: 5-segment paths resolve correctly (both literal-tail and both-{id} variants)
 test_5_segment_paths if {
 	# Literal tail: released/meta

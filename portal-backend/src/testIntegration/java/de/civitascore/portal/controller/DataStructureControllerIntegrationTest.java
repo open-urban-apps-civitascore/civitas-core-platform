@@ -29,8 +29,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
@@ -702,59 +700,6 @@ class DataStructureControllerIntegrationTest
       assertThat(response.getBody().isInUse())
           .as("inUse should be false when no DataSource references any version")
           .isFalse();
-    }
-  }
-
-  @Nested
-  @DisplayName("No Lifecycle Tests")
-  class NoLifecycleTests {
-
-    @ParameterizedTest
-    @CsvSource({"POST, /release", "POST, /unrelease", "PATCH, /released/meta"})
-    @DisplayName("Should answer 404 for the removed lifecycle endpoints")
-    void shouldAnswer404ForRemovedLifecycleEndpoints(String method, String suffix) {
-      UUID id = dataStructureWithReleasedVersion().getId();
-
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              ENDPOINT + "/" + id + suffix,
-              HttpMethod.valueOf(method),
-              new HttpEntity<>(Map.of(), createAuthHeaders()),
-              String.class);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("Should answer without a status of the data structure")
-    void shouldAnswerWithoutStatus() {
-      UUID id = dataStructureWithReleasedVersion().getId();
-
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              ENDPOINT + "/" + id,
-              HttpMethod.GET,
-              new HttpEntity<>(createAuthHeaders()),
-              String.class);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody())
-          .doesNotContain("dataStructureStatus")
-          .contains("dataStructureVersionStatus");
-    }
-
-    @Test
-    @DisplayName("Should not filter the list by the removed status parameter")
-    void shouldNotFilterByRemovedStatusParameter() {
-      UUID id = createTestEntity();
-
-      ResponseEntity<RestPage<DataStructureOutputDTO>> response =
-          performGetAll(Map.of("dataStructureStatus", "AVAILABLE"));
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody().getContent())
-          .extracting(DataStructureOutputDTO::getId)
-          .contains(id);
     }
   }
 

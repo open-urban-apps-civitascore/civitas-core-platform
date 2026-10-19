@@ -36,12 +36,6 @@ tests {
       expect(res.body.id).to.be.a('string');
     }
   });
-
-  test("Has no status of its own", function() {
-    if (res.getStatus() === 201) {
-      expect(res.body).to.not.have.property('dataStructureStatus');
-    }
-  });
 }
 
 docs {

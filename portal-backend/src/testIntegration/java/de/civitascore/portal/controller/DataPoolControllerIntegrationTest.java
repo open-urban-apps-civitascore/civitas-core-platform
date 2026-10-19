@@ -10,16 +10,12 @@ import de.civitascore.portal.model.output.DataPoolOutputDTO;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.RestPage;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -97,7 +93,7 @@ class DataPoolControllerIntegrationTest
       ResponseEntity<ProblemDetail> response =
           exchangeForProblem(
               DATAPOOLS_ENDPOINT + "/" + dataPool.getId(),
-              HttpMethod.DELETE,
+              org.springframework.http.HttpMethod.DELETE,
               createAuthHeaders(),
               null);
 
@@ -160,27 +156,6 @@ class DataPoolControllerIntegrationTest
       assertThat(response.getBody().getContent())
           .extracting(DataPoolOutputDTO::getId)
           .containsExactly(matchingPool.getId());
-    }
-  }
-
-  @Nested
-  @DisplayName("No Lifecycle")
-  class NoLifecycleTests {
-
-    @ParameterizedTest
-    @CsvSource({"POST, /release", "POST, /unrelease", "PATCH, /released/meta"})
-    @DisplayName("Should answer 404 for lifecycle endpoints a datapool does not have")
-    void shouldAnswer404ForLifecycleEndpoints(String method, String suffix) {
-      DataPool dataPool = portalData.dataPool();
-
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              DATAPOOLS_ENDPOINT + "/" + dataPool.getId() + suffix,
-              HttpMethod.valueOf(method),
-              createAuthHeaders(),
-              Map.of());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
   }
 }

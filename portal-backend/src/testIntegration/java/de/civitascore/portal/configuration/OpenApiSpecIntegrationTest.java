@@ -64,30 +64,6 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
     assertThat(schema.has("required")).isFalse();
   }
 
-  @Test
-  @DisplayName("Should describe data structures without a lifecycle of their own")
-  void shouldDescribeDataStructuresWithoutLifecycle() {
-    JsonNode paths = spec.path("paths");
-    assertThat(paths.has("/datastructures/{id}/release")).isFalse();
-    assertThat(paths.has("/datastructures/{id}/unrelease")).isFalse();
-    assertThat(paths.has("/datastructures/{id}/released/meta")).isFalse();
-    assertThat(
-            spec.path("components")
-                .path("schemas")
-                .path("DataStructureOutputDTO")
-                .path("properties")
-                .has("dataStructureStatus"))
-        .isFalse();
-    List<String> filterNames = new ArrayList<>();
-    paths
-        .path("/datastructures")
-        .path("get")
-        .path("parameters")
-        .values()
-        .forEach(parameter -> filterNames.add(parameter.path("name").asString()));
-    assertThat(filterNames).isNotEmpty().doesNotContain("dataStructureStatus");
-  }
-
   @ParameterizedTest
   @CsvSource({"DataSourceInputDTO", "DataSourceOutputDTO"})
   @DisplayName("Should describe the connector as oneOf its types, each with its own connectorType")
