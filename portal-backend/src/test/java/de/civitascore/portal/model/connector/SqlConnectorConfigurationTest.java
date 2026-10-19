@@ -18,6 +18,8 @@ class SqlConnectorConfigurationTest {
   @CsvSource({
     "postgres://user:secret@localhost:5432/mydb, postgres://localhost:5432/mydb",
     "postgres://reader:secret@db:5432/in?sslmode=require, postgres://db:5432/in?sslmode=require",
+    "postgres://reader:secret@db/in?options=-c%20search_path%3Dx,"
+        + " postgres://db/in?options=-c%20search_path%3Dx",
     "sqlserver://sa:pass@host:1433?database=mydb&encrypt=true,"
         + " sqlserver://host:1433?database=mydb&encrypt=true",
     "jdbc:postgres://admin:secret@localhost:5432/mydb, postgres://localhost:5432/mydb",
