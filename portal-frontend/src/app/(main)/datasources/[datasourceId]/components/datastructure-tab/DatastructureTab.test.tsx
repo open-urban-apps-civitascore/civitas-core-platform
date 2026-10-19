@@ -1,12 +1,18 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { DatastructureVersion } from '@/types/datastructures'
 
 import { DatastructureTab } from './DatastructureTab'
 
+const { mockUseGetDatastructureVersion } = vi.hoisted(() => ({
+  mockUseGetDatastructureVersion: vi.fn(),
+}))
+
 vi.mock('next-intl', () => ({
   useTranslations: () =>
-    Object.assign((key: string) => key, {
+    Object.assign((key: string, params?: Record<string, unknown>) => (params ? key + JSON.stringify(params) : key), {
       rich: (key: string) => key,
     }),
 }))
@@ -28,7 +34,7 @@ vi.mock('@/app/services/api/datastructures/clientRequests', () => ({
 }))
 
 vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
-  useGetDatastructureVersion: () => ({ data: undefined }),
+  useGetDatastructureVersion: mockUseGetDatastructureVersion,
 }))
 
 vi.mock('@/app/(main)/datastructures/[datastructureId]/(versions)/hooks/useDatastructureVersion', () => ({
@@ -43,11 +49,25 @@ vi.mock('@/app/(main)/datastructures/[datastructureId]/(versions)/hooks/useDatas
 
 const defaultProps = {
   datasourceTitle: 'Test Datasource',
-  selectedVersionId: null,
+  selectedVersionId: null as string | null,
   isReadOnly: false,
   isDatasourceInUseByReleased: false,
   isDatasourceReleased: false,
   onSelectDatastructureVersion: vi.fn(),
+}
+
+const mockVersion: DatastructureVersion = {
+  id: 'version-1',
+  version: '2',
+  description: null,
+  dataStructureVersionStatus: 'AVAILABLE',
+  dataStructureVersionSource: 'OWN',
+  modelName: null,
+  model: null,
+  styles: null,
+  dataStructure: { id: 'datastructure-1', name: 'Test Datastructure' },
+  createdAt: '2026-01-01T00:00:00Z',
+  modifiedAt: '2026-01-01T00:00:00Z',
 }
 
 const renderComponent = (props = defaultProps) => {
@@ -62,6 +82,10 @@ const renderComponent = (props = defaultProps) => {
 }
 
 describe('DatastructureTab', () => {
+  beforeEach(() => {
+    mockUseGetDatastructureVersion.mockReturnValue({ data: undefined })
+  })
+
   it('renders UmlModeler', () => {
     renderComponent()
     expect(screen.getByTestId('umlModeler')).toBeInTheDocument()
@@ -101,5 +125,40 @@ describe('DatastructureTab', () => {
     renderComponent()
 
     expect(screen.queryByText('availableInfo')).not.toBeInTheDocument()
+  })
+
+  it('shows name, version number and status of the assigned version', () => {
+    mockUseGetDatastructureVersion.mockReturnValue({ data: { data: mockVersion } })
+    renderComponent({ ...defaultProps, selectedVersionId: 'datastructure-1/version-1' })
+
+    const header = screen.getByTestId('datastructureVersionInfo')
+    expect(header).toHaveTextContent('Test Datastructure')
+    expect(header).toHaveTextContent('version{"version":"2"}')
+    expect(header).toHaveTextContent('status.AVAILABLE')
+  })
+
+  it('shows the fallback when the assigned version has no number', () => {
+    mockUseGetDatastructureVersion.mockReturnValue({
+      data: { data: { ...mockVersion, version: null, dataStructureVersionStatus: 'DRAFT' } },
+    })
+    renderComponent({ ...defaultProps, selectedVersionId: 'datastructure-1/version-1' })
+
+    const header = screen.getByTestId('datastructureVersionInfo')
+    expect(header).toHaveTextContent('noVersion')
+    expect(header).toHaveTextContent('status.DRAFT')
+  })
+
+  it('keeps the toolbar with an empty placeholder while the assigned version loads', () => {
+    mockUseGetDatastructureVersion.mockReturnValue({ data: undefined, isLoading: true })
+    renderComponent({ ...defaultProps, isReadOnly: true, selectedVersionId: 'datastructure-1/version-1' })
+
+    expect(screen.getByTestId('datastructureVersionInfoPlaceholder')).toBeInTheDocument()
+    expect(screen.queryByTestId('datastructureVersionInfo')).not.toBeInTheDocument()
+  })
+
+  it('shows no version info when no version is assigned', () => {
+    renderComponent()
+
+    expect(screen.queryByTestId('datastructureVersionInfo')).not.toBeInTheDocument()
   })
 })

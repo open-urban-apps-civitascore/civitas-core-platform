@@ -1111,6 +1111,10 @@
         "title": "Datenmodell importieren",
         "to": "in {name}"
       },
+      "versionInfo": {
+        "version": "Version {version}",
+        "noVersion": "Keine Versionsnummer"
+      },
       "availableInfo": "Diese Datenquelle hat den Status \"Verfügbar\". Um die Datenstruktur zu ändern, setzen Sie den Status zuerst auf \"Entwurf\"."
     },
     "accessManagementTab": {
@@ -1668,10 +1672,6 @@
         "INVALID_DIAGRAM_SCHEMA": "Die Diagrammdaten in der Datei sind ungültig.",
         "UNREADABLE_MODEL": "Das Modell in der Datei ist nicht lesbar."
       }
-    },
-    "save": {
-      "success": "Modell erfolgreich gespeichert",
-      "error": "Modell konnte nicht gespeichert werden. Bitte versuchen Sie es erneut."
     },
     "export": {
       "title": "Exportieren",

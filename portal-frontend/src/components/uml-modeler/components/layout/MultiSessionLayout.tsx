@@ -2,7 +2,7 @@
 
 import { ReactFlowProvider } from '@xyflow/react'
 import { useTranslations } from 'next-intl'
-import { JSX, useCallback, useMemo, useRef, useState } from 'react'
+import { JSX, ReactNode, useCallback, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
@@ -35,8 +35,8 @@ interface MultiSessionLayoutProps {
   className?: string
   externalSessionManager?: UseMultiSessionReturn
   isMultiSessionMode: boolean
-  canExportModel: boolean
   placeHolder?: JSX.Element
+  toolbarContent?: ReactNode
   onImportFromDatastructure?: () => void
   dataStructureName?: string
   versionName?: string | null
@@ -56,8 +56,8 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
     className,
     externalSessionManager,
     isMultiSessionMode,
-    canExportModel,
     placeHolder,
+    toolbarContent,
     onImportFromDatastructure,
     dataStructureName,
     versionName,
@@ -68,7 +68,6 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
   const t = useTranslations('umlModeler')
   const tCommon = useTranslations('common')
   const sessionManager = useMultiSessionManager({ sessionManager: externalSessionManager })
-  const isControlledExternally = !!externalSessionManager
   const [isWarningModalOpen, setIsWarningModalOpen] = useState(false)
   const [isOverwriteModalOpen, setIsOverwriteModalOpen] = useState(false)
   const [pendingImport, setPendingImport] = useState<DiagramImportFile | null>(null)
@@ -109,21 +108,12 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
     [sessionManager],
   )
 
-  // Toolbar handlers
-  const handleSave = useCallback(() => {
-    const activeSession = sessionManager.getActiveSession()
-    if (activeSession) {
-      sessionManager.markSessionClean(activeSession.id)
-    }
-  }, [sessionManager])
-
   const activeSession = sessionManager.getActiveSession()
 
   // The toolbar says which published structures the diagram was built from, so a diagram with pins
   // shows it even when it owns nothing else.
   const hasImportedStructures = (activeSession?.diagram.importedStructures?.length ?? 0) > 0
-  const shouldShowToolBar =
-    !isControlledExternally || canExportModel || !!onImportFromDatastructure || hasImportedStructures
+  const shouldShowToolBar = !!onImportFromDatastructure || hasImportedStructures || !!toolbarContent
 
   const applyImportedDiagram = useCallback(
     (importedDiagram: UMLDiagram) => {
@@ -277,12 +267,7 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
 
             {/* Toolbar */}
             {shouldShowToolBar && (
-              <Toolbar
-                onSave={isControlledExternally ? undefined : handleSave}
-                hasUnsavedChanges={activeSession?.isDirty || false}
-                canExportModel={canExportModel}
-                onImportFromDatastructure={onImportFromDatastructure}
-              />
+              <Toolbar onImportFromDatastructure={onImportFromDatastructure} content={toolbarContent} />
             )}
 
             {/* Tab Content Area */}

@@ -14,6 +14,7 @@ import { DatastructureVersion } from '@/types/datastructures'
 import { mapDatastructureVersionApiToFormData } from '@/utils/datastructures'
 
 import { DataModelImportModal } from './DataModelImportModal'
+import { DatastructureVersionInfo } from './DatastructureVersionInfo'
 
 interface DatastructureTabProps {
   datasourceTitle: string
@@ -41,7 +42,7 @@ export const DatastructureTab = (props: DatastructureTabProps) => {
   const [selectedDatastructureId, selectedDatastructureVersionId] = selectedVersionId?.split('/') ?? [null, null]
 
   // Fetch the full version data (needed for UML model/styles)
-  const { data: datastructureVersionData } = useGetDatastructureVersion({
+  const { data: datastructureVersionData, isLoading: isDatastructureVersionLoading } = useGetDatastructureVersion({
     datastructureId: selectedDatastructureId || '',
     versionId: selectedDatastructureVersionId || '',
     isEnabled: !!selectedDatastructureId && !!selectedDatastructureVersionId,
@@ -78,6 +79,13 @@ export const DatastructureTab = (props: DatastructureTabProps) => {
     setIsImportDatastructureModalOpen(false)
   }
 
+  // The empty placeholder keeps the toolbar visible while the version loads.
+  const versionInfo = datastructureVersion ? (
+    <DatastructureVersionInfo version={datastructureVersion} />
+  ) : (
+    isDatastructureVersionLoading && <div data-testid="datastructureVersionInfoPlaceholder" />
+  )
+
   const UmlCanvasPlaceholder = (
     <div className="text-center">
       <p className="text-xl text-foreground font-semibold mb-2">{t('title')}</p>
@@ -107,8 +115,8 @@ export const DatastructureTab = (props: DatastructureTabProps) => {
         isReadOnly={true}
         modelSessionManager={modelSessionManager}
         isMultiSessionMode={false}
-        canExportModel={false}
         placeHolder={UmlCanvasPlaceholder}
+        toolbarContent={versionInfo}
         onImportFromDatastructure={canImport ? handleImportFromDatastructure : undefined}
       />
       <DataModelImportModal

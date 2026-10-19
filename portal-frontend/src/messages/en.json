@@ -1124,6 +1124,10 @@
         "title": "Import Data Model",
         "to": "into {name}"
       },
+      "versionInfo": {
+        "version": "Version {version}",
+        "noVersion": "No version number"
+      },
       "availableInfo": "This Data source has the status \"Available\". To change the Data structure, set it to \"Draft\" first."
     },
     "accessManagementTab": {
@@ -1681,10 +1685,6 @@
         "INVALID_DIAGRAM_SCHEMA": "The diagram data in the file is invalid.",
         "UNREADABLE_MODEL": "The model in the file cannot be read."
       }
-    },
-    "save": {
-      "success": "Model saved successfully",
-      "error": "Failed to save model. Please try again."
     },
     "export": {
       "title": "Export",
