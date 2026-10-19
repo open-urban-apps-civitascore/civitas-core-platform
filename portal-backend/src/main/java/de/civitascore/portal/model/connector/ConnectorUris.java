@@ -5,11 +5,13 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /** Parses the URLs of a connector configuration and removes the credentials they carry. */
 final class ConnectorUris {
 
   private static final String JDBC_PREFIX = "jdbc:";
+  private static final Set<String> HTTP_SCHEMES = Set.of("http", "https");
 
   private ConnectorUris() {}
 
@@ -55,6 +57,31 @@ final class ConnectorUris {
     return withoutUserInfo(uri, key).toString();
   }
 
+  /**
+   * The API host URL without user info and without a trailing {@code /}. A blank URL is null.
+   *
+   * @throws InvalidConnectorValueException naming {@code key} for a URL without host, with a scheme
+   *     other than {@code http} or {@code https}, or with a query or fragment
+   */
+  static String httpBaseUrl(String url, String key) {
+    if (url == null || url.isBlank()) {
+      return null;
+    }
+    URI uri = parse(url, key);
+    if (uri.getHost() == null
+        || !HTTP_SCHEMES.contains(String.valueOf(uri.getScheme()).toLowerCase(Locale.ROOT))
+        || uri.getRawQuery() != null
+        || uri.getRawFragment() != null) {
+      throw new InvalidConnectorValueException(key);
+    }
+    String cleaned = withoutUserInfo(uri, key).toString();
+    int end = cleaned.length();
+    while (cleaned.charAt(end - 1) == '/') {
+      end--;
+    }
+    return cleaned.substring(0, end);
+  }
+
   private static URI parse(String value, String key) {
     if (value == null) {
       throw new InvalidConnectorValueException(key);
@@ -67,20 +94,21 @@ final class ConnectorUris {
   }
 
   private static URI withoutUserInfo(URI uri, String key) {
-    if (uri.getUserInfo() == null) {
+    if (uri.getRawUserInfo() == null) {
       return uri;
     }
-    try {
-      return new URI(
-          uri.getScheme(),
-          null,
-          uri.getHost(),
-          uri.getPort(),
-          uri.getPath(),
-          uri.getQuery(),
-          uri.getFragment());
-    } catch (URISyntaxException e) {
-      throw new InvalidConnectorValueException(key, e);
+    String authority = uri.getRawAuthority();
+    StringBuilder cleaned =
+        new StringBuilder(uri.getScheme())
+            .append("://")
+            .append(authority, authority.lastIndexOf('@') + 1, authority.length())
+            .append(uri.getRawPath());
+    if (uri.getRawQuery() != null) {
+      cleaned.append('?').append(uri.getRawQuery());
     }
+    if (uri.getRawFragment() != null) {
+      cleaned.append('#').append(uri.getRawFragment());
+    }
+    return parse(cleaned.toString(), key);
   }
 }

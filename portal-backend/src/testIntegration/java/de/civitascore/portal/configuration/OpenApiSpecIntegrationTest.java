@@ -4,9 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -81,12 +85,100 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
           .as("%s requires connectorType", variant)
           .extracting(JsonNode::asString)
           .contains("connectorType");
-      assertThat(properties.path("user").path("description").asString()).isNotBlank();
-      assertThat(properties.path("password").path("writeOnly").asBoolean())
-          .as("%s password is write-only", variant)
-          .isTrue();
     }
-    assertThat(connectorTypes).containsExactlyInAnyOrder("MQTT", "SQL");
+    assertThat(connectorTypes).containsExactlyInAnyOrder("MQTT", "SQL", "HTTP");
+  }
+
+  @ParameterizedTest
+  @CsvSource({"MqttConnector", "SqlConnector", "HttpConnectorBasicAuthentication"})
+  @DisplayName("Should describe each connector password as write-only")
+  void shouldDescribePasswordAsWriteOnly(String schema) {
+    JsonNode password = propertiesOf(component(schema)).path("password");
+
+    assertThat(password.path("writeOnly").asBoolean()).isTrue();
+    assertThat(password.path("format").asString()).isEqualTo("password");
+  }
+
+  @Test
+  @DisplayName("Should describe the method of an HTTP/REST API call as read-only")
+  void shouldDescribeHttpMethodAsReadOnly() {
+    assertThat(
+            propertiesOf(component("HttpConnectorApiCall"))
+                .path("method")
+                .path("readOnly")
+                .asBoolean())
+        .isTrue();
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "MqttConnector",
+    "SqlConnector",
+    "HttpConnector",
+    "HttpConnectorApiCall",
+    "HttpConnectorParameter",
+    "HttpConnectorNoAuthentication",
+    "HttpConnectorBasicAuthentication",
+    "HttpConnectorPageNumberPagination"
+  })
+  @DisplayName("Should describe every connector field")
+  void shouldDescribeEveryConnectorField(String schema) {
+    List<String> undescribed = new ArrayList<>();
+    propertiesOf(component(schema))
+        .properties()
+        .forEach(
+            property -> {
+              if (!Set.of("connectorType", "type").contains(property.getKey())
+                  && property.getValue().path("description").asString().isBlank()) {
+                undescribed.add(property.getKey());
+              }
+            });
+
+    assertThat(component(schema).path("description").asString()).isNotBlank();
+    assertThat(undescribed).isEmpty();
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "HttpConnector, authentication, HttpConnectorAuthentication,"
+        + " NONE=HttpConnectorNoAuthentication BASIC=HttpConnectorBasicAuthentication",
+    "HttpConnectorApiCall, pagination, HttpConnectorPagination,"
+        + " PAGE_NUMBER=HttpConnectorPageNumberPagination"
+  })
+  @DisplayName(
+      "Should describe each nested HTTP/REST variant as oneOf with a type discriminator,"
+          + " each variant restricting type to its own value")
+  void shouldDescribeNestedHttpVariantsAsOneOf(
+      String schema, String property, String base, String variants) {
+    Map<String, String> expected =
+        Arrays.stream(variants.split(" "))
+            .map(variant -> variant.split("="))
+            .collect(Collectors.toMap(v -> v[0], v -> "#/components/schemas/" + v[1]));
+    JsonNode discriminator = component(base).path("discriminator");
+    Map<String, String> mapping = new HashMap<>();
+    discriminator
+        .path("mapping")
+        .properties()
+        .forEach(e -> mapping.put(e.getKey(), e.getValue().asString()));
+    List<String> oneOf = new ArrayList<>();
+    Map<String, String> variantByType = new HashMap<>();
+    for (JsonNode variant : propertiesOf(component(schema)).path(property).path("oneOf")) {
+      String ref = variant.path("$ref").asString();
+      oneOf.add(ref);
+      propertiesOf(schemaOf(variant))
+          .path("type")
+          .path("enum")
+          .forEach(type -> variantByType.merge(type.asString(), ref, (a, b) -> a + " " + b));
+    }
+
+    assertThat(discriminator.path("propertyName").asString()).isEqualTo("type");
+    assertThat(mapping).containsExactlyInAnyOrderEntriesOf(expected);
+    assertThat(oneOf)
+        .as("%s.%s oneOf", schema, property)
+        .containsExactlyInAnyOrderElementsOf(expected.values());
+    assertThat(variantByType)
+        .as("%s.%s variant of each type value", schema, property)
+        .containsExactlyInAnyOrderEntriesOf(expected);
   }
 
   @ParameterizedTest
@@ -104,7 +196,7 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
 
     assertThat(discriminator.path("propertyName").asString()).isEqualTo("connectorType");
     assertThat(discriminator.path("mapping").propertyNames())
-        .containsExactlyInAnyOrder("MQTT", "SQL");
+        .containsExactlyInAnyOrder("MQTT", "SQL", "HTTP");
   }
 
   /** Without this test, a JSON Schema validator would recurse without end on such a schema. */
@@ -149,6 +241,12 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
       properties.setAll(own);
     }
     return properties;
+  }
+
+  private JsonNode component(String name) {
+    JsonNode schema = spec.path("components").path("schemas").path(name);
+    assertThat(schema.isMissingNode()).as("schema %s", name).isFalse();
+    return schema;
   }
 
   private JsonNode schemaOf(JsonNode schemaOrRef) {

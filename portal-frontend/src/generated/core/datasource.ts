@@ -110,13 +110,118 @@ export const SqlDataSourceSchema = z
   })
   .strict()
 
+export const HttpNoAuthenticationSchema = z
+  .object({
+    type: z.literal('NONE'),
+  })
+  .strict()
+
+export const HttpBasicAuthenticationSchema = z
+  .object({
+    type: z.literal('BASIC'),
+    /** Basic auth username. */
+    username: z.union([z.string(), z.null()]).optional(),
+    /** Basic auth password. Stored ENCRYPTED by the host; null/absent when unset. */
+    password: z.union([z.string(), z.null()]).optional(),
+  })
+  .strict()
+
+export const HttpParameterSchema = z
+  .object({
+    name: z.union([z.string(), z.null()]).optional(),
+    value: z.union([z.string(), z.null()]).optional(),
+  })
+  .strict()
+
+export const HttpPageNumberPaginationSchema = z
+  .object({
+    type: z.literal('PAGE_NUMBER'),
+    /** Query parameter that carries the page number. */
+    pageParameter: z.union([z.string(), z.null()]).optional(),
+    /** Query parameter that carries the page size. */
+    pageSizeParameter: z.union([z.string(), z.null()]).optional(),
+    /** Number of records per page. */
+    pageSize: z.union([z.number().int(), z.null()]).optional(),
+    /** First page number. */
+    startPage: z.union([z.number().int(), z.null()]).optional(),
+    /** Last page number; null for no end page. */
+    endPage: z.union([z.number().int(), z.null()]).optional(),
+  })
+  .strict()
+
+export const HttpApiCallSchema = z
+  .object({
+    /** Name of the API call, unique within the DataSource. */
+    name: z.union([z.string(), z.null()]).optional(),
+    /** HTTP method. Only GET is supported. */
+    method: z.literal('GET').optional(),
+    /** Path relative to 'baseUrl', starting with '/'. */
+    path: z.union([z.string(), z.null()]).optional(),
+    /** Query parameters, in clear text. */
+    queryParameters: z.union([z.array(HttpParameterSchema), z.null()]).optional(),
+    /** Request headers, in clear text. */
+    headers: z.union([z.array(HttpParameterSchema), z.null()]).optional(),
+    /** Pagination of the API call, chosen by 'type'; null for none. */
+    pagination: z.union([HttpPageNumberPaginationSchema, z.null()]).optional(),
+  })
+  .strict()
+
+/** Reads from an HTTP/REST API with one or more named GET API calls. */
+export const HttpDataSourceSchema = z
+  .object({
+    $schema: z.enum([
+      'https://civitasconnect.digital/core/datasource/v1',
+      'https://civitasconnect.digital/core-dataset/v1#/$defs/DataSource',
+    ]),
+    /** Versioned CORE URN of this DataSource. */
+    id: z
+      .string()
+      .regex(
+        /^urn:core:[^:]+:[^:]+:datasource:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$/,
+        'Must be a versioned CORE DataSource URN',
+      ),
+    /** Human-readable display name. */
+    title: z.string().optional(),
+    description: z.string().optional(),
+    /** HTTP/REST API source. */
+    connectionType: z.literal('http'),
+    /**
+     * Versioned CORE URN of the DataStructure that describes the payload format.
+     * @coreRef { type: "urn:core:type:DataStructure" }
+     */
+    element: z
+      .string()
+      .regex(
+        /^urn:core:[^:]+:[^:]+:(datastructure|element):[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$/,
+        'Must be a versioned CORE DataStructure URN',
+      )
+      .optional(),
+    /** API host: an http or https URL without user info, query, fragment or trailing '/'. */
+    baseUrl: z.union([z.string(), z.null()]).optional(),
+    /** Authentication of every API call, chosen by 'type'. */
+    authentication: z.union([HttpNoAuthenticationSchema, HttpBasicAuthenticationSchema, z.null()]).optional(),
+    /** The GET API calls. A source node names the one it reads by 'apiCallName'. */
+    apiCalls: z.union([z.array(HttpApiCallSchema), z.null()]).optional(),
+  })
+  .strict()
+
 // ── Root schema ────────────────────────────────────────────────────────────
 
-/** Configuration for a data source that feeds data into a CORE pipeline. The connector-specific fields are chosen by 'connectionType' (mqtt | sql); each variant declares exactly the fields the host persists (the connector configuration POJO). Only 'password' is stored ENCRYPTED by the host — every other field is stored as-is. 'element' references the DataStructure describing the payload format by versioned CORE URN. */
-export const DataSourceSchema = z.discriminatedUnion('connectionType', [MqttDataSourceSchema, SqlDataSourceSchema])
+/** Configuration for a data source that feeds data into a CORE pipeline. The connector-specific fields are chosen by 'connectionType' (mqtt | sql | http); each variant declares exactly the fields the host persists (the connector configuration POJO). Only the fields named 'password', at any depth, are stored ENCRYPTED by the host — every other field is stored as-is. 'element' references the DataStructure describing the payload format by versioned CORE URN. */
+export const DataSourceSchema = z.discriminatedUnion('connectionType', [
+  MqttDataSourceSchema,
+  SqlDataSourceSchema,
+  HttpDataSourceSchema,
+])
 
 // ── Inferred TypeScript types ──────────────────────────────────────────────
 
 export type MqttDataSource = z.infer<typeof MqttDataSourceSchema>
 export type SqlDataSource = z.infer<typeof SqlDataSourceSchema>
+export type HttpNoAuthentication = z.infer<typeof HttpNoAuthenticationSchema>
+export type HttpBasicAuthentication = z.infer<typeof HttpBasicAuthenticationSchema>
+export type HttpParameter = z.infer<typeof HttpParameterSchema>
+export type HttpPageNumberPagination = z.infer<typeof HttpPageNumberPaginationSchema>
+export type HttpApiCall = z.infer<typeof HttpApiCallSchema>
+export type HttpDataSource = z.infer<typeof HttpDataSourceSchema>
 export type DataSource = z.infer<typeof DataSourceSchema>

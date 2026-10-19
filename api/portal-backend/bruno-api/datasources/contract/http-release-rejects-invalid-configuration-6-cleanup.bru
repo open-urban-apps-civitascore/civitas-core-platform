@@ -1,0 +1,18 @@
+meta {
+  name: Contract HTTP — release rejects invalid config (6/6 cleanup)
+  type: http
+  seq: 119
+}
+
+delete {
+  url: {{baseUrl}}/datasources/{{contractHttpReleaseInvalidId}}
+  body: none
+  auth: inherit
+}
+
+
+tests {
+  test("Status is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}

@@ -1,0 +1,47 @@
+meta {
+  name: Contract HTTP — release rejects invalid config (1/6 create DSV)
+  type: http
+  seq: 114
+}
+
+post {
+  url: {{baseUrl}}/datastructures/{{setupDataStructureId}}/versions
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "description": "DSV for http-release-rejects-invalid-configuration",
+    "modelName": "ContractHttpReleaseInvalid",
+    "model": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ContractHttpReleaseInvalid",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      }
+    },
+    "styles": {}
+  }
+}
+
+script:post-response {
+  if (!res.body || !res.body.id) {
+    throw new Error("Expected create response to include non-empty 'id'");
+  }
+  bru.setVar('contractHttpReleaseInvalidDsvId', res.body.id);
+}
+
+tests {
+  test("DSV created (201)", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
+
+docs {
+  Sets up an AVAILABLE DataStructureVersion, so that the release in step
+  5 reaches the connector validation. See
+  `mqtt-release-rejects-empty-configuration-1-create-dsv.bru`.
+}

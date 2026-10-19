@@ -2,10 +2,12 @@ package de.civitascore.modelforge.validation;
 
 import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.Diagnostic;
+import de.civitascore.modelforge.testsupport.Fixtures;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.util.List;
 
@@ -158,6 +160,15 @@ class CoreSchemaValidatorTest {
             """)).isNotEmpty();
     }
 
+    @Test
+    @DisplayName("A Pipeline whose source node names an API call is accepted")
+    void pipelineWithApiCallNameOnSourceNodeIsAccepted() {
+        JsonNode pipeline = Fixtures.json(mapper, "api/pipeline-air-quality.json");
+        ((ObjectNode) pipeline.path("nodes").path(1)).put("apiCallName", "Get all weather stations");
+
+        assertThat(validator.validate(ArtifactKind.PIPELINE, pipeline)).isEmpty();
+    }
+
     // ── DataSource ──────────────────────────────────────────────────────────────
 
     @Test
@@ -172,6 +183,22 @@ class CoreSchemaValidatorTest {
               "topics": ["sensors/+/temp"]
             }
             """)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("A conforming HTTP/REST DataSource is accepted")
+    void conformingHttpDataSourceIsAccepted() {
+        assertThat(validator.validate(ArtifactKind.DATA_SOURCE, Fixtures.json(mapper, "api/datasource-http.json")))
+            .isEmpty();
+    }
+
+    @Test
+    @DisplayName("An HTTP/REST DataSource with an unknown key in an API call is rejected")
+    void httpDataSourceWithUnknownNestedKeyIsRejected() {
+        JsonNode document = Fixtures.json(mapper, "api/datasource-http.json");
+        ((ObjectNode) document.path("apiCalls").path(0)).put("foo", "bar");
+
+        assertThat(validator.validate(ArtifactKind.DATA_SOURCE, document)).isNotEmpty();
     }
 
     // ── DataSet ─────────────────────────────────────────────────────────────────
