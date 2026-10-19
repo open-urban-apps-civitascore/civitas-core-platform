@@ -358,7 +358,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
         <VisualizationList
           datasetId={dataset.id}
           visualizations={visualizationList}
-          canEdit={canEditMetadata && isSelectedDraftState}
+          canEdit={canEditMetadata && isServerDraftState && isSelectedDraftState}
           isOpenDataAccess={dataset.openDataAccess}
         />
       ),

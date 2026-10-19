@@ -49,6 +49,11 @@ describe('VisualizationList', () => {
       expect(screen.getByText('addButton')).toBeInTheDocument()
     })
 
+    it('hides the add visualization button when the user cannot edit', () => {
+      renderComponent({ canEdit: false })
+      expect(screen.queryByText('addButton')).not.toBeInTheDocument()
+    })
+
     it('opens the dropdown and shows the dashboard option', async () => {
       renderComponent()
       await userEvent.click(screen.getByText('addButton'))

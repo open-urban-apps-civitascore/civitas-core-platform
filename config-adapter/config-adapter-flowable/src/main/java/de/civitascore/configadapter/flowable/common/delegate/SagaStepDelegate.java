@@ -78,6 +78,9 @@ public class SagaStepDelegate extends AbstractAdapterCallDelegate {
         Encode.forJava(op));
 
     SagaCommandResult result = handler.handle(command);
+    if (result == null) {
+      recordFailureAndThrow(execution, step, "Saga handler returned no result");
+    }
     handleResult(execution, result, step);
   }
 

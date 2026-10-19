@@ -1,8 +1,8 @@
 # CIVITAS CORE AuthZ - Superset Entry Point
-# Evaluates Superset's dataset/dashboard access-control hooks (civitas_security.py
-# calls these rules by name; the field names below — user, civitasDatasetId,
-# dashboard_dataset_ids — come straight from CivitasSupersetSecurityManager._opa_can_access,
-# not from any URL/path parsing).
+# The active Superset security manager calls schema_access, user_groups, can_access_schema, and
+# can_access_datasource. Dashboard/chart visibility and editorship now use Superset's native
+# Subject assignments. The legacy dashboard/chart rules below are no longer called by the active
+# Superset integration.
 #
 # Fail-secure design: when the AuthZ Repository is unreachable or the caller's
 # sub has no valid user context, user_context stays undefined, so every
@@ -136,8 +136,20 @@ schema_access := {
 	"is_tenant_reader": is_tenant_reader,
 }
 
+# Group IDs and names are returned to Superset so it can mirror CORE membership into
+# FAB Groups. Superset uses those Groups as native Subjects for editors/viewers; group
+# membership itself remains owned by CORE and is reconciled at OAuth login.
+user_groups := {"groups": [
+{"id": group.id, "name": group.name} |
+	some group in user_context.groups
+	group.id != null
+	group.name != null
+]} if {
+	user_context.userId != null
+}
+
 # =============================================================================
-# DASHBOARD LIST ACCESS (civitas_security.py's DashboardAccessFilter override)
+# LEGACY DASHBOARD LIST ACCESS (unused by the active Superset integration)
 # =============================================================================
 # Unlike schema_access above, this resolves AND decides entirely inside OPA rather than handing
 # the caller a permission-derived dataset-id set to match locally: the caller passes every
@@ -181,13 +193,10 @@ allowed_dashboard_ids contains d.externalDashboardId if {
 dashboard_list_access := {"allowedDashboardIds": allowed_dashboard_ids}
 
 # =============================================================================
-# CHART LIST ACCESS (civitas_security.py's EXTRA_ACCESS_QUERY_FILTERS["charts"])
+# LEGACY CHART LIST ACCESS (unused by the active Superset integration)
 # =============================================================================
-# Unlike dashboard_list_access, no fetcher round-trip is needed here: civitas_security.py
-# already knows every chart's civitasDatasetId locally (SqlaTable.extra lives in Superset's own
-# DB, not Civitas's), so the caller passes the deduplicated set of dataset ids directly rather
-# than external ids needing resolution — one OPA call per request, keyed by dataset id, not one
-# per chart.
+# Legacy caller passed deduplicated dataset ids (SqlaTable.extra lives in Superset's own DB, not
+# Civitas's), so no dataset-id resolution call was needed. This endpoint is no longer invoked.
 #
 # A dataset id is visible for chart-listing purposes via either DATASET_PAYLOAD_READ (can see the
 # chart's data) or DATASET_UPDATE (can edit it, so must be able to find it in the list) — mirrors
@@ -238,12 +247,9 @@ can_access_schema if {
 # =============================================================================
 # DATASET WRITE ACCESS (UpdateDataset / DeleteDataset)
 # =============================================================================
-# Only the config-adapter service account may create/update/delete Superset
-# datasets (see SupersetSagaHandler.java) — that path never reaches OPA at all,
-# since CivitasSupersetSecurityManager._is_local_admin() short-circuits to
-# True/return before is_editor()/raise_for_editorship() ever query this rule. Any
-# real user reaching this rule is therefore never authorized — no _allow_all or
-# permission-based branch, just a hard deny.
+# Legacy dataset-write rule; the active Superset integration relies on native dataset
+# editor Subjects and does not call this endpoint. Kept with the other legacy resource rules
+# until those endpoint contracts and their policy tests can be removed together.
 default can_write_dataset := false
 
 default can_access_datasource := false
@@ -263,15 +269,10 @@ can_access_datasource if {
 }
 
 # =============================================================================
-# DASHBOARD READ ACCESS (open-data path)
+# LEGACY DASHBOARD READ ACCESS (open-data path; unused by the active integration)
 # =============================================================================
-# Identity-agnostic: civitas_security.py's raise_for_access calls this rule for both the
-# anonymous branch and, as an open-data fallback, the authenticated branch (via
-# _opa_dashboard_is_open_data) when the caller has no DASHBOARD grant — so a logged-in user
-# without a grant gets the same public-dashboard access an anonymous visitor would. Keyed on
-# every dataset backing the dashboard's charts (dashboard_dataset_ids) rather than a single
-# civitasDatasetId, since ABAC open-data eligibility must hold for all of them, not just the
-# dashboard's own home dataset. The grant-based authenticated case is can_read_dashboard below.
+# This legacy endpoint evaluated open-data access across every dataset backing a dashboard. The
+# active Superset integration no longer calls it; open-data remains enforced at dataset-query time.
 default can_access_dashboard := false
 
 can_access_dashboard if {
@@ -286,24 +287,17 @@ can_access_dashboard if {
 }
 
 # =============================================================================
-# DASHBOARD READ ACCESS (authenticated path)
+# LEGACY DASHBOARD READ ACCESS (authenticated path; unused by the active integration)
 # =============================================================================
-# Mirrors can_write_dashboard's civitasDatasetId-scoped model — a write grant implies read, since
-# editing a dashboard already requires opening it. Replaces the previous design, where authenticated
-# dashboard-container visibility deferred entirely to Superset's own native RBAC
-# (DASHBOARD_RBAC/dashboard.roles) — see civitas_security.py's raise_for_access.
+# Legacy dashboard-read endpoint. It modeled access with Civitas dataset grants; the active
+# Superset integration now uses native dashboard Subject assignments.
 #
 # A draft (unpublished) dashboard is visible only to a writer — a plain reader shouldn't see a
 # dashboard that's still being built, only the finished, published ones. Write still implies read
 # unconditionally, published or not, since a writer needs to see their own drafts.
 #
-# Keyed by civitasDatasetId, not an independent per-dashboard scope: the platform's Dashboard
-# entity always belongs to exactly one dataset (a required FK), so there is nothing an
-# independent DASHBOARD scope would add over reusing the dataset-scoped model every other check
-# here already uses. Resolved from input.externalDashboardId via dashboard_dataset_fetcher — the
-# platform's own Dashboard.dataSet relationship — rather than trusting a copy of the id stored in
-# the Superset dashboard's own json_metadata (civitas_security.py no longer reads that field for
-# authorization; it's still stamped there for display purposes only).
+# The legacy endpoint resolves dataset ownership from the platform dashboard ID through
+# dashboard_dataset_fetcher rather than trusting Superset metadata.
 resolved_dashboard_dataset_id := dashboard_dataset_fetcher.civitas_dataset_id_of(input.externalDashboardId) if {
 	input.externalDashboardId
 }
@@ -324,7 +318,7 @@ can_read_dashboard if {
 }
 
 # =============================================================================
-# DASHBOARD WRITE ACCESS
+# LEGACY DASHBOARD WRITE ACCESS (unused by the active integration)
 # =============================================================================
 # Unlike dataset writes, dashboard writes are a real end-user action: per
 # SupersetSagaHandler.java, the saga provisions only the dataset and the
@@ -341,7 +335,7 @@ can_write_dashboard if {
 }
 
 # =============================================================================
-# CHART WRITE ACCESS (WriteChartInDashboard)
+# LEGACY CHART WRITE ACCESS (unused by the active integration)
 # =============================================================================
 # Also a real end-user action (see can_write_dashboard above) — keyed off the
 # civitasDatasetId of the chart's datasource, not the dashboard it lives on.

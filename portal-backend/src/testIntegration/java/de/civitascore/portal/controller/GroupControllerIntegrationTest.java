@@ -2,6 +2,7 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.config.ConfigAdapterTestConfiguration;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
@@ -24,11 +25,27 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.kafka.test.context.EmbeddedKafka;
+import org.springframework.test.context.TestPropertySource;
 
+@EmbeddedKafka(
+    partitions = 1,
+    topics = {
+      "de.civitascore.idm.user.created",
+      "de.civitascore.idm.user.updated",
+      "de.civitascore.idm.user.deleted",
+      "de.civitascore.idm.group.created",
+      "de.civitascore.idm.group.updated",
+      "de.civitascore.idm.group.deleted",
+      "de.civitascore.config.results"
+    })
+@TestPropertySource(properties = {"kafka.enabled=true"})
+@Import(ConfigAdapterTestConfiguration.class)
 @DisplayName("Group Controller Integration Tests")
 class GroupControllerIntegrationTest
     extends BaseControllerIntegrationTest<GroupInputDTO, GroupOutputDTO> {
@@ -44,7 +61,13 @@ class GroupControllerIntegrationTest
 
   @BeforeEach
   void cleanupBeforeTest() {
+    cleanupKeycloakGroups();
     performAdditionalCleanup();
+  }
+
+  private void cleanupKeycloakGroups() {
+    var groups = keycloakAdminClient.realm("civitas-core").groups();
+    groups.groups().forEach(group -> groups.group(group.getId()).remove());
   }
 
   @Override

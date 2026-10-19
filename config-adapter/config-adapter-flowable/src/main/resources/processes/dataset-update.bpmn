@@ -247,6 +247,18 @@
           <dc:Bounds height="28.0" width="90.0" x="316.0" y="161.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_SyncSuperset" bpmnElement="sync-superset">
+        <dc:Bounds height="50.0" width="110.0" x="466.0" y="60.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_SyncSuperset" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="28.0" width="110.0" x="466.0" y="71.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_SupersetError" bpmnElement="superset-error">
+        <dc:Bounds height="36.0" width="36.0" x="558.0" y="92.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_SupersetError" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="14.0" width="62.0" x="545.0" y="128.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ExclusiveGateway_1" bpmnElement="geo-gateway" isMarkerVisible="true">
         <dc:Bounds height="50.0" width="50.0" x="466.0" y="150.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_4" labelStyle="BPMNLabelStyle_1">
@@ -414,11 +426,27 @@
         <di:waypoint xsi:type="dc:Point" x="200.0" y="280.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_17"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_4" bpmnElement="flow-apisix-geo" sourceElement="BPMNShape_ServiceTask_2" targetElement="BPMNShape_ExclusiveGateway_1">
+      <bpmndi:BPMNEdge id="BPMNEdge_ApisixSuperset" bpmnElement="flow-apisix-superset" sourceElement="BPMNShape_ServiceTask_2" targetElement="BPMNShape_SyncSuperset">
         <di:waypoint xsi:type="dc:Point" x="416.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="441.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="466.0" y="175.0"/>
-        <bpmndi:BPMNLabel id="BPMNLabel_18"/>
+        <di:waypoint xsi:type="dc:Point" x="440.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="440.0" y="85.0"/>
+        <di:waypoint xsi:type="dc:Point" x="466.0" y="85.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_ApisixSuperset"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SupersetGeo" bpmnElement="flow-superset-geo" sourceElement="BPMNShape_SyncSuperset" targetElement="BPMNShape_ExclusiveGateway_1">
+        <di:waypoint xsi:type="dc:Point" x="576.0" y="85.0"/>
+        <di:waypoint xsi:type="dc:Point" x="610.0" y="85.0"/>
+        <di:waypoint xsi:type="dc:Point" x="610.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="516.0" y="175.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_SupersetGeo"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SupersetError" bpmnElement="flow-superset-error" sourceElement="BPMNShape_SupersetError" targetElement="BPMNShape_ServiceTask_6">
+        <di:waypoint xsi:type="dc:Point" x="576.0" y="128.0"/>
+        <di:waypoint xsi:type="dc:Point" x="600.0" y="128.0"/>
+        <di:waypoint xsi:type="dc:Point" x="600.0" y="240.0"/>
+        <di:waypoint xsi:type="dc:Point" x="518.0" y="240.0"/>
+        <di:waypoint xsi:type="dc:Point" x="518.0" y="280.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_SupersetErrorEdge"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_5" bpmnElement="flow-apisix-error" sourceElement="BPMNShape_BoundaryEvent_2" targetElement="BPMNShape_ExclusiveGateway_5">
         <di:waypoint xsi:type="dc:Point" x="360.0" y="218.0"/>

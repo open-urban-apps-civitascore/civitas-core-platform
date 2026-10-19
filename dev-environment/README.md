@@ -61,7 +61,7 @@ cd dev-environment
 ```
 
 This script:
-1. Starts all infrastructure services (Kafka, PostgreSQL, Keycloak, APISIX, FROST, NiFi, etc.)
+1. Starts infrastructure services (Kafka, PostgreSQL, Keycloak, APISIX, OPA, FROST, NiFi, Trino and Superset)
 2. Asks how you want to start each backend service:
    - **auto** (recommended): builds JARs and runs as Docker containers — no local JDK required at runtime
    - **ide**: prints IDE setup instructions for debugging in Eclipse/IntelliJ (requires Java 25+ & Maven locally)
@@ -78,6 +78,7 @@ Options:
   --config-adapter=auto|cmd|ide    Config Adapter startup (default: prompt)
   --backend=auto|cmd|ide           Portal Backend startup (default: prompt)
   --frontend=auto|cmd|manual       Portal Frontend startup (default: prompt)
+  --no-dashboard                   Do not start Trino and Superset
   --keycloak-secret=SECRET         Keycloak client secret for portal-frontend
   -h, --help                       Show this help message
 
@@ -101,6 +102,9 @@ Startup modes:
 
 # Provide the Keycloak client secret directly
 ./start-portal-dev.sh --backend=auto --keycloak-secret=<secret>
+
+# Start the platform without the Trino/Superset dashboard stack
+./start-portal-dev.sh --no-dashboard
 ```
 
 ### Keycloak Client Secret

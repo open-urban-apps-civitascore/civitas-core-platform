@@ -176,6 +176,7 @@ class DatasetUpdateBpmnTest {
   @Test
   void shouldSkipFrostUpdateWhenDatasetHasNoFrostSink() {
     stubApisixSuccess();
+    stubSupersetSuccess();
 
     ProcessInstance instance = startProcess(false, false, false);
     executeAllJobs();

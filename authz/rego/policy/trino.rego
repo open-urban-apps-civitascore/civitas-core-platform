@@ -67,14 +67,12 @@ trusted_impersonators := {u |
 }
 
 # =============================================================================
-# LOCAL ADMIN BYPASS (config-adapter's own Superset identity)
+# LOCAL SERVICE IDENTITY BYPASS (config-adapter's Trino principal)
 # =============================================================================
-# Mirrors CivitasSupersetSecurityManager._is_local_admin() (SUPERSET_LOCAL_ADMIN_USER, default
-# "civitas-config-adapter") — see civitas_security.py and superset.rego's can_write_dataset,
-# which is "not grantable to anyone; only the config-adapter service account can do this, via the
-# local-admin bypass". The config-adapter saga provisions every dataset itself (schema/table
-# creation, then Superset dataset registration), so it must always be able to introspect what it
-# just created through Trino, before any end-user permission grant for that dataset can exist.
+# The config-adapter saga provisions every dataset itself (schema/table creation, then Superset
+# dataset registration), so its Trino principal must be able to introspect the dataset before an
+# end-user permission grant can exist. This is a Trino data-plane exception only; Superset
+# dashboard/chart access is now managed through native Subjects.
 # This identity is a Superset-local account, not a real Keycloak-backed Civitas user, so it can
 # never resolve via user_context_fetcher/is_authenticated the normal way — it needs its own
 # explicit bypass, exactly like trusted_impersonators.

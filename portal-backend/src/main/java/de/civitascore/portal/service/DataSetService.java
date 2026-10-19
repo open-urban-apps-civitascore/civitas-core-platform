@@ -10,7 +10,6 @@ import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
-import de.civitascore.portal.model.entity.Dashboard;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.NamedApi;
@@ -19,8 +18,8 @@ import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.DataSetMetaInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
-import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DashboardRepository;
+import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
@@ -1050,7 +1049,8 @@ public class DataSetService
         dashboardRepository
             .findById(dashboardId)
             .ifPresentOrElse(
-                dashboard -> dashboard.setExternalDashboardId(dashboardResult.externalDashboardId()),
+                dashboard ->
+                    dashboard.setExternalDashboardId(dashboardResult.externalDashboardId()),
                 () ->
                     log.error(
                         "drift={} dataset={} dashboardId={} — saga returned a dashboard id absent"

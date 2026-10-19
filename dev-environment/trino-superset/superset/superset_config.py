@@ -2,12 +2,10 @@ import os
 
 from flask_appbuilder.security.manager import AUTH_OAUTH
 from superset.config import THEME_DARK, THEME_DEFAULT
+from superset.subjects.types import SubjectType
 
 from civitas_security import (
     CivitasSupersetSecurityManager,
-    resolve_extra_chart_ids,
-    resolve_extra_dashboard_ids,
-    resolve_extra_editor_subject_ids,
 )
 
 
@@ -39,9 +37,9 @@ AUTH_API_LOGIN_ALLOW_MULTIPLE_PROVIDERS = True
 AUTH_USER_REGISTRATION = False
 PUBLIC_ROLE_LIKE = "Public"
 # Lets genuinely unauthenticated requests through Flask-AppBuilder's @protect() as the "Public"
-# role (distinct from PUBLIC_ROLE_LIKE above, which only seeds that role's permission set). Only
-# open-data dashboards/datasets are actually reachable anonymously — civitas_security.py and the
-# civitas.superset/civitas.trino OPA policies independently re-check every object.
+# role (distinct from PUBLIC_ROLE_LIKE above, which only seeds that role's permission set). OPA
+# still gates open-data and dataset payload access; Superset Subjects govern dashboard/chart
+# visibility and editorship.
 AUTH_ROLE_PUBLIC = "Public"
 AUTH_ROLES_SYNC_AT_LOGIN = True
 AUTH_ROLES_MAPPING = {
@@ -49,19 +47,6 @@ AUTH_ROLES_MAPPING = {
     env("KEYCLOAK_SUPERSET_GROUP"): ["Gamma"],
 }
 CUSTOM_SECURITY_MANAGER = CivitasSupersetSecurityManager
-# First-party replacement for the old (never-actually-invoked) get_extra_dashboard_ids override —
-# OR'd into DashboardAccessFilter/ChartFilter's native list criteria for the current user.
-EXTRA_ACCESS_QUERY_FILTERS = {
-    "dashboards": resolve_extra_dashboard_ids,
-    "charts": resolve_extra_chart_ids,
-}
-# Feeds both get_extra_editor_subject_ids() (server-side, consulted by is_editor()/
-# raise_for_editorship()) and the chart/dashboard API schemas' extra_editors field (frontend) —
-# without this, a user with a real OPA-granted write permission passes every actual write check
-# but Explore's "Overwrite" option never shows, since that's computed client-side from the
-# resource's native editors list alone (see civitas_security.py's resolve_extra_editor_subject_ids
-# docstring).
-EXTRA_EDITORS_RESOLVER = resolve_extra_editor_subject_ids
 OAUTH_PROVIDERS = [
     {
         "name": "keycloak",
@@ -82,18 +67,26 @@ OAUTH_PROVIDERS = [
 ]
 FEATURE_FLAGS = {
     "ENABLE_TEMPLATE_PROCESSING": True,
-    # DASHBOARD_RBAC was removed upstream (replaced by the Subject/editors/viewers model) —
-    # dropped here rather than left as a dead key.
-    #
-    # ENABLE_VIEWERS / VIEWER_PROMISCUOUS_MODE are deliberately NOT set. Both let a
-    # dashboard/chart accumulate its own native Superset viewer list (a Subject: user/role/group)
-    # assigned through Superset's own UI/API, independent of Civitas's OPA/group model —
-    # VIEWER_PROMISCUOUS_MODE additionally bypasses the underlying dataset's own access check for
-    # a native viewer. Civitas's model is "read/write for datasets, charts, and dashboards is
-    # determined entirely by the external system" — turning these on would open a second,
-    # OPA-invisible grant path. Enable only for a deliberate, scoped reason, not as a byproduct of
-    # this upgrade.
+    # Per-resource dashboard/chart visibility is managed by native Superset Subject assignments.
+    # Dataset query access remains separately gated by CORE OPA and Trino.
+    "ENABLE_VIEWERS": True,
+    # Keep datasource access checks in place for viewer-assigned charts/dashboards.
+    "VIEWER_PROMISCUOUS_MODE": False,
+    "ASSIGN_CREATOR_GROUPS_AS_VIEWERS": False,
 }
+# CORE is authoritative for resource membership: only CORE-synchronized FAB Groups can be
+# assigned as Subjects. CORE group IDs/names and each user's membership are synchronized at OAuth
+# login; these groups receive no FAB roles and are used only for per-resource editors/viewers.
+SUBJECTS_RELATED_TYPES = [SubjectType.GROUP]
+
+
+def core_groups_only(query, *args, **kwargs):
+    from flask_appbuilder.security.sqla.models import Group
+
+    return query.filter(Group.description.like("Managed by CIVITAS CORE; group id=%"))
+
+
+EXTRA_RELATED_QUERY_FILTERS = {"group": core_groups_only}
 
 # Superset ships with i18n off (LANGUAGES = {}) since most locales are incomplete; German is
 # maintained well enough to use. Keeping "en" too so the flag-icon switcher can still fall back.

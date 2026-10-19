@@ -1,7 +1,7 @@
 package de.civitascore.portal.messaging.saga;
 
-import de.civitascore.configadapter.model.dataset.DataPipeline;
 import de.civitascore.configadapter.model.dataset.Dashboard;
+import de.civitascore.configadapter.model.dataset.DataPipeline;
 import de.civitascore.configadapter.model.dataset.NamedApi;
 import de.civitascore.portal.configuration.PipelineClosureValidationProperties;
 import de.civitascore.portal.configuration.SagaProperties;

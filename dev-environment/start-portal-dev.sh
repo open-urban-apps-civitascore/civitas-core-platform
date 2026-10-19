@@ -48,6 +48,8 @@ no_clean_arg=""
 START_FROST=true
 START_GEOSERVER=true
 START_NIFI=true
+# Trino + Superset dashboard stack (Docker Compose, default ON).
+START_DASHBOARD=true
 # Model Forge Admin UI — the registry console (dev-environment/apps: model-forge-admin-ui on :8092,
 # pointed at portal-backend's model_forge schema). Part of the MODELING path (it inspects/edits what
 # modeling creates), so it stays ON under --modeling; turn it off with --no-admin-ui.
@@ -83,6 +85,7 @@ usage() {
     echo "  --no-frost                       Do not start the FROST server"
     echo "  --no-geoserver                   Do not start GeoServer"
     echo "  --no-nifi                        Do not start Apache NiFi"
+    echo "  --no-dashboard                   Do not start Trino and Superset"
     echo "  --no-config-adapter              Do not start the Config Adapter"
     echo "  --no-admin-ui                    Do not start the Model Forge Admin UI (:8092)"
     echo "  --pgadmin                        Also start pgAdmin (optional DB console, :5050)"
@@ -121,6 +124,7 @@ while [ $# -gt 0 ]; do
         --no-frost)     START_FROST=false ;;
         --no-geoserver) START_GEOSERVER=false ;;
         --no-nifi)      START_NIFI=false ;;
+        --no-dashboard) START_DASHBOARD=false ;;
         --no-admin-ui)  START_ADMIN_UI=false ;;
         --pgadmin)      START_PGADMIN=true ;;
         --modeling)
@@ -826,6 +830,19 @@ if [ "$OS_TYPE" = "Darwin" ]; then
     docker exec civitas-keycloak /opt/keycloak/bin/kcadm.sh update realms/master -s sslRequired=NONE
 fi
 
+if [ "$START_DASHBOARD" = "true" ]; then
+    echo "Starting Trino + Superset dashboard stack..."
+    cd "$SCRIPT_DIR/trino-superset"
+    if $DOCKER_COMPOSE up -d $COMPOSE_BUILD 2>&1; then
+        echo "  Trino + Superset started"
+    else
+        echo "  WARNING: Trino + Superset failed to start"
+        echo "           Check: cd dev-environment/trino-superset && docker compose logs"
+    fi
+else
+    echo "  Skipping Trino + Superset (--no-dashboard)"
+fi
+
 echo
 
 # ---- Phase 4: Application Build & Start -----------------------------
@@ -1423,6 +1440,8 @@ echo "  GeoServer PostGIS: localhost:5434  db=geoserver  user=geoserver  (see ge
 echo "  APISIX Gateway:   http://localhost:9080"
 echo "  APISIX Admin API: http://localhost:9180"
 echo "  Apache NiFi:      https://localhost:8443/nifi (login via Keycloak / OIDC)"
+echo "  Trino UI:         https://localhost:${TRINO_PORT:-8446}/ui/ (OIDC via Keycloak)"
+echo "  Superset:         http://localhost:${SUPERSET_PORT:-8092} (OIDC via Keycloak)"
 echo "  OPA:              http://localhost:8181"
 echo "  AuthZ Repository: http://localhost:8091"
 echo
