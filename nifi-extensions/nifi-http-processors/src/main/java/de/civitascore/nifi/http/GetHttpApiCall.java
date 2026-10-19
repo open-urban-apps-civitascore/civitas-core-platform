@@ -101,6 +101,19 @@ public class GetHttpApiCall extends AbstractProcessor {
           .identifiesControllerService(WebClientServiceProvider.class)
           .build();
 
+  static final PropertyDescriptor BODY_READ_TIMEOUT =
+      new PropertyDescriptor.Builder()
+          .name("Body Read Timeout")
+          .displayName("Body Read Timeout")
+          .description(
+              "The longest wait for the next bytes of the response body. A longer wait is a"
+                  + " transient error. The Read Timeout of the web client service ends when the"
+                  + " response headers arrive.")
+          .required(true)
+          .defaultValue("15 secs")
+          .addValidator(StandardValidators.TIME_PERIOD_VALIDATOR)
+          .build();
+
   static final PropertyDescriptor BASE_URL =
       new PropertyDescriptor.Builder()
           .name("Base URL")
@@ -170,6 +183,7 @@ public class GetHttpApiCall extends AbstractProcessor {
   private static final List<PropertyDescriptor> PROPERTIES =
       List.of(
           WEB_CLIENT_SERVICE,
+          BODY_READ_TIMEOUT,
           BASE_URL,
           API_CALL,
           AUTHENTICATION_TYPE,
@@ -229,7 +243,8 @@ public class GetHttpApiCall extends AbstractProcessor {
                 .getProperty(WEB_CLIENT_SERVICE)
                 .asControllerService(WebClientServiceProvider.class)
                 .getWebClientService(),
-            context.getProperty(BASE_URL).getValue());
+            context.getProperty(BASE_URL).getValue(),
+            context.getProperty(BODY_READ_TIMEOUT).asDuration());
     Authentication authentication =
         context
             .getProperty(AUTHENTICATION_TYPE)

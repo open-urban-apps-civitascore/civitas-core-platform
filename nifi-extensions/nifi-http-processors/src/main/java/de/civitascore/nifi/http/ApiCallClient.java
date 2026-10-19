@@ -15,6 +15,7 @@ import java.io.InputStream;
 import java.io.PushbackInputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import org.apache.nifi.web.client.api.HttpRequestHeadersSpec;
@@ -27,7 +28,7 @@ import org.apache.nifi.web.client.api.WebClientServiceException;
  * a page loop can send each page through it as a request of its own.
  *
  * <p>The transport belongs to the web client service: TLS, the proxy, the timeouts and the redirect
- * handling are its properties, and this class adds none of them.
+ * handling are its properties. This class adds only the idle timeout of the body read.
  */
 final class ApiCallClient {
 
@@ -35,13 +36,16 @@ final class ApiCallClient {
 
   private final WebClientService webClient;
   private final String baseUrl;
+  private final Duration bodyReadTimeout;
 
   /**
    * @param baseUrl scheme, host, optional port and optional path; a trailing {@code /} is removed
+   * @param bodyReadTimeout the longest wait of one read from the body
    */
-  ApiCallClient(WebClientService webClient, String baseUrl) {
+  ApiCallClient(WebClientService webClient, String baseUrl, Duration bodyReadTimeout) {
     this.webClient = webClient;
     this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+    this.bodyReadTimeout = bodyReadTimeout;
   }
 
   /** The method, the base URL and the path, for example {@code GET https://host/v1/stations}. */
@@ -68,7 +72,7 @@ final class ApiCallClient {
     return classify(request, response);
   }
 
-  private static ApiCallOutcome classify(String request, HttpResponseEntity response) {
+  private ApiCallOutcome classify(String request, HttpResponseEntity response) {
     int status = response.statusCode();
     Optional<ErrorKind> error = StatusClassification.errorKind(status);
     if (error.isPresent()) {
@@ -77,7 +81,7 @@ final class ApiCallClient {
     }
     Optional<InputStream> content;
     try {
-      content = nonEmpty(response.body());
+      content = nonEmpty(guarded(response));
     } catch (IOException e) {
       discard(response);
       return ApiCallOutcome.Failure.ofTransport(request, e);
@@ -87,6 +91,13 @@ final class ApiCallClient {
       return new ApiCallOutcome.NoBody(status);
     }
     return new ApiCallOutcome.Body(status, content.get(), response);
+  }
+
+  private InputStream guarded(HttpResponseEntity response) {
+    InputStream body = response.body();
+    return body == null
+        ? null
+        : new IdleTimeoutInputStream(body, bodyReadTimeout, () -> discard(response));
   }
 
   /** The body from its first byte, or empty when the first read gives the end of the stream. */

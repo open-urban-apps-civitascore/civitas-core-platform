@@ -18,33 +18,44 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CountDownLatch;
 
 /**
- * An HTTP API that announces a body of 100 bytes, sends only the first part of it and closes the
- * connection, as a server does that fails in the middle of a response.
+ * An HTTP API that announces a body of 100 bytes and sends only the first part of it. Then it
+ * closes the connection, as a server does that fails in the middle of a response, or it stalls: it
+ * keeps the connection open without another byte until the endpoint closes.
  */
 final class BreakingEndpoint implements AutoCloseable {
 
   private static final int ANNOUNCED_LENGTH = 100;
 
   private final ServerSocket socket;
+  private final CountDownLatch closed = new CountDownLatch(1);
 
   private BreakingEndpoint(ServerSocket socket) {
     this.socket = socket;
   }
 
   static BreakingEndpoint sending(String part) {
+    return start(part, false);
+  }
+
+  static BreakingEndpoint stalling(String part) {
+    return start(part, true);
+  }
+
+  private static BreakingEndpoint start(String part, boolean stall) {
     try {
       ServerSocket socket = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
       BreakingEndpoint endpoint = new BreakingEndpoint(socket);
-      Thread.ofVirtual().start(() -> endpoint.answer(part));
+      Thread.ofVirtual().start(() -> endpoint.answer(part, stall));
       return endpoint;
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
   }
 
-  private void answer(String part) {
+  private void answer(String part, boolean stall) {
     try (Socket connection = socket.accept()) {
       BufferedReader request =
           new BufferedReader(
@@ -61,8 +72,13 @@ final class BreakingEndpoint implements AutoCloseable {
                   + part)
               .getBytes(StandardCharsets.UTF_8));
       response.flush();
+      if (stall) {
+        closed.await();
+      }
     } catch (IOException e) {
       // The socket closes when the test ends; there is nobody left to answer.
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
   }
 
@@ -72,6 +88,7 @@ final class BreakingEndpoint implements AutoCloseable {
 
   @Override
   public void close() throws IOException {
+    closed.countDown();
     socket.close();
   }
 }

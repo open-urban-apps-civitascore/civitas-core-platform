@@ -35,6 +35,7 @@ import org.apache.nifi.util.TestRunners;
 import org.apache.nifi.web.client.provider.service.StandardWebClientServiceProvider;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -264,6 +265,26 @@ class GetHttpApiCallTest {
 
       assertFailure(
           runner, "transient", 0, "GET " + endpoint.baseUrl() + "/stations failed: IOException");
+      assertEquals(1, runner.getLogger().getWarnMessages().size());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "[{\"id\":1"})
+  @Timeout(10)
+  void onTrigger_whenTheBodyStalls_routesATransientFailureAfterTheBodyReadTimeout(String part)
+      throws IOException, InitializationException {
+    try (BreakingEndpoint endpoint = BreakingEndpoint.stalling(part)) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.setProperty(GetHttpApiCall.BODY_READ_TIMEOUT, "200 millis");
+
+      runner.run();
+
+      assertFailure(
+          runner,
+          "transient",
+          0,
+          "GET " + endpoint.baseUrl() + "/stations failed: HttpTimeoutException");
       assertEquals(1, runner.getLogger().getWarnMessages().size());
     }
   }

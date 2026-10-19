@@ -207,6 +207,7 @@ call the API otherwise, and one run at a time. The cron schedule of the flow dec
 | Property | Means |
 |---|---|
 | `Web Client Service Provider` | The HTTP client. Its properties carry the TLS material, the proxy, the timeouts and the redirect handling. |
+| `Body Read Timeout` | The longest wait for the next bytes of the response body, `15 secs` by default. A longer wait is a transient error. The `Read Timeout` of the web client service ends when the response headers arrive. |
 | `Base URL` | Scheme `http` or `https`, a host, an optional port and an optional path. No user info, no query, no fragment. A trailing `/` is removed. |
 | `API Call` | The API call as JSON, in the form the portal stores it. |
 | `Authentication Type` | `NONE` (default) or `BASIC`. |
