@@ -63,7 +63,7 @@
 		<commons.io.version>2.22.0</commons.io.version>
 		<commons.lang.version>3.20.0</commons.lang.version>
 		<commons.compress.version>1.28.0</commons.compress.version>
-		<at.yawk.lz4.version>1.11.2</at.yawk.lz4.version>
+		<at.yawk.lz4.version>1.11.4</at.yawk.lz4.version>
 		<owasp.encoder.version>1.4.0</owasp.encoder.version>
 		<flowable.version>7.1.0</flowable.version>
 		<spring.version>6.2.19</spring.version>
