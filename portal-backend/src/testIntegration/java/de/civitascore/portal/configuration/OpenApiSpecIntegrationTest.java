@@ -146,7 +146,9 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
     "HttpConnectorApiCall, pagination, HttpConnectorPagination,"
         + " PAGE_NUMBER=HttpConnectorPageNumberPagination"
   })
-  @DisplayName("Should describe each nested HTTP/REST variant as oneOf with a type discriminator")
+  @DisplayName(
+      "Should describe each nested HTTP/REST variant as oneOf with a type discriminator,"
+          + " each variant restricting type to its own value")
   void shouldDescribeNestedHttpVariantsAsOneOf(
       String schema, String property, String base, String variants) {
     Map<String, String> expected =
@@ -160,16 +162,24 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
         .properties()
         .forEach(e -> mapping.put(e.getKey(), e.getValue().asString()));
     List<String> oneOf = new ArrayList<>();
-    propertiesOf(component(schema))
-        .path(property)
-        .path("oneOf")
-        .forEach(variant -> oneOf.add(variant.path("$ref").asString()));
+    Map<String, String> variantByType = new HashMap<>();
+    for (JsonNode variant : propertiesOf(component(schema)).path(property).path("oneOf")) {
+      String ref = variant.path("$ref").asString();
+      oneOf.add(ref);
+      propertiesOf(schemaOf(variant))
+          .path("type")
+          .path("enum")
+          .forEach(type -> variantByType.merge(type.asString(), ref, (a, b) -> a + " " + b));
+    }
 
     assertThat(discriminator.path("propertyName").asString()).isEqualTo("type");
     assertThat(mapping).containsExactlyInAnyOrderEntriesOf(expected);
     assertThat(oneOf)
         .as("%s.%s oneOf", schema, property)
         .containsExactlyInAnyOrderElementsOf(expected.values());
+    assertThat(variantByType)
+        .as("%s.%s variant of each type value", schema, property)
+        .containsExactlyInAnyOrderEntriesOf(expected);
   }
 
   @ParameterizedTest
