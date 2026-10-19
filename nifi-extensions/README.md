@@ -6,7 +6,9 @@ that use them; the components themselves know nothing about the adapter.
 | Module | Holds |
 |---|---|
 | `nifi-frost-processors` | The code: `PutFrostRecord`, the ports and the batch builder |
-| `nifi-frost-nar` | The NiFi archive that carries the code into an installation |
+| `nifi-frost-nar` | The NiFi archive that carries the FROST code into an installation |
+| `nifi-http-processors` | The code: `GetHttpApiCall`, the request of one API call of an HTTP/REST Data source |
+| `nifi-http-nar` | The NiFi archive that carries the HTTP code into an installation |
 
 ## Build
 
@@ -21,7 +23,7 @@ mvn verify -DskipITs       # skip the integration test when no Docker daemon is 
 through Testcontainers. Without a Docker daemon it skips, so `mvn verify` still passes on a
 workstation without one — check the failsafe report when you need to know whether it ran.
 
-The NAR is at `nifi-frost-nar/target/nifi-frost-nar-<version>.nar`.
+Each NAR is at `nifi-<name>-nar/target/nifi-<name>-nar-<version>.nar`.
 
 **This tree compiles to Java 21**, while the rest of the repository is on 25. That is the NiFi
 extension API level: every NiFi 2.x release, including the newest, compiles to release 21, and the
@@ -31,13 +33,13 @@ follows the NiFi baseline, not the repository.
 
 ## Install into the development NiFi
 
-`start-portal-dev.sh` builds the NAR and copies it to `dev-environment/nifi/extensions`. That
+`start-portal-dev.sh` builds the NARs and copies them to `dev-environment/nifi/extensions`. That
 directory is mounted as the NiFi container's NAR autoload directory, and NiFi loads a NAR dropped
 there without a restart. To install a changed NAR into a running NiFi:
 
 ```bash
 mvn -q package -DskipTests
-cp nifi-frost-nar/target/nifi-frost-nar-*.nar ../dev-environment/nifi/extensions/
+cp nifi-*-nar/target/nifi-*-nar-*.nar ../dev-environment/nifi/extensions/
 ```
 
 ## Install into a deployed NiFi
@@ -195,3 +197,75 @@ FROST, not sub-requests in a document.
 One assumption stays open: **the batch size a server accepts.** The specification names none, and
 the cap of 100 here is a guard rather than a measurement. The integration test sends three records
 in one batch, which proves the isolation of the groups, not the limit.
+
+## GetHttpApiCall
+
+A source processor: it takes no input, and each run sends one HTTP GET request for one API call of
+an HTTP/REST Data source. It runs on the primary node alone, because each node of a cluster would
+call the API otherwise, and one run at a time. The cron schedule of the flow decides when it runs.
+
+| Property | Means |
+|---|---|
+| `Web Client Service Provider` | The HTTP client. Its properties carry the TLS material, the proxy, the timeouts and the redirect handling. |
+| `Body Read Timeout` | The longest wait for the next bytes of the response body, `15 secs` by default. A longer wait is a transient error. The `Read Timeout` of the web client service ends when the response headers arrive. |
+| `Base URL` | Scheme `http` or `https`, a host, an optional port and an optional path. No user info, no query, no fragment. A trailing `/` is removed. |
+| `API Call` | The API call as JSON, in the form the portal stores it. |
+| `Authentication Type` | `NONE` (default) or `BASIC`. |
+| `Basic Auth Username` / `Basic Auth Password` | Required with `BASIC`, which also requires an `https` Base URL. The username contains no colon; the password is sensitive. |
+
+No property supports Expression Language.
+
+```json
+{
+  "name": "Get all weather stations",
+  "method": "GET",
+  "path": "/stations",
+  "queryParameters": [{ "name": "status", "value": "active" }],
+  "headers": [{ "name": "Accept", "value": "application/json" }],
+  "pagination": null
+}
+```
+
+The processor checks the rules of the portal backend again, because it builds the request and the
+credentials from them. `method` is `GET` or absent, `path` matches `^/[A-Za-z0-9._~:/-]*$`, a header
+name is a token and not `Authorization`, `Proxy-Authorization` or `Cookie`, and `pagination` is
+absent or null. A header must also be one the JDK HTTP client behind the web client service sends:
+not `Connection`, `Content-Length`, `Expect`, `Host` or `Upgrade`, and a value of printable
+ISO-8859-1 characters, spaces and tabs only. An unknown key fails. A broken rule makes the
+processor invalid, and the explanation names the key path, for example `headers[1].name`, never the
+value.
+
+The query is percent-encoded with only the unreserved characters of RFC 3986 left as they are, so a
+space is `%20` and `&`, `=` and `+` in a value stay part of the value. The parameters keep their
+order, repeated names included. `HttpUriBuilder.addQueryParameter` is not used for this: NiFi's
+implementation does not encode `&`, `=` and `+` in a value.
+
+Relationships: `success` and `failure`. There is no `retry`; the next cron run is the next attempt.
+
+| Result | Outcome |
+|---|---|
+| 2xx with a body | `success`, the body unchanged, `mime.type` `application/json` |
+| 2xx without a body, for example 204 | No FlowFile, a debug log entry |
+| 3xx, 4xx except 408 and 429 | `failure`, `fatal`, an error log entry |
+| 408, 429, 5xx, any other status | `failure`, `transient`, a warn log entry |
+| Connection refused, timeout, TLS error | `failure`, `transient`, status `0` |
+
+A 3xx is fatal because the processor expects a web client service that does not follow
+redirects (`Redirect Handling Strategy` = `IGNORED`), so a redirect shows a wrong host or path.
+
+A FlowFile on `success` carries `http.status.code` and `http.request.path`. A FlowFile on `failure`
+is empty and carries `http.request.path`, `http.error.kind`, `http.error.status` and
+`http.error.message`. The message is the one the log entry and the bulletin show:
+
+```text
+GET https://api.example.org/v1/stations failed with status 404
+GET https://api.example.org/v1/stations failed: ConnectException
+```
+
+No attribute and no message contains the query, a header value, the username, the password or the
+response body. An exception reaches no logger, because its message can hold the URI with its query;
+the message names its class alone.
+
+The request code knows no NiFi session, so the page loop of a later step can send each page through
+it as a request of its own. A new authentication type adds a value of `Authentication Type`, its
+properties and a class that implements `Authentication`.
