@@ -60,7 +60,8 @@ Publication is per named API, not per dataset.
   plus `status: 1`. Host pinning and the `/v1/datasets/{id}` prefix — strictly more specific than a `/v1/*`
   catch-all — make dispatch deterministic without a second virtual host.
 - `proxy-rewrite` maps gateway path to upstream path via
-  `regex_uri: ["^{routePath}/?$", "{upstreamPath}", "^{routePath}(/.+)$", "{upstreamPath}$1"]`, and APISIX
+  `regex_uri: ["^{routePath}/?$", "{upstreamPath}", "^{routePath}(/.+)$", "{upstreamPath}$1"]` (shape per
+  standard below), and APISIX
   preserves the query string. The upstream path is the FROST project path for `STA` and
   `{geoserver path}/{workspace}/ows` for `OWS`, the workspace name deriving from the dataset id by the same
   rule the GeoServer adapter applies.
@@ -74,10 +75,10 @@ Publication is per named API, not per dataset.
   `["^{routePath}/?$", "{upstreamPath}"]`: an OWS endpoint takes its parameters in the query string, so
   nothing below it belongs to the address. Every deeper path is refused at the gateway, which is what
   GeoServer 2.28 answered anyway — on 3.0.1 it would instead be served, unthrottled, by the admin service.
-- An `STA` route has a third pair before the sub-path pair:
-  `["^{routePath}/v\d+\.\d+(/.+)?/?$", "{upstreamPath}$1"]`. STA clients such as the Masterportal add a
-  version segment (`/v1.0`) after the named-API address, but the upstream path already carries the FROST
-  version. The pair drops the segment, so `{routePath}/v1.0/Things` reaches `{upstreamPath}/Things`.
+- In an `STA` route, both patterns accept an optional version segment `(?:/v\d+\.\d+)?` after
+  `{routePath}`. STA clients such as the Masterportal add `/v1.0` after the named-API address, but the
+  upstream path already carries the FROST version. The rewrite drops the segment, so
+  `{routePath}/v1.0/Things` reaches `{upstreamPath}/Things`.
 - `UPDATE_ROUTE` and `RESTORE_ROUTE` rebuild both the matched addresses and the rewrite from the address a
   route already carries, so a route provisioned earlier is corrected without re-provisioning its dataset.
   This migration can be dropped once every deployed route has been through one update.

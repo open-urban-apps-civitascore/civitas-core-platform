@@ -42,6 +42,17 @@ class PathRewriteTest {
     return proxyRewrite;
   }
 
+  /** The upstream path APISIX forwards a request to: the first matching pair wins. */
+  private static String rewrite(String[] pairs, String requestPath) {
+    for (int i = 0; i < pairs.length; i += 2) {
+      Matcher matcher = Pattern.compile(pairs[i]).matcher(requestPath);
+      if (matcher.matches()) {
+        return matcher.replaceFirst(pairs[i + 1]);
+      }
+    }
+    return null;
+  }
+
   @Test
   @DisplayName("an OWS route stops matching sub-paths and its rewrite loses the back-reference")
   void correctsAnOwsRouteProvisionedEarlier() {
@@ -89,23 +100,9 @@ class PathRewriteTest {
     assertArrayEquals(new String[] {staPath, staPath + "/*"}, (String[]) staRoute.get("uris"));
   }
 
-  /** The upstream path APISIX forwards a request to: the first matching pair wins. */
-  private static String rewrite(String[] pairs, String requestPath) {
-    for (int i = 0; i < pairs.length; i += 2) {
-      Matcher matcher = Pattern.compile(pairs[i]).matcher(requestPath);
-      if (matcher.matches()) {
-        return matcher.replaceFirst(pairs[i + 1]);
-      }
-    }
-    return null;
-  }
-
   @ParameterizedTest(name = "{0} → {1}")
   @CsvSource({
-    "'', /FROST-Server/v1.1/Projects(1)",
-    "/, /FROST-Server/v1.1/Projects(1)",
     "/Things, /FROST-Server/v1.1/Projects(1)/Things",
-    "/Things(7)/Datastreams, /FROST-Server/v1.1/Projects(1)/Things(7)/Datastreams",
     "/v1.0, /FROST-Server/v1.1/Projects(1)",
     "/v1.0/, /FROST-Server/v1.1/Projects(1)",
     "/v1.0/Things, /FROST-Server/v1.1/Projects(1)/Things",

@@ -1639,11 +1639,9 @@ class ApisixSagaHandlerTest {
             () ->
                 assertEquals(
                     List.of(
-                        "^/v1/datasets/ds-001/data/?$",
+                        "^/v1/datasets/ds-001/data(?:/v\\d+\\.\\d+)?/?$",
                         "/FROST-Server/v1.1/Projects(1)",
-                        "^/v1/datasets/ds-001/data/v\\d+\\.\\d+(/.+)?/?$",
-                        "/FROST-Server/v1.1/Projects(1)$1",
-                        "^/v1/datasets/ds-001/data(/.+)$",
+                        "^/v1/datasets/ds-001/data(?:/v\\d+\\.\\d+)?(/.+)$",
                         "/FROST-Server/v1.1/Projects(1)$1"),
                     proxyRewrite.get("regex_uri")),
             () ->
@@ -1834,11 +1832,9 @@ class ApisixSagaHandlerTest {
             (Map<String, Object>) ((Map<String, Object>) body.get("plugins")).get("proxy-rewrite");
         assertEquals(
             List.of(
-                "^/v1/datasets/ds-001/?$",
+                "^/v1/datasets/ds-001(?:/v\\d+\\.\\d+)?/?$",
                 "/FROST-Server/v1.1/Projects(1)",
-                "^/v1/datasets/ds-001/v\\d+\\.\\d+(/.+)?/?$",
-                "/FROST-Server/v1.1/Projects(1)$1",
-                "^/v1/datasets/ds-001(/.+)$",
+                "^/v1/datasets/ds-001(?:/v\\d+\\.\\d+)?(/.+)$",
                 "/FROST-Server/v1.1/Projects(1)$1"),
             RouteAuthConfigurer.readStringList(proxyRewrite.get("regex_uri")));
         // An STA endpoint addresses entities by sub-path, so the wildcard stays.
