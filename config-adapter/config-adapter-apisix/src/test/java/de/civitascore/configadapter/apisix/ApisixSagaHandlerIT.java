@@ -129,10 +129,12 @@ class ApisixSagaHandlerIT extends AbstractApisixIT {
         List.of(
             "^/v1/datasets/" + datasetId + "/" + SLUG + "/?$",
             UPSTREAM_PATH,
+            "^/v1/datasets/" + datasetId + "/" + SLUG + "/v\\d+\\.\\d+(/.+)?/?$",
+            UPSTREAM_PATH + "$1",
             "^/v1/datasets/" + datasetId + "/" + SLUG + "(/.+)$",
             UPSTREAM_PATH + "$1"),
         textValues(regexUri),
-        "both rewrite pairs must be present — the first alone would drop every sub-path");
+        "all rewrite pairs must be present — the first alone would drop every sub-path");
   }
 
   @Test
@@ -196,6 +198,8 @@ class ApisixSagaHandlerIT extends AbstractApisixIT {
         List.of(
             "^/v1/datasets/" + datasetId + "/" + SLUG + "/?$",
             UPSTREAM_PATH,
+            "^/v1/datasets/" + datasetId + "/" + SLUG + "/v\\d+\\.\\d+(/.+)?/?$",
+            UPSTREAM_PATH + "$1",
             "^/v1/datasets/" + datasetId + "/" + SLUG + "(/.+)$",
             UPSTREAM_PATH + "$1"),
         textValues(proxyRewrite.get("regex_uri")),

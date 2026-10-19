@@ -74,6 +74,10 @@ Publication is per named API, not per dataset.
   `["^{routePath}/?$", "{upstreamPath}"]`: an OWS endpoint takes its parameters in the query string, so
   nothing below it belongs to the address. Every deeper path is refused at the gateway, which is what
   GeoServer 2.28 answered anyway — on 3.0.1 it would instead be served, unthrottled, by the admin service.
+- An `STA` route has a third pair before the sub-path pair:
+  `["^{routePath}/v\d+\.\d+(/.+)?/?$", "{upstreamPath}$1"]`. STA clients such as the Masterportal add a
+  version segment (`/v1.0`) after the named-API address, but the upstream path already carries the FROST
+  version. The pair drops the segment, so `{routePath}/v1.0/Things` reaches `{upstreamPath}/Things`.
 - `UPDATE_ROUTE` and `RESTORE_ROUTE` rebuild both the matched addresses and the rewrite from the address a
   route already carries, so a route provisioned earlier is corrected without re-provisioning its dataset.
   This migration can be dropped once every deployed route has been through one update.

@@ -48,6 +48,10 @@ final class PathRewrite {
    * Pattern/replacement pairs for {@code proxy-rewrite.regex_uri}. APISIX tries them in order and
    * keeps the first match, so the bare address and the trailing-slash form reach one upstream path,
    * while an STA sub-path keeps its suffix.
+   *
+   * <p>STA clients such as the Masterportal add a version segment ({@code /v1.0}) after the
+   * address, but the upstream path already carries the FROST version. The second pair drops that
+   * segment. No STA entity set starts with {@code v}, so it never hides an entity path.
    */
   static String[] pairs(String routePath, String upstreamPath, RouteUpstreamKind kind) {
     String exact = "^" + routePath + "/?$";
@@ -55,7 +59,12 @@ final class PathRewrite {
       return new String[] {exact, upstreamPath};
     }
     return new String[] {
-      exact, upstreamPath, "^" + routePath + "(/.+)$", upstreamPath + SUB_PATH_GROUP
+      exact,
+      upstreamPath,
+      "^" + routePath + "/v\\d+\\.\\d+(/.+)?/?$",
+      upstreamPath + SUB_PATH_GROUP,
+      "^" + routePath + "(/.+)$",
+      upstreamPath + SUB_PATH_GROUP
     };
   }
 
