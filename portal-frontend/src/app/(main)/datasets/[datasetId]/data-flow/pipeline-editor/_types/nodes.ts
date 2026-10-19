@@ -82,8 +82,8 @@ export interface DataSourceNodeData extends BasePipelineNodeData {
   entityName?: string
   /**
    * Versioned CORE URN of the selected DataSource's configuration artifact (the entity's
-   * `configurationUrn`), resolved from the picker's fetched list at selection time and emitted as the
-   * CORE pipeline node's `sourceRef`. Round-trips via `styles`; absent until a source is selected.
+   * `configurationUrn`), resolved from the picker's fetched list at selection time. Its `:latest` form
+   * is the CORE pipeline node's `sourceRef`. Round-trips via `styles`; absent until a source is selected.
    */
   configurationUrn?: string
   entityMetadata?: {

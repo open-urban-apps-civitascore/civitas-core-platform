@@ -111,7 +111,7 @@ class PipelineDeploymentRequestTest {
   }
 
   @Test
-  void nullMappingsBecomeEmptyMap() {
+  void nullArtifactsBecomeEmptyMap() {
     PipelineDeploymentRequest request =
         new PipelineDeploymentRequest(
             "p-1",
@@ -119,6 +119,6 @@ class PipelineDeploymentRequestTest {
             new Datasource(),
             new FrostSinkSpec("1", SinkPort.THING_TREE, null),
             null);
-    assertTrue(request.mappings().isEmpty());
+    assertTrue(request.artifacts().isEmpty());
   }
 }

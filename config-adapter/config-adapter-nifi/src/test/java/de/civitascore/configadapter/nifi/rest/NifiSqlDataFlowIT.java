@@ -135,7 +135,7 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
                 { "id": "e5", "source": "k", "target": "e" } ] }
             """
                 .formatted(CRON_EVERY_SECOND));
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> mappings =
         mapping("{ \"$.stationid\": \"$.stationid\", \"$.temperature\": \"$.temperature\" }");
 
     Datasource source = sqlSource("sensor_input");
@@ -178,7 +178,7 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
                 { "id": "e5", "source": "k", "target": "e" } ] }
             """
                 .formatted(CRON_EVERY_SECOND));
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> mappings =
         mapping(
             "{ \"$.stationid\": \"$.stationid\","
                 + " \"$.geom\": { \"op\": \"geoPoint\", \"lon\": \"$.lon\", \"lat\": \"$.lat\" } }");
@@ -220,7 +220,7 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
                 { "id": "e5", "source": "k", "target": "e" } ] }
             """
                 .formatted(CRON_EVERY_SECOND));
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> mappings =
         mapping("{ \"$.stationid\": \"$.stationid\", \"$.temperature\": \"$.temperature\" }");
 
     Datasource source = sqlSource("sensor_input");
@@ -271,7 +271,7 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
                 { "id": "e5", "source": "k", "target": "e" } ] }
             """
                 .formatted(CRON_EVERY_SECOND));
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> mappings =
         mapping("{ \"$.stationId\": \"$.stationId\", \"$.tempValue\": \"$.tempValue\" }");
 
     deploy(
@@ -303,7 +303,7 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
       Map<String, Object> graph,
       Datasource source,
       SinkSpec sink,
-      Map<String, Object> mappings)
+      Map<String, Map<String, Object>> mappings)
       throws Exception {
     byte[] key = CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
     try (CredentialResolver resolver = new CredentialResolver(key)) {
@@ -319,9 +319,9 @@ class NifiSqlDataFlowIT extends AbstractNifiIT {
     }
   }
 
-  /** A single-entry mappings catalog keyed by {@code map-1} (the graphs' mappingRef). */
-  private Map<String, Object> mapping(String fieldsJson) throws Exception {
-    return map("{ \"map-1\": { \"fields\": " + fieldsJson + " } }");
+  /** A single-entry artifacts map keyed by {@code map-1} (the graphs' mappingRef). */
+  private Map<String, Map<String, Object>> mapping(String fieldsJson) throws Exception {
+    return NifiTestFixtures.artifacts("{ \"map-1\": { \"fields\": " + fieldsJson + " } }");
   }
 
   private Datasource sqlSource(String table) throws Exception {

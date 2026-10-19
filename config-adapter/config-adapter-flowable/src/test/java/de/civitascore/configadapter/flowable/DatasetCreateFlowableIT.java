@@ -180,7 +180,7 @@ class DatasetCreateFlowableIT {
     variables.put("description", "Integration test via Flowable");
     variables.put("hasPipelines", false);
     variables.put("hasFrostSink", true);
-    variables.put("datasources", List.of());
+    variables.put("artifacts", Map.of());
     variables.put("dataPipelines", List.of());
     // Per-NamedApi route model (#1311/#1379): CREATE_ROUTE provisions one route per named-API
     // slug and NO route (and no upstream) without one.
@@ -266,7 +266,7 @@ class DatasetCreateFlowableIT {
     variables.put("description", "Should compensate");
     variables.put("hasPipelines", false);
     variables.put("hasFrostSink", true);
-    variables.put("datasources", List.of());
+    variables.put("artifacts", Map.of());
     variables.put("dataPipelines", List.of());
     // Without a named API the APISIX step is a contract-mandated no-op (no route, no upstream),
     // so the 500-mock would never be hit and no compensation would run.

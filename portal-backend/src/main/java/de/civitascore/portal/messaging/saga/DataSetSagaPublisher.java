@@ -1,8 +1,8 @@
 package de.civitascore.portal.messaging.saga;
 
 import de.civitascore.configadapter.model.dataset.DataPipeline;
-import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.model.dataset.NamedApi;
+import de.civitascore.portal.configuration.PipelineClosureValidationProperties;
 import de.civitascore.portal.configuration.SagaProperties;
 import de.civitascore.portal.model.datasink.PostgisConfiguration;
 import de.civitascore.portal.model.embedded.DataSinkType;
@@ -18,22 +18,24 @@ import de.civitascore.portal.model.saga.LayerPayload;
 import de.civitascore.portal.model.saga.StylePayload;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSinkRepository;
-import de.civitascore.portal.service.connector.DataSourceConnectorStore;
 import de.civitascore.portal.util.InvalidInputException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.common.errors.RecordTooLargeException;
 import org.owasp.encoder.Encode;
+import org.springframework.kafka.KafkaException;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
@@ -49,12 +51,15 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 public class DataSetSagaPublisher {
 
+  private static final Set<String> DATA_STRUCTURE_TYPES = Set.of("element", "datastructure");
+  private static final Set<String> EXPANDED_TYPES = Set.of("datasource", "datasink", "mapping");
+
   private final KafkaTemplate<String, String> eventKafkaTemplate;
   private final ObjectMapper objectMapper;
   private final SagaProperties sagaProperties;
   private final DataSinkRepository dataSinkRepository;
   private final ModelRegistryGateway modelRegistryGateway;
-  private final DataSourceConnectorStore connectorStore;
+  private final PipelineClosureValidationProperties closureProperties;
 
   public DataSetSagaPublisher(
       KafkaTemplate<String, String> eventKafkaTemplate,
@@ -62,13 +67,13 @@ public class DataSetSagaPublisher {
       SagaProperties sagaProperties,
       DataSinkRepository dataSinkRepository,
       ModelRegistryGateway modelRegistryGateway,
-      DataSourceConnectorStore connectorStore) {
+      PipelineClosureValidationProperties closureProperties) {
     this.eventKafkaTemplate = eventKafkaTemplate;
     this.objectMapper = objectMapper;
     this.sagaProperties = sagaProperties;
     this.dataSinkRepository = dataSinkRepository;
     this.modelRegistryGateway = modelRegistryGateway;
-    this.connectorStore = connectorStore;
+    this.closureProperties = closureProperties;
   }
 
   /**
@@ -89,12 +94,12 @@ public class DataSetSagaPublisher {
             dataset.getId().toString(),
             dataset.getName(),
             dataset.getDescription(),
-            buildDatasources(dataset),
             buildDatasinks(dataset),
             buildLayers(dataset),
             buildStyles(dataset),
             buildPipelines(dataset.getPipelines(), PipelineAction.ADD),
-            buildNamedApis(dataset));
+            buildNamedApis(dataset),
+            buildArtifacts(dataset.getPipelines()));
     sendTrigger(trigger);
   }
 
@@ -114,12 +119,12 @@ public class DataSetSagaPublisher {
             buildRouteIds(dataset),
             dataset.getServiceId(),
             dataset.getPipelineIds(),
-            buildDatasources(dataset),
             buildDatasinks(dataset),
             buildLayers(dataset),
             buildStyles(dataset),
             buildPipelineDiff(previousPipelines, dataset.getPipelines()),
-            buildNamedApis(dataset));
+            buildNamedApis(dataset),
+            buildArtifacts(dataset.getPipelines()));
     sendTrigger(trigger);
   }
 
@@ -158,35 +163,6 @@ public class DataSetSagaPublisher {
     sendTrigger(trigger);
   }
 
-  private List<Datasource> buildDatasources(DataSet dataset) {
-    if (dataset.getPipelines() == null) {
-      return List.of();
-    }
-
-    Set<UUID> seen = new HashSet<>();
-    return dataset.getPipelines().stream()
-        .filter(p -> p.getDataSources() != null)
-        .flatMap(p -> p.getDataSources().stream())
-        .filter(ds -> seen.add(ds.getId()))
-        .map(
-            ds -> {
-              var datasource = new Datasource();
-              // Keyed by the DataSource's configuration CORE URN — the same URN a pipeline's
-              // source node carries as its sourceRef — so the callback-free config-adapter can
-              // correlate the two on URNs, not GUIDs.
-              datasource.setId(ds.getConfigurationUrn());
-              datasource.setName(ds.getName());
-              datasource.setType(
-                  ds.getConnectorType() != null ? ds.getConnectorType().name() : null);
-              Map<String, Object> configuration = connectorStore.storedDocument(ds);
-              if (configuration != null) {
-                configuration.forEach(datasource::handleUnknownProperty);
-              }
-              return datasource;
-            })
-        .toList();
-  }
-
   /**
    * Reads a configuration payload from the registry by its versioned pin. Returns {@code null} when
    * no configuration was ever stored ({@code urn} null — e.g. FROST sinks); fails the publish when
@@ -217,10 +193,7 @@ public class DataSetSagaPublisher {
   private DataSinkPayload toDataSinkPayload(DataSink sink) {
     Map<String, Object> configuration =
         fetchConfiguration(sink.getConfigurationUrn(), "DataSink", sink.getId());
-    // Keyed by the DataSink's configuration CORE URN — the same URN a pipeline's sink node carries
-    // as its sinkRef — so the config-adapter resolves the sink on URNs, not GUIDs. Every sink,
-    // including a passthrough FROST sink (whose config is just its stamped connectionType), owns a
-    // configurationUrn, so every sink node can carry a sinkRef.
+    // Keyed by the DataSink's configuration CORE URN, the same URN the pipelines' dataSinkIds list.
     return new DataSinkPayload(
         sink.getConfigurationUrn(),
         sink.getDataSinkType() != null ? sink.getDataSinkType().name() : null,
@@ -352,19 +325,113 @@ public class DataSetSagaPublisher {
     if (sinkConfig == null) {
       return null;
     }
-    String element = objectMapper.convertValue(sinkConfig, PostgisConfiguration.class).getElement();
+    String element = elementOf(sinkConfig);
     if (element == null) {
       return null; // e.g. FROST passthrough sink — no referenced element
     }
+    return fetchInlinedSchema(element, "DataSink", "configuration.element");
+  }
+
+  private String elementOf(Map<String, Object> sinkConfig) {
+    return objectMapper.convertValue(sinkConfig, PostgisConfiguration.class).getElement();
+  }
+
+  private Map<String, Object> fetchInlinedSchema(
+      String urn, String resourceType, String resourceInfo) {
     return modelRegistryGateway
-        .fetchInlinedModel(element)
+        .fetchInlinedModel(urn)
         .filter(model -> !model.isEmpty())
         .orElseThrow(
             () ->
                 new InvalidInputException(
-                    "DataSink",
-                    "configuration.element",
-                    "Referenced Element " + element + " not found or has no model"));
+                    resourceType,
+                    resourceInfo,
+                    "Referenced Data structure " + urn + " not found or has no model"));
+  }
+
+  /**
+   * The {@code artifacts} of a CREATE or UPDATE trigger: every artifact the given Pipelines
+   * reference, keyed by the URN that Model Forge's dependency graph reports for it and sorted for a
+   * deterministic payload. A Data structure is its inlined view, every other artifact its stored
+   * document.
+   *
+   * <p>The config-adapter is callback-free, so it resolves every Pipeline node from this map. The
+   * host learns the references from the dependency graph and never interprets Pipeline or Mapping
+   * content. The walk stops at a Data structure, because its inlined view already contains the Data
+   * structures it references.
+   *
+   * <p>A source node names its Data source by {@code :latest}, which the dependency graph reports
+   * as the current configuration. A sink node, and a source node that a client stored with a pin,
+   * keeps the configuration version that was current when it was picked, while a later edit or
+   * release moves the entity on. The walk therefore also starts at the current configuration of
+   * every associated Data source and Data sink, the version that {@code dataSourceIds} and {@code
+   * dataSinkIds} name and that the adapter deploys.
+   *
+   * @throws InvalidInputException if the walk reaches an artifact the registry does not hold, an
+   *     artifact type the payload does not carry, or more than {@code
+   *     dataset.closure-validation.max-depth} hops, so that an incomplete map is never published
+   */
+  private Map<String, Map<String, Object>> buildArtifacts(Collection<Pipeline> pipelines) {
+    Map<String, Map<String, Object>> artifacts = new TreeMap<>();
+    for (Pipeline pipeline : pipelines) {
+      if (pipeline.getModelUrn() != null) {
+        collectArtifacts(pipeline, artifacts);
+      }
+    }
+    return artifacts;
+  }
+
+  private void collectArtifacts(Pipeline pipeline, Map<String, Map<String, Object>> artifacts) {
+    List<String> frontier =
+        new ArrayList<>(modelRegistryGateway.dependencyUrns(pipeline.getModelUrn()));
+    frontier.addAll(dataSourceUrns(pipeline));
+    frontier.addAll(dataSinkUrns(pipeline));
+    for (int depth = 1; !frontier.isEmpty(); depth++) {
+      List<String> next = new ArrayList<>();
+      for (String urn : frontier) {
+        if (!artifacts.containsKey(urn)) {
+          next.addAll(collectArtifact(pipeline, urn, artifacts));
+        }
+      }
+      next.removeIf(artifacts::containsKey);
+      if (!next.isEmpty() && depth + 1 > closureProperties.maxDepth()) {
+        throw new InvalidInputException(
+            "Pipeline",
+            pipeline.getId(),
+            "The artifacts of this pipeline reach beyond "
+                + closureProperties.maxDepth()
+                + " references");
+      }
+      frontier = next;
+    }
+  }
+
+  /** Puts {@code urn} into {@code artifacts} and returns the dependencies to walk next. */
+  private List<String> collectArtifact(
+      Pipeline pipeline, String urn, Map<String, Map<String, Object>> artifacts) {
+    String type = modelRegistryGateway.artifactType(urn);
+    if (DATA_STRUCTURE_TYPES.contains(type)) {
+      artifacts.put(urn, fetchInlinedSchema(urn, "Pipeline", pipeline.getId().toString()));
+      return List.of();
+    }
+    if (!EXPANDED_TYPES.contains(type)) {
+      throw new InvalidInputException(
+          "Pipeline",
+          pipeline.getId(),
+          "Referenced artifact " + urn + " has the type " + type + ", which no pipeline uses");
+    }
+    artifacts.put(
+        urn,
+        modelRegistryGateway
+            .fetchPayload(urn)
+            .map(ModelRegistryGateway.RegistryDocument::content)
+            .orElseThrow(
+                () ->
+                    new InvalidInputException(
+                        "Pipeline",
+                        pipeline.getId(),
+                        "Referenced artifact not found in the model registry: " + urn)));
+    return modelRegistryGateway.dependencyUrns(urn);
   }
 
   private List<DataPipeline> buildPipelines(Set<Pipeline> pipelines, PipelineAction action) {
@@ -391,13 +458,7 @@ public class DataSetSagaPublisher {
       if (!currentMap.containsKey(id)) {
         result.add(
             new DataPipeline(
-                id.toString(),
-                "0",
-                PipelineAction.DELETE.name(),
-                null,
-                List.of(),
-                List.of(),
-                Map.of()));
+                id.toString(), "0", PipelineAction.DELETE.name(), null, List.of(), List.of()));
       }
     }
 
@@ -471,22 +532,6 @@ public class DataSetSagaPublisher {
   }
 
   private DataPipeline toPipelineEntry(Pipeline pipeline, PipelineAction action) {
-    // The relation is a @Builder.Default set and Hibernate never loads it as null (empty for a
-    // pipeline without sources), so null can only mean a corrupted entity reached the publisher —
-    // fail loud rather than publish a silently empty association.
-    if (pipeline.getDataSources() == null) {
-      throw invariant("pipeline %s has a null dataSources relation", pipeline.getId());
-    }
-    // Association carried as the referenced configuration CORE URNs (not GUIDs) — the same URNs the
-    // pipeline graph's source/sink nodes carry as sourceRef/sinkRef, and the keys of the
-    // datasource/datasink catalogs. Sorted so the payload is deterministic (relations are unordered
-    // sets). A source/sink without a stored configuration (null URN) is skipped.
-    List<String> dataSourceIds =
-        pipeline.getDataSources().stream()
-            .map(DataSource::getConfigurationUrn)
-            .filter(Objects::nonNull)
-            .sorted()
-            .toList();
     // The model holds the clean CORE Pipeline document (nodes/edges referencing source/sink/mapping
     // by CORE URN), stored in the Model Forge registry and pinned by the pipeline's modelUrn. The
     // gateway strips the x-ui-styles keyword (React Flow layout), which was never part of the saga
@@ -509,43 +554,37 @@ public class DataSetSagaPublisher {
         String.valueOf(pipeline.getVersion()),
         action.name(),
         model,
-        dataSourceIds,
-        dataSinkRepository.findByPipelineId(pipeline.getId()).stream()
-            .map(DataSink::getConfigurationUrn)
-            .filter(Objects::nonNull)
-            .sorted()
-            .toList(),
-        buildMappings(pipeline));
+        dataSourceUrns(pipeline),
+        dataSinkUrns(pipeline));
   }
 
   /**
-   * Ships the Mapping artifacts the pipeline depends on as {@code URN -> { fields, source, target
-   * }}. The config-adapter is callback-free, so a mapping's transform rules must travel in the saga
-   * payload rather than being fetched at deploy time.
-   *
-   * <p>The set of referenced Mappings is read from Model Forge's <b>dependency graph</b> (an
-   * envelope concern), never by parsing the pipeline document — the host must not interpret
-   * pipeline content ({@code nodes}/{@code mappingRef}); that is the frontend's / Model Forge's
-   * job. Fails the publish if a referenced Mapping cannot be resolved (host/registry
-   * inconsistency).
+   * The current configuration CORE URNs (not GUIDs) of the Pipeline's Data sources, which the
+   * adapter matches against the graph's {@code sourceRef} by logical URN. Sorted so the payload is
+   * deterministic (relations are unordered sets). A source without a stored configuration is
+   * skipped.
    */
-  private Map<String, Object> buildMappings(Pipeline pipeline) {
-    Map<String, Object> mappings = new LinkedHashMap<>();
-    for (String ref :
-        modelRegistryGateway.dependencyUrnsOfType(pipeline.getModelUrn(), "mapping")) {
-      Map<String, Object> content =
-          modelRegistryGateway
-              .fetchPayload(ref)
-              .map(ModelRegistryGateway.RegistryDocument::content)
-              .orElseThrow(
-                  () ->
-                      new InvalidInputException(
-                          "Pipeline",
-                          pipeline.getId(),
-                          "Referenced Mapping not found in the model registry: " + ref));
-      mappings.put(ref, content);
+  private static List<String> dataSourceUrns(Pipeline pipeline) {
+    // The relation is a @Builder.Default set and Hibernate never loads it as null (empty for a
+    // pipeline without sources), so null can only mean a corrupted entity reached the publisher —
+    // fail loud rather than publish a silently empty association.
+    if (pipeline.getDataSources() == null) {
+      throw invariant("pipeline %s has a null dataSources relation", pipeline.getId());
     }
-    return mappings;
+    return pipeline.getDataSources().stream()
+        .map(DataSource::getConfigurationUrn)
+        .filter(Objects::nonNull)
+        .sorted()
+        .toList();
+  }
+
+  /** The Data sink counterpart of {@link #dataSourceUrns}. */
+  private List<String> dataSinkUrns(Pipeline pipeline) {
+    return dataSinkRepository.findByPipelineId(pipeline.getId()).stream()
+        .map(DataSink::getConfigurationUrn)
+        .filter(Objects::nonNull)
+        .sorted()
+        .toList();
   }
 
   /**
@@ -559,31 +598,20 @@ public class DataSetSagaPublisher {
   private void sendTrigger(SagaTrigger trigger) {
     String datasetId = trigger.datasetId();
     String sagaType = trigger.sagaType().name();
+    String json = toJson(trigger);
+    int payloadBytes = json.getBytes(StandardCharsets.UTF_8).length;
     try {
-      String json = objectMapper.writeValueAsString(trigger);
       eventKafkaTemplate
           .send(sagaProperties.triggerTopic(), datasetId, json)
           .get(sagaProperties.publishTimeoutSeconds(), TimeUnit.SECONDS);
       log.info(
-          "Published saga trigger: sagaType={}, datasetId={}, topic={}",
+          "Published saga trigger: sagaType={}, datasetId={}, topic={}, bytes={}",
           Encode.forJava(sagaType),
           Encode.forJava(datasetId),
-          Encode.forJava(sagaProperties.triggerTopic()));
-    } catch (JacksonException e) {
-      log.error(
-          "Failed to serialize saga trigger for dataset {}: {}",
-          Encode.forJava(datasetId),
-          e.getMessage(),
-          e);
-      throw new IllegalStateException("Failed to serialize saga trigger", e);
-    } catch (ExecutionException e) {
-      log.error(
-          "Kafka broker rejected saga trigger for dataset {}, sagaType={}: {}",
-          Encode.forJava(datasetId),
-          Encode.forJava(sagaType),
-          e.getCause() != null ? e.getCause().getMessage() : e.getMessage(),
-          e);
-      throw new IllegalStateException("Failed to send saga trigger to Kafka", e);
+          Encode.forJava(sagaProperties.triggerTopic()),
+          payloadBytes);
+    } catch (ExecutionException | KafkaException e) {
+      throw sendFailure(datasetId, sagaType, payloadBytes, e);
     } catch (TimeoutException e) {
       log.error(
           "Timed out after {}s waiting for Kafka ack for saga trigger: sagaType={}, datasetId={}",
@@ -602,5 +630,52 @@ public class DataSetSagaPublisher {
       throw new IllegalStateException(
           "Interrupted while waiting for Kafka ack for saga trigger", e);
     }
+  }
+
+  private static RuntimeException sendFailure(
+      String datasetId, String sagaType, int payloadBytes, Exception failure) {
+    if (isCausedByRecordTooLarge(failure)) {
+      log.warn(
+          "Kafka rejected saga trigger for dataset {} as too large: sagaType={}, bytes={}",
+          Encode.forJava(datasetId),
+          Encode.forJava(sagaType),
+          payloadBytes);
+      return new InvalidInputException(
+          "DataSet",
+          UUID.fromString(datasetId),
+          "The saga trigger of this Dataset is "
+              + payloadBytes
+              + " bytes, more than the platform accepts. Reduce the size of its Data"
+              + " structures.");
+    }
+    log.error(
+        "Kafka rejected saga trigger for dataset {}, sagaType={}: {}",
+        Encode.forJava(datasetId),
+        Encode.forJava(sagaType),
+        failure.getCause() != null ? failure.getCause().getMessage() : failure.getMessage(),
+        failure);
+    return new IllegalStateException("Failed to send saga trigger to Kafka", failure);
+  }
+
+  private String toJson(SagaTrigger trigger) {
+    try {
+      return objectMapper.writeValueAsString(trigger);
+    } catch (JacksonException e) {
+      log.error(
+          "Failed to serialize saga trigger for dataset {}: {}",
+          Encode.forJava(trigger.datasetId()),
+          e.getMessage(),
+          e);
+      throw new IllegalStateException("Failed to serialize saga trigger", e);
+    }
+  }
+
+  private static boolean isCausedByRecordTooLarge(Throwable failure) {
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause instanceof RecordTooLargeException) {
+        return true;
+      }
+    }
+    return false;
   }
 }

@@ -10,5 +10,8 @@ export const versionOfUrn = (urn: string): string => {
 /** The CORE URN without its version segment. */
 export const logicalUrnOf = (urn: string): string => urn.split(':').slice(0, LOGICAL_SEGMENTS).join(':')
 
+/** The CORE URN that Model Forge resolves to the current version of the artifact. */
+export const latestUrnOf = (urn: string): string => `${logicalUrnOf(urn)}:latest`
+
 export const PINNED_DATASTRUCTURE_URN =
   /^urn:core:[^:]+:[^:]+:datastructure:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d+\.\d+\.\d+$/

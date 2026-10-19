@@ -81,16 +81,16 @@ public final class NifiTestFixtures {
   private static final String DEFAULT_FROST_BASE_URL = "http://frost:8080/FROST-Server/v1.1";
 
   /**
-   * The shipped mappings catalog every planner fixture request carries — the callback-free
-   * adapter's source of a {@code mappingRef}'s {@code fields}. Keyed by the Mapping CORE URNs the
-   * graph fixtures reference; field order is preserved (LinkedHashMap) because the FROST compiler's
-   * flat {@code sta_N} indices depend on it.
+   * The artifacts map every planner fixture request carries — the callback-free adapter's source of
+   * a {@code mappingRef}'s {@code fields}. Keyed by the Mapping CORE URNs the graph fixtures
+   * reference; field order is preserved (LinkedHashMap) because the FROST compiler's flat {@code
+   * sta_N} indices depend on it.
    */
-  static final Map<String, Object> MAPPINGS;
+  static final Map<String, Map<String, Object>> MAPPINGS;
 
   static {
     try {
-      Map<String, Object> m = new LinkedHashMap<>();
+      Map<String, Map<String, Object>> m = new LinkedHashMap<>();
       m.put(
           MAP_BASIC,
           map(
@@ -122,7 +122,7 @@ public final class NifiTestFixtures {
 
   private NifiTestFixtures() {}
 
-  /** A deployment request carrying the shared {@link #MAPPINGS} catalog. */
+  /** A deployment request carrying the shared {@link #MAPPINGS} as its artifacts. */
   static PipelineDeploymentRequest req(
       String pipelineId, Map<String, Object> graph, Datasource source, SinkSpec sink) {
     return new PipelineDeploymentRequest(pipelineId, graph, source, sink, MAPPINGS);
@@ -204,6 +204,10 @@ public final class NifiTestFixtures {
   }
 
   static Map<String, Object> map(String json) throws Exception {
+    return MAPPER.readValue(json, new TypeReference<>() {});
+  }
+
+  public static Map<String, Map<String, Object>> artifacts(String json) throws Exception {
     return MAPPER.readValue(json, new TypeReference<>() {});
   }
 

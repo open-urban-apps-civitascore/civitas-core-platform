@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -59,6 +60,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -235,6 +237,34 @@ class DataSourceServiceTest {
       DataSource result = dataSourceService.release(id);
 
       assertThat(result.getDataSourceStatus()).isEqualTo(DataSourceStatus.AVAILABLE);
+    }
+
+    @Test
+    void release_refreshesTheElementOfTheReleasedDataSourceAfterValidation() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = createMqttDataSource(id);
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+      DataSource result = dataSourceService.release(id);
+
+      InOrder order = inOrder(connectorStore, dataSourceRepository);
+      order.verify(connectorStore).read(entity);
+      order.verify(dataSourceRepository).save(entity);
+      order.verify(connectorStore).refreshElement(entity);
+      assertThat(result).isSameAs(entity);
+    }
+
+    @Test
+    void release_rejected_refreshesNoElement() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = createMqttDataSource(id);
+      entity.setDataStructureVersion(null);
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+
+      assertThatThrownBy(() -> dataSourceService.release(id))
+          .isInstanceOf(InvalidInputException.class);
+      verify(connectorStore, never()).refreshElement(any());
     }
 
     @Test

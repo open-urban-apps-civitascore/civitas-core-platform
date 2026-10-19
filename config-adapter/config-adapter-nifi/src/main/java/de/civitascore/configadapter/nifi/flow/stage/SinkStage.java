@@ -20,7 +20,7 @@ import java.util.Set;
 
 /**
  * A self-describing pipeline sink. One implementation per {@link SinkType}, owning its whole
- * lifecycle: parsing its catalog entry into the typed spec, plan-time binding (validation, property
+ * lifecycle: parsing its stage input into the typed spec, plan-time binding (validation, property
  * maps), and build-time wiring of the entire tail region — terminal processor or sub-graph, the
  * shared error sink, and all failure routing.
  *
@@ -37,11 +37,13 @@ public interface SinkStage<S extends SinkSpec> {
   Class<S> specType();
 
   /**
-   * Resolution half: parses this sink's raw catalog entry (the trigger payload's {@code
-   * datasinks[]} element) into the typed spec, enforcing the sink's own payload invariants.
+   * Resolution half: parses this sink's stage input into the typed spec, enforcing the sink's own
+   * payload invariants. The input carries the sink configuration document as {@code configuration}
+   * and, as {@code dataStructure}, the inlined Data structure that the configuration names in
+   * {@code element} (absent when it names none).
    *
-   * @param datasink the raw catalog entry
-   * @param ctx saga-level values not carried by the entry itself
+   * @param datasink the stage input
+   * @param ctx saga-level values not carried by the input itself
    * @throws FatalAdapterException if the entry or the saga context is invalid for this sink
    */
   S parseSpec(Map<String, Object> datasink, SinkResolutionContext ctx) throws FatalAdapterException;

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,6 +15,7 @@ import de.civitascore.portal.model.connector.Secret;
 import de.civitascore.portal.model.connector.SqlConnectorConfiguration;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway.ModelPin;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway.RegistryDocument;
@@ -42,6 +44,10 @@ class DataSourceConnectorStoreTest {
       "urn:core:platform:civitas:datasource:common:00000000-0000-4000-8000-000000000014";
   private static final String VERSIONED_URN = LOGICAL_URN + ":1.0.0";
   private static final String NEXT_VERSIONED_URN = LOGICAL_URN + ":1.1.0";
+  private static final String MODEL_URN =
+      "urn:core:platform:civitas:element:common:00000000-0000-4000-8000-000000000021:1.0.0";
+  private static final String OTHER_MODEL_URN =
+      "urn:core:platform:civitas:element:common:00000000-0000-4000-8000-000000000021:2.0.0";
 
   @Mock private ModelRegistryGateway modelRegistryGateway;
 
@@ -81,6 +87,30 @@ class DataSourceConnectorStoreTest {
     when(modelRegistryGateway.fetchPayload(VERSIONED_URN))
         .thenReturn(Optional.of(new RegistryDocument(stored, null)));
     return dataSource;
+  }
+
+  private static DataStructureVersion structureVersion(String modelUrn) {
+    DataStructureVersion version = new DataStructureVersion();
+    version.setModelUrn(modelUrn);
+    return version;
+  }
+
+  /**
+   * Makes the document of the last store the stored one, and compares documents as the registry
+   * does for documents without registry stamps.
+   */
+  private void keepWrittenDocumentAsStored() {
+    Map<String, Object> written = writtenDocument();
+    when(modelRegistryGateway.fetchPayload(NEXT_VERSIONED_URN))
+        .thenReturn(Optional.of(new RegistryDocument(written, null)));
+    when(modelRegistryGateway.isUnchanged(any(RegistryDocument.class), any(), any()))
+        .thenAnswer(
+            invocation ->
+                invocation
+                    .<RegistryDocument>getArgument(0)
+                    .content()
+                    .equals(invocation.getArgument(1)));
+    clearInvocations(modelRegistryGateway);
   }
 
   private static SqlConnectorConfiguration sqlConnector(String password) {
@@ -194,6 +224,66 @@ class DataSourceConnectorStoreTest {
     }
 
     @Test
+    void write_namesTheModelUrnOfTheDataStructureVersionInElement() {
+      DataSource dataSource = dataSource(ConnectorType.SQL);
+      dataSource.setDataStructureVersion(structureVersion(MODEL_URN));
+      stubStore();
+
+      store().write(dataSource, sqlConnector("secret"));
+
+      assertThat(writtenDocument()).containsEntry("element", MODEL_URN);
+    }
+
+    @Test
+    void write_withoutDataStructureVersion_storesNoElement() {
+      DataSource dataSource = dataSource(ConnectorType.SQL);
+      stubStore();
+
+      store().write(dataSource, sqlConnector("secret"));
+
+      assertThat(writtenDocument()).doesNotContainKey("element");
+    }
+
+    @Test
+    void write_withDataStructureVersionWithoutModelUrn_storesNoElement() {
+      DataSource dataSource = dataSource(ConnectorType.SQL);
+      dataSource.setDataStructureVersion(structureVersion(null));
+      stubStore();
+
+      store().write(dataSource, sqlConnector("secret"));
+
+      assertThat(writtenDocument()).doesNotContainKey("element");
+    }
+
+    @Test
+    void write_afterTheDataStructureVersionChanged_storesANewVersionWithTheNewElement() {
+      DataSource dataSource = dataSource(ConnectorType.SQL);
+      dataSource.setDataStructureVersion(structureVersion(MODEL_URN));
+      stubStore();
+      store().write(dataSource, sqlConnector("secret"));
+      keepWrittenDocumentAsStored();
+      dataSource.setDataStructureVersion(structureVersion(OTHER_MODEL_URN));
+
+      store().write(dataSource, sqlConnector(Secret.PLACEHOLDER));
+
+      assertThat(writtenDocument()).containsEntry("element", OTHER_MODEL_URN);
+    }
+
+    @Test
+    void write_sameConnectorAndSameDataStructureVersion_storesNothing() {
+      DataSource dataSource = dataSource(ConnectorType.SQL);
+      dataSource.setDataStructureVersion(structureVersion(MODEL_URN));
+      stubStore();
+      store().write(dataSource, sqlConnector("secret"));
+      keepWrittenDocumentAsStored();
+
+      store().write(dataSource, sqlConnector(Secret.PLACEHOLDER));
+
+      verify(modelRegistryGateway, never()).storePayload(any(), any(), any(), any(), any(), any());
+      assertThat(dataSource.getConfigurationUrn()).isEqualTo(NEXT_VERSIONED_URN);
+    }
+
+    @Test
     void write_null_clearsTheContentPinAndKeepsTheLogicalUrn() {
       DataSource dataSource = dataSource(ConnectorType.SQL);
       dataSource.setConfigurationLogicalUrn(LOGICAL_URN);
@@ -203,6 +293,72 @@ class DataSourceConnectorStoreTest {
 
       assertThat(dataSource.getConfigurationUrn()).isNull();
       assertThat(dataSource.getConfigurationLogicalUrn()).isEqualTo(LOGICAL_URN);
+      verify(modelRegistryGateway, never()).storePayload(any(), any(), any(), any(), any(), any());
+    }
+  }
+
+  @Nested
+  class RefreshElement {
+
+    @Test
+    void refreshElement_withAnotherElement_storesTheStoredContentWithTheModelUrn() {
+      DataSource dataSource = storedSqlSource("ENC(stored)");
+      dataSource.setDataStructureVersion(structureVersion(MODEL_URN));
+      stubStore();
+
+      store().refreshElement(dataSource);
+
+      assertThat(writtenDocument())
+          .containsEntry("element", MODEL_URN)
+          .containsEntry("password", "ENC(stored)")
+          .containsEntry("dsn", "postgres://host/db");
+      verify(modelRegistryGateway).fetchPayload(VERSIONED_URN);
+      assertThat(dataSource.getConfigurationUrn()).isEqualTo(NEXT_VERSIONED_URN);
+    }
+
+    @Test
+    void refreshElement_withoutDataStructureVersion_removesTheStoredElement() {
+      DataSource dataSource = dataSource(ConnectorType.SQL);
+      dataSource.setConfigurationLogicalUrn(LOGICAL_URN);
+      dataSource.setConfigurationUrn(VERSIONED_URN);
+      when(modelRegistryGateway.fetchPayload(VERSIONED_URN))
+          .thenReturn(
+              Optional.of(
+                  new RegistryDocument(
+                      Map.of("connectionType", "sql", "element", MODEL_URN), null)));
+      stubStore();
+
+      store().refreshElement(dataSource);
+
+      assertThat(writtenDocument()).doesNotContainKey("element");
+    }
+
+    @Test
+    void refreshElement_withTheSameElement_storesNothing() {
+      DataSource dataSource = dataSource(ConnectorType.SQL);
+      dataSource.setConfigurationLogicalUrn(LOGICAL_URN);
+      dataSource.setConfigurationUrn(VERSIONED_URN);
+      dataSource.setDataStructureVersion(structureVersion(MODEL_URN));
+      when(modelRegistryGateway.fetchPayload(VERSIONED_URN))
+          .thenReturn(
+              Optional.of(
+                  new RegistryDocument(
+                      Map.of("connectionType", "sql", "element", MODEL_URN), null)));
+
+      store().refreshElement(dataSource);
+
+      verify(modelRegistryGateway, never()).storePayload(any(), any(), any(), any(), any(), any());
+      assertThat(dataSource.getConfigurationUrn()).isEqualTo(VERSIONED_URN);
+    }
+
+    @Test
+    void refreshElement_withoutStoredConnector_doesNothing() {
+      DataSource dataSource = dataSource(ConnectorType.SQL);
+      dataSource.setDataStructureVersion(structureVersion(MODEL_URN));
+
+      store().refreshElement(dataSource);
+
+      verify(modelRegistryGateway, never()).fetchPayload(any());
       verify(modelRegistryGateway, never()).storePayload(any(), any(), any(), any(), any(), any());
     }
   }
@@ -263,7 +419,14 @@ class DataSourceConnectorStoreTest {
             (Operation)
                 (store, dataSource) ->
                     store.patch(dataSource, new JsonMapper().readTree("{\"table\":\"users\"}"))),
-        Arguments.of("storedDocument", (Operation) DataSourceConnectorStore::storedDocument));
+        Arguments.of("storedDocument", (Operation) DataSourceConnectorStore::storedDocument),
+        Arguments.of(
+            "refreshElement",
+            (Operation)
+                (store, dataSource) -> {
+                  store.refreshElement(dataSource);
+                  return null;
+                }));
   }
 
   @ParameterizedTest(name = "{0}")

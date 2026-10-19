@@ -357,6 +357,25 @@ public class ModelRegistryGateway {
   }
 
   /**
+   * The direct dependencies of {@code urn} in Model Forge's dependency graph, in graph order and
+   * without duplicates. A pinned reference comes back exactly as the referencing artifact carries
+   * it; a logical or {@code :latest} reference comes back resolved to the current version. The
+   * result does not say whether the registry holds each target. Empty when {@code urn} is
+   * null/blank.
+   *
+   * @param urn the depending artifact's logical or versioned CORE URN
+   */
+  public List<String> dependencyUrns(String urn) {
+    if (urn == null || urn.isBlank()) {
+      return List.of();
+    }
+    return modelForge.dependencies(new DependencyQuery(new ArtifactId(urn))).edges().stream()
+        .map(edge -> edge.target().value())
+        .distinct()
+        .toList();
+  }
+
+  /**
    * A flow's participating closure: every artifact reachable from {@code urn} within {@code
    * maxDepth} reference hops, and which of them the registry no longer holds.
    *

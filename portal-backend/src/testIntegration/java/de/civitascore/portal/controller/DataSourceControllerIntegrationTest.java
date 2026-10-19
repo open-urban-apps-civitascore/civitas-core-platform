@@ -25,6 +25,7 @@ import de.civitascore.portal.model.output.DataSourceOutputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
+import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.ArrayList;
@@ -65,6 +66,7 @@ class DataSourceControllerIntegrationTest
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private ModelRegistryGateway modelRegistryGateway;
+  @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
 
   @Override
   protected String getEndpointPath() {
@@ -266,6 +268,16 @@ class DataSourceControllerIntegrationTest
         url, HttpMethod.GET, new HttpEntity<>(createAuthHeaders()), String.class);
   }
 
+  private DataStructureVersion dataStructureVersionWithModel(DataStructureVersionStatus status) {
+    var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+    DataStructureVersion dsv =
+        portalData.dataStructureVersion(ds, b -> b.dataStructureVersionStatus(status));
+    // attachModel sets the pin on dsv; its result holds a lazy parent outside any session, which
+    // a later attachModel cannot read.
+    portalData.attachModel(dsv, portalData.dataStructureVersionModel("Reading"));
+    return dsv;
+  }
+
   private UUID createDraftDataStructureVersionId() {
     var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
     DataStructureVersion dsv =
@@ -369,6 +381,21 @@ class DataSourceControllerIntegrationTest
           .containsEntry("connectionType", "sql")
           .doesNotContainKey("connectorType");
       assertThat((String) document.get("password")).startsWith("ENC(").doesNotContain("secret");
+    }
+
+    @Test
+    void create_withDataStructureVersion_namesItsModelInElementAndLinksItInTheGraph() {
+      DataStructureVersion dsv =
+          dataStructureVersionWithModel(DataStructureVersionStatus.AVAILABLE);
+
+      UUID id = createWithConnector(sqlConnector(), dsv.getId()).getBody().getId();
+
+      assertThat(storedDocument(id)).containsEntry("element", dsv.getModelUrn());
+      assertThat(
+              modelRegistryGateway.dependencyUrnsOfType(
+                  dataSourceRepository.findById(id).orElseThrow().getConfigurationUrn(),
+                  modelRegistryGateway.artifactType(dsv.getModelUrn())))
+          .contains(dsv.getModelUrn());
     }
 
     @Test
@@ -718,6 +745,26 @@ class DataSourceControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody().getDataSourceStatus()).isEqualTo(DataSourceStatus.AVAILABLE);
+    }
+
+    @Test
+    void release_afterAModelEditOfTheDataStructureVersion_namesTheCurrentModel() {
+      DataStructureVersion dsv = dataStructureVersionWithModel(DataStructureVersionStatus.DRAFT);
+      UUID id = createWithConnector(mqttConnector(), dsv.getId()).getBody().getId();
+      String configurationBeforeRelease =
+          dataSourceRepository.findById(id).orElseThrow().getConfigurationUrn();
+      DataStructureVersion edited =
+          portalData.attachModel(dsv, portalData.dataStructureVersionModel("Reading, edited"));
+      edited.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      dataStructureVersionRepository.save(edited);
+
+      ResponseEntity<DataSourceOutputDTO> response = performRelease(id);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getConfigurationUrn())
+          .isNotEqualTo(configurationBeforeRelease)
+          .isEqualTo(dataSourceRepository.findById(id).orElseThrow().getConfigurationUrn());
+      assertThat(storedDocument(id)).containsEntry("element", edited.getModelUrn());
     }
 
     @Test

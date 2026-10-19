@@ -21,8 +21,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A datasource connection within a dataset. Contains common fields shared across all datasource
- * types (postgresql, mqtt, etc.) and captures type-specific fields via {@link JsonAnySetter}.
+ * The typed view of a Data source configuration. Contains common fields shared across all connector
+ * types; the fields of a connector type go into the additional properties via {@link
+ * JsonAnySetter}.
  *
  * <p>This follows the same pattern as {@link de.civitascore.configadapter.model.AbstractApiModel}
  * for handling unknown JSON properties, but is not an API model (no {@code toApiMap()}).
