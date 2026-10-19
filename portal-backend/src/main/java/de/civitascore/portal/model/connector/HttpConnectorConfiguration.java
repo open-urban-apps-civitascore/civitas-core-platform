@@ -218,15 +218,8 @@ public record HttpConnectorConfiguration(
       name = "HttpConnectorPageNumberPagination",
       description = "Page-number pagination, with page number and page size as query parameters.")
   public record PageNumber(
-      @Schema(
-              description =
-                  "Query parameter that carries the page number. Contains only letters and '.',"
-                      + " '_', '@'.",
-              example = "page")
-          @NotNull(groups = OnRelease.class, message = "'pageParameter' is required") @Pattern(
-              regexp = "^[A-Za-z._@]+$",
-              message = "'pageParameter' must contain only letters and '.', '_', '@'")
-          String pageParameter,
+      @Schema(description = "Query parameter that carries the page number.", example = "page")
+          @NotNull(groups = OnRelease.class, message = "'pageParameter' is required") String pageParameter,
       @Schema(description = "Query parameter that carries the page size.", example = "size")
           @NotNull(groups = OnRelease.class, message = "'pageSizeParameter' is required") String pageSizeParameter,
       @Schema(description = "Number of records per page. At least 1.", example = "100")
