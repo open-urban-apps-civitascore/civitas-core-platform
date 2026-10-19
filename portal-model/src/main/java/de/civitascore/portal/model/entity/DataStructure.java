@@ -18,7 +18,7 @@ import lombok.experimental.SuperBuilder;
 
 /**
  * Represents a data structure definition that contains one or more {@link DataStructureVersion
- * versions}. It carries no lifecycle status of its own; each version does.
+ * versions}, which carry the lifecycle status.
  */
 @Entity
 @Table(name = "data_structures")

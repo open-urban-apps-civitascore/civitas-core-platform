@@ -19,8 +19,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 /**
- * Service for managing {@link DataStructure} entities: logical containers of their versions, which
- * carry the lifecycle. Validates that no version is in use before the data structure is deleted.
+ * Service for managing {@link DataStructure} entities. Validates that no version is in use before
+ * the data structure is deleted.
  */
 @Service
 @RequiredArgsConstructor

@@ -299,8 +299,7 @@ class ArtifactUsageLookupTest {
           .containsExactly(new ReleasedReferrer(ReferrerKind.DATA_STRUCTURE, ELEMENT_URN));
     }
 
-    // Without this a host without a released version, found under one candidate URN, would still
-    // block the unrelease.
+    // Without this an unreleased host found under one candidate URN still blocks the unrelease.
     @Test
     @DisplayName("An element whose only host row has no released version is not released")
     void elementOfUnreleasedStructure_isNotReleased() {

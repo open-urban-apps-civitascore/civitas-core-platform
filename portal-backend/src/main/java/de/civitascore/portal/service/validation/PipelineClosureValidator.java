@@ -215,7 +215,6 @@ public class PipelineClosureValidator {
     }
   }
 
-  /** Whether a version counts as released: its own status decides. */
   private static boolean isReleased(DataStructureVersion version) {
     return version.getDataStructureVersionStatus() == DataStructureVersionStatus.AVAILABLE;
   }

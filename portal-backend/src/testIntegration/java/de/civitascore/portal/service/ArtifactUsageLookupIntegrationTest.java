@@ -298,7 +298,7 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
                   "object",
                   "properties",
                   Map.of("reading", Map.of("$ref", version.getModelUrn())))));
-      DataStructureVersion referrer = structureWithModel(model);
+      DataStructureVersion referrer = draftVersionWith(model);
 
       assertThat(usageOf(version).inUse()).isTrue();
       assertThat(usageOf(version).inUseByReleased()).isFalse();
@@ -318,7 +318,7 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
       DataStructureVersion version = releasedVersion("Reading");
       Map<String, Object> model = portalData.dataStructureVersionModel("RootHost");
       model.put("properties", Map.of("reading", Map.of("$ref", version.getModelUrn())));
-      DataStructureVersion referrer = structureWithModel(model);
+      DataStructureVersion referrer = draftVersionWith(model);
 
       assertThat(usageOf(version).inUse()).isTrue();
       assertThat(usageOf(version).inUseByReleased()).isFalse();
@@ -331,8 +331,7 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
     }
   }
 
-  /** A DRAFT version of a new structure, holding the given model. */
-  private DataStructureVersion structureWithModel(Map<String, Object> model) {
+  private DataStructureVersion draftVersionWith(Map<String, Object> model) {
     DataStructureVersion version = portalData.dataStructureVersion(portalData.dataStructure());
     return portalData.attachModel(version, model);
   }
@@ -383,7 +382,7 @@ class ArtifactUsageLookupIntegrationTest extends BaseKeycloakIntegrationTest {
       defOf(other, "Fremd")
           .put(
               "properties", Map.of("neueKlasse", Map.of("$ref", memberUrn(version, "NeueKlasse"))));
-      structureWithModel(other);
+      draftVersionWith(other);
 
       assertThat(usageOf(version).inUse()).isTrue();
     }
