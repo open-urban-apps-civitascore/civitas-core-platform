@@ -22,7 +22,7 @@ import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
-import { ApiCallSnapshots, HttpApiCallForm } from '@/types/connectors'
+import { ApiCallSnapshots, CollapsedApiCallSections, HttpApiCallForm } from '@/types/connectors'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Datapool } from '@/types/datapools'
 import {
@@ -156,8 +156,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
   // Field ids change on every form reset, indexes do not.
   const [editingApiCalls, setEditingApiCalls] = useState<ApiCallSnapshots>(new Map())
-  const [collapsedRequestIndexes, setCollapsedRequestIndexes] = useState<ReadonlySet<number>>(new Set())
-  const [collapsedPaginationIndexes, setCollapsedPaginationIndexes] = useState<ReadonlySet<number>>(new Set())
+  const [collapsedApiCallSections, setCollapsedApiCallSections] = useState<CollapsedApiCallSections>(new Map())
   // Index of each API call at the last save, null for a new API call. Undefined: no change since then.
   const [initialApiCallIndexes, setInitialApiCallIndexes] = useState<ReadonlyArray<number | null>>()
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
@@ -191,8 +190,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   useEffect(() => {
     setEditingApiCalls(new Map())
-    setCollapsedRequestIndexes(new Set())
-    setCollapsedPaginationIndexes(new Set())
+    setCollapsedApiCallSections(new Map())
     setInitialApiCallIndexes(undefined)
   }, [selectedConnectorType])
 
@@ -230,13 +228,12 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
         ? []
         : [[initialIndex, structuredClone(initialApiCalls[initialIndex] ?? null)] as const]
     })
-    const toInitialIndexes = (indexes: ReadonlySet<number>) => {
-      const initialIndexes = [...indexes].map(toInitialIndex)
-      return new Set(initialIndexes.filter(index => index !== null))
-    }
+    const collapsedEntries = [...collapsedApiCallSections].flatMap(([index, sections]) => {
+      const initialIndex = toInitialIndex(index)
+      return initialIndex === null ? [] : [[initialIndex, sections] as const]
+    })
     setEditingApiCalls(new Map(editingEntries))
-    setCollapsedRequestIndexes(toInitialIndexes(collapsedRequestIndexes))
-    setCollapsedPaginationIndexes(toInitialIndexes(collapsedPaginationIndexes))
+    setCollapsedApiCallSections(new Map(collapsedEntries))
     setInitialApiCallIndexes(undefined)
   }
 
@@ -347,13 +344,11 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             isDatasourceReleased={isReleased}
             dataStructureName={selectedDatastructureName}
             editingApiCalls={editingApiCalls}
-            collapsedRequestIndexes={collapsedRequestIndexes}
-            collapsedPaginationIndexes={collapsedPaginationIndexes}
+            collapsedSections={collapsedApiCallSections}
             onEditingApiCallsChange={setEditingApiCalls}
             onApiCallAdd={handleApiCallAdd}
             onApiCallRemove={handleApiCallRemove}
-            onCollapsedRequestIndexesChange={setCollapsedRequestIndexes}
-            onCollapsedPaginationIndexesChange={setCollapsedPaginationIndexes}
+            onCollapsedSectionsChange={setCollapsedApiCallSections}
           />
         )
       case 'datapools':

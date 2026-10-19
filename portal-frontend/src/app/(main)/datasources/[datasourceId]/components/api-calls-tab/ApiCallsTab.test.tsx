@@ -7,7 +7,8 @@ import { toast } from 'sonner'
 import { describe, expect, it, vi } from 'vitest'
 
 import { Form } from '@/components/ui/form'
-import { ApiCallSnapshots, EMPTY_PAGINATION, HttpApiCallForm } from '@/types/connectors'
+import { PAGINATION_FORM } from '@/test-support/paginationFixtures'
+import { ApiCallSnapshots, CollapsedApiCallSections, EMPTY_PAGINATION, HttpApiCallForm } from '@/types/connectors'
 import { DatasourceFormDraft, DatasourceFormDraftSchema } from '@/types/datasources'
 
 import { ApiCallsTab } from './ApiCallsTab'
@@ -57,8 +58,7 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
       defaultValues,
     })
     const [editingApiCalls, setEditingApiCalls] = useState<ApiCallSnapshots>(new Map())
-    const [collapsedRequestIndexes, setCollapsedRequestIndexes] = useState<ReadonlySet<number>>(new Set())
-    const [collapsedPaginationIndexes, setCollapsedPaginationIndexes] = useState<ReadonlySet<number>>(new Set())
+    const [collapsedSections, setCollapsedSections] = useState<CollapsedApiCallSections>(new Map())
     const [tabKey, setTabKey] = useState(0)
     remountTab = () => setTabKey(key => key + 1)
     return (
@@ -70,13 +70,11 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
           isDatasourceReleased={isDatasourceReleased}
           dataStructureName={dataStructureName}
           editingApiCalls={editingApiCalls}
-          collapsedRequestIndexes={collapsedRequestIndexes}
-          collapsedPaginationIndexes={collapsedPaginationIndexes}
+          collapsedSections={collapsedSections}
           onEditingApiCallsChange={setEditingApiCalls}
           onApiCallAdd={vi.fn()}
           onApiCallRemove={vi.fn()}
-          onCollapsedRequestIndexesChange={setCollapsedRequestIndexes}
-          onCollapsedPaginationIndexesChange={setCollapsedPaginationIndexes}
+          onCollapsedSectionsChange={setCollapsedSections}
         />
       </Form>
     )
@@ -92,16 +90,6 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
 
 const openApiCall = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.click(screen.getByRole('button', { name: /stations/ }))
-}
-
-const PAGINATION = {
-  isEnabled: true,
-  type: 'PAGE_NUMBER' as const,
-  pageParameter: 'page',
-  pageSizeParameter: 'size',
-  pageSize: '100',
-  startPage: '1',
-  endPage: '10',
 }
 
 describe('ApiCallsTab', () => {
@@ -431,21 +419,21 @@ describe('ApiCallsTab', () => {
     })
 
     it('keeps the values when unchecked and checked again', async () => {
-      const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [{ ...API_CALL, pagination: PAGINATION }] })
+      const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [{ ...API_CALL, pagination: PAGINATION_FORM }] })
       await openApiCall(user)
 
       await user.click(screen.getByRole('checkbox', { name: 'enable' }))
 
-      expect(getApiCalls()?.[0].pagination).toEqual({ ...PAGINATION, isEnabled: false })
+      expect(getApiCalls()?.[0].pagination).toEqual({ ...PAGINATION_FORM, isEnabled: false })
 
       await user.click(screen.getByRole('checkbox', { name: 'enable' }))
 
-      expect(getApiCalls()?.[0].pagination).toEqual(PAGINATION)
+      expect(getApiCalls()?.[0].pagination).toEqual(PAGINATION_FORM)
       expect(screen.getByRole('textbox', { name: /^pageParameter\.label/ })).toHaveValue('page')
     })
 
     it('hides only the fields when unchecked', async () => {
-      const { user } = renderApiCallsTab({ apiCalls: [{ ...API_CALL, pagination: PAGINATION }] })
+      const { user } = renderApiCallsTab({ apiCalls: [{ ...API_CALL, pagination: PAGINATION_FORM }] })
       await openApiCall(user)
 
       await user.click(screen.getByRole('checkbox', { name: 'enable' }))
@@ -466,7 +454,7 @@ describe('ApiCallsTab', () => {
       await user.type(screen.getByRole('textbox', { name: 'startPage.label' }), '1')
       await user.type(screen.getByRole('textbox', { name: 'endPage.label' }), '10')
 
-      expect(getApiCalls()?.[0].pagination).toEqual(PAGINATION)
+      expect(getApiCalls()?.[0].pagination).toEqual(PAGINATION_FORM)
     })
 
     it('shows the page size error', async () => {
@@ -492,7 +480,7 @@ describe('ApiCallsTab', () => {
     })
 
     it('restores the pagination after cancel', async () => {
-      const apiCall = { ...API_CALL, pagination: PAGINATION }
+      const apiCall = { ...API_CALL, pagination: PAGINATION_FORM }
       const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [apiCall] })
       await openApiCall(user)
 
@@ -507,7 +495,7 @@ describe('ApiCallsTab', () => {
       ['read-only', { isReadOnly: true }],
       ['released', { isDatasourceReleased: true }],
     ])('disables the checkbox and the fields when %s', async (_name, options) => {
-      const { user } = renderApiCallsTab({ apiCalls: [{ ...API_CALL, pagination: PAGINATION }], ...options })
+      const { user } = renderApiCallsTab({ apiCalls: [{ ...API_CALL, pagination: PAGINATION_FORM }], ...options })
       await openApiCall(user)
 
       expect(screen.getByRole('checkbox', { name: 'enable' })).toBeDisabled()

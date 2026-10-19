@@ -1,4 +1,5 @@
 import { CONNECTOR_TYPES } from '@/const/connectors'
+import { PAGINATION_API, PAGINATION_FORM } from '@/test-support/paginationFixtures'
 
 import {
   ConnectorApiToFormSchema,
@@ -289,24 +290,6 @@ describe('HTTP API call schemas', () => {
     pagination: EMPTY_PAGINATION,
   }
   const HEADER = { name: 'Accept', value: 'application/json' }
-  const PAGINATION = {
-    isEnabled: true,
-    type: 'PAGE_NUMBER' as const,
-    pageParameter: 'page',
-    pageSizeParameter: 'size',
-    pageSize: '100',
-    startPage: '1',
-    endPage: '10',
-  }
-  const PAGINATION_API = {
-    type: 'PAGE_NUMBER',
-    pageParameter: 'page',
-    pageSizeParameter: 'size',
-    pageSize: 100,
-    startPage: 1,
-    endPage: 10,
-  }
-
   const issues = (schema: typeof HttpLooseSchema | typeof HttpStrictSchema, apiCalls: unknown[]) => {
     const result = schema.shape.apiCalls.safeParse(apiCalls)
     return result.success ? [] : result.error.issues
@@ -413,7 +396,7 @@ describe('HTTP API call schemas', () => {
           path: '/stations',
           queryParameters: [{ name: 'status', value: '' }],
           headers: [],
-          pagination: PAGINATION,
+          pagination: PAGINATION_FORM,
         },
       ],
     })
@@ -448,7 +431,7 @@ describe('HTTP API call schemas', () => {
   })
 
   it('sends API calls without the method and with the pagination as numbers', () => {
-    const apiCall = { ...API_CALL, method: 'GET', headers: [HEADER], pagination: PAGINATION }
+    const apiCall = { ...API_CALL, method: 'GET', headers: [HEADER], pagination: PAGINATION_FORM }
     const result = ConnectorFormToApiSchema.parse({
       connectorType: CONNECTOR_TYPES.HTTP,
       configuration: { apiCalls: [apiCall] },
@@ -488,7 +471,7 @@ describe('HTTP API call schemas', () => {
   it('sends a disabled pagination with values as null', () => {
     const result = ConnectorFormToApiSchema.parse({
       connectorType: CONNECTOR_TYPES.HTTP,
-      configuration: { apiCalls: [{ ...API_CALL, pagination: { ...PAGINATION, isEnabled: false } }] },
+      configuration: { apiCalls: [{ ...API_CALL, pagination: { ...PAGINATION_FORM, isEnabled: false } }] },
     })
 
     expect(result).toMatchObject({ apiCalls: [{ pagination: null }] })
@@ -505,7 +488,7 @@ describe('HTTP API call schemas', () => {
     })
 
     it('accepts a complete pagination for release', () => {
-      expect(issues(HttpStrictSchema, [{ ...API_CALL, pagination: PAGINATION }])).toEqual([])
+      expect(issues(HttpStrictSchema, [{ ...API_CALL, pagination: PAGINATION_FORM }])).toEqual([])
     })
 
     it.each(['page', 'page[number]', 'page-no 1'])('accepts the page parameter %s', pageParameter => {
@@ -533,9 +516,9 @@ describe('HTTP API call schemas', () => {
     })
 
     it.each(['pageParameter', 'pageSizeParameter', 'pageSize'])('requires %s for release', field => {
-      expect(issues(HttpStrictSchema, [{ ...API_CALL, pagination: { ...PAGINATION, [field]: '' } }])).toContainEqual(
-        expect.objectContaining({ path: [0, 'pagination', field], message: 'common.errors.required' }),
-      )
+      expect(
+        issues(HttpStrictSchema, [{ ...API_CALL, pagination: { ...PAGINATION_FORM, [field]: '' } }]),
+      ).toContainEqual(expect.objectContaining({ path: [0, 'pagination', field], message: 'common.errors.required' }))
     })
 
     it('accepts a disabled pagination without values for release', () => {

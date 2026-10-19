@@ -2,6 +2,7 @@
 import { z } from 'zod'
 
 import {
+  API_CALL_SECTIONS,
   CONNECTOR_TYPES,
   DEFAULT_START_PAGE,
   HTTP_AUTHENTICATION_TYPES,
@@ -464,6 +465,11 @@ export type HttpApiCallsForm = { configuration: { baseUrl: string; apiCalls: Htt
 
 // Key: index of the API call. Value: its values when the edit view opened, null for a new API call.
 export type ApiCallSnapshots = ReadonlyMap<number, HttpApiCallForm | null>
+
+export type ApiCallSection = (typeof API_CALL_SECTIONS)[number]
+
+// Key: index of the API call. Value: its collapsed sections.
+export type CollapsedApiCallSections = ReadonlyMap<number, ReadonlySet<ApiCallSection>>
 
 export type HttpParameterListPath =
   | `configuration.apiCalls.${number}.queryParameters`

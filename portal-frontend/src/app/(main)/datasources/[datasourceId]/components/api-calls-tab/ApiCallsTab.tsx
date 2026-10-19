@@ -11,7 +11,14 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { InfoBox } from '@/components/text-box/TextBox'
 import { Button } from '@/components/ui/button'
 import { MAX_HTTP_API_CALLS } from '@/const/connectors'
-import { ApiCallSnapshots, EMPTY_PAGINATION, HttpApiCallForm, HttpApiCallsForm } from '@/types/connectors'
+import {
+  ApiCallSection,
+  ApiCallSnapshots,
+  CollapsedApiCallSections,
+  EMPTY_PAGINATION,
+  HttpApiCallForm,
+  HttpApiCallsForm,
+} from '@/types/connectors'
 import { DatasourceFormDraft } from '@/types/datasources'
 
 import { ApiCallItem } from './ApiCallItem'
@@ -26,33 +33,19 @@ const EMPTY_API_CALL: HttpApiCallForm = {
 
 type ArrayError = { message?: string; root?: { message?: string } }
 
-const addIndex = (indexes: ReadonlySet<number>, index: number) => new Set([...indexes, index])
-
-const removeIndex = (indexes: ReadonlySet<number>, index: number) => {
-  const nextIndexes = new Set(indexes)
-  nextIndexes.delete(index)
-  return nextIndexes
-}
+const NO_COLLAPSED_SECTIONS: ReadonlySet<ApiCallSection> = new Set()
 
 const shiftIndex = (index: number, removedIndex: number) => (index > removedIndex ? index - 1 : index)
 
-const removeIndexAndShift = (indexes: ReadonlySet<number>, removedIndex: number) => {
-  const remainingIndexes = [...indexes].filter(index => index !== removedIndex)
-  const shiftedIndexes = remainingIndexes.map(index => shiftIndex(index, removedIndex))
-  return new Set(shiftedIndexes)
+const removeEntry = <T,>(entries: ReadonlyMap<number, T>, index: number) => {
+  const nextEntries = new Map(entries)
+  nextEntries.delete(index)
+  return nextEntries
 }
 
-const removeSnapshot = (snapshots: ApiCallSnapshots, index: number) => {
-  const nextSnapshots = new Map(snapshots)
-  nextSnapshots.delete(index)
-  return nextSnapshots
-}
-
-const removeSnapshotAndShift = (snapshots: ApiCallSnapshots, removedIndex: number) => {
-  const remainingEntries = [...snapshots].filter(([index]) => index !== removedIndex)
-  const shiftedEntries = remainingEntries.map(
-    ([index, snapshot]) => [shiftIndex(index, removedIndex), snapshot] as const,
-  )
+const removeEntryAndShift = <T,>(entries: ReadonlyMap<number, T>, removedIndex: number) => {
+  const remainingEntries = [...entries].filter(([index]) => index !== removedIndex)
+  const shiftedEntries = remainingEntries.map(([index, value]) => [shiftIndex(index, removedIndex), value] as const)
   return new Map(shiftedEntries)
 }
 
@@ -62,11 +55,9 @@ interface ApiCallsTabProps {
   isDatasourceReleased?: boolean
   dataStructureName?: string
   editingApiCalls: ApiCallSnapshots
-  collapsedRequestIndexes: ReadonlySet<number>
-  collapsedPaginationIndexes: ReadonlySet<number>
+  collapsedSections: CollapsedApiCallSections
   onEditingApiCallsChange: (editingApiCalls: ApiCallSnapshots) => void
-  onCollapsedRequestIndexesChange: (collapsedRequestIndexes: ReadonlySet<number>) => void
-  onCollapsedPaginationIndexesChange: (collapsedPaginationIndexes: ReadonlySet<number>) => void
+  onCollapsedSectionsChange: (collapsedSections: CollapsedApiCallSections) => void
   onApiCallAdd: () => void
   onApiCallRemove: (index: number) => void
 }
@@ -78,11 +69,9 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
     isDatasourceReleased = false,
     dataStructureName,
     editingApiCalls,
-    collapsedRequestIndexes,
-    collapsedPaginationIndexes,
+    collapsedSections,
     onEditingApiCallsChange,
-    onCollapsedRequestIndexesChange,
-    onCollapsedPaginationIndexesChange,
+    onCollapsedSectionsChange,
     onApiCallAdd,
     onApiCallRemove,
   } = props
@@ -106,14 +95,12 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
 
   const openEditView = (index: number, snapshot: HttpApiCallForm | null) => {
     onEditingApiCallsChange(new Map(editingApiCalls).set(index, snapshot))
-    onCollapsedRequestIndexesChange(removeIndex(collapsedRequestIndexes, index))
-    onCollapsedPaginationIndexesChange(removeIndex(collapsedPaginationIndexes, index))
+    onCollapsedSectionsChange(removeEntry(collapsedSections, index))
   }
 
   const removeApiCall = (index: number) => {
-    onEditingApiCallsChange(removeSnapshotAndShift(editingApiCalls, index))
-    onCollapsedRequestIndexesChange(removeIndexAndShift(collapsedRequestIndexes, index))
-    onCollapsedPaginationIndexesChange(removeIndexAndShift(collapsedPaginationIndexes, index))
+    onEditingApiCallsChange(removeEntryAndShift(editingApiCalls, index))
+    onCollapsedSectionsChange(removeEntryAndShift(collapsedSections, index))
     onApiCallRemove(index)
     remove(index)
   }
@@ -122,7 +109,7 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
   const handleEdit = (index: number) =>
     openEditView(index, structuredClone(apiCallsForm.getValues(`configuration.apiCalls.${index}`)))
 
-  const handleClose = (index: number) => onEditingApiCallsChange(removeSnapshot(editingApiCalls, index))
+  const handleClose = (index: number) => onEditingApiCallsChange(removeEntry(editingApiCalls, index))
 
   const handleCancel = (index: number) => {
     const snapshot = editingApiCalls.get(index)
@@ -134,19 +121,8 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
     handleClose(index)
   }
 
-  const handleRequestOpenChange = (index: number, isRequestOpen: boolean) => {
-    const nextCollapsedRequestIndexes = isRequestOpen
-      ? removeIndex(collapsedRequestIndexes, index)
-      : addIndex(collapsedRequestIndexes, index)
-    onCollapsedRequestIndexesChange(nextCollapsedRequestIndexes)
-  }
-
-  const handlePaginationOpenChange = (index: number, isPaginationOpen: boolean) => {
-    const nextCollapsedPaginationIndexes = isPaginationOpen
-      ? removeIndex(collapsedPaginationIndexes, index)
-      : addIndex(collapsedPaginationIndexes, index)
-    onCollapsedPaginationIndexesChange(nextCollapsedPaginationIndexes)
-  }
+  const handleCollapsedSectionsChange = (index: number, sections: ReadonlySet<ApiCallSection>) =>
+    onCollapsedSectionsChange(new Map(collapsedSections).set(index, sections))
 
   const handleAdd = () => {
     openEditView(fields.length, null)
@@ -194,13 +170,11 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
                 form={apiCallsForm}
                 index={index}
                 isEditing={editingApiCalls.has(index)}
-                isRequestOpen={!collapsedRequestIndexes.has(index)}
-                isPaginationOpen={!collapsedPaginationIndexes.has(index)}
+                collapsedSections={collapsedSections.get(index) ?? NO_COLLAPSED_SECTIONS}
                 isDisabled={isDisabled}
                 dataStructureName={dataStructureName}
                 onEdit={() => handleEdit(index)}
-                onRequestOpenChange={isRequestOpen => handleRequestOpenChange(index, isRequestOpen)}
-                onPaginationOpenChange={isPaginationOpen => handlePaginationOpenChange(index, isPaginationOpen)}
+                onCollapsedSectionsChange={sections => handleCollapsedSectionsChange(index, sections)}
                 onDelete={() => setDeleteIndex(index)}
                 onClose={() => handleClose(index)}
                 onCancel={() => handleCancel(index)}
