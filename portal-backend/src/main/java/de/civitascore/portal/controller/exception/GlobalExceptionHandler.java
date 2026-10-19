@@ -142,8 +142,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   public ProblemDetail handleModelReferenceNotAvailable(
       ModelReferenceNotAvailableException ex, HttpServletRequest request) {
     log.warn("Model reference not available");
-    // TR-03187 W-18/W-19: the detail is a fixed constant, identical for every cause, so it neither
-    // names the referenced model nor reveals whether it exists.
+    // TR-03187 W-18/W-19: one fixed detail for every cause; it does not reveal if the model exists.
     return createProblemDetail(
         HttpStatus.BAD_REQUEST, "MODEL_REFERENCE_NOT_AVAILABLE", ex.getMessage(), request);
   }

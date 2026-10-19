@@ -29,19 +29,13 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Removes the references Data structure models hold to models of other Data structures. Such a
- * reference could be stored without the right to read its target; it made the target readable
- * through the referring model and blocked the target's deletion. A reference stays when its target
- * is the Data structure's own or belongs to a published structure.
+ * Removes references from Data structure models to models of other Data structures, which a caller
+ * could store without the right to read them. References to own models and to published structures
+ * stay.
  *
- * <p>Own is decided as the registry decides it: a member Element belongs to the Data structure that
- * minted it, which its UUID shows, and an Element a Data structure lists but no Data structure
- * minted stays the lister's own. The derivation is a copy, so a later change to the code that mints
- * ids does not change what this migration removed.
- *
- * <p>A removed {@code $ref} leaves its schema without it, a removed bare {@code $defs} member
- * leaves the Data structure, and a removed {@code x-core-ref} leaves a plain string. Released
- * versions are rewritten in place, without a new version, so every removal is logged.
+ * <p>Own is decided as at write time, by the Data structure that minted an Element. The derivation
+ * is a copy, so a later change to the code that mints ids does not change this migration. Released
+ * versions are rewritten in place, so every removal is logged.
  */
 @Slf4j
 public class V1_2_28__strip_foreign_model_references extends BaseJavaMigration {
@@ -273,7 +267,7 @@ public class V1_2_28__strip_foreign_model_references extends BaseJavaMigration {
     }
   }
 
-  /** Reference edges are stored verbatim, one per target, and outlive no removed reference. */
+  /** Removes the edges of foreign references. */
   private void sweepEdges(JdbcTemplate jdbc, Host host, UUID versionId) {
     List<UUID> foreign = new ArrayList<>();
     jdbc.query(
@@ -293,15 +287,27 @@ public class V1_2_28__strip_foreign_model_references extends BaseJavaMigration {
     }
   }
 
+  /** A released version changed when its model, or an Element its model refers to, changed. */
   private void warnAboutReleasedVersions(JdbcTemplate jdbc, Host host, Set<String> changedPins) {
+    Set<String> changed = new LinkedHashSet<>(changedPins);
+    changedPins.forEach(pin -> changed.add(pin.substring(0, pin.lastIndexOf(':'))));
     List<Object> parameters = new ArrayList<>(List.of(host.id()));
-    parameters.addAll(changedPins);
+    parameters.addAll(changed);
+    parameters.addAll(changed);
     List<String> released =
         jdbc.queryForList(
-            "SELECT version FROM data_structure_versions WHERE data_structure_id = ?"
-                + " AND data_structure_version_status <> 'DRAFT' AND model_urn IN ("
-                + String.join(", ", Collections.nCopies(changedPins.size(), "?"))
-                + ")",
+            """
+            SELECT dsv.version FROM data_structure_versions dsv
+            WHERE dsv.data_structure_id = ? AND dsv.data_structure_version_status <> 'DRAFT'
+              AND (dsv.model_urn IN (%1$s)
+                OR EXISTS (SELECT 1 FROM model_forge.artifact a
+                  JOIN model_forge.artifact_version v ON v.artifact_id = a.id
+                  JOIN model_forge.artifact_reference e ON e.from_version_id = v.id
+                  WHERE a.logical_urn || ':' || v.version = dsv.model_urn
+                    AND e.target_urn IN (%1$s)))
+            ORDER BY dsv.version
+            """
+                .formatted(String.join(", ", Collections.nCopies(changed.size(), "?"))),
             String.class,
             parameters.toArray());
     if (!released.isEmpty()) {

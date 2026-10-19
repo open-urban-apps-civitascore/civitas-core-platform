@@ -210,10 +210,7 @@ class ArtifactReferenceRepository {
             .list();
     }
 
-    /**
-     * Logical URNs of the Data Structures that list the Element as a member in any of their
-     * versions, superseded ones included.
-     */
+    /** Logical URNs of the Data Structures that list the Element in any version. */
     List<String> dataStructuresListing(String elementLogicalUrn) {
         return jdbc.sql("""
                 select distinct a.logical_urn

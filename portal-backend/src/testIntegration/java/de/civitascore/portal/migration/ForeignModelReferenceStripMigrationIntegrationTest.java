@@ -4,6 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import db.migration.V1_2_28__strip_foreign_model_references;
 import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.portal.util.TestContainerImages;
@@ -17,6 +21,7 @@ import org.flywaydb.core.api.migration.Context;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -25,9 +30,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * Standalone instead of a Spring context, because Spring Boot would migrate straight to the newest
  * version before the references to strip exist.
  *
- * <p>Charlie lists a member of Bravo and references it from its own member, as a caller could store
- * before references were checked. Charlie also references a published port structure, GeoJSON and a
- * model that does not exist.
+ * <p>Charlie, Delta and Echo reference a member of Bravo, as a caller could store before references
+ * were checked: Charlie in its grouping and its member, Delta in the root Element it is stored as,
+ * Echo in its member only.
  */
 class ForeignModelReferenceStripMigrationIntegrationTest {
 
@@ -45,12 +50,19 @@ class ForeignModelReferenceStripMigrationIntegrationTest {
   private static final String PORT_GROUPING = PREFIX + "datastructure:frost:" + THING_TREE;
   private static final String PORT_MEMBER =
       PREFIX + "element:common:" + UrnParser.memberId(THING_TREE, "Thing");
+  private static final UUID DELTA = UUID.fromString("10000000-0000-4000-8000-0000000000d0");
+  private static final UUID ECHO = UUID.fromString("10000000-0000-4000-8000-0000000000e0");
+  private static final String DELTA_ROOT = PREFIX + "element:common:" + DELTA;
+  private static final String ECHO_GROUPING = PREFIX + "datastructure:common:" + ECHO;
+  private static final String ECHO_MEMBER =
+      PREFIX + "element:common:" + UrnParser.memberId(ECHO, "Own");
   private static final String MISSING =
       PREFIX + "element:common:" + UUID.fromString("10000000-0000-4000-8000-0000000000ff");
 
   private static PostgreSQLContainer postgres;
   private static DriverManagerDataSource dataSource;
   private static JdbcClient jdbc;
+  private static final ListAppender<ILoggingEvent> LOG = new ListAppender<>();
 
   @BeforeAll
   static void migrateStoredForeignReferences() {
@@ -76,6 +88,9 @@ class ForeignModelReferenceStripMigrationIntegrationTest {
         .migrate();
     seed();
 
+    LOG.start();
+    ((Logger) LoggerFactory.getLogger(V1_2_28__strip_foreign_model_references.class))
+        .addAppender(LOG);
     Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
   }
 
@@ -119,6 +134,26 @@ class ForeignModelReferenceStripMigrationIntegrationTest {
   void migrate_deletesTheEdgesOfRemovedReferences() {
     assertThat(edgeTargets(CHARLIE_GROUPING)).containsExactly(CHARLIE_MEMBER + ":1.0.0");
     assertThat(edgeTargets(CHARLIE_MEMBER)).containsExactly(PORT_MEMBER + ":1.0.0");
+  }
+
+  @Test
+  void migrate_cleansTheRootElementOfAStructureStoredAsAnElement() {
+    assertThat(content(DELTA_ROOT)).doesNotContain(BRAVO_MEMBER).contains("\"z\": {}");
+    assertThat(edgeTargets(DELTA_ROOT)).isEmpty();
+  }
+
+  @Test
+  void migrate_warnsAboutEveryReleasedVersionItChanged() {
+    List<String> warnings =
+        LOG.list.stream()
+            .filter(event -> event.getLevel() == Level.WARN)
+            .map(ILoggingEvent::getFormattedMessage)
+            .toList();
+
+    assertThat(warnings)
+        .anySatisfy(warning -> assertThat(warning).contains(CHARLIE.toString(), "[1.0.0]"))
+        .anySatisfy(warning -> assertThat(warning).contains(DELTA.toString(), "[1.0.0]"))
+        .anySatisfy(warning -> assertThat(warning).contains(ECHO.toString(), "[1.0.0]"));
   }
 
   @Test
@@ -172,6 +207,8 @@ class ForeignModelReferenceStripMigrationIntegrationTest {
         .param("charlie", CHARLIE)
         .param("pin", CHARLIE_GROUPING + ":1.0.0")
         .update();
+    structure(DELTA, DELTA_ROOT);
+    structure(ECHO, ECHO_GROUPING);
     jdbc.sql(
             """
             INSERT INTO published_structures (id, created_at, port, logical_urn, versioned_urn,
@@ -227,6 +264,51 @@ class ForeignModelReferenceStripMigrationIntegrationTest {
         "{\"$defs\": {\"Thing\": {\"$ref\": \"%s:1.0.0\"}}}".formatted(PORT_MEMBER),
         edge(PORT_MEMBER + ":1.0.0", "datastructure-ref"));
     artifact(PORT_MEMBER, "element", "{\"type\": \"object\"}");
+    artifact(
+        DELTA_ROOT,
+        "element",
+        "{\"type\": \"object\", \"properties\": {\"z\": {\"$ref\": \"%s:1.0.0\"}}}"
+            .formatted(BRAVO_MEMBER),
+        edge(BRAVO_MEMBER + ":1.0.0", "schema-ref"));
+    artifact(
+        PREFIX + "datastructure:common:" + DELTA,
+        "datastructure",
+        "{\"$defs\": {\"Delta\": {\"$ref\": \"%s:1.0.0\"}}}".formatted(DELTA_ROOT),
+        edge(DELTA_ROOT + ":1.0.0", "datastructure-ref"));
+    artifact(
+        ECHO_GROUPING,
+        "datastructure",
+        "{\"$ref\": \"%1$s:1.0.0\", \"$defs\": {\"Own\": {\"$ref\": \"%1$s:1.0.0\"}}}"
+            .formatted(ECHO_MEMBER),
+        edge(ECHO_MEMBER + ":1.0.0", "datastructure-ref"));
+    artifact(
+        ECHO_MEMBER,
+        "element",
+        "{\"type\": \"object\", \"properties\": {\"x\": {\"$ref\": \"%s:1.0.0\"}}}"
+            .formatted(BRAVO_MEMBER),
+        edge(BRAVO_MEMBER + ":1.0.0", "schema-ref"));
+  }
+
+  /** A released Data structure whose version 1.0.0 is the given model. */
+  private static void structure(UUID id, String modelLogicalUrn) {
+    jdbc.sql(
+            """
+            INSERT INTO data_structures (id, name, created_at, data_structure_status, model_logical_urn)
+            VALUES (:id, :name, now(), 'AVAILABLE', :urn)
+            """)
+        .param("id", id)
+        .param("name", "structure-" + id)
+        .param("urn", modelLogicalUrn)
+        .update();
+    jdbc.sql(
+            """
+            INSERT INTO data_structure_versions (id, created_at, data_structure_version_status,
+                data_structure_version_source, data_structure_id, version, model_urn)
+            VALUES (gen_random_uuid(), now(), 'AVAILABLE', 'OWN', :id, '1.0.0', :pin)
+            """)
+        .param("id", id)
+        .param("pin", modelLogicalUrn + ":1.0.0")
+        .update();
   }
 
   private record Edge(String target, String type) {}

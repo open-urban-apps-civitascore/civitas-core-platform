@@ -711,8 +711,8 @@ class DataStructureVersionServiceTest {
     }
 
     @Test
-    @DisplayName("An unchanged model is not checked again")
-    void anUnchangedModelIsNotCheckedAgain() {
+    @DisplayName("An unchanged model stores nothing and keeps its pin")
+    void anUnchangedModelStoresNothing() {
       UUID versionId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(UUID.randomUUID());
@@ -726,9 +726,11 @@ class DataStructureVersionServiceTest {
       when(dataStructureService.findByIdOrThrow(dataStructure.getId())).thenReturn(dataStructure);
       when(modelRegistryGateway.isUnchanged(eq(STORED_PIN), any(), any())).thenReturn(true);
 
-      dataStructureVersionService.update(versionId, input);
+      DataStructureVersion result = dataStructureVersionService.update(versionId, input);
 
-      verify(modelReferenceAuthorizer, never()).authorizeWrite(any(), any(), any(), any());
+      verify(modelRegistryGateway, never())
+          .storeModel(any(), any(), any(), any(), any(), any(), any());
+      assertThat(result.getModelUrn()).isEqualTo(STORED_PIN);
     }
   }
 }

@@ -5,8 +5,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 
 /**
  * Thrown when a data structure model references a model the caller may not use: one that does not
- * exist, belongs to no data structure, may not be read, or is embedded without a version. The
- * message is the same for every cause, so it does not reveal whether the referenced model exists.
+ * exist, belongs to no data structure, may not be read, or is embedded without a version.
  */
 @ResponseStatus(HttpStatus.BAD_REQUEST)
 public class ModelReferenceNotAvailableException extends RuntimeException {

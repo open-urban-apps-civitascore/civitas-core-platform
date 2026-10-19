@@ -35,9 +35,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * References from a data structure model to models of other data structures, written through the
- * version endpoints. The caller holds Data Architect on its own structure only and sends the scope
- * header OPA emits for that, so what is exercised is the reference check alone.
+ * References to other data structures' models, written through the version endpoints by a caller
+ * who holds Data Architect on its own structure only.
  */
 @DisplayName("Data structure model references")
 class DataStructureReferenceAuthorizationIntegrationTest extends BaseKeycloakIntegrationTest {
@@ -92,8 +91,6 @@ class DataStructureReferenceAuthorizationIntegrationTest extends BaseKeycloakInt
   void cleanup() {
     portalData.cleanAll();
   }
-
-  // ---------------------------------------------------------------- helpers
 
   private HttpHeaders headers(String scope) {
     HttpHeaders headers = new HttpHeaders();
@@ -190,8 +187,6 @@ class DataStructureReferenceAuthorizationIntegrationTest extends BaseKeycloakInt
             call(HttpMethod.DELETE, "/datastructures/" + bravo, null, "*").getStatusCode().value())
         .isEqualTo(204);
   }
-
-  // ---------------------------------------------------------------- cases
 
   @Nested
   @DisplayName("A caller who may not read the other data structure")
@@ -449,6 +444,37 @@ class DataStructureReferenceAuthorizationIntegrationTest extends BaseKeycloakInt
               charlie.toString());
 
       assertThat(patch.getStatusCode().value()).isEqualTo(200);
+    }
+
+    private ResponseEntity<String> save(Map<String, Object> rootProperties) {
+      return call(
+          HttpMethod.PUT,
+          "/datastructures/" + charlie + "/versions/" + version.getId(),
+          Map.of(
+              "description", "edited", "model", library("CharlieRoot", rootProperties, Map.of())),
+          charlie.toString());
+    }
+
+    @Test
+    @DisplayName("does not stop a save of the full model that keeps it")
+    void savingTheFullModelThatKeepsItWorks() {
+      ResponseEntity<String> put =
+          save(Map.of("x", Map.of("$ref", bravoMemberPin), "y", Map.of("type", "string")));
+
+      assertThat(put.getStatusCode().value()).isEqualTo(200);
+    }
+
+    @Test
+    @DisplayName("does not let a save add another reference the caller may not read")
+    void savingAnotherUnreadableReferenceIsRefused() {
+      assertRefused(
+          save(
+              Map.of(
+                  "x",
+                  Map.of("$ref", bravoMemberPin),
+                  "z",
+                  Map.of("$ref", NS + "datastructure:common:" + bravo + ":1.0.0"))),
+          mapper);
     }
 
     @Test

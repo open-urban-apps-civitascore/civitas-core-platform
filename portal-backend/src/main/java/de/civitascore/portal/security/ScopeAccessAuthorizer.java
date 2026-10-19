@@ -98,10 +98,9 @@ public class ScopeAccessAuthorizer {
   }
 
   /**
-   * Authorizes that the current caller may read every given entity of the given scope type, decided
-   * from the caller's assignments alone. Unlike {@link #authorizeReferences}, neither the scope
-   * header nor its wildcard counts: the header is computed for the route's own permission, so a
-   * wildcard on a write route proves tenant-wide write access, not read access.
+   * Authorizes that the current caller may read every given entity, from the caller's assignments
+   * alone. The scope header does not count: it reflects the route's own permission, so its wildcard
+   * on a write route proves no read access.
    *
    * @param scopeType the scope type of the entities (e.g. {@link ScopeType#DATASTRUCTURE})
    * @param requestedIds the entity IDs to be read

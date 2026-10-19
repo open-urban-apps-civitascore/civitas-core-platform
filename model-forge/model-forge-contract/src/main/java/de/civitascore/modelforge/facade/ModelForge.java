@@ -144,19 +144,13 @@ public interface ModelForge {
     RootCheck checkRoot(ArtifactId artifactId);
 
     /**
-     * The artifacts a DataStructure model references that are not the DataStructure's own, each
-     * with the DataStructure that minted it. A reference is a CORE-URN {@code $ref} at any depth,
-     * including a bare {@code $defs} member and the top-level {@code $ref}, or a concrete
-     * {@code x-core-ref}; an {@code $id} is none. The DataStructure's own artifacts are its
-     * grouping, its root Element, the members its {@code $defs} keys derive, and the Elements any
-     * of its versions lists that no other DataStructure minted.
+     * The artifacts a DataStructure model references that are not its own, each with the
+     * DataStructure that minted it. A reference is a CORE-URN {@code $ref} at any depth or a
+     * concrete {@code x-core-ref}; own is what the DataStructure minted.
      *
-     * <p>Asked about a document before it is stored, the answer covers both ways the host stores a
-     * model: imported under the DataStructure's id, or saved as its root Element. Asked about a
-     * stored version, it also covers the DataStructure's own Elements that version reaches.
-     *
-     * <p>Answered from the stored references, not the in-memory graph. Model Forge decides nothing
-     * here: whether a reference is allowed is the caller's question.
+     * <p>Asked of a document before either store path, or of a stored version with the own
+     * Elements it reaches. Answered from the stored references, not the in-memory graph; whether a
+     * reference is allowed is the caller's decision.
      *
      * @throws IllegalArgumentException when only a stored version is asked about and the registry
      *     does not hold it

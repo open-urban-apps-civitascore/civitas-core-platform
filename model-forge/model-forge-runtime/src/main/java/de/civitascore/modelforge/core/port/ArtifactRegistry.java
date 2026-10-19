@@ -184,7 +184,7 @@ public interface ArtifactRegistry {
     /** Logical URNs of the Elements any version of the Data Structure contains. */
     List<String> dataStructureMembersOfAnyVersion(String urn);
 
-    /** Logical URNs of the Data Structures that any of their versions lists the Element as a member of. */
+    /** Logical URNs of the Data Structures that list the Element in any version. */
     List<String> dataStructuresListing(String elementUrn);
 
     /** The {@code $defs} keys any version of the Data Structure holds. */

@@ -87,16 +87,18 @@ public class ModelRegistryGateway {
   public record ArtifactClosure(Set<String> artifacts, Set<String> unresolved, boolean truncated) {}
 
   /**
-   * An artifact a Data structure model references that is not the Data structure's own.
-   *
-   * @param target logical CORE URN of the referenced artifact
-   * @param embedded whether a {@code $ref} names it, so its content becomes part of the model; an
-   *     {@code x-core-ref} alone only links to it
-   * @param pinned whether every {@code $ref} to it names a concrete version
-   * @param mintedBy logical CORE URN of the Data structure that minted the target, or null when the
-   *     registry holds none
+   * An artifact a Data structure model references that is not the Data structure's own, as {@link
+   * ModelForge#foreignReferences} reports it.
    */
-  public record ModelReference(String target, boolean embedded, boolean pinned, String mintedBy) {}
+  public record ModelReference(String target, Kind kind, String mintedBy) {
+
+    /** How the model refers to the target. */
+    public enum Kind {
+      LINKED,
+      EMBEDDED_PINNED,
+      EMBEDDED_FLOATING
+    }
+  }
 
   /**
    * Stores a model (with its styles merged in as {@value #X_UI_STYLES}) in the registry and returns
@@ -267,9 +269,8 @@ public class ModelRegistryGateway {
   }
 
   /**
-   * The references a model about to be stored for a Data structure adds to the version's stored
-   * model, as {@link ModelForge#foreignReferences} defines them: those that leave the Data
-   * structure, and of them only the ones the stored model does not already hold as written.
+   * The foreign references a model about to be stored adds to the version's stored model, as {@link
+   * ModelForge#foreignReferences} defines them.
    *
    * @param dataStructureId the id of the Data structure the model belongs to
    * @param model the submitted model
@@ -289,8 +290,7 @@ public class ModelRegistryGateway {
   }
 
   /**
-   * Every reference of a stored model that leaves its Data structure, including those of the Data
-   * structure's own Elements the model reaches.
+   * Every foreign reference of a stored model, including those of the own Elements it reaches.
    *
    * @param dataStructureId the id of the Data structure the model belongs to
    * @param modelUrn CORE URN of the stored model
@@ -307,8 +307,7 @@ public class ModelRegistryGateway {
             reference ->
                 new ModelReference(
                     reference.target(),
-                    reference.embedded(),
-                    reference.pinned(),
+                    ModelReference.Kind.valueOf(reference.kind().name()),
                     reference.mintedBy()))
         .toList();
   }

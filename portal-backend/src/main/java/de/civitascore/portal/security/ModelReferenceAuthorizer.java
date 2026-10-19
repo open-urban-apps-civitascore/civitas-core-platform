@@ -18,13 +18,9 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
 /**
- * Decides whether a data structure model may reference models outside its data structure. OPA never
- * sees the model, so it cannot decide this.
- *
- * <p>A reference is allowed when the referenced model belongs to a published structure, or to a
- * data structure the caller may read. A reference that embeds the referenced model must also name
- * its version, or the model would change whenever the referenced one does. Every refusal reads the
- * same to the caller; the reason is logged.
+ * Decides whether a data structure model may reference models of other data structures, which OPA
+ * cannot see. Allowed are published structures and data structures the caller may read; an
+ * embedding reference must name a version. Every refusal reads the same; the reason is logged.
  */
 @Component
 @Slf4j
@@ -38,8 +34,7 @@ public class ModelReferenceAuthorizer {
 
   /**
    * Refuses a model about to be stored that adds a reference the caller may not use. References the
-   * version's stored model already holds are left alone, so editing a version does not depend on
-   * them.
+   * stored model already holds are not checked again.
    *
    * @param dataStructureId the id of the data structure the model belongs to
    * @param model the submitted model
@@ -73,7 +68,7 @@ public class ModelReferenceAuthorizer {
   private void requireUsable(UUID dataStructureId, Collection<ModelReference> references) {
     Set<UUID> toRead = new LinkedHashSet<>();
     for (ModelReference reference : references) {
-      if (reference.embedded() && !reference.pinned()) {
+      if (reference.kind() == ModelReference.Kind.EMBEDDED_FLOATING) {
         throw refused(dataStructureId, reference.target(), "embedded without a version");
       }
       if (reference.mintedBy() == null) {
@@ -93,9 +88,6 @@ public class ModelReferenceAuthorizer {
                           reference.target(),
                           "minted by no portal data structure"));
       toRead.add(owner);
-    }
-    if (toRead.isEmpty()) {
-      return;
     }
     try {
       scopeAccessAuthorizer.authorizeReadAccess(ScopeType.DATASTRUCTURE, toRead);

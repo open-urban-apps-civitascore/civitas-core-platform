@@ -30,11 +30,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-/**
- * Which references of a Data Structure model leave it, asked of a real registry: the stored
- * references and {@code $defs} keys are what tell a Data Structure's own members from the members
- * of another it merely lists.
- */
+/** Foreign references against a real registry, whose stored edges and keys tell own from listed. */
 class ForeignReferencesDatabaseTest extends AbstractRegistryDatabaseTest {
 
     private final UUID bravoId = UUID.randomUUID();
@@ -90,7 +86,7 @@ class ForeignReferencesDatabaseTest extends AbstractRegistryDatabaseTest {
             new ForeignReferencesQuery(charlieId, null, new ArtifactId(charliePin)));
 
         assertThat(references).containsExactly(new ForeignReference(
-            UrnParser.logicalUrn(bravoMember), true, true, UrnParser.logicalUrn(urns.dataStructure(bravoId))));
+            UrnParser.logicalUrn(bravoMember), ForeignReference.Kind.EMBEDDED_PINNED, UrnParser.logicalUrn(urns.dataStructure(bravoId))));
     }
 
     @Test

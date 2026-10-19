@@ -5,17 +5,12 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Query for the references of a DataStructure model that leave the DataStructure, see
- * {@link de.civitascore.modelforge.facade.ModelForge#foreignReferences(ForeignReferencesQuery)}.
+ * Query for {@link de.civitascore.modelforge.facade.ModelForge#foreignReferences}.
  *
- * @param dataStructureId the UUID of the DataStructure the model belongs to, as passed to
- *     {@link ImportSchemaCommand#dataStructureId()} (required)
- * @param document a document about to be stored for that DataStructure; {@code null} asks about
- *     {@code stored} alone
- * @param stored a stored version of the DataStructure's model. With a {@code document}, the answer
- *     leaves out every reference this version already holds, written the same way; without one,
- *     it is every reference of this version. {@code null} with a {@code document} means nothing is
- *     stored yet.
+ * @param dataStructureId the UUID of the DataStructure the model belongs to (required)
+ * @param document a document about to be stored, or {@code null} to ask about {@code stored} alone
+ * @param stored a stored version; with a {@code document}, the references it holds as written are
+ *     left out
  */
 public record ForeignReferencesQuery(UUID dataStructureId, JsonNode document, ArtifactId stored) {
 

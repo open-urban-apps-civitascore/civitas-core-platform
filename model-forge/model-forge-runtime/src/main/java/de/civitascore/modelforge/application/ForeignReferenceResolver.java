@@ -2,6 +2,7 @@ package de.civitascore.modelforge.application;
 
 import tools.jackson.databind.JsonNode;
 import de.civitascore.modelforge.contract.ForeignReference;
+import de.civitascore.modelforge.contract.ForeignReference.Kind;
 import de.civitascore.modelforge.contract.ForeignReferencesQuery;
 import de.civitascore.modelforge.core.port.ArtifactRegistry;
 import de.civitascore.modelforge.graph.SchemaRefExtractor;
@@ -21,15 +22,11 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Answers {@link de.civitascore.modelforge.facade.ModelForge#foreignReferences}. It reads the same
- * {@code $ref} and {@code x-core-ref} targets a write stores as reference edges, so every edge a
- * write would create is either the DataStructure's own or reported here.
+ * Answers {@link de.civitascore.modelforge.facade.ModelForge#foreignReferences}. It reads the
+ * targets a write stores as reference edges, so no edge escapes the answer.
  *
- * <p>An Element is the DataStructure's own when the DataStructure minted it, which its UUID shows:
- * a member's UUID derives from its grouping's UUID and its {@code $defs} key. Being listed is not
- * enough, since a bare {@code $defs} reference makes any DataStructure list an Element of another.
- * An Element listed but minted by no DataStructure, such as a member renamed on a key collision,
- * stays the lister's own.
+ * <p>An Element is own when the DataStructure minted it, which its UUID shows. Listing is not
+ * enough: a bare {@code $defs} reference lists another DataStructure's Element.
  */
 final class ForeignReferenceResolver {
 
@@ -72,11 +69,11 @@ final class ForeignReferenceResolver {
     }
 
     private static ForeignReference foreignReference(String target, List<Occurrence> found, String mintedBy) {
-        boolean embedded = found.stream().anyMatch(Occurrence::embedding);
-        boolean pinned = found.stream()
-            .filter(occurrence -> occurrence.embedding() || !embedded)
-            .allMatch(occurrence -> isPinned(occurrence.urn()));
-        return new ForeignReference(target, embedded, pinned, mintedBy);
+        List<Occurrence> embeddings = found.stream().filter(Occurrence::embedding).toList();
+        Kind kind = embeddings.isEmpty() ? Kind.LINKED
+            : embeddings.stream().allMatch(occurrence -> isPinned(occurrence.urn())) ? Kind.EMBEDDED_PINNED
+            : Kind.EMBEDDED_FLOATING;
+        return new ForeignReference(target, kind, mintedBy);
     }
 
     private static boolean isPinned(String urn) {

@@ -20,6 +20,9 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static de.civitascore.modelforge.contract.ForeignReference.Kind.EMBEDDED_FLOATING;
+import static de.civitascore.modelforge.contract.ForeignReference.Kind.EMBEDDED_PINNED;
+import static de.civitascore.modelforge.contract.ForeignReference.Kind.LINKED;
 import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -105,21 +108,21 @@ class ForeignReferenceResolverTest {
     void aPropertyReferenceToAnotherDataStructuresMemberNamesItsMinter() {
         var references = ofDocument(library("{\"x\": {\"$ref\": \"" + bravoMember + ":1.0.0\"}}", ""));
 
-        assertThat(references).containsExactly(new ForeignReference(bravoMember, true, true, bravoGrouping));
+        assertThat(references).containsExactly(new ForeignReference(bravoMember, EMBEDDED_PINNED, bravoGrouping));
     }
 
     @Test
     void aBareDefsMemberOfAnotherDataStructureIsForeign() {
         var references = ofDocument(library("{}", ", \"Stolen\": {\"$ref\": \"" + bravoMember + ":1.0.0\"}"));
 
-        assertThat(references).containsExactly(new ForeignReference(bravoMember, true, true, bravoGrouping));
+        assertThat(references).containsExactly(new ForeignReference(bravoMember, EMBEDDED_PINNED, bravoGrouping));
     }
 
     @Test
     void aTopLevelReferenceToAnotherDataStructureIsMintedByThatDataStructure() {
         var references = ofDocument("{\"$ref\": \"" + bravoGrouping + ":1.0.0\"}");
 
-        assertThat(references).containsExactly(new ForeignReference(bravoGrouping, true, true, bravoGrouping));
+        assertThat(references).containsExactly(new ForeignReference(bravoGrouping, EMBEDDED_PINNED, bravoGrouping));
     }
 
     @Test
@@ -128,10 +131,10 @@ class ForeignReferenceResolverTest {
             "{\"a\": {\"$ref\": \"" + bravoMember + "\"}, \"b\": {\"$ref\": \"" + bravoGrouping + ":latest\"}}", ""));
 
         assertThat(references)
-            .extracting(ForeignReference::target, ForeignReference::pinned)
+            .extracting(ForeignReference::target, ForeignReference::kind)
             .containsExactlyInAnyOrder(
-                tuple(bravoMember, false),
-                tuple(bravoGrouping, false));
+                tuple(bravoMember, EMBEDDED_FLOATING),
+                tuple(bravoGrouping, EMBEDDED_FLOATING));
     }
 
     @Test
@@ -139,7 +142,7 @@ class ForeignReferenceResolverTest {
         var references = ofDocument(library(
             "{\"a\": {\"$ref\": \"" + bravoMember + ":1.0.0\"}, \"b\": {\"$ref\": \"" + bravoMember + "\"}}", ""));
 
-        assertThat(references).singleElement().extracting(ForeignReference::pinned).isEqualTo(false);
+        assertThat(references).singleElement().extracting(ForeignReference::kind).isEqualTo(EMBEDDED_FLOATING);
     }
 
     /** A link embeds nothing, so its target is reported as linked only. */
@@ -148,7 +151,7 @@ class ForeignReferenceResolverTest {
         var references = ofDocument(library(
             "{\"x\": {\"type\": \"string\", \"x-core-ref\": {\"type\": \"" + bravoMember + "\"}}}", ""));
 
-        assertThat(references).containsExactly(new ForeignReference(bravoMember, false, false, bravoGrouping));
+        assertThat(references).containsExactly(new ForeignReference(bravoMember, LINKED, bravoGrouping));
     }
 
     @Test
@@ -167,7 +170,7 @@ class ForeignReferenceResolverTest {
         var references = ofDocument(library("{\"x\": {\"$ref\": \"" + unknown + "\"}}", ""));
 
         assertThat(references).containsExactly(
-            new ForeignReference(UrnParser.logicalUrn(unknown), true, true, null));
+            new ForeignReference(UrnParser.logicalUrn(unknown), EMBEDDED_PINNED, null));
     }
 
     /** A bare reference makes the host list another Data structure's member; listing does not mint it. */
@@ -178,7 +181,7 @@ class ForeignReferenceResolverTest {
 
         var references = ofDocument(library("{\"x\": {\"$ref\": \"" + bravoMember + ":1.0.0\"}}", ""));
 
-        assertThat(references).containsExactly(new ForeignReference(bravoMember, true, true, bravoGrouping));
+        assertThat(references).containsExactly(new ForeignReference(bravoMember, EMBEDDED_PINNED, bravoGrouping));
     }
 
     @Test
@@ -202,13 +205,25 @@ class ForeignReferenceResolverTest {
         assertThat(ofDocument(library("{\"x\": {\"$ref\": \"" + earlier + "\"}}", ""))).isEmpty();
     }
 
+    /** The host as the registry stores it: its member holds the reference to Bravo's member. */
+    private String storedHostReferencingBravo() {
+        String stored = hostGrouping + ":1.0.0";
+        String root = urns.member(HOST, "Root") + ":1.0.0";
+        when(registry.fetch(stored)).thenReturn(Optional.of(json("""
+            {"$ref": "%1$s", "$defs": {"Root": {"$ref": "%1$s"}}}
+            """.formatted(root))));
+        when(registry.fetch(root)).thenReturn(Optional.of(json("""
+            {"type": "object", "properties": {"x": {"$ref": "%s:1.0.0"}}}
+            """.formatted(bravoMember))));
+        return stored;
+    }
+
     @Test
     void aReferenceTheStoredVersionAlreadyHoldsIsLeftOut() {
-        String stored = hostGrouping + ":1.0.0";
-        String document = library("{\"x\": {\"$ref\": \"" + bravoMember + ":1.0.0\"}}", "");
-        when(registry.fetch(stored)).thenReturn(Optional.of(json(document)));
+        String stored = storedHostReferencingBravo();
 
-        var references = resolver.resolve(new ForeignReferencesQuery(HOST, json(document), new ArtifactId(stored)));
+        var references = resolver.resolve(new ForeignReferencesQuery(HOST,
+            json(library("{\"x\": {\"$ref\": \"" + bravoMember + ":1.0.0\"}}", "")), new ArtifactId(stored)));
 
         assertThat(references).isEmpty();
     }
@@ -216,9 +231,7 @@ class ForeignReferenceResolverTest {
     /** Pinning an already stored reference to another version reads another version, so it counts as new. */
     @Test
     void aReferenceRepinnedToAnotherVersionIsNew() {
-        String stored = hostGrouping + ":1.0.0";
-        when(registry.fetch(stored))
-            .thenReturn(Optional.of(json(library("{\"x\": {\"$ref\": \"" + bravoMember + ":1.0.0\"}}", ""))));
+        String stored = storedHostReferencingBravo();
 
         var references = resolver.resolve(new ForeignReferencesQuery(HOST,
             json(library("{\"x\": {\"$ref\": \"" + bravoMember + ":2.0.0\"}}", "")), new ArtifactId(stored)));
@@ -246,7 +259,7 @@ class ForeignReferenceResolverTest {
 
         var references = resolver.resolve(new ForeignReferencesQuery(HOST, null, new ArtifactId(stored)));
 
-        assertThat(references).containsExactly(new ForeignReference(bravoMember, true, true, bravoGrouping));
+        assertThat(references).containsExactly(new ForeignReference(bravoMember, EMBEDDED_PINNED, bravoGrouping));
         verify(registry, never()).fetch(bravoMember + ":1.0.0");
     }
 

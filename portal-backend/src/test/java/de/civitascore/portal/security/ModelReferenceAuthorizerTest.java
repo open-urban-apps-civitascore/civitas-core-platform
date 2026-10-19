@@ -1,5 +1,8 @@
 package de.civitascore.portal.security;
 
+import static de.civitascore.portal.modelregistry.ModelRegistryGateway.ModelReference.Kind.EMBEDDED_FLOATING;
+import static de.civitascore.portal.modelregistry.ModelRegistryGateway.ModelReference.Kind.EMBEDDED_PINNED;
+import static de.civitascore.portal.modelregistry.ModelRegistryGateway.ModelReference.Kind.LINKED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -66,19 +69,19 @@ class ModelReferenceAuthorizerTest {
   }
 
   @Test
-  @DisplayName("A model that adds no foreign reference needs no permission check")
-  void noForeignReferenceNeedsNoCheck() {
+  @DisplayName("A model that adds no foreign reference needs no data structure to be readable")
+  void noForeignReferenceNeedsNoReadableDataStructure() {
     adding();
 
     assertThatCode(() -> authorizer.authorizeWrite(HOST, MODEL, null, STORED))
         .doesNotThrowAnyException();
-    verify(scopeAccessAuthorizer, never()).authorizeReadAccess(any(), any());
+    verify(scopeAccessAuthorizer).authorizeReadAccess(ScopeType.DATASTRUCTURE, Set.of());
   }
 
   @Test
   @DisplayName("A pinned reference to a data structure the caller may read is allowed")
   void pinnedReadableReferenceIsAllowed() {
-    adding(new ModelReference(MEMBER, true, true, BRAVO_URN));
+    adding(new ModelReference(MEMBER, EMBEDDED_PINNED, BRAVO_URN));
     when(dataStructureRepository.existsById(BRAVO)).thenReturn(true);
 
     assertThatCode(() -> authorizer.authorizeWrite(HOST, MODEL, null, STORED))
@@ -89,7 +92,7 @@ class ModelReferenceAuthorizerTest {
   @Test
   @DisplayName("An x-core-ref link needs no version, only read access")
   void unpinnedLinkIsAllowed() {
-    adding(new ModelReference(MEMBER, false, false, BRAVO_URN));
+    adding(new ModelReference(MEMBER, LINKED, BRAVO_URN));
     when(dataStructureRepository.existsById(BRAVO)).thenReturn(true);
 
     assertThatCode(() -> authorizer.authorizeWrite(HOST, MODEL, null, STORED))
@@ -97,21 +100,21 @@ class ModelReferenceAuthorizerTest {
   }
 
   @Test
-  @DisplayName("A published structure may be referenced without a read check")
-  void publishedStructureNeedsNoReadCheck() {
+  @DisplayName("A published structure needs READ on no data structure")
+  void publishedStructureNeedsNoReadableDataStructure() {
     String port = "urn:core:platform:civitas:datastructure:frost:" + UUID.randomUUID();
-    adding(new ModelReference(MEMBER, true, true, port));
+    adding(new ModelReference(MEMBER, EMBEDDED_PINNED, port));
     when(publishedStructureRepository.existsByLogicalUrn(port)).thenReturn(true);
 
     assertThatCode(() -> authorizer.authorizeWrite(HOST, MODEL, null, STORED))
         .doesNotThrowAnyException();
-    verify(scopeAccessAuthorizer, never()).authorizeReadAccess(any(), any());
+    verify(scopeAccessAuthorizer).authorizeReadAccess(ScopeType.DATASTRUCTURE, Set.of());
   }
 
   @Test
   @DisplayName("An embedded reference without a version is refused")
   void unpinnedEmbeddingIsRefused() {
-    adding(new ModelReference(MEMBER, true, false, BRAVO_URN));
+    adding(new ModelReference(MEMBER, EMBEDDED_FLOATING, BRAVO_URN));
 
     assertThat(write()).isInstanceOf(ModelReferenceNotAvailableException.class);
     verify(scopeAccessAuthorizer, never()).authorizeReadAccess(any(), any());
@@ -120,10 +123,10 @@ class ModelReferenceAuthorizerTest {
   @Test
   @DisplayName("Every refusal reads the same, so it reveals neither the target nor its existence")
   void everyRefusalReadsTheSame() {
-    adding(new ModelReference(MEMBER, true, true, null));
+    adding(new ModelReference(MEMBER, EMBEDDED_PINNED, null));
     Throwable unknown = write();
 
-    adding(new ModelReference(MEMBER, true, true, BRAVO_URN));
+    adding(new ModelReference(MEMBER, EMBEDDED_PINNED, BRAVO_URN));
     when(dataStructureRepository.existsById(BRAVO)).thenReturn(false);
     Throwable noPortalOwner = write();
 
@@ -133,7 +136,7 @@ class ModelReferenceAuthorizerTest {
         .authorizeReadAccess(ScopeType.DATASTRUCTURE, Set.of(BRAVO));
     Throwable unreadable = write();
 
-    adding(new ModelReference(MEMBER, true, false, BRAVO_URN));
+    adding(new ModelReference(MEMBER, EMBEDDED_FLOATING, BRAVO_URN));
     Throwable unpinned = write();
 
     for (Throwable refusal : List.of(unknown, noPortalOwner, unreadable, unpinned)) {
@@ -148,7 +151,7 @@ class ModelReferenceAuthorizerTest {
   @DisplayName("Release checks every reference of the stored model")
   void releaseChecksTheStoredModel() {
     when(modelRegistryGateway.foreignReferencesOf(HOST, STORED))
-        .thenReturn(List.of(new ModelReference(MEMBER, true, true, BRAVO_URN)));
+        .thenReturn(List.of(new ModelReference(MEMBER, EMBEDDED_PINNED, BRAVO_URN)));
     when(dataStructureRepository.existsById(BRAVO)).thenReturn(true);
     doThrow(new AccessDeniedException("denied"))
         .when(scopeAccessAuthorizer)
