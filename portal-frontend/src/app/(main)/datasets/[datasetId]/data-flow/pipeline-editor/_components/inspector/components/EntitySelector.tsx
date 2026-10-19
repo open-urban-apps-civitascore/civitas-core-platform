@@ -28,6 +28,7 @@ interface EntitySelectorProps {
   onChange: (entity: SelectableEntity | undefined) => void
   isDisabled?: boolean
   fallbackName?: string
+  renderEntityName?: (entity: SelectableEntity) => React.ReactNode
 }
 
 // ============================================================================
@@ -44,6 +45,7 @@ export const EntitySelector: React.FC<EntitySelectorProps> = ({
   onChange,
   isDisabled = false,
   fallbackName,
+  renderEntityName = entity => entity.name,
 }) => {
   const t = useTranslations('pipelineEditor')
   const tCommon = useTranslations('common')
@@ -97,7 +99,7 @@ export const EntitySelector: React.FC<EntitySelectorProps> = ({
               )}
               {displayEntities.map(entity => (
                 <SelectItem key={String(entity.id)} value={String(entity.id)}>
-                  {entity.name}
+                  {renderEntityName(entity)}
                 </SelectItem>
               ))}
             </SelectContent>

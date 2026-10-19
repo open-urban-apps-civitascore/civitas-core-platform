@@ -1420,7 +1420,10 @@
       "tags": "Tags",
       "showDataStructure": "Datenstruktur anzeigen",
       "noPermission": "Keine Berechtigung zum Lesen von Datenquellen",
-      "anonymousName": "Anonyme Datenquelle"
+      "anonymousName": "Anonyme Datenquelle",
+      "apiCall": "API-Aufruf",
+      "apiCallPlaceholder": "API-Aufruf auswählen...",
+      "noApiCalls": "Diese Datenquelle hat keine API-Aufrufe"
     },
     "sink": {
       "locked": {

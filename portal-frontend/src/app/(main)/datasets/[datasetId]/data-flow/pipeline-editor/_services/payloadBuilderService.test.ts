@@ -268,6 +268,26 @@ describe('buildPipelinePayload — clean CORE Pipeline document', () => {
     expect(model.nodes.find(n => n.id === 'sink-1')).not.toHaveProperty('sinkRef')
   })
 
+  it('emits the API call name of an HTTP source', () => {
+    const source = sourceNode(DS_URN)
+    const httpSource: FixtureNode = {
+      ...source,
+      data: { ...source.data, apiCallName: 'Weather', entityMetadata: { connector: 'HTTP' } },
+    }
+    const { model } = buildPipelinePayload(pipeline([httpSource], []))
+    expect(model.nodes.find(n => n.id === 'src-1')).toMatchObject({ kind: 'source', apiCallName: 'Weather' })
+  })
+
+  it('omits a stale API call name on a non-HTTP source', () => {
+    const source = sourceNode(DS_URN)
+    const sqlSource: FixtureNode = {
+      ...source,
+      data: { ...source.data, apiCallName: 'Weather', entityMetadata: { connector: 'SQL' } },
+    }
+    const { model } = buildPipelinePayload(pipeline([sqlSource], []))
+    expect(model.nodes.find(n => n.id === 'src-1')).not.toHaveProperty('apiCallName')
+  })
+
   it('keeps styles as the full React-Flow graph and preserves FK id lists', () => {
     const p = pipeline([sourceNode(DS_URN), sinkNode(SINK_URN)], [{ source: 'src-1', target: 'sink-1' }])
     const payload = buildPipelinePayload(p)

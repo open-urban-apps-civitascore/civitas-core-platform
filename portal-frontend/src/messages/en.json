@@ -1433,7 +1433,10 @@
       "tags": "Tags",
       "showDataStructure": "Show Data Structure",
       "noPermission": "No permission to read datasources",
-      "anonymousName": "Anonymous Data Source"
+      "anonymousName": "Anonymous Data Source",
+      "apiCall": "API call",
+      "apiCallPlaceholder": "Select an API call...",
+      "noApiCalls": "This Data source has no API calls"
     },
     "sink": {
       "locked": {

@@ -393,6 +393,7 @@ describe('HTTP API call schemas', () => {
       apiCalls: [
         {
           name: '',
+          method: 'GET',
           path: '/stations',
           queryParameters: [{ name: 'status', value: '' }],
           headers: [],
@@ -400,6 +401,15 @@ describe('HTTP API call schemas', () => {
         },
       ],
     })
+  })
+
+  it('keeps an API call with an unknown method and leaves out the method', () => {
+    const result = ConnectorApiToFormSchema.parse({
+      connectorType: CONNECTOR_TYPES.HTTP,
+      configuration: { apiCalls: [{ name: 'Get all stations', method: 'UNKNOWN', path: '/stations' }] },
+    })
+
+    expect(result.configuration).toMatchObject({ apiCalls: [{ name: 'Get all stations', method: undefined }] })
   })
 
   it('maps empty pagination values from the API to the form', () => {
