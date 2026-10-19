@@ -849,6 +849,7 @@
     "customRole": "Custom",
     "tabLabels": {
       "basicInformation": "Basic Information",
+      "permissions": "Permissions",
       "systemPermissions": "System Permissions",
       "dataPermissions": "Data Permissions",
       "groupAssignment": "Groups"
