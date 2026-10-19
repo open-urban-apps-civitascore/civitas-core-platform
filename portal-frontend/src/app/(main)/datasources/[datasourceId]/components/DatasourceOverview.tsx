@@ -139,6 +139,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const {
     areAssignmentsDirty,
     areDatapoolsDirty,
+    isFormDirty,
     form: datasourceForm,
     dataSourceStatus,
     selectedConnectorType,
@@ -170,8 +171,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     handleStatusChange(newStatus)
   }
 
-  const hasUnsavedChanges =
-    datasourceForm.formState.isDirty || areAssignmentsDirty || areDatapoolsDirty || hasStatusChanged
+  const hasUnsavedChanges = isFormDirty || areAssignmentsDirty || areDatapoolsDirty || hasStatusChanged
 
   const isHttpConnector = selectedConnectorType === CONNECTOR_TYPES.HTTP
 

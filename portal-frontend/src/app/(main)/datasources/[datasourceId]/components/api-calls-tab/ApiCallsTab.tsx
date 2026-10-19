@@ -11,12 +11,18 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { InfoBox } from '@/components/text-box/TextBox'
 import { Button } from '@/components/ui/button'
 import { MAX_HTTP_API_CALLS } from '@/const/connectors'
-import { ApiCallSnapshots, HttpApiCallForm, HttpApiCallsForm } from '@/types/connectors'
+import { ApiCallSnapshots, EMPTY_PAGINATION, HttpApiCallForm, HttpApiCallsForm } from '@/types/connectors'
 import { DatasourceFormDraft } from '@/types/datasources'
 
 import { ApiCallItem } from './ApiCallItem'
 
-const EMPTY_API_CALL: HttpApiCallForm = { name: '', path: '', queryParameters: [], headers: [], pagination: null }
+const EMPTY_API_CALL: HttpApiCallForm = {
+  name: '',
+  path: '',
+  queryParameters: [],
+  headers: [],
+  pagination: EMPTY_PAGINATION,
+}
 
 type ArrayError = { message?: string; root?: { message?: string } }
 

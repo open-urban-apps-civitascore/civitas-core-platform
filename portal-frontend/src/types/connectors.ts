@@ -272,6 +272,7 @@ const HttpPaginationApiResponseSchema = z
     endPage: z.number().nullable().optional(),
   })
   .transform(({ type, pageParameter, pageSizeParameter, pageSize, startPage, endPage }) => ({
+    isEnabled: true,
     type,
     pageParameter: pageParameter ?? '',
     pageSizeParameter: pageSizeParameter ?? '',
@@ -297,7 +298,7 @@ const HttpApiCallApiResponseSchema = z
     path: path ?? '',
     queryParameters: queryParameters ?? [],
     headers: headers ?? [],
-    pagination: pagination ?? null,
+    pagination: pagination ?? EMPTY_PAGINATION,
   }))
 
 export const HttpApiResponseSchema = z.object({
@@ -350,7 +351,6 @@ const HTTP_PATH = /^\/[A-Za-z0-9._~:/-]*$/
 const HTTP_HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/
 const CREDENTIAL_HEADERS = new Set(['authorization', 'proxy-authorization', 'cookie'])
 const LINE_BREAK = /[\r\n]/
-const HTTP_PAGE_PARAMETER = /^[A-Za-z._@]+$/
 const NON_NEGATIVE_INTEGER = /^\d+$/
 
 const HttpPathSchema = z
@@ -386,6 +386,7 @@ const validateHeader = (header: HttpParameterForm, ctx: z.RefinementCtx) => {
 }
 
 const HttpPaginationFormSchema = z.object({
+  isEnabled: z.boolean(),
   type: z.literal(HTTP_PAGINATION_TYPES.PAGE_NUMBER),
   pageParameter: z.string().trim(),
   pageSizeParameter: z.string().trim(),
@@ -397,6 +398,7 @@ const HttpPaginationFormSchema = z.object({
 export type HttpPaginationForm = z.input<typeof HttpPaginationFormSchema>
 
 export const EMPTY_PAGINATION: HttpPaginationForm = {
+  isEnabled: false,
   type: HTTP_PAGINATION_TYPES.PAGE_NUMBER,
   pageParameter: '',
   pageSizeParameter: '',
@@ -408,9 +410,7 @@ export const EMPTY_PAGINATION: HttpPaginationForm = {
 const PAGE_NUMBER_FIELDS = ['pageSize', 'startPage', 'endPage'] as const
 
 const validatePagination = (pagination: HttpPaginationForm, ctx: z.RefinementCtx) => {
-  if (pagination.pageParameter && !HTTP_PAGE_PARAMETER.test(pagination.pageParameter)) {
-    ctx.addIssue({ code: 'custom', path: ['pageParameter'], message: 'datasources.errors.invalidPageParameter' })
-  }
+  if (!pagination.isEnabled) return
   const invalidFields = PAGE_NUMBER_FIELDS.filter(
     field => pagination[field] && !NON_NEGATIVE_INTEGER.test(pagination[field]),
   )
@@ -429,6 +429,7 @@ const validatePagination = (pagination: HttpPaginationForm, ctx: z.RefinementCtx
 const REQUIRED_PAGINATION_FIELDS = ['pageParameter', 'pageSizeParameter', 'pageSize'] as const
 
 const requirePagination = (pagination: HttpPaginationForm, ctx: z.RefinementCtx) => {
+  if (!pagination.isEnabled) return
   for (const field of REQUIRED_PAGINATION_FIELDS) {
     if (!pagination[field]) {
       ctx.addIssue({ code: 'custom', path: [field], message: 'common.errors.required' })
@@ -436,8 +437,8 @@ const requirePagination = (pagination: HttpPaginationForm, ctx: z.RefinementCtx)
   }
 }
 
-const toPaginationApi = (pagination: HttpPaginationForm | null) => {
-  if (!pagination) return null
+const toPaginationApi = (pagination: HttpPaginationForm) => {
+  if (!pagination.isEnabled) return null
   const toNumber = (value: string) => (value ? Number(value) : null)
   return {
     type: pagination.type,
@@ -454,7 +455,7 @@ const HttpApiCallFormSchema = z.object({
   path: HttpPathSchema,
   queryParameters: z.array(HttpParameterFormSchema).transform(withoutEmptyParameters),
   headers: z.array(HttpParameterFormSchema.superRefine(validateHeader)).transform(withoutEmptyParameters),
-  pagination: HttpPaginationFormSchema.superRefine(validatePagination).nullable(),
+  pagination: HttpPaginationFormSchema.superRefine(validatePagination),
 })
 
 export type HttpApiCallForm = z.input<typeof HttpApiCallFormSchema>
@@ -475,7 +476,7 @@ const HttpApiCallStrictFormSchema = HttpApiCallFormSchema.extend({
   headers: z
     .array(HttpParameterFormSchema.superRefine(validateHeader).superRefine(requireParameterName))
     .transform(withoutEmptyParameters),
-  pagination: HttpPaginationFormSchema.superRefine(validatePagination).superRefine(requirePagination).nullable(),
+  pagination: HttpPaginationFormSchema.superRefine(validatePagination).superRefine(requirePagination),
 })
 
 const HttpApiCallsLooseSchema = z.array(HttpApiCallFormSchema).max(MAX_HTTP_API_CALLS, 'datasources.errors.apiCallsMax')

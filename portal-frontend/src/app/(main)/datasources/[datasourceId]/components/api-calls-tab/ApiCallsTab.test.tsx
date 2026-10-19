@@ -25,7 +25,7 @@ const API_CALL: HttpApiCallForm = {
   path: '/stations',
   queryParameters: [{ name: 'status', value: 'active' }],
   headers: [{ name: 'Accept', value: 'application/json' }],
-  pagination: null,
+  pagination: EMPTY_PAGINATION,
 }
 
 interface RenderOptions {
@@ -95,6 +95,7 @@ const openApiCall = async (user: ReturnType<typeof userEvent.setup>) => {
 }
 
 const PAGINATION = {
+  isEnabled: true,
   type: 'PAGE_NUMBER' as const,
   pageParameter: 'page',
   pageSizeParameter: 'size',
@@ -116,7 +117,9 @@ describe('ApiCallsTab', () => {
 
     await user.click(screen.getByRole('button', { name: 'add' }))
 
-    expect(getApiCalls()).toEqual([{ name: '', path: '', queryParameters: [], headers: [], pagination: null }])
+    expect(getApiCalls()).toEqual([
+      { name: '', path: '', queryParameters: [], headers: [], pagination: EMPTY_PAGINATION },
+    ])
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'path.label' })).toHaveFocus())
   })
 
@@ -424,22 +427,31 @@ describe('ApiCallsTab', () => {
 
       expect(screen.getByRole('combobox', { name: 'type.label' })).toBeDisabled()
       expect(screen.getByRole('textbox', { name: 'startPage.label' })).toHaveValue('0')
-      expect(getApiCalls()?.[0].pagination).toEqual(EMPTY_PAGINATION)
+      expect(getApiCalls()?.[0].pagination).toEqual({ ...EMPTY_PAGINATION, isEnabled: true })
     })
 
-    it('deletes the values when unchecked and shows empty fields when checked again', async () => {
+    it('keeps the values when unchecked and checked again', async () => {
       const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [{ ...API_CALL, pagination: PAGINATION }] })
       await openApiCall(user)
 
       await user.click(screen.getByRole('checkbox', { name: 'enable' }))
 
-      expect(getApiCalls()?.[0].pagination).toBeNull()
-      expect(screen.queryByRole('textbox', { name: /^pageParameter\.label/ })).not.toBeInTheDocument()
+      expect(getApiCalls()?.[0].pagination).toEqual({ ...PAGINATION, isEnabled: false })
 
       await user.click(screen.getByRole('checkbox', { name: 'enable' }))
 
-      expect(getApiCalls()?.[0].pagination).toEqual(EMPTY_PAGINATION)
-      expect(screen.getByRole('textbox', { name: /^pageParameter\.label/ })).toHaveValue('')
+      expect(getApiCalls()?.[0].pagination).toEqual(PAGINATION)
+      expect(screen.getByRole('textbox', { name: /^pageParameter\.label/ })).toHaveValue('page')
+    })
+
+    it('hides only the fields when unchecked', async () => {
+      const { user } = renderApiCallsTab({ apiCalls: [{ ...API_CALL, pagination: PAGINATION }] })
+      await openApiCall(user)
+
+      await user.click(screen.getByRole('checkbox', { name: 'enable' }))
+
+      expect(screen.getByRole('checkbox', { name: 'enable' })).toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /^pageParameter\.label/ })).not.toBeInTheDocument()
     })
 
     it('writes the entered values into the form', async () => {
@@ -457,14 +469,26 @@ describe('ApiCallsTab', () => {
       expect(getApiCalls()?.[0].pagination).toEqual(PAGINATION)
     })
 
-    it('shows the page parameter error', async () => {
+    it('shows the page size error', async () => {
       const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
       await openApiCall(user)
       await user.click(screen.getByRole('checkbox', { name: 'enable' }))
 
-      await user.type(screen.getByRole('textbox', { name: /^pageParameter\.label/ }), 'page1')
+      await user.type(screen.getByRole('textbox', { name: /^pageSize\.label/ }), '0')
 
-      expect(await screen.findByText('datasources.errors.invalidPageParameter')).toBeInTheDocument()
+      expect(await screen.findByText('datasources.errors.pageSizeMin')).toBeInTheDocument()
+    })
+
+    it('hides the errors when unchecked', async () => {
+      const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+      await openApiCall(user)
+      await user.click(screen.getByRole('checkbox', { name: 'enable' }))
+      await user.type(screen.getByRole('textbox', { name: /^pageSize\.label/ }), '0')
+      expect(await screen.findByText('datasources.errors.pageSizeMin')).toBeInTheDocument()
+
+      await user.click(screen.getByRole('checkbox', { name: 'enable' }))
+
+      await waitFor(() => expect(screen.queryByText('datasources.errors.pageSizeMin')).not.toBeInTheDocument())
     })
 
     it('restores the pagination after cancel', async () => {

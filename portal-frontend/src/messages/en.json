@@ -1009,7 +1009,6 @@
       "invalidHeaderName": "Allowed in the header name: a–z A–Z 0–9 and ! # $ % & ' * + - . ^ _ ` | ~. No spaces.",
       "credentialHeader": "Use the authentication for credentials.",
       "headerValueLineBreak": "The header value must not contain a line break.",
-      "invalidPageParameter": "Allowed in the page parameter: a–z A–Z . _ @",
       "pageNumberInteger": "Enter a whole number of 0 or more.",
       "pageSizeMin": "The page size must be at least 1.",
       "endPageBeforeStartPage": "The end page must not be lower than the start page.",

@@ -9,9 +9,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { HTTP_PAGINATION_TYPES } from '@/const/connectors'
-import { EMPTY_PAGINATION, HttpApiCallsForm, HttpPaginationForm } from '@/types/connectors'
+import { HttpApiCallsForm, HttpPaginationForm } from '@/types/connectors'
 
-type PaginationField = Exclude<keyof HttpPaginationForm, 'type'>
+type PaginationField = Exclude<keyof HttpPaginationForm, 'isEnabled' | 'type'>
 
 const PAGINATION_FIELDS: { name: PaginationField; isRequired: boolean; isNumeric: boolean }[] = [
   { name: 'pageParameter', isRequired: true, isNumeric: false },
@@ -36,7 +36,12 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
   const t = useTranslations('datasources.apiCallsTab.pagination')
 
   const paginationPath = `configuration.apiCalls.${index}.pagination` as const
-  const pagination = useWatch({ control: form.control, name: paginationPath })
+  const isEnabled = useWatch({ control: form.control, name: `${paginationPath}.isEnabled` })
+
+  const handleEnabledChange = (isChecked: boolean, onChange: (isChecked: boolean) => void) => {
+    onChange(isChecked)
+    void form.trigger(paginationPath)
+  }
   const typeId = `${paginationPath}.type`
 
   return (
@@ -48,15 +53,15 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
         </button>
       </CollapsibleTrigger>
 
-      <CollapsibleContent className="flex flex-col gap-4 pt-4">
+      <CollapsibleContent className="flex flex-col pt-4">
         <FormField
           control={form.control}
-          name={paginationPath}
+          name={`${paginationPath}.isEnabled`}
           render={({ field }) => (
             <Label className="w-fit">
               <Checkbox
-                checked={field.value !== null}
-                onCheckedChange={isChecked => field.onChange(isChecked ? { ...EMPTY_PAGINATION } : null)}
+                checked={field.value}
+                onCheckedChange={isChecked => handleEnabledChange(isChecked === true, field.onChange)}
                 disabled={isDisabled}
               />
               {t('enable')}
@@ -64,8 +69,8 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
           )}
         />
 
-        {pagination && (
-          <>
+        <Collapsible open={isEnabled}>
+          <CollapsibleContent className="flex flex-col gap-4 pt-4">
             <div className={ROW_CLASS_NAME}>
               <Label htmlFor={typeId}>{t('type.label')}</Label>
               <Select value={HTTP_PAGINATION_TYPES.PAGE_NUMBER} disabled>
@@ -97,8 +102,8 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
                 )}
               />
             ))}
-          </>
-        )}
+          </CollapsibleContent>
+        </Collapsible>
       </CollapsibleContent>
     </Collapsible>
   )

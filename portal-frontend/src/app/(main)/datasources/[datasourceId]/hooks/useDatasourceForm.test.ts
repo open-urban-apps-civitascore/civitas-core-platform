@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { EMPTY_PAGINATION } from '@/types/connectors'
 import { DATAPOOL_SCOPE_TYPES, Datasource, DatasourceStatusType } from '@/types/datasources'
 
 import { useDatasourceForm } from './useDatasourceForm'
@@ -271,7 +272,7 @@ describe('useDatasourceForm with an HTTP connector', () => {
     const connector = await submitAfter(form =>
       form.setValue(
         'configuration.apiCalls',
-        [{ name: '', path: '/stations', queryParameters: [], headers: [], pagination: null }],
+        [{ name: '', path: '/stations', queryParameters: [], headers: [], pagination: EMPTY_PAGINATION }],
         { shouldDirty: true },
       ),
     )
@@ -279,6 +280,75 @@ describe('useDatasourceForm with an HTTP connector', () => {
     expect(connector.apiCalls).toEqual([
       { name: '', path: '/stations', queryParameters: [], headers: [], pagination: null },
     ])
+  })
+
+  describe('isFormDirty', () => {
+    const API_CALL = { name: 'Get all stations', path: '/stations', queryParameters: [], headers: [] }
+
+    it('is false without changes', () => {
+      const { result } = renderDatasourceForm(createHttpDatasource())
+
+      expect(result.current.isFormDirty).toBe(false)
+    })
+
+    it('is false after a change of an unchecked pagination', () => {
+      const { result } = renderDatasourceForm(createHttpDatasource())
+
+      act(() =>
+        result.current.form.setValue(
+          'configuration.apiCalls',
+          [{ ...API_CALL, pagination: { ...EMPTY_PAGINATION, pageParameter: 'page' } }],
+          { shouldDirty: true },
+        ),
+      )
+
+      expect(result.current.form.formState.isDirty).toBe(true)
+      expect(result.current.isFormDirty).toBe(false)
+    })
+
+    it('is true after checking the pagination', () => {
+      const { result } = renderDatasourceForm(createHttpDatasource())
+
+      act(() =>
+        result.current.form.setValue(
+          'configuration.apiCalls',
+          [{ ...API_CALL, pagination: { ...EMPTY_PAGINATION, isEnabled: true } }],
+          { shouldDirty: true },
+        ),
+      )
+
+      expect(result.current.isFormDirty).toBe(true)
+    })
+
+    it('is true after a change outside the connector', () => {
+      const { result } = renderDatasourceForm(createHttpDatasource())
+
+      act(() => result.current.form.setValue('description', 'Changed description', { shouldDirty: true }))
+
+      expect(result.current.isFormDirty).toBe(true)
+    })
+
+    it('is true after a connector change when the loaded connector is invalid', () => {
+      const datasource = createHttpDatasource()
+      const apiCalls = [{ name: 'Get all stations', method: 'GET' as const, path: 'stations' }]
+      const { result } = renderDatasourceForm({ ...datasource, connector: { ...datasource.connector!, apiCalls } })
+
+      act(() =>
+        result.current.form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true }),
+      )
+
+      expect(result.current.isFormDirty).toBe(true)
+    })
+
+    it('is true after a change of the connector', () => {
+      const { result } = renderDatasourceForm(createHttpDatasource())
+
+      act(() =>
+        result.current.form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true }),
+      )
+
+      expect(result.current.isFormDirty).toBe(true)
+    })
   })
 
   it('marks the API calls tab complete with a complete API call', () => {

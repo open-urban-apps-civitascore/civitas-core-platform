@@ -41,6 +41,11 @@ import { getConnectorDefaults } from '@/utils/connectors'
 import { isDatastructureNotAvailableError, isResourceInUseError } from '@/utils/errors'
 import { hasDirtyField, pickDirtyValues } from '@/utils/form'
 
+const toConnectorPayloadKey = (values: unknown) => {
+  const parsed = ConnectorFormToApiSchema.safeParse(values)
+  return parsed.success ? JSON.stringify(parsed.data) : undefined
+}
+
 export const useDatasourceForm = (
   datasource: Datasource,
   assignedGroups: GroupRoleAssignmentTable[],
@@ -90,6 +95,15 @@ export const useDatasourceForm = (
   }, [datasource])
 
   const formValues = useWatch({ control: form.control })
+  const { isDirty, dirtyFields, defaultValues: initialFormValues } = form.formState
+  const hasDirtyFieldOutsideConfiguration = Object.entries(dirtyFields).some(
+    ([key, value]) => key !== 'configuration' && hasDirtyField(value),
+  )
+  const connectorPayloadKey = toConnectorPayloadKey(formValues)
+  const initialConnectorPayloadKey = useMemo(() => toConnectorPayloadKey(initialFormValues), [initialFormValues])
+  const isConnectorChanged =
+    !connectorPayloadKey || !initialConnectorPayloadKey || connectorPayloadKey !== initialConnectorPayloadKey
+  const isFormDirty = isDirty && (hasDirtyFieldOutsideConfiguration || isConnectorChanged)
   const nameWatch = form.watch('name')
   const descriptionWatch = form.watch('description')
   const connectorTypeWatch = form.watch('connectorType')
@@ -326,6 +340,7 @@ export const useDatasourceForm = (
   return {
     areAssignmentsDirty,
     areDatapoolsDirty,
+    isFormDirty,
     form,
     dataSourceStatus,
     selectedConnectorType,

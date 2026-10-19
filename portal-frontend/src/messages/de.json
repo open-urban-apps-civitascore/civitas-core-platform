@@ -1001,7 +1001,6 @@
       "invalidHeaderName": "Erlaubte Zeichen im Header-Namen: a–z, A–Z, 0–9 und ! # $ % & ' * + - . ^ _ ` | ~. Keine Leerzeichen.",
       "credentialHeader": "Zugangsdaten gehören in die Authentifizierung.",
       "headerValueLineBreak": "Der Header-Wert darf keinen Zeilenumbruch enthalten.",
-      "invalidPageParameter": "Erlaubte Zeichen im Seitenparameter: a–z, A–Z, ., _, @",
       "pageNumberInteger": "Geben Sie eine ganze Zahl ab 0 ein.",
       "pageSizeMin": "Die Seitengröße muss mindestens 1 sein.",
       "endPageBeforeStartPage": "Die Endseite darf nicht kleiner als die Startseite sein.",
