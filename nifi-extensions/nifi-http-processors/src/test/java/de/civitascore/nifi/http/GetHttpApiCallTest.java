@@ -355,7 +355,9 @@ class GetHttpApiCallTest {
         "{\"stationid\":",
         "[] [\"val-1f3e\"]",
         "[{\"stationid\":\"a1\"},",
-        "[{\"lat\":\"x\"}] <html>val-1f3e</html>"
+        "[{\"lat\":\"x\"}] <html>val-1f3e</html>",
+        // The start of an MP4 file, which Jackson takes for UTF-32 and cannot decode.
+        "\0\0\0\030ftypisom"
       })
   void onTrigger_whenTheResponseIsNotJson_routesToStop(String body) throws InitializationException {
     try (ApiEndpoint endpoint = ApiEndpoint.answering(200, body)) {

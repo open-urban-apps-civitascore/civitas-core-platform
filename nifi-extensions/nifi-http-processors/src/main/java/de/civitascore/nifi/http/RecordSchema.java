@@ -117,10 +117,8 @@ final class RecordSchema {
    * Reads the response one record at a time: a JSON array holds one record in each element, a JSON
    * object is one record. The message of the validator is not used, because some messages quote the
    * value.
-   *
-   * @throws IOException when the response cannot be read; a response that is not JSON is rejected
    */
-  Verdict verdict(InputStream response) throws IOException {
+  Verdict verdict(InputStream response) {
     try (JsonParser parser = RECORD_READER.createParser(response)) {
       JsonToken first = parser.nextToken();
       if (first == null) {
@@ -139,7 +137,9 @@ final class RecordSchema {
                     "the response is a JSON " + scalarType(first) + ", not an object or an array");
           };
       return parser.nextToken() == null ? verdict : new Verdict.Rejected(NOT_JSON);
-    } catch (JacksonException e) {
+    } catch (IOException e) {
+      // Also CharConversionException, which Jackson throws for bytes that look like UTF-32. NiFi
+      // throws a failed read of the content unchecked, so it does not end up here.
       return new Verdict.Rejected(NOT_JSON);
     }
   }
