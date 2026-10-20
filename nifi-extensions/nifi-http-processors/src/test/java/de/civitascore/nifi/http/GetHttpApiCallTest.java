@@ -49,6 +49,15 @@ class GetHttpApiCallTest {
 
   private static final String STATIONS = "{\"name\":\"Stations\",\"path\":\"/stations\"}";
 
+  private static final String STATION_SCHEMA =
+      """
+      {"$schema": "https://json-schema.org/draft/2020-12/schema",
+       "type": "object",
+       "required": ["stationid"],
+       "properties": {"stationid": {"type": "string"},
+                      "name": {"type": "string", "maxLength": 20},
+                      "lat": {"type": "number"}}}""";
+
   @TempDir static Path keys;
 
   private static TestTls tls;
@@ -170,7 +179,7 @@ class GetHttpApiCallTest {
   @Test
   void onTrigger_whenTheResponseHasABody_routesItUnchangedToSuccess()
       throws InitializationException {
-    String body = "[{\"id\":1,\"name\":\"Münster\"},{\"id\":2}]";
+    String body = "[{\"stationid\":\"a1\",\"name\":\"Münster\"},{\"stationid\":\"a2\"}]";
     try (ApiEndpoint endpoint = ApiEndpoint.answering(200, body)) {
       TestRunner runner = runner(endpoint.baseUrl());
 
@@ -183,6 +192,329 @@ class GetHttpApiCallTest {
       flowFile.assertAttributeEquals(GetHttpApiCall.STATUS_CODE, "200");
       flowFile.assertAttributeEquals(GetHttpApiCall.REQUEST_PATH, "/stations");
     }
+  }
+
+  @Test
+  void onTrigger_whenTheResponseIsAnEmptyArray_routesItToSuccess() throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, "[]")) {
+      TestRunner runner = runner(endpoint.baseUrl());
+
+      runner.run();
+
+      runner.assertAllFlowFilesTransferred(GetHttpApiCall.SUCCESS, 1);
+      runner.getFlowFilesForRelationship(GetHttpApiCall.SUCCESS).get(0).assertContentEquals("[]");
+    }
+  }
+
+  @Test
+  void onTrigger_whenTheResponseIsAnObjectThatAgrees_routesItUnchangedToSuccess()
+      throws InitializationException {
+    String body = "{\"stationid\":\"a1\",\"lat\":51.96}";
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, body)) {
+      TestRunner runner = runner(endpoint.baseUrl());
+
+      runner.run();
+
+      runner.assertAllFlowFilesTransferred(GetHttpApiCall.SUCCESS, 1);
+      runner.getFlowFilesForRelationship(GetHttpApiCall.SUCCESS).get(0).assertContentEquals(body);
+    }
+  }
+
+  @Test
+  void onTrigger_whenOneRecordViolatesTheRecordSchema_routesTheWholeResponseToStop()
+      throws InitializationException {
+    String body =
+        "[{\"stationid\":\"a1\",\"lat\":1},{\"stationid\":\"a2\",\"lat\":\"x\"},{\"lat\":3}]";
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, body)) {
+      TestRunner runner = runner(endpoint.baseUrl());
+
+      runner.run();
+
+      String message =
+          "API call \"Stations\": 2 of 3 records violate the Data structure:"
+              + " record 1: /lat type; record 2: required stationid";
+      assertRouted(runner, GetHttpApiCall.STOP, 200, message);
+      List<LogMessage> errors = runner.getLogger().getErrorMessages();
+      assertEquals(1, errors.size());
+      assertTrue(errors.get(0).getMsg().contains(message), errors.get(0).getMsg());
+    }
+  }
+
+  @Test
+  void onTrigger_whenManyRecordsViolate_namesTheFirstThree() throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, "[{},{},{},{},{\"lat\":\"x\"}]")) {
+      TestRunner runner = runner(endpoint.baseUrl());
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": 5 of 5 records violate the Data structure:"
+              + " record 0: required stationid; record 1: required stationid;"
+              + " record 2: required stationid");
+    }
+  }
+
+  @Test
+  void onTrigger_whenAnArrayHoldsAScalar_routesToStop() throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, "[{\"stationid\":\"a1\"},7]")) {
+      TestRunner runner = runner(endpoint.baseUrl());
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": 1 of 2 records violate the Data structure: record 1: type");
+    }
+  }
+
+  @Test
+  void onTrigger_whenARecordViolates_keepsItsValuesOutOfLogsAndAttributes()
+      throws InitializationException {
+    String secret = "val-4e2a9c";
+    String body =
+        "[{\"stationid\":\""
+            + secret
+            + "\",\"name\":\"long-"
+            + secret
+            + "-long-long\",\"lat\":\""
+            + secret
+            + "\"}]";
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, body)) {
+      TestRunner runner = runner(endpoint.baseUrl());
+
+      runner.run();
+
+      runner.assertAllFlowFilesTransferred(GetHttpApiCall.STOP, 1);
+      MockFlowFile stopped = runner.getFlowFilesForRelationship(GetHttpApiCall.STOP).get(0);
+      stopped.assertContentEquals("");
+      List<String> visible = new ArrayList<>(logged(runner.getLogger()));
+      visible.addAll(stopped.getAttributes().values());
+      for (String text : visible) {
+        assertFalse(text.contains(secret), text);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource(
+      delimiter = '|',
+      quoteCharacter = '\'',
+      value = {
+        "'\"val-1f3e\"' | string",
+        "42             | number",
+        "true           | boolean",
+        "null           | null"
+      })
+  void onTrigger_whenTheResponseIsAJsonScalar_routesToStop(String body, String kind)
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, body)) {
+      TestRunner runner = runner(endpoint.baseUrl());
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": the response is a JSON " + kind + ", not an object or an array");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"<html>val-1f3e</html>", "{\"stationid\":", "[] [\"val-1f3e\"]", " "})
+  void onTrigger_whenTheResponseIsNotJson_routesToStop(String body) throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, body)) {
+      TestRunner runner = runner(endpoint.baseUrl());
+
+      runner.run();
+
+      assertRouted(
+          runner, GetHttpApiCall.STOP, 200, "API call \"Stations\": the response is not JSON");
+      assertFalse(logged(runner.getLogger()).toString().contains("val-1f3e"));
+    }
+  }
+
+  @Test
+  void onTrigger_withAGeoJsonGeometryInTheRecordSchema_validatesTheGeometry()
+      throws InitializationException {
+    String schema =
+        """
+        {"type": "object",
+         "properties": {"geom": {"$ref": "https://geojson.org/schema/Point.json",
+                                 "crs": "EPSG:25832"}}}""";
+    try (ApiEndpoint valid =
+            ApiEndpoint.answering(
+                200, "[{\"geom\":{\"type\":\"Point\",\"coordinates\":[7.6,51.9]}}]");
+        ApiEndpoint invalid =
+            ApiEndpoint.answering(200, "[{\"geom\":{\"type\":\"Point\",\"coordinates\":\"x\"}}]")) {
+      TestRunner agreeing = runner(valid.baseUrl());
+      agreeing.setProperty(GetHttpApiCall.RECORD_SCHEMA, schema);
+      TestRunner violating = runner(invalid.baseUrl());
+      violating.setProperty(GetHttpApiCall.RECORD_SCHEMA, schema);
+
+      agreeing.run();
+      violating.run();
+
+      agreeing.assertAllFlowFilesTransferred(GetHttpApiCall.SUCCESS, 1);
+      assertRouted(
+          violating,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": 1 of 1 records violate the Data structure:"
+              + " record 0: /geom/coordinates type");
+    }
+  }
+
+  @Test
+  void onTrigger_withALocalDefinitionInTheRecordSchema_validatesAgainstIt()
+      throws InitializationException {
+    String schema =
+        """
+        {"type": "object",
+         "properties": {"address": {"$ref": "#/$defs/Address"}},
+         "$defs": {"Address": {"type": "object", "required": ["street"],
+                               "properties": {"street": {"type": "string"}}}}}""";
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answering(200, "[{\"address\":{\"street\":\"Hauptstr.\"}},{\"address\":{}}]")) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, schema);
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": 1 of 2 records violate the Data structure:"
+              + " record 1: /address required street");
+    }
+  }
+
+  /** The form Model Forge gives a Data structure that imports one with its own $defs. */
+  @Test
+  void onTrigger_withAnInlinedImportThatHasItsOwnDefinitions_validatesAgainstThem()
+      throws InitializationException {
+    String schema =
+        """
+        {"$schema": "https://json-schema.org/draft/2020-12/schema",
+         "$id": "urn:core:platform:civitas:element:common:2f1c7a0e-0d1b-4c51-9a37-5d0e1c2b3a41:1.0.0",
+         "type": "object",
+         "required": ["station"],
+         "properties": {
+           "station": {
+             "$schema": "https://json-schema.org/draft/2020-12/schema",
+             "$id": "urn:core:platform:civitas:element:common:7d3e9b2a-6c4f-4e18-8b05-9a1f2c3d4e5f:1.0.0",
+             "type": "object",
+             "properties": {"position": {"$ref": "#/$defs/Position"}},
+             "$defs": {"Position": {"type": "object", "required": ["lat"],
+                                    "properties": {"lat": {"type": "number"}}}}}}}""";
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answering(
+            200, "[{\"station\":{\"position\":{\"lat\":51.9}}},{\"station\":{\"position\":{}}}]")) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, schema);
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": 1 of 2 records violate the Data structure:"
+              + " record 1: /station/position required lat");
+    }
+  }
+
+  @Test
+  void onTrigger_withThePlatformKeywordsInTheRecordSchema_validatesNothingWithThem()
+      throws InitializationException {
+    String schema =
+        """
+        {"type": "object",
+         "x-core-primaryKey": ["stationid"],
+         "properties": {
+           "stationid": {"type": "string", "x-core-primaryKey": true},
+           "owner": {"type": "string",
+                     "x-core-ref": {"type": "urn:core:platform:civitas:element:common:x:1.0.0"}},
+           "geom": {"$ref": "https://geojson.org/schema/Point.json", "crs": "EPSG:4326"}}}""";
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answering(
+            200,
+            "[{\"stationid\":\"a1\",\"owner\":\"o\","
+                + "\"geom\":{\"type\":\"Point\",\"coordinates\":[7.6,51.9]}}]")) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, schema);
+
+      runner.run();
+
+      runner.assertAllFlowFilesTransferred(GetHttpApiCall.SUCCESS, 1);
+    }
+  }
+
+  @Test
+  void validate_withARemoteReferenceOtherThanAGeoJsonGeometry_isInvalidAndFetchesNothing()
+      throws InitializationException {
+    try (ApiEndpoint schemaHost = ApiEndpoint.answering(200, "{\"type\":\"object\"}")) {
+      TestRunner runner = runner("http://localhost:8080");
+      runner.setProperty(
+          GetHttpApiCall.RECORD_SCHEMA,
+          "{\"type\":\"object\",\"properties\":{\"a\":{\"$ref\":\""
+              + schemaHost.baseUrl()
+              + "/schema.json\"}}}");
+
+      Collection<ValidationResult> results = invalid(runner);
+
+      assertTrue(
+          results.stream().anyMatch(r -> "Record Schema".equals(r.getSubject())),
+          results::toString);
+      assertTrue(schemaHost.requests().isEmpty());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "https://geojson.org/schema/Feature.json",
+        "https://geojson.org/schema/../schema/Point.json",
+        "urn:core:platform:civitas:element:common:x:1.0.0"
+      })
+  void validate_withAReferenceThatIsNotVendored_isInvalid(String reference)
+      throws InitializationException {
+    TestRunner runner = runner("http://localhost:8080");
+    runner.setProperty(
+        GetHttpApiCall.RECORD_SCHEMA,
+        "{\"type\":\"object\",\"properties\":{\"a\":{\"$ref\":\"" + reference + "\"}}}");
+
+    Collection<ValidationResult> results = invalid(runner);
+
+    assertTrue(
+        results.stream().anyMatch(r -> "Record Schema".equals(r.getSubject())), results::toString);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"{\"type\":", "[]"})
+  void validate_withARecordSchemaThatIsNoJsonSchema_isInvalid(String schema)
+      throws InitializationException {
+    TestRunner runner = runner("http://localhost:8080");
+    runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, schema);
+
+    Collection<ValidationResult> results = invalid(runner);
+
+    assertTrue(
+        results.stream().anyMatch(r -> "Record Schema".equals(r.getSubject())), results::toString);
+  }
+
+  @Test
+  void validate_withoutARecordSchema_isInvalid() throws InitializationException {
+    TestRunner runner = runner("http://localhost:8080");
+    runner.removeProperty(GetHttpApiCall.RECORD_SCHEMA);
+
+    runner.assertNotValid();
   }
 
   @ParameterizedTest
@@ -575,6 +907,7 @@ class GetHttpApiCallTest {
     runner.setProperty(GetHttpApiCall.WEB_CLIENT_SERVICE, WEB_CLIENT);
     runner.setProperty(GetHttpApiCall.BASE_URL, baseUrl);
     runner.setProperty(GetHttpApiCall.API_CALL, STATIONS);
+    runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, STATION_SCHEMA);
     return runner;
   }
 }

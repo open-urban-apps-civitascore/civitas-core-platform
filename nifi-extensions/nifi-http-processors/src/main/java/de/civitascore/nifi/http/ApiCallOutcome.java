@@ -11,24 +11,16 @@ package de.civitascore.nifi.http;
 
 import java.io.IOException;
 import java.io.InputStream;
-import org.apache.nifi.web.client.api.HttpResponseEntity;
 
 /** What one request of an API call gave. */
 sealed interface ApiCallOutcome {
 
   /**
-   * A 2xx response with a body. The caller reads the content and closes the response.
+   * A 2xx response with a body whose records agree with the record schema.
    *
-   * @param content the body as the server sent it, from its first byte
+   * @param content the body as the server sent it, read into memory
    */
-  record Body(int status, InputStream content, HttpResponseEntity response)
-      implements ApiCallOutcome, AutoCloseable {
-
-    @Override
-    public void close() {
-      ApiCallClient.discard(response);
-    }
-  }
+  record Body(int status, InputStream content) implements ApiCallOutcome {}
 
   /** A 2xx response without a body, for example a 204. */
   record NoBody(int status) implements ApiCallOutcome {}
@@ -41,6 +33,11 @@ sealed interface ApiCallOutcome {
    *     header or a credential
    */
   record Failure(ErrorKind kind, int status, String message) implements ApiCallOutcome {
+
+    /** Whether the next run fails again unless the configuration or the Data structure changes. */
+    boolean fatal() {
+      return kind == ErrorKind.FATAL;
+    }
 
     /**
      * The runtime monitor of the NiFi config-adapter counts a WARN bulletin only when its text
@@ -58,6 +55,15 @@ sealed interface ApiCallOutcome {
     static Failure ofTransport(String request, Throwable cause) {
       return new Failure(
           ErrorKind.TRANSIENT, 0, request + " failed: " + transportCause(cause).getSimpleName());
+    }
+
+    /**
+     * A 2xx response whose body is not the JSON of records that agree with the record schema.
+     *
+     * @param reason names no value of the response
+     */
+    static Failure ofRejectedBody(String apiCall, int status, String reason) {
+      return new Failure(ErrorKind.FATAL, status, apiCall + ": " + reason);
     }
 
     /** A request the web client refused to build. The same configuration fails again. */

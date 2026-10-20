@@ -10,9 +10,9 @@
 package de.civitascore.nifi.http;
 
 import de.civitascore.nifi.http.ApiCall.Parameter;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PushbackInputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -24,8 +24,9 @@ import org.apache.nifi.web.client.api.WebClientService;
 import org.apache.nifi.web.client.api.WebClientServiceException;
 
 /**
- * Sends one request of an API call and classifies what came back. It knows no NiFi session, so that
- * a page loop can send each page through it as a request of its own.
+ * Sends one request of an API call, reads the body, checks it against the record schema and
+ * classifies what came back. It knows no NiFi session, so that a page loop can send each page
+ * through it as a request of its own.
  *
  * <p>The transport belongs to the web client service: TLS, the proxy, the timeouts and the redirect
  * handling are its properties. This class adds only the idle timeout of the body read.
@@ -37,28 +38,26 @@ final class ApiCallClient {
   private final WebClientService webClient;
   private final String baseUrl;
   private final Duration bodyReadTimeout;
+  private final RecordSchema recordSchema;
 
   /**
    * @param baseUrl scheme, host, optional port and optional path; a trailing {@code /} is removed
    * @param bodyReadTimeout the longest wait of one read from the body
    */
-  ApiCallClient(WebClientService webClient, String baseUrl, Duration bodyReadTimeout) {
+  ApiCallClient(
+      WebClientService webClient,
+      String baseUrl,
+      Duration bodyReadTimeout,
+      RecordSchema recordSchema) {
     this.webClient = webClient;
     this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     this.bodyReadTimeout = bodyReadTimeout;
+    this.recordSchema = recordSchema;
   }
 
-  /**
-   * The name, the method and the path, for example {@code API call "Stations": GET /stations}. The
-   * base URL stays out, so that no host reaches the portal.
-   */
-  static String describe(ApiCall call) {
-    return "API call \"" + call.name() + "\": " + call.method().name() + " " + call.path();
-  }
-
-  /** Sends the request. A {@link ApiCallOutcome.Body} must be closed by the caller. */
+  /** Sends the request and reads the whole response. */
   ApiCallOutcome send(ApiCall call, Authentication authentication) {
-    String request = describe(call);
+    String request = call.describe();
     HttpResponseEntity response;
     try {
       HttpRequestHeadersSpec spec = webClient.method(call.method().requestMethod()).uri(uri(call));
@@ -72,28 +71,33 @@ final class ApiCallClient {
       // The last guard: the JDK HTTP client puts the header value into the exception message.
       return ApiCallOutcome.Failure.ofRejectedRequest(request, e);
     }
-    return classify(request, response);
+    return classify(call, response);
   }
 
-  private ApiCallOutcome classify(String request, HttpResponseEntity response) {
+  private ApiCallOutcome classify(ApiCall call, HttpResponseEntity response) {
     int status = response.statusCode();
     Optional<ErrorKind> error = StatusClassification.errorKind(status);
     if (error.isPresent()) {
       discard(response);
-      return ApiCallOutcome.Failure.ofStatus(request, status, error.get());
+      return ApiCallOutcome.Failure.ofStatus(call.describe(), status, error.get());
     }
-    Optional<InputStream> content;
+    byte[] content;
     try {
-      content = nonEmpty(guarded(response));
+      InputStream body = guarded(response);
+      content = body == null ? new byte[0] : body.readAllBytes();
     } catch (IOException e) {
+      return ApiCallOutcome.Failure.ofTransport(call.describe(), e);
+    } finally {
       discard(response);
-      return ApiCallOutcome.Failure.ofTransport(request, e);
     }
-    if (content.isEmpty()) {
-      discard(response);
+    if (content.length == 0) {
       return new ApiCallOutcome.NoBody(status);
     }
-    return new ApiCallOutcome.Body(status, content.get(), response);
+    Optional<String> rejection = recordSchema.rejection(content);
+    if (rejection.isPresent()) {
+      return ApiCallOutcome.Failure.ofRejectedBody(call.label(), status, rejection.get());
+    }
+    return new ApiCallOutcome.Body(status, new ByteArrayInputStream(content));
   }
 
   private InputStream guarded(HttpResponseEntity response) {
@@ -101,20 +105,6 @@ final class ApiCallClient {
     return body == null
         ? null
         : new IdleTimeoutInputStream(body, bodyReadTimeout, () -> discard(response));
-  }
-
-  /** The body from its first byte, or empty when the first read gives the end of the stream. */
-  private static Optional<InputStream> nonEmpty(InputStream body) throws IOException {
-    if (body == null) {
-      return Optional.empty();
-    }
-    PushbackInputStream content = new PushbackInputStream(body);
-    int first = content.read();
-    if (first == -1) {
-      return Optional.empty();
-    }
-    content.unread(first);
-    return Optional.of(content);
   }
 
   static void discard(HttpResponseEntity response) {

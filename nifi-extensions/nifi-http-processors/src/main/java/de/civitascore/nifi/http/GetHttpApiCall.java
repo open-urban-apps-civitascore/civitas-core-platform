@@ -37,7 +37,6 @@ import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
-import org.apache.nifi.processor.exception.FlowFileAccessException;
 import org.apache.nifi.processor.util.StandardValidators;
 import org.apache.nifi.web.client.provider.api.WebClientServiceProvider;
 
@@ -85,6 +84,9 @@ public class GetHttpApiCall extends AbstractProcessor {
 
   private static final Validator USERNAME_VALIDATOR =
       (subject, input, context) -> result(subject, usernameViolation(input));
+
+  private static final Validator RECORD_SCHEMA_VALIDATOR =
+      (subject, input, context) -> result(subject, RecordSchema.violation(input));
 
   static final PropertyDescriptor WEB_CLIENT_SERVICE =
       new PropertyDescriptor.Builder()
@@ -163,10 +165,25 @@ public class GetHttpApiCall extends AbstractProcessor {
           .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
           .build();
 
+  static final PropertyDescriptor RECORD_SCHEMA =
+      new PropertyDescriptor.Builder()
+          .name("Record Schema")
+          .displayName("Record Schema")
+          .description(
+              "The JSON Schema of the Data structure, with its imports inlined. Each record of a"
+                  + " response must agree with it: each element of a JSON array, or a JSON"
+                  + " object as one record. A $ref resolves only inside the schema or to a GeoJSON"
+                  + " geometry of https://geojson.org/schema/, which the NAR holds.")
+          .required(true)
+          .addValidator(RECORD_SCHEMA_VALIDATOR)
+          .build();
+
   static final Relationship SUCCESS =
       new Relationship.Builder()
           .name("success")
-          .description("One FlowFile for each 2xx response with a body. The content is the body.")
+          .description(
+              "One FlowFile for each 2xx response with a body whose records all agree with the"
+                  + " Record Schema. The content is the body.")
           .build();
 
   static final Relationship STOP =
@@ -195,13 +212,15 @@ public class GetHttpApiCall extends AbstractProcessor {
           API_CALL,
           AUTHENTICATION_TYPE,
           BASIC_AUTH_USERNAME,
-          BASIC_AUTH_PASSWORD);
+          BASIC_AUTH_PASSWORD,
+          RECORD_SCHEMA);
 
   private static final Set<Relationship> RELATIONSHIPS = Set.of(SUCCESS, STOP, FAILURE);
 
   private static final String JSON = "application/json";
 
   private volatile ApiCall apiCall;
+  private volatile ApiCallClient client;
 
   @Override
   protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
@@ -238,20 +257,22 @@ public class GetHttpApiCall extends AbstractProcessor {
   }
 
   @OnScheduled
-  public void readApiCall(ProcessContext context) throws InvalidApiCallException {
+  public void readConfiguration(ProcessContext context)
+      throws InvalidApiCallException, InvalidRecordSchemaException {
     apiCall = ApiCallParser.parse(context.getProperty(API_CALL).getValue());
-  }
-
-  @Override
-  public void onTrigger(ProcessContext context, ProcessSession session) {
-    ApiCallClient client =
+    client =
         new ApiCallClient(
             context
                 .getProperty(WEB_CLIENT_SERVICE)
                 .asControllerService(WebClientServiceProvider.class)
                 .getWebClientService(),
             context.getProperty(BASE_URL).getValue(),
-            context.getProperty(BODY_READ_TIMEOUT).asDuration());
+            context.getProperty(BODY_READ_TIMEOUT).asDuration(),
+            RecordSchema.compile(context.getProperty(RECORD_SCHEMA).getValue()));
+  }
+
+  @Override
+  public void onTrigger(ProcessContext context, ProcessSession session) {
     Authentication authentication =
         context
             .getProperty(AUTHENTICATION_TYPE)
@@ -259,43 +280,26 @@ public class GetHttpApiCall extends AbstractProcessor {
             .authentication(context);
 
     switch (client.send(apiCall, authentication)) {
-      case ApiCallOutcome.Body body -> {
-        try (body) {
-          transferBody(session, client, body);
-        }
-      }
+      case ApiCallOutcome.Body body -> transferBody(session, body);
       case ApiCallOutcome.NoBody noBody ->
-          getLogger()
-              .debug(
-                  "{} returned {} without a body",
-                  ApiCallClient.describe(apiCall),
-                  noBody.status());
+          getLogger().debug("{} returned {} without a body", apiCall.describe(), noBody.status());
       case ApiCallOutcome.Failure failure -> transferFailure(session, failure);
     }
   }
 
-  private void transferBody(
-      ProcessSession session, ApiCallClient client, ApiCallOutcome.Body body) {
-    FlowFile flowFile = session.create();
-    try {
-      flowFile = session.importFrom(body.content(), flowFile);
-    } catch (FlowFileAccessException e) {
-      session.remove(flowFile);
-      transferFailure(
-          session, ApiCallOutcome.Failure.ofTransport(ApiCallClient.describe(apiCall), e));
-      return;
-    }
+  private void transferBody(ProcessSession session, ApiCallOutcome.Body body) {
     Map<String, String> attributes = new LinkedHashMap<>();
     attributes.put(CoreAttributes.MIME_TYPE.key(), JSON);
     attributes.put(STATUS_CODE, Integer.toString(body.status()));
     attributes.put(REQUEST_PATH, apiCall.path());
+    FlowFile flowFile = session.importFrom(body.content(), session.create());
     session.transfer(session.putAllAttributes(flowFile, attributes), SUCCESS);
   }
 
   /** Logs the error, which raises the bulletin, and sends an empty FlowFile that describes it. */
   private void transferFailure(ProcessSession session, ApiCallOutcome.Failure failure) {
     Relationship relationship;
-    if (failure.kind() == ErrorKind.FATAL) {
+    if (failure.fatal()) {
       getLogger().error(failure.message());
       relationship = STOP;
     } else {
