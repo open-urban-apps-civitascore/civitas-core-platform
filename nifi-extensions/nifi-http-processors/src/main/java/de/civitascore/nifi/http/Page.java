@@ -11,15 +11,17 @@ package de.civitascore.nifi.http;
 
 import de.civitascore.nifi.http.ApiCall.Parameter;
 import java.util.List;
-import java.util.OptionalLong;
+import java.util.Optional;
 
 /**
  * One request of a run of an API call.
  *
- * @param number the page number of a paginated run, empty for an API call without pagination
+ * @param index the position in the run, 0 for the first page
+ * @param name what causes and {@code http.page} show for the page; empty when the run has no named
+ *     pages
  * @param queryParameters what the page adds after the query parameters of the API call
  */
-record Page(OptionalLong number, List<Parameter> queryParameters) {
+record Page(long index, Optional<String> name, List<Parameter> queryParameters) {
 
   Page {
     queryParameters = List.copyOf(queryParameters);

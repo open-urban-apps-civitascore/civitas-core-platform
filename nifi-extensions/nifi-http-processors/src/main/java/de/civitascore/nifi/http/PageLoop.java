@@ -24,10 +24,6 @@ import org.apache.nifi.processor.exception.FlowFileAccessException;
 /**
  * One run of an API call: the pages, each through {@link ApiCallClient} as a request of its own,
  * and the FlowFiles of the run. An API call without pagination is a run of one page.
- *
- * <p>A page of a paginated run must be a JSON array, and a page without records ends the run
- * without a FlowFile. An API call without pagination keeps the rules of one response: a JSON object
- * is one record, and {@code []} is delivered.
  */
 final class PageLoop {
 
@@ -61,29 +57,26 @@ final class PageLoop {
    * session.
    */
   void run(ProcessSession session, Authentication authentication) {
-    List<FlowFile> pages = new ArrayList<>();
-    Optional<ApiCallOutcome.Failure> failure = readPages(session, authentication, pages);
-    if (failure.isPresent()) {
-      session.remove(pages);
-      transferFailure(session, failure.get());
-    } else {
-      session.transfer(pages, GetHttpApiCall.SUCCESS);
+    switch (readPages(session, authentication)) {
+      case RunResult.Complete complete ->
+          session.transfer(complete.pages(), GetHttpApiCall.SUCCESS);
+      case RunResult.Failed failed -> {
+        session.remove(failed.pages());
+        transferFailure(session, failed.failure());
+      }
     }
   }
 
-  /**
-   * @return the failure that ends the run, or empty when the run is complete
-   */
-  private Optional<ApiCallOutcome.Failure> readPages(
-      ProcessSession session, Authentication authentication, List<FlowFile> pages) {
+  private RunResult readPages(ProcessSession session, Authentication authentication) {
     Pagination pagination = apiCall.pagination();
+    List<FlowFile> pages = new ArrayList<>();
     Page page = pagination.first();
     for (int read = 1; ; read++) {
       ApiCallOutcome outcome = client.send(apiCall, page, authentication);
       int records;
       switch (accept(session, page, outcome, pages)) {
         case PageRead.Failed failed -> {
-          return Optional.of(failed.failure());
+          return new RunResult.Failed(pages, failed.failure());
         }
         case PageRead.Records accepted -> {
           records = accepted.count();
@@ -91,11 +84,11 @@ final class PageLoop {
       }
       Optional<Page> next = pagination.next(page, records);
       if (next.isEmpty()) {
-        return Optional.empty();
+        return new RunResult.Complete(pages);
       }
       if (read == maxPages) {
-        return Optional.of(
-            ApiCallOutcome.Failure.ofPageLimit(apiCall.label(), status(outcome), maxPages));
+        return new RunResult.Failed(
+            pages, ApiCallOutcome.Failure.ofPageLimit(apiCall.label(), outcome.status(), maxPages));
       }
       page = next.get();
     }
@@ -128,7 +121,7 @@ final class PageLoop {
       session.remove(flowFile);
       return new PageRead.Failed(ApiCallOutcome.Failure.ofTransport(apiCall.describe(page), e));
     }
-    boolean paginated = page.number().isPresent();
+    boolean pagesAreArrays = apiCall.pagination().pagesAreArrays();
     return switch (recordSchema.verdict(session, flowFile)) {
       case RecordSchema.Verdict.Blank() -> {
         session.remove(flowFile);
@@ -141,22 +134,25 @@ final class PageLoop {
             ApiCallOutcome.Failure.ofRejectedBody(apiCall.label(page), body.status(), reason));
       }
       case RecordSchema.Verdict.Agrees(int records, boolean array) -> {
-        if (paginated && !array) {
+        if (pagesAreArrays && !array) {
           session.remove(flowFile);
-          yield new PageRead.Failed(
-              ApiCallOutcome.Failure.ofRejectedBody(
-                  apiCall.label(),
-                  body.status(),
-                  "page " + page.number().getAsLong() + " is a JSON object, not an array"));
+          yield new PageRead.Failed(notAnArray(page, body.status()));
         }
-        if (paginated && records == 0) {
-          session.remove(flowFile);
-        } else {
+        if (!pagesAreArrays || records > 0) {
           pages.add(session.putAllAttributes(flowFile, attributes(page, body.status())));
+        } else {
+          session.remove(flowFile);
         }
         yield new PageRead.Records(records);
       }
     };
+  }
+
+  private ApiCallOutcome.Failure notAnArray(Page page, int status) {
+    return ApiCallOutcome.Failure.ofRejectedBody(
+        apiCall.label(),
+        status,
+        "page " + page.name().orElseThrow() + " is a JSON object, not an array");
   }
 
   private Map<String, String> attributes(Page page, int status) {
@@ -164,7 +160,7 @@ final class PageLoop {
     attributes.put(CoreAttributes.MIME_TYPE.key(), JSON);
     attributes.put(GetHttpApiCall.STATUS_CODE, Integer.toString(status));
     attributes.put(GetHttpApiCall.REQUEST_PATH, apiCall.path());
-    page.number().ifPresent(number -> attributes.put(GetHttpApiCall.PAGE, Long.toString(number)));
+    page.name().ifPresent(name -> attributes.put(GetHttpApiCall.PAGE, name));
     return attributes;
   }
 
@@ -173,7 +169,7 @@ final class PageLoop {
         "{} {}{} returned {} without a body",
         apiCall.method().name(),
         apiCall.path(),
-        page.number().isPresent() ? " page " + page.number().getAsLong() : "",
+        page.name().map(name -> " page " + name).orElse(""),
         status);
   }
 
@@ -194,12 +190,21 @@ final class PageLoop {
     session.transfer(session.putAllAttributes(session.create(), attributes), relationship);
   }
 
-  private static int status(ApiCallOutcome outcome) {
-    return switch (outcome) {
-      case ApiCallOutcome.Body body -> body.status();
-      case ApiCallOutcome.NoBody noBody -> noBody.status();
-      case ApiCallOutcome.Failure failure -> failure.status();
-    };
+  private sealed interface RunResult {
+
+    record Complete(List<FlowFile> pages) implements RunResult {
+
+      public Complete {
+        pages = List.copyOf(pages);
+      }
+    }
+
+    record Failed(List<FlowFile> pages, ApiCallOutcome.Failure failure) implements RunResult {
+
+      public Failed {
+        pages = List.copyOf(pages);
+      }
+    }
   }
 
   /** What one page gave: its record count, or the failure that ends the run. */

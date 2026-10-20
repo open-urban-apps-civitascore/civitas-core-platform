@@ -16,6 +16,9 @@ import org.apache.nifi.web.client.api.HttpResponseEntity;
 /** What one request of an API call gave. */
 sealed interface ApiCallOutcome {
 
+  /** The status of the response, 0 when no response came. */
+  int status();
+
   /**
    * A 2xx response with a body. The caller reads the content and closes the response.
    *
@@ -36,7 +39,6 @@ sealed interface ApiCallOutcome {
   /**
    * A request that failed.
    *
-   * @param status the status of the response, 0 when no response came
    * @param message with each control character and line separator escaped, so that no part of it
    *     can start a log line of its own
    */

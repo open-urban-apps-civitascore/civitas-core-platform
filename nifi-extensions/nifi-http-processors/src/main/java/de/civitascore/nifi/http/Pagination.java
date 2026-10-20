@@ -18,6 +18,12 @@ sealed interface Pagination permits PageNumberPagination, SinglePage {
   Page first();
 
   /**
+   * Whether each page must be a JSON array, and a page without records ends the run without a
+   * FlowFile. Otherwise a JSON object is one record, and {@code []} gives a FlowFile.
+   */
+  boolean pagesAreArrays();
+
+  /**
    * The page after {@code page}, or empty when the run ends with {@code page}.
    *
    * @param records the number of records of {@code page}

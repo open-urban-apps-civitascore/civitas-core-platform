@@ -11,16 +11,20 @@ package de.civitascore.nifi.http;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.OptionalLong;
 
 /** An API call without pagination: each run sends one request. */
 record SinglePage() implements Pagination {
 
-  private static final Page ONLY = new Page(OptionalLong.empty(), List.of());
+  private static final Page ONLY = new Page(0, Optional.empty(), List.of());
 
   @Override
   public Page first() {
     return ONLY;
+  }
+
+  @Override
+  public boolean pagesAreArrays() {
+    return false;
   }
 
   @Override

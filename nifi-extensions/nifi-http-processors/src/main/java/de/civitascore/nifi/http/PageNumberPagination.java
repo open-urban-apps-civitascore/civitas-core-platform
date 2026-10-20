@@ -13,12 +13,9 @@ import de.civitascore.nifi.http.ApiCall.Parameter;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.OptionalLong;
 
 /**
- * Sends the page number and the page size as query parameters. The page number starts at {@code
- * startPage} and increases by 1. The run ends after the end page, after a page without records, and
- * after a page with fewer records than the page size.
+ * Sends the page number and the page size as query parameters.
  *
  * @param pageSize at least 1
  * @param startPage at least 0
@@ -34,22 +31,32 @@ record PageNumberPagination(
 
   @Override
   public Page first() {
-    return page(startPage);
+    return page(0);
+  }
+
+  @Override
+  public boolean pagesAreArrays() {
+    return true;
   }
 
   @Override
   public Optional<Page> next(Page page, int records) {
-    long number = page.number().orElseThrow();
-    boolean endPageDone = endPage.isPresent() && number >= endPage.getAsInt();
+    boolean endPageDone = endPage.isPresent() && number(page.index()) >= endPage.getAsInt();
     if (endPageDone || records < pageSize) {
       return Optional.empty();
     }
-    return Optional.of(page(number + 1));
+    return Optional.of(page(page.index() + 1));
   }
 
-  private Page page(long number) {
+  private long number(long index) {
+    return startPage + index;
+  }
+
+  private Page page(long index) {
+    long number = number(index);
     return new Page(
-        OptionalLong.of(number),
+        index,
+        Optional.of(Long.toString(number)),
         List.of(
             new Parameter(pageParameter, Long.toString(number)),
             new Parameter(pageSizeParameter, Integer.toString(pageSize))));

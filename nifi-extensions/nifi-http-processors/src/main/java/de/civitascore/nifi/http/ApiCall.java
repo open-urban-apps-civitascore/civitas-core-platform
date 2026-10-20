@@ -10,7 +10,6 @@
 package de.civitascore.nifi.http;
 
 import java.util.List;
-import java.util.OptionalLong;
 
 /**
  * One API call of an HTTP/REST Data source, read from the {@code API Call} property and checked.
@@ -39,10 +38,8 @@ record ApiCall(
     return label() + ": " + method.name() + " " + path;
   }
 
-  /** As {@link #describe()}, with the number of a paginated page after the path. */
   String describe(Page page) {
-    OptionalLong number = page.number();
-    return number.isPresent() ? describe() + " page " + number.getAsLong() : describe();
+    return describe() + page.name().map(name -> " page " + name).orElse("");
   }
 
   /** The name alone, for example {@code API call "Stations"}. */
@@ -50,10 +47,8 @@ record ApiCall(
     return "API call \"" + name + "\"";
   }
 
-  /** As {@link #label()}, with the number of a paginated page, for example {@code ...: page 3}. */
   String label(Page page) {
-    OptionalLong number = page.number();
-    return number.isPresent() ? label() + ": page " + number.getAsLong() : label();
+    return label() + page.name().map(name -> ": page " + name).orElse("");
   }
 
   /** A query parameter or a header. The value is never null. */
