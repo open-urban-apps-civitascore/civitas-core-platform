@@ -14,13 +14,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 
-/**
- * Sends the page number and the page size as query parameters.
- *
- * @param pageSize at least 1
- * @param startPage at least 0
- * @param endPage at least {@code startPage}, empty for no end page
- */
+/** Sends the page number and the page size as query parameters. */
 record PageNumberPagination(
     String pageParameter,
     String pageSizeParameter,
@@ -28,6 +22,18 @@ record PageNumberPagination(
     int startPage,
     OptionalInt endPage)
     implements Pagination {
+
+  PageNumberPagination {
+    if (pageSize <= 0) {
+      throw new IllegalArgumentException("pageSize must be at least 1");
+    }
+    if (startPage < 0) {
+      throw new IllegalArgumentException("startPage must be at least 0");
+    }
+    if (endPage.isPresent() && endPage.getAsInt() < startPage) {
+      throw new IllegalArgumentException("endPage must be at least startPage");
+    }
+  }
 
   @Override
   public Page first() {

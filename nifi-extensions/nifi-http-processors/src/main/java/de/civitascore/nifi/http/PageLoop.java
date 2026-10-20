@@ -35,15 +35,15 @@ final class PageLoop {
   private final int maxPages;
   private final ComponentLog log;
 
-  /**
-   * @param maxPages at least 1
-   */
   PageLoop(
       ApiCall apiCall,
       ApiCallClient client,
       RecordSchema recordSchema,
       int maxPages,
       ComponentLog log) {
+    if (maxPages <= 0) {
+      throw new IllegalArgumentException("maxPages must be at least 1");
+    }
     this.apiCall = apiCall;
     this.client = client;
     this.recordSchema = recordSchema;
