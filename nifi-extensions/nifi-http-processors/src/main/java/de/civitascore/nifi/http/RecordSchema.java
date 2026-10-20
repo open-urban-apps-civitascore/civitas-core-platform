@@ -47,13 +47,13 @@ final class RecordSchema {
     this.schema = schema;
   }
 
-  /** Why the text is no schema that the processor can validate with, or null when it is one. */
-  static String violation(String text) {
+  /** Why the text is no schema that the processor can validate with, or empty when it is one. */
+  static Optional<String> compileError(String text) {
     try {
       compile(text);
-      return null;
+      return Optional.empty();
     } catch (InvalidRecordSchemaException e) {
-      return e.getMessage();
+      return Optional.of(e.getMessage());
     }
   }
 
@@ -146,7 +146,7 @@ final class RecordSchema {
     }
     List<String> violations = new ArrayList<>();
     for (ValidationMessage message : schema.validate(record)) {
-      violations.add(violation(message));
+      violations.add(describe(message));
     }
     return violations;
   }
@@ -165,7 +165,7 @@ final class RecordSchema {
   }
 
   /** The pointer inside the record and the keyword; for {@code required} the property too. */
-  private static String violation(ValidationMessage message) {
+  private static String describe(ValidationMessage message) {
     StringBuilder text = new StringBuilder();
     String pointer = pointer(message.getInstanceLocation());
     if (!pointer.isEmpty()) {
