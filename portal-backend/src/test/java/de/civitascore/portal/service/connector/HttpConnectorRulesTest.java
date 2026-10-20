@@ -9,6 +9,7 @@ import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Basic;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.PageNumber;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Parameter;
 import de.civitascore.portal.model.connector.Secret;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -30,6 +31,19 @@ class HttpConnectorRulesTest {
   private static ApiCall withPages(Integer startPage, Integer endPage) {
     return new ApiCall(
         null, null, "/x", null, null, new PageNumber("page", "size", 10, startPage, endPage));
+  }
+
+  private static ApiCall paged(
+      String pageParameter, String pageSizeParameter, String... queryParameterNames) {
+    List<Parameter> queryParameters =
+        Arrays.stream(queryParameterNames).map(name -> new Parameter(name, "1")).toList();
+    return new ApiCall(
+        null,
+        null,
+        "/x",
+        queryParameters,
+        null,
+        new PageNumber(pageParameter, pageSizeParameter, 10, null, null));
   }
 
   private List<ConnectorViolation> validate(ApiCall... apiCalls) {
@@ -92,6 +106,44 @@ class HttpConnectorRulesTest {
         .containsExactly(
             ConnectorViolation.at(
                 "apiCalls[2].pagination.endPage", "'endPage' must be at least 'startPage'"));
+  }
+
+  @Test
+  void validate_withPaginationParameterNamedAsQueryParameter_reportsThePaginationField() {
+    assertThat(
+            validate(
+                paged("page", "size", "status", "page"),
+                paged("page", "size", "size"),
+                paged("page", "size", "status")))
+        .containsExactly(
+            ConnectorViolation.at(
+                "apiCalls[0].pagination.pageParameter",
+                "'pageParameter' must differ from the name of each query parameter"),
+            ConnectorViolation.at(
+                "apiCalls[1].pagination.pageSizeParameter",
+                "'pageSizeParameter' must differ from the name of each query parameter"));
+  }
+
+  @Test
+  void validate_withPageParameterNamedAsPageSizeParameter_reportsPageSizeParameter() {
+    assertThat(validate(paged("page", "size"), paged("p", "p")))
+        .containsExactly(
+            ConnectorViolation.at(
+                "apiCalls[1].pagination.pageSizeParameter",
+                "'pageSizeParameter' must differ from 'pageParameter'"));
+  }
+
+  @Test
+  void validate_withPaginationParameterNamesThatDifferOnlyInCase_reportsNothing() {
+    assertThat(validate(paged("page", "Page", "PAGE", "Size"), paged("size", "SIZE"))).isEmpty();
+  }
+
+  @Test
+  void validate_withPaginationParameterNamesMissingInADraft_reportsNothing() {
+    ApiCall withoutQueryParameters =
+        new ApiCall(null, null, "/x", null, null, new PageNumber(null, null, 10, null, null));
+
+    assertThat(validate(withoutQueryParameters, paged(null, null, (String) null))).isEmpty();
   }
 
   @Test

@@ -222,7 +222,12 @@ public record HttpConnectorConfiguration(
           @NotNull(groups = OnRelease.class, message = "'pageParameter' is required") String pageParameter,
       @Schema(description = "Query parameter that carries the page size.", example = "size")
           @NotNull(groups = OnRelease.class, message = "'pageSizeParameter' is required") String pageSizeParameter,
-      @Schema(description = "Number of records per page. At least 1.", example = "100")
+      @Schema(
+              description =
+                  "Number of records per page. At least 1, and not larger than the maximum page"
+                      + " size of the API: the API then sends fewer records than the page size,"
+                      + " and the run stops after the first page without an error.",
+              example = "100")
           @NotNull(groups = OnRelease.class, message = "'pageSize' is required") @Min(value = 1, message = "'pageSize' must be at least 1") Integer pageSize,
       @Schema(
               description = "First page number. Absent or null is 0.",

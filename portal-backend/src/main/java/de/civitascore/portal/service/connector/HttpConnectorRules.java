@@ -53,15 +53,48 @@ public class HttpConnectorRules implements ConnectorRules {
                 apiCallPath + ".name", "'name' must be unique among the API calls"));
       }
       addHeaderNameViolations(apiCall.headers(), apiCallPath, violations);
-      if (apiCall.pagination() instanceof PageNumber page
-          && page.endPage() != null
-          && page.endPage() < page.startPage()) {
-        violations.add(
-            ConnectorViolation.at(
-                apiCallPath + ".pagination.endPage", "'endPage' must be at least 'startPage'"));
+      if (apiCall.pagination() instanceof PageNumber page) {
+        addPageNumberViolations(page, apiCall.queryParameters(), apiCallPath, violations);
       }
     }
     return violations;
+  }
+
+  private static void addPageNumberViolations(
+      PageNumber page,
+      List<Parameter> queryParameters,
+      String apiCallPath,
+      List<ConnectorViolation> violations) {
+    String paginationPath = apiCallPath + ".pagination.";
+    if (namesAQueryParameter(page.pageParameter(), queryParameters)) {
+      violations.add(
+          ConnectorViolation.at(
+              paginationPath + "pageParameter",
+              "'pageParameter' must differ from the name of each query parameter"));
+    }
+    if (namesAQueryParameter(page.pageSizeParameter(), queryParameters)) {
+      violations.add(
+          ConnectorViolation.at(
+              paginationPath + "pageSizeParameter",
+              "'pageSizeParameter' must differ from the name of each query parameter"));
+    }
+    if (page.pageParameter() != null && page.pageParameter().equals(page.pageSizeParameter())) {
+      violations.add(
+          ConnectorViolation.at(
+              paginationPath + "pageSizeParameter",
+              "'pageSizeParameter' must differ from 'pageParameter'"));
+    }
+    if (page.endPage() != null && page.endPage() < page.startPage()) {
+      violations.add(
+          ConnectorViolation.at(
+              paginationPath + "endPage", "'endPage' must be at least 'startPage'"));
+    }
+  }
+
+  private static boolean namesAQueryParameter(String name, List<Parameter> queryParameters) {
+    return name != null
+        && queryParameters != null
+        && queryParameters.stream().anyMatch(parameter -> name.equals(parameter.name()));
   }
 
   private static boolean sendsCredentialsInClearText(HttpConnectorConfiguration http) {

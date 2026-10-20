@@ -599,7 +599,12 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
           "null | [{'pagination':{'type':'PAGE_NUMBER','endPage':-1}}]"
               + " | connector.apiCalls[0].pagination.endPage",
           "null | [{'pagination':{'type':'PAGE_NUMBER','startPage':2,'endPage':1}}]"
-              + " | connector.apiCalls[0].pagination.endPage"
+              + " | connector.apiCalls[0].pagination.endPage",
+          "null | [{'queryParameters':[{'name':'page','value':'1'}],"
+              + "'pagination':{'type':'PAGE_NUMBER','pageParameter':'page'}}]"
+              + " | connector.apiCalls[0].pagination.pageParameter",
+          "null | [{'pagination':{'type':'PAGE_NUMBER','pageParameter':'p','pageSizeParameter':'p'}}]"
+              + " | connector.apiCalls[0].pagination.pageSizeParameter"
         })
     @DisplayName("rejects a save that breaks a rule, with the key path of the field")
     void saveWithInvalidConfigurationNamesTheField(
