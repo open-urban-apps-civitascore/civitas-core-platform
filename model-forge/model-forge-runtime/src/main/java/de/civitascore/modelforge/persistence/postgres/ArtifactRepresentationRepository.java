@@ -38,6 +38,24 @@ class ArtifactRepresentationRepository {
             .list();
     }
 
+    /** The {@code $defs} keys any version of the Data Structure holds in its authored content. */
+    List<String> dataStructureMemberKeys(String dataStructureLogicalUrn) {
+        return jdbc.sql("""
+                select distinct k.key
+                  from model_forge.artifact a
+                  join model_forge.artifact_version v        on v.artifact_id = a.id
+                  join model_forge.artifact_representation r on r.version_id = v.id and r.format = v.primary_format
+                  cross join lateral jsonb_object_keys(
+                       case when jsonb_typeof(r.content_jsonb -> '$defs') = 'object'
+                            then r.content_jsonb -> '$defs' else '{}'::jsonb end) as k(key)
+                 where a.logical_urn = :logical
+                 order by k.key
+                """)
+            .param("logical", dataStructureLogicalUrn)
+            .query(String.class)
+            .list();
+    }
+
     void insert(ArtifactRepresentationRow r) {
         jdbc.sql("""
                 insert into model_forge.artifact_representation

@@ -11,6 +11,7 @@ import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ModelMemberUnreachableException;
 import de.civitascore.portal.util.ModelMissingException;
+import de.civitascore.portal.util.ModelReferenceNotAvailableException;
 import de.civitascore.portal.util.ModelRootMissingException;
 import de.civitascore.portal.util.PipelineClosureValidationException;
 import de.civitascore.portal.util.ResourceInUseException;
@@ -117,6 +118,19 @@ class GlobalExceptionHandlerTest {
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:MODEL_ROOT_MISSING");
       assertThat(problemDetail.getDetail()).isEqualTo(ex.getMessage());
       assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+    }
+
+    @Test
+    @DisplayName("Should return 400 with its own type for ModelReferenceNotAvailableException")
+    void shouldReturn400ForModelReferenceNotAvailable() {
+      ModelReferenceNotAvailableException ex = new ModelReferenceNotAvailableException();
+
+      ProblemDetail problemDetail = handler.handleModelReferenceNotAvailable(ex, mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+      assertThat(problemDetail.getType())
+          .hasToString("urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE");
+      assertThat(problemDetail.getDetail()).isEqualTo(ex.getMessage());
     }
 
     @Test
