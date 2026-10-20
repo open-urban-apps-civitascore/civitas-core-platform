@@ -184,10 +184,11 @@ public class GetHttpApiCall extends AbstractProcessor {
           .name("Max Pages")
           .displayName("Max Pages")
           .description(
-              "The most pages of one run of an API call with pagination, also with an end page. A"
-                  + " run that reads this many pages and meets no stop condition is a fatal"
-                  + " error, so that an API that ignores the page parameter cannot make the"
-                  + " processor send requests without end.")
+              "The maximum number of pages in one run of an API call with pagination. The limit"
+                  + " applies also when the API call has an end page. A run that reads this"
+                  + " number of pages and meets no stop condition is a fatal error. Thus an API"
+                  + " that ignores the page parameter cannot make the processor send requests"
+                  + " without end.")
           .required(true)
           .defaultValue("1000")
           .addValidator(StandardValidators.POSITIVE_INTEGER_VALIDATOR)

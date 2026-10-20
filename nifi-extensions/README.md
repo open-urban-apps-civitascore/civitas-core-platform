@@ -214,7 +214,7 @@ at a time. The cron schedule of the flow decides when it runs.
 | `Authentication Type` | `NONE` (default) or `BASIC`. |
 | `Basic Auth Username` / `Basic Auth Password` | Required with `BASIC`, which also requires an `https` Base URL. The username contains no colon; the password is sensitive. |
 | `Record Schema` | The JSON Schema of the Data structure of the Data source, with its imports inlined. Required. |
-| `Max Pages` | The most pages of one paginated run, `1000` by default. The config-adapter does not set it, and the portal does not show it. |
+| `Max Pages` | The maximum number of pages in one paginated run, `1000` by default. The config-adapter does not set it, and the portal does not show it. |
 
 No property supports Expression Language.
 
@@ -288,6 +288,7 @@ API call "Get stations": 2 of 50 records violate the Data structure: record 3: /
 API call "Get stations": the response is a JSON string, not an object or an array
 API call "Get stations": the response is not JSON
 API call "Get stations": GET /stations page 3 failed with status 404
+API call "Get stations": GET /stations page 3 failed: ConnectException
 API call "Get stations": page 3: 2 of 50 records violate the Data structure: record 3: /lat type; record 7: required stationid
 API call "Get stations": page 3 is a JSON object, not an array
 API call "Get stations": no stop condition after 1000 pages (Max Pages)
@@ -360,9 +361,9 @@ object is one record, and `[]` gives one FlowFile `[]`.
 
 **A run delivers all its pages or none.** The page FlowFiles of a run stay in one session, which
 the processor commits when the loop ends. An error on any page, fatal or transient, removes the page
-FlowFiles of the run and sends the one error FlowFile to `stop` or `failure`, so each failed run
-still gives one FlowFile. The next run starts again at `startPage`. The pages of a run wait in the
-content repository until the commit. This
+FlowFiles of the run. The processor then sends one error FlowFile to `stop` or `failure`. Thus each
+failed run gives one FlowFile. The next run starts again at `startPage`. The pages of a run wait in
+the content repository until the commit. This
 applies to what the processor sends: the Data sink writes the pages one FlowFile after the other,
 so a Data sink error on a page leaves the pages before it in the Data storage.
 
@@ -374,7 +375,8 @@ that ignores the page parameter.
 first page, because the API sends fewer records than `pageSize`. The processor cannot tell this from
 a last page, so no error shows.
 
-The request code knows no NiFi session and no pagination; the page loop asks a `Pagination` for the
-first page and, from the record count of a page, for the next one. A new pagination method adds an
-implementation of `Pagination`, and the page loop stays as it is. A new authentication type adds a
+The request code knows no NiFi session. The page loop asks a `Pagination` for the first page and,
+from the record count of a page, for the next one. The `Pagination` also tells if each page must be
+a JSON array. A new pagination method adds an implementation of `Pagination`, and the page loop
+stays as it is. A new authentication type adds a
 value of `Authentication Type`, its properties and a class that implements `Authentication`.
