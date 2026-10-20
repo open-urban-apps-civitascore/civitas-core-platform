@@ -1009,6 +1009,99 @@ class NifiRestClientTest {
     assertEquals(true, status.healthy());
   }
 
+  /** The stop sink next to a processor that NiFi shows as stopped. */
+  private void stubProcessorsWithStopSink() {
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/processors"))
+            .willReturn(
+                json(
+                    "{ \"processors\": ["
+                        + " { \"id\": \"proc-1\", \"component\": { \"name\": \"HttpApiCall\","
+                        + " \"validationStatus\": \"VALID\" },"
+                        + " \"status\": { \"runStatus\": \"Stopped\" } },"
+                        + " { \"id\": \"proc-stop\", \"component\": { \"name\": \"PipelineStop\","
+                        + " \"validationStatus\": \"VALID\" },"
+                        + " \"status\": { \"runStatus\": \"Running\" } } ] }")));
+  }
+
+  private static com.fasterxml.jackson.databind.JsonNode bulletinOf(
+      String sourceId, String level, String message, String timestampIso) throws Exception {
+    return new com.fasterxml.jackson.databind.ObjectMapper()
+        .readTree(
+            "[ { \"bulletin\": { \"groupId\": \"pg-1\", \"sourceId\": \""
+                + sourceId
+                + "\", \"level\": \""
+                + level
+                + "\", \"message\": \""
+                + message
+                + "\", \"timestamp\": \"08:00:00 UTC\", \"timestampIso\": \""
+                + timestampIso
+                + "\" } } ]");
+  }
+
+  @Test
+  void aBulletinOfTheStopSinkReportsTheStopWithTheCauseAlone() throws Exception {
+    stubProcessorsWithStopSink();
+
+    NifiRestClient.RuntimeStatus status =
+        client.readRuntimeStatus(
+            "pg-1",
+            bulletinOf(
+                "proc-stop",
+                "ERROR",
+                "LogMessage[id=6f1c0b8e-0199-1000-ffff-ffffd1c3a2b1] API call \\\"Get stations\\\":"
+                    + " GET /stations failed with status 404",
+                "2026-10-20T08:00:00.123Z"));
+
+    assertEquals(NifiRestClient.RuntimeStatus.State.STOPPED, status.state());
+    assertEquals(
+        "API call \"Get stations\": GET /stations failed with status 404", status.message());
+    assertEquals(java.time.Instant.parse("2026-10-20T08:00:00.123Z"), status.occurredAt());
+  }
+
+  @Test
+  void anErrorBulletinOfAnotherProcessorIsNoStop() throws Exception {
+    stubHealthyProcessorsForBulletinTests();
+
+    NifiRestClient.RuntimeStatus status =
+        client.readRuntimeStatus(
+            "pg-1", bulletinOf("proc-1", "ERROR", "Pipeline record dropped", ""));
+
+    assertEquals(NifiRestClient.RuntimeStatus.State.ERROR, status.state());
+  }
+
+  @Test
+  void stopProcessGroupWaitsForTheLastThreadAndKeepsQueuesServicesAndGroup() throws Exception {
+    server.stubFor(put(urlEqualTo("/nifi-api/flow/process-groups/pg-1")).willReturn(json("{}")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/pg-1"))
+            .inScenario("stopping")
+            .whenScenarioStateIs("Started")
+            .willReturn(
+                json(
+                    "{ \"runningCount\": 0, \"revision\": { \"version\": 3 }, \"status\": {"
+                        + " \"aggregateSnapshot\": { \"activeThreadCount\": 1 } } }"))
+            .willSetStateTo("stopped"));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/pg-1"))
+            .inScenario("stopping")
+            .whenScenarioStateIs("stopped")
+            .willReturn(
+                json(
+                    "{ \"runningCount\": 0, \"revision\": { \"version\": 3 }, \"status\": {"
+                        + " \"aggregateSnapshot\": { \"activeThreadCount\": 0 } } }")));
+
+    client.stopProcessGroup("pg-1");
+
+    server.verify(
+        putRequestedFor(urlEqualTo("/nifi-api/flow/process-groups/pg-1"))
+            .withRequestBody(containing("\"state\":\"STOPPED\"")));
+    server.verify(2, getRequestedFor(urlPathEqualTo("/nifi-api/process-groups/pg-1")));
+    server.verify(0, postRequestedFor(urlMatching(".*/empty-all-connections-requests.*")));
+    server.verify(0, putRequestedFor(urlMatching(".*/controller-services.*")));
+    server.verify(0, deleteRequestedFor(urlMatching(".*")));
+  }
+
   private static com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder json(
       String body) {
     return aResponse()

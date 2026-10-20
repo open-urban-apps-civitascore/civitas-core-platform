@@ -12,10 +12,14 @@ package de.civitascore.configadapter.nifi;
 import com.fasterxml.jackson.databind.JsonNode;
 import de.civitascore.configadapter.adapter.PipelineStatusPublisher;
 import de.civitascore.configadapter.exception.AdapterException;
+import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.nifi.rest.NifiRestClient;
+import de.civitascore.configadapter.nifi.rest.NifiRestClient.RuntimeStatus;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -34,6 +38,9 @@ final class NifiRuntimeMonitor implements AutoCloseable {
   private final NifiRestClient client;
   private final ScheduledExecutorService executor;
   private final Map<String, Pipeline> pipelines = new ConcurrentHashMap<>();
+  // Pipelines this monitor stopped. Discovery still finds their process groups, so it must skip
+  // them until a deployment registers them again.
+  private final Set<String> stoppedPipelines = ConcurrentHashMap.newKeySet();
   private volatile PipelineStatusPublisher publisher;
 
   NifiRuntimeMonitor(NifiRestClient client, long intervalMs) {
@@ -53,14 +60,16 @@ final class NifiRuntimeMonitor implements AutoCloseable {
   }
 
   void register(String pipelineId, String datasetId, String processGroupId) {
+    stoppedPipelines.remove(pipelineId);
     pipelines.put(pipelineId, new Pipeline(pipelineId, datasetId, processGroupId));
   }
 
   void unregister(String pipelineId) {
     pipelines.remove(pipelineId);
+    stoppedPipelines.remove(pipelineId);
   }
 
-  private void poll() {
+  void poll() {
     JsonNode bulletins;
     try {
       bulletins = client.readBulletins();
@@ -75,6 +84,9 @@ final class NifiRuntimeMonitor implements AutoCloseable {
   private void discoverPipelines() {
     try {
       for (NifiRestClient.ManagedProcessGroup group : client.listManagedProcessGroups()) {
+        if (stoppedPipelines.contains(group.pipelineId())) {
+          continue;
+        }
         pipelines.compute(
             group.pipelineId(),
             (pipelineId, pipeline) -> {
@@ -93,13 +105,11 @@ final class NifiRuntimeMonitor implements AutoCloseable {
 
   private void inspectPipeline(Pipeline pipeline, JsonNode bulletins) {
     try {
-      NifiRestClient.RuntimeStatus status =
-          client.readRuntimeStatus(pipeline.processGroupId(), bulletins);
-      if (shouldPublish(pipeline, status)) {
-        PipelineStatusPublisher currentPublisher = publisher;
-        if (currentPublisher != null) {
-          currentPublisher.publish(event(pipeline, status));
-        }
+      RuntimeStatus status = client.readRuntimeStatus(pipeline.processGroupId(), bulletins);
+      if (status.state() == RuntimeStatus.State.STOPPED) {
+        stop(pipeline, status);
+      } else if (shouldPublish(pipeline, status)) {
+        publish(event(pipeline, status.healthy() ? "OK" : "ERROR", status));
       }
     } catch (AdapterException | IllegalStateException e) {
       if (e instanceof AdapterException adapterException
@@ -114,13 +124,32 @@ final class NifiRuntimeMonitor implements AutoCloseable {
   }
 
   /**
+   * Stops the process group, then reports the Pipeline as stopped and no longer watches it. When
+   * the stop call fails, it throws before anything is published, and the next poll tries again.
+   */
+  private void stop(Pipeline pipeline, RuntimeStatus status)
+      throws FatalAdapterException, RetryableAdapterException {
+    client.stopProcessGroup(pipeline.processGroupId());
+    publish(event(pipeline, "STOPPED", status));
+    stoppedPipelines.add(pipeline.pipelineId());
+    pipelines.remove(pipeline.pipelineId(), pipeline);
+  }
+
+  private void publish(Map<String, Object> event) {
+    PipelineStatusPublisher currentPublisher = publisher;
+    if (currentPublisher != null) {
+      currentPublisher.publish(event);
+    }
+  }
+
+  /**
    * Decides whether this poll's status is a transition worth publishing, updating the pipeline's
    * debounce state. An ERROR is published as soon as the pipeline leaves the OK state (once, not on
    * every subsequent poll — a persistent failure whose bulletin text varies must not re-fire). A
    * return to OK is only published after {@link #HEALTHY_ROUNDS_FOR_RECOVERY} consecutive healthy
    * polls, so a flapping pipeline does not emit an OK/ERROR storm.
    */
-  private static boolean shouldPublish(Pipeline pipeline, NifiRestClient.RuntimeStatus status) {
+  private static boolean shouldPublish(Pipeline pipeline, RuntimeStatus status) {
     if (!status.healthy()) {
       pipeline.healthyStreak(0);
       boolean wasError = pipeline.lastPublishedError();
@@ -136,13 +165,13 @@ final class NifiRuntimeMonitor implements AutoCloseable {
     return false;
   }
 
-  private Map<String, Object> event(Pipeline pipeline, NifiRestClient.RuntimeStatus status) {
+  private Map<String, Object> event(Pipeline pipeline, String state, RuntimeStatus status) {
     Map<String, Object> event = new HashMap<>();
     event.put("type", "PIPELINE_STATUS_CHANGED");
     event.put("eventId", UUID.randomUUID().toString());
     event.put("datasetId", pipeline.datasetId());
     event.put("pipelineId", pipeline.pipelineId());
-    event.put("status", status.healthy() ? "OK" : "ERROR");
+    event.put("status", state);
     event.put("source", "RUNTIME");
     event.put(
         "message", sanitize(status.message() == null ? "Pipeline is running" : status.message()));

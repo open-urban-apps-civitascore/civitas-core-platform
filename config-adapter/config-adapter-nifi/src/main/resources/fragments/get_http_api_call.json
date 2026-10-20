@@ -11,6 +11,7 @@
     "Web Client Service Provider": "${CS:HttpSourceWebClient}",
     "Base URL": null,
     "API Call": null,
+    "Record Schema": null,
     "Authentication Type": "NONE",
     "Basic Auth Username": null,
     "Basic Auth Password": null
@@ -33,6 +34,13 @@
     "API Call": {
       "name": "API Call",
       "displayName": "API Call",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Record Schema": {
+      "name": "Record Schema",
+      "displayName": "Record Schema",
       "identifiesControllerService": false,
       "sensitive": false,
       "dynamic": false

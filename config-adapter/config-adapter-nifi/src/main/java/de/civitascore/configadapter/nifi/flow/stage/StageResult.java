@@ -19,8 +19,11 @@ import java.util.List;
  * @param chain the stage's processors in chain order (never empty)
  * @param failureSources processors whose {@code failure} relationship the sink stage must route to
  *     the shared error sink
+ * @param stopSources relationships on which the stage reports a fatal error, which the flow builder
+ *     routes to the stop sink of the Pipeline
  */
-public record StageResult(List<Processor> chain, List<Processor> failureSources) {
+public record StageResult(
+    List<Processor> chain, List<Processor> failureSources, List<StopSource> stopSources) {
   public StageResult {
     chain = List.copyOf(chain);
     if (chain.isEmpty()) {
@@ -29,6 +32,12 @@ public record StageResult(List<Processor> chain, List<Processor> failureSources)
       throw new IllegalArgumentException("a stage must contribute at least one processor");
     }
     failureSources = List.copyOf(failureSources);
+    stopSources = List.copyOf(stopSources);
+  }
+
+  /** A stage that reports no fatal error. */
+  public StageResult(List<Processor> chain, List<Processor> failureSources) {
+    this(chain, failureSources, List.of());
   }
 
   /** The processor the next stage connects to. */

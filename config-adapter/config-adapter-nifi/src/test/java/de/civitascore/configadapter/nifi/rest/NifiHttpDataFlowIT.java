@@ -209,6 +209,7 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
     Datasource source = new Datasource();
     source.setId("ds-" + pipelineId);
     source.setType("http");
+    source.handleUnknownProperty("element", "el-1");
     source.handleUnknownProperty("baseUrl", "http://api:8080");
     source.handleUnknownProperty(
         "apiCalls", List.of(Map.of("name", "readings", "method", "GET", "path", path)));
@@ -230,9 +231,13 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
                 { "id": "e4", "source": "k", "target": "e" } ] }
             """
                 .formatted(EVERY_SECOND));
-    Map<String, Map<String, Object>> mappings =
+    Map<String, Map<String, Object>> artifacts =
         NifiTestFixtures.artifacts(
-            "{ \"map-1\": { \"fields\": { \"$.id\": \"$.id\", \"$.name\": \"$.name\" } } }");
+            """
+            { "map-1": { "fields": { "$.id": "$.id", "$.name": "$.name" } },
+              "el-1": { "type": "object",
+                "properties": { "id": { "type": "string" }, "name": { "type": "string" } } } }
+            """);
     DeploymentPlan plan =
         NifiTestFixtures.planner(
                 new CredentialResolver(new byte[0]),
@@ -246,7 +251,7 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
                     graph,
                     source,
                     new PostgisSinkSpec(table, List.of("id")),
-                    mappings));
+                    artifacts));
     return client.deployFlow(plan);
   }
 

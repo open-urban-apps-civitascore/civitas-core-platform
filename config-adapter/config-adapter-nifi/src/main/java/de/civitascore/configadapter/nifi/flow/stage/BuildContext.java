@@ -38,6 +38,9 @@ public final class BuildContext {
 
   private static final String CS_TOKEN_PREFIX = "${CS:";
 
+  /** The attribute that holds the cause of a fatal error on its way to the stop sink. */
+  public static final String STOP_CAUSE_ATTRIBUTE = "core.stop.cause";
+
   private final ObjectMapper mapper;
   private final String pgId;
   private final FlowBuildSpec spec;
@@ -137,6 +140,24 @@ public final class BuildContext {
   public void routeFailure(Processor processor, Processor errorSink) {
     removeAutoTerminated(processor, "failure");
     addConnection(processor, errorSink, "failure");
+  }
+
+  /**
+   * Routes a stop source through a stop stamp of its own to the stop sink. The stamp copies the
+   * cause into {@value #STOP_CAUSE_ATTRIBUTE}, the one attribute the stop sink logs, so a processor
+   * keeps its own attribute names.
+   */
+  public void routeStop(StopSource source, Processor stopSink) throws FatalAdapterException {
+    Processor stamp =
+        loadProcessor(
+            Fragment.STOP_STAMP,
+            "success",
+            "stop:" + source.processor().id() + ":" + source.relationship());
+    setExpression(stamp, STOP_CAUSE_ATTRIBUTE, "${" + source.causeAttribute() + "}");
+    addProcessor(stamp);
+    removeAutoTerminated(source.processor(), source.relationship());
+    addConnection(source.processor(), stamp, source.relationship());
+    addChainConnection(stamp, stopSink);
   }
 
   /**
