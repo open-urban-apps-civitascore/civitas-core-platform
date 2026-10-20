@@ -1284,6 +1284,80 @@ class DataSetServiceTest {
           .markDeploymentSucceeded(List.of(keptPipeline.toString()));
     }
 
+    private SagaResultPayload updateResult(UUID id, List<String> pipelineIds) {
+      return new SagaResultPayload(
+          id.toString(),
+          "proj-1",
+          "https://frost.example.com",
+          Map.of("traffic", "route-1"),
+          "svc-1",
+          "https://public.example.com",
+          pipelineIds,
+          null,
+          null,
+          null);
+    }
+
+    @Test
+    @DisplayName(
+        "UPDATE: a pipeline the saga left out keeps its deployed id and is not marked as deployed")
+    void updateRetainsPipelinesLeftOutOfTheSaga() {
+      UUID id = UUID.randomUUID();
+      UUID runningPipeline = UUID.randomUUID();
+      UUID stoppedPipeline = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      attachedPipeline(ds, runningPipeline);
+      attachedPipeline(ds, stoppedPipeline);
+      ds.setPipelineIds(List.of(runningPipeline.toString(), stoppedPipeline.toString()));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService()
+          .handleSagaCompleted(id, updateResult(id, List.of(runningPipeline.toString())));
+
+      assertThat(ds.getPipelineIds())
+          .containsExactlyInAnyOrder(runningPipeline.toString(), stoppedPipeline.toString());
+      verify(pipelineRuntimeStatusService)
+          .markDeploymentSucceeded(List.of(runningPipeline.toString()));
+    }
+
+    @Test
+    @DisplayName("UPDATE: an empty result keeps the ids of the pipelines the saga left out")
+    void updateWithEmptyResultRetainsDeployedPipelines() {
+      UUID id = UUID.randomUUID();
+      UUID stoppedPipeline = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      attachedPipeline(ds, stoppedPipeline);
+      ds.setPipelineIds(List.of(stoppedPipeline.toString()));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().handleSagaCompleted(id, updateResult(id, List.of()));
+
+      assertThat(ds.getPipelineIds()).containsExactly(stoppedPipeline.toString());
+      verify(pipelineRuntimeStatusService).markDeploymentSucceeded(List.of());
+    }
+
+    @Test
+    @DisplayName("UPDATE: a detached pipeline the saga tore down loses its deployed id")
+    void updateDropsTornDownPipelineIds() {
+      UUID id = UUID.randomUUID();
+      UUID keptPipeline = UUID.randomUUID();
+      UUID removedPipeline = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      attachedPipeline(ds, keptPipeline);
+      ds.setPipelineIds(List.of(keptPipeline.toString(), removedPipeline.toString()));
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().handleSagaCompleted(id, updateResult(id, List.of(keptPipeline.toString())));
+
+      assertThat(ds.getPipelineIds()).containsExactly(keptPipeline.toString());
+    }
+
     @Test
     @DisplayName("UNRELEASE: torn-down pipelines are not marked as deployed")
     void unreleaseDoesNotMarkPipelinesDeployed() {
