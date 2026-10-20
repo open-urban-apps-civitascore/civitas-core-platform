@@ -171,10 +171,10 @@ public class GetHttpApiCall extends AbstractProcessor {
           .displayName("Record Schema")
           .description(
               "The JSON Schema of the Data structure, with its imports inlined. Each record of a"
-                  + " response must agree with it: each element of a JSON array, or a JSON"
-                  + " object as one record. A $ref resolves only inside the schema or to a GeoJSON"
-                  + " geometry of https://geojson.org/schema/, which the NAR holds. The processor"
-                  + " does not start with a schema that it cannot compile.")
+                  + " response must agree with it: each element of a JSON array, or, without"
+                  + " pagination, a JSON object as one record. A $ref resolves only inside the"
+                  + " schema or to a GeoJSON geometry of https://geojson.org/schema/, which the NAR"
+                  + " holds. The processor does not start with a schema that it cannot compile.")
           .required(true)
           .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
           .build();
@@ -211,7 +211,8 @@ public class GetHttpApiCall extends AbstractProcessor {
                   + " configuration or to the Data structure: 3xx, 4xx except 408 and 429, a"
                   + " request the web client refuses, a response that is not JSON or does not"
                   + " agree with the Record Schema, a page that is not a JSON array, a page that"
-                  + " repeats an earlier page of the run, and a run that reaches Max Pages.")
+                  + " repeats an earlier page of the run, and a run that reads Max Pages pages"
+                  + " and meets no stop condition.")
           .build();
 
   static final Relationship FAILURE =
@@ -219,7 +220,8 @@ public class GetHttpApiCall extends AbstractProcessor {
           .name("failure")
           .description(
               "One empty FlowFile for each run with an error that the next run can repair: 408,"
-                  + " 429, 5xx, a failed connection, a timeout.")
+                  + " 429, 5xx, a failed connection, a timeout, and a run that NiFi stops between"
+                  + " pages.")
           .build();
 
   private static final List<PropertyDescriptor> PROPERTIES =

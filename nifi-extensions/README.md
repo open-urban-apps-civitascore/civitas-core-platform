@@ -371,20 +371,21 @@ applies to what the processor sends: the Data sink writes the pages one FlowFile
 so a Data sink error on a page leaves the pages before it in the Data storage.
 
 A page whose body is the same as the body of an earlier page of the run goes to `stop`, also in a
-run with an `endPage`, and none of the pages of the run reaches `success`. The same body leads to
-the same next request, so such a run does not end. Thus an API that ignores the page parameter
-stops at the second page. The processor compares a SHA-256 of each body, which it computes while it
-writes the body into its FlowFile.
+run with an `endPage`, and none of the pages of the run reaches `success`. The same body means that
+the API ignores the page parameter, so the run would deliver the same records again until the
+`endPage` or `Max Pages`. Thus such an API stops at the second page. The processor compares a
+SHA-256 of each body, which it computes while it writes the body into its FlowFile.
 
 `Max Pages` limits a run, also one with an `endPage`. A run that reads `Max Pages` pages and meets no
 stop condition goes to `stop`, and none of its pages reaches `success`. This guards against an API
 that ignores the page parameter and changes its response on each request, for example with a
 timestamp in each record.
 
-**Record limit:** a run reads at most `Max Pages` × `pageSize` records, 1000 × `pageSize` by
-default. The config-adapter does not set `Max Pages`, and each deployment of the Pipeline replaces
-a value set in the NiFi UI. Thus an API with more pages stops its Pipeline on each run, and only a
-code change raises the limit.
+**Page limit:** a run reads at most `Max Pages` pages, 1000 by default. When the page at
+`Max Pages` is full, the run also goes to `stop`, because it cannot know that no further page
+exists. The first run of an API with more pages stops the Pipeline. The config-adapter does not set
+`Max Pages`, and each deployment of the Pipeline replaces a value set in the NiFi UI, so only a code
+change raises the limit.
 
 When NiFi stops the processor during a run, the processor sends no further page. It removes the
 pages of the run and sends one FlowFile to `failure`, as for a transient error. Thus a stop of the
