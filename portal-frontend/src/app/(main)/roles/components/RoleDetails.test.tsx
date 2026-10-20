@@ -316,6 +316,30 @@ describe('RoleDetails', () => {
       })
     })
 
+    it('creates a Data role and navigates with tab=DATA for tab=DATA', async () => {
+      mockTabValue = 'DATA'
+      render(<RoleDetails />)
+      fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'New Role' } })
+      await waitFor(() => expect(screen.getByTestId('confirmButton')).not.toBeDisabled())
+      fireEvent.click(screen.getByTestId('confirmButton'))
+      await waitFor(() => {
+        expect(mockCreateMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ roleType: 'DATA' }))
+        expect(mockPush).toHaveBeenCalledWith('/roles/new-role-id?tab=DATA')
+      })
+    })
+
+    it('creates a System role and navigates with tab=SYSTEM for an unknown tab query param', async () => {
+      mockTabValue = 'unknown'
+      render(<RoleDetails />)
+      fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'New Role' } })
+      await waitFor(() => expect(screen.getByTestId('confirmButton')).not.toBeDisabled())
+      fireEvent.click(screen.getByTestId('confirmButton'))
+      await waitFor(() => {
+        expect(mockCreateMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ roleType: 'SYSTEM' }))
+        expect(mockPush).toHaveBeenCalledWith('/roles/new-role-id?tab=SYSTEM')
+      })
+    })
+
     it('shows success toast and navigates after successful create', async () => {
       mockCreateMutateAsync.mockResolvedValue({ data: { id: 'new-role-id' } })
       render(<RoleDetails />)
@@ -639,14 +663,58 @@ describe('RoleDetails', () => {
     describe('Permissions tab visibility', () => {
       it('shows Permissions tab when user has PERMISSION_READ', () => {
         mockHasPermission([PERMISSION_NAMES.PERMISSION_READ])
+        mockRoleResponse = { ...mockRoleResponse, data: { data: mockRole } }
+        render(<RoleDetails roleId="role-1" />)
+        expect(screen.getByText('roles.tabLabels.systemPermissions')).toBeInTheDocument()
+      })
+
+      it('labels the Permissions tab as data permissions for a Data role', () => {
+        mockHasPermission([PERMISSION_NAMES.PERMISSION_READ])
+        mockRoleResponse = { ...mockRoleResponse, data: { data: { ...mockRole, roleType: 'DATA' } } }
+        render(<RoleDetails roleId="role-1" />)
+        expect(screen.getByText('roles.tabLabels.dataPermissions')).toBeInTheDocument()
+        expect(screen.queryByText('roles.tabLabels.systemPermissions')).not.toBeInTheDocument()
+      })
+
+      it('shows a neutral Permissions tab label and no badge while the role is loading', () => {
+        mockHasPermission([PERMISSION_NAMES.PERMISSION_READ])
+        mockTabValue = 'DATA'
+        mockRoleResponse = { ...mockRoleResponse, data: null, isFetching: true }
         render(<RoleDetails roleId="role-1" />)
         expect(screen.getByText('roles.tabLabels.permissions')).toBeInTheDocument()
+        expect(screen.queryByText('dataRole')).not.toBeInTheDocument()
+        expect(screen.queryByText('systemRole')).not.toBeInTheDocument()
+      })
+
+      it('shows a neutral Permissions tab label and no badge when the role request fails', () => {
+        mockHasPermission([PERMISSION_NAMES.PERMISSION_READ])
+        mockTabValue = 'DATA'
+        mockRoleResponse = { ...mockRoleResponse, data: null, error: new Error('Request failed') }
+        render(<RoleDetails roleId="role-1" />)
+        expect(screen.getByText('roles.tabLabels.permissions')).toBeInTheDocument()
+        expect(screen.queryByText('dataRole')).not.toBeInTheDocument()
+        expect(screen.queryByText('systemRole')).not.toBeInTheDocument()
+      })
+
+      it('labels the Permissions tab as system permissions for an unknown tab query param', () => {
+        mockHasPermission([PERMISSION_NAMES.PERMISSION_READ])
+        mockTabValue = 'unknown'
+        render(<RoleDetails />)
+        expect(screen.getByText('roles.tabLabels.systemPermissions')).toBeInTheDocument()
+      })
+
+      it('shows the system role badge for an unknown tab query param', () => {
+        mockTabValue = 'unknown'
+        render(<RoleDetails />)
+        expect(screen.getByText('systemRole')).toBeInTheDocument()
+        expect(screen.queryByText('unknownRole')).not.toBeInTheDocument()
       })
 
       it('hides Permissions tab when user lacks PERMISSION_READ', () => {
         mockHasPermission([PERMISSION_NAMES.ROLE_READ])
+        mockRoleResponse = { ...mockRoleResponse, data: { data: mockRole } }
         render(<RoleDetails roleId="role-1" />)
-        expect(screen.queryByText('roles.tabLabels.permissions')).not.toBeInTheDocument()
+        expect(screen.queryByText('roles.tabLabels.systemPermissions')).not.toBeInTheDocument()
       })
     })
 

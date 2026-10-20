@@ -850,6 +850,8 @@
     "tabLabels": {
       "basicInformation": "Basic Information",
       "permissions": "Permissions",
+      "systemPermissions": "System Permissions",
+      "dataPermissions": "Data Permissions",
       "groupAssignment": "Groups"
     },
     "baseInfoTab": {
@@ -1119,6 +1121,10 @@
           "step2": "Create a Data structure in <link>Data structures</link>",
           "step3": "Return here and import it"
         }
+      },
+      "restricted": {
+        "title": "Data structure not accessible",
+        "description": "You do not have permission to view the Data structure."
       },
       "importModal": {
         "title": "Import Data Model",

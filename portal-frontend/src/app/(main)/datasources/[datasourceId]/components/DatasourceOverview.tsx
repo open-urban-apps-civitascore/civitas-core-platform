@@ -162,9 +162,10 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const hasUnsavedChanges =
     datasourceForm.formState.isDirty || areAssignmentsDirty || areDatapoolsDirty || hasStatusChanged
 
+  const hasAssignedDatastructure = initialDatastructureId !== null
   const tabs = useMemo(
-    () => allTabs.filter(tab => tab.value !== 'dataStructure' || canReadDatastructures),
-    [canReadDatastructures],
+    () => allTabs.filter(tab => tab.value !== 'dataStructure' || canReadDatastructures || hasAssignedDatastructure),
+    [canReadDatastructures, hasAssignedDatastructure],
   )
 
   const resetToInitialState = () => {

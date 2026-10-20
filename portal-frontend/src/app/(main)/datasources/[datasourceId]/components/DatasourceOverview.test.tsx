@@ -421,6 +421,25 @@ describe('DatasourceOverview', () => {
         render(<DatasourceOverview {...defaultProps} />)
         expect(screen.queryByTestId('tab-dataStructure')).not.toBeInTheDocument()
       })
+
+      it('shows dataStructure tab when user lacks DATASTRUCTURE_READ but a data structure is assigned', () => {
+        mockCurrentUser([PERMISSION_NAMES.DATASOURCE_UPDATE])
+        const assignedDatasource = {
+          ...datasource,
+          dataStructureVersion: {
+            id: 'v-1',
+            version: '1.0.0',
+            description: null,
+            dataStructureVersionStatus: 'AVAILABLE' as const,
+            dataStructureVersionSource: 'OWN' as const,
+            createdAt: '2024-01-01',
+            modifiedAt: '2024-01-01',
+            dataStructureId: 'ds-1',
+          },
+        }
+        render(<DatasourceOverview {...defaultProps} datasource={assignedDatasource} />)
+        expect(screen.getByTestId('tab-dataStructure')).toBeInTheDocument()
+      })
     })
 
     describe('Edit button gating when AVAILABLE', () => {
