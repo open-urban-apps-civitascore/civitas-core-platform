@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import okhttp3.HttpUrl;
 import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
@@ -61,6 +62,7 @@ public class NifiRestClient implements AutoCloseable {
   private static final String CLIENT_ID = "config-adapter-nifi";
   private static final int POLL_ATTEMPTS = 30;
   private static final long POLL_INTERVAL_MS = 1000L;
+  private static final Pattern COMPONENT_PREFIX = Pattern.compile("^\\S+\\[id=[^\\]]*\\]\\s*");
 
   private final String baseUrl;
   private final NifiTokenProvider tokenProvider;
@@ -133,9 +135,26 @@ public class NifiRestClient implements AutoCloseable {
     return result;
   }
 
-  /** Runtime information collected from processors and the NiFi bulletin board. */
-  public record RuntimeStatus(
-      boolean healthy, String message, String stacktrace, Instant occurredAt) {}
+  /**
+   * Runtime information collected from processors and the NiFi bulletin board.
+   *
+   * @param state the health of the Pipeline
+   * @param message for {@link State#STOPPED}, the cause that the stop sink logged
+   */
+  public record RuntimeStatus(State state, String message, String stacktrace, Instant occurredAt) {
+
+    /** The health of a Pipeline as NiFi shows it. */
+    public enum State {
+      HEALTHY,
+      ERROR,
+      /** The stop sink of the Pipeline logged a fatal error. */
+      STOPPED
+    }
+
+    public boolean healthy() {
+      return state == State.HEALTHY;
+    }
+  }
 
   private record ProcessorInspection(RuntimeStatus status, Set<String> processorIds) {}
 
@@ -144,19 +163,29 @@ public class NifiRestClient implements AutoCloseable {
     return readRuntimeStatus(processGroupId, readBulletins());
   }
 
+  /**
+   * Reads the health of the Pipeline in the process group. A bulletin of the stop sink comes before
+   * every other unhealthy state: a stop that did not complete leaves some processors stopped, and
+   * the next poll must still report the stop.
+   */
   public RuntimeStatus readRuntimeStatus(String processGroupId, JsonNode bulletins)
       throws FatalAdapterException, RetryableAdapterException {
     if (token == null) {
       authenticate();
     }
-    ProcessorInspection inspection = readProcessorStatus(processGroupId);
+    JsonNode processors = processorNodes(processGroupId);
+    Optional<RuntimeStatus> stop = readStopStatus(processors, bulletins);
+    if (stop.isPresent()) {
+      return stop.get();
+    }
+    ProcessorInspection inspection = readProcessorStatus(processors);
     if (inspection.status() != null) {
       return inspection.status();
     }
     RuntimeStatus bulletinStatus =
         readBulletinStatus(processGroupId, inspection.processorIds(), bulletins);
     return bulletinStatus == null
-        ? new RuntimeStatus(true, null, null, Instant.now())
+        ? new RuntimeStatus(RuntimeStatus.State.HEALTHY, null, null, Instant.now())
         : bulletinStatus;
   }
 
@@ -169,9 +198,64 @@ public class NifiRestClient implements AutoCloseable {
         .path("bulletins");
   }
 
-  private ProcessorInspection readProcessorStatus(String processGroupId)
+  /**
+   * Stops every component of the process group and waits until no thread is active. Keeps the
+   * queues, the controller services and the group, so an operator can inspect a stopped Pipeline.
+   *
+   * @throws FatalAdapterException on a non-retryable error, e.g. HTTP 404 for a group that is gone
+   * @throws RetryableAdapterException on a transient error, or if the group does not stop in time
+   */
+  public void stopProcessGroup(String processGroupId)
       throws FatalAdapterException, RetryableAdapterException {
-    JsonNode processors = processorNodes(processGroupId);
+    if (token == null) {
+      authenticate();
+    }
+    stopAndAwait(processGroupId);
+  }
+
+  private Optional<RuntimeStatus> readStopStatus(JsonNode processors, JsonNode bulletins) {
+    String stopSinkId = null;
+    for (JsonNode processor : processors) {
+      if (STOP_SINK.equals(processor.path("component").path("name").asText())) {
+        stopSinkId = processor.path("id").asText();
+        break;
+      }
+    }
+    if (stopSinkId == null) {
+      return Optional.empty();
+    }
+    for (JsonNode entry : bulletins) {
+      JsonNode bulletin = entry.path("bulletin");
+      if (stopSinkId.equals(bulletin.path("sourceId").asText())) {
+        String cause = withoutComponentPrefix(bulletin.path("message").asText());
+        return Optional.of(
+            new RuntimeStatus(RuntimeStatus.State.STOPPED, cause, "", occurredAt(bulletin)));
+      }
+    }
+    return Optional.empty();
+  }
+
+  /** NiFi puts the component in front of the message of a bulletin, as in {@code Type[id=…] }. */
+  private static String withoutComponentPrefix(String message) {
+    return COMPONENT_PREFIX.matcher(message).replaceFirst("");
+  }
+
+  private static Instant occurredAt(JsonNode bulletin) {
+    for (String field : List.of("timestampIso", "timestamp")) {
+      String timestamp = bulletin.path(field).asText();
+      if (!timestamp.isBlank()) {
+        try {
+          return Instant.parse(timestamp);
+        } catch (DateTimeParseException ignored) {
+          // NiFi writes "timestamp" as a time of day without a date; the next field or now
+          // stands in for it.
+        }
+      }
+    }
+    return Instant.now();
+  }
+
+  private ProcessorInspection readProcessorStatus(JsonNode processors) {
     Set<String> processorIds = new HashSet<>();
     for (JsonNode processor : processors) {
       processorIds.add(processor.path("id").asText());
@@ -182,7 +266,7 @@ public class NifiRestClient implements AutoCloseable {
       if ("INVALID".equals(validation)) {
         return new ProcessorInspection(
             new RuntimeStatus(
-                false,
+                RuntimeStatus.State.ERROR,
                 "Processor '" + name + "' is invalid",
                 validationErrors(component),
                 Instant.now()),
@@ -191,7 +275,7 @@ public class NifiRestClient implements AutoCloseable {
       if ("Stopped".equals(runStatus) || "Disabled".equals(runStatus)) {
         return new ProcessorInspection(
             new RuntimeStatus(
-                false,
+                RuntimeStatus.State.ERROR,
                 "Processor '" + name + "' is " + runStatus,
                 name + " runStatus=" + runStatus,
                 Instant.now()),
@@ -229,18 +313,11 @@ public class NifiRestClient implements AutoCloseable {
       String level = bulletin.path("level").asText();
       String message = bulletin.path("message").asText();
       if (isRuntimeFailure(level, message)) {
-        String timestamp = bulletin.path("timestamp").asText();
-        Instant occurredAt;
-        try {
-          occurredAt = timestamp.isBlank() ? Instant.now() : Instant.parse(timestamp);
-        } catch (DateTimeParseException ignored) {
-          occurredAt = Instant.now();
-        }
         return new RuntimeStatus(
-            false,
+            RuntimeStatus.State.ERROR,
             message.isBlank() ? "NiFi reported a pipeline error" : message,
             message,
-            occurredAt);
+            occurredAt(bulletin));
       }
     }
     return null;
@@ -935,17 +1012,7 @@ public class NifiRestClient implements AutoCloseable {
 
   private void stopAndDeleteProcessGroup(ProcessGroupRef group)
       throws FatalAdapterException, RetryableAdapterException {
-    ObjectNode stop = mapper.createObjectNode();
-    stop.put("id", group.id());
-    stop.put("state", "STOPPED");
-    stop.put("disconnectedNodeAcknowledged", false);
-    put(API + "/flow/process-groups/" + group.id(), stop, "stop process group");
-
-    // Stopping is asynchronous: NiFi rejects the delete below with HTTP 409 ("Processor is
-    // running")
-    // while any processor is still scheduled or draining a thread (e.g. ConsumeMQTT closing its
-    // broker connection). Wait until the group is fully stopped before deleting.
-    long version = awaitProcessGroupStopped(group.id());
+    long version = stopAndAwait(group.id());
 
     // Stopping the group does not discard what its connections already hold, and NiFi rejects the
     // delete with HTTP 409 ("Queue not empty") while any FlowFile is queued. Drop them — strictly
@@ -971,6 +1038,16 @@ public class NifiRestClient implements AutoCloseable {
     } catch (IOException e) {
       throw network("delete process group", e);
     }
+  }
+
+  /** Stops the process group and returns its revision once it reports stopped. */
+  private long stopAndAwait(String pgId) throws FatalAdapterException, RetryableAdapterException {
+    ObjectNode stop = mapper.createObjectNode();
+    stop.put("id", pgId);
+    stop.put("state", "STOPPED");
+    stop.put("disconnectedNodeAcknowledged", false);
+    put(API + "/flow/process-groups/" + pgId, stop, "stop process group");
+    return awaitProcessGroupStopped(pgId);
   }
 
   /**
