@@ -284,8 +284,9 @@ query; the message names its class alone.
 The processor reads a 2xx body into memory and parses it once. A JSON array holds one record in each
 element, and `[]` holds none. A JSON object is one record. A JSON scalar, or a body that is not JSON,
 goes to `stop`. Each record is validated against `Record Schema`; one invalid record sends the whole
-response to `stop`, and no FlowFile goes to `success`. A body that passes is an object or an array of
-objects, so the record reader behind the processor skips no data.
+response to `stop`, and no FlowFile goes to `success`. An array element that is not a JSON object is an
+invalid record with the keyword `type`, also when `Record Schema` allows it. A body that passes is an
+object or an array of objects, so the record reader behind the processor skips no data.
 
 The cause names the number of invalid records and at most the first 3 violations: the index of the
 record from 0, the JSON Pointer inside the record and the keyword. For `required`, it also names the

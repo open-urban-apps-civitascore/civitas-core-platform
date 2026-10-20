@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * The Data structure of an HTTP/REST Data source, which each record of a response must agree with.
@@ -119,14 +118,14 @@ final class RecordSchema {
     int invalid = 0;
     List<String> reported = new ArrayList<>();
     for (int index = 0; index < records.size(); index++) {
-      Set<ValidationMessage> messages = schema.validate(records.get(index));
-      if (messages.isEmpty()) {
+      List<String> recordViolations = recordViolations(records.get(index));
+      if (recordViolations.isEmpty()) {
         continue;
       }
       invalid++;
-      for (ValidationMessage message : messages) {
+      for (String violation : recordViolations) {
         if (reported.size() < REPORTED_VIOLATIONS) {
-          reported.add("record " + index + ": " + violation(message));
+          reported.add("record " + index + ": " + violation);
         }
       }
     }
@@ -139,6 +138,17 @@ final class RecordSchema {
             + records.size()
             + " records violate the Data structure: "
             + String.join("; ", reported));
+  }
+
+  private List<String> recordViolations(JsonNode record) {
+    if (!record.isObject()) {
+      return List.of("type");
+    }
+    List<String> violations = new ArrayList<>();
+    for (ValidationMessage message : schema.validate(record)) {
+      violations.add(violation(message));
+    }
+    return violations;
   }
 
   private static String scalarType(JsonNode scalar) {

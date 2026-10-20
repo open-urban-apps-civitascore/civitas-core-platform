@@ -272,6 +272,26 @@ class GetHttpApiCallTest {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"7", "\"val-1f3e\"", "true", "null", "[]", "[{\"stationid\":\"a0\"}]"})
+  void onTrigger_whenAnArrayHoldsANonObjectAndTheSchemaAllowsIt_routesToStop(String element)
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answering(200, "[" + element + ",{\"stationid\":\"a1\"}]")) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, "{\"required\": [\"stationid\"]}");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": 1 of 2 records violate the Data structure: record 0: type");
+      assertFalse(logged(runner.getLogger()).toString().contains("val-1f3e"));
+    }
+  }
+
   @Test
   void onTrigger_whenARecordViolates_keepsItsValuesOutOfLogsAndAttributes()
       throws InitializationException {
