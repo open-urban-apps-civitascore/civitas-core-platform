@@ -50,6 +50,11 @@ vi.mock('../../_hooks/use-pipeline-read-only', () => ({
   ReadOnlyProvider: ({ children }: { children: React.ReactNode }) => children,
 }))
 
+const mockDatasources = vi.hoisted(() => ({ entities: [] }))
+vi.mock('../../_hooks/use-pipeline-datasources', () => ({
+  usePipelineDatasources: () => mockDatasources,
+}))
+
 vi.mock('@/hooks/use-dataset-permissions', () => ({
   useDatasetPermissions: () => ({ canDeletePipeline: true, canEditPipeline: true }),
   useDatasetPermissionsById: () => ({ canDeletePipeline: true, canEditPipeline: true, isLoading: false }),

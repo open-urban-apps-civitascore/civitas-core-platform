@@ -1423,7 +1423,9 @@
       "anonymousName": "Anonyme Datenquelle",
       "apiCall": "API-Aufruf",
       "apiCallPlaceholder": "API-Aufruf auswählen...",
-      "noApiCalls": "Diese Datenquelle hat keine API-Aufrufe"
+      "noApiCalls": "Keine API-Aufrufe",
+      "apiCallNotFound": "Dieser API-Aufruf existiert nicht in der Datenquelle. Bitte einen anderen API-Aufruf wählen.",
+      "apiCallMissing": "Bitte einen API-Aufruf wählen."
     },
     "sink": {
       "locked": {
@@ -1541,8 +1543,11 @@
         "orphanNode": "{label} ist mit keinem anderen Knoten verbunden",
         "minimumFunctionalNodes": "Pipeline muss mindestens einen funktionalen Knoten zwischen Start und Ende haben",
         "duplicateTableName": "Der Tabellenname \"{tableName}\" wird bereits in der Pipeline \"{pipeline}\" verwendet",
-        "cronMqttIncompatible": "Ein CRON-Trigger kann nicht mit einer MQTT-Datenquelle verwendet werden. Bitte eine SQL-Quelle (Pull) verwenden.",
-        "cronSourceConnectorUnknown": "Der Quell-Konnektor konnte nicht ermittelt werden; ein CRON-Trigger funktioniert nur mit einer SQL-Quelle (Pull), nicht mit MQTT.",
+        "cronMqttIncompatible": "Ein CRON-Trigger kann nicht mit einer MQTT-Datenquelle verwendet werden. Bitte eine Pull-Quelle (SQL oder HTTP) verwenden.",
+        "cronSourceConnectorUnknown": "Der Quell-Konnektor konnte nicht ermittelt werden; ein CRON-Trigger funktioniert nur mit einer Pull-Quelle (SQL oder HTTP), nicht mit MQTT.",
+        "sourceRequiresCron": "{label} braucht einen CRON-Trigger. Bitte einen CRON-Knoten mit dieser Datenquelle verbinden.",
+        "apiCallMissing": "{label} hat keinen API-Aufruf. Bitte einen API-Aufruf auswählen.",
+        "apiCallNotFound": "Der API-Aufruf \"{apiCallName}\" von {label} existiert nicht in der Datenquelle. Bitte einen API-Aufruf auswählen.",
         "sqlSourceNoScheduleDefaultPoll": "Diese SQL-Quelle hat keinen CRON-Knoten und pollt im Standardintervall (alle 5 Minuten). Für einen expliziten Zeitplan bitte einen CRON-Knoten hinzufügen.",
         "frostMappingUnknownStaTarget": "{label} bildet {path} ab — kein gültiger SensorThings-Zielpfad; erlaubt sind die Katalogpfade des Thing-förmigen Zielmodells (z. B. $.name, $.Datastreams[].name, $.Datastreams[].Observations[].result) sowie dessen Match-Schlüssel",
         "frostMappingMissingMatchKeys": "{label} muss die Match-Schlüssel ({entity}) abbilden: {fields} — sie identifizieren die Entität beim Find-or-Create",
@@ -1604,6 +1609,7 @@
       "savingAll": "Speichert...",
       "exit": "Beenden",
       "validationFailed": "Validierung fehlgeschlagen für: {names}",
+      "unchangedPipelinesInvalid": "Diese Pipelines sind nicht gültig: {names}. Bitte die Fehler beheben.",
       "duplicateNames": "Doppelte Pipeline-Namen: {names}",
       "saveFailed": "Speichern fehlgeschlagen: {names}",
       "saveSuccess": "Pipeline \"{name}\" erfolgreich gespeichert",
@@ -1622,7 +1628,8 @@
     "tabs": {
       "closeTab": "Tab schließen",
       "newPipeline": "Neue Pipeline",
-      "untitledPipeline": "Pipeline ohne Namen"
+      "untitledPipeline": "Pipeline ohne Namen",
+      "hasErrors": "Diese Pipeline hat Fehler"
     },
     "nodeLabels": {
       "notConfigured": "Nicht konfiguriert"

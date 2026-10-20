@@ -11,6 +11,7 @@ import { useTranslations } from 'next-intl'
 
 import { CONNECTOR_TYPES } from '@/const/connectors'
 
+import { useActivePipeline } from '../../../_hooks/use-active-pipeline'
 import { usePipelineDatasources } from '../../../_hooks/use-pipeline-datasources'
 import {
   apiCallNamesOf,
@@ -30,6 +31,7 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
   const t = useTranslations('pipelineEditor')
   const tStatus = useTranslations('common.status')
   const { entities, isLoading, isError, canReadDatasources, getEntityById, getName } = usePipelineDatasources()
+  const { pipeline } = useActivePipeline()
 
   const selectedEntity = data.entityId !== undefined ? getEntityById(data.entityId) : undefined
 
@@ -65,8 +67,19 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
   const apiCalls = selectedEntity ? apiCallsOf(selectedEntity) : []
   const selectableApiCalls = apiCalls.map(apiCall => ({ id: apiCall.name, name: apiCall.name }))
   const methodByApiCallName = new Map(apiCalls.map(apiCall => [apiCall.name, apiCall.method]))
+  const isApiCallNotFound = data.apiCallName !== undefined && !methodByApiCallName.has(data.apiCallName)
+  const isPipelineSaved = Boolean(pipeline?.id)
+
+  const getApiCallErrorMessage = (): string | undefined => {
+    if (isApiCallNotFound) return t('dataSourcePanel.apiCallNotFound')
+    if (!data.apiCallName && isPipelineSaved) return t('dataSourcePanel.apiCallMissing')
+    return undefined
+  }
 
   const renderApiCallName = (apiCall: SelectableEntity) => {
+    if (!methodByApiCallName.has(apiCall.name)) {
+      return <span className="text-muted-foreground">{apiCall.name}</span>
+    }
     const method = methodByApiCallName.get(apiCall.name)
     return (
       <>
@@ -101,6 +114,7 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
           onChange={apiCall => onUpdate({ apiCallName: apiCall?.name })}
           fallbackName={data.apiCallName}
           renderEntityName={renderApiCallName}
+          errorMessage={getApiCallErrorMessage()}
         />
       )}
 

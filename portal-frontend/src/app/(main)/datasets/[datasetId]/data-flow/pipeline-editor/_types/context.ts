@@ -103,6 +103,8 @@ export interface ActivePipelineContextValue {
   shouldShowValidationPanel: boolean
   /** Hide the validation panel (called when user selects a node/edge) */
   hideValidationPanel: () => void
+  /** Sessions whose last validation result has errors */
+  sessionIdsWithErrors: ReadonlySet<string>
 
   // ===== Pipeline Operations =====
   /** Rename the active pipeline. Persisted on the next Save All, like any other edit. */

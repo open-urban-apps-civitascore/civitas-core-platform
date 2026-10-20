@@ -47,6 +47,7 @@ const renderCanvas = (
     addEdge: vi.fn(),
     validateConnection: () => true,
     hideValidationPanel: vi.fn(),
+    getNodeValidationSeverity: () => 'none',
     getSinkLockReason: () => lockReason,
     getSelectionLockReason: () => lockReason,
     getLastApiSinkLockReason: () => lastApiSinkLockReason,

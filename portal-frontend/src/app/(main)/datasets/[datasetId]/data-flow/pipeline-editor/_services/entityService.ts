@@ -15,6 +15,9 @@ import { HttpApiResponseSchema, type HttpMethod } from '@/types/connectors'
 import type { Datasource } from '@/types/datasources'
 import { DATAPOOL_SCOPE_TYPES } from '@/types/datasources'
 
+import { isDataSourceNodeData } from '../_types/nodes'
+import type { Pipeline } from '../_types/pipeline'
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -123,3 +126,16 @@ export const apiCallsOf = (datasource: Datasource): ApiCallSummary[] => {
 }
 
 export const apiCallNamesOf = (datasource: Datasource): string[] => apiCallsOf(datasource).map(apiCall => apiCall.name)
+
+export const withCurrentConnectorTypes = (
+  pipeline: Pipeline,
+  connectorTypeById: ReadonlyMap<string, string>,
+): Pipeline => ({
+  ...pipeline,
+  nodes: pipeline.nodes.map(node => {
+    if (!isDataSourceNodeData(node.data) || node.data.entityId === undefined) return node
+    const connector = connectorTypeById.get(node.data.entityId)
+    if (connector === undefined) return node
+    return { ...node, data: { ...node.data, entityMetadata: { ...node.data.entityMetadata, connector } } }
+  }),
+})

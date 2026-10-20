@@ -6,6 +6,8 @@
  *
  */
 
+import { CONNECTOR_TYPES } from '@/const/connectors'
+
 import { isFormAccepted, NODE_FLOW_DECLARATIONS, type NodeFlowDeclaration } from '../_config/nodeFlow'
 import type { FrostSinkPort } from '../_constants/frostPorts'
 import {
@@ -142,6 +144,8 @@ interface ValidationRule {
 export interface PipelineValidationContext {
   /** Table names used outside this pipeline, mapped to the pipeline using them (see dataSinkNameService). */
   tableNameOwners?: TableNameOwners
+  /** API call names of each HTTP data source, by data source id. A missing entry is not checked. */
+  apiCallNamesByDatasourceId?: ReadonlyMap<string, readonly string[]>
 }
 
 /**
@@ -414,6 +418,52 @@ const validateSqlSourceHasExplicitSchedule: ValidationRule = {
 }
 
 const nodeLabel = (node: PipelineNode): string => node.data.label || node.type
+
+const validateSourceHasRequiredSchedule: ValidationRule = {
+  id: 'source-required-schedule',
+  name: 'Source Required Schedule',
+  description: 'A source that only runs on a schedule needs a CRON node wired to it',
+  validate: (pipeline: Pipeline) => {
+    const errors: PipelineValidationError[] = []
+    const cronNodes = pipeline.nodes.filter(node => node.type === PIPELINE_NODE_TYPES.Cron)
+    const cronIds = new Set(cronNodes.map(node => node.id))
+
+    pipeline.nodes.forEach(node => {
+      const decl = flowDeclOf(node)
+      if (decl?.role !== 'source' || !decl.requiresSchedule(node.data)) return
+      const hasCron = pipeline.edges.some(edge => edge.target === node.id && cronIds.has(edge.source))
+      if (!hasCron) errors.push(errorAt(node, 'validation.messages.sourceRequiresCron', { label: nodeLabel(node) }))
+    })
+
+    return { errors, warnings: [] }
+  },
+}
+
+const validateHttpSourceApiCall: ValidationRule = {
+  id: 'http-source-api-call',
+  name: 'HTTP Source API Call',
+  description: 'An HTTP source needs an API call that exists in its data source',
+  validate: (pipeline: Pipeline, context: PipelineValidationContext) => {
+    const errors: PipelineValidationError[] = []
+
+    pipeline.nodes.forEach(node => {
+      if (!isDataSourceNodeData(node.data)) return
+      const { entityId, apiCallName, entityMetadata } = node.data
+      if (entityMetadata?.connector !== CONNECTOR_TYPES.HTTP || !entityId) return
+      const label = nodeLabel(node)
+      if (!apiCallName) {
+        errors.push(errorAt(node, 'validation.messages.apiCallMissing', { label }))
+        return
+      }
+      const knownNames = context.apiCallNamesByDatasourceId?.get(entityId)
+      if (knownNames && !knownNames.includes(apiCallName)) {
+        errors.push(errorAt(node, 'validation.messages.apiCallNotFound', { label, apiCallName }))
+      }
+    })
+
+    return { errors, warnings: [] }
+  },
+}
 
 const errorAt = (
   node: PipelineNode,
@@ -1142,6 +1192,8 @@ export const VALIDATION_RULES: ValidationRule[] = [
   validateEdgeCompatibility,
   validateMappingChainStructure,
   validateSqlSourceHasExplicitSchedule,
+  validateSourceHasRequiredSchedule,
+  validateHttpSourceApiCall,
   // FROST mapping/STA-catalog validation temporarily disabled; re-add to re-enable.
   // validateFrostMappingCoversStaGroups,
   validateCronAndMappingWired,
