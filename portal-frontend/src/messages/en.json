@@ -1437,8 +1437,7 @@
       "apiCall": "API call",
       "apiCallPlaceholder": "Select an API call...",
       "noApiCalls": "No API calls",
-      "apiCallNotFound": "This API call does not exist in the Data source. Select another API call.",
-      "apiCallMissing": "Select an API call."
+      "apiCallNotFound": "This API call does not exist in the Data source. Select another API call."
     },
     "sink": {
       "locked": {

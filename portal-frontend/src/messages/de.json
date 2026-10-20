@@ -1424,8 +1424,7 @@
       "apiCall": "API-Aufruf",
       "apiCallPlaceholder": "API-Aufruf auswählen...",
       "noApiCalls": "Keine API-Aufrufe",
-      "apiCallNotFound": "Dieser API-Aufruf existiert nicht in der Datenquelle. Bitte einen anderen API-Aufruf wählen.",
-      "apiCallMissing": "Bitte einen API-Aufruf wählen."
+      "apiCallNotFound": "Dieser API-Aufruf existiert nicht in der Datenquelle. Bitte einen anderen API-Aufruf wählen."
     },
     "sink": {
       "locked": {

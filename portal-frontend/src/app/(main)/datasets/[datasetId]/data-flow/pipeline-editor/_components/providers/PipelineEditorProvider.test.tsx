@@ -2746,6 +2746,24 @@ describe('PipelineEditorProviderComponent', () => {
         expect(validatePipelineWithNodeStatus).not.toHaveBeenCalled()
       })
 
+      it('validates the loaded pipelines when a refetch returns an additional pipeline', () => {
+        mockDatasources.isLoading = true
+        vi.mocked(useGetPipelines).mockReturnValue({
+          data: { data: [pipelineDto('pipeline-a')] },
+          isLoading: false,
+        } as unknown as ReturnType<typeof useGetPipelines>)
+        const { rerender } = renderProvider()
+
+        vi.mocked(useGetPipelines).mockReturnValue({
+          data: { data: [pipelineDto('pipeline-a'), pipelineDto('pipeline-b')] },
+          isLoading: false,
+        } as unknown as ReturnType<typeof useGetPipelines>)
+        mockDatasources.isLoading = false
+        rerender()
+
+        expect(validatedPipelineIds()).toEqual(['pipeline-a'])
+      })
+
       it('waits until the data sources are loaded', () => {
         mockDatasources.isLoading = true
 

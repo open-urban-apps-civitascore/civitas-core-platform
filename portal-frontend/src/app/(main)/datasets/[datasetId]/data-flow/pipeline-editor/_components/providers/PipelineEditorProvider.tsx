@@ -87,7 +87,6 @@ import type { PipelineNodeData } from '../../_types/nodes'
 import type { NodeCreationContext, Pipeline, PipelineEdge, PipelineNode, PipelineNodeType } from '../../_types/pipeline'
 import type { UsePipelineSessionReturn } from '../../_types/session'
 
-// The next click on a node must fire a selection change, which hides the validation panel.
 const withoutSelection = (pipeline: Pipeline): Pipeline => ({
   ...pipeline,
   nodes: pipeline.nodes.map(node => ({ ...node, selected: false })),
@@ -128,6 +127,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Track whether initial load has been done =====
   const hasLoadedRef = useRef(false)
+  const loadedPipelineIdsRef = useRef<string[] | null>(null)
 
   // ===== Backend API Hooks =====
   const pipelinesQuery = useGetPipelines(datasetId)
@@ -211,6 +211,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
     hasLoadedRef.current = true
     const pipelineDTOs = pipelinesQuery.data.data
+    loadedPipelineIdsRef.current = pipelineDTOs.map(dto => dto.id)
 
     if (pipelineDTOs.length === 0) {
       // No pipelines in backend — keep the default empty session
@@ -508,9 +509,11 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   // ===== Validate all saved pipelines once after load =====
   const hasValidatedOnLoadRef = useRef(false)
   useEffect(() => {
-    if (hasValidatedOnLoadRef.current || !pipelinesQuery.data || isLoadingDatasources || isReadOnly) return
+    const loadedPipelineIds = loadedPipelineIdsRef.current
+    if (hasValidatedOnLoadRef.current || !loadedPipelineIds || isLoadingDatasources || isReadOnly) return
     const savedSessions = sessionManager.sessions.filter(session => session.pipeline.id)
-    if (savedSessions.length < pipelinesQuery.data.data.length) return
+    const sessionPipelineIds = new Set(savedSessions.map(session => session.pipeline.id))
+    if (!loadedPipelineIds.every(pipelineId => sessionPipelineIds.has(pipelineId))) return
     hasValidatedOnLoadRef.current = true
 
     const results = savedSessions.map(
@@ -529,7 +532,6 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       sessionManager.updateSessionPipeline(activeSession.id, withoutSelection)
     }
   }, [
-    pipelinesQuery.data,
     isLoadingDatasources,
     isReadOnly,
     sessionManager,

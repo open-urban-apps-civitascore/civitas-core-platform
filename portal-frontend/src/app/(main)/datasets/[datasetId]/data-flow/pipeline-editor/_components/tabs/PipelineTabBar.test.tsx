@@ -26,7 +26,7 @@ describe('PipelineTabBar', () => {
   it('marks only the tab of a pipeline with errors', () => {
     renderTabBar(new Set(['session-2']))
 
-    const markers = screen.getAllByLabelText('tabs.hasErrors')
+    const markers = screen.getAllByRole('img', { name: 'tabs.hasErrors' })
     expect(markers).toHaveLength(1)
     expect(markers[0].parentElement).toHaveTextContent('Test Pipeline 2')
   })

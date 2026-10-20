@@ -3,8 +3,6 @@ import userEvent from '@testing-library/user-event'
 
 import type { Datasource } from '@/types/datasources'
 
-import { ActivePipelineContext } from '../../../_hooks/use-active-pipeline'
-import type { ActivePipelineContextValue } from '../../../_types/context'
 import type { DataSourceNodeData } from '../../../_types/nodes'
 import { DataSourcePanel } from './DataSourcePanel'
 
@@ -65,13 +63,8 @@ const nodeData: DataSourceNodeData = {
   entityType: 'datasource',
 }
 
-const renderPanel = (overrides: Partial<DataSourceNodeData> = {}, onUpdate = vi.fn(), pipelineId?: string) => {
-  const contextValue = { pipeline: { id: pipelineId } } as unknown as ActivePipelineContextValue
-  render(
-    <ActivePipelineContext.Provider value={contextValue}>
-      <DataSourcePanel data={{ ...nodeData, ...overrides }} onUpdate={onUpdate} />
-    </ActivePipelineContext.Provider>,
-  )
+const renderPanel = (overrides: Partial<DataSourceNodeData> = {}, onUpdate = vi.fn()) => {
+  render(<DataSourcePanel data={{ ...nodeData, ...overrides }} onUpdate={onUpdate} />)
   return onUpdate
 }
 
@@ -190,28 +183,11 @@ describe('DataSourcePanel', () => {
     expect(screen.queryByText('dataSourcePanel.apiCallNotFound')).not.toBeInTheDocument()
   })
 
-  it('marks a missing API call as invalid in a saved pipeline', () => {
-    renderPanel(selectedNode(HTTP_TWO_CALLS), vi.fn(), 'pipeline-1')
-
-    expect(screen.getAllByRole('combobox')[1]).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getByText('dataSourcePanel.apiCallMissing')).toBeInTheDocument()
-  })
-
-  it('shows the placeholder and the missing hint in a saved pipeline when the data source has no API calls', () => {
-    const httpNoCalls = datasource('http-3', 'Test HTTP Source 3', { connectorType: 'HTTP', apiCalls: [] })
-    mockUseGetDatasources.mockReturnValue({ data: { data: [httpNoCalls] }, isLoading: false, isError: false })
-
-    renderPanel(selectedNode(httpNoCalls), vi.fn(), 'pipeline-1')
-
-    expect(screen.getAllByRole('combobox')[1]).toHaveTextContent('dataSourcePanel.noApiCalls')
-    expect(screen.getByText('dataSourcePanel.apiCallMissing')).toBeInTheDocument()
-  })
-
-  it('does not mark a missing API call in a pipeline that was never saved', () => {
+  it('does not mark a missing API call', () => {
     renderPanel(selectedNode(HTTP_TWO_CALLS))
 
     expect(screen.getAllByRole('combobox')[1]).toHaveAttribute('aria-invalid', 'false')
-    expect(screen.queryByText('dataSourcePanel.apiCallMissing')).not.toBeInTheDocument()
+    expect(screen.queryByText('dataSourcePanel.apiCallNotFound')).not.toBeInTheDocument()
   })
 
   it('shows a placeholder when the HTTP data source has no API calls', () => {

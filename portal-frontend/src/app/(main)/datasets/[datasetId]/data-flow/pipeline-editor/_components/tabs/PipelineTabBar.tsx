@@ -46,7 +46,12 @@ const Tab: React.FC<TabProps> = ({ session, isActive, hasErrors, onSelect }) => 
           {session.name}
           {session.isDirty && <span className="ml-1 text-primary">•</span>}
           {hasErrors && (
-            <span className="ml-1 text-destructive" title={t('tabs.hasErrors')} aria-label={t('tabs.hasErrors')}>
+            <span
+              className="ml-1 text-destructive"
+              role="img"
+              title={t('tabs.hasErrors')}
+              aria-label={t('tabs.hasErrors')}
+            >
               •
             </span>
           )}
