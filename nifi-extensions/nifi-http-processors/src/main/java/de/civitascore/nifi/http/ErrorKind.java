@@ -9,15 +9,11 @@
  */
 package de.civitascore.nifi.http;
 
-import java.util.Locale;
-
-/** Whether another run can succeed without a change to the configuration. */
+/**
+ * Whether the next run can succeed, or only a change to the configuration or the Data structure
+ * repairs the error.
+ */
 enum ErrorKind {
   FATAL,
-  TRANSIENT;
-
-  /** The value of the {@code http.error.kind} attribute. */
-  String attributeValue() {
-    return name().toLowerCase(Locale.ROOT);
-  }
+  TRANSIENT
 }

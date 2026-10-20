@@ -37,10 +37,18 @@ sealed interface ApiCallOutcome {
    * A request that failed.
    *
    * @param status the status of the response, 0 when no response came
-   * @param message names the method, the base URL and the path, never the query, a header or a
-   *     credential
+   * @param message with each control character and line separator escaped, so that no part of it
+   *     can start a log line of its own
    */
   record Failure(ErrorKind kind, int status, String message) implements ApiCallOutcome {
+
+    public Failure {
+      message = withEscapedControlCharacters(message);
+    }
+
+    boolean fatal() {
+      return kind == ErrorKind.FATAL;
+    }
 
     /**
      * The runtime monitor of the NiFi config-adapter counts a WARN bulletin only when its text
@@ -60,10 +68,42 @@ sealed interface ApiCallOutcome {
           ErrorKind.TRANSIENT, 0, request + " failed: " + transportCause(cause).getSimpleName());
     }
 
+    /**
+     * A 2xx response whose body is not the JSON of records that agree with the record schema.
+     *
+     * @param reason names no value of the response
+     */
+    static Failure ofRejectedBody(String apiCall, int status, String reason) {
+      return new Failure(ErrorKind.FATAL, status, apiCall + ": " + reason);
+    }
+
     /** A request the web client refused to build. The same configuration fails again. */
     static Failure ofRejectedRequest(String request, IllegalArgumentException cause) {
       return new Failure(
           ErrorKind.FATAL, 0, request + " failed: " + cause.getClass().getSimpleName());
+    }
+
+    private static String withEscapedControlCharacters(String text) {
+      StringBuilder escaped = new StringBuilder(text.length());
+      for (char c : text.toCharArray()) {
+        switch (c) {
+          case '\r' -> escaped.append("\\r");
+          case '\n' -> escaped.append("\\n");
+          default ->
+              escaped.append(
+                  isControlOrLineSeparator(c)
+                      ? String.format("\\u%04x", (int) c)
+                      : String.valueOf(c));
+        }
+      }
+      return escaped.toString();
+    }
+
+    private static boolean isControlOrLineSeparator(char c) {
+      int type = Character.getType(c);
+      return type == Character.CONTROL
+          || type == Character.LINE_SEPARATOR
+          || type == Character.PARAGRAPH_SEPARATOR;
     }
 
     /** The first I/O exception of the chain; the wrappers around it say nothing more. */

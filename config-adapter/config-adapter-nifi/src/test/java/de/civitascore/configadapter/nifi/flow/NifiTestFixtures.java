@@ -74,6 +74,10 @@ public final class NifiTestFixtures {
   static final String MAP_MIXED =
       "urn:core:dataset:acme:mapping:sensors:e519292a-7dc6-85c6-bbc6-9d2bf792cd44:1.0.0";
 
+  /** The Data structure the {@link #httpSource} names in its {@code element}. */
+  static final String HTTP_ELEMENT =
+      "urn:core:dataset:acme:element:stations:4c3b2a19-8d7e-8f6a-b5c4-d3e2f1a0b9c8:1.0.0";
+
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   private static final PlatformSinkConfig DEFAULT_PLATFORM_SINK =
@@ -83,9 +87,9 @@ public final class NifiTestFixtures {
 
   /**
    * The artifacts map every planner fixture request carries — the callback-free adapter's source of
-   * a {@code mappingRef}'s {@code fields}. Keyed by the Mapping CORE URNs the graph fixtures
-   * reference; field order is preserved (LinkedHashMap) because the FROST compiler's flat {@code
-   * sta_N} indices depend on it.
+   * a {@code mappingRef}'s {@code fields} and of the Data structure of the {@link #httpSource}.
+   * Keyed by the CORE URNs the fixtures reference; field order is preserved (LinkedHashMap) because
+   * the FROST compiler's flat {@code sta_N} indices depend on it.
    */
   static final Map<String, Map<String, Object>> MAPPINGS;
 
@@ -111,6 +115,14 @@ public final class NifiTestFixtures {
       m.put(MAP_FROST_INCOMPLETE, map("{\"fields\": {\"$.name\":\"$.station\"}}"));
       m.put(MAP_CRON, map("{\"fields\": {\"$.a\":\"$.b\"}}"));
       m.put(MAP_TOINT, map("{\"fields\": {\"$.count\":{\"op\":\"toInt\",\"input\":\"$.n\"}}}"));
+      m.put(
+          HTTP_ELEMENT,
+          map(
+              """
+              { "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object",
+                "properties": { "stationid": { "type": "string" }, "lat": { "type": "number" } },
+                "required": ["stationid"] }
+              """));
       m.put(
           MAP_MIXED,
           map(
@@ -391,6 +403,7 @@ public final class NifiTestFixtures {
     Datasource source = new Datasource();
     source.setId("h1");
     source.setType("http");
+    source.handleUnknownProperty("element", HTTP_ELEMENT);
     source.handleUnknownProperty("baseUrl", "https://api.example.org/v1");
     if (authenticationJson != null) {
       source.handleUnknownProperty("authentication", map(authenticationJson));

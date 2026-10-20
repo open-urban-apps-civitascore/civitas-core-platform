@@ -48,14 +48,8 @@ final class ApiCallClient {
     this.bodyReadTimeout = bodyReadTimeout;
   }
 
-  /** The method, the base URL and the path, for example {@code GET https://host/v1/stations}. */
-  String describe(ApiCall call) {
-    return call.method().name() + " " + baseUrl + call.path();
-  }
-
-  /** Sends the request. A {@link ApiCallOutcome.Body} must be closed by the caller. */
   ApiCallOutcome send(ApiCall call, Authentication authentication) {
-    String request = describe(call);
+    String request = call.describe();
     HttpResponseEntity response;
     try {
       HttpRequestHeadersSpec spec = webClient.method(call.method().requestMethod()).uri(uri(call));

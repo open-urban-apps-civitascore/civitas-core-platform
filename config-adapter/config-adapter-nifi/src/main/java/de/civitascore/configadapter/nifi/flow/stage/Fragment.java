@@ -28,6 +28,8 @@ public enum Fragment {
   INVOKE_HTTP("invoke_http"),
   PUT_FROST_RECORD("put_frost_record"),
   LOG_MESSAGE("log_message"),
+  STOP_STAMP("stop_stamp"),
+  PIPELINE_STOP("pipeline_stop"),
   SPLIT_JSON("split_json"),
   EVALUATE_JSON_PATH("evaluate_json_path"),
   REPLACE_TEXT("replace_text"),

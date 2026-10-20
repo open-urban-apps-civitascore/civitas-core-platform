@@ -8,6 +8,8 @@ package de.civitascore.portal.model.embedded;
 public enum PipelineRuntimeState {
   /** The pipeline is running and processing data. */
   OK,
-  /** The pipeline failed to deploy or stopped processing (see the accompanying message). */
-  ERROR
+  /** The pipeline failed to deploy or failed while running (see the accompanying message). */
+  ERROR,
+  /** The platform stopped the pipeline after a fatal error; the message holds the cause. */
+  STOPPED
 }

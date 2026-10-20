@@ -11,6 +11,7 @@ package de.civitascore.nifi.http;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.Locale;
 import java.util.Optional;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -49,6 +50,6 @@ class StatusClassificationTest {
   void errorKind_ofAStatus_isTheKindOfItsRange(int status, String expected) {
     Optional<ErrorKind> kind = StatusClassification.errorKind(status);
 
-    assertEquals(expected, kind.map(ErrorKind::attributeValue).orElse("success"));
+    assertEquals(expected, kind.map(k -> k.name().toLowerCase(Locale.ROOT)).orElse("success"));
   }
 }

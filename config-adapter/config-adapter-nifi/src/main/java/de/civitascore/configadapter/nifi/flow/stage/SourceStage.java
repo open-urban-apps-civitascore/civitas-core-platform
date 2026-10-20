@@ -14,6 +14,7 @@ import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.flow.SourceType;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -62,12 +63,18 @@ public interface SourceStage {
    * Plan-time half: validates the datasource, decrypts credentials, and fills the property maps.
    * Secrets go only into {@link PlanContext#putSensitive}, never into snapshot-bound properties.
    *
+   * @param artifacts the trigger's artifacts (CORE URN → document)
    * @param sourceNodeKey unique per source node across all pipelines and the same on every deploy
    *     of it, for properties that must be unique per source node rather than per (shared)
    *     datasource
    * @throws FatalAdapterException if the datasource is invalid or unsafe to deploy
    */
-  void bind(Datasource source, GraphNode node, String sourceNodeKey, PlanContext out)
+  void bind(
+      Datasource source,
+      Map<String, Map<String, Object>> artifacts,
+      GraphNode node,
+      String sourceNodeKey,
+      PlanContext out)
       throws FatalAdapterException;
 
   /** Build-time half, phase A: registers source-side controller services (before processors). */

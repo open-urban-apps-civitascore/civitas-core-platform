@@ -26,6 +26,7 @@ import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
 import de.civitascore.configadapter.nifi.flow.stage.Processor;
 import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageResult;
+import de.civitascore.configadapter.nifi.flow.stage.StopSource;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -79,9 +80,15 @@ public final class HttpSourceStage implements SourceStage {
   }
 
   @Override
-  public void bind(Datasource source, GraphNode node, String sourceNodeKey, PlanContext out)
+  public void bind(
+      Datasource source,
+      Map<String, Map<String, Object>> artifacts,
+      GraphNode node,
+      String sourceNodeKey,
+      PlanContext out)
       throws FatalAdapterException {
     Map<String, Object> original = source.getAdditionalProperties();
+    Map<String, Object> recordSchema = dataStructure(source, artifacts);
     Map<String, Object> apiCall = selectApiCall(original.get("apiCalls"), node);
     Map<String, Object> authentication = objectOrEmpty(original.get("authentication"));
     Object password = authentication.get("password");
@@ -93,6 +100,7 @@ public final class HttpSourceStage implements SourceStage {
 
     putIfPresent(out::putSourceProperty, "Base URL", original.get("baseUrl"));
     out.putSourceProperty("API Call", json(withoutPagination(apiCall)));
+    out.putSourceProperty("Record Schema", json(recordSchema));
     String type = authentication.get("type") instanceof String text ? text : NONE;
     out.putSourceProperty("Authentication Type", type);
     if (BASIC.equals(type)) {
@@ -116,7 +124,32 @@ public final class HttpSourceStage implements SourceStage {
     Processor source = ctx.loadProcessor(Fragment.GET_HTTP_API_CALL, "success");
     BuildContext.applySchedule(source, ctx.spec().sourceCron());
     ctx.spec().sourceProperties().forEach((key, value) -> BuildContext.setProp(source, key, value));
-    return new StageResult(List.of(source), List.of(source));
+    return new StageResult(
+        List.of(source),
+        List.of(source),
+        List.of(new StopSource(source, "stop", "http.error.message")));
+  }
+
+  /** The processor validates each record of a response against this inlined JSON Schema. */
+  private static Map<String, Object> dataStructure(
+      Datasource source, Map<String, Map<String, Object>> artifacts) throws FatalAdapterException {
+    if (!(source.getAdditionalProperties().get("element") instanceof String element)
+        || element.isBlank()) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD,
+          "HTTP/REST Data source '" + source.getId() + "' names no Data structure");
+    }
+    Map<String, Object> schema = artifacts.get(element);
+    if (schema == null) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD,
+          "HTTP/REST Data source '"
+              + source.getId()
+              + "' names the Data structure '"
+              + element
+              + "', which the payload's artifacts do not hold");
+    }
+    return schema;
   }
 
   private static Map<String, Object> selectApiCall(Object apiCalls, GraphNode node)
@@ -150,12 +183,12 @@ public final class HttpSourceStage implements SourceStage {
     return copy;
   }
 
-  private static String json(Map<String, Object> apiCall) throws FatalAdapterException {
+  private static String json(Map<String, Object> document) throws FatalAdapterException {
     try {
-      return MAPPER.writeValueAsString(apiCall);
+      return MAPPER.writeValueAsString(document);
     } catch (JsonProcessingException e) {
       throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_FLOW_ERROR, e, "API call serialization");
+          AdapterErrorCode.NIFI_FLOW_ERROR, e, "HTTP/REST source property serialization");
     }
   }
 

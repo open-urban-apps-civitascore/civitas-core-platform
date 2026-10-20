@@ -1,0 +1,71 @@
+meta {
+  name: 2a. Create DataStructure Version
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{httpSagaDataStructureId}}
+}
+
+body:json {
+  {
+    "description": "A Thing with its reference and optional Point Locations",
+    "modelName": "HttpSagaThing",
+    "model": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "HttpSagaThing",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "properties": {
+          "type": "object",
+          "properties": {
+            "reference": { "type": "string" }
+          },
+          "required": ["reference"]
+        },
+        "Locations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "description": { "type": "string" },
+              "encodingType": { "type": "string" },
+              "location": { "$ref": "https://geojson.org/schema/Point.json" }
+            },
+            "required": ["name", "description", "encodingType", "location"]
+          }
+        }
+      },
+      "required": ["name", "description", "properties"]
+    },
+    "styles": {}
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('httpSagaDataStructureVersionId', res.body.id);
+  }
+}
+
+tests {
+  test("Version created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
+
+docs {
+  The Data structure of the HTTP/REST Data source. GetHttpApiCall validates each record of each
+  response against it. The `$ref` to the GeoJSON Point stays in the inlined schema, and the
+  processor resolves it from the copy in its NAR, without a network call.
+}
