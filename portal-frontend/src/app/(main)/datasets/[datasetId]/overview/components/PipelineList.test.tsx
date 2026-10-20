@@ -193,9 +193,9 @@ describe('PipelineList', () => {
   })
 
   describe('Error toast', () => {
-    it('shows an error toast once for a pipeline in ERROR state', () => {
+    it.each(['ERROR', 'STOPPED'] as const)('shows an error toast once for a pipeline in %s state', state => {
       renderComponent({
-        pipelines: [makePipeline({ id: 'p1', runtimeStatus: { state: 'ERROR', message: 'Boom' } })],
+        pipelines: [makePipeline({ id: 'p1', runtimeStatus: { state, message: 'Boom' } })],
       })
       expect(toast.error).toHaveBeenCalledTimes(1)
     })
@@ -205,14 +205,14 @@ describe('PipelineList', () => {
       expect(toast.error).not.toHaveBeenCalled()
     })
 
-    it('does not repeat the toast for the same error on re-render', () => {
+    it.each(['ERROR', 'STOPPED'] as const)('does not repeat the toast for the same %s event on re-render', state => {
       const { rerender } = renderComponent({
-        pipelines: [makePipeline({ id: 'p1', runtimeStatus: { state: 'ERROR', lastEventId: 'evt-1' } })],
+        pipelines: [makePipeline({ id: 'p1', runtimeStatus: { state, lastEventId: 'evt-1' } })],
       })
       rerender(
         <PipelineList
           {...defaultProps}
-          pipelines={[makePipeline({ id: 'p1', runtimeStatus: { state: 'ERROR', lastEventId: 'evt-1' } })]}
+          pipelines={[makePipeline({ id: 'p1', runtimeStatus: { state, lastEventId: 'evt-1' } })]}
         />,
       )
       expect(toast.error).toHaveBeenCalledTimes(1)
