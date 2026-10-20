@@ -52,31 +52,18 @@ final class RecordSchema {
     this.schema = schema;
   }
 
-  /** Why the text is no schema that the processor can validate with, or empty when it is one. */
-  static Optional<String> compileError(String text) {
-    try {
-      compile(text);
-      return Optional.empty();
-    } catch (InvalidRecordSchemaException e) {
-      return Optional.of(e.getMessage());
-    }
-  }
-
   /**
    * Compiles the schema and resolves each of its references.
    *
-   * @throws InvalidRecordSchemaException when the text is no JSON Schema, or a reference leads to a
-   *     document that is not vendored
+   * @throws InvalidRecordSchemaException when the text is not JSON, the validator cannot compile
+   *     it, or a reference leads to a document that is not vendored
    */
   static RecordSchema compile(String text) throws InvalidRecordSchemaException {
     JsonNode node;
     try {
       node = MAPPER.readTree(text);
     } catch (JacksonException e) {
-      throw new InvalidRecordSchemaException("is not JSON", e);
-    }
-    if (node == null || !node.isObject()) {
-      throw new InvalidRecordSchemaException("is not a JSON object", null);
+      throw new InvalidRecordSchemaException("Record Schema is not JSON", e);
     }
     try {
       JsonSchema schema = factory().getSchema(node);
@@ -84,7 +71,7 @@ final class RecordSchema {
       return new RecordSchema(schema);
     } catch (JsonSchemaException | IllegalArgumentException | StackOverflowError e) {
       throw new InvalidRecordSchemaException(
-          "is not a JSON Schema that the processor can compile, or refers to a document other"
+          "Record Schema cannot be compiled, or refers to a document other"
               + " than a GeoJSON geometry of https://geojson.org/schema/: "
               + e.getClass().getSimpleName(),
           e);

@@ -302,8 +302,15 @@ keyword lists agree). The `x-core-*` keywords and `crs` validate nothing.
 A `$ref` resolves inside the schema, to an embedded resource of the schema with its own `$id`, or to
 one of the seven GeoJSON geometry schemas `https://geojson.org/schema/<Type>.json`. The NAR holds
 copies of those, identical to the ones Model Forge vendors (`GeoJsonCopiesTest` checks that), and the
-processor never fetches a schema over the network. Any other reference makes the processor invalid,
-as does a `Record Schema` that is not a JSON object or that the validator cannot compile.
+processor never fetches a schema over the network.
+
+The processor compiles `Record Schema` when it starts. It does not check the schema when NiFi
+validates the processor: Model Forge validates the Data structure. A `Record Schema` that is not
+JSON, that the validator cannot compile, or that has any other reference stops the start: the
+processor stays valid and scheduled but sends no request, NiFi raises an error bulletin
+`Failed to properly initialize Processor` with the `InvalidRecordSchemaException` as its cause and
+tries again after the `Administrative Yield Duration`. The runtime monitor publishes this bulletin
+as an `ERROR` event of the Pipeline.
 
 The request code knows no NiFi session, so the page loop of a later step can send each page through
 it as a request of its own. A new authentication type adds a value of `Authentication Type`, its
