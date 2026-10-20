@@ -373,6 +373,11 @@ so a Data sink error on a page leaves the pages before it in the Data storage.
 stop condition goes to `stop`, and none of its pages reaches `success`. This guards against an API
 that ignores the page parameter.
 
+**Record limit:** a run reads at most `Max Pages` × `pageSize` records, 1000 × `pageSize` by
+default. The config-adapter does not set `Max Pages`, and each deployment of the Pipeline replaces
+a value set in the NiFi UI. Thus an API with more pages stops its Pipeline on each run, and only a
+code change raises the limit.
+
 When NiFi stops the processor during a run, the processor sends no further page. It removes the
 pages of the run and sends one FlowFile to `failure`, as for a transient error. Thus a stop of the
 process group waits for one page at most, not for the whole run.
