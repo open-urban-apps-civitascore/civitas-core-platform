@@ -28,7 +28,6 @@ import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageResult;
 import de.civitascore.configadapter.nifi.flow.stage.StopSource;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -99,7 +98,7 @@ public final class HttpSourceStage implements SourceStage {
     }
 
     putIfPresent(out::putSourceProperty, "Base URL", original.get("baseUrl"));
-    out.putSourceProperty("API Call", json(withoutPagination(apiCall)));
+    out.putSourceProperty("API Call", json(apiCall));
     out.putSourceProperty("Record Schema", json(recordSchema));
     String type = authentication.get("type") instanceof String text ? text : NONE;
     out.putSourceProperty("Authentication Type", type);
@@ -174,13 +173,6 @@ public final class HttpSourceStage implements SourceStage {
             + "' names the API call '"
             + name
             + "', which its Data source does not have");
-  }
-
-  /** The processor refuses a pagination, because it has no page loop yet. */
-  private static Map<String, Object> withoutPagination(Map<String, Object> apiCall) {
-    Map<String, Object> copy = new LinkedHashMap<>(apiCall);
-    copy.remove("pagination");
-    return copy;
   }
 
   private static String json(Map<String, Object> document) throws FatalAdapterException {

@@ -122,7 +122,8 @@ class FlowDeploymentPlannerHttpSourceTest {
             """
             { "name": "stations", "method": "GET", "path": "/stations",
               "queryParameters": [ { "name": "limit", "value": "100" } ],
-              "headers": [ { "name": "Accept", "value": "application/json" } ] }
+              "headers": [ { "name": "Accept", "value": "application/json" } ],
+              "pagination": null }
             """),
         mapper.readTree(properties.path("API Call").asText()));
   }
@@ -215,14 +216,17 @@ class FlowDeploymentPlannerHttpSourceTest {
   }
 
   @Test
-  void flowCallsTheSecondApiCallWithoutItsPagination() throws Exception {
+  void flowCallsTheSecondApiCallWithItsPaginationUnchanged() throws Exception {
     JsonNode properties = httpProcessor(plan("readings", null)).path("properties");
 
     assertEquals(
         mapper.readTree(
             """
             { "name": "readings", "method": "GET", "path": "/readings",
-              "queryParameters": [], "headers": [] }
+              "queryParameters": [], "headers": [],
+              "pagination": { "type": "PAGE_NUMBER", "pageParameter": "page",
+                              "pageSizeParameter": "size", "pageSize": 50,
+                              "startPage": 1, "endPage": 9 } }
             """),
         mapper.readTree(properties.path("API Call").asText()));
   }
