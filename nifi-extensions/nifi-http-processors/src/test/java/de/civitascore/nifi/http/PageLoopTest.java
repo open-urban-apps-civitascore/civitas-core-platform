@@ -22,6 +22,8 @@ class PageLoopTest {
         new ApiCall(
             "Stations", HttpMethod.GET, "/stations", List.of(), List.of(), new SinglePage());
 
-    assertThrows(IllegalArgumentException.class, () -> new PageLoop(apiCall, null, null, 0, null));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new PageLoop(apiCall, null, null, 0, () -> true, null));
   }
 }

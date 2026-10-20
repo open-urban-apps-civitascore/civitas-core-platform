@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.flowfile.attributes.CoreAttributes;
 import org.apache.nifi.logging.ComponentLog;
@@ -33,13 +34,19 @@ final class PageLoop {
   private final ApiCallClient client;
   private final RecordSchema recordSchema;
   private final int maxPages;
+  private final BooleanSupplier scheduled;
   private final ComponentLog log;
 
+  /**
+   * @param scheduled whether NiFi still schedules the processor; NiFi does not interrupt a running
+   *     trigger when it stops the processor, so the loop asks before each further page
+   */
   PageLoop(
       ApiCall apiCall,
       ApiCallClient client,
       RecordSchema recordSchema,
       int maxPages,
+      BooleanSupplier scheduled,
       ComponentLog log) {
     if (maxPages <= 0) {
       throw new IllegalArgumentException("maxPages must be at least 1");
@@ -48,6 +55,7 @@ final class PageLoop {
     this.client = client;
     this.recordSchema = recordSchema;
     this.maxPages = maxPages;
+    this.scheduled = scheduled;
     this.log = log;
   }
 
@@ -91,6 +99,10 @@ final class PageLoop {
             pages, ApiCallOutcome.Failure.ofPageLimit(apiCall.label(), outcome.status(), maxPages));
       }
       page = next.get();
+      if (!scheduled.getAsBoolean()) {
+        return new RunResult.Failed(
+            pages, ApiCallOutcome.Failure.ofStopped(apiCall.describe(page)));
+      }
     }
   }
 

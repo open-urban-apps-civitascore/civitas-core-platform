@@ -287,7 +287,12 @@ public class GetHttpApiCall extends AbstractProcessor {
             context.getProperty(BODY_READ_TIMEOUT).asDuration());
     pageLoop =
         new PageLoop(
-            apiCall, client, recordSchema, context.getProperty(MAX_PAGES).asInteger(), getLogger());
+            apiCall,
+            client,
+            recordSchema,
+            context.getProperty(MAX_PAGES).asInteger(),
+            this::isScheduled,
+            getLogger());
   }
 
   @Override

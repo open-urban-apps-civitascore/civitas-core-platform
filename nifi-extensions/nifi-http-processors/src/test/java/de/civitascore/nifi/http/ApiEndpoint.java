@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
 import javax.net.ssl.SSLContext;
 
@@ -70,8 +71,17 @@ final class ApiEndpoint implements AutoCloseable {
 
   /** Answers the requests in order with the responses, and any request after them with a 500. */
   static ApiEndpoint answeringInTurn(Response... responses) {
+    return answeringInTurn(index -> {}, responses);
+  }
+
+  /** As {@link #answeringInTurn(Response...)}, and calls the action with the index of a request. */
+  static ApiEndpoint answeringInTurn(IntConsumer beforeAnswer, Response... responses) {
     List<Response> script = List.of(responses);
-    return startHttp(index -> index < script.size() ? script.get(index) : SCRIPT_EXHAUSTED);
+    return startHttp(
+        index -> {
+          beforeAnswer.accept(index);
+          return index < script.size() ? script.get(index) : SCRIPT_EXHAUSTED;
+        });
   }
 
   static ApiEndpoint answering(int status, String body) {

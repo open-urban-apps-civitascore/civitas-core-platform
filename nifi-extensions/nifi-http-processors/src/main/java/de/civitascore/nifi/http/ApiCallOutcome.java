@@ -87,6 +87,12 @@ sealed interface ApiCallOutcome {
           apiCall + ": no stop condition after " + maxPages + " pages (Max Pages)");
     }
 
+    /** A run that NiFi stopped before this request. */
+    static Failure ofStopped(String request) {
+      return new Failure(
+          ErrorKind.TRANSIENT, 0, request + " not sent, because the processor stopped");
+    }
+
     /** A request the web client refused to build. The same configuration fails again. */
     static Failure ofRejectedRequest(String request, IllegalArgumentException cause) {
       return new Failure(

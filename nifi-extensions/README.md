@@ -292,10 +292,12 @@ API call "Get stations": GET /stations page 3 failed: ConnectException
 API call "Get stations": page 3: 2 of 50 records violate the Data structure: record 3: /lat type; record 7: required stationid
 API call "Get stations": page 3 is a JSON object, not an array
 API call "Get stations": no stop condition after 1000 pages (Max Pages)
+API call "Get stations": GET /stations page 3 not sent, because the processor stopped
 ```
 
 A transient message keeps the word `failed`: the runtime monitor of the NiFi config-adapter counts a
-warn bulletin only when its text names a failure.
+warn bulletin only when its text names a failure. The message of a stop has no such word, because a
+stop is not an error of the Pipeline.
 
 No attribute and no message contains the query, a header value, the username, the password or a
 value of the response. An exception reaches no logger, because its message can hold the URI with its
@@ -370,6 +372,10 @@ so a Data sink error on a page leaves the pages before it in the Data storage.
 `Max Pages` limits a run, also one with an `endPage`. A run that reads `Max Pages` pages and meets no
 stop condition goes to `stop`, and none of its pages reaches `success`. This guards against an API
 that ignores the page parameter.
+
+When NiFi stops the processor during a run, the processor sends no further page. It removes the
+pages of the run and sends one FlowFile to `failure`, as for a transient error. Thus a stop of the
+process group waits for one page at most, not for the whole run.
 
 **Known limit:** a `pageSize` larger than the maximum page size of the API ends the run after the
 first page, because the API sends fewer records than `pageSize`. The processor cannot tell this from

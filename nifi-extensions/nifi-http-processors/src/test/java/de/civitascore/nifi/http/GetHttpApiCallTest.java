@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.processor.Relationship;
@@ -1052,6 +1053,28 @@ class GetHttpApiCallTest {
           rawQueries(endpoint));
       runner.assertTransferCount(GetHttpApiCall.FAILURE, 1);
       runner.assertTransferCount(GetHttpApiCall.SUCCESS, 2);
+    }
+  }
+
+  @Test
+  void onTrigger_whenNiFiStopsTheProcessorDuringARun_sendsNoFurtherPageAndRoutesTheRunToFailure()
+      throws InitializationException {
+    AtomicReference<TestRunner> runner = new AtomicReference<>();
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            index -> ((GetHttpApiCall) runner.get().getProcessor()).updateScheduledFalse(),
+            Response.json(FULL_PAGE),
+            Response.json(FULL_PAGE))) {
+      runner.set(paginatedRunner(endpoint, ""));
+
+      runner.get().run();
+
+      assertEquals(1, endpoint.requests().size());
+      assertRouted(
+          runner.get(),
+          GetHttpApiCall.FAILURE,
+          0,
+          "API call \"Stations\": GET /stations page 1 not sent, because the processor stopped");
     }
   }
 
