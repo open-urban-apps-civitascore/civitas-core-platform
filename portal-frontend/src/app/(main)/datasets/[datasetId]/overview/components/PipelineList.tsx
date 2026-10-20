@@ -73,7 +73,7 @@ export const PipelineList = ({
   useEffect(() => {
     for (const pipeline of pipelines) {
       const status = pipeline.runtimeStatus
-      if (status?.state !== 'ERROR') continue
+      if (status?.state !== 'ERROR' && status?.state !== 'STOPPED') continue
       const key = `${pipeline.id}:${status.lastEventId ?? status.occurredAt ?? status.message ?? 'error'}`
       if (seenErrors.current.has(key)) continue
       seenErrors.current.add(key)

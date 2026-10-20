@@ -63,6 +63,9 @@ public class PipelineRuntimeStatusService {
     if (eventId != null && eventId.equals(status.getLastEventId())) {
       return;
     }
+    if (onlyDeploymentReplacesStop(status, source)) {
+      return;
+    }
     status.setState(state);
     status.setSource(source);
     status.setMessage(sanitize(message));
@@ -104,6 +107,14 @@ public class PipelineRuntimeStatusService {
   private void applyPlainStatus(
       UUID pipelineId, PipelineRuntimeState state, PipelineRuntimeSource source) {
     apply(pipelineId, state, source, null, null, null, null);
+  }
+
+  // A stopped process group stays stopped until the next deployment, and after a restart the
+  // runtime monitor reports it as ERROR ("is Stopped"), which would hide the cause of the stop.
+  private static boolean onlyDeploymentReplacesStop(
+      PipelineRuntimeStatus status, PipelineRuntimeSource source) {
+    return status.getState() == PipelineRuntimeState.STOPPED
+        && source == PipelineRuntimeSource.RUNTIME;
   }
 
   private static String sanitize(String value) {

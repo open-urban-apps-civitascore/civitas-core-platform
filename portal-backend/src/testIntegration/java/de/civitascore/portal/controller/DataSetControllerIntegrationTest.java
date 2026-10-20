@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.tuple;
 
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.configuration.CivitasProperties;
+import de.civitascore.portal.messaging.kafka.PipelineStatusListener;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.ConnectorType;
@@ -72,6 +73,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import tools.jackson.databind.JsonNode;
 
 @DisplayName("DataSet Controller Integration Tests")
 class DataSetControllerIntegrationTest
@@ -87,6 +89,7 @@ class DataSetControllerIntegrationTest
   @Autowired private DataSourceRepository dataSourceRepository;
   @Autowired private DataSetService dataSetService;
   @Autowired private PipelineClosureValidator pipelineClosureValidator;
+  @Autowired private PipelineStatusListener pipelineStatusListener;
   @Autowired private AllowedScopes allowedScopes;
   @Autowired private CivitasProperties civitasProperties;
   @Autowired private org.springframework.transaction.support.TransactionTemplate txTemplate;
@@ -959,6 +962,40 @@ class DataSetControllerIntegrationTest
       assertThat(output.getDataSetStatus())
           .as("Status should be DRAFT")
           .isEqualTo(DataSetStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("Should show a Pipeline stopped by the runtime monitor as STOPPED with its cause")
+    void shouldShowStoppedPipelineWithCause() {
+      DataSet dataSet = createDataSetWithRelationships();
+      UUID pipelineId = dataSet.getPipelines().iterator().next().getId();
+      pipelineStatusListener.handle(
+          """
+          {"type": "PIPELINE_STATUS_CHANGED", "pipelineId": "%s", "status": "STOPPED",
+           "source": "RUNTIME", "message": "API call \\"missing\\": GET /missing failed with status 404",
+           "occurredAt": "2026-10-20T08:00:00Z", "eventId": "%s"}
+          """
+              .formatted(pipelineId, UUID.randomUUID()));
+
+      ResponseEntity<JsonNode> response =
+          exchange(
+              DATASETS_ENDPOINT + "/" + dataSet.getId(),
+              HttpMethod.GET,
+              createAuthHeaders(),
+              null,
+              new ParameterizedTypeReference<>() {});
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      JsonNode runtimeStatus =
+          response.getBody().path("pipelines").values().stream()
+              .filter(pipeline -> pipeline.path("id").asString().equals(pipelineId.toString()))
+              .findFirst()
+              .orElseThrow()
+              .path("runtimeStatus");
+      assertThat(runtimeStatus.path("state").asString()).isEqualTo("STOPPED");
+      assertThat(runtimeStatus.path("source").asString()).isEqualTo("RUNTIME");
+      assertThat(runtimeStatus.path("message").asString())
+          .isEqualTo("API call \"missing\": GET /missing failed with status 404");
     }
 
     @Test
