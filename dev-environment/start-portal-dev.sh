@@ -320,6 +320,7 @@ mvn_in_container() {
     host_gid=$(id -g)
 
     docker run --rm \
+        --network civitas-network \
         -v "$(winhost "$PROJECT_ROOT"):${CP}project" \
         -v "$MVN_CACHE_VOLUME:${CP}var/maven/.m2" \
         -e "MAVEN_CONFIG=${CP}var/maven/.m2" \
@@ -621,14 +622,11 @@ if [ "$FLOWABLE_DB_READY" = false ]; then
 fi
 
 echo "  Running database migrations..."
-FLYWAY_MIGRATIONS="$SCRIPT_DIR/../portal-backend/src/main/resources/db/migration"
-if docker run --rm --network civitas-network \
-    -v "$(winhost "$FLYWAY_MIGRATIONS"):${CP}flyway/sql:ro" \
-    flyway/flyway:11-alpine \
-    -url=jdbc:postgresql://postgres-portal:5432/portal_backend \
-    -user=admin -password=admin \
-    -locations=filesystem:${CP}flyway/sql \
-    migrate; then
+if mvn_in_container "$SCRIPT_DIR/../portal-backend" \
+    -Dflyway.url=jdbc:postgresql://postgis-dev-env:5432/portal_backend \
+    -Dflyway.user=admin \
+    -Dflyway.password=admin \
+    -DskipTests compile flyway:migrate; then
     echo "  Database migrations complete"
 else
     echo "  WARNING: Database migrations failed (AuthZ services may not work until backend starts)"
