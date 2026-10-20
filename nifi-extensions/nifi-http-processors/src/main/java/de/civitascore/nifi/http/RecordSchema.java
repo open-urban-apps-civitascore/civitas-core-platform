@@ -38,6 +38,8 @@ final class RecordSchema {
 
   private static final int REPORTED_VIOLATIONS = 3;
 
+  private static final String NOT_JSON = "the response is not JSON";
+
   private static final ObjectMapper MAPPER =
       JsonMapper.builder().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
 
@@ -96,10 +98,10 @@ final class RecordSchema {
     try {
       response = MAPPER.readTree(body);
     } catch (IOException e) {
-      return Optional.of("the response is not JSON");
+      return Optional.of(NOT_JSON);
     }
     if (response == null || response.isMissingNode()) {
-      return Optional.of("the response is not JSON");
+      return Optional.of(NOT_JSON);
     }
     if (!response.isArray() && !response.isObject()) {
       return Optional.of(
