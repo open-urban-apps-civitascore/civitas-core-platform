@@ -408,7 +408,12 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
     it('keeps DRAFT selectable for the only available version of a datastructure', async () => {
       const user = userEvent.setup()
-      renderComponent({ datastructure: { ...mockDatastructure, dataStructureVersions: [] } })
+
+      const onlyAvailableVersion: DatastructureVersion = {
+        ...mockVersion,
+        dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
+      }
+      renderComponent({ version: onlyAvailableVersion })
 
       await openStatusDropdown(user)
 
