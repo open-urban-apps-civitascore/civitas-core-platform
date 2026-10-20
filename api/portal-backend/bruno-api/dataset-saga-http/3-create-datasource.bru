@@ -21,7 +21,17 @@ body:json {
       "apiCalls": [
         { "name": "things", "path": "/things" },
         { "name": "missing", "path": "/missing" },
-        { "name": "invalid", "path": "/invalid" }
+        { "name": "invalid", "path": "/invalid" },
+        {
+          "name": "pages",
+          "path": "/pages",
+          "pagination": {
+            "type": "PAGE_NUMBER",
+            "pageParameter": "page",
+            "pageSizeParameter": "size",
+            "pageSize": 2
+          }
+        }
       ]
     },
     "dataStructureVersionId": "{{httpSagaDataStructureVersionId}}",

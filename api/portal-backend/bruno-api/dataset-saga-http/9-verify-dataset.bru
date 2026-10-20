@@ -1,7 +1,7 @@
 meta {
   name: 9. Verify DataSet (release saga complete)
   type: http
-  seq: 17
+  seq: 19
 }
 
 get {
@@ -62,7 +62,7 @@ tests {
     expect(res.body.pendingSagaType).to.be.null;
   });
 
-  test("Status is AVAILABLE (the three HTTP/REST Pipelines deployed)", function() {
+  test("Status is AVAILABLE (the four HTTP/REST Pipelines deployed)", function() {
     // READY means that the saga failed and compensated, for example because the NiFi
     // config-adapter refused an HTTP/REST Data source without its Data structure.
     expect(res.body.dataSetStatus).to.equal('AVAILABLE');

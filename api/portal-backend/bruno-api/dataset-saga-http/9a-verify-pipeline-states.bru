@@ -1,7 +1,7 @@
 meta {
   name: 9a. Verify the runtime states of the Pipelines
   type: http
-  seq: 18
+  seq: 20
 }
 
 get {
@@ -67,6 +67,10 @@ tests {
     expect(statusOf(bru.getVar('httpSagaThingsPipelineId')).state).to.equal('OK');
   });
 
+  test("The pages Pipeline is OK", function() {
+    expect(statusOf(bru.getVar('httpSagaPagesPipelineId')).state).to.equal('OK');
+  });
+
   test("The missing Pipeline is STOPPED on the 404 of its API call", function() {
     const status = statusOf(bru.getVar('httpSagaMissingPipelineId'));
     expect(status.state).to.equal('STOPPED');
@@ -88,5 +92,5 @@ tests {
 docs {
   Polls the Dataset until the runtime monitor has stopped the `missing` and the `invalid`
   Pipeline. A stop leaves the Dataset released and the other Pipelines running, so the `things`
-  Pipeline stays `OK`.
+  and the `pages` Pipeline stay `OK`.
 }

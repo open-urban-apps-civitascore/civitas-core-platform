@@ -1,7 +1,7 @@
 meta {
   name: 9b. Verify the Things in FROST via APISIX
   type: http
-  seq: 19
+  seq: 21
 }
 
 get {
@@ -15,6 +15,11 @@ script:pre-request {
   // FROST would show here.
   const axios = require('axios');
   const url = `${bru.getVar('httpSagaPublicUrl')}/things/Things`;
+  const expected = [
+    'http-saga-things-1', 'http-saga-things-2',
+    'http-saga-pages-1', 'http-saga-pages-2', 'http-saga-pages-3', 'http-saga-pages-4',
+    'http-saga-pages-5',
+  ];
 
   const form = [
     ['grant_type', 'password'],
@@ -35,8 +40,9 @@ script:pre-request {
     try {
       resp = await axios.get(url, { headers: { 'Authorization': `Bearer ${token}` } });
     } catch (e) { /* transient; retry */ }
-    const things = (resp && resp.data && resp.data.value) || [];
-    if (things.length >= 2) break;
+    const references = ((resp && resp.data && resp.data.value) || [])
+      .map(thing => thing.properties && thing.properties.reference);
+    if (expected.every(reference => references.includes(reference))) break;
     await new Promise(r => setTimeout(r, 2000));
   }
 }
@@ -51,6 +57,13 @@ tests {
 
   test("FROST holds the Things of the things API call", function() {
     expect(references()).to.include.members(['http-saga-things-1', 'http-saga-things-2']);
+  });
+
+  test("FROST holds the Things of all three pages of the pages API call", function() {
+    expect(references()).to.include.members([
+      'http-saga-pages-1', 'http-saga-pages-2', 'http-saga-pages-3', 'http-saga-pages-4',
+      'http-saga-pages-5',
+    ]);
   });
 
   test("FROST holds no record of the invalid response", function() {
