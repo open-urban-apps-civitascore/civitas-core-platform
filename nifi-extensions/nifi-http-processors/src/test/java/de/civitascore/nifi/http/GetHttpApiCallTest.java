@@ -349,7 +349,14 @@ class GetHttpApiCallTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"<html>val-1f3e</html>", "{\"stationid\":", "[] [\"val-1f3e\"]", " "})
+  @ValueSource(
+      strings = {
+        "<html>val-1f3e</html>",
+        "{\"stationid\":",
+        "[] [\"val-1f3e\"]",
+        "[{\"stationid\":\"a1\"},",
+        "[{\"lat\":\"x\"}] <html>val-1f3e</html>"
+      })
   void onTrigger_whenTheResponseIsNotJson_routesToStop(String body) throws InitializationException {
     try (ApiEndpoint endpoint = ApiEndpoint.answering(200, body)) {
       TestRunner runner = runner(endpoint.baseUrl());
@@ -359,6 +366,93 @@ class GetHttpApiCallTest {
       assertRouted(
           runner, GetHttpApiCall.STOP, 200, "API call \"Stations\": the response is not JSON");
       assertFalse(logged(runner.getLogger()).toString().contains("val-1f3e"));
+    }
+  }
+
+  @Test
+  void onTrigger_whenTheResponseIsAnObjectThatViolates_routesToStopAsRecordZero()
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, "{\"lat\":\"x\"}")) {
+      TestRunner runner = runner(endpoint.baseUrl());
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": 1 of 1 records violate the Data structure:"
+              + " record 0: /lat type; record 0: required stationid");
+    }
+  }
+
+  @Test
+  void onTrigger_whenAPropertyNameHoldsATildeAndASlash_escapesItInThePointer()
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, "[{\"a/b~c\":\"x\"}]")) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.setProperty(
+          GetHttpApiCall.RECORD_SCHEMA, "{\"properties\": {\"a/b~c\": {\"type\": \"number\"}}}");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": 1 of 1 records violate the Data structure:"
+              + " record 0: /a~1b~0c type");
+    }
+  }
+
+  @Test
+  void onTrigger_whenAViolationIsBelowAPropertyTheSchemaDoesNotDeclare_namesThatPropertyStar()
+      throws InitializationException {
+    String schema =
+        """
+        {"type": "object",
+         "properties": {"sensors": {"type": "object", "additionalProperties": {
+           "properties": {"readings": {"items": {"properties": {"value": {"type": "number"}}}}}}}},
+         "patternProperties": {"^x-": {"type": "number"}}}""";
+    String body =
+        "[{\"sensors\":{\"k-91aa\\nFORGED\":{\"readings\":[{\"value\":1},{\"value\":\"v\"}]}},"
+            + "\"x-k-91aa\":\"v\"}]";
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, body)) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, schema);
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": 1 of 1 records violate the Data structure:"
+              + " record 0: /sensors/*/readings/1/value type; record 0: /* type");
+      for (String text : logged(runner.getLogger())) {
+        assertFalse(text.contains("k-91aa"), text);
+      }
+    }
+  }
+
+  @Test
+  void onTrigger_withALineBreakInARequiredPropertyOfTheRecordSchema_escapesItInLogsAndAttributes()
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, "[{}]")) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, "{\"required\": [\"sta\\r\\ntionid\"]}");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": 1 of 1 records violate the Data structure:"
+              + " record 0: required sta\\r\\ntionid");
+      for (String text : logged(runner.getLogger())) {
+        assertFalse(text.matches("(?s).*[\\r\\n].*"), text);
+      }
     }
   }
 
@@ -537,6 +631,23 @@ class GetHttpApiCallTest {
       runner.run();
 
       runner.assertTransferCount(GetHttpApiCall.SUCCESS, 0);
+      runner.assertTransferCount(GetHttpApiCall.FAILURE, 0);
+      assertTrue(runner.getLogger().getErrorMessages().isEmpty());
+      assertTrue(runner.getLogger().getWarnMessages().isEmpty());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {" ", "\r\n\t "})
+  void onTrigger_whenTheBodyHoldsOnlyWhitespace_createsNoFlowFile(String body)
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, body)) {
+      TestRunner runner = runner(endpoint.baseUrl());
+
+      runner.run();
+
+      runner.assertTransferCount(GetHttpApiCall.SUCCESS, 0);
+      runner.assertTransferCount(GetHttpApiCall.STOP, 0);
       runner.assertTransferCount(GetHttpApiCall.FAILURE, 0);
       assertTrue(runner.getLogger().getErrorMessages().isEmpty());
       assertTrue(runner.getLogger().getWarnMessages().isEmpty());

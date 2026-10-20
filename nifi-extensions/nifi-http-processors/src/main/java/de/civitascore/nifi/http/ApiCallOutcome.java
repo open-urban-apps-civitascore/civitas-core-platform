@@ -11,16 +11,24 @@ package de.civitascore.nifi.http;
 
 import java.io.IOException;
 import java.io.InputStream;
+import org.apache.nifi.web.client.api.HttpResponseEntity;
 
 /** What one request of an API call gave. */
 sealed interface ApiCallOutcome {
 
   /**
-   * A 2xx response with a body whose records agree with the record schema.
+   * A 2xx response with a body. The caller reads the content and closes the response.
    *
-   * @param content the body as the server sent it, read into memory
+   * @param content the body as the server sent it, from its first byte
    */
-  record Body(int status, InputStream content) implements ApiCallOutcome {}
+  record Body(int status, InputStream content, HttpResponseEntity response)
+      implements ApiCallOutcome, AutoCloseable {
+
+    @Override
+    public void close() {
+      ApiCallClient.discard(response);
+    }
+  }
 
   /** A 2xx response without a body, for example a 204. */
   record NoBody(int status) implements ApiCallOutcome {}
@@ -29,12 +37,15 @@ sealed interface ApiCallOutcome {
    * A request that failed.
    *
    * @param status the status of the response, 0 when no response came
-   * @param message names the API call, the method and the path, never the base URL, the query, a
-   *     header or a credential
+   * @param message with each control character and line separator escaped, so that no part of it
+   *     can start a log line of its own
    */
   record Failure(ErrorKind kind, int status, String message) implements ApiCallOutcome {
 
-    /** Whether the next run fails again unless the configuration or the Data structure changes. */
+    public Failure {
+      message = withEscapedControlCharacters(message);
+    }
+
     boolean fatal() {
       return kind == ErrorKind.FATAL;
     }
@@ -70,6 +81,29 @@ sealed interface ApiCallOutcome {
     static Failure ofRejectedRequest(String request, IllegalArgumentException cause) {
       return new Failure(
           ErrorKind.FATAL, 0, request + " failed: " + cause.getClass().getSimpleName());
+    }
+
+    private static String withEscapedControlCharacters(String text) {
+      StringBuilder escaped = new StringBuilder(text.length());
+      for (char c : text.toCharArray()) {
+        switch (c) {
+          case '\r' -> escaped.append("\\r");
+          case '\n' -> escaped.append("\\n");
+          default ->
+              escaped.append(
+                  isControlOrLineSeparator(c)
+                      ? String.format("\\u%04x", (int) c)
+                      : String.valueOf(c));
+        }
+      }
+      return escaped.toString();
+    }
+
+    private static boolean isControlOrLineSeparator(char c) {
+      int type = Character.getType(c);
+      return type == Character.CONTROL
+          || type == Character.LINE_SEPARATOR
+          || type == Character.PARAGRAPH_SEPARATOR;
     }
 
     /** The first I/O exception of the chain; the wrappers around it say nothing more. */

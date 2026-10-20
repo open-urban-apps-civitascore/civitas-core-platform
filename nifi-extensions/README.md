@@ -248,7 +248,7 @@ attempt. `stop` carries an error that the next run cannot repair: the flow stops
 | Result | Relationship | Log level |
 |---|---|---|
 | 2xx, each record agrees with the `Record Schema` | `success`, the body unchanged, `mime.type` `application/json` | none |
-| 2xx without a body, for example 204 | none, no FlowFile | debug |
+| 2xx without a body or with only whitespace, for example 204 | none, no FlowFile | debug |
 | 3xx, 4xx except 408 and 429 | `stop` | error |
 | A request that the web client refuses, status `0` | `stop` | error |
 | 2xx, the body is not JSON, or is a JSON scalar | `stop` | error |
@@ -263,8 +263,8 @@ A FlowFile on `success` carries `http.status.code` and `http.request.path`. A Fl
 `failure` is empty and carries `http.request.path`, `http.error.status` and `http.error.message`.
 `http.error.status` is the status of the response, or `0` when no response came. The message is the
 one the log entry and the bulletin show. It names the API call and its path, never the base URL. A
-control character or line separator in the name appears as `\r`, `\n` or `\uXXXX`, so it cannot
-start a forged log line; every other character stays as entered:
+control character or line separator in the message appears as `\r`, `\n` or `\uXXXX`, so no part
+of it can start a forged log line; every other character stays as entered:
 
 ```text
 API call "Get stations": GET /stations failed with status 404
@@ -283,17 +283,19 @@ query; the message names its class alone.
 
 ### Response validation
 
-The processor reads a 2xx body into memory and parses it once. A JSON array holds one record in each
-element, and `[]` holds none. A JSON object is one record. A JSON scalar, or a body that is not JSON,
-goes to `stop`. Each record is validated against `Record Schema`; one invalid record sends the whole
-response to `stop`, and no FlowFile goes to `success`. An array element that is not a JSON object is an
-invalid record with the keyword `type`, also when `Record Schema` allows it. A body that passes is an
-object or an array of objects, so the record reader behind the processor skips no data.
+The processor writes a 2xx body into its FlowFile and then reads it one record at a time, so only
+one record is in memory. A JSON array holds one record in each element, and `[]` holds none. A JSON
+object is one record. A JSON scalar, or a body that is not JSON, goes to `stop`. Each record is
+validated against `Record Schema`; one invalid record sends the whole response to `stop`, and no
+FlowFile goes to `success`. An array element that is not a JSON object is an invalid record with the
+keyword `type`, also when `Record Schema` allows it. A body that passes is an object or an array of
+objects, so the record reader behind the processor skips no data.
 
 The cause names the number of invalid records and at most the first 3 violations: the index of the
-record from 0, the JSON Pointer inside the record and the keyword. For `required`, it also names the
-missing property, which comes from the schema. It never uses the message of the validator, because
-some messages quote the value.
+record from 0, the JSON Pointer inside the record and the keyword. In the JSON Pointer, a property
+name that no `properties` of the schema declares appears as `*`, because it comes from the response.
+For `required`, it also names the missing property, which comes from the schema. It never uses the
+message of the validator, because some messages quote the value.
 
 The validator is the networknt `json-schema-validator` in the version of Model Forge, with draft
 2020-12 and the keyword and format settings of Model Forge (`ModelForgeKeywordsTest` checks that the

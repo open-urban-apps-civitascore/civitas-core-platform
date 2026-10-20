@@ -13,7 +13,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -37,6 +36,7 @@ import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
+import org.apache.nifi.processor.exception.FlowFileAccessException;
 import org.apache.nifi.processor.util.StandardValidators;
 import org.apache.nifi.web.client.provider.api.WebClientServiceProvider;
 
@@ -219,6 +219,7 @@ public class GetHttpApiCall extends AbstractProcessor {
 
   private volatile ApiCall apiCall;
   private volatile ApiCallClient client;
+  private volatile RecordSchema recordSchema;
 
   @Override
   protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
@@ -258,6 +259,7 @@ public class GetHttpApiCall extends AbstractProcessor {
   public void readConfiguration(ProcessContext context)
       throws InvalidApiCallException, InvalidRecordSchemaException {
     apiCall = ApiCallParser.parse(context.getProperty(API_CALL).getValue());
+    recordSchema = RecordSchema.compile(context.getProperty(RECORD_SCHEMA).getValue());
     client =
         new ApiCallClient(
             context
@@ -265,8 +267,7 @@ public class GetHttpApiCall extends AbstractProcessor {
                 .asControllerService(WebClientServiceProvider.class)
                 .getWebClientService(),
             context.getProperty(BASE_URL).getValue(),
-            context.getProperty(BODY_READ_TIMEOUT).asDuration(),
-            RecordSchema.compile(context.getProperty(RECORD_SCHEMA).getValue()));
+            context.getProperty(BODY_READ_TIMEOUT).asDuration());
   }
 
   @Override
@@ -278,20 +279,54 @@ public class GetHttpApiCall extends AbstractProcessor {
             .authentication(context);
 
     switch (client.send(apiCall, authentication)) {
-      case ApiCallOutcome.Body body -> transferBody(session, body);
-      case ApiCallOutcome.NoBody noBody ->
-          getLogger().debug("{} returned {} without a body", apiCall.describe(), noBody.status());
+      case ApiCallOutcome.Body body -> {
+        try (body) {
+          transferBody(session, body);
+        }
+      }
+      case ApiCallOutcome.NoBody noBody -> logNoBody(noBody.status());
       case ApiCallOutcome.Failure failure -> transferFailure(session, failure);
     }
   }
 
+  /** Validates the body from its FlowFile, so that only one record at a time is in memory. */
   private void transferBody(ProcessSession session, ApiCallOutcome.Body body) {
-    Map<String, String> attributes = new LinkedHashMap<>();
-    attributes.put(CoreAttributes.MIME_TYPE.key(), JSON);
-    attributes.put(STATUS_CODE, Integer.toString(body.status()));
-    attributes.put(REQUEST_PATH, apiCall.path());
-    FlowFile flowFile = session.importFrom(body.content(), session.create());
-    session.transfer(session.putAllAttributes(flowFile, attributes), SUCCESS);
+    FlowFile flowFile = session.create();
+    try {
+      flowFile = session.importFrom(body.content(), flowFile);
+    } catch (FlowFileAccessException e) {
+      session.remove(flowFile);
+      transferFailure(session, ApiCallOutcome.Failure.ofTransport(apiCall.describe(), e));
+      return;
+    }
+    switch (recordSchema.verdict(session, flowFile)) {
+      case RecordSchema.Verdict.Agrees() ->
+          session.transfer(
+              session.putAllAttributes(
+                  flowFile,
+                  Map.of(
+                      CoreAttributes.MIME_TYPE.key(),
+                      JSON,
+                      STATUS_CODE,
+                      Integer.toString(body.status()),
+                      REQUEST_PATH,
+                      apiCall.path())),
+              SUCCESS);
+      case RecordSchema.Verdict.Blank() -> {
+        session.remove(flowFile);
+        logNoBody(body.status());
+      }
+      case RecordSchema.Verdict.Rejected(String reason) -> {
+        session.remove(flowFile);
+        transferFailure(
+            session, ApiCallOutcome.Failure.ofRejectedBody(apiCall.label(), body.status(), reason));
+      }
+    }
+  }
+
+  private void logNoBody(int status) {
+    getLogger()
+        .debug("{} {} returned {} without a body", apiCall.method().name(), apiCall.path(), status);
   }
 
   /** Logs the error, which raises the bulletin, and sends an empty FlowFile that describes it. */
@@ -304,11 +339,17 @@ public class GetHttpApiCall extends AbstractProcessor {
       getLogger().warn(failure.message());
       relationship = FAILURE;
     }
-    Map<String, String> attributes = new LinkedHashMap<>();
-    attributes.put(REQUEST_PATH, apiCall.path());
-    attributes.put(ERROR_STATUS, Integer.toString(failure.status()));
-    attributes.put(ERROR_MESSAGE, failure.message());
-    session.transfer(session.putAllAttributes(session.create(), attributes), relationship);
+    session.transfer(
+        session.putAllAttributes(
+            session.create(),
+            Map.of(
+                REQUEST_PATH,
+                apiCall.path(),
+                ERROR_STATUS,
+                Integer.toString(failure.status()),
+                ERROR_MESSAGE,
+                failure.message())),
+        relationship);
   }
 
   private static String baseUrlViolation(String input) {
