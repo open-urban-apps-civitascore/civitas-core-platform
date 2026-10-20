@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.nifi.rest;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
@@ -184,6 +185,56 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
   }
 
   @Test
+  void paginatedApiCallReadsEachPageUntilAShortPage() throws Exception {
+    registerPage("/pages", 0, "[{\"id\":\"s1\",\"name\":\"A\"},{\"id\":\"s2\",\"name\":\"B\"}]");
+    registerPage("/pages", 1, "[{\"id\":\"s3\",\"name\":\"C\"},{\"id\":\"s4\",\"name\":\"D\"}]");
+    registerPage("/pages", 2, "[{\"id\":\"s5\",\"name\":\"E\"}]");
+
+    deploy(
+        "http-pages",
+        map(
+            """
+            { "name": "readings", "method": "GET", "path": "/pages",
+              "pagination": { "type": "PAGE_NUMBER", "pageParameter": "page",
+                              "pageSizeParameter": "size", "pageSize": 2 } }
+            """),
+        "http_pages");
+
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(2))
+        .ignoreExceptions()
+        .until(() -> names("http_pages").equals(List.of("A", "B", "C", "D", "E")));
+    assertEquals(0, pageRequests("/pages", 3));
+  }
+
+  @Test
+  void paginatedApiCallStopsAfterTheEndPage() throws Exception {
+    registerPage("/end-page", 1, "[{\"id\":\"s1\",\"name\":\"A\"},{\"id\":\"s2\",\"name\":\"B\"}]");
+    registerPage("/end-page", 2, "[{\"id\":\"s3\",\"name\":\"C\"},{\"id\":\"s4\",\"name\":\"D\"}]");
+    registerPage("/end-page", 3, "[{\"id\":\"s5\",\"name\":\"E\"},{\"id\":\"s6\",\"name\":\"F\"}]");
+    registerPage("/end-page", 4, "[{\"id\":\"s7\",\"name\":\"G\"},{\"id\":\"s8\",\"name\":\"H\"}]");
+
+    deploy(
+        "http-end-page",
+        map(
+            """
+            { "name": "readings", "method": "GET", "path": "/end-page",
+              "pagination": { "type": "PAGE_NUMBER", "pageParameter": "page",
+                              "pageSizeParameter": "size", "pageSize": 2,
+                              "startPage": 1, "endPage": 3 } }
+            """),
+        "http_end_page");
+
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(2))
+        .ignoreExceptions()
+        .until(() -> names("http_end_page").equals(List.of("A", "B", "C", "D", "E", "F")));
+    assertEquals(0, pageRequests("/end-page", 4));
+  }
+
+  @Test
   void redirectStopsThePipelineAndIsNotFollowed() throws Exception {
     wireMock.register(
         get(urlPathEqualTo("/moved"))
@@ -277,13 +328,17 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
   }
 
   private String deploy(String pipelineId, String path, String table) throws Exception {
+    return deploy(pipelineId, Map.of("name", "readings", "method", "GET", "path", path), table);
+  }
+
+  private String deploy(String pipelineId, Map<String, Object> apiCall, String table)
+      throws Exception {
     Datasource source = new Datasource();
     source.setId("ds-" + pipelineId);
     source.setType("http");
     source.handleUnknownProperty("element", "el-1");
     source.handleUnknownProperty("baseUrl", "http://api:8080");
-    source.handleUnknownProperty(
-        "apiCalls", List.of(Map.of("name", "readings", "method", "GET", "path", path)));
+    source.handleUnknownProperty("apiCalls", List.of(apiCall));
     Map<String, Object> graph =
         map(
             """
@@ -366,6 +421,23 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
         .until(() -> requests(path) >= count);
   }
 
+  /** Registers the response of one page; a request for a page without a stub gets a 404. */
+  private static void registerPage(String path, int page, String body) {
+    wireMock.register(
+        get(urlPathEqualTo(path))
+            .withQueryParam("page", equalTo(String.valueOf(page)))
+            .withQueryParam("size", equalTo("2"))
+            .willReturn(okJson(body)));
+  }
+
+  private static int pageRequests(String path, int page) {
+    return wireMock
+        .find(
+            getRequestedFor(urlPathEqualTo(path))
+                .withQueryParam("page", equalTo(String.valueOf(page))))
+        .size();
+  }
+
   private static int requests(String path) {
     return wireMock.find(getRequestedFor(urlPathEqualTo(path))).size();
   }
@@ -401,6 +473,8 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
               "http_redirect",
               "http_gone",
               "http_invalid",
+              "http_pages",
+              "http_end_page",
               "http_unavailable",
               "http_slow")) {
         st.execute("CREATE TABLE " + table + " (id text PRIMARY KEY, name text)");
