@@ -388,6 +388,7 @@ a last page, so no error shows.
 
 The request code knows no NiFi session. The page loop asks a `Pagination` for the first page and,
 from the record count of a page, for the next one. The `Pagination` also tells if each page must be
-a JSON array. A new pagination method adds an implementation of `Pagination`, and the page loop
-stays as it is. A new authentication type adds a
+a JSON array. An offset pagination adds an implementation of `Pagination`, and the page loop stays
+as it is. A cursor or a link header needs the response of a page, which `Pagination` does not get.
+A new authentication type adds a
 value of `Authentication Type`, its properties and a class that implements `Authentication`.
