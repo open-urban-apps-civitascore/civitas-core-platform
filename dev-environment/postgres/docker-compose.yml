@@ -1,11 +1,24 @@
 services:
-  postgres-portal:
-    image: postgres:16-alpine
-    container_name: civitas-postgres-portal
+  postgis-dev-env:
+    image: imresamu/postgis:18-3.6.1-bookworm@sha256:b69c48439e08c05127d47ae6ad8a2bb41934ff0161773089759f2f15fb8207d7
+    mem_limit: 512m
+    container_name: postgis-dev-env
     environment:
       POSTGRES_DB: portal_backend
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
+      KEYCLOAK_DB_NAME: ${KEYCLOAK_DB_NAME:-keycloak}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
+      FROST_DB_NAME: ${FROST_DB_NAME:-sensorthings}
+      FROST_DB_PASSWORD: ${FROST_DB_PASSWORD:-changeme-generate-a-strong-password}
+      GEOSERVER_DB_NAME: ${GEOSERVER_DB_NAME:-geoserver}
+      GEOSERVER_DB_PASSWORD: ${GEOSERVER_DB_PASSWORD:-geoserver}
+      MODEL_FORGE_DB_NAME: ${MODEL_FORGE_DB_NAME:-model_forge_admin}
+      MODEL_FORGE_DB_USER: ${MODEL_FORGE_DB_USER:-model_forge}
+      MODEL_FORGE_DB_PASSWORD: ${MODEL_FORGE_DB_PASSWORD:-model_forge}
+      NIFI_DEMO_DB_NAME: ${NIFI_DEMO_DB_NAME:-nifi_demo}
+      NIFI_DEMO_DB_USER: ${NIFI_DEMO_DB_USER:-nifi}
+      NIFI_DEMO_DB_PASSWORD: ${NIFI_DEMO_DB_PASSWORD:-nifi-demo-password}
       # Use md5 instead of scram-sha-256 for local dev only.
       # Reason: PostgreSQL JDBC driver 42.7.x SCRAM authentication fails on
       # Java 25 ("Protocol error. Session setup failed"). No upstream fix as of
@@ -18,11 +31,13 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_portal_data:/var/lib/postgresql/data
+      - postgres_portal_data:/var/lib/postgresql
       # Bootstrap the Flowable saga database on a fresh volume (runs after init, race-free).
       - ./initdb:/docker-entrypoint-initdb.d:ro
     networks:
-      - civitas-network
+      civitas-network:
+        aliases:
+          - postgis
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d portal_backend"]
       interval: 5s

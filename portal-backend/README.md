@@ -38,7 +38,7 @@ This option is useful if you want to **run the Portal Backend locally** for deve
 
 ```bash
 cd ../dev-environment/backend
-docker compose up -d postgres-portal postgres-keycloak keycloak kafka config-adapter apisix
+docker compose up -d postgis-dev-env keycloak kafka config-adapter apisix
 ```
 
 Only infrastructure services are started. The Portal Backend container is **not started** in this mode.
@@ -246,7 +246,7 @@ lsof -i :8089 :8088 :8080 :5432 :9092
 
 # Database access
 cd ../dev-environment/backend
-docker compose exec postgres-portal psql -U admin -d portal_backend -c "\dt"
+docker compose exec postgis-dev-env psql -U admin -d portal_backend -c "\dt"
 
 # Logs
 docker compose logs -f portal-backend

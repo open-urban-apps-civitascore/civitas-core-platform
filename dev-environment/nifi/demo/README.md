@@ -56,10 +56,13 @@ part of the file by design), and start the processors.
 ### 1. Start the containers
 
 ```bash
+# Shared PostGIS database (skip if the main dev stack is running)
+docker network create civitas-network 2>/dev/null || true
+cd dev-environment/postgres && docker compose up -d
 # NiFi itself
-cd dev-environment/nifi && docker compose up -d
-# Demo sidecars: Mosquitto + PostGIS
-cd dev-environment/nifi/demo && docker compose up -d
+cd ../nifi && docker compose up -d
+# Demo broker: Mosquitto (the database is in the shared PostGIS stack)
+cd demo && docker compose up -d
 ```
 
 This brings up:
@@ -68,7 +71,7 @@ This brings up:
 |-------------|---------------------------------|------------------------------------------|
 | NiFi UI     | `https://localhost:8443/nifi`   | login via Keycloak (OIDC)                |
 | Mosquitto   | `localhost:1883`                | anonymous                                |
-| PostGIS     | `localhost:5435`, DB `nifi_demo`| `nifi` / `nifi-demo-password`            |
+| PostGIS     | `localhost:5432`, DB `nifi_demo`| `nifi` / `nifi-demo-password`            |
 
 ### 2. Deploy the pipeline
 
@@ -103,7 +106,7 @@ cd dev-environment/nifi/demo
 ### 4. See it arrive in PostGIS
 
 ```bash
-docker exec -it -e PGPASSWORD=nifi-demo-password civitas-nifi-demo-postgis \
+docker exec -it -e PGPASSWORD=nifi-demo-password postgis-dev-env \
   psql -U nifi -d nifi_demo -c \
   "SELECT station_id, temperature, ST_AsText(geom), measurement_time FROM sensor_observations;"
 ```
@@ -138,11 +141,11 @@ cd dev-environment/nifi/demo
 | Want to see…             | Command                                                                                     |
 |--------------------------|----------------------------------------------------------------------------------------------|
 | MQTT messages live       | `docker exec -it civitas-nifi-demo-mosquitto mosquitto_sub -h localhost -t 'sensors/#' -v`   |
-| PostGIS rows interactive | `docker exec -it -e PGPASSWORD=nifi-demo-password civitas-nifi-demo-postgis psql -U nifi -d nifi_demo` |
+| PostGIS rows interactive | `docker exec -it -e PGPASSWORD=nifi-demo-password postgis-dev-env psql -U nifi -d nifi_demo` |
 | Flow state in NiFi UI    | open `https://localhost:8443/nifi`, log in, right-click a processor → **View data provenance** |
 | Pipeline health check    | `npx --yes @usebruno/cli@3.3.0 run 02_verify --env local --insecure` (5 Passed = healthy)    |
 
-For a GUI DB browser: DBeaver / pgAdmin against `localhost:5435`,
+For a GUI DB browser: DBeaver / pgAdmin against `localhost:5432`,
 user `nifi`, password `nifi-demo-password`, database `nifi_demo`.
 
 ---
@@ -200,8 +203,8 @@ MQTT_VERSION=mqttv5 ./scripts/publish-loop.sh
   with the same name both subscribe to the same MQTT topic, and which one
   receives a given message is undefined. If the Bruno cleanup ever stalls,
   `./scripts/cleanup.sh` is the robust fallback.
-- **PostGIS sidecar is on port 5435**, not 5434 — port 5434 is already used
-  by `dev-environment/geoserver`'s own database.
+- **PostGIS uses the shared server on port 5432**. The `nifi_demo` database
+  has its own user and schema on that server.
 
 ---
 
@@ -209,8 +212,7 @@ MQTT_VERSION=mqttv5 ./scripts/publish-loop.sh
 
 ```
 demo/
-├── docker-compose.yml             # Mosquitto + PostGIS sidecars
-├── init/01-schema.sql             # PostGIS extension + the target table
+├── docker-compose.yml             # Mosquitto sidecar
 ├── mosquitto/mosquitto.conf       # broker config (anonymous, port 1883)
 ├── MQTT_TO_POSTGIS_demo.snapshot.json   # the flow as a single JSON file
 ├── scripts/

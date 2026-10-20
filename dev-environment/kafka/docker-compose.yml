@@ -2,6 +2,7 @@
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.0
+    mem_limit: 256m
     hostname: zookeeper
     container_name: civitas-zookeeper
     ports:
@@ -14,6 +15,7 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.6.0
+    mem_limit: 768m
     hostname: kafka
     container_name: civitas-kafka
     depends_on:
@@ -43,6 +45,7 @@ services:
 
   kafka-ui:
     image: provectuslabs/kafka-ui:v0.7.2@sha256:8f2ff02d64b0a7a2b71b6b3b3148b85f66d00ec20ad40c30bdcd415d46d31818
+    mem_limit: 256m
     container_name: civitas-kafka-ui
     depends_on:
       - kafka

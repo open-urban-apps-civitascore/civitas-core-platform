@@ -14,7 +14,7 @@
 # backend created.
 #
 # Same database as local-demo.md's default (portal_backend, admin/admin) — it is
-# local-demo.md's STANDALONE section that switches to a SEPARATE database
+# local-demo.md's STANDALONE section that switches to a SEPARATE logical database
 # (model_forge_admin, model_forge/model_forge) and therefore never shows portal-backend's
 # artifacts.
 #
@@ -44,10 +44,9 @@ KC_USERNAME="${KC_USERNAME:-dev@civitas.local}"
 KC_PASSWORD="${KC_PASSWORD:-dev123}"
 
 # --- Admin UI, pointed at portal-backend's DB / model_forge schema -----------
-# 8092 is the Admin UI's own default, but start-portal-dev.sh already runs the
-# model-forge-admin-ui container there; 8090=Kafka UI and 8091=authz-repository are
-# taken too — hence 8093 for this by-hand instance.
-ADMIN_UI_PORT="${ADMIN_UI_PORT:-8093}"
+# The main stack publishes the Admin UI on 8092; use another port for this
+# by-hand instance. 8090=Kafka UI and 8091=authz-repository.
+ADMIN_UI_PORT="${ADMIN_UI_PORT:-8095}"
 PORTAL_DB_URL="${PORTAL_DB_URL:-jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable}"
 PORTAL_DB_USER="${PORTAL_DB_USER:-admin}"
 PORTAL_DB_PASS="${PORTAL_DB_PASS:-admin}"

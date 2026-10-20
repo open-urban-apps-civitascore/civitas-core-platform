@@ -60,12 +60,12 @@ the `model_forge` schema itself on first start. Anything you see there is what *
 there through these pages. To browse the bundled OGC SensorThings examples instead, use
 standalone mode below.
 
-To run it by hand rather than as a container — pick a free port, since its default 8092 is
-already taken by the container from Step 1 (and 8090 is Kafka UI):
+To run it by hand rather than as a container alongside Step 1, use a different port
+from the main stack's 8092 (8090 is Kafka UI and 8091 is AuthZ Repository):
 
 ```bash
 cd ../../model-forge/model-forge-admin-ui
-SERVER_PORT=8093 mvn spring-boot:run
+SERVER_PORT=8095 mvn spring-boot:run
 ```
 
 > The Admin UI is read-WRITE and unauthenticated — imports/edits/deletes here change the
@@ -74,23 +74,23 @@ SERVER_PORT=8093 mvn spring-boot:run
 ### Standalone mode — own seeded database (no portal-backend)
 
 To explore the bundled OGC SensorThings examples without running portal-backend,
-point the Admin UI at its own database (started from this folder) and enable the
-seed. That dedicated PostgreSQL uses **host port 5439** (5432 is the main stack's
-PostgreSQL and 5433 is Keycloak's, so both would collide):
+point the Admin UI at its own logical database on the shared PostGIS server and
+enable the seed. Start the shared database if it is not already running:
 
 ```bash
 cd dev-environment/model-forge
+docker network create civitas-network 2>/dev/null || true
 docker compose up -d
 
 cd ../../model-forge/model-forge-admin-ui
-SERVER_PORT=8093 \
-SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5439/model_forge_admin?sslmode=disable \
+SERVER_PORT=8095 \
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/model_forge_admin?sslmode=disable \
 SPRING_DATASOURCE_USERNAME=model_forge SPRING_DATASOURCE_PASSWORD=model_forge \
 MODEL_FORGE_ADMIN_UI_SEED_ENABLED=true \
 mvn spring-boot:run
 ```
 
-Open **http://localhost:8093**. On first start it seeds the bundled OGC
+Open **http://localhost:8095**. On first start it seeds the bundled OGC
 SensorThings example schemas, so there is something to explore immediately.
 
 ### Why the port overrides
@@ -102,18 +102,15 @@ instance by hand alongside that container therefore needs a port override:
 
 | Port | Main stack | Admin UI default | Conflict |
 |------|------------|-------------------|----------|
-| `5432` | PostgreSQL (portal-backend's DB) | the Admin UI's default datasource | No — that is the intended target |
-| `5433` | PostgreSQL (Keycloak's DB) | — | Would collide with a standalone DB; hence `5439` |
+| `5432` | Shared PostgreSQL/PostGIS server | `portal_backend` or `model_forge_admin` | Separate databases on one server |
 | `8090` | Kafka UI | — | — |
-| `8092` | Model Forge Admin UI container (Step 1) | Admin UI web app | Yes → override with `SERVER_PORT=8093` |
+| `8092` | Model Forge Admin UI container (Step 1) | Admin UI web app | Yes → override with `SERVER_PORT=8095` |
 
 The shipped defaults describe **local-demo mode**: the `portal_backend` database with
 `admin`/`admin`. They do *not* match this module's own
 [docker-compose.yml](../../model-forge/model-forge-admin-ui/docker-compose.yml), which
-creates database `model_forge_admin` with user `model_forge` — that compose (a duplicate of
-this folder's, same container name and host port `5439`) belongs to **standalone mode**, so
-starting it without also passing the `SPRING_DATASOURCE_*` overrides from the section above
-leaves the Admin UI pointed at `portal_backend` and the new database unused.
+includes the shared PostgreSQL/PostGIS service. Standalone mode uses the separate logical
+database `model_forge_admin` with user `model_forge` on that same server.
 
 ## Key URLs (combined)
 
@@ -126,7 +123,7 @@ leaves the Admin UI pointed at `portal_backend` and the new database unused.
 | Kafka UI | http://localhost:8090 | |
 | FROST Server | http://localhost:8085/FROST-Server/v1.1 | |
 | GeoServer Admin | http://localhost:8082/geoserver/web | admin / see `../geoserver/.env` |
-| Model Forge Admin UI | http://localhost:8093 | with the overrides above |
+| Model Forge Admin UI | http://localhost:8095 | with the overrides above |
 
 See [../README.md](../README.md) for the full list (OPA, AuthZ Repository,
 Apache NiFi, ...).
@@ -149,9 +146,9 @@ this folder shows `model-forge-admin-postgres` as healthy, and that
 `SPRING_DATASOURCE_URL` in the run command matches the port in this folder's
 `docker-compose.yml` (`5439` by default).
 
-**Admin UI won't bind its port** — something is already on `8093`, or you forgot
-`SERVER_PORT` and it collided with the Step 1 container on its default `8092`. The main
-stack also already publishes `8089`, `8090` and `8091`, so pick a port outside that set.
+**Admin UI won't bind its port** — something is already on `8095`, or you forgot
+`SERVER_PORT` and a second instance collided with the main stack's `8092`. The main
+stack also publishes `8089`, `8090`, `8091` and the Admin UI on `8092`, so pick another port.
 
 **Admin UI is empty** — expected on a fresh stack. It points at portal-backend's
 database, but portal-backend does not write to Model Forge yet, so the registry only

@@ -11,6 +11,7 @@ services:
   # etcd - configuration store for APISIX traditional mode
   etcd:
     image: quay.io/coreos/etcd:v3.5.16
+    mem_limit: 256m
     container_name: civitas-etcd
     restart: always
     environment:
@@ -31,6 +32,7 @@ services:
   # APISIX - API Gateway with Admin API + JWT validation + OPA authorization
   apisix:
     image: apache/apisix:3.17.0-debian
+    mem_limit: 512m
     container_name: civitas-apisix
     restart: always
     volumes:
