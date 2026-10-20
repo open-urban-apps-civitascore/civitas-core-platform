@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.nifi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -110,7 +111,93 @@ class NifiRuntimeMonitorTest {
     monitor.poll();
 
     verify(client, times(1)).readRuntimeStatus(anyString(), any());
+    assertTrue(published.stream().allMatch(event -> "STOPPED".equals(event.get("status"))));
+  }
+
+  @Test
+  void theStopIsPublishedAgainOnceAMinuteOfPollsHasPassed() throws Exception {
+    when(client.readRuntimeStatus("pg-1", bulletins)).thenReturn(STOPPED);
+    try (NifiRuntimeMonitor everyTwentySeconds =
+        new NifiRuntimeMonitor(client, Duration.ofSeconds(20).toMillis())) {
+      everyTwentySeconds.setPublisher(published::add);
+      everyTwentySeconds.register(PIPELINE_ID, "ds-1", "pg-1");
+
+      everyTwentySeconds.poll();
+      everyTwentySeconds.poll();
+      everyTwentySeconds.poll();
+      assertEquals(1, published.size());
+
+      everyTwentySeconds.poll();
+    }
+
+    assertEquals(2, published.size());
+    Map<String, Object> first = published.getFirst();
+    Map<String, Object> repeated = published.getLast();
+    assertEquals("STOPPED", repeated.get("status"));
+    assertEquals(CAUSE, repeated.get("message"));
+    assertEquals(BULLETIN_TIME.toString(), repeated.get("occurredAt"));
+    assertNotEquals(first.get("eventId"), repeated.get("eventId"));
+    verify(client, times(1)).stopProcessGroup("pg-1");
+  }
+
+  @Test
+  void theStopIsNoLongerRepeatedAfterADeploymentRegistersThePipeline() throws Exception {
+    when(client.readRuntimeStatus("pg-1", bulletins)).thenReturn(STOPPED);
+    when(client.readRuntimeStatus("pg-2", bulletins))
+        .thenReturn(new RuntimeStatus(State.HEALTHY, null, null, null));
+    monitor.poll();
+
+    when(client.listManagedProcessGroups())
+        .thenReturn(List.of(new ManagedProcessGroup(PIPELINE_ID, "pg-2")));
+    monitor.register(PIPELINE_ID, "ds-1", "pg-2");
+    monitor.poll();
+    monitor.poll();
+
     assertEquals(1, published.size());
+  }
+
+  @Test
+  void theStopIsNoLongerRepeatedAfterThePipelineIsUnregistered() throws Exception {
+    when(client.readRuntimeStatus("pg-1", bulletins)).thenReturn(STOPPED);
+    monitor.poll();
+
+    when(client.listManagedProcessGroups()).thenReturn(List.of());
+    monitor.unregister(PIPELINE_ID);
+    monitor.poll();
+    monitor.poll();
+
+    assertEquals(1, published.size());
+  }
+
+  @Test
+  void aStopWhosePublishFailedIsPublishedWithTheNextRepeat() throws Exception {
+    when(client.readRuntimeStatus("pg-1", bulletins)).thenReturn(STOPPED);
+    monitor.setPublisher(
+        event -> {
+          throw new IllegalStateException("Failed to publish saga result");
+        });
+    monitor.poll();
+
+    monitor.setPublisher(published::add);
+    monitor.poll();
+
+    verify(client, times(1)).stopProcessGroup("pg-1");
+    assertEquals(1, published.size());
+    assertEquals("STOPPED", published.getFirst().get("status"));
+    assertEquals(CAUSE, published.getFirst().get("message"));
+  }
+
+  @Test
+  void aStopWithoutPublisherIsPublishedWithTheNextRepeat() throws Exception {
+    when(client.readRuntimeStatus("pg-1", bulletins)).thenReturn(STOPPED);
+    monitor.setPublisher(null);
+    monitor.poll();
+
+    monitor.setPublisher(published::add);
+    monitor.poll();
+
+    assertEquals(1, published.size());
+    assertEquals("STOPPED", published.getFirst().get("status"));
   }
 
   @Test

@@ -16,10 +16,10 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.nifi.rest.NifiRestClient;
 import de.civitascore.configadapter.nifi.rest.NifiRestClient.RuntimeStatus;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -29,22 +29,33 @@ import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Polls NiFi runtime state and emits only state transitions for registered pipelines. */
+/**
+ * Polls NiFi runtime state and emits only state transitions for registered pipelines, except for
+ * the STOPPED event of a pipeline it stopped, which it repeats until the pipeline is registered or
+ * unregistered again.
+ */
 final class NifiRuntimeMonitor implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(NifiRuntimeMonitor.class);
   // Consecutive healthy polls required before a recovered pipeline is reported OK again, so a
   // flapping pipeline does not emit an OK/ERROR storm.
   private static final int HEALTHY_ROUNDS_FOR_RECOVERY = 3;
+  // The portal backend can apply the deployment result of a saga after the STOPPED event of a
+  // pipeline that saga deployed, because the two travel on different topics; the repeat corrects
+  // the resulting OK.
+  private static final Duration STOPPED_REPEAT_INTERVAL = Duration.ofMinutes(1);
   private final NifiRestClient client;
   private final ScheduledExecutorService executor;
   private final Map<String, Pipeline> pipelines = new ConcurrentHashMap<>();
   // Pipelines this monitor stopped. Discovery still finds their process groups, so it must skip
   // them until a deployment registers them again.
-  private final Set<String> stoppedPipelines = ConcurrentHashMap.newKeySet();
+  private final Map<String, StoppedPipeline> stoppedPipelines = new ConcurrentHashMap<>();
+  private final long pollsPerStoppedRepeat;
   private volatile PipelineStatusPublisher publisher;
 
   NifiRuntimeMonitor(NifiRestClient client, long intervalMs) {
     this.client = client;
+    this.pollsPerStoppedRepeat =
+        Math.max(1, Math.ceilDiv(STOPPED_REPEAT_INTERVAL.toMillis(), intervalMs));
     this.executor =
         Executors.newSingleThreadScheduledExecutor(
             r -> {
@@ -70,6 +81,7 @@ final class NifiRuntimeMonitor implements AutoCloseable {
   }
 
   void poll() {
+    repeatStoppedEvents();
     JsonNode bulletins;
     try {
       bulletins = client.readBulletins();
@@ -84,7 +96,7 @@ final class NifiRuntimeMonitor implements AutoCloseable {
   private void discoverPipelines() {
     try {
       for (NifiRestClient.ManagedProcessGroup group : client.listManagedProcessGroups()) {
-        if (stoppedPipelines.contains(group.pipelineId())) {
+        if (stoppedPipelines.containsKey(group.pipelineId())) {
           continue;
         }
         pipelines.compute(
@@ -130,9 +142,31 @@ final class NifiRuntimeMonitor implements AutoCloseable {
         "Stopped process group {} of pipeline {} on a fatal error of its flow",
         Encode.forJava(pipeline.processGroupId()),
         Encode.forJava(pipeline.pipelineId()));
-    publish(event(pipeline, status));
-    stoppedPipelines.add(pipeline.pipelineId());
+    Map<String, Object> event = event(pipeline, status);
+    stoppedPipelines.put(pipeline.pipelineId(), new StoppedPipeline(event));
     pipelines.remove(pipeline.pipelineId(), pipeline);
+    publish(event);
+  }
+
+  private void repeatStoppedEvents() {
+    for (StoppedPipeline stopped : stoppedPipelines.values()) {
+      if (stopped.countPoll() % pollsPerStoppedRepeat == 0) {
+        repeat(stopped.event());
+      }
+    }
+  }
+
+  private void repeat(Map<String, Object> event) {
+    Map<String, Object> repeated = new HashMap<>(event);
+    repeated.put("eventId", UUID.randomUUID().toString());
+    try {
+      publish(repeated);
+    } catch (IllegalStateException e) {
+      LOG.debug(
+          "Could not repeat STOPPED of pipeline {}: {}",
+          Encode.forJava(String.valueOf(event.get("pipelineId"))),
+          Encode.forJava(e.getMessage()));
+    }
   }
 
   private void publish(Map<String, Object> event) {
@@ -197,6 +231,24 @@ final class NifiRuntimeMonitor implements AutoCloseable {
   @Override
   public void close() {
     executor.shutdownNow();
+  }
+
+  private static final class StoppedPipeline {
+    private final Map<String, Object> event;
+    private long polls;
+
+    private StoppedPipeline(Map<String, Object> event) {
+      this.event = event;
+    }
+
+    Map<String, Object> event() {
+      return event;
+    }
+
+    long countPoll() {
+      polls++;
+      return polls;
+    }
   }
 
   @SuppressWarnings("PMD.DataClass") // Mutable debounce counters are the monitor's dedup state.
