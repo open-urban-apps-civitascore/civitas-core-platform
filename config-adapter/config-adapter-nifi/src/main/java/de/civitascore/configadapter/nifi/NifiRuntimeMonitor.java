@@ -123,10 +123,6 @@ final class NifiRuntimeMonitor implements AutoCloseable {
     }
   }
 
-  /**
-   * Stops the process group, then reports the Pipeline as stopped and no longer watches it. When
-   * the stop call fails, it throws before anything is published, and the next poll tries again.
-   */
   private void stop(Pipeline pipeline, RuntimeStatus status)
       throws FatalAdapterException, RetryableAdapterException {
     client.stopProcessGroup(pipeline.processGroupId());
