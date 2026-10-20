@@ -48,9 +48,12 @@ final class ApiCallClient {
     this.bodyReadTimeout = bodyReadTimeout;
   }
 
-  /** The method, the base URL and the path, for example {@code GET https://host/v1/stations}. */
-  String describe(ApiCall call) {
-    return call.method().name() + " " + baseUrl + call.path();
+  /**
+   * The name, the method and the path, for example {@code API call "Stations": GET /stations}. The
+   * base URL stays out, so that no host reaches the portal.
+   */
+  static String describe(ApiCall call) {
+    return "API call \"" + call.name() + "\": " + call.method().name() + " " + call.path();
   }
 
   /** Sends the request. A {@link ApiCallOutcome.Body} must be closed by the caller. */

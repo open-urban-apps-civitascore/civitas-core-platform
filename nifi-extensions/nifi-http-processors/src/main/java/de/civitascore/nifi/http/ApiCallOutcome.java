@@ -37,8 +37,8 @@ sealed interface ApiCallOutcome {
    * A request that failed.
    *
    * @param status the status of the response, 0 when no response came
-   * @param message names the method, the base URL and the path, never the query, a header or a
-   *     credential
+   * @param message names the API call, the method and the path, never the base URL, the query, a
+   *     header or a credential
    */
   record Failure(ErrorKind kind, int status, String message) implements ApiCallOutcome {
 

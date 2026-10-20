@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.apache.nifi.components.ValidationResult;
+import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.reporting.InitializationException;
 import org.apache.nifi.ssl.SSLContextProvider;
 import org.apache.nifi.util.LogMessage;
@@ -181,7 +182,6 @@ class GetHttpApiCallTest {
       flowFile.assertAttributeEquals("mime.type", "application/json");
       flowFile.assertAttributeEquals(GetHttpApiCall.STATUS_CODE, "200");
       flowFile.assertAttributeEquals(GetHttpApiCall.REQUEST_PATH, "/stations");
-      flowFile.assertAttributeNotExists(GetHttpApiCall.ERROR_KIND);
     }
   }
 
@@ -203,7 +203,7 @@ class GetHttpApiCallTest {
 
   @ParameterizedTest
   @ValueSource(ints = {400, 401, 403, 404, 301, 302})
-  void onTrigger_whenTheStatusNeedsAChangeOfTheConfiguration_routesAFatalFailure(int status)
+  void onTrigger_whenTheStatusNeedsAChangeOfTheConfiguration_routesToStop(int status)
       throws InitializationException {
     try (ApiEndpoint endpoint =
         ApiEndpoint.answering(status, Map.of("Location", "/v1/elsewhere"), "{}")) {
@@ -211,8 +211,8 @@ class GetHttpApiCallTest {
 
       runner.run();
 
-      String message = "GET " + endpoint.baseUrl() + "/stations failed with status " + status;
-      assertFailure(runner, "fatal", status, message);
+      String message = "API call \"Stations\": GET /stations failed with status " + status;
+      assertRouted(runner, GetHttpApiCall.STOP, status, message);
       assertEquals(1, endpoint.requests().size());
       List<LogMessage> errors = runner.getLogger().getErrorMessages();
       assertEquals(1, errors.size());
@@ -223,15 +223,15 @@ class GetHttpApiCallTest {
 
   @ParameterizedTest
   @ValueSource(ints = {408, 429, 500, 503})
-  void onTrigger_whenTheStatusIsTemporary_routesATransientFailure(int status)
+  void onTrigger_whenTheStatusIsTemporary_routesToFailure(int status)
       throws InitializationException {
     try (ApiEndpoint endpoint = ApiEndpoint.answering(status, "{}")) {
       TestRunner runner = runner(endpoint.baseUrl());
 
       runner.run();
 
-      String message = "GET " + endpoint.baseUrl() + "/stations failed with status " + status;
-      assertFailure(runner, "transient", status, message);
+      String message = "API call \"Stations\": GET /stations failed with status " + status;
+      assertRouted(runner, GetHttpApiCall.FAILURE, status, message);
       List<LogMessage> warnings = runner.getLogger().getWarnMessages();
       assertEquals(1, warnings.size());
       assertTrue(warnings.get(0).getMsg().contains(message), warnings.get(0).getMsg());
@@ -240,7 +240,7 @@ class GetHttpApiCallTest {
   }
 
   @Test
-  void onTrigger_whenNoServerListens_routesATransientFailureWithStatusZero()
+  void onTrigger_whenNoServerListens_routesToFailureWithStatusZero()
       throws InitializationException {
     String baseUrl;
     try (ApiEndpoint endpoint = ApiEndpoint.answering(200, "[]")) {
@@ -250,21 +250,28 @@ class GetHttpApiCallTest {
 
     runner.run();
 
-    assertFailure(runner, "transient", 0, "GET " + baseUrl + "/stations failed: ConnectException");
+    assertRouted(
+        runner,
+        GetHttpApiCall.FAILURE,
+        0,
+        "API call \"Stations\": GET /stations failed: ConnectException");
     assertEquals(1, runner.getLogger().getWarnMessages().size());
   }
 
   @ParameterizedTest
   @ValueSource(strings = {"", "[{\"id\":1"})
-  void onTrigger_whenTheBodyBreaksOff_routesATransientFailureAndNoPartialFlowFile(String part)
+  void onTrigger_whenTheBodyBreaksOff_routesToFailureAndNoPartialFlowFile(String part)
       throws IOException, InitializationException {
     try (BreakingEndpoint endpoint = BreakingEndpoint.sending(part)) {
       TestRunner runner = runner(endpoint.baseUrl());
 
       runner.run();
 
-      assertFailure(
-          runner, "transient", 0, "GET " + endpoint.baseUrl() + "/stations failed: IOException");
+      assertRouted(
+          runner,
+          GetHttpApiCall.FAILURE,
+          0,
+          "API call \"Stations\": GET /stations failed: IOException");
       assertEquals(1, runner.getLogger().getWarnMessages().size());
     }
   }
@@ -272,7 +279,7 @@ class GetHttpApiCallTest {
   @ParameterizedTest
   @ValueSource(strings = {"", "[{\"id\":1"})
   @Timeout(10)
-  void onTrigger_whenTheBodyStalls_routesATransientFailureAfterTheBodyReadTimeout(String part)
+  void onTrigger_whenTheBodyStalls_routesToFailureAfterTheBodyReadTimeout(String part)
       throws IOException, InitializationException {
     try (BreakingEndpoint endpoint = BreakingEndpoint.stalling(part)) {
       TestRunner runner = runner(endpoint.baseUrl());
@@ -280,11 +287,11 @@ class GetHttpApiCallTest {
 
       runner.run();
 
-      assertFailure(
+      assertRouted(
           runner,
-          "transient",
+          GetHttpApiCall.FAILURE,
           0,
-          "GET " + endpoint.baseUrl() + "/stations failed: HttpTimeoutException");
+          "API call \"Stations\": GET /stations failed: HttpTimeoutException");
       assertEquals(1, runner.getLogger().getWarnMessages().size());
     }
   }
@@ -320,6 +327,9 @@ class GetHttpApiCallTest {
         visible.addAll(flowFile.getAttributes().values());
       }
       for (MockFlowFile flowFile : runner.getFlowFilesForRelationship(GetHttpApiCall.FAILURE)) {
+        visible.addAll(flowFile.getAttributes().values());
+      }
+      for (MockFlowFile flowFile : runner.getFlowFilesForRelationship(GetHttpApiCall.STOP)) {
         visible.addAll(flowFile.getAttributes().values());
       }
       assertFalse(visible.isEmpty());
@@ -515,11 +525,11 @@ class GetHttpApiCallTest {
     return runner.validate().stream().filter(result -> !result.isValid()).toList();
   }
 
-  private static void assertFailure(TestRunner runner, String kind, int status, String message) {
-    runner.assertAllFlowFilesTransferred(GetHttpApiCall.FAILURE, 1);
-    MockFlowFile failed = runner.getFlowFilesForRelationship(GetHttpApiCall.FAILURE).get(0);
+  private static void assertRouted(
+      TestRunner runner, Relationship relationship, int status, String message) {
+    runner.assertAllFlowFilesTransferred(relationship, 1);
+    MockFlowFile failed = runner.getFlowFilesForRelationship(relationship).get(0);
     failed.assertAttributeEquals(GetHttpApiCall.REQUEST_PATH, "/stations");
-    failed.assertAttributeEquals(GetHttpApiCall.ERROR_KIND, kind);
     failed.assertAttributeEquals(GetHttpApiCall.ERROR_STATUS, Integer.toString(status));
     failed.assertAttributeEquals(GetHttpApiCall.ERROR_MESSAGE, message);
     failed.assertContentEquals("");
