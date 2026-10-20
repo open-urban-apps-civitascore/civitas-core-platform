@@ -1001,6 +1001,10 @@
       "invalidHeaderName": "Erlaubte Zeichen im Header-Namen: a–z, A–Z, 0–9 und ! # $ % & ' * + - . ^ _ ` | ~. Keine Leerzeichen.",
       "credentialHeader": "Zugangsdaten gehören in die Authentifizierung.",
       "headerValueLineBreak": "Der Header-Wert darf keinen Zeilenumbruch enthalten.",
+      "pageNumberInteger": "Geben Sie eine ganze Zahl ab 0 ein.",
+      "pageNumberMax": "Geben Sie eine Zahl bis 2147483647 ein.",
+      "pageSizeMin": "Die Seitengröße muss mindestens 1 sein.",
+      "endPageBeforeStartPage": "Die Endseite darf nicht kleiner als die Startseite sein.",
       "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten",
       "inUseError": "Diese Datenquelle wird noch von einer Pipeline verwendet.",
@@ -1048,6 +1052,8 @@
         "title": "Noch kein API-Aufruf"
       },
       "unnamed": "Unbenannter API-Aufruf",
+      "collapseAll": "Alle zuklappen",
+      "expandAll": "Alle aufklappen",
       "request": {
         "title": "Request",
         "question": "Welcher Endpunkt soll aufgerufen werden?"
@@ -1075,6 +1081,29 @@
       "delete": {
         "title": "API-Aufruf löschen?",
         "description": "Pipelines, die „{name}“ verwenden, funktionieren nicht mehr."
+      },
+      "pagination": {
+        "title": "Paginierung",
+        "enable": "Paginierung verwenden",
+        "type": {
+          "label": "Art der Paginierung",
+          "pageNumber": "Seitennummer"
+        },
+        "pageParameter": {
+          "label": "Seitenparameter"
+        },
+        "pageSizeParameter": {
+          "label": "Seitengrößenparameter"
+        },
+        "pageSize": {
+          "label": "Seitengröße"
+        },
+        "startPage": {
+          "label": "Startseite"
+        },
+        "endPage": {
+          "label": "Endseite"
+        }
       }
     },
     "connectorTab": {

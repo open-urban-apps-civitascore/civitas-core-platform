@@ -109,6 +109,7 @@ vi.mock('../hooks/useDatasourceForm', () => ({
     isLoading: false,
     areAssignmentsDirty: false,
     areDatapoolsDirty: false,
+    isFormDirty: mockForm.formState.isDirty,
   }),
 }))
 

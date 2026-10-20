@@ -7,7 +7,8 @@ import { toast } from 'sonner'
 import { describe, expect, it, vi } from 'vitest'
 
 import { Form } from '@/components/ui/form'
-import { ApiCallSnapshots, HttpApiCallForm } from '@/types/connectors'
+import { PAGINATION_FORM } from '@/test-support/paginationFixtures'
+import { ApiCallSnapshots, CollapsedApiCallSections, EMPTY_PAGINATION, HttpApiCallForm } from '@/types/connectors'
 import { DatasourceFormDraft, DatasourceFormDraftSchema } from '@/types/datasources'
 
 import { ApiCallsTab } from './ApiCallsTab'
@@ -25,7 +26,7 @@ const API_CALL: HttpApiCallForm = {
   path: '/stations',
   queryParameters: [{ name: 'status', value: 'active' }],
   headers: [{ name: 'Accept', value: 'application/json' }],
-  pagination: null,
+  pagination: EMPTY_PAGINATION,
 }
 
 interface RenderOptions {
@@ -57,7 +58,7 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
       defaultValues,
     })
     const [editingApiCalls, setEditingApiCalls] = useState<ApiCallSnapshots>(new Map())
-    const [collapsedRequestIndexes, setCollapsedRequestIndexes] = useState<ReadonlySet<number>>(new Set())
+    const [collapsedSections, setCollapsedSections] = useState<CollapsedApiCallSections>(new Map())
     const [tabKey, setTabKey] = useState(0)
     remountTab = () => setTabKey(key => key + 1)
     return (
@@ -69,11 +70,11 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
           isDatasourceReleased={isDatasourceReleased}
           dataStructureName={dataStructureName}
           editingApiCalls={editingApiCalls}
-          collapsedRequestIndexes={collapsedRequestIndexes}
+          collapsedSections={collapsedSections}
           onEditingApiCallsChange={setEditingApiCalls}
           onApiCallAdd={vi.fn()}
           onApiCallRemove={vi.fn()}
-          onCollapsedRequestIndexesChange={setCollapsedRequestIndexes}
+          onCollapsedSectionsChange={setCollapsedSections}
         />
       </Form>
     )
@@ -104,7 +105,9 @@ describe('ApiCallsTab', () => {
 
     await user.click(screen.getByRole('button', { name: 'add' }))
 
-    expect(getApiCalls()).toEqual([{ name: '', path: '', queryParameters: [], headers: [], pagination: null }])
+    expect(getApiCalls()).toEqual([
+      { name: '', path: '', queryParameters: [], headers: [], pagination: EMPTY_PAGINATION },
+    ])
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'path.label' })).toHaveFocus())
   })
 
@@ -400,6 +403,178 @@ describe('ApiCallsTab', () => {
     expect(screen.queryByRole('button', { name: 'parameters.addQuery' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'parameters.addHeader' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /remove$/ })).not.toBeInTheDocument()
+  })
+
+  describe('pagination', () => {
+    it('shows the fields with start page 0 when checked', async () => {
+      const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [API_CALL] })
+      await openApiCall(user)
+      expect(screen.queryByRole('textbox', { name: /^pageParameter\.label/ })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('checkbox', { name: 'enable' }))
+
+      expect(screen.getByRole('combobox', { name: 'type.label' })).toBeDisabled()
+      expect(screen.getByRole('textbox', { name: 'startPage.label' })).toHaveValue('0')
+      expect(getApiCalls()?.[0].pagination).toEqual({ ...EMPTY_PAGINATION, isEnabled: true })
+    })
+
+    it('keeps the values when unchecked and checked again', async () => {
+      const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [{ ...API_CALL, pagination: PAGINATION_FORM }] })
+      await openApiCall(user)
+
+      await user.click(screen.getByRole('checkbox', { name: 'enable' }))
+
+      expect(getApiCalls()?.[0].pagination).toEqual({ ...PAGINATION_FORM, isEnabled: false })
+
+      await user.click(screen.getByRole('checkbox', { name: 'enable' }))
+
+      expect(getApiCalls()?.[0].pagination).toEqual(PAGINATION_FORM)
+      expect(screen.getByRole('textbox', { name: /^pageParameter\.label/ })).toHaveValue('page')
+    })
+
+    it('hides only the fields when unchecked', async () => {
+      const { user } = renderApiCallsTab({ apiCalls: [{ ...API_CALL, pagination: PAGINATION_FORM }] })
+      await openApiCall(user)
+
+      await user.click(screen.getByRole('checkbox', { name: 'enable' }))
+
+      expect(screen.getByRole('checkbox', { name: 'enable' })).toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /^pageParameter\.label/ })).not.toBeInTheDocument()
+    })
+
+    it('writes the entered values into the form', async () => {
+      const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [API_CALL] })
+      await openApiCall(user)
+      await user.click(screen.getByRole('checkbox', { name: 'enable' }))
+
+      await user.type(screen.getByRole('textbox', { name: /^pageParameter\.label/ }), 'page')
+      await user.type(screen.getByRole('textbox', { name: /^pageSizeParameter\.label/ }), 'size')
+      await user.type(screen.getByRole('textbox', { name: /^pageSize\.label/ }), '100')
+      await user.clear(screen.getByRole('textbox', { name: 'startPage.label' }))
+      await user.type(screen.getByRole('textbox', { name: 'startPage.label' }), '1')
+      await user.type(screen.getByRole('textbox', { name: 'endPage.label' }), '10')
+
+      expect(getApiCalls()?.[0].pagination).toEqual(PAGINATION_FORM)
+    })
+
+    it('shows the page size error', async () => {
+      const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+      await openApiCall(user)
+      await user.click(screen.getByRole('checkbox', { name: 'enable' }))
+
+      await user.type(screen.getByRole('textbox', { name: /^pageSize\.label/ }), '0')
+
+      expect(await screen.findByText('datasources.errors.pageSizeMin')).toBeInTheDocument()
+    })
+
+    it('hides the errors when unchecked', async () => {
+      const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+      await openApiCall(user)
+      await user.click(screen.getByRole('checkbox', { name: 'enable' }))
+      await user.type(screen.getByRole('textbox', { name: /^pageSize\.label/ }), '0')
+      expect(await screen.findByText('datasources.errors.pageSizeMin')).toBeInTheDocument()
+
+      await user.click(screen.getByRole('checkbox', { name: 'enable' }))
+
+      await waitFor(() => expect(screen.queryByText('datasources.errors.pageSizeMin')).not.toBeInTheDocument())
+    })
+
+    it('restores the pagination after cancel', async () => {
+      const apiCall = { ...API_CALL, pagination: PAGINATION_FORM }
+      const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [apiCall] })
+      await openApiCall(user)
+
+      await user.type(screen.getByRole('textbox', { name: /^pageSize\.label/ }), '0')
+      await user.click(screen.getByRole('checkbox', { name: 'enable' }))
+      await user.click(screen.getByRole('button', { name: 'cancel' }))
+
+      expect(getApiCalls()).toEqual([apiCall])
+    })
+
+    it.each([
+      ['read-only', { isReadOnly: true }],
+      ['released', { isDatasourceReleased: true }],
+    ])('disables the checkbox and the fields when %s', async (_name, options) => {
+      const { user } = renderApiCallsTab({ apiCalls: [{ ...API_CALL, pagination: PAGINATION_FORM }], ...options })
+      await openApiCall(user)
+
+      expect(screen.getByRole('checkbox', { name: 'enable' })).toBeDisabled()
+      expect(screen.getByRole('textbox', { name: /^pageParameter\.label/ })).toBeDisabled()
+      expect(screen.getByRole('textbox', { name: 'endPage.label' })).toBeDisabled()
+    })
+
+    it('collapses and expands the pagination section', async () => {
+      const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+      await openApiCall(user)
+      const paginationSection = screen.getByRole('button', { name: 'title' })
+
+      await user.click(paginationSection)
+      expect(screen.queryByRole('checkbox', { name: 'enable' })).not.toBeInTheDocument()
+
+      await user.click(paginationSection)
+      expect(screen.getByRole('checkbox', { name: 'enable' })).toBeInTheDocument()
+    })
+  })
+
+  describe('collapse all', () => {
+    it('collapses and expands request and pagination together', async () => {
+      const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+      await openApiCall(user)
+
+      await user.click(screen.getByRole('button', { name: 'collapseAll' }))
+      expect(screen.queryByText('request.question')).not.toBeInTheDocument()
+      expect(screen.queryByRole('checkbox', { name: 'enable' })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'expandAll' }))
+      expect(screen.getByText('request.question')).toBeInTheDocument()
+      expect(screen.getByRole('checkbox', { name: 'enable' })).toBeInTheDocument()
+    })
+
+    it('collapses all when only one section is open', async () => {
+      const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+      await openApiCall(user)
+      await user.click(screen.getByRole('button', { name: /^request\.title/ }))
+
+      await user.click(screen.getByRole('button', { name: 'collapseAll' }))
+
+      expect(screen.queryByRole('checkbox', { name: 'enable' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'expandAll' })).toBeInTheDocument()
+    })
+
+    it('opens all sections when the edit view opens again', async () => {
+      const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+      await openApiCall(user)
+      await user.click(screen.getByRole('button', { name: 'collapseAll' }))
+      await user.click(screen.getByRole('button', { name: 'apply' }))
+
+      await openApiCall(user)
+
+      expect(screen.getByText('request.question')).toBeInTheDocument()
+      expect(screen.getByRole('checkbox', { name: 'enable' })).toBeInTheDocument()
+    })
+
+    it.each([
+      ['a form reset', 'resetForm'],
+      ['mounting the tab again', 'remount'],
+    ] as const)('keeps all sections collapsed after %s', async (_name, action) => {
+      const rendered = renderApiCallsTab({ apiCalls: [API_CALL] })
+      await openApiCall(rendered.user)
+      await rendered.user.click(screen.getByRole('button', { name: 'collapseAll' }))
+
+      rendered[action]()
+
+      expect(screen.queryByText('request.question')).not.toBeInTheDocument()
+      expect(screen.queryByRole('checkbox', { name: 'enable' })).not.toBeInTheDocument()
+    })
+
+    it('is available when read-only', async () => {
+      const { user } = renderApiCallsTab({ apiCalls: [API_CALL], isReadOnly: true })
+      await openApiCall(user)
+
+      await user.click(screen.getByRole('button', { name: 'collapseAll' }))
+
+      expect(screen.queryByText('request.question')).not.toBeInTheDocument()
+    })
   })
 
   it('shows the available info when released and editable', () => {

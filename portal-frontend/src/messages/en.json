@@ -1009,6 +1009,10 @@
       "invalidHeaderName": "Allowed in the header name: a–z A–Z 0–9 and ! # $ % & ' * + - . ^ _ ` | ~. No spaces.",
       "credentialHeader": "Use the authentication for credentials.",
       "headerValueLineBreak": "The header value must not contain a line break.",
+      "pageNumberInteger": "Enter a whole number of 0 or more.",
+      "pageNumberMax": "Enter a number up to 2147483647.",
+      "pageSizeMin": "The page size must be at least 1.",
+      "endPageBeforeStartPage": "The end page must not be lower than the start page.",
       "creationError": "An error occurred while creating the Data source.",
       "updateError": "An error occurred while updating the Data source.",
       "inUseError": "This Data source is still used by a pipeline.",
@@ -1061,6 +1065,8 @@
         "title": "No API call yet"
       },
       "unnamed": "Unnamed API call",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all",
       "request": {
         "title": "Request",
         "question": "Which endpoint should be called?"
@@ -1088,6 +1094,29 @@
       "delete": {
         "title": "Delete API call?",
         "description": "Pipelines that use \"{name}\" stop working."
+      },
+      "pagination": {
+        "title": "Pagination",
+        "enable": "Use pagination",
+        "type": {
+          "label": "Pagination type",
+          "pageNumber": "Page Number"
+        },
+        "pageParameter": {
+          "label": "Page parameter"
+        },
+        "pageSizeParameter": {
+          "label": "Page size parameter"
+        },
+        "pageSize": {
+          "label": "Page size"
+        },
+        "startPage": {
+          "label": "Start page"
+        },
+        "endPage": {
+          "label": "End page"
+        }
       }
     },
     "connectorTab": {
