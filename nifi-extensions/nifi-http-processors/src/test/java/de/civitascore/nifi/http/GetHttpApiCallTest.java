@@ -579,15 +579,36 @@ class GetHttpApiCallTest {
     try (ApiEndpoint endpoint = ApiEndpoint.answering(404, "{}")) {
       TestRunner runner = runner(endpoint.baseUrl());
       runner.setProperty(
-          GetHttpApiCall.API_CALL, "{\"name\":\"Sta\\r\\ntions\",\"path\":\"/stations\"}");
+          GetHttpApiCall.API_CALL,
+          "{\"name\":\"Sta\\r\\n\\u2028\\u0085tions\",\"path\":\"/stations\"}");
 
       runner.run();
 
-      String message = "API call \"Sta\\r\\ntions\": GET /stations failed with status 404";
+      String message =
+          "API call \"Sta\\r\\n\\u2028\\u0085tions\": GET /stations failed with status 404";
       assertRouted(runner, GetHttpApiCall.STOP, 404, message);
       for (String text : logged(runner.getLogger())) {
-        assertFalse(text.contains("\r") || text.contains("\n"), text);
+        assertFalse(text.matches("(?s).*[\\r\\n\\u2028\\u0085].*"), text);
       }
+    }
+  }
+
+  @Test
+  void onTrigger_withAnUmlautAndQuotesInTheApiCallName_keepsThemInTheMessage()
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(404, "{}")) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.setProperty(
+          GetHttpApiCall.API_CALL,
+          "{\"name\":\"Messwerte \\\"Köln\\\" ✓\",\"path\":\"/stations\"}");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          404,
+          "API call \"Messwerte \"Köln\" ✓\": GET /stations failed with status 404");
     }
   }
 

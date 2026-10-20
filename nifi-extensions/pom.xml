@@ -51,7 +51,6 @@
 		     structure as Model Forge validates data against it, so the two must not disagree. -->
 		<networknt.version>1.5.8</networknt.version>
 		<slf4j.version>2.0.18</slf4j.version>
-		<owasp.encoder.version>1.4.0</owasp.encoder.version>
 		<junit.version>5.14.4</junit.version>
 		<!-- The platform line that belongs to the JUnit version above. nifi-mock carries a newer
 		     JUnit into the test classpath, and two lines in one JVM break test discovery, so both
@@ -147,11 +146,6 @@
 						<artifactId>jackson-dataformat-yaml</artifactId>
 					</exclusion>
 				</exclusions>
-			</dependency>
-			<dependency>
-				<groupId>org.owasp.encoder</groupId>
-				<artifactId>encoder</artifactId>
-				<version>${owasp.encoder.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>org.slf4j</groupId>
