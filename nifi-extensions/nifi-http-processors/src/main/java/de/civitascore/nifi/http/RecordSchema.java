@@ -107,18 +107,19 @@ final class RecordSchema {
   }
 
   /** The verdict on the response in the content of a FlowFile. */
-  Verdict verdict(ProcessSession session, FlowFile response) {
+  Verdict verdict(ProcessSession session, FlowFile response, boolean arrayRequired) {
     AtomicReference<Verdict> verdict = new AtomicReference<>();
-    session.read(response, content -> verdict.set(verdict(content)));
+    session.read(response, content -> verdict.set(verdict(content, arrayRequired)));
     return verdict.get();
   }
 
   /**
    * Reads the response one record at a time: a JSON array holds one record in each element, a JSON
-   * object is one record. The message of the validator is not used, because some messages quote the
-   * value.
+   * object is one record unless {@code arrayRequired}. The type comes before the records, so a
+   * response of the wrong type gets no record violation. The message of the validator is not used,
+   * because some messages quote the value.
    */
-  Verdict verdict(InputStream response) {
+  Verdict verdict(InputStream response, boolean arrayRequired) {
     try (JsonParser parser = RECORD_READER.createParser(response)) {
       JsonToken first = parser.nextToken();
       if (first == null) {
@@ -128,13 +129,17 @@ final class RecordSchema {
           switch (first) {
             case START_ARRAY -> elements(parser);
             case START_OBJECT -> {
+              if (arrayRequired) {
+                parser.skipChildren();
+                yield new Verdict.WrongType("object", "an array");
+              }
               Violations violations = new Violations();
               violations.add(recordViolations(parser, first));
               yield violations.verdict();
             }
             default ->
-                new Verdict.Rejected(
-                    "the response is a JSON " + scalarType(first) + ", not an object or an array");
+                new Verdict.WrongType(
+                    scalarType(first), arrayRequired ? "an array" : "an object or an array");
           };
       return parser.nextToken() == null ? verdict : new Verdict.Rejected(NOT_JSON);
     } catch (IOException e) {
@@ -239,12 +244,28 @@ final class RecordSchema {
     /** The response holds only JSON whitespace. */
     record Blank() implements Verdict {}
 
-    record Agrees() implements Verdict {}
+    /**
+     * @param records the number of records
+     */
+    record Agrees(int records) implements Verdict {}
 
     /**
      * @param reason names no value of the response
      */
     record Rejected(String reason) implements Verdict {}
+
+    /**
+     * The response is JSON of a type that holds no records.
+     *
+     * @param found for example {@code object} or {@code number}
+     * @param expected for example {@code an array}
+     */
+    record WrongType(String found, String expected) implements Verdict {
+
+      String reason(String subject) {
+        return subject + " is a JSON " + found + ", not " + expected;
+      }
+    }
   }
 
   private static final class Violations {
@@ -267,7 +288,7 @@ final class RecordSchema {
 
     Verdict verdict() {
       if (invalid == 0) {
-        return new Verdict.Agrees();
+        return new Verdict.Agrees(records);
       }
       return new Verdict.Rejected(
           invalid

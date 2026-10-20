@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.civitascore.nifi.http.ApiEndpoint.Response;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -26,6 +27,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.processor.Relationship;
@@ -43,6 +45,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class GetHttpApiCallTest {
@@ -60,6 +63,10 @@ class GetHttpApiCallTest {
        "properties": {"stationid": {"type": "string"},
                       "name": {"type": "string", "maxLength": 20},
                       "lat": {"type": "number"}}}""";
+
+  private static final String FULL_PAGE = "[{\"stationid\":\"a1\"},{\"stationid\":\"a2\"}]";
+
+  private static final String SHORT_PAGE = "[{\"stationid\":\"a3\"}]";
 
   @TempDir static Path keys;
 
@@ -836,6 +843,393 @@ class GetHttpApiCallTest {
   }
 
   @Test
+  void onTrigger_withPagination_sendsThePageAndThePageSizeAfterTheQueryParametersFromTheStartPage()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(Response.json(FULL_PAGE), Response.json(SHORT_PAGE))) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.setProperty(
+          GetHttpApiCall.API_CALL,
+          """
+          {"name": "Stations", "path": "/stations",
+           "queryParameters": [{"name": "status", "value": "active"}],
+           "pagination": {"type": "PAGE_NUMBER", "pageParameter": "page",
+                          "pageSizeParameter": "size", "pageSize": 2, "startPage": 5}}""");
+
+      runner.run();
+
+      assertEquals(
+          List.of("status=active&page=5&size=2", "status=active&page=6&size=2"),
+          rawQueries(endpoint));
+      assertPages(runner, "5", "6");
+    }
+  }
+
+  @Test
+  void onTrigger_withPaginationWithoutAStartPage_requestsPage0First()
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, SHORT_PAGE)) {
+      TestRunner runner = paginatedRunner(endpoint, "");
+
+      runner.run();
+
+      assertEquals(List.of("page=0&size=2"), rawQueries(endpoint));
+    }
+  }
+
+  @Test
+  void onTrigger_withAnEndPage_readsTheEndPageAndStopsAfterIt() throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(fullPage(0)), Response.json(fullPage(1)), Response.json(fullPage(2)))) {
+      TestRunner runner = paginatedRunner(endpoint, ", \"startPage\": 0, \"endPage\": 2");
+
+      runner.run();
+
+      assertEquals(3, endpoint.requests().size());
+      assertPages(runner, "0", "1", "2");
+    }
+  }
+
+  @Test
+  void onTrigger_whenAPageHasFewerRecordsThanThePageSize_stopsAfterIt()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(Response.json(FULL_PAGE), Response.json(SHORT_PAGE))) {
+      TestRunner runner = paginatedRunner(endpoint, "");
+
+      runner.run();
+
+      assertEquals(2, endpoint.requests().size());
+      assertPages(runner, "0", "1");
+      runner
+          .getFlowFilesForRelationship(GetHttpApiCall.SUCCESS)
+          .get(1)
+          .assertContentEquals(SHORT_PAGE);
+    }
+  }
+
+  static List<Response> pagesWithoutRecords() {
+    return List.of(
+        Response.json("[]"), new Response(200, Map.of(), null), new Response(204, Map.of(), null));
+  }
+
+  @ParameterizedTest
+  @MethodSource("pagesWithoutRecords")
+  void onTrigger_whenAPageHasNoRecords_stopsThereWithoutAFlowFileForIt(Response empty)
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answeringInTurn(Response.json(FULL_PAGE), empty)) {
+      TestRunner runner = paginatedRunner(endpoint, "");
+
+      runner.run();
+
+      assertEquals(2, endpoint.requests().size());
+      assertPages(runner, "0");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"{\"stationid\":\"a1\"}", "{\"lat\":1}"})
+  void onTrigger_whenAPageIsAJsonObject_routesTheRunToStop(String object)
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(Response.json(FULL_PAGE), Response.json(object))) {
+      TestRunner runner = paginatedRunner(endpoint, "");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": page 1 is a JSON object, not an array");
+      assertEquals(1, runner.getLogger().getErrorMessages().size());
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource(
+      delimiter = '|',
+      quoteCharacter = '\'',
+      value = {"'\"val-1f3e\"' | string", "42             | number"})
+  void onTrigger_whenAPageIsAJsonScalar_routesTheRunToStop(String body, String kind)
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(Response.json(FULL_PAGE), Response.json(body))) {
+      TestRunner runner = paginatedRunner(endpoint, "");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": page 1 is a JSON " + kind + ", not an array");
+    }
+  }
+
+  @Test
+  void onTrigger_whenAPageIsNotJson_routesTheRunToStop() throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(FULL_PAGE), Response.json("<html>val-1f3e</html>"))) {
+      TestRunner runner = paginatedRunner(endpoint, "");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": page 1: the response is not JSON");
+    }
+  }
+
+  @Test
+  void onTrigger_whenPage2NeedsAChangeOfTheConfiguration_routesTheRunToStopWithoutPage1()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(Response.json(FULL_PAGE), Response.status(403))) {
+      TestRunner runner = paginatedRunner(endpoint, ", \"startPage\": 1");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          403,
+          "API call \"Stations\": GET /stations page 2 failed with status 403");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {400, 404})
+  void onTrigger_whenAPageAfterTheFirstIsPastTheLastPage_routesTheEarlierPagesToSuccess(int status)
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(fullPage(0)), Response.json(fullPage(1)), Response.status(status))) {
+      TestRunner runner = paginatedRunner(endpoint, "");
+
+      runner.run();
+
+      assertEquals(3, endpoint.requests().size());
+      assertPages(runner, "0", "1");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {400, 404})
+  void onTrigger_whenTheFirstPageAnswers400Or404_routesTheRunToStop(int status)
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(status, "{}")) {
+      TestRunner runner = paginatedRunner(endpoint, "");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          status,
+          "API call \"Stations\": GET /stations page 0 failed with status " + status);
+    }
+  }
+
+  @Test
+  void onTrigger_whenPage2IsTemporarilyUnavailable_routesTheRunToFailureWithoutPage1()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(Response.json(FULL_PAGE), Response.status(503))) {
+      TestRunner runner = paginatedRunner(endpoint, ", \"startPage\": 1");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.FAILURE,
+          503,
+          "API call \"Stations\": GET /stations page 2 failed with status 503");
+      assertEquals(1, runner.getLogger().getWarnMessages().size());
+    }
+  }
+
+  @Test
+  void onTrigger_whenARecordOfPage2Violates_routesTheRunToStopWithoutPage1()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(FULL_PAGE), Response.json("[{\"stationid\":\"a3\"},{\"lat\":1}]"))) {
+      TestRunner runner = paginatedRunner(endpoint, ", \"startPage\": 1");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": page 2: 1 of 2 records violate the Data structure:"
+              + " record 1: required stationid");
+    }
+  }
+
+  @Test
+  void onTrigger_afterARunThatFailed_startsAgainAtTheStartPage() throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(FULL_PAGE),
+            Response.status(503),
+            Response.json(FULL_PAGE),
+            Response.json(SHORT_PAGE))) {
+      TestRunner runner = paginatedRunner(endpoint, ", \"startPage\": 1");
+
+      runner.run(2);
+
+      assertEquals(
+          List.of("page=1&size=2", "page=2&size=2", "page=1&size=2", "page=2&size=2"),
+          rawQueries(endpoint));
+      runner.assertTransferCount(GetHttpApiCall.FAILURE, 1);
+      runner.assertTransferCount(GetHttpApiCall.SUCCESS, 2);
+    }
+  }
+
+  @Test
+  void onTrigger_whenNiFiStopsTheProcessorDuringARun_sendsNoFurtherPageAndRoutesTheRunToFailure()
+      throws InitializationException {
+    AtomicReference<TestRunner> runner = new AtomicReference<>();
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            index -> ((GetHttpApiCall) runner.get().getProcessor()).updateScheduledFalse(),
+            Response.json(FULL_PAGE),
+            Response.json(FULL_PAGE))) {
+      runner.set(paginatedRunner(endpoint, ""));
+
+      runner.get().run();
+
+      assertEquals(1, endpoint.requests().size());
+      assertRouted(
+          runner.get(),
+          GetHttpApiCall.FAILURE,
+          0,
+          "API call \"Stations\": GET /stations page 1 not sent, because the processor stopped");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", ", \"endPage\": 1"})
+  void onTrigger_whenAPageRepeatsThePageBefore_routesTheRunToStopAtTheSecondPage(String endPage)
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, FULL_PAGE)) {
+      TestRunner runner = paginatedRunner(endpoint, endPage);
+
+      runner.run();
+
+      assertRouted(
+          runner, GetHttpApiCall.STOP, 200, "API call \"Stations\": page 1 repeats page 0");
+      assertEquals(2, endpoint.requests().size());
+    }
+  }
+
+  @Test
+  void onTrigger_whenAPageRepeatsAnEarlierPage_routesTheRunToStop() throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(fullPage(0)), Response.json(fullPage(1)), Response.json(fullPage(0)))) {
+      TestRunner runner = paginatedRunner(endpoint, "");
+
+      runner.run();
+
+      assertRouted(
+          runner, GetHttpApiCall.STOP, 200, "API call \"Stations\": page 2 repeats page 0");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", ", \"endPage\": 10"})
+  void onTrigger_whenMaxPagesPagesMeetNoStopCondition_routesTheRunToStop(String endPage)
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(fullPage(0)), Response.json(fullPage(1)), Response.json(fullPage(2)))) {
+      TestRunner runner = paginatedRunner(endpoint, endPage);
+      runner.setProperty(GetHttpApiCall.MAX_PAGES, "3");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": no stop condition after 3 pages (Max Pages)");
+      assertEquals(3, endpoint.requests().size());
+    }
+  }
+
+  @Test
+  void onTrigger_whenThePageAtMaxPagesMeetsAStopCondition_routesAllPagesToSuccess()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(Response.json(FULL_PAGE), Response.json(SHORT_PAGE))) {
+      TestRunner runner = paginatedRunner(endpoint, "");
+      runner.setProperty(GetHttpApiCall.MAX_PAGES, "2");
+
+      runner.run();
+
+      assertPages(runner, "0", "1");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"0", "-1", "x"})
+  void validate_withMaxPagesThatIsNotAPositiveInteger_isInvalid(String maxPages)
+      throws InitializationException {
+    TestRunner runner = runner("http://localhost:8080");
+    runner.setProperty(GetHttpApiCall.MAX_PAGES, maxPages);
+
+    runner.assertNotValid();
+  }
+
+  @Test
+  void onTrigger_whenAPageHasMoreRecordsThanThePageSize_readsTheNextPage()
+      throws InitializationException {
+    String overfull = "[{\"stationid\":\"a1\"},{\"stationid\":\"a2\"},{\"stationid\":\"a3\"}]";
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(Response.json(overfull), Response.json(SHORT_PAGE))) {
+      TestRunner runner = paginatedRunner(endpoint, "");
+
+      runner.run();
+
+      assertPages(runner, "0", "1");
+    }
+  }
+
+  @Test
+  void onTrigger_withTheLargestStartPage_countsPastTheIntRange() throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(Response.json(FULL_PAGE), Response.json(SHORT_PAGE))) {
+      TestRunner runner = paginatedRunner(endpoint, ", \"startPage\": 2147483647");
+
+      runner.run();
+
+      assertEquals(
+          List.of("page=2147483647&size=2", "page=2147483648&size=2"), rawQueries(endpoint));
+    }
+  }
+
+  @Test
+  void onTrigger_withoutPagination_setsNoPageAttribute() throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, FULL_PAGE)) {
+      TestRunner runner = runner(endpoint.baseUrl());
+
+      runner.run();
+
+      runner
+          .getFlowFilesForRelationship(GetHttpApiCall.SUCCESS)
+          .get(0)
+          .assertAttributeNotExists(GetHttpApiCall.PAGE);
+    }
+  }
+
+  @Test
   void basicAuthPassword_isSensitive() {
     assertTrue(GetHttpApiCall.BASIC_AUTH_PASSWORD.isSensitive());
   }
@@ -982,7 +1376,19 @@ class GetHttpApiCallTest {
         "{\"name\":\"n\",\"path\":\"/s\",\"headers\":[{\"name\":\"content-length\",\"value\":\"v-61b0\"}]} | headers[0].name",
         "{\"name\":\"n\",\"path\":\"/s\",\"headers\":[{\"name\":\"X\",\"value\":\"v-61b0-€\"}]} | headers[0].value",
         "{\"name\":\"n\",\"path\":\"/s\",\"headers\":[{\"name\":\"X\",\"value\":\"v-61b0\\u0000\"}]} | headers[0].value",
-        "{\"name\":\"n\",\"path\":\"/s\",\"pagination\":{\"type\":\"v-61b0\"}} | pagination",
+        "{\"name\":\"n\",\"path\":\"/s\",\"pagination\":{\"type\":\"v-61b0\"}} | pagination.type",
+        "{\"name\":\"n\",\"path\":\"/s\",\"queryParameters\":[{\"name\":\"v-61b0\",\"value\":\"x\"}],\"pagination\":{\"type\":\"PAGE_NUMBER\",\"pageSizeParameter\":\"size\",\"pageSize\":2}} | pagination.pageParameter",
+        "{\"name\":\"n\",\"path\":\"/s\",\"queryParameters\":[{\"name\":\"v-61b0\",\"value\":\"x\"}],\"pagination\":{\"type\":\"PAGE_NUMBER\",\"pageParameter\":\" \",\"pageSizeParameter\":\"size\",\"pageSize\":2}} | pagination.pageParameter",
+        "{\"name\":\"n\",\"path\":\"/s\",\"queryParameters\":[{\"name\":\"v-61b0\",\"value\":\"x\"}],\"pagination\":{\"type\":\"PAGE_NUMBER\",\"pageParameter\":\"page\",\"pageSize\":2}} | pagination.pageSizeParameter",
+        "{\"name\":\"n\",\"path\":\"/s\",\"queryParameters\":[{\"name\":\"v-61b0\",\"value\":\"x\"}],\"pagination\":{\"type\":\"PAGE_NUMBER\",\"pageParameter\":\"page\",\"pageSizeParameter\":\"size\"}} | pagination.pageSize",
+        "{\"name\":\"n\",\"path\":\"/s\",\"queryParameters\":[{\"name\":\"v-61b0\",\"value\":\"x\"}],\"pagination\":{\"type\":\"PAGE_NUMBER\",\"pageParameter\":\"page\",\"pageSizeParameter\":\"size\",\"pageSize\":0}} | pagination.pageSize",
+        "{\"name\":\"n\",\"path\":\"/s\",\"queryParameters\":[{\"name\":\"v-61b0\",\"value\":\"x\"}],\"pagination\":{\"type\":\"PAGE_NUMBER\",\"pageParameter\":\"page\",\"pageSizeParameter\":\"size\",\"pageSize\":2,\"startPage\":-1}} | pagination.startPage",
+        "{\"name\":\"n\",\"path\":\"/s\",\"queryParameters\":[{\"name\":\"v-61b0\",\"value\":\"x\"}],\"pagination\":{\"type\":\"PAGE_NUMBER\",\"pageParameter\":\"page\",\"pageSizeParameter\":\"size\",\"pageSize\":2,\"startPage\":3,\"endPage\":2}} | pagination.endPage",
+        "{\"name\":\"n\",\"path\":\"/s\",\"queryParameters\":[{\"name\":\"v-61b0\",\"value\":\"x\"}],\"pagination\":{\"type\":\"PAGE_NUMBER\",\"pageParameter\":\"v-61b0\",\"pageSizeParameter\":\"size\",\"pageSize\":2}} | pagination.pageParameter",
+        "{\"name\":\"n\",\"path\":\"/s\",\"queryParameters\":[{\"name\":\"v-61b0\",\"value\":\"x\"}],\"pagination\":{\"type\":\"PAGE_NUMBER\",\"pageParameter\":\"page\",\"pageSizeParameter\":\"v-61b0\",\"pageSize\":2}} | pagination.pageSizeParameter",
+        "{\"name\":\"n\",\"path\":\"/s\",\"queryParameters\":[{\"name\":\"v-61b0\",\"value\":\"x\"}],\"pagination\":{\"type\":\"PAGE_NUMBER\",\"pageParameter\":\"page\",\"pageSizeParameter\":\"page\",\"pageSize\":2}} | pagination.pageSizeParameter",
+        "{\"name\":\"n\",\"path\":\"/s\",\"queryParameters\":[{\"name\":\"v-61b0\",\"value\":\"x\"}],\"pagination\":{\"type\":\"PAGE_NUMBER\",\"pageParameter\":\"page\",\"pageSizeParameter\":\"size\",\"pageSize\":2,\"extra\":\"v-61b0\"}} | pagination.extra",
+        "{\"name\":\"n\",\"path\":\"/s\",\"queryParameters\":[{\"name\":\"v-61b0\",\"value\":\"x\"}],\"pagination\":{\"type\":\"PAGE_NUMBER\",\"pageParameter\":\"page\",\"pageSizeParameter\":\"size\",\"pageSize\":\"v-61b0\"}} | pagination.pageSize",
         "{\"name\":\"n\",\"path\":\"/s\",\"extra\":\"v-61b0\"}              | extra",
         "{\"name\":\"n\",\"path\":\"/s\",\"headers\":[{\"name\":\"A\",\"value\":\"b\"},{\"name\":\"X\",\"extra\":\"v-61b0\"}]} | headers[1].extra",
         "{\"name\":\"n\",\"path\":\"/s\"} {\"v-61b0\":1}                    | API Call",
@@ -1004,6 +1410,21 @@ class GetHttpApiCallTest {
                         && r.getExplanation().startsWith(keyPath + " ")),
         results::toString);
     assertFalse(results.toString().contains("v-61b0"), results::toString);
+  }
+
+  @Test
+  void validate_withAPaginationInTheFormOfThePortal_isValid() throws InitializationException {
+    TestRunner runner = runner("http://localhost:8080");
+    runner.setProperty(
+        GetHttpApiCall.API_CALL,
+        """
+        {"name": "Stations", "method": "GET", "path": "/stations",
+         "queryParameters": [{"name": "Page", "value": "x"}], "headers": [],
+         "pagination": {"type": "PAGE_NUMBER", "pageParameter": "page",
+                        "pageSizeParameter": "size", "pageSize": 100,
+                        "startPage": 0, "endPage": null}}""");
+
+    runner.assertValid();
   }
 
   @Test
@@ -1031,6 +1452,38 @@ class GetHttpApiCallTest {
 
   private static Stream<Throwable> causes(Throwable throwable) {
     return Stream.iterate(throwable, Objects::nonNull, Throwable::getCause);
+  }
+
+  /** A runner for a page-number pagination with page size 2 and the further fields. */
+  private static TestRunner paginatedRunner(ApiEndpoint endpoint, String furtherFields)
+      throws InitializationException {
+    TestRunner runner = runner(endpoint.baseUrl());
+    runner.setProperty(
+        GetHttpApiCall.API_CALL,
+        "{\"name\": \"Stations\", \"path\": \"/stations\", \"pagination\": {\"type\":"
+            + " \"PAGE_NUMBER\", \"pageParameter\": \"page\", \"pageSizeParameter\": \"size\","
+            + " \"pageSize\": 2"
+            + furtherFields
+            + "}}");
+    return runner;
+  }
+
+  /** A page of page size 2 with records of its own, so that no two pages have the same body. */
+  private static String fullPage(int page) {
+    return "[{\"stationid\":\"p" + page + "a\"},{\"stationid\":\"p" + page + "b\"}]";
+  }
+
+  private static void assertPages(TestRunner runner, String... pages) {
+    runner.assertAllFlowFilesTransferred(GetHttpApiCall.SUCCESS, pages.length);
+    List<String> actual =
+        runner.getFlowFilesForRelationship(GetHttpApiCall.SUCCESS).stream()
+            .map(flowFile -> flowFile.getAttribute(GetHttpApiCall.PAGE))
+            .toList();
+    assertEquals(List.of(pages), actual);
+  }
+
+  private static List<String> rawQueries(ApiEndpoint endpoint) {
+    return endpoint.requests().stream().map(ApiEndpoint.Request::rawQuery).toList();
   }
 
   private static Collection<ValidationResult> invalid(TestRunner runner) {

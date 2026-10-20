@@ -418,7 +418,9 @@ public final class NifiTestFixtures {
                 "pagination": null },
               { "name": "readings", "method": "GET", "path": "/readings",
                 "queryParameters": [], "headers": [],
-                "pagination": { "type": "PAGE_NUMBER", "pageParameter": "page" } } ]
+                "pagination": { "type": "PAGE_NUMBER", "pageParameter": "page",
+                                "pageSizeParameter": "size", "pageSize": 50,
+                                "startPage": 1, "endPage": 9 } } ]
             """,
             List.class));
     return source;

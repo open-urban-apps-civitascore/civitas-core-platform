@@ -22,7 +22,8 @@ record ApiCall(
     HttpMethod method,
     String path,
     List<Parameter> queryParameters,
-    List<Parameter> headers) {
+    List<Parameter> headers,
+    Pagination pagination) {
 
   ApiCall {
     queryParameters = List.copyOf(queryParameters);
@@ -37,9 +38,17 @@ record ApiCall(
     return label() + ": " + method.name() + " " + path;
   }
 
+  String describe(Page page) {
+    return describe() + page.title().map(title -> " " + title).orElse("");
+  }
+
   /** The name alone, for example {@code API call "Stations"}. */
   String label() {
     return "API call \"" + name + "\"";
+  }
+
+  String label(Page page) {
+    return label() + page.title().map(title -> ": " + title).orElse("");
   }
 
   /** A query parameter or a header. The value is never null. */

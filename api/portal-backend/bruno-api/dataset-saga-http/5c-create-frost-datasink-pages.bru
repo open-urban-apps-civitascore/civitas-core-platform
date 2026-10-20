@@ -1,0 +1,37 @@
+meta {
+  name: 5c. Create FROST DataSink (pages)
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{httpSagaDataSetId}}
+}
+
+body:json {
+  {
+    "dataSinkType": "FROST",
+    "configuration": { "port": "ThingTree" }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('httpSagaPagesSinkId', res.body.id);
+  }
+  if (res.body && res.body.configurationUrn) {
+    bru.setVar('httpSagaPagesSinkConfigurationUrn', res.body.configurationUrn);
+  }
+}
+
+tests {
+  test("DataSink created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

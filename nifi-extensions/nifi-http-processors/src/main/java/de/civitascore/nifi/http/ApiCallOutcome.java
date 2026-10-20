@@ -16,6 +16,9 @@ import org.apache.nifi.web.client.api.HttpResponseEntity;
 /** What one request of an API call gave. */
 sealed interface ApiCallOutcome {
 
+  /** The status of the response, 0 when no response came. */
+  int status();
+
   /**
    * A 2xx response with a body. The caller reads the content and closes the response.
    *
@@ -36,7 +39,6 @@ sealed interface ApiCallOutcome {
   /**
    * A request that failed.
    *
-   * @param status the status of the response, 0 when no response came
    * @param message with each control character and line separator escaped, so that no part of it
    *     can start a log line of its own
    */
@@ -75,6 +77,26 @@ sealed interface ApiCallOutcome {
      */
     static Failure ofRejectedBody(String apiCall, int status, String reason) {
       return new Failure(ErrorKind.FATAL, status, apiCall + ": " + reason);
+    }
+
+    /** A paginated run that read {@code maxPages} pages and met no stop condition. */
+    static Failure ofPageLimit(String apiCall, int status, int maxPages) {
+      return new Failure(
+          ErrorKind.FATAL,
+          status,
+          apiCall + ": no stop condition after " + maxPages + " pages (Max Pages)");
+    }
+
+    /** A page whose body is the same as the body of an earlier page of the run. */
+    static Failure ofRepeatedPage(String apiCall, int status, String page, String earlierPage) {
+      return new Failure(
+          ErrorKind.FATAL, status, apiCall + ": " + page + " repeats " + earlierPage);
+    }
+
+    /** A run that NiFi stopped before this request. */
+    static Failure ofStopped(String request) {
+      return new Failure(
+          ErrorKind.TRANSIENT, 0, request + " not sent, because the processor stopped");
     }
 
     /** A request the web client refused to build. The same configuration fails again. */

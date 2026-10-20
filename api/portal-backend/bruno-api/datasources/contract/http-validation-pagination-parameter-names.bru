@@ -1,0 +1,54 @@
+meta {
+  name: Contract HTTP — validation: pagination parameter names
+  type: http
+  seq: 123
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "name": "contract_http_pagination_parameter_names",
+    "description": "contract — HTTP",
+    "connector": {
+      "connectorType": "HTTP",
+      "apiCalls": [
+        {
+          "name": "stations",
+          "path": "/stations",
+          "queryParameters": [{ "name": "size", "value": "10" }],
+          "pagination": { "type": "PAGE_NUMBER", "pageParameter": "page", "pageSizeParameter": "size", "pageSize": 10 }
+        },
+        {
+          "name": "sensors",
+          "path": "/sensors",
+          "pagination": { "type": "PAGE_NUMBER", "pageParameter": "p", "pageSizeParameter": "p", "pageSize": 10 }
+        }
+      ]
+    },
+    "dataStructureVersionId": null
+  }
+}
+
+tests {
+  test("Status is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Error body matches the VALIDATION_FAILED contract", function() {
+    expect(res.body.type).to.equal("urn:civitas:error:VALIDATION_FAILED");
+    expect(res.body.fieldErrors).to.deep.equal([
+      { field: "connector.apiCalls[0].pagination.pageSizeParameter", message: "'pageSizeParameter' must differ from the name of each query parameter" },
+      { field: "connector.apiCalls[1].pagination.pageSizeParameter", message: "'pageSizeParameter' must differ from 'pageParameter'" }
+    ]);
+  });
+}
+
+docs {
+  A request must never send one query parameter name with two values.
+  The rule runs on every write, not only at release.
+}
