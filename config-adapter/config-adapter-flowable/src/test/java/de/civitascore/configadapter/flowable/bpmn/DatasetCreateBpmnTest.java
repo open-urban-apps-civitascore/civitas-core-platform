@@ -62,7 +62,8 @@ class DatasetCreateBpmnTest {
         .thenAnswer(
             invocation -> {
               SagaCommandMessage command = invocation.getArgument(0);
-              return SagaCommandResult.success(command.sagaId(), command.stepId(), Map.of(), Map.of());
+              return SagaCommandResult.success(
+                  command.sagaId(), command.stepId(), Map.of(), Map.of());
             });
     stubGeoserverSuccess();
     stubPostgisSuccess();

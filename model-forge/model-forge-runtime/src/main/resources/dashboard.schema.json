@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://civitasconnect.digital/core/dashboard/v1",
+  "title": "CORE Dashboard",
+  "description": "A CORE Dashboard model. It is the authoritative configuration for the dashboard rendered by an engine such as Superset.",
+  "type": "object",
+  "required": ["$schema", "id", "title", "released", "standaloneMode", "showFilters", "filterExpansion"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://civitasconnect.digital/core/dashboard/v1"
+    },
+    "id": {
+      "type": "string",
+      "description": "Versioned CORE URN of this Dashboard.",
+      "pattern": "^urn:core:[^:]+:[^:]+:dashboard:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable dashboard title."
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional dashboard description."
+    },
+    "released": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether CORE releases this dashboard in the dashboard engine."
+    },
+    "standaloneMode": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3,
+      "default": 1,
+      "description": "Superset standalone display mode included in the portal link."
+    },
+    "showFilters": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether the dashboard link shows the native filter bar."
+    },
+    "filterExpansion": {
+      "type": "string",
+      "enum": ["DEFAULT", "COLLAPSED", "EXPANDED"],
+      "default": "DEFAULT",
+      "description": "Initial native filter bar state in the dashboard link."
+    }
+  }
+}

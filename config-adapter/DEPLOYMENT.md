@@ -41,11 +41,11 @@ Fixed, non-configurable settings: `auto.offset.reset=earliest`, `enable.auto.com
 
 ### 1.3 Flowable State Database
 
-The saga orchestrator keeps its state in a dedicated PostgreSQL database. Only the password fails fast: url and username ship with packaged values, so an unset `FLOWABLE_JDBC_URL` connects to `localhost:5433` instead of failing.
+The saga orchestrator keeps its state in a dedicated PostgreSQL database. Only the password fails fast: url and username ship with packaged values, so an unset `FLOWABLE_JDBC_URL` connects to `localhost:5432` instead of failing.
 
 | Property | Env var | Default | Description |
 |---|---|---|---|
-| `flowable.jdbc.url` | `FLOWABLE_JDBC_URL` | `jdbc:postgresql://localhost:5433/flowable` | JDBC URL of the Flowable database. |
+| `flowable.jdbc.url` | `FLOWABLE_JDBC_URL` | `jdbc:postgresql://localhost:5432/flowable` | JDBC URL of the Flowable database. |
 | `flowable.jdbc.username` | `FLOWABLE_JDBC_USERNAME` | `flowable` | Database user. |
 | `flowable.jdbc.password` | `FLOWABLE_JDBC_PASSWORD` | *(required)* | Database password. An empty string is accepted; null is not. |
 

@@ -101,6 +101,10 @@ const makeVisualization = (overrides: Partial<Visualization> = {}): Visualizatio
   name: 'Sales Dashboard',
   type: 'dashboard',
   externalDashboardId: null,
+  released: false,
+  standaloneMode: 1,
+  showFilters: true,
+  filterExpansion: 'DEFAULT',
   ...overrides,
 })
 

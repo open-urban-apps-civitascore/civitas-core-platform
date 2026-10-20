@@ -45,6 +45,7 @@ services:
   # Create the scoped views and least-privilege role used by Trino's frost catalog.
   frost-migrations:
     image: postgres:18.1-alpine
+    mem_limit: 256m
     container_name: civitas-frost-migrations
     restart: "no"
     environment:

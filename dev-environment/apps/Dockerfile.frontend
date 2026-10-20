@@ -12,6 +12,8 @@ RUN pnpm install --frozen-lockfile
 FROM node:22-alpine AS builder
 WORKDIR /app
 RUN corepack enable
+ARG NEXT_PUBLIC_SUPERSET_URL=http://localhost:8092
+ENV NEXT_PUBLIC_SUPERSET_URL=${NEXT_PUBLIC_SUPERSET_URL}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # Build Next.js production bundle

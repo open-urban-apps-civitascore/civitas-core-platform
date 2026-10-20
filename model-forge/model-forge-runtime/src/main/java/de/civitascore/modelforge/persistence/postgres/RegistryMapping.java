@@ -25,6 +25,7 @@ final class RegistryMapping {
     static final String TYPE_DATASOURCE    = "datasource";
     static final String TYPE_DATASINK      = "datasink";
     static final String TYPE_DATASTRUCTURE       = "datastructure";
+    static final String TYPE_DASHBOARD = "dashboard";
 
     // ── Technical representation formats (model_forge.artifact_representation.format) ──────────
     static final String FORMAT_JSONSCHEMA = Formats.JSON_SCHEMA;   // shared with the HTTP surface
@@ -49,6 +50,7 @@ final class RegistryMapping {
             case "pipelines"      -> TYPE_PIPELINE;
             case "datasources"    -> TYPE_DATASOURCE;
             case "datasinks"      -> TYPE_DATASINK;
+            case "dashboards" -> TYPE_DASHBOARD;
             case "datasets"       -> TYPE_DATASET;
             case "datastructures"       -> TYPE_DATASTRUCTURE;
             default                -> group;

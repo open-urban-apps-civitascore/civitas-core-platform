@@ -66,6 +66,7 @@ class DataSetSagaPublisherTest {
   @Mock private KafkaTemplate<String, String> kafkaTemplate;
   @Mock private DataSinkRepository dataSinkRepository;
   @Mock private DashboardRepository dashboardRepository;
+  @Mock private de.civitascore.portal.repository.UserRepository userRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;
 
   private DataSetSagaPublisher publisher;
@@ -83,6 +84,7 @@ class DataSetSagaPublisherTest {
         new SagaProperties("test.saga.trigger", 5),
         dataSinkRepository,
         dashboardRepository,
+        userRepository,
         modelRegistryGateway,
         new PipelineClosureValidationProperties(maxDepth));
   }

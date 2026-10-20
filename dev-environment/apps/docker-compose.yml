@@ -87,6 +87,8 @@ services:
       POSTGIS_JDBC_URL: jdbc:postgresql://postgis-dev-env:5432/geoserver
       POSTGIS_JDBC_USER: geoserver
       POSTGIS_JDBC_PASSWORD: ${GEOSERVER_DB_PASSWORD:-geoserver}
+      # Use Superset's container address. localhost:8088 is the adapter itself in this service.
+      SUPERSET_URL: http://civitas-superset:8088
       # Dev master key for decrypting ENC(...) credentials at deploy time; must match
       # portal-backend's civitas.master-key.
       CIVITAS_MASTER_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
@@ -146,6 +148,8 @@ services:
     build:
       context: ../../portal-frontend
       dockerfile: ../dev-environment/apps/Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_SUPERSET_URL: ${NEXT_PUBLIC_SUPERSET_URL:-http://localhost:8092}
     mem_limit: 768m
     container_name: civitas-portal-frontend
     restart: unless-stopped
@@ -201,10 +205,10 @@ services:
     container_name: civitas-model-forge-admin-ui
     restart: unless-stopped
     ports:
-      - "8092:8092"
+      - "8094:8094"
     environment:
       JAVA_TOOL_OPTIONS: "-XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=65"
-      SERVER_PORT: 8092
+      SERVER_PORT: 8094
       # Host is the Docker service name (not localhost); read-WRITE console over the real registry.
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgis-dev-env:5432/portal_backend?sslmode=disable
       SPRING_DATASOURCE_USERNAME: admin
@@ -212,7 +216,7 @@ services:
     networks:
       - civitas-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8092/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8094/"]
       interval: 15s
       timeout: 10s
       retries: 5

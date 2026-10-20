@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl'
 import { ComponentType, useState } from 'react'
 import { toast } from 'sonner'
 
-import { useDeleteVisualization } from '@/app/services/api/visualizations/clientRequests'
+import { useDeleteVisualization, useUpdateVisualization } from '@/app/services/api/visualizations/clientRequests'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,10 +22,17 @@ interface VisualizationCardProps {
   visualization: Visualization
   datasetId: string
   canEdit: boolean
+  isEditing: boolean
   isOpenDataAccess: boolean
 }
 
-export const VisualizationCard = ({ visualization, datasetId, canEdit, isOpenDataAccess }: VisualizationCardProps) => {
+export const VisualizationCard = ({
+  visualization,
+  datasetId,
+  canEdit,
+  isEditing,
+  isOpenDataAccess,
+}: VisualizationCardProps) => {
   const t = useTranslations('datasets.overview.completion.visualizations')
   const tCard = useTranslations('datasets.overview.completion.visualizations.card')
   const tConfig = useTranslations('datasets.overview.completion.visualizations.config')
@@ -33,14 +40,22 @@ export const VisualizationCard = ({ visualization, datasetId, canEdit, isOpenDat
   const router = useRouter()
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const deleteVisualization = useDeleteVisualization()
+  const updateVisualization = useUpdateVisualization()
 
   const Icon = TYPE_ICONS[visualization.type]
   const typeLabel = tConfig(`type.${visualization.type}`)
 
   const goToView = () => router.push(`/datasets/${datasetId}/visualizations/${visualization.id}`)
 
+  const dashboardParams = new URLSearchParams({
+    standalone: String(visualization.standaloneMode),
+    show_filters: visualization.showFilters ? '1' : '0',
+  })
+  if (visualization.filterExpansion !== 'DEFAULT') {
+    dashboardParams.set('expand_filters', visualization.filterExpansion === 'EXPANDED' ? '1' : '0')
+  }
   const supersetUrl = visualization.externalDashboardId
-    ? `${process.env.NEXT_PUBLIC_SUPERSET_URL}/dashboard/${visualization.externalDashboardId}/`
+    ? `${process.env.NEXT_PUBLIC_SUPERSET_URL}/dashboard/${visualization.externalDashboardId}/?${dashboardParams}`
     : undefined
 
   const handleConfirmDelete = async () => {
@@ -52,6 +67,27 @@ export const VisualizationCard = ({ visualization, datasetId, canEdit, isOpenDat
     }
     setIsDeleteOpen(false)
     router.refresh()
+  }
+
+  const handleReleaseToggle = async () => {
+    try {
+      await updateVisualization.mutateAsync({
+        datasetId,
+        visualizationId: visualization.id,
+        visualization: {
+          name: visualization.name,
+          description: visualization.description,
+          standaloneMode: visualization.standaloneMode,
+          showFilters: visualization.showFilters,
+          filterExpansion: visualization.filterExpansion,
+          released: !visualization.released,
+        },
+      })
+      toast.success(tCard(visualization.released ? 'messages.unreleaseSuccess' : 'messages.releaseSuccess'))
+      router.refresh()
+    } catch {
+      toast.error(tCard('messages.releaseError'))
+    }
   }
 
   return (
@@ -69,6 +105,9 @@ export const VisualizationCard = ({ visualization, datasetId, canEdit, isOpenDat
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             <div className="flex items-center gap-2">
               <span className="text-sm font-normal text-muted-foreground">{typeLabel}</span>
+              <Badge variant="secondary">
+                {tConfig(visualization.released ? 'releasedBadge' : 'unreleasedBadge')}
+              </Badge>
               {isOpenDataAccess ? (
                 <Badge variant="secondary">{tConfig('openDataBadge')}</Badge>
               ) : (
@@ -123,21 +162,31 @@ export const VisualizationCard = ({ visualization, datasetId, canEdit, isOpenDat
               </Tooltip>
             )}
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  data-testid={`visualizationCardMenu-${visualization.id}`}
-                  aria-label={visualization.name}
-                  onClick={e => e.stopPropagation()}
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {canEdit && (
+            {isEditing && canEdit && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    data-testid={`visualizationCardMenu-${visualization.id}`}
+                    aria-label={visualization.name}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={e => {
+                      e.stopPropagation()
+                      void handleReleaseToggle()
+                    }}
+                    disabled={updateVisualization.isPending}
+                    data-testid={`visualizationCardMenuRelease-${visualization.id}`}
+                  >
+                    {tCard(visualization.released ? 'actions.unrelease' : 'actions.release')}
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     variant="destructive"
                     onClick={e => {
@@ -148,9 +197,9 @@ export const VisualizationCard = ({ visualization, datasetId, canEdit, isOpenDat
                   >
                     {tCard('actions.delete')}
                   </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
       </div>

@@ -37,7 +37,8 @@ public final class SchemaCatalog {
         ArtifactKind.MAPPING, "/mapping.schema.json",
         ArtifactKind.PIPELINE, "/pipeline.schema.json",
         ArtifactKind.DATA_SOURCE, "/datasource.schema.json",
-        ArtifactKind.DATA_SINK, "/datasink.schema.json"
+        ArtifactKind.DATA_SINK, "/datasink.schema.json",
+        ArtifactKind.DASHBOARD, "/dashboard.schema.json"
     );
 
     private static final String META_SCHEMA = "/schema/json-schema-2020-12.json";

@@ -27,7 +27,7 @@ USER spring
 
 # SERVER_PORT (not PORT) is the name Spring binds to server.port; it matches the
 # application.yml default so a plain `docker run` listens where the healthcheck probes.
-ENV SERVER_PORT=8092
+ENV SERVER_PORT=8094
 EXPOSE $SERVER_PORT
 
 # --add-opens java.base/java.io: Wicket's DEVELOPMENT-mode CheckingObjectOutputStream reflects into

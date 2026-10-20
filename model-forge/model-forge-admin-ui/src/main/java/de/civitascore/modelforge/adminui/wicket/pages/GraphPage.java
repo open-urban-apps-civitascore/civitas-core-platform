@@ -105,6 +105,7 @@ public class GraphPage extends BasePage {
             + "    pipeline: {color: {background: '#76b7b2', border: '#3f7a75'}},"
             + "    datasource: {color: {background: '#59a14f', border: '#2f5c29'}},"
             + "    datasink: {color: {background: '#edc948', border: '#a88a12'}},"
+            + "    dashboard: {color: {background: '#af7aa1', border: '#70466a'}},"
             + "    dataset: {color: {background: '#b07aa1', border: '#6e4568'}},"
             // A reference target that is not a registered artifact: the edge survives its target's
             // removal by design, so the node is real but must not read as an existing artifact.

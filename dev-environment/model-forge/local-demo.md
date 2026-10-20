@@ -13,7 +13,7 @@ Model Forge inside the backend, and the backend writes nothing to the registry.
 
 The only host that consumes Model Forge today is the **Admin UI**
 (`model-forge-admin-ui`), a Wicket/Spring Boot console over the model registry. It is
-started by `start-portal-dev.sh` as the `model-forge-admin-ui` service (port 8092;
+started by `start-portal-dev.sh` as the `model-forge-admin-ui` service (port 8094;
 disable with `--no-admin-ui`), and by **default it points at portal-backend's own
 database**, where it creates and owns the `model_forge` schema itself via its own Flyway
 migration. It is read-WRITE: imports/edits/deletes here hit that registry directly,
@@ -52,7 +52,7 @@ Wait for it to report all services healthy before continuing.
 ## Step 2 — The Model Forge Admin UI
 
 Step 1 already starts it as the `model-forge-admin-ui` service on
-**http://localhost:8092** (pass `--no-admin-ui` to skip it). Nothing further is needed.
+**http://localhost:8094** (pass `--no-admin-ui` to skip it). Nothing further is needed.
 
 The registry it shows will be **empty** on a fresh stack: it points at portal-backend's
 database, but portal-backend does not write to Model Forge yet, and the Admin UI creates
@@ -61,7 +61,7 @@ there through these pages. To browse the bundled OGC SensorThings examples inste
 standalone mode below.
 
 To run it by hand rather than as a container alongside Step 1, use a different port
-from the main stack's 8092 (8090 is Kafka UI and 8091 is AuthZ Repository):
+from the main stack's 8094 (8090 is Kafka UI, 8091 is AuthZ Repository, and 8092 is Superset):
 
 ```bash
 cd ../../model-forge/model-forge-admin-ui
@@ -96,7 +96,7 @@ SensorThings example schemas, so there is something to explore immediately.
 ### Why the port overrides
 
 The Admin UI's [application.yml](../../model-forge/model-forge-admin-ui/src/main/resources/application.yml)
-defaults to port `8092` and datasource `localhost:5432/portal_backend` (user
+defaults to port `8094` and datasource `localhost:5432/portal_backend` (user
 `admin`/`admin`) — exactly what the container from Step 1 uses. Running a *second*
 instance by hand alongside that container therefore needs a port override:
 
@@ -104,7 +104,8 @@ instance by hand alongside that container therefore needs a port override:
 |------|------------|-------------------|----------|
 | `5432` | Shared PostgreSQL/PostGIS server | `portal_backend` or `model_forge_admin` | Separate databases on one server |
 | `8090` | Kafka UI | — | — |
-| `8092` | Model Forge Admin UI container (Step 1) | Admin UI web app | Yes → override with `SERVER_PORT=8095` |
+| `8092` | Superset | Admin UI web app | Yes → override with `SERVER_PORT=8095` |
+| `8094` | Model Forge Admin UI container (Step 1) | Admin UI web app | Yes → override with `SERVER_PORT=8095` |
 
 The shipped defaults describe **local-demo mode**: the `portal_backend` database with
 `admin`/`admin`. They do *not* match this module's own
@@ -147,8 +148,8 @@ this folder shows `model-forge-admin-postgres` as healthy, and that
 `docker-compose.yml` (`5439` by default).
 
 **Admin UI won't bind its port** — something is already on `8095`, or you forgot
-`SERVER_PORT` and a second instance collided with the main stack's `8092`. The main
-stack also publishes `8089`, `8090`, `8091` and the Admin UI on `8092`, so pick another port.
+`SERVER_PORT` and a second instance collided with the main stack's `8094`. The main
+stack also publishes `8089`, `8090`, `8091` and Superset on `8092`, so pick another port.
 
 **Admin UI is empty** — expected on a fresh stack. It points at portal-backend's
 database, but portal-backend does not write to Model Forge yet, so the registry only

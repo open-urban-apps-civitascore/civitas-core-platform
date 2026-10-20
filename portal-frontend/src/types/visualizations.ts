@@ -16,6 +16,10 @@ export interface Visualization {
   type: VisualizationTypeQuery
   // Null until the rendering engine (Superset) has materialized the dashboard.
   externalDashboardId: string | null
+  released: boolean
+  standaloneMode: 0 | 1 | 2 | 3
+  showFilters: boolean
+  filterExpansion: 'DEFAULT' | 'COLLAPSED' | 'EXPANDED'
 }
 
 // --- Backend schema (DashboardOutputDTO; visualizationType is the DTO's uppercase discriminator
@@ -29,6 +33,10 @@ export const VisualizationApiResponseSchema = z.object({
   dataSetId: z.uuid(),
   externalDashboardId: z.string().nullable(),
   active: z.boolean(),
+  released: z.boolean(),
+  standaloneMode: z.number().int().min(0).max(3),
+  showFilters: z.boolean(),
+  filterExpansion: z.enum(['DEFAULT', 'COLLAPSED', 'EXPANDED']),
   createdAt: z.string(),
   modifiedAt: z.string(),
 })
@@ -41,6 +49,10 @@ export const toVisualization = (dto: VisualizationApiResponse): Visualization =>
   description: dto.description ?? undefined,
   type: VISUALIZATION_TYPE_QUERY.DASHBOARD,
   externalDashboardId: dto.externalDashboardId,
+  released: dto.released,
+  standaloneMode: dto.standaloneMode as 0 | 1 | 2 | 3,
+  showFilters: dto.showFilters,
+  filterExpansion: dto.filterExpansion,
 })
 
 export const VISUALIZATION_DESCRIPTION_MAX_LENGTH = 150
@@ -48,6 +60,9 @@ export const VISUALIZATION_DESCRIPTION_MAX_LENGTH = 150
 export const visualizationFormSchema = z.object({
   name: z.string().min(1),
   description: z.string().max(VISUALIZATION_DESCRIPTION_MAX_LENGTH).optional(),
+  standaloneMode: z.number().int().min(0).max(3),
+  showFilters: z.boolean(),
+  filterExpansion: z.enum(['DEFAULT', 'COLLAPSED', 'EXPANDED']),
 })
 
 export type VisualizationFormData = z.infer<typeof visualizationFormSchema>
@@ -65,14 +80,14 @@ export type DeleteVisualizationInput = {
 export type UpdateVisualizationInput = {
   datasetId: string
   visualizationId: string
-  visualization: VisualizationFormData
+  visualization: VisualizationFormData & { released?: boolean }
 }
 
 // VisualizationInputDTO's @JsonTypeInfo discriminator lives on the abstract base class, so Jackson
 // requires it on the wire even though the controller binds directly to the concrete
 // DashboardInputDTO — the form itself never lets the user pick a type, so it's added here rather
 // than carried around in VisualizationFormData.
-export const toVisualizationPayload = (data: VisualizationFormData) => ({
+export const toVisualizationPayload = (data: VisualizationFormData & { released?: boolean }) => ({
   ...data,
   visualizationType: 'DASHBOARD',
 })

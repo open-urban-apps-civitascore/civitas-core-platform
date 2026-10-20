@@ -134,9 +134,15 @@ class CivitasSupersetSecurityManager(SupersetSecurityManager):
                     raise ValueError("CORE group name conflicts with an unmanaged FAB group")
                 fab_group.label = core_group_name[:150]
                 fab_group.description = description
-            # CORE groups are membership containers in Superset, never a source of
-            # Superset-wide role capabilities.
-            fab_group.roles = []
+            # CORE groups carry no roles by default. The adapter can attach one
+            # narrow role to groups that edit a CORE-provisioned dashboard; keep
+            # that managed grant when OAuth reconciles group membership.
+            creator_role = self.find_role("CORE Dashboard Dataset Creator")
+            fab_group.roles = (
+                [role for role in (fab_group.roles or []) if role.id == creator_role.id]
+                if creator_role
+                else []
+            )
 
             sync_group_subject(fab_group)
             desired_groups[core_group_id] = fab_group
@@ -226,7 +232,7 @@ class CivitasSupersetSecurityManager(SupersetSecurityManager):
                 from flask_appbuilder.security.sqla.models import ViewMenu
                 from superset import db
 
-                database_name = os.getenv("SUPERSET_TRINO_DATABASE_NAME", "Trino")
+                database_name = os.getenv("SUPERSET_TRINO_DATABASE_NAME", "CORE")
                 core_schema_permissions = {
                     row.name
                     for row in db.session.query(ViewMenu.name)
@@ -237,7 +243,7 @@ class CivitasSupersetSecurityManager(SupersetSecurityManager):
                 logger.warning("Could not list Trino schemas for tenant reader: %s", exc)
                 core_schema_permissions = set()
         else:
-            database_name = os.getenv("SUPERSET_TRINO_DATABASE_NAME", "Trino")
+            database_name = os.getenv("SUPERSET_TRINO_DATABASE_NAME", "CORE")
             core_schema_permissions = {
                 f"[{database_name}].[civitas].[{self._workspace_name(dataset_id)}]"
                 for dataset_id in result.get("allowed_schemas", [])

@@ -11,6 +11,7 @@ package de.civitascore.configadapter.model.dataset;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.util.List;
 
 /**
  * Saga-contract shape of a dashboard, carried alongside the dataset on {@code DATASET_CREATE} and
@@ -35,13 +36,19 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  *       survive).
  * </ul>
  *
- * <p>It is sent on both CREATE and UPDATE sagas, so a dashboard added before release and one edited
- * after release are handled by the same rule.
- *
  * @param id platform dashboard UUID; correlation key for the confirmation
- * @param name human-readable dashboard name
+ * @param modelUrn logical CORE URN of the authoritative Model Forge artifact
  * @param externalDashboardId engine id when known (update), else {@code null} (create)
+ * @param editorGroupIds CORE group IDs allowed to edit the engine dashboard
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record Dashboard(String id, String name, String externalDashboardId) {}
+public record Dashboard(
+    String id,
+    String modelUrn,
+    String externalDashboardId,
+    List<String> editorGroupIds) {
+  public Dashboard {
+    editorGroupIds = editorGroupIds == null ? List.of() : List.copyOf(editorGroupIds);
+  }
+}

@@ -14,16 +14,25 @@ interface VisualizationListProps {
   datasetId: string
   visualizations: Visualization[]
   canEdit: boolean
+  canCreate: boolean
+  isEditing: boolean
   isOpenDataAccess: boolean
 }
 
-export const VisualizationList = ({ datasetId, visualizations, canEdit, isOpenDataAccess }: VisualizationListProps) => {
+export const VisualizationList = ({
+  datasetId,
+  visualizations,
+  canEdit,
+  canCreate,
+  isEditing,
+  isOpenDataAccess,
+}: VisualizationListProps) => {
   const t = useTranslations('datasets.overview.completion.visualizations')
 
   return (
     <div>
       <div className="flex justify-end">
-        {canEdit && (
+        {canCreate && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
@@ -54,6 +63,7 @@ export const VisualizationList = ({ datasetId, visualizations, canEdit, isOpenDa
               visualization={visualization}
               datasetId={datasetId}
               canEdit={canEdit}
+              isEditing={isEditing}
               isOpenDataAccess={isOpenDataAccess}
             />
           ))}

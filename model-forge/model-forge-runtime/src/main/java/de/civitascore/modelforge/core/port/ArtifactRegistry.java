@@ -103,6 +103,9 @@ public interface ArtifactRegistry {
     /** @return the concrete versioned URN (pin) the write resolved to */
     String storeDataSink(String id, JsonNode sink, VersionBump bump);
 
+    /** @return the concrete versioned URN (pin) the write resolved to */
+    String storeDashboard(String id, JsonNode dashboard, VersionBump bump);
+
     default String storeDataSet(String urn, JsonNode manifest) {
         return storeDataSet(urn, manifest, VersionBump.PATCH);
     }

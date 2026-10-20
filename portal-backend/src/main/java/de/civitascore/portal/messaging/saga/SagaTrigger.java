@@ -57,6 +57,7 @@ public sealed interface SagaTrigger
       List<DataPipeline> dataPipelines,
       List<NamedApi> namedApis,
       List<Dashboard> dashboards,
+      List<String> editorGroupIds,
       Map<String, Map<String, Object>> artifacts)
       implements SagaTrigger {
 
@@ -78,6 +79,7 @@ public sealed interface SagaTrigger
         List<DataPipeline> dataPipelines,
         List<NamedApi> namedApis,
         List<Dashboard> dashboards,
+        List<String> editorGroupIds,
         Map<String, Map<String, Object>> artifacts) {
       return new DatasetCreate(
           SagaType.DATASET_CREATE,
@@ -90,6 +92,7 @@ public sealed interface SagaTrigger
           dataPipelines,
           namedApis,
           dashboards,
+          editorGroupIds,
           artifacts);
     }
   }
@@ -110,6 +113,8 @@ public sealed interface SagaTrigger
       List<DataPipeline> dataPipelines,
       List<NamedApi> namedApis,
       List<Dashboard> dashboards,
+      List<String> deletedDashboardIds,
+      List<String> editorGroupIds,
       Map<String, Map<String, Object>> artifacts)
       implements SagaTrigger {
 
@@ -135,6 +140,8 @@ public sealed interface SagaTrigger
         List<DataPipeline> dataPipelines,
         List<NamedApi> namedApis,
         List<Dashboard> dashboards,
+        List<String> deletedDashboardIds,
+        List<String> editorGroupIds,
         Map<String, Map<String, Object>> artifacts) {
       return new DatasetUpdate(
           SagaType.DATASET_UPDATE,
@@ -151,6 +158,8 @@ public sealed interface SagaTrigger
           dataPipelines,
           namedApis,
           dashboards,
+          deletedDashboardIds,
+          editorGroupIds,
           artifacts);
     }
   }

@@ -10,6 +10,7 @@ import { VisualizationCard } from './VisualizationCard'
 const mockPush = vi.fn()
 const mockRefresh = vi.fn()
 const mockDeleteVisualization = vi.fn().mockResolvedValue(undefined)
+const mockUpdateVisualization = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, refresh: mockRefresh }),
@@ -25,6 +26,7 @@ vi.mock('sonner', () => ({
 
 vi.mock('@/app/services/api/visualizations/clientRequests', () => ({
   useDeleteVisualization: () => ({ mutateAsync: mockDeleteVisualization, isPending: false }),
+  useUpdateVisualization: () => ({ mutateAsync: mockUpdateVisualization, isPending: false }),
 }))
 
 vi.mock('@/components/modals/warning-modal/WarningModal', () => ({
@@ -43,6 +45,10 @@ const makeVisualization = (overrides: Partial<Visualization> = {}): Visualizatio
   name: 'Sales Dashboard',
   type: 'dashboard',
   externalDashboardId: null,
+  released: false,
+  standaloneMode: 1,
+  showFilters: true,
+  filterExpansion: 'DEFAULT',
   ...overrides,
 })
 
@@ -50,6 +56,7 @@ const defaultProps = {
   visualization: makeVisualization(),
   datasetId: 'dataset-123',
   canEdit: true,
+  isEditing: true,
   isOpenDataAccess: false,
 }
 
@@ -60,6 +67,7 @@ describe('VisualizationCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockDeleteVisualization.mockResolvedValue(undefined)
+    mockUpdateVisualization.mockResolvedValue(undefined)
     process.env.NEXT_PUBLIC_SUPERSET_URL = 'http://localhost:8092'
   })
 
@@ -102,10 +110,14 @@ describe('VisualizationCard', () => {
       expect(screen.getByTestId('visualizationCardMenuDelete-vis-1')).toBeInTheDocument()
     })
 
-    it('hides the delete menu item when canEdit is false', async () => {
+    it('hides the three-dot menu when the dataset is not in edit mode', () => {
+      renderComponent({ isEditing: false })
+      expect(screen.queryByTestId('visualizationCardMenu-vis-1')).not.toBeInTheDocument()
+    })
+
+    it('hides the three-dot menu when canEdit is false', () => {
       renderComponent({ canEdit: false })
-      await userEvent.click(screen.getByTestId('visualizationCardMenu-vis-1'))
-      expect(screen.queryByTestId('visualizationCardMenuDelete-vis-1')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('visualizationCardMenu-vis-1')).not.toBeInTheDocument()
     })
   })
 
@@ -121,7 +133,7 @@ describe('VisualizationCard', () => {
     it('links directly to the dashboard when externalDashboardId is set', () => {
       renderComponent({ visualization: makeVisualization({ externalDashboardId: '42' }) })
       const link = screen.getByRole('link', { name: 'actions.openInSuperset' })
-      expect(link).toHaveAttribute('href', 'http://localhost:8092/dashboard/42/')
+      expect(link).toHaveAttribute('href', 'http://localhost:8092/dashboard/42/?standalone=1&show_filters=1')
       expect(link).toHaveAttribute('target', '_blank')
     })
 

@@ -28,8 +28,8 @@ The Admin UI is started with:
   out here so the script does not depend on that default)
 * `MODEL_FORGE_ADMIN_UI_SEED_ENABLED=false` → don't seed the SensorThings examples into
   portal-backend's registry (this is also the default)
-* `SERVER_PORT=8095` → the main stack publishes the Admin UI on 8092
-  (8090 is Kafka UI, 8091 authz-repository)
+* `SERVER_PORT=8095` → the main stack publishes the Admin UI on 8094; Superset uses
+  8092 (8090 is Kafka UI, 8091 authz-repository)
 
 Migrations are left **enabled** (the default): nothing else creates the `model_forge`
 schema today, so the Admin UI creates it. Disabling them against a database where the

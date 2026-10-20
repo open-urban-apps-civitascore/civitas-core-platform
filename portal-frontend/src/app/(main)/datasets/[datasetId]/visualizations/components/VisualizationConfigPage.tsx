@@ -30,8 +30,9 @@ import {
 } from '@/types/visualizations'
 
 import { VisualizationConfigForm } from './VisualizationConfigForm'
+import { DashboardOptionsForm } from './DashboardOptionsForm'
 
-type VisualizationConfigTab = 'basicInfo'
+type VisualizationConfigTab = 'basicInfo' | 'options'
 
 interface VisualizationConfigPageProps {
   dataset: Dataset
@@ -72,6 +73,9 @@ export const VisualizationConfigPage = ({
   const defaultValues: VisualizationFormData = {
     name: existingVisualization?.name ?? '',
     description: existingVisualization?.description ?? '',
+    standaloneMode: existingVisualization?.standaloneMode ?? 1,
+    showFilters: existingVisualization?.showFilters ?? true,
+    filterExpansion: existingVisualization?.filterExpansion ?? 'DEFAULT',
   }
 
   const form = useForm<VisualizationFormData>({
@@ -87,8 +91,13 @@ export const VisualizationConfigPage = ({
   const typeLabel = t(`type.${resolvedType}`)
 
   const tabs: Tab<VisualizationConfigTab>[] = useMemo(
-    () => [{ value: 'basicInfo', label: 'datasets.overview.completion.visualizations.config.tabs.basicInfo' }],
-    [],
+    () => [
+      { value: 'basicInfo', label: 'datasets.overview.completion.visualizations.config.tabs.basicInfo' },
+      ...(!isCreate
+        ? [{ value: 'options' as const, label: 'datasets.overview.completion.visualizations.config.tabs.options' }]
+        : []),
+    ],
+    [isCreate],
   )
 
   const completedTabs: VisualizationConfigTab[] = isFormValid ? ['basicInfo'] : []
@@ -197,6 +206,7 @@ export const VisualizationConfigPage = ({
           selectedTab,
           onTabChange: setSelectedTab,
           completedTabs,
+          tabsWithNoCompletionStatus: ['options'],
           hasCompletionStatus: true,
         }}
       />
@@ -213,6 +223,9 @@ export const VisualizationConfigPage = ({
             <ContentCard>
               {selectedTab === 'basicInfo' && (
                 <VisualizationConfigForm form={form} typeLabel={typeLabel} isReadOnly={isReadOnly} />
+              )}
+              {selectedTab === 'options' && !isCreate && (
+                <DashboardOptionsForm form={form} isReadOnly={isReadOnly} />
               )}
             </ContentCard>
           </form>

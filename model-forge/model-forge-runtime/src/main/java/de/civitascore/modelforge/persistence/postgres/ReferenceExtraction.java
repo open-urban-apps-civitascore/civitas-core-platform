@@ -129,6 +129,7 @@ final class ReferenceExtraction {
         addArrayRefs(rows, manifest.path("pipelineRefs"),      DATASET_REF, "pipeline",      i);
         addArrayRefs(rows, manifest.path("dataSourceRefs"),    DATASET_REF, "datasource",    i);
         addArrayRefs(rows, manifest.path("dataSinkRefs"),      DATASET_REF, "datasink",      i);
+        addArrayRefs(rows, manifest.path("dashboardRefs"),     DATASET_REF, "dashboard",    i);
         return rows;
     }
 

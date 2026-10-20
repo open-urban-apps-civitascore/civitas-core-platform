@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://civitasconnect.digital/core-dataset/v1",
   "title": "CORE DataSet",
-  "description": "A CORE DataSet manifest: the envelope of a dataset and its member artifacts referenced by versioned CORE URN (data structures, mappings, pipelines, data sources, data sinks). The backend composes it from the DataSet entity and its relations; the members themselves are separate CORE artifacts. This is the stored manifest form — member content is not inlined here.",
+  "description": "A CORE DataSet manifest: the envelope of a dataset and its member artifacts referenced by versioned CORE URN (data structures, mappings, pipelines, data sources, data sinks, dashboards). The backend composes it from the DataSet entity and its relations; the members themselves are separate CORE artifacts. This is the stored manifest form — member content is not inlined here.",
   "type": "object",
   "required": ["$schema", "id"],
   "additionalProperties": false,
@@ -62,6 +62,15 @@
         "type": "string",
         "pattern": "^urn:core:[^:]+:[^:]+:datasink:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$",
         "x-core-ref": { "type": "urn:core:type:DataSink" }
+      }
+    },
+    "dashboardRefs": {
+      "description": "Versioned CORE URNs of the Dashboard models belonging to this dataset.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^urn:core:[^:]+:[^:]+:dashboard:[^:]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[^:]+)?$",
+        "x-core-ref": { "type": "urn:core:type:Dashboard" }
       }
     }
   }

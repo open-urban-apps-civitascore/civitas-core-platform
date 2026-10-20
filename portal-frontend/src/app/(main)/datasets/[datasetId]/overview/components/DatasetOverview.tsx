@@ -31,9 +31,12 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form'
 import { useDatasetPermissions } from '@/hooks/use-dataset-permissions'
 import { useError } from '@/hooks/use-error'
+import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { SelectOption } from '@/types/common'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import {
   CompletionStepData,
   Dataset,
@@ -45,8 +48,8 @@ import {
   DatasetUpdateApiData,
   DatasetUpdateApiSchema,
 } from '@/types/datasets'
-import { isDatapoolScopeViolationError, isPipelineClosureInvalidError, isSagaInFlightError } from '@/utils/errors'
 import { toVisualization } from '@/types/visualizations'
+import { isDatapoolScopeViolationError, isPipelineClosureInvalidError, isSagaInFlightError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
 import { mapDatasetToFormData } from '../../../utils/mappers'
@@ -80,6 +83,13 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const { canEditMetadata, canRelease, canViewApis, canEditApis, canCreatePipeline, canDeletePipeline } =
     useDatasetPermissions(dataset)
+  const { hasScopedPermission } = usePermissions()
+  const canManageVisualizations = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_UPDATE,
+    ASSIGNMENT_SCOPE_TYPES.DATASET,
+    dataset.id,
+    dataset.datapool?.id,
+  )
 
   const searchParams = useSearchParams()
   const mode = searchParams.get('mode')
@@ -358,7 +368,9 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
         <VisualizationList
           datasetId={dataset.id}
           visualizations={visualizationList}
-          canEdit={canEditMetadata && isServerDraftState && isSelectedDraftState}
+          canEdit={canManageVisualizations}
+          canCreate={canManageVisualizations && isServerDraftState && isSelectedDraftState}
+          isEditing={!isReadOnly}
           isOpenDataAccess={dataset.openDataAccess}
         />
       ),

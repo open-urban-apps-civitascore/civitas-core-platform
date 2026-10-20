@@ -48,7 +48,9 @@ no_clean_arg=""
 START_FROST=true
 START_GEOSERVER=true
 START_NIFI=true
-# Model Forge Admin UI — the registry console (dev-environment/apps: model-forge-admin-ui on :8092,
+# Trino + Superset dashboard stack (Docker Compose, default ON).
+START_DASHBOARD=true
+# Model Forge Admin UI — the registry console (dev-environment/apps: model-forge-admin-ui on :8094,
 # pointed at portal-backend's model_forge schema). Part of the MODELING path (it inspects/edits what
 # modeling creates), so it stays ON under --modeling; turn it off with --no-admin-ui.
 START_ADMIN_UI=true
@@ -84,7 +86,7 @@ usage() {
     echo "  --no-geoserver                   Do not start GeoServer"
     echo "  --no-nifi                        Do not start Apache NiFi"
     echo "  --no-config-adapter              Do not start the Config Adapter"
-    echo "  --no-admin-ui                    Do not start the Model Forge Admin UI (:8092)"
+    echo "  --no-admin-ui                    Do not start the Model Forge Admin UI (:8094)"
     echo "  --pgadmin                        Also start pgAdmin (optional DB console, :5050)"
     echo "  --modeling                       Modeling-only: skip config-adapter, NiFi, FROST and"
     echo "                                   GeoServer (the deployment side). They are Kafka-decoupled,"
@@ -534,7 +536,7 @@ skipped_infra=""
 [ "$START_NIFI" = "true" ]      || skipped_infra="$skipped_infra NiFi"
 [ "$START_ADMIN_UI" = "true" ]  || skipped_infra="$skipped_infra Admin-UI"
 [ -n "$skipped_infra" ] && echo "  Skipped infra:  $skipped_infra"
-[ "$START_ADMIN_UI" = "true" ]  && echo "  Model Forge Admin UI: http://localhost:8092"
+[ "$START_ADMIN_UI" = "true" ]  && echo "  Model Forge Admin UI: http://localhost:8094"
 [ "$START_PGADMIN" = "true" ]   && echo "  pgAdmin:              http://localhost:5050 (admin@civitas.com / admin)"
 echo "------------------------------------------------------"
 echo
@@ -551,7 +553,7 @@ docker network create civitas-network 2>/dev/null && \
 echo
 echo "Starting infrastructure services..."
 echo "  - Kafka + Zookeeper + Kafka UI"
-echo "  - Shared PostgreSQL/PostGIS + Flyway migrations"
+echo "  - Shared PostgreSQL/PostGIS (all service databases) + Flyway migrations"
 echo "  - Keycloak"
 echo "  - APISIX + etcd"
 echo "  - OPA + AuthZ Repository"
@@ -559,8 +561,9 @@ echo "  - FROST Server"
 echo "  - Apache NiFi"
 echo
 
-# Load service DB settings before starting the shared PostGIS server.
-for env_dir in frost geoserver; do
+# The shared PostGIS server provisions the databases and roles used by these stacks.
+# Seed the example env files before starting it so custom passwords stay consistent.
+for env_dir in frost geoserver trino-superset; do
     if [ ! -f "$SCRIPT_DIR/$env_dir/.env" ] && [ -f "$SCRIPT_DIR/$env_dir/.env.example" ]; then
         cp "$SCRIPT_DIR/$env_dir/.env.example" "$SCRIPT_DIR/$env_dir/.env"
         echo "  Created $env_dir/.env from .env.example"
@@ -577,6 +580,7 @@ cd "$SCRIPT_DIR/postgres"
 $DOCKER_COMPOSE \
     --env-file "$SCRIPT_DIR/frost/.env" \
     --env-file "$SCRIPT_DIR/geoserver/.env" \
+    --env-file "$SCRIPT_DIR/trino-superset/.env" \
     up -d --remove-orphans
 echo "  PostgreSQL started"
 
@@ -654,6 +658,26 @@ if [ "$FLOWABLE_DB_READY" = false ]; then
     echo "    docker exec postgis-dev-env psql -U admin -d portal_backend -c 'CREATE DATABASE flowable OWNER admin'"
     exit 1
 fi
+
+# The init script creates all service databases after the server becomes reachable.
+# Wait for the last one so later services never race database provisioning.
+echo "  Waiting for shared service databases..."
+for database_name in keycloak sensorthings geoserver superset model_forge_admin nifi_demo; do
+    DATABASE_READY=false
+    for i in $(seq 1 30); do
+        if docker exec postgis-dev-env psql -U admin -d portal_backend -tAc \
+            "SELECT 1 FROM pg_database WHERE datname='$database_name'" 2>/dev/null | grep -q 1; then
+            DATABASE_READY=true
+            break
+        fi
+        sleep 1
+    done
+    if [ "$DATABASE_READY" = false ]; then
+        echo "  ERROR: Shared database '$database_name' was not created."
+        echo "         Check: cd dev-environment/postgres && docker compose logs postgis-dev-env"
+        exit 1
+    fi
+done
 
 echo "  Running database migrations..."
 if mvn_in_container "$SCRIPT_DIR/../portal-backend" \
@@ -858,7 +882,10 @@ wait_for_service "AuthZ Repository" "http://localhost:8091/actuator/health" 120
 
 # macOS: disable Keycloak https requirement on master realm on macos
 if [ "$OS_TYPE" = "Darwin" ]; then
-    docker exec -it civitas-keycloak /opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080 --realm master --user admin --password admin
+    # The container-local kcadm cache can be left incomplete when an earlier
+    # non-interactive startup was interrupted. Recreate it for this short-lived CLI call.
+    docker exec civitas-keycloak rm -f /opt/keycloak/.keycloak/kcadm.config
+    docker exec civitas-keycloak /opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080 --realm master --user admin --password admin
     docker exec civitas-keycloak /opt/keycloak/bin/kcadm.sh update realms/master -s sslRequired=NONE
 fi
 
@@ -876,15 +903,30 @@ docker rm -f civitas-portal-backend 2>/dev/null || true
 docker rm -f civitas-portal-frontend 2>/dev/null || true
 sleep 1
 
-# Now kill any remaining non-Docker processes on these ports (8092 = Model Forge Admin UI,
+# Now kill any remaining non-Docker processes on these ports (8094 = Model Forge Admin UI,
 # which local-demo.md/vertical-slice.sh also run by hand outside Docker)
-for port in 8088 8089 3000 8092; do
+for port in 8088 8089 3000 8094; do
+    # Docker Desktop owns host listeners for published container ports (often through
+    # com.docker.backend). Never kill those host processes; doing so stops the Docker VM.
+    if docker ps --filter "publish=$port" --format '{{.ID}}' 2>/dev/null | grep -q .; then
+        echo "  Port $port is published by a Docker container; leaving it alone"
+        continue
+    fi
     if [ "$OS_TYPE" = "Darwin" ]; then
         pid=$(lsof -ti :"$port" 2>/dev/null | head -1)
     else
         pid=$(fuser "$port/tcp" 2>/dev/null | awk '{print $1}')
     fi
     if [ -n "$pid" ]; then
+        if [ "$OS_TYPE" = "Darwin" ]; then
+            process=$(ps -p "$pid" -o command= 2>/dev/null || true)
+            case "$process" in
+                *com.docker.backend*|*Docker.app/*)
+                    echo "  Port $port is owned by Docker Desktop; leaving it alone"
+                    continue
+                    ;;
+            esac
+        fi
         echo "  Killing leftover process on port $port (PID $pid)"
         kill "$pid" 2>/dev/null
         sleep 1
@@ -977,6 +1019,30 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ] || [ "$STAR
     fi
     if [ "$START_PGADMIN" = "true" ]; then
         COMPOSE_SERVICES="$COMPOSE_SERVICES pgadmin"
+    fi
+
+    # Portal Backend initialization publishes user/group sync events and waits for their
+    # Config Adapter results. Start the adapter first so a cold start cannot time out those
+    # requests while Flowable and its Kafka consumers are still initializing.
+    if [ "$config_adapter_option" = "1" ] && [ "$backend_option" = "1" ]; then
+        echo "Starting Config Adapter before Portal Backend..."
+        $DOCKER_COMPOSE --env-file "$SCRIPT_DIR/geoserver/.env" up -d $COMPOSE_BUILD config-adapter
+
+        CONFIG_ADAPTER_READY=false
+        for i in $(seq 1 90); do
+            adapter_health=$(docker inspect civitas-config-adapter --format '{{.State.Health.Status}}' 2>/dev/null || true)
+            if [ "$adapter_health" = "healthy" ]; then
+                CONFIG_ADAPTER_READY=true
+                break
+            fi
+            sleep 2
+        done
+        if [ "$CONFIG_ADAPTER_READY" = false ]; then
+            echo "ERROR: Config Adapter did not become healthy before Portal Backend startup."
+            echo "       Check: docker compose -f apps/docker-compose.yml logs config-adapter"
+            exit 1
+        fi
+        echo "  Config Adapter is ready for Portal Backend initialization"
     fi
 
     $DOCKER_COMPOSE --env-file "$SCRIPT_DIR/geoserver/.env" up -d $COMPOSE_BUILD $COMPOSE_SERVICES
@@ -1094,7 +1160,7 @@ export GEOSERVER_ADMIN_USER=admin
 export GEOSERVER_ADMIN_PASSWORD=geoserver
 # GeoServer datastore connection: the adapter only relays these to GeoServer via REST; the
 # GeoServer CONTAINER opens the actual DB connection over the docker network, so this must be
-# the container name + internal port (NOT localhost / the host-published 5432, which from inside
+# the container name + internal port (NOT localhost / the host-published port, which from inside
 # the GeoServer container would point at GeoServer itself). Var name is GEOSERVER_POSTGIS_DATABASE
 # (dots->underscores of geoserver.postgis.database), matching apps/docker-compose.yml.
 export GEOSERVER_POSTGIS_HOST=postgis-dev-env
@@ -1261,7 +1327,7 @@ if [ "$START_ADMIN_UI" = "true" ]; then
     echo "Waiting for Model Forge Admin UI to be healthy..."
     ADMIN_UI_READY=false
     for i in $(seq 1 60); do
-        if curl -s -f "http://localhost:8092/" >/dev/null 2>&1; then
+        if curl -s -f "http://localhost:8094/" >/dev/null 2>&1; then
             echo "  Model Forge Admin UI is ready"
             ADMIN_UI_READY=true
             break
@@ -1455,7 +1521,7 @@ echo "  FROST Server:     http://localhost:8085/FROST-Server/v1.1 (HTTP)"
 echo "  FROST MQTT:       mqtt://localhost:1883"
 echo "  GeoServer Admin:  http://localhost:8082/geoserver/web (admin / geoserver)"
 echo "  GeoServer OWS:    http://localhost:9080/geoserver/{workspace}/ows (via APISIX)"
-echo "  GeoServer PostGIS: localhost:5432  db=geoserver  user=geoserver  (see geoserver/.env)"
+echo "  Shared PostGIS:    localhost:5432  (GeoServer DB: geoserver / geoserver)"
 echo "  APISIX Gateway:   http://localhost:9080"
 echo "  APISIX Admin API: http://localhost:9180"
 echo "  Apache NiFi:      https://localhost:8443/nifi (login via Keycloak / OIDC)"

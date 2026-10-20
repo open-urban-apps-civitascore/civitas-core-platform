@@ -20,8 +20,13 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +51,7 @@ final class SupersetResourceClient {
 
   private static final String AUTH_HEADER = "Authorization";
   private static final String CSRF_HEADER = "X-CSRFToken";
+  private static final String DATASET_CREATOR_ROLE = "CORE Dashboard Dataset Creator";
   // Package-visible: SupersetSagaHandler builds the extraFields map these key names go into.
   static final String CIVITAS_DATASET_ID_KEY = "civitasDatasetId";
   static final String FROST_VIEW_KEY = "frostView";
@@ -55,6 +61,11 @@ final class SupersetResourceClient {
   private final String baseUrl;
   private final int trinoDatabaseId;
   private final ObjectMapper objectMapper = new ObjectMapper();
+  // Group subjects are stable for the lifetime of this adapter. Resolve them once, because a
+  // dataset release can sync several datasets and dashboards for the same CORE groups while
+  // Superset applies a strict request rate limit.
+  private final ConcurrentMap<String, List<Integer>> editorSubjectIdsByGroupSet =
+      new ConcurrentHashMap<>();
 
   SupersetResourceClient(
       Client client, SupersetSession session, String baseUrl, int trinoDatabaseId) {
@@ -69,13 +80,8 @@ final class SupersetResourceClient {
   /**
    * Creates a dashboard titled {@code title}. Returns the new dashboard id.
    *
-   * <p>Left in Superset's default draft state deliberately: {@code raise_for_access}'s grant-based
-   * permission check (a real {@code DATASET_DASHBOARD_READ}/{@code _WRITE} grant) is independent of
-   * {@code published} and works regardless, so authorized users are never blocked by this. Only the
-   * open-data/anonymous bypass path requires {@code published: true} — leaving that decision to an
-   * explicit publish action in Superset (rather than defaulting every saga-provisioned dashboard to
-   * it) avoids new dashboards becoming publicly/anonymously reachable the moment their backing
-   * dataset happens to be flagged open data.
+   * <p>The caller supplies CORE's release state. Newly created dashboards are drafts unless the
+   * CORE dashboard row is explicitly released.
    *
    * <p>Does not stamp {@code civitasDatasetId} anywhere on the Superset side: authorization
    * resolves which Civitas dataset a dashboard belongs to via the platform's own {@code
@@ -83,16 +89,30 @@ final class SupersetResourceClient {
    * this dashboard's Superset id), not by reading anything back from Superset. A Superset-side copy
    * would only ever be as reliable as this write path and Superset's own schema validation.
    *
-   * <p>Doesn't send an owner/editor either: the old {@code owners} field (a plain user-id list) no
-   * longer exists on Superset's dashboard-create schema — it's been replaced by {@code editors}/
-   * {@code viewers} lists of Subject ids (a Subject wraps a user/role/group, distinct from a raw
-   * FAB user id). Superset's own {@code populate_subjects()} defaults {@code editors} to the
-   * current authenticated user when the field is omitted, which is exactly this service account —
-   * so there's nothing to resolve or translate here.
+   * <p>When CORE editor groups are supplied, they are resolved to Superset Subject ids and sent in
+   * {@code editors}. Superset's create schema expects Subject ids, not user or group ids.
    */
   int createDashboard(String title) {
+    return createDashboard(title, List.of(), false);
+  }
+
+  int createDashboard(String title, List<String> editorGroupIds) {
+    return createDashboard(title, editorGroupIds, false);
+  }
+
+  int createDashboard(String title, List<String> editorGroupIds, boolean released) {
+    return createDashboard(title, null, editorGroupIds, released);
+  }
+
+  int createDashboard(
+      String title, String description, List<String> editorGroupIds, boolean released) {
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("dashboard_title", title);
+    body.put("description", description);
+    body.put("published", released);
+    if (editorGroupIds != null && !editorGroupIds.isEmpty()) {
+      body.put("editors", resolveEditorSubjectIds(editorGroupIds));
+    }
 
     Response response = null;
     try {
@@ -102,6 +122,7 @@ final class SupersetResourceClient {
       }
       checkStatus(response, "create dashboard");
       int dashboardId = parseId(response, "dashboard");
+      grantDatasetCreationToGroups(editorGroupIds);
       LOG.info("Created Superset dashboard id={} for title={}", dashboardId, Encode.forJava(title));
       return dashboardId;
     } finally {
@@ -109,14 +130,212 @@ final class SupersetResourceClient {
     }
   }
 
+  /** Resolve CORE UUID group names to Superset Subject ids used by dashboard editor ACLs. */
+  private List<Integer> resolveEditorSubjectIds(List<String> groupIds) {
+    List<String> canonicalGroupIds = canonicalGroupIds(groupIds);
+    String cacheKey = String.join(",", canonicalGroupIds);
+    return editorSubjectIdsByGroupSet.computeIfAbsent(
+        cacheKey, ignored -> resolveEditorSubjectIdsUncached(canonicalGroupIds));
+  }
+
+  /** Give only the dashboard editor groups access to the CORE connection and dataset creation. */
+  private void grantDatasetCreationToGroups(List<String> groupIds) {
+    if (groupIds == null || groupIds.isEmpty()) {
+      return;
+    }
+
+    List<String> canonicalIds = canonicalGroupIds(groupIds);
+    int roleId = findDatasetCreatorRoleId();
+    JsonNode groups = listSecurityGroups();
+    for (String groupId : canonicalIds) {
+      String groupName = "core-" + groupId;
+      JsonNode group = null;
+      for (JsonNode candidate : groups.path("result")) {
+        if (groupName.equals(candidate.path("name").asText())) {
+          group = candidate;
+          break;
+        }
+      }
+      if (group == null || !group.path("id").canConvertToInt()) {
+        throw new SagaApiException("Superset CORE group " + groupName + " was not found", 404);
+      }
+
+      Set<Integer> roleIds = new LinkedHashSet<>();
+      for (JsonNode role : group.path("roles")) {
+        if (role.path("id").canConvertToInt()) {
+          roleIds.add(role.path("id").asInt());
+        }
+      }
+      if (!roleIds.add(roleId)) {
+        continue;
+      }
+
+      int groupIdValue = group.path("id").asInt();
+      Response response = null;
+      try {
+        response = putJson("/api/v1/security/groups/" + groupIdValue, Map.of("roles", roleIds));
+        if (response.getStatus() == 401) {
+          response =
+              closeAndReauth(
+                  response,
+                  () ->
+                      putJson("/api/v1/security/groups/" + groupIdValue, Map.of("roles", roleIds)));
+        }
+        checkStatus(response, "grant CORE dataset creation to group");
+        LOG.info("Granted CORE dataset creation to Superset group {}", Encode.forJava(groupName));
+      } finally {
+        closeQuietly(response);
+      }
+    }
+  }
+
+  private int findDatasetCreatorRoleId() {
+    Response response = null;
+    try {
+      response = getJson("/api/v1/security/roles/", Map.of("q", "(page:0,page_size:1000)"));
+      if (response.getStatus() == 401) {
+        response =
+            closeAndReauth(
+                response,
+                () -> getJson("/api/v1/security/roles/", Map.of("q", "(page:0,page_size:1000)")));
+      }
+      checkStatus(response, "list Superset roles");
+      for (JsonNode role : readTree(response).path("result")) {
+        if (DATASET_CREATOR_ROLE.equals(role.path("name").asText())
+            && role.path("id").canConvertToInt()) {
+          return role.path("id").asInt();
+        }
+      }
+      throw new SagaApiException("Superset role " + DATASET_CREATOR_ROLE + " was not found", 503);
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  private JsonNode listSecurityGroups() {
+    Response response = null;
+    try {
+      response = getJson("/api/v1/security/groups/", Map.of("q", "(page:0,page_size:1000)"));
+      if (response.getStatus() == 401) {
+        response =
+            closeAndReauth(
+                response,
+                () -> getJson("/api/v1/security/groups/", Map.of("q", "(page:0,page_size:1000)")));
+      }
+      checkStatus(response, "list Superset groups");
+      return readTree(response);
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  private List<String> canonicalGroupIds(List<String> groupIds) {
+    return groupIds.stream()
+        .map(
+            groupId -> {
+              try {
+                return UUID.fromString(groupId).toString();
+              } catch (IllegalArgumentException e) {
+                throw new SagaApiException("Invalid CORE dashboard editor group id", 422);
+              }
+            })
+        .distinct()
+        .sorted()
+        .toList();
+  }
+
+  private List<Integer> resolveEditorSubjectIdsUncached(List<String> groupIds) {
+    Set<Integer> subjectIds = new LinkedHashSet<>();
+    for (String groupId : groupIds) {
+      String groupName = "core-" + groupId;
+      List<Integer> resolved = findEditorSubjectIds(groupName);
+      if (resolved.isEmpty()) {
+        ensureCoreGroup(groupName);
+        resolved = findEditorSubjectIds(groupName);
+      }
+      if (resolved.isEmpty()) {
+        throw new SagaApiException(
+            "Superset group subject " + groupName + " could not be created or resolved", 503);
+      }
+      subjectIds.addAll(resolved);
+    }
+    return List.copyOf(subjectIds);
+  }
+
+  private List<Integer> findEditorSubjectIds(String groupName) {
+    Response response = null;
+    try {
+      response =
+          getJson(
+              "/api/v1/dashboard/related/editors",
+              Map.of("q", "(filter:" + groupName + ",page_size:1000)"));
+      if (response.getStatus() == 401) {
+        response = closeAndReauth(response, () -> getDashboardEditorSubjects(groupName));
+      }
+      checkStatus(response, "resolve dashboard editor group");
+      JsonNode results = objectMapper.readTree(response.readEntity(String.class)).path("result");
+      List<Integer> subjectIds = new ArrayList<>();
+      String managedDescription =
+          "Managed by CIVITAS CORE; group id=" + groupName.substring("core-".length());
+      for (JsonNode result : results) {
+        if (result.path("value").canConvertToInt()
+            && result.path("extra").path("secondary_label").asText().equals(managedDescription)) {
+          subjectIds.add(result.path("value").asInt());
+        }
+      }
+      return subjectIds;
+    } catch (SagaApiException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new SagaApiException(
+          "Could not resolve Superset editor group " + groupName + ": " + e.getMessage(), 500);
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  /** Create the CORE group shell in Superset so its Subject exists before editor ACL creation. */
+  private void ensureCoreGroup(String groupName) {
+    Map<String, Object> group = new LinkedHashMap<>();
+    group.put("name", groupName);
+    group.put("label", groupName);
+    group.put("description", "Managed by CIVITAS CORE; group id=" + groupName.substring(5));
+    group.put("roles", List.of());
+    Response response = null;
+    try {
+      response = postJson("/api/v1/security/groups/", group);
+      if (response.getStatus() == 401) {
+        response = closeAndReauth(response, () -> postJson("/api/v1/security/groups/", group));
+      }
+      if (response.getStatus() == 422) {
+        return; // A concurrent dashboard sync created the same CORE group.
+      }
+      checkStatus(response, "create CORE group subject");
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  private Response getDashboardEditorSubjects(String groupName) {
+    return getJson(
+        "/api/v1/dashboard/related/editors",
+        Map.of("q", "(filter:" + groupName + ",page_size:1000)"));
+  }
+
   /**
-   * Renames a dashboard in place. Does not touch {@code published}: that stays whatever the
-   * dashboard owner set it to in Superset (see {@link #createDashboard} for why it isn't
-   * force-enabled). Returns {@code false} if {@code dashboardId} no longer exists in Superset (404)
-   * so the caller can self-heal by creating a replacement instead.
+   * Updates the dashboard title and CORE-controlled publication state. Returns {@code false} if
+   * {@code dashboardId} no longer exists in Superset (404) so the caller can self-heal.
    */
-  boolean updateDashboardTitle(int dashboardId, String title) {
-    Map<String, Object> body = Map.of("dashboard_title", title);
+  boolean updateDashboardTitle(int dashboardId, String title, boolean released) {
+    return updateDashboardTitle(dashboardId, title, null, released);
+  }
+
+  boolean updateDashboardTitle(
+      int dashboardId, String title, String description, boolean released) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("dashboard_title", title);
+    body.put("description", description);
+    body.put("published", released);
     Response response = null;
     try {
       response = putJson("/api/v1/dashboard/" + dashboardId, body);
@@ -131,6 +350,78 @@ final class SupersetResourceClient {
       checkStatus(response, "update dashboard");
       LOG.info("Renamed Superset dashboard id={} to title={}", dashboardId, Encode.forJava(title));
       return true;
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  /** Update the title and add the creator's CORE groups without removing existing editors. */
+  boolean syncDashboardEditors(
+      int dashboardId, String title, List<String> editorGroupIds, boolean released) {
+    return syncDashboardEditors(dashboardId, title, null, editorGroupIds, released);
+  }
+
+  boolean syncDashboardEditors(
+      int dashboardId,
+      String title,
+      String description,
+      List<String> editorGroupIds,
+      boolean released) {
+    if (editorGroupIds == null || editorGroupIds.isEmpty()) {
+      return updateDashboardTitle(dashboardId, title, description, released);
+    }
+
+    Set<Integer> editorIds = new LinkedHashSet<>(resolveEditorSubjectIds(editorGroupIds));
+    Response response = null;
+    try {
+      response = getJson("/api/v1/dashboard/" + dashboardId, Map.of());
+      if (response.getStatus() == 401) {
+        response =
+            closeAndReauth(response, () -> getJson("/api/v1/dashboard/" + dashboardId, Map.of()));
+      }
+      if (response.getStatus() == 404) {
+        LOG.info("Superset dashboard id={} not found for editor sync (drift)", dashboardId);
+        return false;
+      }
+      checkStatus(response, "get dashboard editors");
+      JsonNode current = readTree(response).path("result");
+      for (JsonNode editor : current.path("editors")) {
+        if (editor.path("id").canConvertToInt()) {
+          editorIds.add(editor.path("id").asInt());
+        }
+      }
+    } finally {
+      closeQuietly(response);
+    }
+
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("dashboard_title", title);
+    body.put("description", description);
+    body.put("editors", List.copyOf(editorIds));
+    body.put("published", released);
+    response = null;
+    try {
+      response = putJson("/api/v1/dashboard/" + dashboardId, body);
+      if (response.getStatus() == 401) {
+        response =
+            closeAndReauth(response, () -> putJson("/api/v1/dashboard/" + dashboardId, body));
+      }
+      if (response.getStatus() == 404) {
+        LOG.info("Superset dashboard id={} not found for editor sync (drift)", dashboardId);
+        return false;
+      }
+      checkStatus(response, "sync dashboard editors");
+      grantDatasetCreationToGroups(editorGroupIds);
+      LOG.info(
+          "Synced title and {} editor(s) for Superset dashboard id={}",
+          editorIds.size(),
+          dashboardId);
+      return true;
+    } catch (SagaApiException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new SagaApiException(
+          "Could not update Superset dashboard editors: " + e.getMessage(), 500);
     } finally {
       closeQuietly(response);
     }
@@ -163,7 +454,17 @@ final class SupersetResourceClient {
    * 422 that does NOT match an existing dataset is a genuine failure (thrown), not idempotency.
    */
   int createDataset(String schemaName, String tableName, String civitasDatasetId) {
-    return createDataset(schemaName, tableName, null, civitasDatasetId);
+    return createDataset(schemaName, tableName, civitasDatasetId, List.of());
+  }
+
+  int createDataset(
+      String schemaName, String tableName, String civitasDatasetId, List<String> editorGroupIds) {
+    return createDataset(
+        schemaName,
+        tableName,
+        null,
+        Map.of(CIVITAS_DATASET_ID_KEY, civitasDatasetId),
+        editorGroupIds);
   }
 
   /**
@@ -178,7 +479,7 @@ final class SupersetResourceClient {
    */
   int createDataset(String schemaName, String tableName, String sql, String civitasDatasetId) {
     return createDataset(
-        schemaName, tableName, sql, Map.of(CIVITAS_DATASET_ID_KEY, civitasDatasetId));
+        schemaName, tableName, sql, Map.of(CIVITAS_DATASET_ID_KEY, civitasDatasetId), List.of());
   }
 
   /**
@@ -190,6 +491,15 @@ final class SupersetResourceClient {
    */
   int createDataset(
       String schemaName, String tableName, String sql, Map<String, String> extraFields) {
+    return createDataset(schemaName, tableName, sql, extraFields, List.of());
+  }
+
+  int createDataset(
+      String schemaName,
+      String tableName,
+      String sql,
+      Map<String, String> extraFields,
+      List<String> editorGroupIds) {
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("database", trinoDatabaseId);
     body.put("catalog", null);
@@ -197,6 +507,9 @@ final class SupersetResourceClient {
     body.put("table_name", tableName);
     if (sql != null) {
       body.put("sql", sql);
+    }
+    if (editorGroupIds != null && !editorGroupIds.isEmpty()) {
+      body.put("editors", resolveEditorSubjectIds(editorGroupIds));
     }
 
     Response response = null;
@@ -254,6 +567,59 @@ final class SupersetResourceClient {
     }
   }
 
+  /** Add CORE creator groups to a Superset dataset without removing existing editors. */
+  boolean syncDatasetEditors(int datasetId, List<String> editorGroupIds) {
+    if (editorGroupIds == null || editorGroupIds.isEmpty()) {
+      return true;
+    }
+
+    Set<Integer> editorIds = new LinkedHashSet<>(resolveEditorSubjectIds(editorGroupIds));
+    Response response = null;
+    try {
+      response = getJson("/api/v1/dataset/" + datasetId, Map.of());
+      if (response.getStatus() == 401) {
+        response =
+            closeAndReauth(response, () -> getJson("/api/v1/dataset/" + datasetId, Map.of()));
+      }
+      if (response.getStatus() == 404) {
+        LOG.info("Superset dataset id={} not found for editor sync (drift)", datasetId);
+        return false;
+      }
+      checkStatus(response, "get dataset editors");
+      JsonNode current = readTree(response).path("result");
+      for (JsonNode editor : current.path("editors")) {
+        if (editor.path("id").canConvertToInt()) {
+          editorIds.add(editor.path("id").asInt());
+        }
+      }
+    } finally {
+      closeQuietly(response);
+    }
+
+    Map<String, Object> body = Map.of("editors", List.copyOf(editorIds));
+    response = null;
+    try {
+      response = putJson("/api/v1/dataset/" + datasetId, body);
+      if (response.getStatus() == 401) {
+        response = closeAndReauth(response, () -> putJson("/api/v1/dataset/" + datasetId, body));
+      }
+      if (response.getStatus() == 404) {
+        LOG.info("Superset dataset id={} disappeared during editor sync", datasetId);
+        return false;
+      }
+      checkStatus(response, "sync dataset editors");
+      LOG.info("Synced {} editor(s) for Superset dataset id={}", editorIds.size(), datasetId);
+      return true;
+    } catch (SagaApiException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new SagaApiException(
+          "Could not update Superset dataset editors: " + e.getMessage(), 500);
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
   private void updateDatasetExtra(int datasetId, Map<String, String> extraFields) {
     String extra;
     try {
@@ -300,6 +666,88 @@ final class SupersetResourceClient {
           datasetId,
           Encode.forJava(newTableName));
       return true;
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  /** Deletes a dashboard and its charts only when no other Superset dashboard uses them. */
+  void deleteDashboardAndUnusedCharts(int dashboardId) {
+    List<Integer> chartIds = findDashboardChartIds(dashboardId);
+    Set<Integer> unusedChartIds = new LinkedHashSet<>();
+    for (int chartId : chartIds) {
+      if (!isChartUsedByAnotherDashboard(chartId, dashboardId)) {
+        unusedChartIds.add(chartId);
+      }
+    }
+
+    deleteDashboard(dashboardId);
+    for (int chartId : unusedChartIds) {
+      deleteChart(chartId);
+    }
+  }
+
+  private List<Integer> findDashboardChartIds(int dashboardId) {
+    Response response = null;
+    try {
+      response = getJson("/api/v1/dashboard/" + dashboardId + "/charts", Map.of());
+      if (response.getStatus() == 401) {
+        response =
+            closeAndReauth(
+                response, () -> getJson("/api/v1/dashboard/" + dashboardId + "/charts", Map.of()));
+      }
+      if (response.getStatus() == 404) {
+        return List.of();
+      }
+      checkStatus(response, "get dashboard charts before delete");
+      JsonNode result = readTree(response).path("result");
+      Set<Integer> chartIds = new LinkedHashSet<>();
+      for (JsonNode chart : result) {
+        if (chart.path("id").canConvertToInt()) {
+          chartIds.add(chart.path("id").asInt());
+        }
+      }
+      return List.copyOf(chartIds);
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  private boolean isChartUsedByAnotherDashboard(int chartId, int dashboardId) {
+    Response response = null;
+    try {
+      response = getJson("/api/v1/chart/" + chartId, Map.of());
+      if (response.getStatus() == 401) {
+        response = closeAndReauth(response, () -> getJson("/api/v1/chart/" + chartId, Map.of()));
+      }
+      if (response.getStatus() == 404) {
+        return false;
+      }
+      checkStatus(response, "get chart dashboard references");
+      for (JsonNode dashboard : readTree(response).path("result").path("dashboards")) {
+        if (dashboard.path("id").canConvertToInt() && dashboard.path("id").asInt() != dashboardId) {
+          return true;
+        }
+      }
+      return false;
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  private void deleteChart(int chartId) {
+    Response response = null;
+    try {
+      response = deleteJson("/api/v1/chart/" + chartId);
+      if (response.getStatus() == 401) {
+        response = closeAndReauth(response, () -> deleteJson("/api/v1/chart/" + chartId));
+      }
+      if (response.getStatus() == 404) {
+        LOG.info("Superset chart id={} already deleted (idempotent)", chartId);
+        return;
+      }
+      checkStatus(response, "delete unused chart");
+      LOG.info("Deleted unused Superset chart id={}", chartId);
     } finally {
       closeQuietly(response);
     }

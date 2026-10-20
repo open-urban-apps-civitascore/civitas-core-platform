@@ -1,6 +1,7 @@
 services:
   keycloak-reconcile:
     image: quay.io/keycloak/keycloak:latest
+    mem_limit: 128m
     container_name: civitas-keycloak-reconcile
     restart: "no"
     entrypoint:
@@ -27,6 +28,7 @@ services:
 
   trino:
     image: ${TRINO_IMAGE:-trinodb/trino:481}
+    mem_limit: 1024m
     container_name: civitas-trino
     restart: unless-stopped
     entrypoint:
@@ -43,7 +45,7 @@ services:
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-civitas-core}
       KEYCLOAK_TRINO_CLIENT_ID: ${KEYCLOAK_TRINO_CLIENT_ID:-civitas-trino}
       KEYCLOAK_TRINO_CLIENT_SECRET: ${KEYCLOAK_TRINO_CLIENT_SECRET:-dev-only-civitas-trino-secret}
-      FROST_DB_HOST: ${FROST_DB_HOST:-civitas-frost-db}
+      FROST_DB_HOST: ${FROST_DB_HOST:-postgis-dev-env}
       FROST_DB_PORT: ${FROST_DB_PORT:-5432}
       FROST_DB_NAME: ${FROST_DB_NAME:-sensorthings}
       # Password for frost_trino_reader, the least-privilege role the frost_scoped.* views'
@@ -51,7 +53,7 @@ services:
       # match FROST_TRINO_READER_PASSWORD there. Not FROST-Server's own app user/password, which
       # has full read-write access to every project's raw tables.
       FROST_TRINO_READER_PASSWORD: ${FROST_TRINO_READER_PASSWORD:-dev-only-frost-trino-reader-password}
-      CIVITAS_DB_HOST: ${CIVITAS_DB_HOST:-civitas-geoserver-db}
+      CIVITAS_DB_HOST: ${CIVITAS_DB_HOST:-postgis-dev-env}
       CIVITAS_DB_PORT: ${CIVITAS_DB_PORT:-5432}
       CIVITAS_DB_NAME: ${CIVITAS_DB_NAME:-geoserver}
       CIVITAS_DB_USER: ${CIVITAS_DB_USER:-geoserver}
@@ -73,30 +75,13 @@ services:
       retries: 20
       start_period: 40s
 
-  superset-db:
-    image: postgres:18.1-alpine
-    container_name: civitas-superset-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${SUPERSET_DB_NAME:-superset}
-      POSTGRES_USER: ${SUPERSET_DB_USER:-superset}
-      POSTGRES_PASSWORD: ${SUPERSET_DB_PASSWORD:-dev-only-civitas-superset-db-password}
-    volumes:
-      - superset_db_data:/var/lib/postgresql/data
-    networks:
-      - civitas-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${SUPERSET_DB_USER:-superset} -d ${SUPERSET_DB_NAME:-superset}"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-
   superset:
     build:
       context: .
       dockerfile: superset/Dockerfile
       args:
         SUPERSET_BASE_IMAGE: registry.gitlab.com/civitas-connect/civitas-core/civitas-core-v2/superset:feat-superset-7-build
+    mem_limit: 1g
     container_name: civitas-superset
     restart: unless-stopped
     entrypoint:
@@ -105,7 +90,7 @@ services:
     environment:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-dev-only-civitas-superset-secret-key}
       SUPERSET_PUBLIC_URL: ${SUPERSET_PUBLIC_URL:-http://localhost:8092}
-      SUPERSET_DB_HOST: superset-db
+      SUPERSET_DB_HOST: postgis-dev-env
       SUPERSET_DB_PORT: 5432
       SUPERSET_DB_NAME: ${SUPERSET_DB_NAME:-superset}
       SUPERSET_DB_USER: ${SUPERSET_DB_USER:-superset}
@@ -123,7 +108,7 @@ services:
       SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
       SUPERSET_SERVICE_USERNAME: ${SUPERSET_SERVICE_USERNAME:-civitas-config-adapter}
       SUPERSET_SERVICE_PASSWORD: ${SUPERSET_SERVICE_PASSWORD:-dev-only-civitas-superset-service-password}
-      SUPERSET_TRINO_DATABASE_NAME: ${SUPERSET_TRINO_DATABASE_NAME:-Trino}
+      SUPERSET_TRINO_DATABASE_NAME: ${SUPERSET_TRINO_DATABASE_NAME:-CORE}
       TRINO_SUPERSET_SERVICE_USER: ${TRINO_SUPERSET_SERVICE_USER:-superset_trino}
       TRINO_SUPERSET_SERVICE_PASSWORD: ${TRINO_SUPERSET_SERVICE_PASSWORD:-dev-only-civitas-trino-superset-password}
       OPA_URL: ${OPA_URL:-http://civitas-opa:8181}
@@ -133,8 +118,6 @@ services:
     volumes:
       - superset_home:/app/superset_home
     depends_on:
-      superset-db:
-        condition: service_healthy
       trino:
         condition: service_healthy
     networks:
@@ -148,7 +131,6 @@ services:
 
 volumes:
   trino_data:
-  superset_db_data:
   superset_home:
 
 networks:

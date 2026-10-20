@@ -2,6 +2,9 @@ package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -13,6 +16,9 @@ import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.Dashboard;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.input.DashboardInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway.ModelPin;
+import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DashboardRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.ResourceInUseException;
@@ -33,6 +39,7 @@ class DashboardServiceTest {
   @Mock private DashboardMapper dashboardMapper;
   @Mock private DataSetRepository dataSetRepository;
   @Mock private DataSetSagaPublisher sagaPublisher;
+  @Mock private ModelRegistryGateway modelRegistryGateway;
   @InjectMocks private DashboardService service;
 
   private UUID dataSetId;
@@ -43,6 +50,15 @@ class DashboardServiceTest {
     dataSetId = UUID.randomUUID();
     dataSet = new DataSet();
     dataSet.setId(dataSetId);
+    dataSet.setManifestLogicalUrn("urn:core:platform:civitas:dataset:common:test");
+    lenient()
+        .when(modelRegistryGateway.storePayload(
+            eq(PayloadKind.DASHBOARD), any(), any(), any(), any(), any(), any()))
+        .thenReturn(
+            new ModelPin(
+                "urn:core:platform:civitas:dashboard:common:test",
+                "urn:core:platform:civitas:dashboard:common:test:1.0.0",
+                "1.0.0"));
   }
 
   @Test
@@ -191,6 +207,8 @@ class DashboardServiceTest {
 
     assertThatThrownBy(() -> service.postSave(dashboard, new DashboardInputDTO()))
         .isInstanceOf(ResourceInUseException.class);
+    verify(modelRegistryGateway, never())
+        .storePayload(eq(PayloadKind.DASHBOARD), any(), any(), any(), any(), any(), any());
     verify(sagaPublisher, never()).publishUpdateRequested(dataSet, dataSet.getPipelines());
   }
 

@@ -133,6 +133,7 @@ public class ArtifactEditPage extends BasePage {
             case "pipeline" -> ArtifactKind.PIPELINE;
             case "datasource" -> ArtifactKind.DATA_SOURCE;
             case "datasink" -> ArtifactKind.DATA_SINK;
+            case "dashboard" -> ArtifactKind.DASHBOARD;
             case "dataset" -> ArtifactKind.DATA_SET;
             default -> ArtifactKind.ELEMENT;
         };

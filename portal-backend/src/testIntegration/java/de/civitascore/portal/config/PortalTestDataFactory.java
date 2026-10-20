@@ -324,7 +324,11 @@ public class PortalTestDataFactory {
             .dataSetStatus(DataSetStatus.DRAFT)
             .openDataAccess(false);
     customizer.accept(builder);
-    return dataSetRepository.save(builder.build());
+    DataSet dataSet = dataSetRepository.save(builder.build());
+    ModelRegistryGateway.ModelPin manifest =
+        modelRegistryGateway.createDataSetManifest(dataSet.getId(), dataSet.getName());
+    dataSet.setManifestLogicalUrn(manifest.logicalUrn());
+    return dataSetRepository.save(dataSet);
   }
 
   /** Re-saves an existing dataset (e.g. after wiring child collections post-build). */

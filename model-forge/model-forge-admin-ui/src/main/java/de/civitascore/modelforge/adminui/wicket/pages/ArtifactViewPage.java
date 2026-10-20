@@ -48,7 +48,8 @@ public class ArtifactViewPage extends BasePage {
         "mapping", "Mapping",
         "pipeline", "Pipeline",
         "datasource", "Data Source",
-        "datasink", "Data Sink"
+        "datasink", "Data Sink",
+        "dashboard", "Dashboard"
     );
 
     @SpringBean

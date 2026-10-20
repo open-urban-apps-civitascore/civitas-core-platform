@@ -1,9 +1,7 @@
 server:
-  # 8092 everywhere: the image listens here by default, its healthcheck probes it, and
-  # dev-environment/apps/docker-compose.yml publishes it. When running the Admin UI BY HAND
-  # alongside the main dev stack (dev-environment/start-portal-dev.sh), 8092 is already taken
-  # by that container — start with SERVER_PORT=8093 (see dev-environment/model-forge/vertical-slice.sh).
-  port: 8092
+  # Keep the Model Forge Admin UI separate from Superset (8092) and use the same port
+  # for local runs and the main dev stack.
+  port: 8094
 
 spring:
   application:
@@ -17,11 +15,11 @@ spring:
   #
   # NOTE: this is a read-WRITE console — imports/edits/deletes here hit the real registry.
   #
-  # STANDALONE (no portal-backend, seeded example schemas): point it at the bundled Postgres
-  # from dev-environment/model-forge/docker-compose.yml (host port 5439 — 5432 is
-  # portal-backend's database and 5433 is Keycloak's) and enable the seed instead — see
+  # STANDALONE (no portal-backend, seeded example schemas): point it at the shared Postgres
+  # from dev-environment/postgres/docker-compose.yml (`model_forge_admin` database) and
+  # enable the seed instead — see
   # dev-environment/model-forge/local-demo.md:
-  #   SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5439/model_forge_admin?sslmode=disable \
+  #   SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/model_forge_admin?sslmode=disable \
   #   SPRING_DATASOURCE_USERNAME=model_forge SPRING_DATASOURCE_PASSWORD=model_forge \
   #   MODEL_FORGE_ADMIN_UI_SEED_ENABLED=true mvn spring-boot:run
   datasource:

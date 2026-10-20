@@ -3,16 +3,22 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.mapper.DashboardMapper;
 import de.civitascore.portal.mapper.DtoMapper;
 import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
+import de.civitascore.portal.model.embedded.DashboardFilterExpansion;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.Dashboard;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.input.DashboardInputDTO;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.BaseRepository;
 import de.civitascore.portal.repository.DashboardRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +34,7 @@ public class DashboardService extends BaseService<Dashboard, DashboardInputDTO> 
   private final DashboardMapper dashboardMapper;
   private final DataSetRepository dataSetRepository;
   private final DataSetSagaPublisher sagaPublisher;
+  private final ModelRegistryGateway modelRegistryGateway;
 
   @Override
   protected BaseRepository<Dashboard, UUID> getRepository() {
@@ -71,6 +78,11 @@ public class DashboardService extends BaseService<Dashboard, DashboardInputDTO> 
     if (entity.getId() == null) {
       entity.setActive(true);
     }
+    // MapStruct calls the Lombok builder setter with null for this option, which replaces the
+    // builder default. Restore the domain default before the model is stored.
+    if (entity.getFilterExpansion() == null) {
+      entity.setFilterExpansion(DashboardFilterExpansion.DEFAULT);
+    }
     return super.postConvertToEntity(entity, input);
   }
 
@@ -82,6 +94,7 @@ public class DashboardService extends BaseService<Dashboard, DashboardInputDTO> 
         && !input.getDataSetId().equals(existingEntity.getDataSet().getId())) {
       throw new ResourceNotFoundException(getEntityName(), existingEntity.getId());
     }
+    guardNoSagaInFlight(existingEntity.getDataSet());
     return super.preProcessUpdateInput(input, existingEntity);
   }
 
@@ -93,6 +106,11 @@ public class DashboardService extends BaseService<Dashboard, DashboardInputDTO> 
    */
   @Override
   protected Dashboard postSave(Dashboard entity, DashboardInputDTO input) {
+    // Keep this boundary safe even when postSave is invoked outside BaseService's normal update
+    // path. In particular, do not write a new Model Forge version before rejecting a concurrent
+    // change to a dataset whose engine update saga is still running.
+    guardNoSagaInFlight(entity.getDataSet());
+    storeModel(entity);
     triggerSyncIfReleased(entity.getDataSet());
     return super.postSave(entity, input);
   }
@@ -110,9 +128,45 @@ public class DashboardService extends BaseService<Dashboard, DashboardInputDTO> 
   @Override
   protected void postDelete(Dashboard entity) {
     if (entity != null) {
-      triggerSyncIfReleased(entity.getDataSet());
+      if (entity.getModelUrn() != null) {
+        modelRegistryGateway.unlinkPayloadFromDataSet(
+            entity.getDataSet().getManifestLogicalUrn(), entity.getModelUrn());
+        modelRegistryGateway.deletePayload(entity.getModelUrn());
+      }
+      triggerSyncIfReleased(entity.getDataSet(), entity.getExternalDashboardId());
     }
     super.postDelete(entity);
+  }
+
+  /** Stores the dashboard's user-controlled configuration in Model Forge and keeps only its URN
+   * on the relational row. The row remains the engine-id and authorization binding. */
+  private void storeModel(Dashboard entity) {
+    DataSet dataSet = entity.getDataSet();
+    String manifestUrn = dataSet == null ? null : dataSet.getManifestLogicalUrn();
+    if (manifestUrn == null || manifestUrn.isBlank()) {
+      throw new IllegalStateException("Dashboard DataSet has no Model Forge manifest");
+    }
+    Map<String, Object> content = new LinkedHashMap<>();
+    content.put("title", entity.getName());
+    if (entity.getDescription() != null) {
+      content.put("description", entity.getDescription());
+    }
+    content.put("released", entity.isReleased());
+    content.put("standaloneMode", entity.getStandaloneMode());
+    content.put("showFilters", entity.isShowFilters());
+    content.put("filterExpansion", entity.getFilterExpansion().name());
+
+    ModelRegistryGateway.ModelPin pin =
+        modelRegistryGateway.storePayload(
+            PayloadKind.DASHBOARD,
+            Optional.ofNullable(entity.getModelUrn()),
+            entity.getId(),
+            entity.getName(),
+            content,
+            null,
+            manifestUrn);
+    entity.setModelUrn(pin.logicalUrn());
+    dashboardRepository.save(entity);
   }
 
   /**
@@ -122,6 +176,10 @@ public class DashboardService extends BaseService<Dashboard, DashboardInputDTO> 
    * @throws ResourceInUseException if a saga is already in-flight for the dataset
    */
   private void triggerSyncIfReleased(DataSet dataSet) {
+    triggerSyncIfReleased(dataSet, null);
+  }
+
+  private void triggerSyncIfReleased(DataSet dataSet, String deletedExternalDashboardId) {
     if (dataSet == null
         || dataSet.getDataSetStatus() != DataSetStatus.AVAILABLE
         || dataSet.getProjectId() == null) {
@@ -130,7 +188,12 @@ public class DashboardService extends BaseService<Dashboard, DashboardInputDTO> 
     guardNoSagaInFlight(dataSet);
     dataSet.setPendingSagaType(PendingSagaType.UPDATE);
     dataSetRepository.save(dataSet);
-    sagaPublisher.publishUpdateRequested(dataSet, dataSet.getPipelines());
+    if (deletedExternalDashboardId == null || deletedExternalDashboardId.isBlank()) {
+      sagaPublisher.publishUpdateRequested(dataSet, dataSet.getPipelines());
+    } else {
+      sagaPublisher.publishUpdateRequested(
+          dataSet, dataSet.getPipelines(), List.of(deletedExternalDashboardId));
+    }
   }
 
   private void guardNoSagaInFlight(DataSet dataSet) {

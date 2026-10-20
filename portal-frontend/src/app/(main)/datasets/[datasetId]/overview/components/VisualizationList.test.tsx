@@ -6,9 +6,19 @@ import { Visualization } from '@/types/visualizations'
 
 import { VisualizationList } from './VisualizationList'
 
+interface VisualizationCardMockProps {
+  visualization: Visualization
+  canEdit: boolean
+  isEditing: boolean
+}
+
 vi.mock('./VisualizationCard', () => ({
-  VisualizationCard: ({ visualization, canEdit }: { visualization: Visualization; canEdit: boolean }) => (
-    <div data-testid={`visualizationCard-${visualization.id}`} data-can-edit={String(canEdit)} />
+  VisualizationCard: ({ visualization, canEdit, isEditing }: VisualizationCardMockProps) => (
+    <div
+      data-testid={`visualizationCard-${visualization.id}`}
+      data-can-edit={String(canEdit)}
+      data-is-editing={String(isEditing)}
+    />
   ),
 }))
 
@@ -25,6 +35,10 @@ const makeVisualization = (overrides: Partial<Visualization> = {}): Visualizatio
   name: 'Sales Dashboard',
   type: 'dashboard',
   externalDashboardId: null,
+  released: false,
+  standaloneMode: 1,
+  showFilters: true,
+  filterExpansion: 'DEFAULT',
   ...overrides,
 })
 
@@ -32,6 +46,8 @@ const defaultProps = {
   datasetId: 'dataset-123',
   visualizations: [] as Visualization[],
   canEdit: true,
+  canCreate: true,
+  isEditing: false,
   isOpenDataAccess: false,
 }
 
@@ -49,8 +65,8 @@ describe('VisualizationList', () => {
       expect(screen.getByText('addButton')).toBeInTheDocument()
     })
 
-    it('hides the add visualization button when the user cannot edit', () => {
-      renderComponent({ canEdit: false })
+    it('hides the add visualization button when the user cannot create', () => {
+      renderComponent({ canCreate: false })
       expect(screen.queryByText('addButton')).not.toBeInTheDocument()
     })
 
@@ -78,6 +94,11 @@ describe('VisualizationList', () => {
     it('passes canEdit to each VisualizationCard', () => {
       renderComponent({ visualizations: [makeVisualization({ id: '1' })], canEdit: false })
       expect(screen.getByTestId('visualizationCard-1')).toHaveAttribute('data-can-edit', 'false')
+    })
+
+    it('passes the dataset edit mode to each VisualizationCard', () => {
+      renderComponent({ visualizations: [makeVisualization({ id: '1' })], isEditing: true })
+      expect(screen.getByTestId('visualizationCard-1')).toHaveAttribute('data-is-editing', 'true')
     })
 
     it('shows the empty state when there are no visualizations', () => {

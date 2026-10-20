@@ -34,7 +34,11 @@ AUTH_TYPE = AUTH_OAUTH
 # interactive Keycloak redirect — this flag is FAB's own documented opt-in to allow that
 # alongside real users' OAuth logins, not a workaround for something else.
 AUTH_API_LOGIN_ALLOW_MULTIPLE_PROVIDERS = True
-AUTH_USER_REGISTRATION = False
+# Superset must create its local FAB user on the first successful Keycloak login.
+# CivitasSupersetSecurityManager only returns OAuth user info for users in the
+# configured Keycloak group, so this does not enable registration for other users.
+AUTH_USER_REGISTRATION = True
+AUTH_USER_REGISTRATION_ROLE = "Public"
 PUBLIC_ROLE_LIKE = "Public"
 # Lets genuinely unauthenticated requests through Flask-AppBuilder's @protect() as the "Public"
 # role (distinct from PUBLIC_ROLE_LIKE above, which only seeds that role's permission set). OPA
@@ -76,7 +80,8 @@ FEATURE_FLAGS = {
 }
 # CORE is authoritative for resource membership: only CORE-synchronized FAB Groups can be
 # assigned as Subjects. CORE group IDs/names and each user's membership are synchronized at OAuth
-# login; these groups receive no FAB roles and are used only for per-resource editors/viewers.
+# login. Groups receive no FAB roles by default; the config adapter grants the narrow
+# CORE Dashboard Dataset Creator role only to groups that edit a CORE-provisioned dashboard.
 SUBJECTS_RELATED_TYPES = [SubjectType.GROUP]
 
 

@@ -11,7 +11,15 @@ import java.util.Map;
 public final class ArtifactTypeCatalog {
 
     public static final List<String> TYPE_ORDER =
-        List.of("element", "datastructure", "dataset", "mapping", "pipeline", "datasource", "datasink");
+        List.of(
+            "element",
+            "datastructure",
+            "dataset",
+            "mapping",
+            "pipeline",
+            "datasource",
+            "datasink",
+            "dashboard");
 
     public static final Map<String, String> TYPE_LABELS = Map.of(
         "element", "Elements",
@@ -20,7 +28,8 @@ public final class ArtifactTypeCatalog {
         "mapping", "Mappings",
         "pipeline", "Pipelines",
         "datasource", "Data Sources",
-        "datasink", "Data Sinks"
+        "datasink", "Data Sinks",
+        "dashboard", "Dashboards"
     );
 
     public static String labelFor(String type) {

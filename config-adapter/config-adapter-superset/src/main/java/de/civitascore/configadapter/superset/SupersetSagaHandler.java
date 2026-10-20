@@ -61,8 +61,9 @@ import org.owasp.encoder.Encode;
  * {@code datasinks} list whose {@code POSTGIS} entries carry {@code configuration.tableName} and
  * whose presence of a {@code FROST} entry (no per-entry configuration needed) gates the FROST
  * branch; {@code projectId} (the dataset's FROST project id — required only when a {@code FROST}
- * sink is present); a {@code dashboards} list of {@code {id, name, externalDashboardId}} (see
- * {@code de.civitascore.configadapter.model.dataset.Dashboard}). The PostGIS Superset schema is
+ * sink is present); a {@code dashboards} binding list and an {@code artifacts} map keyed by each
+ * Dashboard's {@code modelUrn} (see {@code de.civitascore.configadapter.model.dataset.Dashboard}).
+ * The dashboard model is the source of its title, description and release state. The PostGIS Superset schema is
  * derived from {@code datasetId} via {@link WorkspaceNames#fromDatasetId} — the same rule {@code
  * PostgisSagaHandler}'s {@code PROVISION_SINK} step uses to name the schema, so the two agree on
  * where the table actually lives. FROST datasets have no per-dataset schema — they all live in the
@@ -205,6 +206,7 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
     String datasetId = requireString(command, "datasetId");
     List<String> tables = postgisTableNames(command);
     List<DashboardEntry> dashboards = dashboardEntries(command);
+    List<String> editorGroupIds = stringList(command.payload(), "editorGroupIds");
 
     Map<String, Object> resultData = new LinkedHashMap<>();
     Map<String, Object> compensationData = new LinkedHashMap<>();
@@ -218,7 +220,7 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
         int supersetDatasetId =
             existingDatasetId != null
                 ? existingDatasetId
-                : resourceClient.createDataset(schemaName, table, datasetId);
+                : resourceClient.createDataset(schemaName, table, datasetId, editorGroupIds);
         if (supersetDatasetId <= 0) {
           // Superset created (or already had) a dataset for this table but its id couldn't be
           // resolved — failing loudly here is essential: silently skipping would report this step
@@ -227,6 +229,10 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
           throw new SagaApiException(
               "Could not resolve Superset dataset id for schema=" + schemaName + ", table=" + table,
               422);
+        }
+        if (!resourceClient.syncDatasetEditors(supersetDatasetId, editorGroupIds)) {
+          throw new SagaApiException(
+              "Superset dataset id=" + supersetDatasetId + " disappeared during editor sync", 404);
         }
         datasetIds.add(supersetDatasetId);
       }
@@ -289,7 +295,8 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
                       SupersetResourceClient.CIVITAS_DATASET_ID_KEY,
                       datasetId,
                       SupersetResourceClient.FROST_VIEW_KEY,
-                      view.schemaName()));
+                      view.schemaName()),
+                  editorGroupIds);
         }
         if (supersetDatasetId <= 0) {
           throw new SagaApiException(
@@ -298,6 +305,10 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
                   + ", projectId="
                   + frostProjectId,
               422);
+        }
+        if (!resourceClient.syncDatasetEditors(supersetDatasetId, editorGroupIds)) {
+          throw new SagaApiException(
+              "Superset dataset id=" + supersetDatasetId + " disappeared during editor sync", 404);
         }
         datasetIds.add(supersetDatasetId);
       }
@@ -332,6 +343,16 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
           Encode.forJava(command.sagaId()));
     }
 
+    for (String externalDashboardId : stringList(command.payload(), "deletedDashboardIds")) {
+      int dashboardId;
+      try {
+        dashboardId = Integer.parseInt(externalDashboardId);
+      } catch (NumberFormatException e) {
+        throw new SagaApiException("Invalid Superset dashboard id in delete request", 422);
+      }
+      resourceClient.deleteDashboardAndUnusedCharts(dashboardId);
+    }
+
     return SagaCommandResult.success(
         command.sagaId(), command.stepId(), resultData, compensationData);
   }
@@ -349,16 +370,23 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
   private int syncDashboard(DashboardEntry entry) {
     Integer existingId = parseSupersetId(entry.externalDashboardId());
     if (existingId == null) {
-      return resourceClient.createDashboard(entry.name());
+      return resourceClient.createDashboard(
+          entry.title(), entry.description(), entry.editorGroupIds(), entry.released());
     }
-    if (resourceClient.updateDashboardTitle(existingId, entry.name())) {
+    if (resourceClient.syncDashboardEditors(
+        existingId,
+        entry.title(),
+        entry.description(),
+        entry.editorGroupIds(),
+        entry.released())) {
       return existingId;
     }
     log.warn(
         "Superset dashboard id={} referenced by dashboard {} no longer exists, recreating",
         existingId,
         Encode.forJava(entry.id()));
-    return resourceClient.createDashboard(entry.name());
+    return resourceClient.createDashboard(
+        entry.title(), entry.description(), entry.editorGroupIds(), entry.released());
   }
 
   private static Integer parseSupersetId(String externalId) {
@@ -393,7 +421,7 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
     }
 
     for (int dashboardId : intList(payload, "dashboardIds")) {
-      resourceClient.deleteDashboard(dashboardId);
+      resourceClient.deleteDashboardAndUnusedCharts(dashboardId);
     }
     log.info("Deregistered Superset resources, saga={}", Encode.forJava(command.sagaId()));
     return compensation
@@ -457,22 +485,67 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
   }
 
   /** One entry of the trigger's {@code dashboards} list — see {@code Dashboard}'s Javadoc. */
-  private record DashboardEntry(String id, String name, String externalDashboardId) {}
+  private record DashboardEntry(
+      String id,
+      String modelUrn,
+      String externalDashboardId,
+      List<String> editorGroupIds,
+      Map<?, ?> model) {
+    String title() {
+      return requiredModelString("title");
+    }
+
+    String description() {
+      Object description = model.get("description");
+      return description instanceof String value ? value : null;
+    }
+
+    boolean released() {
+      return Boolean.TRUE.equals(model.get("released"));
+    }
+
+    private String requiredModelString(String key) {
+      if (model.get(key) instanceof String value && !value.isBlank()) {
+        return value;
+      }
+      throw new SagaApiException(
+          "Dashboard model " + Encode.forJava(modelUrn) + " has no valid '" + key + "'", 422);
+    }
+  }
 
   private static List<DashboardEntry> dashboardEntries(SagaCommandMessage command) {
     if (!(command.payload().get("dashboards") instanceof List<?> raw)) {
       return List.of();
     }
+    Map<?, ?> artifacts =
+        command.payload().get("artifacts") instanceof Map<?, ?> values ? values : Map.of();
     List<DashboardEntry> entries = new ArrayList<>();
     for (Object item : raw) {
       if (item instanceof Map<?, ?> dash
           && dash.get("id") instanceof String id
-          && dash.get("name") instanceof String name) {
+          && dash.get("modelUrn") instanceof String modelUrn) {
+        Object modelValue = artifacts.get(modelUrn);
+        if (!(modelValue instanceof Map<?, ?> model)) {
+          throw new SagaApiException(
+              "Dashboard model " + Encode.forJava(modelUrn) + " is missing from saga artifacts",
+              422);
+        }
         entries.add(
             new DashboardEntry(
-                id, name, dash.get("externalDashboardId") instanceof String ext ? ext : null));
+                id,
+                modelUrn,
+                dash.get("externalDashboardId") instanceof String ext ? ext : null,
+                stringList(dash, "editorGroupIds"),
+                model));
       }
     }
     return entries;
+  }
+
+  private static List<String> stringList(Map<?, ?> payload, String key) {
+    if (!(payload.get(key) instanceof List<?> raw)) {
+      return List.of();
+    }
+    return raw.stream().filter(String.class::isInstance).map(String.class::cast).toList();
   }
 }

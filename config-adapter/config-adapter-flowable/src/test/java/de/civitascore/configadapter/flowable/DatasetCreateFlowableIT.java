@@ -13,10 +13,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import de.civitascore.configadapter.adapter.SagaCommandHandler;
+import de.civitascore.configadapter.adapter.SagaCommandMessage;
+import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.apisix.ApisixSagaHandler;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.flowable.bpmn.BpmnProcessDeployer;
@@ -105,6 +110,7 @@ class DatasetCreateFlowableIT {
   private HttpServer apisixMock;
   private List<String> apisixRequestPaths;
   private FlowableResultPublisher resultPublisher;
+  private SagaCommandHandler supersetHandler;
   private OkHttpClient httpClient;
   private String frostBaseUrl;
 
@@ -144,6 +150,15 @@ class DatasetCreateFlowableIT {
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);
     registry.register(apisixHandler);
+    supersetHandler = FlowableTestSupport.mockHandler("superset");
+    when(supersetHandler.handle(any()))
+        .thenAnswer(
+            invocation -> {
+              SagaCommandMessage command = invocation.getArgument(0);
+              return SagaCommandResult.success(
+                  command.sagaId(), command.stepId(), Map.of(), Map.of());
+            });
+    registry.register(supersetHandler);
 
     resultPublisher = mock(FlowableResultPublisher.class);
 
@@ -214,9 +229,9 @@ class DatasetCreateFlowableIT {
             .filter(id -> !id.startsWith("compensate-") && !id.startsWith("publish-"))
             .toList();
     assertEquals(
-        List.of("create-project", "create-route"),
+        List.of("create-project", "create-route", "register-superset"),
         tasks,
-        "Should execute FROST then APISIX (no pipelines = skip Pipeline)");
+        "Should execute FROST, APISIX, and Superset while skipping absent pipelines");
 
     Object projectId =
         historyService

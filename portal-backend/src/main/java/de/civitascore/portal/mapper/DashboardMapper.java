@@ -35,6 +35,10 @@ public interface DashboardMapper
   @Mapping(target = "dataSet", ignore = true)
   @Mapping(target = "active", ignore = true)
   @Mapping(target = "externalDashboardId", ignore = true)
+  @Mapping(target = "released", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+  @Mapping(target = "standaloneMode", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+  @Mapping(target = "showFilters", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+  @Mapping(target = "filterExpansion", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
   @Override
   void updateEntity(@MappingTarget Dashboard entity, DashboardInputDTO input);
 }

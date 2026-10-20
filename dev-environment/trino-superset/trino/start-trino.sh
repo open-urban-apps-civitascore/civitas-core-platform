@@ -87,6 +87,24 @@ node.environment=civitas_core_dev
 node.data-dir=/data/trino
 EOF
 
+# This local single-node coordinator is capped at 2 GiB by Compose. Keep the JVM
+# heap below that ceiling to leave room for Trino's native/off-heap allocations.
+cat > /etc/trino/jvm.config <<'EOF'
+-server
+-Xmx1024M
+-XX:InitialRAMPercentage=50
+-XX:MaxRAMPercentage=70
+-XX:G1HeapRegionSize=32M
+-XX:+ExplicitGCInvokesConcurrent
+-XX:+ExitOnOutOfMemoryError
+-XX:+HeapDumpOnOutOfMemoryError
+-XX:-OmitStackTraceInFastThrow
+-XX:ReservedCodeCacheSize=256M
+-Djdk.attach.allowAttachSelf=true
+-Djdk.nio.maxCachedBufferSize=2000000
+--add-modules=jdk.incubator.vector
+EOF
+
 cat > /etc/trino/config.properties <<EOF
 coordinator=true
 node-scheduler.include-coordinator=true

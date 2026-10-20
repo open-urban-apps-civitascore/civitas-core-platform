@@ -553,6 +553,8 @@
               "edit": "Edit",
               "view": "View",
               "delete": "Delete",
+              "release": "Publish dashboard",
+              "unrelease": "Unpublish dashboard",
               "openInSuperset": "Open in Superset"
             },
             "notYetProvisionedTooltip": "The dashboard is not yet available in Superset.",
@@ -563,7 +565,10 @@
             },
             "messages": {
               "deleteSuccess": "Visualization deleted successfully",
-              "deleteError": "An error occurred while deleting. Please try again."
+              "deleteError": "An error occurred while deleting. Please try again.",
+              "releaseSuccess": "Dashboard published successfully",
+              "unreleaseSuccess": "Dashboard unpublished successfully",
+              "releaseError": "The publication status could not be changed. Please try again."
             }
           },
           "config": {
@@ -573,11 +578,39 @@
             "type": {
               "dashboard": "Dashboard"
             },
+            "releasedBadge": "Published",
+            "unreleasedBadge": "Draft",
             "protectedBadge": "Protected",
             "protectedBadgeTooltip": "Access to this Dashboard is restricted and requires appropriate permissions.",
             "openDataBadge": "Open Data",
             "tabs": {
-              "basicInfo": "Basic Information"
+              "basicInfo": "Basic Information",
+              "options": "Options"
+            },
+            "options": {
+              "standalone": {
+                "title": "Display",
+                "description": "Choose which Superset elements appear around the dashboard.",
+                "label": "Dashboard view",
+                "values": {
+                  "0": "Normal dashboard view",
+                  "1": "Hide top navigation",
+                  "2": "Hide top navigation and title",
+                  "3": "Hide top navigation, title, and tabs"
+                }
+              },
+              "filters": {
+                "title": "Filters",
+                "description": "Control the filter bar and its initial state.",
+                "showLabel": "Show filter bar",
+                "showDescription": "When disabled, Superset opens the dashboard without a filter bar.",
+                "expansionLabel": "Initial filter bar state",
+                "expansionValues": {
+                  "DEFAULT": "Superset default",
+                  "COLLAPSED": "Collapsed",
+                  "EXPANDED": "Expanded"
+                }
+              }
             },
             "form": {
               "sectionTitle": "Basic Information",

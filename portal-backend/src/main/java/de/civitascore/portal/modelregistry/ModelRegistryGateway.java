@@ -543,6 +543,13 @@ public class ModelRegistryGateway {
     modelForge.deleteArtifact(new ArtifactId(logicalUrn));
   }
 
+  /** Removes a Dataset member edge before deleting its model artifact. */
+  public void unlinkPayloadFromDataSet(String dataSetUrn, String logicalUrn) {
+    if (dataSetUrn != null && logicalUrn != null) {
+      modelForge.unlinkFromDataSet(new ArtifactId(dataSetUrn), new ArtifactId(logicalUrn));
+    }
+  }
+
   /**
    * Stores a document through the import path, which splits its members and builds the grouping
    * that references them. The root pin is returned, dependency edges are logged.
@@ -609,6 +616,7 @@ public class ModelRegistryGateway {
       case DATA_SOURCE -> ArtifactKind.DATA_SOURCE;
       case DATA_SINK -> ArtifactKind.DATA_SINK;
       case MAPPING -> ArtifactKind.MAPPING;
+      case DASHBOARD -> ArtifactKind.DASHBOARD;
     };
   }
 

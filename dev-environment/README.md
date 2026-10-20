@@ -126,7 +126,7 @@ cd dev-environment
 
 The `/postgres` Compose stack is the only database server in the local development
 environment. It runs PostGIS and creates separate databases and roles for the portal,
-Keycloak, FROST, GeoServer, Model Forge, and the NiFi demo. The services connect
+Keycloak, FROST, GeoServer, Superset, Model Forge, and the NiFi demo. The services connect
 to `postgis-dev-env` on `civitas-network`. Host tools connect to `localhost:5432`.
 
 Start this stack before you start an individual service Compose file. The main
@@ -232,6 +232,17 @@ cd keycloak  && docker compose up -d
 cd apisix    && docker compose up -d
 cd trino-superset && docker compose up -d --build
 ```
+
+To start the complete dev environment and then build CIVITAS Superset on the locally
+built `superset-local:latest` image (Superset 7.0rc2), use:
+
+```bash
+./start-trino-superset-local.sh
+```
+
+This accepts the same options as `start-portal-dev.sh`. The regular
+`start-portal-dev.sh` and the direct Compose command continue to use the configured
+registry base image.
 
 ---
 

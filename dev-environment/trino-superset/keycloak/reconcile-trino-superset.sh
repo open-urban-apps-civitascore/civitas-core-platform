@@ -168,17 +168,37 @@ get_user_id() {
   /opt/keycloak/bin/kcadm.sh get users -r "$KEYCLOAK_REALM" -q username="$1" | extract_first_id
 }
 
+wait_for_user_id() {
+  local username="$1"
+  local user_id
+  local max_attempts=60
+  local attempt=1
+
+  while [ "$attempt" -le "$max_attempts" ]; do
+    user_id="$(get_user_id "$username")"
+    if [ -n "$user_id" ]; then
+      echo "$user_id"
+      return 0
+    fi
+
+    sleep 2
+    attempt=$((attempt + 1))
+  done
+
+  return 1
+}
+
 ensure_group_membership() {
   local username="$1"
   local group_id="$2"
   local user_id
 
-  user_id="$(get_user_id "$username")"
-  if [ -n "$user_id" ]; then
-    /opt/keycloak/bin/kcadm.sh update "users/$user_id/groups/$group_id" -r "$KEYCLOAK_REALM" >/dev/null || true
-  else
-    echo "Keycloak user '$username' not found in realm '$KEYCLOAK_REALM' yet; skipping group assignment" >&2
+  if ! user_id="$(wait_for_user_id "$username")"; then
+    echo "Configured Keycloak user was not found in realm '$KEYCLOAK_REALM' after 120 seconds; cannot assign required groups" >&2
+    exit 1
   fi
+
+  /opt/keycloak/bin/kcadm.sh update "users/$user_id/groups/$group_id" -r "$KEYCLOAK_REALM" >/dev/null
 }
 
 require_env KEYCLOAK_INTERNAL_URL
