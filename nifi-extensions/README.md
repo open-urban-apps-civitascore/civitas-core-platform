@@ -295,8 +295,8 @@ missing property, which comes from the schema. It never uses the message of the 
 some messages quote the value.
 
 The validator is the networknt `json-schema-validator` in the version of Model Forge, with draft
-2020-12 and the keyword and format settings of Model Forge. The `x-core-*` keywords and `crs` validate
-nothing.
+2020-12 and the keyword and format settings of Model Forge (`ModelForgeKeywordsTest` checks that the
+keyword lists agree). The `x-core-*` keywords and `crs` validate nothing.
 
 A `$ref` resolves inside the schema, to an embedded resource of the schema with its own `$id`, or to
 one of the seven GeoJSON geometry schemas `https://geojson.org/schema/<Type>.json`. The NAR holds

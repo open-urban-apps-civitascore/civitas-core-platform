@@ -36,6 +36,9 @@ import java.util.Optional;
  */
 final class RecordSchema {
 
+  static final List<String> NON_VALIDATING_KEYWORDS =
+      List.of("x-core-ref", "x-xsd-source", "x-ui-position");
+
   private static final int REPORTED_VIOLATIONS = 3;
 
   private static final String NOT_JSON = "the response is not JSON";
@@ -195,12 +198,10 @@ final class RecordSchema {
    * {@code $id}, and the Pipelines of all tenants share the JVM of NiFi.
    */
   private static JsonSchemaFactory factory() {
-    JsonMetaSchema metaSchema =
-        JsonMetaSchema.builder(JsonMetaSchema.getV202012())
-            .keyword(new NonValidationKeyword("x-core-ref"))
-            .keyword(new NonValidationKeyword("x-xsd-source"))
-            .keyword(new NonValidationKeyword("x-ui-position"))
-            .build();
+    JsonMetaSchema.Builder metaSchemaBuilder = JsonMetaSchema.builder(JsonMetaSchema.getV202012());
+    NON_VALIDATING_KEYWORDS.forEach(
+        keyword -> metaSchemaBuilder.keyword(new NonValidationKeyword(keyword)));
+    JsonMetaSchema metaSchema = metaSchemaBuilder.build();
     return JsonSchemaFactory.getInstance(
         SpecVersion.VersionFlag.V202012,
         builder ->
