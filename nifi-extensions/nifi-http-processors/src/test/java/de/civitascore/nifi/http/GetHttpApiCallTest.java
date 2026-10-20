@@ -573,6 +573,24 @@ class GetHttpApiCallTest {
     }
   }
 
+  @Test
+  void onTrigger_withALineBreakInTheApiCallName_escapesItInLogsAndAttributes()
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(404, "{}")) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.setProperty(
+          GetHttpApiCall.API_CALL, "{\"name\":\"Sta\\r\\ntions\",\"path\":\"/stations\"}");
+
+      runner.run();
+
+      String message = "API call \"Sta\\r\\ntions\": GET /stations failed with status 404";
+      assertRouted(runner, GetHttpApiCall.STOP, 404, message);
+      for (String text : logged(runner.getLogger())) {
+        assertFalse(text.contains("\r") || text.contains("\n"), text);
+      }
+    }
+  }
+
   @ParameterizedTest
   @ValueSource(ints = {408, 429, 500, 503})
   void onTrigger_whenTheStatusIsTemporary_routesToFailure(int status)

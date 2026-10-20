@@ -10,6 +10,7 @@
 package de.civitascore.nifi.http;
 
 import java.util.List;
+import org.owasp.encoder.Encode;
 
 /**
  * One API call of an HTTP/REST Data source, read from the {@code API Call} property and checked.
@@ -39,7 +40,7 @@ record ApiCall(
 
   /** The name alone, for example {@code API call "Stations"}. */
   String label() {
-    return "API call \"" + name + "\"";
+    return "API call \"" + Encode.forJava(name) + "\"";
   }
 
   /** A query parameter or a header. The value is never null. */

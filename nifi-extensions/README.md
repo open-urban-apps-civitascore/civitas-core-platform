@@ -262,7 +262,8 @@ redirects (`Redirect Handling Strategy` = `IGNORED`), so a redirect shows a wron
 A FlowFile on `success` carries `http.status.code` and `http.request.path`. A FlowFile on `stop` or
 `failure` is empty and carries `http.request.path`, `http.error.status` and `http.error.message`.
 `http.error.status` is the status of the response, or `0` when no response came. The message is the
-one the log entry and the bulletin show. It names the API call and its path, never the base URL:
+one the log entry and the bulletin show. It names the API call and its path, never the base URL. The
+name is escaped as in a Java string literal, so a line break in it cannot start a forged log line:
 
 ```text
 API call "Get stations": GET /stations failed with status 404
