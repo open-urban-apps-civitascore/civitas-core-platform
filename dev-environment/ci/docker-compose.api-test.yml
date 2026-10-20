@@ -623,7 +623,7 @@ services:
   # stubs: each Bruno folder registers its own through the admin API and removes them again. The
   # service name is the host name of the Data source, and NiFi's HTTP client takes no host with a '_'.
   wiremock:
-    image: wiremock/wiremock:3.9.2
+    image: wiremock/wiremock:3.9.2@sha256:d13997cd7b52583528a766019cfe7d4e91c4d224a67bdaa6f60efbb532f32176
     command: ["--verbose"]
 
   # ── APISIX Route Seeding (one-shot, run via: docker compose run --rm apisix-seed)

@@ -86,7 +86,7 @@ public class GetHttpApiCall extends AbstractProcessor {
       (subject, input, context) -> result(subject, usernameViolation(input));
 
   private static final Validator RECORD_SCHEMA_VALIDATOR =
-      (subject, input, context) -> result(subject, RecordSchema.violation(input));
+      (subject, input, context) -> result(subject, RecordSchema.compileError(input).orElse(null));
 
   static final PropertyDescriptor WEB_CLIENT_SERVICE =
       new PropertyDescriptor.Builder()

@@ -272,6 +272,26 @@ class GetHttpApiCallTest {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"7", "\"val-1f3e\"", "true", "null", "[]", "[{\"stationid\":\"a0\"}]"})
+  void onTrigger_whenAnArrayHoldsANonObjectAndTheSchemaAllowsIt_routesToStop(String element)
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answering(200, "[" + element + ",{\"stationid\":\"a1\"}]")) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, "{\"required\": [\"stationid\"]}");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": 1 of 2 records violate the Data structure: record 0: type");
+      assertFalse(logged(runner.getLogger()).toString().contains("val-1f3e"));
+    }
+  }
+
   @Test
   void onTrigger_whenARecordViolates_keepsItsValuesOutOfLogsAndAttributes()
       throws InitializationException {
@@ -550,6 +570,45 @@ class GetHttpApiCallTest {
       assertEquals(1, errors.size());
       assertTrue(errors.get(0).getMsg().contains(message), errors.get(0).getMsg());
       assertTrue(runner.getLogger().getWarnMessages().isEmpty());
+    }
+  }
+
+  @Test
+  void onTrigger_withALineBreakInTheApiCallName_escapesItInLogsAndAttributes()
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(404, "{}")) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.setProperty(
+          GetHttpApiCall.API_CALL,
+          "{\"name\":\"Sta\\r\\n\\u2028\\u0085tions\",\"path\":\"/stations\"}");
+
+      runner.run();
+
+      String message =
+          "API call \"Sta\\r\\n\\u2028\\u0085tions\": GET /stations failed with status 404";
+      assertRouted(runner, GetHttpApiCall.STOP, 404, message);
+      for (String text : logged(runner.getLogger())) {
+        assertFalse(text.matches("(?s).*[\\r\\n\\u2028\\u0085].*"), text);
+      }
+    }
+  }
+
+  @Test
+  void onTrigger_withAnUmlautAndQuotesInTheApiCallName_keepsThemInTheMessage()
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(404, "{}")) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.setProperty(
+          GetHttpApiCall.API_CALL,
+          "{\"name\":\"Messwerte \\\"Köln\\\" ✓\",\"path\":\"/stations\"}");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          404,
+          "API call \"Messwerte \"Köln\" ✓\": GET /stations failed with status 404");
     }
   }
 

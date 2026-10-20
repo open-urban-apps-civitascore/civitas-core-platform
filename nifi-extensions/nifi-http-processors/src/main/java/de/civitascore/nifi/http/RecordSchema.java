@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * The Data structure of an HTTP/REST Data source, which each record of a response must agree with.
@@ -37,7 +36,12 @@ import java.util.Set;
  */
 final class RecordSchema {
 
+  static final List<String> NON_VALIDATING_KEYWORDS =
+      List.of("x-core-ref", "x-xsd-source", "x-ui-position");
+
   private static final int REPORTED_VIOLATIONS = 3;
+
+  private static final String NOT_JSON = "the response is not JSON";
 
   private static final ObjectMapper MAPPER =
       JsonMapper.builder().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
@@ -48,13 +52,13 @@ final class RecordSchema {
     this.schema = schema;
   }
 
-  /** Why the text is no schema that the processor can validate with, or null when it is one. */
-  static String violation(String text) {
+  /** Why the text is no schema that the processor can validate with, or empty when it is one. */
+  static Optional<String> compileError(String text) {
     try {
       compile(text);
-      return null;
+      return Optional.empty();
     } catch (InvalidRecordSchemaException e) {
-      return e.getMessage();
+      return Optional.of(e.getMessage());
     }
   }
 
@@ -97,10 +101,10 @@ final class RecordSchema {
     try {
       response = MAPPER.readTree(body);
     } catch (IOException e) {
-      return Optional.of("the response is not JSON");
+      return Optional.of(NOT_JSON);
     }
     if (response == null || response.isMissingNode()) {
-      return Optional.of("the response is not JSON");
+      return Optional.of(NOT_JSON);
     }
     if (!response.isArray() && !response.isObject()) {
       return Optional.of(
@@ -119,14 +123,14 @@ final class RecordSchema {
     int invalid = 0;
     List<String> reported = new ArrayList<>();
     for (int index = 0; index < records.size(); index++) {
-      Set<ValidationMessage> messages = schema.validate(records.get(index));
-      if (messages.isEmpty()) {
+      List<String> recordViolations = recordViolations(records.get(index));
+      if (recordViolations.isEmpty()) {
         continue;
       }
       invalid++;
-      for (ValidationMessage message : messages) {
+      for (String violation : recordViolations) {
         if (reported.size() < REPORTED_VIOLATIONS) {
-          reported.add("record " + index + ": " + violation(message));
+          reported.add("record " + index + ": " + violation);
         }
       }
     }
@@ -139,6 +143,17 @@ final class RecordSchema {
             + records.size()
             + " records violate the Data structure: "
             + String.join("; ", reported));
+  }
+
+  private List<String> recordViolations(JsonNode record) {
+    if (!record.isObject()) {
+      return List.of("type");
+    }
+    List<String> violations = new ArrayList<>();
+    for (ValidationMessage message : schema.validate(record)) {
+      violations.add(describe(message));
+    }
+    return violations;
   }
 
   private static String scalarType(JsonNode scalar) {
@@ -155,7 +170,7 @@ final class RecordSchema {
   }
 
   /** The pointer inside the record and the keyword; for {@code required} the property too. */
-  private static String violation(ValidationMessage message) {
+  private static String describe(ValidationMessage message) {
     StringBuilder text = new StringBuilder();
     String pointer = pointer(message.getInstanceLocation());
     if (!pointer.isEmpty()) {
@@ -183,12 +198,10 @@ final class RecordSchema {
    * {@code $id}, and the Pipelines of all tenants share the JVM of NiFi.
    */
   private static JsonSchemaFactory factory() {
-    JsonMetaSchema metaSchema =
-        JsonMetaSchema.builder(JsonMetaSchema.getV202012())
-            .keyword(new NonValidationKeyword("x-core-ref"))
-            .keyword(new NonValidationKeyword("x-xsd-source"))
-            .keyword(new NonValidationKeyword("x-ui-position"))
-            .build();
+    JsonMetaSchema.Builder metaSchemaBuilder = JsonMetaSchema.builder(JsonMetaSchema.getV202012());
+    NON_VALIDATING_KEYWORDS.forEach(
+        keyword -> metaSchemaBuilder.keyword(new NonValidationKeyword(keyword)));
+    JsonMetaSchema metaSchema = metaSchemaBuilder.build();
     return JsonSchemaFactory.getInstance(
         SpecVersion.VersionFlag.V202012,
         builder ->

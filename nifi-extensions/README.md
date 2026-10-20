@@ -262,7 +262,9 @@ redirects (`Redirect Handling Strategy` = `IGNORED`), so a redirect shows a wron
 A FlowFile on `success` carries `http.status.code` and `http.request.path`. A FlowFile on `stop` or
 `failure` is empty and carries `http.request.path`, `http.error.status` and `http.error.message`.
 `http.error.status` is the status of the response, or `0` when no response came. The message is the
-one the log entry and the bulletin show. It names the API call and its path, never the base URL:
+one the log entry and the bulletin show. It names the API call and its path, never the base URL. A
+control character or line separator in the name appears as `\r`, `\n` or `\uXXXX`, so it cannot
+start a forged log line; every other character stays as entered:
 
 ```text
 API call "Get stations": GET /stations failed with status 404
@@ -284,8 +286,9 @@ query; the message names its class alone.
 The processor reads a 2xx body into memory and parses it once. A JSON array holds one record in each
 element, and `[]` holds none. A JSON object is one record. A JSON scalar, or a body that is not JSON,
 goes to `stop`. Each record is validated against `Record Schema`; one invalid record sends the whole
-response to `stop`, and no FlowFile goes to `success`. A body that passes is an object or an array of
-objects, so the record reader behind the processor skips no data.
+response to `stop`, and no FlowFile goes to `success`. An array element that is not a JSON object is an
+invalid record with the keyword `type`, also when `Record Schema` allows it. A body that passes is an
+object or an array of objects, so the record reader behind the processor skips no data.
 
 The cause names the number of invalid records and at most the first 3 violations: the index of the
 record from 0, the JSON Pointer inside the record and the keyword. For `required`, it also names the
@@ -293,8 +296,8 @@ missing property, which comes from the schema. It never uses the message of the 
 some messages quote the value.
 
 The validator is the networknt `json-schema-validator` in the version of Model Forge, with draft
-2020-12 and the keyword and format settings of Model Forge. The `x-core-*` keywords and `crs` validate
-nothing.
+2020-12 and the keyword and format settings of Model Forge (`ModelForgeKeywordsTest` checks that the
+keyword lists agree). The `x-core-*` keywords and `crs` validate nothing.
 
 A `$ref` resolves inside the schema, to an embedded resource of the schema with its own `$id`, or to
 one of the seven GeoJSON geometry schemas `https://geojson.org/schema/<Type>.json`. The NAR holds

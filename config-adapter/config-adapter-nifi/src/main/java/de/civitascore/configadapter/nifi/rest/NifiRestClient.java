@@ -138,7 +138,6 @@ public class NifiRestClient implements AutoCloseable {
   /**
    * Runtime information collected from processors and the NiFi bulletin board.
    *
-   * @param state the health of the Pipeline
    * @param message for {@link State#STOPPED}, the cause that the stop sink logged
    */
   public record RuntimeStatus(State state, String message, String stacktrace, Instant occurredAt) {

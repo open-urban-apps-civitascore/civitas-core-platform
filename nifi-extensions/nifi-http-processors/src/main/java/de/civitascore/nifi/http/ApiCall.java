@@ -39,7 +39,30 @@ record ApiCall(
 
   /** The name alone, for example {@code API call "Stations"}. */
   String label() {
-    return "API call \"" + name + "\"";
+    return "API call \"" + withEscapedControlCharacters(name) + "\"";
+  }
+
+  private static String withEscapedControlCharacters(String text) {
+    StringBuilder escaped = new StringBuilder(text.length());
+    for (char c : text.toCharArray()) {
+      switch (c) {
+        case '\r' -> escaped.append("\\r");
+        case '\n' -> escaped.append("\\n");
+        default ->
+            escaped.append(
+                isControlOrLineSeparator(c)
+                    ? String.format("\\u%04x", (int) c)
+                    : String.valueOf(c));
+      }
+    }
+    return escaped.toString();
+  }
+
+  private static boolean isControlOrLineSeparator(char c) {
+    int type = Character.getType(c);
+    return type == Character.CONTROL
+        || type == Character.LINE_SEPARATOR
+        || type == Character.PARAGRAPH_SEPARATOR;
   }
 
   /** A query parameter or a header. The value is never null. */
