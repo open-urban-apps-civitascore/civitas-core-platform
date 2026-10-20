@@ -187,8 +187,8 @@ public class GetHttpApiCall extends AbstractProcessor {
               "The maximum number of pages in one run of an API call with pagination. The limit"
                   + " applies also when the API call has an end page. A run that reads this"
                   + " number of pages and meets no stop condition is a fatal error. Thus an API"
-                  + " that ignores the page parameter cannot make the processor send requests"
-                  + " without end.")
+                  + " that ignores the page parameter and changes its response on each request"
+                  + " cannot make the processor send requests without end.")
           .required(true)
           .defaultValue("1000")
           .addValidator(StandardValidators.POSITIVE_INTEGER_VALIDATOR)
@@ -210,8 +210,8 @@ public class GetHttpApiCall extends AbstractProcessor {
               "One empty FlowFile for each run with an error that needs a change to the"
                   + " configuration or to the Data structure: 3xx, 4xx except 408 and 429, a"
                   + " request the web client refuses, a response that is not JSON or does not"
-                  + " agree with the Record Schema, a page that is not a JSON array, and a run"
-                  + " that reaches Max Pages.")
+                  + " agree with the Record Schema, a page that is not a JSON array, a page that"
+                  + " repeats an earlier page of the run, and a run that reaches Max Pages.")
           .build();
 
   static final Relationship FAILURE =

@@ -87,6 +87,12 @@ sealed interface ApiCallOutcome {
           apiCall + ": no stop condition after " + maxPages + " pages (Max Pages)");
     }
 
+    /** A page whose body is the same as the body of an earlier page of the run. */
+    static Failure ofRepeatedPage(String apiCall, int status, String page, String earlierPage) {
+      return new Failure(
+          ErrorKind.FATAL, status, apiCall + ": " + page + " repeats " + earlierPage);
+    }
+
     /** A run that NiFi stopped before this request. */
     static Failure ofStopped(String request) {
       return new Failure(

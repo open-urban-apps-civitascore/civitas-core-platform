@@ -78,11 +78,12 @@ final class PageLoop {
   private RunResult readPages(ProcessSession session, Authentication authentication) {
     Pagination pagination = apiCall.pagination();
     List<FlowFile> pages = new ArrayList<>();
+    PageBodies bodies = new PageBodies();
     Page page = pagination.first();
     for (int read = 1; ; read++) {
       ApiCallOutcome outcome = client.send(apiCall, page, authentication);
       int records;
-      switch (accept(session, page, outcome, pages)) {
+      switch (accept(session, page, outcome, pages, bodies)) {
         case PageRead.Failed failed -> {
           return new RunResult.Failed(pages, failed.failure());
         }
@@ -108,7 +109,11 @@ final class PageLoop {
 
   /** Adds the FlowFile of a page with records, or gives the failure that ends the run. */
   private PageRead accept(
-      ProcessSession session, Page page, ApiCallOutcome outcome, List<FlowFile> pages) {
+      ProcessSession session,
+      Page page,
+      ApiCallOutcome outcome,
+      List<FlowFile> pages,
+      PageBodies bodies) {
     return switch (outcome) {
       case ApiCallOutcome.Failure failure -> new PageRead.Failed(failure);
       case ApiCallOutcome.NoBody noBody -> {
@@ -117,7 +122,7 @@ final class PageLoop {
       }
       case ApiCallOutcome.Body body -> {
         try (body) {
-          yield acceptBody(session, page, body, pages);
+          yield acceptBody(session, page, body, pages, bodies);
         }
       }
     };
@@ -125,13 +130,24 @@ final class PageLoop {
 
   /** Validates the body from its FlowFile, so that only one record at a time is in memory. */
   private PageRead acceptBody(
-      ProcessSession session, Page page, ApiCallOutcome.Body body, List<FlowFile> pages) {
+      ProcessSession session,
+      Page page,
+      ApiCallOutcome.Body body,
+      List<FlowFile> pages,
+      PageBodies bodies) {
     FlowFile flowFile = session.create();
     try {
-      flowFile = session.importFrom(body.content(), flowFile);
+      flowFile = session.importFrom(bodies.hashing(body.content()), flowFile);
     } catch (FlowFileAccessException e) {
       session.remove(flowFile);
       return new PageRead.Failed(ApiCallOutcome.Failure.ofTransport(apiCall.describe(page), e));
+    }
+    Optional<Page> earlier = bodies.earlierWithSameBody(page);
+    if (earlier.isPresent()) {
+      session.remove(flowFile);
+      return new PageRead.Failed(
+          ApiCallOutcome.Failure.ofRepeatedPage(
+              apiCall.label(), body.status(), title(page), title(earlier.get())));
     }
     boolean pagesAreArrays = apiCall.pagination().pagesAreArrays();
     return switch (recordSchema.verdict(session, flowFile, pagesAreArrays)) {
@@ -162,6 +178,11 @@ final class PageLoop {
         yield new PageRead.Records(records);
       }
     };
+  }
+
+  /** The title of the page, or its position in a run whose pages have no names. */
+  private static String title(Page page) {
+    return page.title().orElse("request " + (page.index() + 1));
   }
 
   private Map<String, String> attributes(Page page, int status) {

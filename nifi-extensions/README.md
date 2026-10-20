@@ -291,6 +291,7 @@ API call "Get stations": GET /stations page 3 failed with status 404
 API call "Get stations": GET /stations page 3 failed: ConnectException
 API call "Get stations": page 3: 2 of 50 records violate the Data structure: record 3: /lat type; record 7: required stationid
 API call "Get stations": page 3 is a JSON object, not an array
+API call "Get stations": page 3 repeats page 2
 API call "Get stations": no stop condition after 1000 pages (Max Pages)
 API call "Get stations": GET /stations page 3 not sent, because the processor stopped
 ```
@@ -369,9 +370,16 @@ the content repository until the commit. This
 applies to what the processor sends: the Data sink writes the pages one FlowFile after the other,
 so a Data sink error on a page leaves the pages before it in the Data storage.
 
+A page whose body is the same as the body of an earlier page of the run goes to `stop`, also in a
+run with an `endPage`, and none of the pages of the run reaches `success`. The same body leads to
+the same next request, so such a run does not end. Thus an API that ignores the page parameter
+stops at the second page. The processor compares a SHA-256 of each body, which it computes while it
+writes the body into its FlowFile.
+
 `Max Pages` limits a run, also one with an `endPage`. A run that reads `Max Pages` pages and meets no
 stop condition goes to `stop`, and none of its pages reaches `success`. This guards against an API
-that ignores the page parameter.
+that ignores the page parameter and changes its response on each request, for example with a
+timestamp in each record.
 
 **Record limit:** a run reads at most `Max Pages` × `pageSize` records, 1000 × `pageSize` by
 default. The config-adapter does not set `Max Pages`, and each deployment of the Pipeline replaces

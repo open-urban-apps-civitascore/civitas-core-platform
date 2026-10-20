@@ -879,7 +879,9 @@ class GetHttpApiCallTest {
 
   @Test
   void onTrigger_withAnEndPage_readsTheEndPageAndStopsAfterIt() throws InitializationException {
-    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, FULL_PAGE)) {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(fullPage(0)), Response.json(fullPage(1)), Response.json(fullPage(2)))) {
       TestRunner runner = paginatedRunner(endpoint, ", \"startPage\": 0, \"endPage\": 2");
 
       runner.run();
@@ -1080,10 +1082,41 @@ class GetHttpApiCallTest {
   }
 
   @ParameterizedTest
+  @ValueSource(strings = {"", ", \"endPage\": 1"})
+  void onTrigger_whenAPageRepeatsThePageBefore_routesTheRunToStopAtTheSecondPage(String endPage)
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, FULL_PAGE)) {
+      TestRunner runner = paginatedRunner(endpoint, endPage);
+
+      runner.run();
+
+      assertRouted(
+          runner, GetHttpApiCall.STOP, 200, "API call \"Stations\": page 1 repeats page 0");
+      assertEquals(2, endpoint.requests().size());
+    }
+  }
+
+  @Test
+  void onTrigger_whenAPageRepeatsAnEarlierPage_routesTheRunToStop() throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(fullPage(0)), Response.json(fullPage(1)), Response.json(fullPage(0)))) {
+      TestRunner runner = paginatedRunner(endpoint, "");
+
+      runner.run();
+
+      assertRouted(
+          runner, GetHttpApiCall.STOP, 200, "API call \"Stations\": page 2 repeats page 0");
+    }
+  }
+
+  @ParameterizedTest
   @ValueSource(strings = {"", ", \"endPage\": 10"})
   void onTrigger_whenMaxPagesPagesMeetNoStopCondition_routesTheRunToStop(String endPage)
       throws InitializationException {
-    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, FULL_PAGE)) {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(fullPage(0)), Response.json(fullPage(1)), Response.json(fullPage(2)))) {
       TestRunner runner = paginatedRunner(endpoint, endPage);
       runner.setProperty(GetHttpApiCall.MAX_PAGES, "3");
 
@@ -1400,6 +1433,11 @@ class GetHttpApiCallTest {
             + furtherFields
             + "}}");
     return runner;
+  }
+
+  /** A page of page size 2 with records of its own, so that no two pages have the same body. */
+  private static String fullPage(int page) {
+    return "[{\"stationid\":\"p" + page + "a\"},{\"stationid\":\"p" + page + "b\"}]";
   }
 
   private static void assertPages(TestRunner runner, String... pages) {
