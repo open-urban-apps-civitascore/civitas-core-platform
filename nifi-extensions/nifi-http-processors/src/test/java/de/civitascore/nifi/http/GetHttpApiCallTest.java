@@ -12,6 +12,7 @@ package de.civitascore.nifi.http;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -24,6 +25,8 @@ import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Stream;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.reporting.InitializationException;
@@ -477,21 +480,16 @@ class GetHttpApiCallTest {
   }
 
   @Test
-  void validate_withARemoteReferenceOtherThanAGeoJsonGeometry_isInvalidAndFetchesNothing()
+  void start_withARemoteReferenceOtherThanAGeoJsonGeometry_failsAndFetchesNothing()
       throws InitializationException {
-    try (ApiEndpoint schemaHost = ApiEndpoint.answering(200, "{\"type\":\"object\"}")) {
-      TestRunner runner = runner("http://localhost:8080");
-      runner.setProperty(
-          GetHttpApiCall.RECORD_SCHEMA,
+    try (ApiEndpoint schemaHost = ApiEndpoint.answering(200, "{\"type\":\"object\"}");
+        ApiEndpoint endpoint = ApiEndpoint.answering(200, "[]")) {
+      String schema =
           "{\"type\":\"object\",\"properties\":{\"a\":{\"$ref\":\""
               + schemaHost.baseUrl()
-              + "/schema.json\"}}}");
+              + "/schema.json\"}}}";
 
-      Collection<ValidationResult> results = invalid(runner);
-
-      assertTrue(
-          results.stream().anyMatch(r -> "Record Schema".equals(r.getSubject())),
-          results::toString);
+      assertStartFails(endpoint, schema);
       assertTrue(schemaHost.requests().isEmpty());
     }
   }
@@ -503,30 +501,22 @@ class GetHttpApiCallTest {
         "https://geojson.org/schema/../schema/Point.json",
         "urn:core:platform:civitas:element:common:x:1.0.0"
       })
-  void validate_withAReferenceThatIsNotVendored_isInvalid(String reference)
+  void start_withAReferenceThatIsNotVendored_fails(String reference)
       throws InitializationException {
-    TestRunner runner = runner("http://localhost:8080");
-    runner.setProperty(
-        GetHttpApiCall.RECORD_SCHEMA,
-        "{\"type\":\"object\",\"properties\":{\"a\":{\"$ref\":\"" + reference + "\"}}}");
-
-    Collection<ValidationResult> results = invalid(runner);
-
-    assertTrue(
-        results.stream().anyMatch(r -> "Record Schema".equals(r.getSubject())), results::toString);
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, "[]")) {
+      assertStartFails(
+          endpoint,
+          "{\"type\":\"object\",\"properties\":{\"a\":{\"$ref\":\"" + reference + "\"}}}");
+    }
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"{\"type\":", "[]"})
-  void validate_withARecordSchemaThatIsNoJsonSchema_isInvalid(String schema)
+  @ValueSource(strings = {"{\"type\":", "{\"type\": \"object\"} trailing"})
+  void start_withARecordSchemaThatDoesNotCompile_fails(String schema)
       throws InitializationException {
-    TestRunner runner = runner("http://localhost:8080");
-    runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, schema);
-
-    Collection<ValidationResult> results = invalid(runner);
-
-    assertTrue(
-        results.stream().anyMatch(r -> "Record Schema".equals(r.getSubject())), results::toString);
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, "[]")) {
+      assertStartFails(endpoint, schema);
+    }
   }
 
   @Test
@@ -910,6 +900,24 @@ class GetHttpApiCallTest {
     runner.setProperty(GetHttpApiCall.API_CALL, "{\"name\":\"\",\"path\":\"x\",\"pagination\":{}}");
 
     assertEquals(3, invalid(runner).size(), invalid(runner)::toString);
+  }
+
+  private static void assertStartFails(ApiEndpoint endpoint, String schema)
+      throws InitializationException {
+    TestRunner runner = runner(endpoint.baseUrl());
+    runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, schema);
+    runner.assertValid();
+
+    AssertionError failure = assertThrows(AssertionError.class, runner::run);
+
+    assertTrue(
+        causes(failure).anyMatch(InvalidRecordSchemaException.class::isInstance),
+        failure::toString);
+    assertTrue(endpoint.requests().isEmpty());
+  }
+
+  private static Stream<Throwable> causes(Throwable throwable) {
+    return Stream.iterate(throwable, Objects::nonNull, Throwable::getCause);
   }
 
   private static Collection<ValidationResult> invalid(TestRunner runner) {
