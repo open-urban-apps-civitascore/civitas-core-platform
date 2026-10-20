@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
@@ -30,27 +29,27 @@ import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.components.Validator;
-import org.apache.nifi.flowfile.FlowFile;
-import org.apache.nifi.flowfile.attributes.CoreAttributes;
 import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
-import org.apache.nifi.processor.exception.FlowFileAccessException;
 import org.apache.nifi.processor.util.StandardValidators;
 import org.apache.nifi.web.client.provider.api.WebClientServiceProvider;
 
 /**
- * The source of an HTTP/REST Data source: one request of one API call in each run.
+ * The source of an HTTP/REST Data source: in each run, one request of one API call, or one request
+ * for each page of an API call with pagination. A run delivers all its pages or none.
  *
  * <p>It runs on the primary node alone, because each node of a cluster would call the API
  * otherwise, and one run at a time, so that two requests of one API call never overlap.
  */
 @Tags({"HTTP", "REST", "API", "GET", "source", "civitas"})
 @CapabilityDescription(
-    "Sends the HTTP GET request of one API call of an HTTP/REST Data source. A 2xx response with a"
-        + " body becomes a FlowFile on success. An error that the next run cannot repair becomes a"
-        + " FlowFile on stop, any other error a FlowFile on failure.")
+    "Sends the HTTP GET request of one API call of an HTTP/REST Data source, one request for each"
+        + " page when the API call has a pagination. A 2xx response with records becomes a"
+        + " FlowFile on success. An error on any page discards the pages of the run before it: an"
+        + " error that the next run cannot repair becomes a FlowFile on stop, any other error a"
+        + " FlowFile on failure.")
 @InputRequirement(Requirement.INPUT_FORBIDDEN)
 @PrimaryNodeOnly
 @TriggerSerially
@@ -62,6 +61,9 @@ import org.apache.nifi.web.client.provider.api.WebClientServiceProvider;
   @WritesAttribute(
       attribute = GetHttpApiCall.REQUEST_PATH,
       description = "The path of the API call, without the query."),
+  @WritesAttribute(
+      attribute = GetHttpApiCall.PAGE,
+      description = "The page number, on success of an API call with pagination."),
   @WritesAttribute(
       attribute = GetHttpApiCall.ERROR_STATUS,
       description = "The status of the response, or 0 when no response came, on stop and failure."),
@@ -75,6 +77,7 @@ public class GetHttpApiCall extends AbstractProcessor {
 
   public static final String STATUS_CODE = "http.status.code";
   public static final String REQUEST_PATH = "http.request.path";
+  public static final String PAGE = "http.page";
   public static final String ERROR_STATUS = "http.error.status";
   public static final String ERROR_MESSAGE = "http.error.message";
 
@@ -176,12 +179,27 @@ public class GetHttpApiCall extends AbstractProcessor {
           .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
           .build();
 
+  static final PropertyDescriptor MAX_PAGES =
+      new PropertyDescriptor.Builder()
+          .name("Max Pages")
+          .displayName("Max Pages")
+          .description(
+              "The most pages of one run of an API call with pagination, also with an end page. A"
+                  + " run that reads this many pages and meets no stop condition is a fatal"
+                  + " error, so that an API that ignores the page parameter cannot make the"
+                  + " processor send requests without end.")
+          .required(true)
+          .defaultValue("1000")
+          .addValidator(StandardValidators.POSITIVE_INTEGER_VALIDATOR)
+          .build();
+
   static final Relationship SUCCESS =
       new Relationship.Builder()
           .name("success")
           .description(
               "One FlowFile for each 2xx response with a body whose records all agree with the"
-                  + " Record Schema. The content is the body.")
+                  + " Record Schema; with pagination, one for each page with records of a run"
+                  + " without an error. The content is the body.")
           .build();
 
   static final Relationship STOP =
@@ -190,8 +208,9 @@ public class GetHttpApiCall extends AbstractProcessor {
           .description(
               "One empty FlowFile for each run with an error that needs a change to the"
                   + " configuration or to the Data structure: 3xx, 4xx except 408 and 429, a"
-                  + " request the web client refuses, and a response that is not JSON or does not"
-                  + " agree with the Record Schema.")
+                  + " request the web client refuses, a response that is not JSON or does not"
+                  + " agree with the Record Schema, a page that is not a JSON array, and a run"
+                  + " that reaches Max Pages.")
           .build();
 
   static final Relationship FAILURE =
@@ -211,15 +230,12 @@ public class GetHttpApiCall extends AbstractProcessor {
           AUTHENTICATION_TYPE,
           BASIC_AUTH_USERNAME,
           BASIC_AUTH_PASSWORD,
-          RECORD_SCHEMA);
+          RECORD_SCHEMA,
+          MAX_PAGES);
 
   private static final Set<Relationship> RELATIONSHIPS = Set.of(SUCCESS, STOP, FAILURE);
 
-  private static final String JSON = "application/json";
-
-  private volatile ApiCall apiCall;
-  private volatile ApiCallClient client;
-  private volatile RecordSchema recordSchema;
+  private volatile PageLoop pageLoop;
 
   @Override
   protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
@@ -258,9 +274,9 @@ public class GetHttpApiCall extends AbstractProcessor {
   @OnScheduled
   public void readConfiguration(ProcessContext context)
       throws InvalidApiCallException, InvalidRecordSchemaException {
-    apiCall = ApiCallParser.parse(context.getProperty(API_CALL).getValue());
-    recordSchema = RecordSchema.compile(context.getProperty(RECORD_SCHEMA).getValue());
-    client =
+    ApiCall apiCall = ApiCallParser.parse(context.getProperty(API_CALL).getValue());
+    RecordSchema recordSchema = RecordSchema.compile(context.getProperty(RECORD_SCHEMA).getValue());
+    ApiCallClient client =
         new ApiCallClient(
             context
                 .getProperty(WEB_CLIENT_SERVICE)
@@ -268,6 +284,9 @@ public class GetHttpApiCall extends AbstractProcessor {
                 .getWebClientService(),
             context.getProperty(BASE_URL).getValue(),
             context.getProperty(BODY_READ_TIMEOUT).asDuration());
+    pageLoop =
+        new PageLoop(
+            apiCall, client, recordSchema, context.getProperty(MAX_PAGES).asInteger(), getLogger());
   }
 
   @Override
@@ -278,78 +297,7 @@ public class GetHttpApiCall extends AbstractProcessor {
             .asAllowableValue(AuthenticationType.class)
             .authentication(context);
 
-    switch (client.send(apiCall, authentication)) {
-      case ApiCallOutcome.Body body -> {
-        try (body) {
-          transferBody(session, body);
-        }
-      }
-      case ApiCallOutcome.NoBody noBody -> logNoBody(noBody.status());
-      case ApiCallOutcome.Failure failure -> transferFailure(session, failure);
-    }
-  }
-
-  /** Validates the body from its FlowFile, so that only one record at a time is in memory. */
-  private void transferBody(ProcessSession session, ApiCallOutcome.Body body) {
-    FlowFile flowFile = session.create();
-    try {
-      flowFile = session.importFrom(body.content(), flowFile);
-    } catch (FlowFileAccessException e) {
-      session.remove(flowFile);
-      transferFailure(session, ApiCallOutcome.Failure.ofTransport(apiCall.describe(), e));
-      return;
-    }
-    switch (recordSchema.verdict(session, flowFile)) {
-      case RecordSchema.Verdict.Agrees() ->
-          session.transfer(
-              session.putAllAttributes(
-                  flowFile,
-                  Map.of(
-                      CoreAttributes.MIME_TYPE.key(),
-                      JSON,
-                      STATUS_CODE,
-                      Integer.toString(body.status()),
-                      REQUEST_PATH,
-                      apiCall.path())),
-              SUCCESS);
-      case RecordSchema.Verdict.Blank() -> {
-        session.remove(flowFile);
-        logNoBody(body.status());
-      }
-      case RecordSchema.Verdict.Rejected(String reason) -> {
-        session.remove(flowFile);
-        transferFailure(
-            session, ApiCallOutcome.Failure.ofRejectedBody(apiCall.label(), body.status(), reason));
-      }
-    }
-  }
-
-  private void logNoBody(int status) {
-    getLogger()
-        .debug("{} {} returned {} without a body", apiCall.method().name(), apiCall.path(), status);
-  }
-
-  /** Logs the error, which raises the bulletin, and sends an empty FlowFile that describes it. */
-  private void transferFailure(ProcessSession session, ApiCallOutcome.Failure failure) {
-    Relationship relationship;
-    if (failure.fatal()) {
-      getLogger().error(failure.message());
-      relationship = STOP;
-    } else {
-      getLogger().warn(failure.message());
-      relationship = FAILURE;
-    }
-    session.transfer(
-        session.putAllAttributes(
-            session.create(),
-            Map.of(
-                REQUEST_PATH,
-                apiCall.path(),
-                ERROR_STATUS,
-                Integer.toString(failure.status()),
-                ERROR_MESSAGE,
-                failure.message())),
-        relationship);
+    pageLoop.run(session, authentication);
   }
 
   private static String baseUrlViolation(String input) {

@@ -16,6 +16,7 @@ import java.io.PushbackInputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.apache.nifi.web.client.api.HttpRequestHeadersSpec;
@@ -48,11 +49,12 @@ final class ApiCallClient {
     this.bodyReadTimeout = bodyReadTimeout;
   }
 
-  ApiCallOutcome send(ApiCall call, Authentication authentication) {
-    String request = call.describe();
+  ApiCallOutcome send(ApiCall call, Page page, Authentication authentication) {
+    String request = call.describe(page);
     HttpResponseEntity response;
     try {
-      HttpRequestHeadersSpec spec = webClient.method(call.method().requestMethod()).uri(uri(call));
+      HttpRequestHeadersSpec spec =
+          webClient.method(call.method().requestMethod()).uri(uri(call, page));
       for (Parameter header : call.headers()) {
         spec = spec.header(header.name(), header.value());
       }
@@ -116,8 +118,10 @@ final class ApiCallClient {
     }
   }
 
-  private URI uri(ApiCall call) {
-    String query = query(call.queryParameters());
+  private URI uri(ApiCall call, Page page) {
+    List<Parameter> parameters = new ArrayList<>(call.queryParameters());
+    parameters.addAll(page.queryParameters());
+    String query = query(parameters);
     return URI.create(baseUrl + call.path() + (query.isEmpty() ? "" : "?" + query));
   }
 

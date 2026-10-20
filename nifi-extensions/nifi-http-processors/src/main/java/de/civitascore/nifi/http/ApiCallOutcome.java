@@ -77,6 +77,14 @@ sealed interface ApiCallOutcome {
       return new Failure(ErrorKind.FATAL, status, apiCall + ": " + reason);
     }
 
+    /** A paginated run that read {@code maxPages} pages and met no stop condition. */
+    static Failure ofPageLimit(String apiCall, int status, int maxPages) {
+      return new Failure(
+          ErrorKind.FATAL,
+          status,
+          apiCall + ": no stop condition after " + maxPages + " pages (Max Pages)");
+    }
+
     /** A request the web client refused to build. The same configuration fails again. */
     static Failure ofRejectedRequest(String request, IllegalArgumentException cause) {
       return new Failure(

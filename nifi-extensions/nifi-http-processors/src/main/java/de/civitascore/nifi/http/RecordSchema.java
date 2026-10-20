@@ -130,7 +130,7 @@ final class RecordSchema {
             case START_OBJECT -> {
               Violations violations = new Violations();
               violations.add(recordViolations(parser, first));
-              yield violations.verdict();
+              yield violations.verdict(false);
             }
             default ->
                 new Verdict.Rejected(
@@ -151,7 +151,7 @@ final class RecordSchema {
         token = parser.nextToken()) {
       violations.add(recordViolations(parser, token));
     }
-    return violations.verdict();
+    return violations.verdict(true);
   }
 
   private List<String> recordViolations(JsonParser parser, JsonToken token) throws IOException {
@@ -239,7 +239,11 @@ final class RecordSchema {
     /** The response holds only JSON whitespace. */
     record Blank() implements Verdict {}
 
-    record Agrees() implements Verdict {}
+    /**
+     * @param records the number of records
+     * @param array whether the response is a JSON array
+     */
+    record Agrees(int records, boolean array) implements Verdict {}
 
     /**
      * @param reason names no value of the response
@@ -265,9 +269,9 @@ final class RecordSchema {
       records++;
     }
 
-    Verdict verdict() {
+    Verdict verdict(boolean array) {
       if (invalid == 0) {
-        return new Verdict.Agrees();
+        return new Verdict.Agrees(records, array);
       }
       return new Verdict.Rejected(
           invalid

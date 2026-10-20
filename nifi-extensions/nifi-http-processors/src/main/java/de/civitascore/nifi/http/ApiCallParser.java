@@ -70,14 +70,12 @@ final class ApiCallParser {
     List<Parameter> queryParameters =
         parameters(call.queryParameters(), "queryParameters", false, violations);
     List<Parameter> headers = parameters(call.headers(), "headers", true, violations);
-    if (call.pagination() != null && !call.pagination().isNull()) {
-      violations.add("pagination is not supported");
-    }
+    Pagination pagination = PaginationParser.parse(call.pagination(), queryParameters, violations);
 
     if (!violations.isEmpty()) {
       throw new InvalidApiCallException(violations);
     }
-    return new ApiCall(call.name(), method, call.path(), queryParameters, headers);
+    return new ApiCall(call.name(), method, call.path(), queryParameters, headers, pagination);
   }
 
   /** Reads the JSON shape, or adds the one violation that stops the reading. */
@@ -151,7 +149,7 @@ final class ApiCallParser {
     return c == '\t' || (c >= ' ' && c <= '~') || (c >= 0x80 && c <= 0xFF);
   }
 
-  private static boolean notBlank(String text, String path, List<String> violations) {
+  static boolean notBlank(String text, String path, List<String> violations) {
     if (text == null || text.isBlank()) {
       violations.add(path + " must not be blank");
       return false;
@@ -192,7 +190,7 @@ final class ApiCallParser {
       String path,
       List<JsonParameter> queryParameters,
       List<JsonParameter> headers,
-      JsonNode pagination) {}
+      PaginationParser.JsonPagination pagination) {}
 
   record JsonParameter(String name, String value) {}
 }
