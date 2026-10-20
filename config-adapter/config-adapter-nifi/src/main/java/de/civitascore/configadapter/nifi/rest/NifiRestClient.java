@@ -164,9 +164,9 @@ public class NifiRestClient implements AutoCloseable {
   }
 
   /**
-   * Reads the health of the Pipeline in the process group. A bulletin of the stop sink comes before
-   * every other unhealthy state: a stop that did not complete leaves some processors stopped, and
-   * the next poll must still report the stop.
+   * Reads the health of the Pipeline in the process group. An error bulletin of the stop sink comes
+   * before every other unhealthy state: a stop that did not complete leaves some processors
+   * stopped, and the next poll must still report the stop.
    */
   public RuntimeStatus readRuntimeStatus(String processGroupId, JsonNode bulletins)
       throws FatalAdapterException, RetryableAdapterException {
@@ -226,7 +226,10 @@ public class NifiRestClient implements AutoCloseable {
     }
     for (JsonNode entry : bulletins) {
       JsonNode bulletin = entry.path("bulletin");
-      if (stopSinkId.equals(bulletin.path("sourceId").asText())) {
+      // The stop sink logs its cause at error. NiFi also raises framework warnings for it, such as
+      // "Encountering difficulty starting" while it still validates after a deployment.
+      if (stopSinkId.equals(bulletin.path("sourceId").asText())
+          && "ERROR".equals(bulletin.path("level").asText())) {
         String cause = withoutComponentPrefix(bulletin.path("message").asText());
         return Optional.of(
             new RuntimeStatus(RuntimeStatus.State.STOPPED, cause, "", occurredAt(bulletin)));

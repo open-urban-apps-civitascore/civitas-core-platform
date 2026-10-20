@@ -1009,8 +1009,8 @@ class NifiRestClientTest {
     assertEquals(true, status.healthy());
   }
 
-  /** The stop sink next to a processor that NiFi shows as stopped. */
-  private void stubProcessorsWithStopSink() {
+  /** The stop sink next to a processor with the given run status. */
+  private void stubProcessorsWithStopSink(String runStatus) {
     server.stubFor(
         get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/processors"))
             .willReturn(
@@ -1018,7 +1018,9 @@ class NifiRestClientTest {
                     "{ \"processors\": ["
                         + " { \"id\": \"proc-1\", \"component\": { \"name\": \"HttpApiCall\","
                         + " \"validationStatus\": \"VALID\" },"
-                        + " \"status\": { \"runStatus\": \"Stopped\" } },"
+                        + " \"status\": { \"runStatus\": \""
+                        + runStatus
+                        + "\" } },"
                         + " { \"id\": \"proc-stop\", \"component\": { \"name\": \"PipelineStop\","
                         + " \"validationStatus\": \"VALID\" },"
                         + " \"status\": { \"runStatus\": \"Running\" } } ] }")));
@@ -1041,7 +1043,7 @@ class NifiRestClientTest {
 
   @Test
   void aBulletinOfTheStopSinkReportsTheStopWithTheCauseAlone() throws Exception {
-    stubProcessorsWithStopSink();
+    stubProcessorsWithStopSink("Stopped");
 
     NifiRestClient.RuntimeStatus status =
         client.readRuntimeStatus(
@@ -1057,6 +1059,24 @@ class NifiRestClientTest {
     assertEquals(
         "API call \"Get stations\": GET /stations failed with status 404", status.message());
     assertEquals(java.time.Instant.parse("2026-10-20T08:00:00.123Z"), status.occurredAt());
+  }
+
+  @Test
+  void aStartupWarningOfTheStopSinkIsNoStop() throws Exception {
+    stubProcessorsWithStopSink("Running");
+
+    NifiRestClient.RuntimeStatus status =
+        client.readRuntimeStatus(
+            "pg-1",
+            bulletinOf(
+                "proc-stop",
+                "WARNING",
+                "LogMessage[id=6f1c0b8e-0199-1000-ffff-ffffd1c3a2b1] Encountering difficulty"
+                    + " starting. (Validation State is VALIDATING: []). Will continue trying to"
+                    + " start.",
+                "2026-10-20T08:00:00.123Z"));
+
+    assertEquals(NifiRestClient.RuntimeStatus.State.HEALTHY, status.state());
   }
 
   @Test
