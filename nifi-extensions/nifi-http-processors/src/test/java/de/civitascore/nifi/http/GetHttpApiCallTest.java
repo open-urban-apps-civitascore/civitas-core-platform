@@ -924,11 +924,12 @@ class GetHttpApiCallTest {
     }
   }
 
-  @Test
-  void onTrigger_whenAPageIsAJsonObject_routesTheRunToStop() throws InitializationException {
+  @ParameterizedTest
+  @ValueSource(strings = {"{\"stationid\":\"a1\"}", "{\"lat\":1}"})
+  void onTrigger_whenAPageIsAJsonObject_routesTheRunToStop(String object)
+      throws InitializationException {
     try (ApiEndpoint endpoint =
-        ApiEndpoint.answeringInTurn(
-            Response.json(FULL_PAGE), Response.json("{\"stationid\":\"a1\"}"))) {
+        ApiEndpoint.answeringInTurn(Response.json(FULL_PAGE), Response.json(object))) {
       TestRunner runner = paginatedRunner(endpoint, "");
 
       runner.run();
@@ -943,8 +944,11 @@ class GetHttpApiCallTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"42", "\"val-1f3e\"", "<html>val-1f3e</html>"})
-  void onTrigger_whenAPageIsAJsonScalarOrNotJson_routesTheRunToStop(String body)
+  @CsvSource(
+      delimiter = '|',
+      quoteCharacter = '\'',
+      value = {"'\"val-1f3e\"' | string", "42             | number"})
+  void onTrigger_whenAPageIsAJsonScalar_routesTheRunToStop(String body, String kind)
       throws InitializationException {
     try (ApiEndpoint endpoint =
         ApiEndpoint.answeringInTurn(Response.json(FULL_PAGE), Response.json(body))) {
@@ -952,13 +956,28 @@ class GetHttpApiCallTest {
 
       runner.run();
 
-      runner.assertAllFlowFilesTransferred(GetHttpApiCall.STOP, 1);
-      String message =
-          runner
-              .getFlowFilesForRelationship(GetHttpApiCall.STOP)
-              .get(0)
-              .getAttribute(GetHttpApiCall.ERROR_MESSAGE);
-      assertTrue(message.startsWith("API call \"Stations\": page 1: the response is"), message);
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": page 1 is a JSON " + kind + ", not an array");
+    }
+  }
+
+  @Test
+  void onTrigger_whenAPageIsNotJson_routesTheRunToStop() throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(FULL_PAGE), Response.json("<html>val-1f3e</html>"))) {
+      TestRunner runner = paginatedRunner(endpoint, "");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": page 1: the response is not JSON");
     }
   }
 

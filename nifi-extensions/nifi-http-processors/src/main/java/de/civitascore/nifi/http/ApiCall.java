@@ -39,7 +39,7 @@ record ApiCall(
   }
 
   String describe(Page page) {
-    return describe() + page.name().map(name -> " page " + name).orElse("");
+    return describe() + page.title().map(title -> " " + title).orElse("");
   }
 
   /** The name alone, for example {@code API call "Stations"}. */
@@ -48,7 +48,7 @@ record ApiCall(
   }
 
   String label(Page page) {
-    return label() + page.name().map(name -> ": page " + name).orElse("");
+    return label() + page.title().map(title -> ": " + title).orElse("");
   }
 
   /** A query parameter or a header. The value is never null. */

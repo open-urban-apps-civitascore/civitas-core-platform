@@ -26,4 +26,8 @@ record Page(long index, Optional<String> name, List<Parameter> queryParameters) 
   Page {
     queryParameters = List.copyOf(queryParameters);
   }
+
+  Optional<String> title() {
+    return name.map(text -> "page " + text);
+  }
 }

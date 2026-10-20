@@ -122,7 +122,7 @@ final class PageLoop {
       return new PageRead.Failed(ApiCallOutcome.Failure.ofTransport(apiCall.describe(page), e));
     }
     boolean pagesAreArrays = apiCall.pagination().pagesAreArrays();
-    return switch (recordSchema.verdict(session, flowFile)) {
+    return switch (recordSchema.verdict(session, flowFile, pagesAreArrays)) {
       case RecordSchema.Verdict.Blank() -> {
         session.remove(flowFile);
         logNoBody(page, body.status());
@@ -133,11 +133,15 @@ final class PageLoop {
         yield new PageRead.Failed(
             ApiCallOutcome.Failure.ofRejectedBody(apiCall.label(page), body.status(), reason));
       }
-      case RecordSchema.Verdict.Agrees(int records, boolean array) -> {
-        if (pagesAreArrays && !array) {
-          session.remove(flowFile);
-          yield new PageRead.Failed(notAnArray(page, body.status()));
-        }
+      case RecordSchema.Verdict.WrongType wrongType -> {
+        session.remove(flowFile);
+        yield new PageRead.Failed(
+            ApiCallOutcome.Failure.ofRejectedBody(
+                apiCall.label(),
+                body.status(),
+                wrongType.reason(page.title().orElse("the response"))));
+      }
+      case RecordSchema.Verdict.Agrees(int records) -> {
         if (!pagesAreArrays || records > 0) {
           pages.add(session.putAllAttributes(flowFile, attributes(page, body.status())));
         } else {
@@ -146,13 +150,6 @@ final class PageLoop {
         yield new PageRead.Records(records);
       }
     };
-  }
-
-  private ApiCallOutcome.Failure notAnArray(Page page, int status) {
-    return ApiCallOutcome.Failure.ofRejectedBody(
-        apiCall.label(),
-        status,
-        "page " + page.name().orElseThrow() + " is a JSON object, not an array");
   }
 
   private Map<String, String> attributes(Page page, int status) {
@@ -169,7 +166,7 @@ final class PageLoop {
         "{} {}{} returned {} without a body",
         apiCall.method().name(),
         apiCall.path(),
-        page.name().map(name -> " page " + name).orElse(""),
+        page.title().map(title -> " " + title).orElse(""),
         status);
   }
 
