@@ -30,6 +30,7 @@ import de.civitascore.configadapter.nifi.mapping.CompiledMapping;
 import de.civitascore.configadapter.nifi.mapping.ForkPlan;
 import de.civitascore.configadapter.nifi.mapping.FrostPortPlan;
 import de.civitascore.configadapter.nifi.mapping.SinkPort;
+import de.civitascore.configadapter.nifi.rest.NifiRestClient;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -732,6 +733,21 @@ class NifiFlowBuilderTest {
     JsonNode writer = component(flow, "controllerServices", "JsonRecordSetWriter");
     assertEquals(
         "inherit-record-schema", writer.get("properties").get("Schema Access Strategy").asText());
+  }
+
+  @Test
+  void flowsWithoutAStopSourceHaveNoStopPath() throws Exception {
+    for (FlowBuildSpec spec : List.of(mqttToPostgis(mapping()), sqlToPostgis())) {
+      JsonNode flow = build(spec);
+
+      for (JsonNode processor : flow.get("flowContents").get("processors")) {
+        assertFalse(
+            processor.path("type").asText().endsWith("UpdateAttribute"), spec.sourceType().name());
+        assertFalse(
+            NifiRestClient.STOP_SINK.equals(processor.path("name").asText()),
+            spec.sourceType().name());
+      }
+    }
   }
 
   @Test

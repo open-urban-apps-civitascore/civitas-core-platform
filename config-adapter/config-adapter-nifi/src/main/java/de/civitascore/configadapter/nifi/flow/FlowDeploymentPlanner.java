@@ -143,7 +143,11 @@ public class FlowDeploymentPlanner {
     String snapshot;
     try {
       sourceStage.bind(
-          source, path.source(), sourceNodeKey(request.pipelineId(), path.source()), out);
+          source,
+          request.artifacts(),
+          path.source(),
+          sourceNodeKey(request.pipelineId(), path.source()),
+          out);
       bindSink(sinkStage, sink, out);
       snapshot =
           flowBuilder.build(

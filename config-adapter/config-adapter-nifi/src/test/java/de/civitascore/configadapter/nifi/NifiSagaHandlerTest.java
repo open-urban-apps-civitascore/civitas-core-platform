@@ -573,10 +573,18 @@ class NifiSagaHandlerTest {
             "ds-http",
             map(
                 """
-                { "connectionType": "http", "baseUrl": "https://api.example.org/v1",
+                { "id": "ds-http", "connectionType": "http", "element": "el-http",
+                  "baseUrl": "https://api.example.org/v1",
                   "authentication": { "type": "NONE" },
                   "apiCalls": [ { "name": "stations", "method": "GET", "path": "/stations",
                     "headers": [ { "name": "Accept", "value": "application/json" } ] } ] }
+                """));
+    artifacts(payload)
+        .put(
+            "el-http",
+            map(
+                """
+                { "type": "object", "properties": { "stationid": { "type": "string" } } }
                 """));
     pipelines(payload)
         .add(
@@ -698,6 +706,33 @@ class NifiSagaHandlerTest {
     for (String expected : named) {
       assertTrue(detail.contains(expected), detail);
     }
+    verifyNoInteractions(restClient);
+  }
+
+  static List<Arguments> httpPipelinesWithoutTheirDataStructure() {
+    return List.of(
+        Arguments.of(
+            "no element",
+            (Consumer<Map<String, Object>>) payload -> httpSource(payload).remove("element")),
+        Arguments.of(
+            "no artifact for the element",
+            (Consumer<Map<String, Object>>) payload -> artifacts(payload).remove("el-http")));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("httpPipelinesWithoutTheirDataStructure")
+  void httpPipelineWithoutItsDataStructureIsRefusedBeforeTheFirstNifiCall(
+      String condition, Consumer<Map<String, Object>> defect) throws Exception {
+    Map<String, Object> payload = deployPayloadWithHttpPipeline();
+    defect.accept(payload);
+
+    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+
+    assertEquals(INVALID_PAYLOAD_ERROR, result.error());
+    @SuppressWarnings("unchecked")
+    Map<String, Object> status = (Map<String, Object>) result.resultData().get("pipelineStatus");
+    String detail = String.valueOf(status.get("stacktrace"));
+    assertTrue(detail.contains("'ds-http'"), detail);
     verifyNoInteractions(restClient);
   }
 

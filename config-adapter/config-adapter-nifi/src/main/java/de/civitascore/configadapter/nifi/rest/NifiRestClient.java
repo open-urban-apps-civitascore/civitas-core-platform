@@ -53,6 +53,9 @@ import org.slf4j.LoggerFactory;
  */
 public class NifiRestClient implements AutoCloseable {
 
+  /** The name of the processor whose bulletin means that the platform stops the Pipeline. */
+  public static final String STOP_SINK = "PipelineStop";
+
   private static final Logger LOG = LoggerFactory.getLogger(NifiRestClient.class);
   private static final String API = "/nifi-api";
   private static final String CLIENT_ID = "config-adapter-nifi";

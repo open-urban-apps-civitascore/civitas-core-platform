@@ -1,0 +1,60 @@
+{
+  "name": "PipelineStop",
+  "comments": "Stop sink: a FlowFile here means a fatal error. The runtime monitor finds this processor by its name, stops the process group when it raises a bulletin, and reports the logged cause as the STOPPED status of the Pipeline.",
+  "position": {
+    "x": 400.0,
+    "y": 600.0
+  },
+  "type": "org.apache.nifi.processors.standard.LogMessage",
+  "bundle": {
+    "group": "org.apache.nifi",
+    "artifact": "nifi-standard-nar",
+    "version": "2.9.0"
+  },
+  "properties": {
+    "log-level": "error",
+    "log-prefix": null,
+    "log-message": "${core.stop.cause}"
+  },
+  "propertyDescriptors": {
+    "log-level": {
+      "name": "log-level",
+      "displayName": "Log Level",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "log-prefix": {
+      "name": "log-prefix",
+      "displayName": "Log prefix",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "log-message": {
+      "name": "log-message",
+      "displayName": "Log message",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    }
+  },
+  "style": {},
+  "schedulingPeriod": "0 sec",
+  "schedulingStrategy": "TIMER_DRIVEN",
+  "executionNode": "ALL",
+  "penaltyDuration": "30 sec",
+  "yieldDuration": "1 sec",
+  "bulletinLevel": "WARN",
+  "runDurationMillis": 0,
+  "concurrentlySchedulableTaskCount": 1,
+  "autoTerminatedRelationships": [
+    "success"
+  ],
+  "scheduledState": "ENABLED",
+  "retryCount": 10,
+  "retriedRelationships": [],
+  "backoffMechanism": "PENALIZE_FLOWFILE",
+  "maxBackoffPeriod": "10 mins",
+  "componentType": "PROCESSOR"
+}

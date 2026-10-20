@@ -9,6 +9,8 @@
  */
 package de.civitascore.configadapter.nifi.flow;
 
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.HTTP_ELEMENT;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.MAPPINGS;
 import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.graphWithHttpSource;
 import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.httpSource;
 import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.planner;
@@ -18,12 +20,19 @@ import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.stretchedK
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.crypto.CredentialEncryptor;
+import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
+import de.civitascore.configadapter.nifi.rest.NifiRestClient;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -36,15 +45,54 @@ class FlowDeploymentPlannerHttpSourceTest {
   private final ObjectMapper mapper = new ObjectMapper();
 
   private DeploymentPlan plan(String apiCallName, String authenticationJson) throws Exception {
+    return plan(apiCallName, httpSource(authenticationJson), MAPPINGS);
+  }
+
+  private DeploymentPlan plan(
+      String apiCallName, Datasource source, Map<String, Map<String, Object>> artifacts)
+      throws Exception {
     try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
       return planner(resolver)
           .plan(
-              req(
+              new PipelineDeploymentRequest(
                   "p-http",
                   graphWithHttpSource(apiCallName, CRON),
-                  httpSource(authenticationJson),
-                  postgisSink()));
+                  source,
+                  postgisSink(),
+                  artifacts));
     }
+  }
+
+  private FatalAdapterException refusal(
+      Datasource source, Map<String, Map<String, Object>> artifacts) {
+    return assertThrows(FatalAdapterException.class, () -> plan("stations", source, artifacts));
+  }
+
+  private static Map<String, Map<String, Object>> artifactsWithDataStructure(
+      Map<String, Object> dataStructure) {
+    Map<String, Map<String, Object>> artifacts = new LinkedHashMap<>(MAPPINGS);
+    artifacts.put(HTTP_ELEMENT, dataStructure);
+    return artifacts;
+  }
+
+  private JsonNode processorNamed(JsonNode flow, String name) {
+    for (JsonNode processor : flow.path("flowContents").path("processors")) {
+      if (name.equals(processor.path("name").asText())) {
+        return processor;
+      }
+    }
+    throw new AssertionError("no processor named " + name);
+  }
+
+  private List<JsonNode> connectionsFrom(JsonNode flow, String sourceId, String relationship) {
+    List<JsonNode> found = new ArrayList<>();
+    for (JsonNode connection : flow.path("flowContents").path("connections")) {
+      if (sourceId.equals(connection.path("source").path("id").asText())
+          && connection.path("selectedRelationships").toString().contains(relationship)) {
+        found.add(connection);
+      }
+    }
+    return found;
   }
 
   private List<JsonNode> processorsOfType(JsonNode flow, String typeSuffix) {
@@ -77,6 +125,93 @@ class FlowDeploymentPlannerHttpSourceTest {
               "headers": [ { "name": "Accept", "value": "application/json" } ] }
             """),
         mapper.readTree(properties.path("API Call").asText()));
+  }
+
+  @Test
+  void recordSchemaIsTheDataStructureThatTheDataSourceNames() throws Exception {
+    JsonNode properties = httpProcessor(plan("stations", null)).path("properties");
+
+    assertEquals(
+        mapper.valueToTree(MAPPINGS.get(HTTP_ELEMENT)),
+        mapper.readTree(properties.path("Record Schema").asText()));
+  }
+
+  @Test
+  void dataSourceWithoutDataStructureIsRefusedAsInvalidPayload() throws Exception {
+    Datasource source = httpSource(null);
+    source.handleUnknownProperty("element", null);
+
+    FatalAdapterException refusal = refusal(source, MAPPINGS);
+
+    assertEquals(AdapterErrorCode.INVALID_PAYLOAD, refusal.getErrorCode());
+    assertTrue(refusal.getInternalMessage().contains("'h1'"), refusal.getInternalMessage());
+  }
+
+  @Test
+  void dataStructureMissingFromTheArtifactsIsRefusedAsInvalidPayload() throws Exception {
+    Map<String, Map<String, Object>> artifacts = new LinkedHashMap<>(MAPPINGS);
+    artifacts.remove(HTTP_ELEMENT);
+
+    FatalAdapterException refusal = refusal(httpSource(null), artifacts);
+
+    assertEquals(AdapterErrorCode.INVALID_PAYLOAD, refusal.getErrorCode());
+    assertTrue(refusal.getInternalMessage().contains("'h1'"), refusal.getInternalMessage());
+    assertTrue(refusal.getInternalMessage().contains(HTTP_ELEMENT), refusal.getInternalMessage());
+  }
+
+  @Test
+  void parameterReferenceInTheDataStructureIsRefusedByTheLiteralCheck() throws Exception {
+    Map<String, Map<String, Object>> artifacts =
+        artifactsWithDataStructure(
+            Map.of("type", "object", "description", "reads #{secret} on import"));
+
+    FatalAdapterException refusal = refusal(httpSource(null), artifacts);
+
+    assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, refusal.getErrorCode());
+    assertTrue(
+        refusal.getInternalMessage().contains("Record Schema"), refusal.getInternalMessage());
+  }
+
+  @Test
+  void stopOfTheProcessorEndsInTheStopSinkThroughAStopStamp() throws Exception {
+    JsonNode flow = mapper.readTree(plan("stations", null).snapshotJson());
+    String processorId = httpProcessor(plan("stations", null)).path("identifier").asText();
+    JsonNode stopSink = processorNamed(flow, NifiRestClient.STOP_SINK);
+
+    List<JsonNode> toStamp = connectionsFrom(flow, processorId, "\"stop\"");
+    assertEquals(1, toStamp.size());
+    String stampId = toStamp.getFirst().path("destination").path("id").asText();
+    JsonNode stamp = null;
+    for (JsonNode processor : processorsOfType(flow, "UpdateAttribute")) {
+      if (stampId.equals(processor.path("identifier").asText())) {
+        stamp = processor;
+      }
+    }
+    assertNotNull(stamp, "the stop relationship ends in an UpdateAttribute");
+    assertEquals(
+        "${http.error.message}", stamp.path("properties").path("core.stop.cause").asText());
+    List<JsonNode> toSink = connectionsFrom(flow, stampId, "\"success\"");
+    assertEquals(1, toSink.size());
+    assertEquals(
+        stopSink.path("identifier").asText(),
+        toSink.getFirst().path("destination").path("id").asText());
+    assertFalse(
+        httpProcessor(plan("stations", null))
+            .path("autoTerminatedRelationships")
+            .toString()
+            .contains("stop"));
+  }
+
+  @Test
+  void stopSinkLogsTheCauseAtErrorWithoutAPrefix() throws Exception {
+    JsonNode flow = mapper.readTree(plan("stations", null).snapshotJson());
+
+    JsonNode properties = processorNamed(flow, NifiRestClient.STOP_SINK).path("properties");
+
+    assertEquals("error", properties.path("log-level").asText());
+    assertEquals("${core.stop.cause}", properties.path("log-message").asText());
+    assertTrue(properties.path("log-prefix").isNull());
+    assertEquals(1, processorsOfType(flow, "UpdateAttribute").size());
   }
 
   @Test

@@ -74,7 +74,12 @@ class StageRegistryTest {
       }
 
       @Override
-      public void bind(Datasource source, GraphNode node, String sourceNodeKey, PlanContext out) {}
+      public void bind(
+          Datasource source,
+          Map<String, Map<String, Object>> artifacts,
+          GraphNode node,
+          String sourceNodeKey,
+          PlanContext out) {}
 
       @Override
       public StageResult build(BuildContext ctx) {
