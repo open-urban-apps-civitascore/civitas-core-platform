@@ -286,12 +286,12 @@ saga-e2e-test-backend:
     reports:
       junit: portal-backend/target/failsafe-reports/TEST-*.xml
 
-# The NARs of the NiFi extensions for the NiFi of the API test. The saga collections deploy FROST
-# Pipelines, and a FROST flow writes through PutFrostRecord, so NiFi has to carry the FROST NAR. The
-# NARs are built here on the rules of the API test, not taken from the extensions lane: that lane
-# runs only when the extensions change, and the API test would then lose its FROST Pipelines in
-# every other MR.
-build-frost-nar-api-test:
+# The NARs of the NiFi extensions for the NiFi of the API test. The saga collections deploy
+# Pipelines that write through PutFrostRecord and read through GetHttpApiCall, so NiFi has to carry
+# every NAR. The NARs are built here on the rules of the API test, not taken from the extensions
+# lane: that lane runs only when the extensions change, and the API test would then lose those
+# Pipelines in every other MR.
+build-nifi-nars-api-test:
   extends: .api-test-stack-changes
   image: maven:3.9-eclipse-temurin-25
   stage: build-package
@@ -334,7 +334,7 @@ api-test-backend:
     - job: build-authz
       artifacts: true
       optional: true
-    - job: build-frost-nar-api-test
+    - job: build-nifi-nars-api-test
       artifacts: true
 
   services:
@@ -407,7 +407,7 @@ api-test-backend:
       docker cp bruno-runner:/tests/bruno-output.txt bruno-results.txt || true
       # On bruno failure, dump service logs so we can diagnose 500s etc.
       if [ "$BRUNO_EXIT" != "0" ]; then
-        for svc in portal-backend config-adapter kafka apisix frost; do
+        for svc in portal-backend config-adapter kafka apisix frost nifi wiremock; do
           echo "=== $svc logs (last 300 lines) ==="
           docker compose -p api-test $COMPOSE_FILES logs --tail=300 --no-color "$svc" 2>&1 | tee "${svc}-logs.txt" || true
         done
@@ -425,6 +425,8 @@ api-test-backend:
       - kafka-logs.txt
       - apisix-logs.txt
       - frost-logs.txt
+      - nifi-logs.txt
+      - wiremock-logs.txt
     expire_in: 30 days
 
 report-test-backend:
