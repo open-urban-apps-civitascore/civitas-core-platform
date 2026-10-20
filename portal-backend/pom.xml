@@ -337,6 +337,28 @@
 
     <build>
         <plugins>
+            <!-- Keep the development startup migration runner on the backend classpath so it
+                 can execute both SQL migrations and Java migrations from src/main/java. -->
+            <plugin>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-maven-plugin</artifactId>
+                <version>${flyway.version}</version>
+                <configuration>
+                    <locations>
+                        <location>classpath:db/migration</location>
+                    </locations>
+                    <baselineOnMigrate>true</baselineOnMigrate>
+                    <baselineVersion>1.0.0</baselineVersion>
+                </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.flywaydb</groupId>
+                        <artifactId>flyway-database-postgresql</artifactId>
+                        <version>${flyway.version}</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+
             <!-- Maven Dependency Plugin - Generate dependency tree JSON for license scanning -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

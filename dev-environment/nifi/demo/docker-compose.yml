@@ -3,8 +3,8 @@
 # Spun up manually (NOT wired into start-portal-dev.sh):
 #   cd dev-environment/nifi/demo && docker compose up -d
 #
-# Both containers join civitas-network so the existing civitas-nifi container
-# can reach mosquitto:1883 and postgis-demo:5432.
+# The broker joins civitas-network. The demo writes to the shared PostGIS database
+# `nifi_demo` on postgis-dev-env, which must be running first.
 
 services:
   mosquitto:
@@ -19,33 +19,6 @@ services:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
     networks:
       - civitas-network
-
-  postgis-demo:
-    image: postgis/postgis:17-3.5-alpine@sha256:894f570c0cf0664ed5576a8fd5d5bfb8fb1b19d592885b686c3a88c8bd90c41f
-    container_name: civitas-nifi-demo-postgis
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: nifi_demo
-      POSTGRES_USER: nifi
-      POSTGRES_PASSWORD: nifi-demo-password
-      POSTGRES_HOST_AUTH_METHOD: md5
-      POSTGRES_INITDB_ARGS: "--auth-host=md5"
-    # 5434 is taken by dev-environment/geoserver's PostGIS (civitas-geoserver-db).
-    ports:
-      - "5435:5432"
-    volumes:
-      - ./init:/docker-entrypoint-initdb.d:ro
-      - postgis_demo_data:/var/lib/postgresql/data
-    networks:
-      - civitas-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nifi -d nifi_demo"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-volumes:
-  postgis_demo_data:
 
 networks:
   civitas-network:

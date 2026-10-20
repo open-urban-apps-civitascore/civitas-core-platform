@@ -2,7 +2,7 @@
 # teardown-test-users.sh — Remove E2E test users from PostgreSQL and Keycloak.
 #
 # Prerequisites: curl, jq, and one of: psql (local) OR docker/sudo docker
-#                (falls back to docker exec into civitas-postgres-portal)
+#                (falls back to docker exec into postgis-dev-env)
 # Usage:         bash e2e/scripts/teardown-test-users.sh
 #
 # Idempotent: safe to run even if users have already been removed.
@@ -17,7 +17,7 @@ PG_PORT="${PG_PORT:-5432}"
 PG_DB="${PG_DB:-portal_backend}"
 PG_USER="${PG_USER:-admin}"
 PG_PASSWORD="${PG_PASSWORD:-admin}"
-PG_CONTAINER="${PG_CONTAINER:-civitas-postgres-portal}"
+PG_CONTAINER="${PG_CONTAINER:-postgis-dev-env}"
 
 KC_URL="${KC_URL:-http://localhost:8080}"
 KC_REALM="${KC_REALM:-civitas-core}"

@@ -1,6 +1,6 @@
 # Keeps api/portal-backend/openapi.yaml in sync with the description the running backend serves.
 
-# Starts the portal-backend with only the services it needs to boot (postgres-portal, Kafka,
+# Starts the portal-backend with only the services it needs to boot (postgis-dev-env, Kafka,
 # Keycloak) and exports the springdoc description as the artifact openapi.generated.yaml.
 # This job is separate from api-test-backend, so the export does not wait for the Bruno run,
 # a failed Bruno test does not stop the export, and a failed export does not stop the tests.

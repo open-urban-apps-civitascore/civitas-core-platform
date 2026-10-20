@@ -79,7 +79,7 @@ WRITER=$(mk_cs "org.apache.nifi.json.JsonRecordSetWriter" "JsonRecordSetWriter" 
 
 echo ">> create DBCPConnectionPool" >&2
 DBCP=$(mk_cs "org.apache.nifi.dbcp.DBCPConnectionPool" "PostGISConnectionPool" '{
-  "Database Connection URL": "jdbc:postgresql://civitas-nifi-demo-postgis:5432/nifi_demo",
+  "Database Connection URL": "jdbc:postgresql://postgis:5432/nifi_demo",
   "Database Driver Class Name": "org.postgresql.Driver",
   "Database Driver Locations": "/opt/nifi/drivers/postgresql.jar",
   "Database User": "nifi",

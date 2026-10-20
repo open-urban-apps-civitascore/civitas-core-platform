@@ -55,7 +55,7 @@ x-gs-healthcheck: &gs_healthcheck
 services:
   # ── Databases ──────────────────────────────────────────────
 
-  postgres-portal:
+  postgis-dev-env:
     build:
       context: .
       dockerfile_inline: |
@@ -233,12 +233,12 @@ services:
     # to build from source when JAR artifacts are available.
     image: ${CI_REGISTRY_IMAGE}/authz-repo-service:${IMAGE_TAG:-develop}
     environment:
-      DATABASE_URL: jdbc:postgresql://postgres-portal:5432/portal_backend
+      DATABASE_URL: jdbc:postgresql://postgis-dev-env:5432/portal_backend
       DATABASE_USERNAME: admin
       DATABASE_PASSWORD: admin
       SERVER_PORT: 8091
     depends_on:
-      postgres-portal:
+      postgis-dev-env:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8091/actuator/health"]
@@ -471,7 +471,7 @@ services:
     # to build from source when JAR artifacts are available.
     image: ${CI_REGISTRY_IMAGE}/backend-portal:${IMAGE_TAG:-develop}
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-portal:5432/portal_backend
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgis-dev-env:5432/portal_backend
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: admin
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
@@ -488,7 +488,7 @@ services:
       # real Keycloak URL; the export-openapi-spec job sets an example.org URL instead.
       OPENAPI_OAUTH_SERVER_URL: ${OPENAPI_OAUTH_SERVER_URL:-}
     depends_on:
-      postgres-portal:
+      postgis-dev-env:
         condition: service_healthy
       kafka:
         condition: service_healthy
@@ -568,7 +568,7 @@ services:
       POSTGIS_JDBC_URL: jdbc:postgresql://postgres-sink:5432/geosink
       POSTGIS_JDBC_USER: geosink
       POSTGIS_JDBC_PASSWORD: geosink
-      FLOWABLE_JDBC_URL: jdbc:postgresql://postgres-portal:5432/flowable
+      FLOWABLE_JDBC_URL: jdbc:postgresql://postgis-dev-env:5432/flowable
       FLOWABLE_JDBC_USERNAME: admin
       FLOWABLE_JDBC_PASSWORD: admin
       # GeoServer Cloud REST (via the gateway): the dataset saga runs CREATE_WORKSPACE /
@@ -583,8 +583,8 @@ services:
       GEOSERVER_POSTGIS_USER: geosink
       GEOSERVER_POSTGIS_PASSWORD: geosink
     depends_on:
-      # Flowable's JDBC URL targets postgres-portal — wait until it is healthy before boot.
-      postgres-portal:
+      # Flowable's JDBC URL targets postgis-dev-env — wait until it is healthy before boot.
+      postgis-dev-env:
         condition: service_healthy
       # The PostGIS saga handler opens its DDL connection at init — wait for the sink DB.
       postgres-sink:
