@@ -109,7 +109,7 @@ final class NifiRuntimeMonitor implements AutoCloseable {
       if (status.state() == RuntimeStatus.State.STOPPED) {
         stop(pipeline, status);
       } else if (shouldPublish(pipeline, status)) {
-        publish(event(pipeline, status.healthy() ? "OK" : "ERROR", status));
+        publish(event(pipeline, status));
       }
     } catch (AdapterException | IllegalStateException e) {
       if (e instanceof AdapterException adapterException
@@ -126,7 +126,7 @@ final class NifiRuntimeMonitor implements AutoCloseable {
   private void stop(Pipeline pipeline, RuntimeStatus status)
       throws FatalAdapterException, RetryableAdapterException {
     client.stopProcessGroup(pipeline.processGroupId());
-    publish(event(pipeline, "STOPPED", status));
+    publish(event(pipeline, status));
     stoppedPipelines.add(pipeline.pipelineId());
     pipelines.remove(pipeline.pipelineId(), pipeline);
   }
@@ -161,13 +161,13 @@ final class NifiRuntimeMonitor implements AutoCloseable {
     return false;
   }
 
-  private Map<String, Object> event(Pipeline pipeline, String state, RuntimeStatus status) {
+  private Map<String, Object> event(Pipeline pipeline, RuntimeStatus status) {
     Map<String, Object> event = new HashMap<>();
     event.put("type", "PIPELINE_STATUS_CHANGED");
     event.put("eventId", UUID.randomUUID().toString());
     event.put("datasetId", pipeline.datasetId());
     event.put("pipelineId", pipeline.pipelineId());
-    event.put("status", state);
+    event.put("status", eventStatus(status.state()));
     event.put("source", "RUNTIME");
     event.put(
         "message", sanitize(status.message() == null ? "Pipeline is running" : status.message()));
@@ -176,6 +176,14 @@ final class NifiRuntimeMonitor implements AutoCloseable {
         "occurredAt",
         status.occurredAt() == null ? Instant.now().toString() : status.occurredAt().toString());
     return event;
+  }
+
+  private static String eventStatus(RuntimeStatus.State state) {
+    return switch (state) {
+      case HEALTHY -> "OK";
+      case ERROR -> "ERROR";
+      case STOPPED -> "STOPPED";
+    };
   }
 
   private static String sanitize(String value) {
