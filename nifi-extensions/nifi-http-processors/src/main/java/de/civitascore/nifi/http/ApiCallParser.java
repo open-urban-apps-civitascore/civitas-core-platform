@@ -70,12 +70,14 @@ final class ApiCallParser {
     List<Parameter> queryParameters =
         parameters(call.queryParameters(), "queryParameters", false, violations);
     List<Parameter> headers = parameters(call.headers(), "headers", true, violations);
-    Pagination pagination = PaginationParser.parse(call.pagination(), queryParameters, violations);
+    Optional<Pagination> pagination =
+        PaginationParser.parse(call.pagination(), queryParameters, violations);
 
     if (!violations.isEmpty()) {
       throw new InvalidApiCallException(violations);
     }
-    return new ApiCall(call.name(), method, call.path(), queryParameters, headers, pagination);
+    return new ApiCall(
+        call.name(), method, call.path(), queryParameters, headers, pagination.orElseThrow());
   }
 
   /** Reads the JSON shape, or adds the one violation that stops the reading. */

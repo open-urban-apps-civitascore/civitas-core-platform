@@ -11,6 +11,7 @@ package de.civitascore.nifi.http;
 
 import de.civitascore.nifi.http.ApiCall.Parameter;
 import java.util.List;
+import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
@@ -25,35 +26,36 @@ final class PaginationParser {
   private PaginationParser() {}
 
   /**
-   * Reads the pagination of an API call.
-   *
    * @param queryParameters the query parameters of the API call, which the parameter names of the
    *     pagination must not repeat
    * @param violations receives one violation for each broken rule
-   * @return {@link SinglePage} when the pagination is absent, null when it breaks a rule
+   * @return {@link SinglePage} when the pagination is absent, empty when it breaks a rule
    */
-  static Pagination parse(
+  static Optional<Pagination> parse(
       JsonPagination pagination, List<Parameter> queryParameters, List<String> violations) {
     if (pagination == null) {
-      return new SinglePage();
+      return Optional.of(new SinglePage());
     }
     if (!PAGE_NUMBER.equals(pagination.type())) {
       violations.add("pagination.type must be " + PAGE_NUMBER);
-      return null;
+      return Optional.empty();
     }
     int before = violations.size();
     checkParameterNames(pagination, queryParameters, violations);
     int startPage = pagination.startPage() == null ? 0 : pagination.startPage();
     checkNumbers(pagination, startPage, violations);
     if (violations.size() > before) {
-      return null;
+      return Optional.empty();
     }
-    return new PageNumberPagination(
-        pagination.pageParameter(),
-        pagination.pageSizeParameter(),
-        pagination.pageSize(),
-        startPage,
-        pagination.endPage() == null ? OptionalInt.empty() : OptionalInt.of(pagination.endPage()));
+    return Optional.of(
+        new PageNumberPagination(
+            pagination.pageParameter(),
+            pagination.pageSizeParameter(),
+            pagination.pageSize(),
+            startPage,
+            pagination.endPage() == null
+                ? OptionalInt.empty()
+                : OptionalInt.of(pagination.endPage())));
   }
 
   /** A request must never send one name with two values, so the names must not collide. */
