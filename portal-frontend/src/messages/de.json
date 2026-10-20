@@ -320,9 +320,6 @@
             "errorLabel": "Fehler",
             "errorDetails": "Fehlerdetails für {name}",
             "errorToast": "Pipeline „{name}“: {message}",
-            "stoppedLabel": "Gestoppt",
-            "stoppedDetails": "Details zum Stopp von {name}",
-            "restartHint": "Heben Sie die Freigabe des Datensatzes auf und geben Sie ihn erneut frei, damit diese Pipeline wieder läuft.",
             "menuLabel": "Aktionen für {name}",
             "actions": {
               "open": "Öffnen",

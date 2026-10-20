@@ -19,45 +19,6 @@ import { PipelineBasicInfo } from '@/types/datasets'
 import { formatDate } from '@/utils/formatDate'
 import { PipelineDeleteBlockReason } from '@/utils/pipelineDeleteGuard'
 
-interface RuntimeStatusBadgeProps {
-  title: string
-  ariaLabel: string
-  cause?: string | null
-  occurredAt?: string | null
-  stacktrace?: string | null
-  hint?: string
-}
-
-const RuntimeStatusBadge = (props: RuntimeStatusBadgeProps) => {
-  const { title, ariaLabel, cause, occurredAt, stacktrace, hint } = props
-  return (
-    <BasicTooltip
-      tooltipContent={
-        <div className="space-y-2 text-left text-sm">
-          {cause && <p>{cause}</p>}
-          {occurredAt && <p>{occurredAt}</p>}
-          {stacktrace && (
-            <pre className="max-h-48 max-w-[480px] overflow-auto whitespace-pre-wrap text-xs">{stacktrace}</pre>
-          )}
-          {hint && <p>{hint}</p>}
-        </div>
-      }
-    >
-      <button
-        type="button"
-        aria-label={ariaLabel}
-        className="inline-flex items-center border-none bg-transparent p-0"
-        onClick={e => {
-          e.preventDefault()
-          e.stopPropagation()
-        }}
-      >
-        <ActivityBadge isActive={false} title={title} />
-      </button>
-    </BasicTooltip>
-  )
-}
-
 interface PipelineCardProps {
   datasetId: string
   pipeline: PipelineBasicInfo
@@ -82,12 +43,9 @@ export const PipelineCard = ({
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [isDeleteBlockedOpen, setIsDeleteBlockedOpen] = useState(false)
 
-  const runtimeStatus = pipeline.runtimeStatus
-  const hasError = runtimeStatus?.state === 'ERROR'
-  const isStopped = runtimeStatus?.state === 'STOPPED'
-  const isActive = runtimeStatus?.state === 'OK'
-  const hasBadges = hasError || isStopped || isActive || badges.length > 0
-  const occurredAt = runtimeStatus?.occurredAt ? formatDate(runtimeStatus.occurredAt, locale) : null
+  const hasError = pipeline.runtimeStatus?.state === 'ERROR'
+  const isActive = pipeline.runtimeStatus?.state === 'OK'
+  const hasBadges = hasError || isActive || badges.length > 0
 
   const editorUrl = `/datasets/${datasetId}/data-flow/pipeline-editor?pipeline=${pipeline.id}`
 
@@ -168,22 +126,33 @@ export const PipelineCard = ({
               data-testid={`pipelineCardBadges-${pipeline.id}`}
             >
               {hasError && (
-                <RuntimeStatusBadge
-                  title={t('errorLabel')}
-                  ariaLabel={t('errorDetails', { name: pipeline.name })}
-                  cause={runtimeStatus?.message ?? t('pipelineError')}
-                  occurredAt={occurredAt}
-                  stacktrace={runtimeStatus?.sanitizedStacktrace}
-                />
-              )}
-              {isStopped && (
-                <RuntimeStatusBadge
-                  title={t('stoppedLabel')}
-                  ariaLabel={t('stoppedDetails', { name: pipeline.name })}
-                  cause={runtimeStatus?.message}
-                  occurredAt={occurredAt}
-                  hint={t('restartHint')}
-                />
+                <BasicTooltip
+                  tooltipContent={
+                    <div className="space-y-2 text-left text-sm">
+                      <p>{pipeline.runtimeStatus?.message ?? t('pipelineError')}</p>
+                      {pipeline.runtimeStatus?.occurredAt && (
+                        <p>{formatDate(pipeline.runtimeStatus.occurredAt, locale)}</p>
+                      )}
+                      {pipeline.runtimeStatus?.sanitizedStacktrace && (
+                        <pre className="max-h-48 max-w-[480px] overflow-auto whitespace-pre-wrap text-xs">
+                          {pipeline.runtimeStatus.sanitizedStacktrace}
+                        </pre>
+                      )}
+                    </div>
+                  }
+                >
+                  <button
+                    type="button"
+                    aria-label={t('errorDetails', { name: pipeline.name })}
+                    className="inline-flex items-center border-none bg-transparent p-0"
+                    onClick={e => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                    }}
+                  >
+                    <ActivityBadge isActive={false} title={t('errorLabel')} />
+                  </button>
+                </BasicTooltip>
               )}
               {isActive && <ActivityBadge isActive title={t('activeLabel')} />}
               {badges.map(label => (

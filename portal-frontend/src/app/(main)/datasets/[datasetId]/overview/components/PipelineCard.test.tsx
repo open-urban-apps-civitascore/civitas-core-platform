@@ -120,29 +120,6 @@ describe('PipelineCard', () => {
     })
   })
 
-  describe('Stopped status', () => {
-    it('shows the Stopped badge with the cause and the restart hint', async () => {
-      renderComponent({
-        pipeline: makePipeline({
-          runtimeStatus: {
-            state: 'STOPPED',
-            message: 'API call "Get stations": GET /stations failed with status 404',
-            occurredAt: '2024-01-01T00:00:00Z',
-          },
-        }),
-      })
-      expect(screen.getByText('stoppedLabel')).toBeInTheDocument()
-      expect(screen.queryByText('errorLabel')).not.toBeInTheDocument()
-
-      await userEvent.hover(screen.getByRole('button', { name: 'stoppedDetails' }))
-
-      expect(
-        (await screen.findAllByText('API call "Get stations": GET /stations failed with status 404')).length,
-      ).toBeGreaterThan(0)
-      expect(screen.getAllByText('restartHint').length).toBeGreaterThan(0)
-    })
-  })
-
   describe('Three-dot menu', () => {
     it('does not navigate the card when the menu trigger is clicked', () => {
       renderComponent()
