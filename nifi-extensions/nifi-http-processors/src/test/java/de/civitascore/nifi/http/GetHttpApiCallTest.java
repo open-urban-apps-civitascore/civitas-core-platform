@@ -861,6 +861,7 @@ class GetHttpApiCallTest {
       assertEquals(
           List.of("status=active&page=5&size=2", "status=active&page=6&size=2"),
           rawQueries(endpoint));
+      assertPages(runner, "5", "6");
     }
   }
 
