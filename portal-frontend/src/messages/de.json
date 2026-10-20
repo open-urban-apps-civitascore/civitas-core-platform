@@ -898,7 +898,9 @@
     "searchRoles": "Rollen durchsuchen",
     "tabLabels": {
       "basicInformation": "Basisinformationen",
-      "permissions": "Systemberechtigungen",
+      "permissions": "Berechtigungen",
+      "systemPermissions": "Systemberechtigungen",
+      "dataPermissions": "Datenberechtigungen",
       "groupAssignment": "Gruppen"
     },
     "baseInfoTab": {
@@ -1162,6 +1164,10 @@
           "step2": "Eine Datenstruktur in <link>Datenstrukturen</link> erstellen",
           "step3": "Wieder hierher zurückkommen und die Datenstruktur importieren"
         }
+      },
+      "restricted": {
+        "title": "Datenstruktur nicht zugänglich",
+        "description": "Sie haben keine Berechtigung zum Anzeigen der Datenstruktur."
       },
       "importModal": {
         "title": "Datenmodell importieren",

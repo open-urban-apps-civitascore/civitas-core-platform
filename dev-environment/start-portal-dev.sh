@@ -48,8 +48,6 @@ no_clean_arg=""
 START_FROST=true
 START_GEOSERVER=true
 START_NIFI=true
-# Trino + Superset dashboard stack (Docker Compose, default ON).
-START_DASHBOARD=true
 # Model Forge Admin UI — the registry console (dev-environment/apps: model-forge-admin-ui on :8092,
 # pointed at portal-backend's model_forge schema). Part of the MODELING path (it inspects/edits what
 # modeling creates), so it stays ON under --modeling; turn it off with --no-admin-ui.
@@ -85,7 +83,6 @@ usage() {
     echo "  --no-frost                       Do not start the FROST server"
     echo "  --no-geoserver                   Do not start GeoServer"
     echo "  --no-nifi                        Do not start Apache NiFi"
-    echo "  --no-dashboard                   Do not start Trino and Superset"
     echo "  --no-config-adapter              Do not start the Config Adapter"
     echo "  --no-admin-ui                    Do not start the Model Forge Admin UI (:8092)"
     echo "  --pgadmin                        Also start pgAdmin (optional DB console, :5050)"
@@ -124,7 +121,6 @@ while [ $# -gt 0 ]; do
         --no-frost)     START_FROST=false ;;
         --no-geoserver) START_GEOSERVER=false ;;
         --no-nifi)      START_NIFI=false ;;
-        --no-dashboard) START_DASHBOARD=false ;;
         --no-admin-ui)  START_ADMIN_UI=false ;;
         --pgadmin)      START_PGADMIN=true ;;
         --modeling)
@@ -321,9 +317,12 @@ mvn_in_container() {
 
     docker run --rm \
         --network civitas-network \
+        --memory="${MAVEN_CONTAINER_MEMORY:-2g}" \
+        --cpus="${MAVEN_CONTAINER_CPUS:-4}" \
         -v "$(winhost "$PROJECT_ROOT"):${CP}project" \
         -v "$MVN_CACHE_VOLUME:${CP}var/maven/.m2" \
         -e "MAVEN_CONFIG=${CP}var/maven/.m2" \
+        -e "MAVEN_OPTS=${MAVEN_CONTAINER_OPTS:--Xms256m -Xmx1280m -XX:MaxMetaspaceSize=384m}" \
         -w "${CP}project/$rel_path" \
         maven:3.9-eclipse-temurin-25 \
         sh -c "
@@ -552,7 +551,7 @@ docker network create civitas-network 2>/dev/null && \
 echo
 echo "Starting infrastructure services..."
 echo "  - Kafka + Zookeeper + Kafka UI"
-echo "  - PostgreSQL (Portal + Keycloak) + Flyway migrations"
+echo "  - Shared PostgreSQL/PostGIS + Flyway migrations"
 echo "  - Keycloak"
 echo "  - APISIX + etcd"
 echo "  - OPA + AuthZ Repository"
@@ -560,8 +559,25 @@ echo "  - FROST Server"
 echo "  - Apache NiFi"
 echo
 
+# Load service DB settings before starting the shared PostGIS server.
+for env_dir in frost geoserver; do
+    if [ ! -f "$SCRIPT_DIR/$env_dir/.env" ] && [ -f "$SCRIPT_DIR/$env_dir/.env.example" ]; then
+        cp "$SCRIPT_DIR/$env_dir/.env.example" "$SCRIPT_DIR/$env_dir/.env"
+        echo "  Created $env_dir/.env from .env.example"
+    fi
+done
+if [ "${GEOSERVER_DB_PASSWORD+x}" != x ]; then
+    GEOSERVER_DB_PASSWORD=$(sed -n 's/^GEOSERVER_DB_PASSWORD=//p' "$SCRIPT_DIR/geoserver/.env" | tail -n 1)
+    export GEOSERVER_DB_PASSWORD
+fi
+
 cd "$SCRIPT_DIR/postgres"
-$DOCKER_COMPOSE up -d
+# Remove the old `postgres-portal` service container during the rename to
+# `postgis-dev-env`. It uses the same persistent volume, so the data stays intact.
+$DOCKER_COMPOSE \
+    --env-file "$SCRIPT_DIR/frost/.env" \
+    --env-file "$SCRIPT_DIR/geoserver/.env" \
+    up -d --remove-orphans
 echo "  PostgreSQL started"
 
 # Run Flyway migrations to ensure database schema exists.
@@ -571,7 +587,7 @@ echo "  PostgreSQL started"
 # Flyway is idempotent — already-applied migrations are skipped automatically.
 PG_READY=false
 for i in $(seq 1 30); do
-    if docker exec civitas-postgres-portal pg_isready -U admin -d portal_backend -q 2>/dev/null; then
+    if docker exec postgis-dev-env pg_isready -U admin -d portal_backend -q 2>/dev/null; then
         PG_READY=true
         break
     fi
@@ -581,6 +597,24 @@ if [ "$PG_READY" = false ]; then
     echo "  ERROR: PostgreSQL not ready after 30s"
     exit 1
 fi
+
+# Ensure all shared service databases have completed initialization before starting consumers.
+for database_name in keycloak sensorthings geoserver model_forge_admin nifi_demo; do
+    DATABASE_READY=false
+    for i in $(seq 1 30); do
+        if docker exec postgis-dev-env psql -U admin -d portal_backend -tAc \
+            "SELECT 1 FROM pg_database WHERE datname='$database_name'" 2>/dev/null | grep -q 1; then
+            DATABASE_READY=true
+            break
+        fi
+        sleep 1
+    done
+    if [ "$DATABASE_READY" = false ]; then
+        echo "  ERROR: Shared database '$database_name' was not created."
+        echo "         Check: cd dev-environment/postgres && docker compose logs postgis-dev-env"
+        exit 1
+    fi
+done
 
 # Ensure the Flowable saga database exists (config-adapter's embedded engine).
 # PostgreSQL has no "CREATE DATABASE IF NOT EXISTS", so guard with a catalog check.
@@ -592,13 +626,13 @@ fi
 echo "  Ensuring Flowable database exists..."
 FLOWABLE_DB_READY=false
 for i in $(seq 1 10); do
-    if docker exec civitas-postgres-portal psql -U admin -d portal_backend -tAc \
+    if docker exec postgis-dev-env psql -U admin -d portal_backend -tAc \
         "SELECT 1 FROM pg_database WHERE datname='flowable'" 2>/dev/null | grep -q 1; then
         echo "  Flowable database already present"
         FLOWABLE_DB_READY=true
         break
     fi
-    CREATE_OUTPUT=$(docker exec civitas-postgres-portal psql -U admin -d portal_backend -c \
+    CREATE_OUTPUT=$(docker exec postgis-dev-env psql -U admin -d portal_backend -c \
         "CREATE DATABASE flowable OWNER admin" 2>&1)
     if echo "$CREATE_OUTPUT" | grep -q "CREATE DATABASE"; then
         echo "  Flowable database created"
@@ -617,7 +651,7 @@ if [ "$FLOWABLE_DB_READY" = false ]; then
     echo "  ERROR: Could not create Flowable database after 10 attempts; last psql output:"
     echo "    $CREATE_OUTPUT"
     echo "  config-adapter will fail to start — create it manually with:"
-    echo "    docker exec civitas-postgres-portal psql -U admin -d portal_backend -c 'CREATE DATABASE flowable OWNER admin'"
+    echo "    docker exec postgis-dev-env psql -U admin -d portal_backend -c 'CREATE DATABASE flowable OWNER admin'"
     exit 1
 fi
 
@@ -828,19 +862,6 @@ if [ "$OS_TYPE" = "Darwin" ]; then
     docker exec civitas-keycloak /opt/keycloak/bin/kcadm.sh update realms/master -s sslRequired=NONE
 fi
 
-if [ "$START_DASHBOARD" = "true" ]; then
-    echo "Starting Trino + Superset dashboard stack..."
-    cd "$SCRIPT_DIR/trino-superset"
-    if $DOCKER_COMPOSE up -d $COMPOSE_BUILD 2>&1; then
-        echo "  Trino + Superset started"
-    else
-        echo "  WARNING: Trino + Superset failed to start"
-        echo "           Check: cd dev-environment/trino-superset && docker compose logs"
-    fi
-else
-    echo "  Skipping Trino + Superset (--no-dashboard)"
-fi
-
 echo
 
 # ---- Phase 4: Application Build & Start -----------------------------
@@ -958,7 +979,7 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ] || [ "$STAR
         COMPOSE_SERVICES="$COMPOSE_SERVICES pgadmin"
     fi
 
-    $DOCKER_COMPOSE up -d $COMPOSE_BUILD $COMPOSE_SERVICES
+    $DOCKER_COMPOSE --env-file "$SCRIPT_DIR/geoserver/.env" up -d $COMPOSE_BUILD $COMPOSE_SERVICES
     echo "  Application containers started: $COMPOSE_SERVICES"
     echo
 fi
@@ -1064,28 +1085,28 @@ export NIFI_FROST_URL=http://civitas-frost:8080/FROST-Server/v1.1
 export NIFI_TOPICS=de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
 # PostGIS sink connection for the DEPLOYED NiFi flow (PutDatabaseRecord). The flow runs INSIDE the
 # NiFi container, so this must be the docker name + internal port (like apps/docker-compose.yml) —
-# not localhost/5434. Without it the POSTGIS sink stage fails: "no platform database connection URL".
-export NIFI_POSTGIS_URL=${NIFI_POSTGIS_URL:-jdbc:postgresql://civitas-geoserver-db:5432/geoserver}
+# not localhost/5432. Without it the POSTGIS sink stage fails: "no platform database connection URL".
+export NIFI_POSTGIS_URL=${NIFI_POSTGIS_URL:-jdbc:postgresql://postgis-dev-env:5432/geoserver}
 export NIFI_POSTGIS_USER=${NIFI_POSTGIS_USER:-geoserver}
-export NIFI_POSTGIS_PASSWORD=${NIFI_POSTGIS_PASSWORD:-geoserver}
+export NIFI_POSTGIS_PASSWORD=${NIFI_POSTGIS_PASSWORD:-${GEOSERVER_DB_PASSWORD:-geoserver}}
 export GEOSERVER_URL=http://localhost:8082/geoserver
 export GEOSERVER_ADMIN_USER=admin
 export GEOSERVER_ADMIN_PASSWORD=geoserver
 # GeoServer datastore connection: the adapter only relays these to GeoServer via REST; the
 # GeoServer CONTAINER opens the actual DB connection over the docker network, so this must be
-# the container name + internal port (NOT localhost / the host-published 5434, which from inside
+# the container name + internal port (NOT localhost / the host-published 5432, which from inside
 # the GeoServer container would point at GeoServer itself). Var name is GEOSERVER_POSTGIS_DATABASE
 # (dots->underscores of geoserver.postgis.database), matching apps/docker-compose.yml.
-export GEOSERVER_POSTGIS_HOST=civitas-geoserver-db
+export GEOSERVER_POSTGIS_HOST=postgis-dev-env
 export GEOSERVER_POSTGIS_PORT=5432
 export GEOSERVER_POSTGIS_DATABASE=geoserver
 export GEOSERVER_POSTGIS_USER=geoserver
-export GEOSERVER_POSTGIS_PASSWORD=geoserver
+export GEOSERVER_POSTGIS_PASSWORD=${GEOSERVER_DB_PASSWORD:-geoserver}
 # PostGIS adapter DDL connection — opened by the config-adapter ITSELF (runs on the host in cmd
-# mode), so it uses the host-published port 5434. Same physical DB as the datastore above.
-export POSTGIS_JDBC_URL=jdbc:postgresql://localhost:5434/geoserver
+# mode), so it uses the host-published port 5432. Same physical DB as the datastore above.
+export POSTGIS_JDBC_URL=jdbc:postgresql://localhost:5432/geoserver
 export POSTGIS_JDBC_USER=geoserver
-export POSTGIS_JDBC_PASSWORD=geoserver
+export POSTGIS_JDBC_PASSWORD=${GEOSERVER_DB_PASSWORD:-geoserver}
 
 java -jar "$CONFIG_ADAPTER_JAR"
 exec bash
@@ -1168,22 +1189,22 @@ if [ "$config_adapter_option" = "3" ]; then
     echo "  NIFI_OIDC_CLIENT_ID=nifi"
     echo "  NIFI_OIDC_CLIENT_SECRET=<set; see dev-environment/nifi/.env.example>"
     echo "  # PostGIS sink conn for the deployed NiFi flow (runs in the NiFi container) -> docker name + 5432"
-    echo "  NIFI_POSTGIS_URL=jdbc:postgresql://civitas-geoserver-db:5432/geoserver"
+    echo "  NIFI_POSTGIS_URL=jdbc:postgresql://postgis-dev-env:5432/geoserver"
     echo "  NIFI_POSTGIS_USER=geoserver"
-    echo "  NIFI_POSTGIS_PASSWORD=geoserver"
+    echo "  NIFI_POSTGIS_PASSWORD=\${GEOSERVER_DB_PASSWORD:-geoserver}"
     echo "  GEOSERVER_URL=http://localhost:8082/geoserver"
     echo "  GEOSERVER_ADMIN_USER=admin"
     echo "  GEOSERVER_ADMIN_PASSWORD=geoserver"
     echo "  # datastore conn is relayed to the GeoServer container -> use the docker name + internal port"
-    echo "  GEOSERVER_POSTGIS_HOST=civitas-geoserver-db"
+    echo "  GEOSERVER_POSTGIS_HOST=postgis-dev-env"
     echo "  GEOSERVER_POSTGIS_PORT=5432"
     echo "  GEOSERVER_POSTGIS_DATABASE=geoserver"
     echo "  GEOSERVER_POSTGIS_USER=geoserver"
-    echo "  GEOSERVER_POSTGIS_PASSWORD=geoserver"
-    echo "  # DDL conn is opened by the adapter itself (host) -> host-published port 5434"
-    echo "  POSTGIS_JDBC_URL=jdbc:postgresql://localhost:5434/geoserver"
+    echo "  GEOSERVER_POSTGIS_PASSWORD=\${GEOSERVER_DB_PASSWORD:-geoserver}"
+    echo "  # DDL conn is opened by the adapter itself (host) -> host-published port 5432"
+    echo "  POSTGIS_JDBC_URL=jdbc:postgresql://localhost:5432/geoserver"
     echo "  POSTGIS_JDBC_USER=geoserver"
-    echo "  POSTGIS_JDBC_PASSWORD=geoserver"
+    echo "  POSTGIS_JDBC_PASSWORD=\${GEOSERVER_DB_PASSWORD:-geoserver}"
     echo
 fi
 
@@ -1307,7 +1328,7 @@ if [ "$frontend_option" = "1" ]; then
     echo "Starting Portal Frontend (Docker)..."
     docker rm -f civitas-portal-frontend 2>/dev/null || true
     cd "$SCRIPT_DIR/apps"
-    $DOCKER_COMPOSE up -d $COMPOSE_BUILD portal-frontend
+    $DOCKER_COMPOSE --env-file "$SCRIPT_DIR/geoserver/.env" up -d $COMPOSE_BUILD portal-frontend
     echo "  Frontend container started on http://localhost:3000"
     echo "  Logs: cd dev-environment/apps && docker compose logs -f portal-frontend"
     cd "$SCRIPT_DIR"
@@ -1434,12 +1455,10 @@ echo "  FROST Server:     http://localhost:8085/FROST-Server/v1.1 (HTTP)"
 echo "  FROST MQTT:       mqtt://localhost:1883"
 echo "  GeoServer Admin:  http://localhost:8082/geoserver/web (admin / geoserver)"
 echo "  GeoServer OWS:    http://localhost:9080/geoserver/{workspace}/ows (via APISIX)"
-echo "  GeoServer PostGIS: localhost:5434  db=geoserver  user=geoserver  (see geoserver/.env)"
+echo "  GeoServer PostGIS: localhost:5432  db=geoserver  user=geoserver  (see geoserver/.env)"
 echo "  APISIX Gateway:   http://localhost:9080"
 echo "  APISIX Admin API: http://localhost:9180"
 echo "  Apache NiFi:      https://localhost:8443/nifi (login via Keycloak / OIDC)"
-echo "  Trino UI:         https://localhost:${TRINO_PORT:-8446}/ui/ (OIDC via Keycloak)"
-echo "  Superset:         http://localhost:${SUPERSET_PORT:-8092} (OIDC via Keycloak)"
 echo "  OPA:              http://localhost:8181"
 echo "  AuthZ Repository: http://localhost:8091"
 echo

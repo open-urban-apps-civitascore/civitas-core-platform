@@ -3,7 +3,7 @@
     "1": {
       "Name": "CIVITAS Portal DB",
       "Group": "CIVITAS",
-      "Host": "postgres-portal",
+      "Host": "postgis-dev-env",
       "Port": 5432,
       "MaintenanceDB": "portal_backend",
       "Username": "admin",

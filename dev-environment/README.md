@@ -12,7 +12,7 @@ dev-environment/
 ├── backend/    # Full backend stack — all services in Docker (CI/demos)
 ├── authz/      # AuthZ test data and integration tests
 ├── kafka/      # Kafka only
-├── postgres/   # PostgreSQL only
+├── postgres/   # Shared PostgreSQL/PostGIS server and service databases
 ├── keycloak/   # Keycloak only
 ├── apisix/     # API Gateway + Authorization (OPA, AuthZ Repository)
 ├── frost/      # FROST IoT Server
@@ -121,6 +121,26 @@ The portal frontend requires a Keycloak client secret. If not yet configured in
 cd dev-environment
 ./stop-portal-dev.sh
 ```
+
+### Shared PostgreSQL/PostGIS
+
+The `/postgres` Compose stack is the only database server in the local development
+environment. It runs PostGIS and creates separate databases and roles for the portal,
+Keycloak, FROST, GeoServer, Model Forge, and the NiFi demo. The services connect
+to `postgis-dev-env` on `civitas-network`. Host tools connect to `localhost:5432`.
+
+Start this stack before you start an individual service Compose file. The main
+`start-portal-dev.sh` script starts it first. To start only the database, create the shared
+network and then start the Compose service:
+
+```bash
+docker network create civitas-network 2>/dev/null || true
+cd dev-environment/postgres && docker compose up -d
+```
+
+The old per-service database volumes are no longer used. The development database volume
+can be reset with `docker compose down -v` from `dev-environment/postgres`; this deletes all
+local development database data.
 
 ---
 
@@ -248,6 +268,19 @@ For Trino Web UI and Superset OIDC login, use the central dev user of the
 ```bash
 ./stop-portal-dev.sh            # Stop all services (prompts to remove volumes)
 ```
+
+## Resource limits
+
+The local Compose services have per-container memory ceilings; their combined limits are
+about 16 GiB. The containerized Maven build is capped at 2 GiB of container memory and a
+1.25 GiB Java heap, keeping the combined configured limits at about 18 GiB. These are limits,
+not reserved memory. All local stacks use the shared PostgreSQL/PostGIS service in
+`postgres/docker-compose.yml`.
+If a service repeatedly exits with code 137, inspect its logs and raise only that
+service's `mem_limit` in its Compose file.
+
+The Maven build limits can be overridden for a run with `MAVEN_CONTAINER_MEMORY`,
+`MAVEN_CONTAINER_CPUS`, and `MAVEN_CONTAINER_OPTS`.
 
 Or manually per service:
 

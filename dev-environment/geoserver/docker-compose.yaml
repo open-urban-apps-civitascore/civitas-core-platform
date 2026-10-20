@@ -6,9 +6,9 @@ x-variables:
     GEOWEBCACHE_CACHE_DIR: /data/geowebcache
     # pgconfig catalog backend — every service reads it directly, which is what the
     # standalone profile means: no service discovery and no config server
-    PGCONFIG_HOST: geoserverdb
+    PGCONFIG_HOST: postgis-dev-env
     PGCONFIG_PORT: 5432
-    PGCONFIG_DATABASE: geoserver
+    PGCONFIG_DATABASE: ${GEOSERVER_DB_NAME:-geoserver}
     PGCONFIG_USERNAME: geoserver
     PGCONFIG_PASSWORD: ${GEOSERVER_DB_PASSWORD:-geoserver}
     PGCONFIG_SCHEMA: pgconfig
@@ -30,46 +30,20 @@ x-variables:
     # doubled $$ keeps the placeholder for the image to resolve instead of compose consuming it
     GEOSERVER_EXTENSION_CONTROLFLOW_PROPERTIES_OWS_WMS: "$${cpu.cores} * 8"
     GEOSERVER_EXTENSION_CONTROLFLOW_PROPERTIES_OWS_WMS_GETMAP: "$${cpu.cores} * 4"
+    # GeoServer Cloud 3.0.1.1 includes preview classes compiled for Java 25.
+    JAVA_TOOL_OPTIONS: "--enable-preview -XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60"
 
 x-gs-dependencies: &gs-dependencies
   rabbitmq:
     condition: service_healthy
-  geoserverdb:
-    # Healthy, not started — every service opens its catalog connection during startup
-    condition: service_healthy
 
 volumes:
   geowebcache_data:
-  geoserverdb_data:
 
 services:
-  geoserverdb:
-    image: imresamu/postgis:17-3.5@sha256:35fe7dceda62bfe7d2965b0ba78d915ff9f901b5e0466d633ecc58421b5b5210
-    container_name: civitas-geoserver-db
-    hostname: civitas-geoserver-db
-    shm_size: 2g
-    environment:
-      POSTGRES_DB: geoserver
-      POSTGRES_USER: geoserver
-      POSTGRES_PASSWORD: ${GEOSERVER_DB_PASSWORD:-geoserver}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U geoserver"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    volumes:
-      - geoserverdb_data:/var/lib/postgresql/data
-      - ./init:/docker-entrypoint-initdb.d
-    ports:
-      - "5434:5432"
-    networks:
-      - geoserver-internal
-      # The NiFi PostGIS sink (PutDatabaseRecord in deployed pipelines) writes into this
-      # database and reaches it by container name over civitas-network.
-      - civitas-network
-
   rabbitmq:
     image: rabbitmq:4.1.3-alpine
+    mem_limit: 512m
     user: "1000:1000"
     restart: unless-stopped
     tmpfs:
@@ -82,12 +56,14 @@ services:
       retries: 3
     networks:
       - geoserver-internal
+      - civitas-network
 
   # Single entry point routing to all GeoServer microservices.
   # Named civitas-geoserver so APISIX can reach it via Docker network
   # at civitas-geoserver:8080 (see setup-apisix-route.sh).
   gateway:
     image: geoservercloud/geoserver-cloud-gateway:3.0.1.1@sha256:de0b20bd2a4393bac7b9923e63f6e03611648bd749834434f170e9bfc9c0e47d
+    mem_limit: 512m
     user: "1000:1000"
     container_name: civitas-geoserver
     hostname: civitas-geoserver
@@ -105,6 +81,7 @@ services:
   # Base template for all GeoServer microservices (replicas: 0 = not started directly)
   geoserver_template:
     image: geoservercloud/geoserver-cloud-webui:3.0.1.1@sha256:4f91e3048ac894a476a1e84c2a018d2fb8e9d933fb88d1a6556386bdc2bf1bde
+    mem_limit: 512m
     user: "1000:1000"
     environment:
       <<: *common_env
@@ -115,6 +92,7 @@ services:
       replicas: 0
     networks:
       - geoserver-internal
+      - civitas-network
 
   wfs:
     image: geoservercloud/geoserver-cloud-wfs:3.0.1.1@sha256:299f0d6232d1aa7a94afce0394fa8d5465e03b3f890b445c7876a62d55259ddc

@@ -10,15 +10,17 @@
 
 services:
   # AuthZ Repository - serves user context to OPA
-  # Requires PostgreSQL (postgres-portal) to be running — started by infra compose.
+  # Requires PostgreSQL (postgis-dev-env) to be running — started by infra compose.
   authz-repository:
     build:
       context: ../../authz/repository
       dockerfile: Dockerfile
+    mem_limit: 1g
     container_name: civitas-authz-repository
     restart: unless-stopped
     environment:
-      DATABASE_URL: jdbc:postgresql://postgres-portal:5432/portal_backend
+      JAVA_TOOL_OPTIONS: "-XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60"
+      DATABASE_URL: jdbc:postgresql://postgis-dev-env:5432/portal_backend
       DATABASE_USERNAME: ${POSTGRES_USER:-admin}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
       SERVER_PORT: 8091
@@ -39,6 +41,7 @@ services:
   # OPA - Policy Decision Point
   opa:
     image: openpolicyagent/opa:1.19.1-static
+    mem_limit: 256m
     container_name: civitas-opa
     restart: always
     environment:

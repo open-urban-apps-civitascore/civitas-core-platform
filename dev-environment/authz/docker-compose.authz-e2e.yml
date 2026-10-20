@@ -112,7 +112,7 @@ services:
       # Spring profiles
       SPRING_PROFILES_ACTIVE: local,postgres,init
       # Database
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-portal:5432/portal_backend?sslmode=disable
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgis-dev-env:5432/portal_backend?sslmode=disable
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: admin
       # Kafka
@@ -158,7 +158,7 @@ services:
       INIT_USERS_2_PASSWORD: test123
       INIT_USERS_2_GROUPS_0: AuthzNoPermsGroup
     depends_on:
-      postgres-portal:
+      postgis-dev-env:
         condition: service_healthy
       kafka:
         condition: service_healthy

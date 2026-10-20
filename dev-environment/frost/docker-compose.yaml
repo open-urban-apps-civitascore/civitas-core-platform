@@ -2,11 +2,13 @@ name: frost_allinone
 services:
   web:
     image: fraunhoferiosb/frost-server-http:2.7.3
+    mem_limit: 1g
     platform: linux/amd64
     container_name: civitas-frost
     hostname: civitas-frost
     environment:
       # For all settings see: https://fraunhoferiosb.github.io/FROST-Server/settings/settings.html
+      - JAVA_TOOL_OPTIONS=-XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60
       - serviceRootUrl=http://localhost:9080/FROST-Server/
       # Projects data model (project-scoped Things, Users, Roles) — ships in core since 2.7.0,
       # replacing the hylkevds/frost-http-projects fork. The plugin loads its bundled model
@@ -20,45 +22,34 @@ services:
       - http_cors_enable=true
       - http_cors_allowed_origins=*
       - persistence_db_driver=org.postgresql.Driver
-      - persistence_db_url=jdbc:postgresql://database:5432/sensorthings
+      - persistence_db_url=jdbc:postgresql://postgis-dev-env:5432/${FROST_DB_NAME:-sensorthings}
       - persistence_db_username=sensorthings
-      - persistence_db_password=${FROST_DB_PASSWORD}
+      - persistence_db_password=${FROST_DB_PASSWORD:-changeme-generate-a-strong-password}
       - persistence_autoUpdateDatabase=true
     expose:
       - "8080"
     ports:
       - 1883:1883
       - 8085:8080
-    depends_on:
-      database:
-        condition: service_healthy
-    networks:
-      - frost-network
-      - civitas-network
     healthcheck:
-      # The DB's own healthcheck only proves Postgres is reachable, not that FROST has finished
-      # applying its own schema migrations (persistence_autoUpdateDatabase=true, run lazily on
-      # FROST's own startup) — THINGS/PROJECTS/etc. don't exist until this passes. The
-      # frost-migrations service (below) depends on this, not on `database`, for that reason.
+      # FROST creates its schema during startup. Gate scoped-view creation on the API being ready.
       test: ["CMD-SHELL", "curl -sf http://localhost:8080/FROST-Server/v1.1/ >/dev/null"]
       interval: 5s
       timeout: 5s
       retries: 20
       start_period: 20s
+    networks:
+      - civitas-network
 
-  # One-shot: creates the frost_scoped.* row-scoping views and the least-privilege
-  # frost_trino_reader role Trino's "frost" catalog connects as (see
-  # dev-environment/trino-superset/trino/start-trino.sh). Runs after FROST-Server itself (not just
-  # its DB) is healthy, since FROST creates THINGS/PROJECTS/etc. lazily on its own startup —
-  # depends_on: database wouldn't be enough. Safe to re-run (idempotent DDL); the retry loop is
-  # belt-and-suspenders for environments without an equivalent health-gate (e.g. a deploy pipeline
-  # stage), not a substitute for the depends_on above.
+
+  # Create the scoped views and least-privilege role used by Trino's frost catalog.
   frost-migrations:
     image: postgres:18.1-alpine
     container_name: civitas-frost-migrations
     restart: "no"
     environment:
-      - FROST_DB_PASSWORD=${FROST_DB_PASSWORD}
+      - FROST_DB_PASSWORD=${FROST_DB_PASSWORD:-changeme-generate-a-strong-password}
+      - FROST_DB_NAME=${FROST_DB_NAME:-sensorthings}
       - FROST_TRINO_READER_PASSWORD=${FROST_TRINO_READER_PASSWORD:-dev-only-frost-trino-reader-password}
     entrypoint:
       - /bin/sh
@@ -67,7 +58,7 @@ services:
         set -e
         attempt=0
         until PGPASSWORD="$$FROST_DB_PASSWORD" psql -v ON_ERROR_STOP=1 \
-            -h database -U sensorthings -d sensorthings \
+            -h postgis-dev-env -U sensorthings -d "$$FROST_DB_NAME" \
             -v frost_trino_reader_password="$$FROST_TRINO_READER_PASSWORD" \
             -f /migrations/01-create-scoped-views.sql; do
           attempt=$$((attempt + 1))
@@ -84,36 +75,9 @@ services:
       web:
         condition: service_healthy
     networks:
-      - frost-network
-
-  database:
-    image: postgis/postgis:16-3.5-alpine@sha256:47e961a569fd52ff31f0fe205ed91eeab17d9f5fff6722e6d7ea6b588748b293
-    platform: linux/amd64
-    container_name: civitas-frost-db
-    hostname: civitas-frost-db
-    environment:
-      - POSTGRES_DB=sensorthings
-      - POSTGRES_USER=sensorthings
-      - POSTGRES_PASSWORD=${FROST_DB_PASSWORD}
-    volumes:
-      - postgis_volume:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d sensorthings -U sensorthings "]
-      interval: 2s
-      timeout: 2s
-      retries: 10
-    networks:
-      frost-network:
-      civitas-network:
-        aliases:
-          - civitas-frost-db
-
-volumes:
-    postgis_volume:
+      - civitas-network
 
 networks:
-  frost-network:
-    driver: bridge
   civitas-network:
     name: civitas-network
     external: true

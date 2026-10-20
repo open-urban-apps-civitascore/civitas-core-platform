@@ -13,8 +13,8 @@ service requests enter through the gateway. The stack runs the `standalone`
 profile production uses, which means no service discovery and no config server.
 
 ```
-Host                Docker (geoserver-internal network)
-────                ──────────────────────────────────
+Host                Docker (geoserver-internal and civitas-network)
+────                ────────────────────────────────────────────────
 localhost:8082 ──►  gateway (civitas-geoserver)
                       ├─► webui
                       ├─► wfs
@@ -23,9 +23,9 @@ localhost:8082 ──►  gateway (civitas-geoserver)
                       ├─► wps
                       ├─► restconfig
                       └─► gwc
-                    acl  ◄──► geoserverdb (PostgreSQL/PostGIS)
+                    acl  ◄──► postgis-dev-env (database: geoserver)
                     rabbitmq (message bus)
-localhost:5434 ──►  geoserverdb (direct DB access)
+localhost:5432 ──►  postgis-dev-env (PostGIS)
 ```
 
 The gateway is also connected to `civitas-network` so APISIX can route
@@ -38,7 +38,7 @@ The gateway is also connected to `civitas-network` so APISIX can route
 | Container | Role                                | Local Port |
 |-----------|-------------------------------------|------------|
 | `civitas-geoserver` | Gateway — single entry point        | `8082` |
-| `civitas-geoserver-db` | PostgreSQL/PostGIS (pgconfig + ACL) | `5434` |
+| `postgis-dev-env` | Shared PostgreSQL/PostGIS (pgconfig + ACL database) | `5432` |
 | *(internal)* | OWS, WCS, WPS, REST, WebUI, GWC     | — |
 | *(internal)* | RabbitMQ, ACL                       | — |
 
@@ -49,6 +49,8 @@ The gateway is also connected to `civitas-network` so APISIX can route
 ```bash
 cd dev-environment/geoserver
 cp .env.example .env          # review GEOSERVER_DB_PASSWORD
+cd ../postgres && docker compose up -d
+cd ../geoserver
 docker compose up -d
 ```
 
@@ -71,14 +73,14 @@ catalog migrations and connects to the message bus before answering requests).
 | Property | Value |
 |----------|-------|
 | Host | `localhost` |
-| Port | `5434` |
+| Port | `5432` |
 | Database | `geoserver` |
 | User | `geoserver` |
 | Password | see `geoserver/.env` → `GEOSERVER_DB_PASSWORD` |
 | SSL | disabled (local dev) |
 
 ```bash
-psql -h localhost -p 5434 -U geoserver -d geoserver
+psql -h localhost -p 5432 -U geoserver -d geoserver
 ```
 
 ### PostGIS — From GeoServer Containers (Docker network)
@@ -87,7 +89,7 @@ GeoServer datastores must use the internal Docker hostname:
 
 | Property | Value |
 |----------|-------|
-| Host | `civitas-geoserver-db` |
+| Host | `postgis-dev-env` |
 | Port | `5432` |
 | Database | `geoserver` |
 | User | `geoserver` |
@@ -145,7 +147,7 @@ curl -u admin:geoserver -X POST \
       "name": "my-dataset-db",
       "connectionParameters": {
         "entry": [
-          {"@key": "host",     "content": "civitas-geoserver-db"},
+          {"@key": "host",     "content": "postgis-dev-env"},
           {"@key": "port",     "content": "5432"},
           {"@key": "database", "content": "geoserver"},
           {"@key": "user",     "content": "geoserver"},
@@ -189,14 +191,13 @@ curl -u admin:geoserver -X DELETE \
 ## Notes
 
 - GeoServer Cloud persists catalog data (workspaces, stores, layers) in the
-  `geoserverdb` PostgreSQL database (`pgconfig` schema), not in a file-based
-  data directory. The `geoserverdb_data` volume survives container restarts.
+  `geoserver` database on the shared PostGIS server (`pgconfig` schema), not in
+  a file-based data directory. The `postgres_portal_data` volume stores it.
 - GeoWebCache tiles are stored in the `geowebcache_data` volume.
-- The PostGIS container exposes port `5434` to avoid conflict with the portal
-  backend PostgreSQL on `5432`.
+- The shared PostGIS server publishes port `5432`. GeoServer uses the logical
+  `geoserver` database on that server.
 - Spatial tables must exist in the PostGIS database before they can be
-  published as feature types. The `init/` directory seeds a test schema on
-  first startup.
+  published as feature types. The shared database init scripts seed a test schema.
 - The ACL authorization layer is **not enabled** (`acl` Spring profile omitted).
   OGC services (WFS, WMS, WCS) are publicly accessible without authentication,
   matching the default behaviour of monolithic GeoServer. The REST API and Web

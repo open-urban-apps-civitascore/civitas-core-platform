@@ -1,27 +1,10 @@
 services:
-  postgres-keycloak:
-    image: postgres:16-alpine
-    container_name: civitas-postgres-keycloak
-    environment:
-      POSTGRES_DB: keycloak
-      POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: keycloak
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_keycloak_data:/var/lib/postgresql/data
-    networks:
-      - civitas-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   keycloak:
     image: quay.io/keycloak/keycloak:26.6.4
+    mem_limit: 1g
     container_name: civitas-keycloak
     hostname: civitas-keycloak.local
+    restart: unless-stopped
     command: start-dev --import-realm
     ports:
       - "8080:8080"
@@ -30,24 +13,22 @@ services:
       - keycloak_data:/opt/keycloak/data
     environment:
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres-keycloak:5432/keycloak
+      KC_DB_URL: jdbc:postgresql://postgis-dev-env:5432/${KEYCLOAK_DB_NAME:-keycloak}
       KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
       KC_HTTP_ENABLED: "true"
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
       KC_LOG_LEVEL: info
+      JAVA_OPTS_APPEND: "-XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60"
       # Force issuer to localhost so browser-issued JWTs match what APISIX expects.
       # Without this, Keycloak mirrors the request hostname into the issuer claim,
       # causing a mismatch between browser (localhost) and APISIX (civitas-keycloak).
       # Override KC_HOSTNAME for VM/remote access: export KC_HOSTNAME=http://<vm-ip>:8080
       KC_HOSTNAME: ${KC_HOSTNAME:-http://localhost:8080}
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
-    depends_on:
-      postgres-keycloak:
-        condition: service_healthy
     networks:
       - civitas-network
     healthcheck:
@@ -64,6 +45,7 @@ services:
   # The realm-export.json configures Keycloak SMTP to point to mailpit:1025.
   mailpit:
     image: axllent/mailpit:v1.30@sha256:d5ecbb067db3705fa953d79e1b7f81ef84038df67aba6c52825d8c02a1ea748a
+    mem_limit: 128m
     container_name: civitas-mailpit
     ports:
       - "8025:8025"   # Web UI
@@ -72,7 +54,6 @@ services:
       - civitas-network
 
 volumes:
-  postgres_keycloak_data:
   keycloak_data:
 
 networks:

@@ -30,7 +30,7 @@ import { useQueryParams } from '@/hooks/use-query-params'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
-import { FormRole, Role, ROLE_TYPES, RoleSchema, RoleTab } from '@/types/roles'
+import { FormRole, Role, ROLE_TYPES, RoleSchema, RoleTab, RoleType, RoleTypeEnum } from '@/types/roles'
 import { isPlatformwideAssignment } from '@/utils/assignments'
 import { isNameConflictError, isPermissionsError } from '@/utils/errors'
 
@@ -38,6 +38,11 @@ import { DEFAULT_TAB } from '../page'
 import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
 import { GroupAssignmentTab } from './group-assignment-tab/GroupAssignmentTab'
 import { PermissionsTab } from './permissions-tab/PermissionsTab'
+
+const permissionsTabLabels: Record<RoleType, string> = {
+  SYSTEM: 'roles.tabLabels.systemPermissions',
+  DATA: 'roles.tabLabels.dataPermissions',
+}
 
 const subTabValues: Record<RoleTab, Tab<RoleTab>> = {
   basicInformation: {
@@ -79,6 +84,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const router = useRouter()
   const { hasPermission } = usePermissions()
   const { setSubTabValueParam, subTabValue, tabValue } = useQueryParams()
+  const tabRoleType = RoleTypeEnum.safeParse(tabValue).data
   const { handleFormValidationError, handleNameError, handlePermissionsError } = useError()
 
   const canUpdate = !roleId || hasPermission(PERMISSION_NAMES.ROLE_UPDATE)
@@ -233,12 +239,12 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
       const { data } = await createRole.mutateAsync({
         name: formValues.name,
         description: formValues.description,
-        roleType: (tabValue as Role['roleType']) || DEFAULT_TAB,
+        roleType: tabRoleType ?? DEFAULT_TAB,
         permissionIds: pendingPermissionIds,
         readonly: formValues.readonly,
       })
       toast.success(tCommon('success.creationSuccess', { item: tCommon('items.role') }))
-      router.push(`/roles/${data.id}?tab=${tabValue}`)
+      router.push(`/roles/${data.id}?tab=${tabRoleType ?? DEFAULT_TAB}`)
       return true
     } catch (error) {
       handleRoleRequestError(error as AxiosError, tRoles('errors.createError'))
@@ -352,9 +358,15 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   // - State-gated tabs (unsaved role) are disabled (visible but greyed out)
   const disabledTabs = !roleId ? ['groupAssignment'] : undefined
 
+  const roleType = roleId ? roleData?.data?.roleType : (tabRoleType ?? DEFAULT_TAB)
+  const permissionsSubTab: Tab<RoleTab> = {
+    ...subTabValues.permissions,
+    label: roleType ? permissionsTabLabels[roleType] : subTabValues.permissions.label,
+  }
+
   const subTabs: Tab<RoleTab>[] = [
     subTabValues.basicInformation,
-    ...(hasPermission(PERMISSION_NAMES.PERMISSION_READ) ? [subTabValues.permissions] : []),
+    ...(hasPermission(PERMISSION_NAMES.PERMISSION_READ) ? [permissionsSubTab] : []),
     ...(hasPermission(PERMISSION_NAMES.ASSIGNMENT_READ) && hasPermission(PERMISSION_NAMES.GROUP_READ)
       ? [subTabValues.groupAssignment]
       : []),
@@ -367,7 +379,6 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     }
   }, [subTabValue, setSubTabValueParam, defaultSubTab])
 
-  const roleType = roleId ? initialRole?.roleType : tabValue || DEFAULT_TAB
   const badgeTitle = roleType ? tRoles(`${roleType.toLowerCase()}Roles`).slice(0, -1) : undefined
 
   const SaveAndExitButtons = (
@@ -430,7 +441,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
                 onPendingPermissionIdsChange={setPendingPermissionIds}
                 isReadOnly={isReadOnly || isDefaultRole}
                 currentRoleId={roleId}
-                roleType={(roleType as Role['roleType']) || DEFAULT_TAB}
+                roleType={roleType ?? DEFAULT_TAB}
               />
             )}
             {subTabValue === subTabValues.groupAssignment.value && (

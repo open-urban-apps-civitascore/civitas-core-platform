@@ -194,7 +194,7 @@ fi
 echo -e "  Docker: ${GREEN}OK${NC}"
 
 # Check port conflicts
-PORTS_TO_CHECK="5432 5433 8080 8088 8089 8091 8181 9080 9092 9180"
+PORTS_TO_CHECK="5432 8080 8088 8089 8091 8181 9080 9092 9180"
 PORT_CONFLICT=false
 for port in $PORTS_TO_CHECK; do
     if ss -tlnp 2>/dev/null | grep -q ":$port " || \
@@ -261,9 +261,8 @@ echo "=== Phase 3: Starting Services ==="
 
 # Step 1: Databases
 echo "  Starting databases..."
-dc up -d postgres-portal postgres-keycloak
-wait_for_healthy postgres-portal 30 1 || exit 1
-wait_for_healthy postgres-keycloak 30 1 || exit 1
+dc up -d postgis-dev-env
+wait_for_healthy postgis-dev-env 30 1 || exit 1
 
 # Step 2: Flyway migrations
 echo "  Running Flyway migrations..."
@@ -271,7 +270,7 @@ FLYWAY_MIGRATIONS="$PROJECT_ROOT/portal-backend/src/main/resources/db/migration"
 if docker run --rm --network civitas-network \
     -v "$FLYWAY_MIGRATIONS:/flyway/sql:ro" \
     flyway/flyway:11-alpine \
-    -url=jdbc:postgresql://postgres-portal:5432/portal_backend \
+    -url=jdbc:postgresql://postgis-dev-env:5432/portal_backend \
     -user=admin -password=admin \
     -locations=filesystem:/flyway/sql \
     migrate; then
@@ -283,7 +282,7 @@ fi
 
 # Step 3: Seed authz test roles (before backend, so UserInitializer can find them)
 echo "  Seeding authz test roles..."
-if docker exec -i civitas-postgres-portal psql -U admin -d portal_backend < "$SCRIPT_DIR/seed-authz-roles.sql" > /dev/null 2>&1; then
+if docker exec -i postgis-dev-env psql -U admin -d portal_backend < "$SCRIPT_DIR/seed-authz-roles.sql" > /dev/null 2>&1; then
     echo -e "  Roles: ${GREEN}OK${NC}"
 else
     echo -e "  Roles: ${RED}FAILED${NC}"
@@ -316,7 +315,7 @@ wait_for_url "Backend health" "http://localhost:8089/v1/actuator/health" 60 2 ||
 # the standard permissions (USER_READ, DATASET_READ, etc.) at startup.
 # The seed links the authz test roles to those permissions.
 echo "  Seeding role-permission mappings..."
-if docker exec -i civitas-postgres-portal psql -U admin -d portal_backend < "$SCRIPT_DIR/seed-authz-role-permissions.sql" > /dev/null 2>&1; then
+if docker exec -i postgis-dev-env psql -U admin -d portal_backend < "$SCRIPT_DIR/seed-authz-role-permissions.sql" > /dev/null 2>&1; then
     echo -e "  Role-permissions: ${GREEN}OK${NC}"
 else
     echo -e "  Role-permissions: ${RED}FAILED${NC}"

@@ -6,7 +6,7 @@ portal-backend's *own* database.
 
 > This is the counterpart to [local-demo.md](local-demo.md), and uses the same database as
 > its default: `portal_backend` with `admin`/`admin`. Only local-demo.md's **standalone**
-> section switches to a **separate** database (`model_forge_admin` with
+> section switches to a **separate logical database** (`model_forge_admin` with
 > `model_forge`/`model_forge`), which therefore never shows what portal-backend created.
 
 > **NOT YET FUNCTIONAL — requires a portal-backend integration that does not exist yet.**
@@ -28,8 +28,8 @@ The Admin UI is started with:
   out here so the script does not depend on that default)
 * `MODEL_FORGE_ADMIN_UI_SEED_ENABLED=false` → don't seed the SensorThings examples into
   portal-backend's registry (this is also the default)
-* `SERVER_PORT=8093` → the Admin UI's own default is 8092, which the main stack's
-  `model-forge-admin-ui` container already holds (8090 is Kafka UI, 8091 authz-repository)
+* `SERVER_PORT=8095` → the main stack publishes the Admin UI on 8092
+  (8090 is Kafka UI, 8091 authz-repository)
 
 Migrations are left **enabled** (the default): nothing else creates the `model_forge`
 schema today, so the Admin UI creates it. Disabling them against a database where the
@@ -48,7 +48,7 @@ cd dev-environment
 bash model-forge/vertical-slice.sh
 ```
 
-Then open **http://localhost:8093**. Until the portal-backend integration exists the
+Then open **http://localhost:8095**. Until the portal-backend integration exists the
 Elements list stays **empty** — the DataStructure version is stored as a portal-backend
 entity only, with nothing written to the `model_forge` schema. Ctrl+C stops the Admin UI;
 the created DataStructure version stays in the database.
