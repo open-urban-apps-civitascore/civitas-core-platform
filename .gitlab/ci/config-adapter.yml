@@ -389,6 +389,17 @@ publish-config-adapter:
       mvn deploy -DskipTests -Drevision=$CONFIG_ADAPTER_VERSION \
         -DaltDeploymentRepository=gitlab-maven::default::${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/maven \
         -s ci_settings.xml
+    # The portal-backend jobs of a merge request compile against the snapshot of that merge
+    # request; every other pipeline keeps the config-adapter.version of portal-backend/pom.xml.
+    - |
+      if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
+        echo "PUBLISHED_CONFIG_ADAPTER_VERSION=$CONFIG_ADAPTER_VERSION" > ../published-config-adapter.env
+      else
+        echo "PUBLISHED_CONFIG_ADAPTER_VERSION=" > ../published-config-adapter.env
+      fi
+  artifacts:
+    reports:
+      dotenv: published-config-adapter.env
 
 build-config-adapter-image:
   extends: .only-config-adapter-changes

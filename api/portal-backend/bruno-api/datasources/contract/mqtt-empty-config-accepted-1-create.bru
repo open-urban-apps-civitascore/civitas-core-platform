@@ -1,5 +1,5 @@
 meta {
-  name: Contract MQTT — DRAFT accepts empty configuration (deferred validation)
+  name: Contract MQTT — DRAFT accepts empty connector (deferred validation)
   type: http
   seq: 33
 }
@@ -15,8 +15,7 @@ body:json {
   {
     "name": "contract_mqtt_empty",
     "description": "x",
-    "connectorType": "MQTT",
-    "configuration": {},
+    "connector": { "connectorType": "MQTT" },
     "dataStructureVersionId": null
   }
 }
@@ -29,25 +28,33 @@ script:post-response {
 }
 
 tests {
-  test("Status is 201 — empty MQTT configuration accepted on DRAFT", function() {
+  test("Status is 201 — empty MQTT connector accepted on DRAFT", function() {
     expect(res.getStatus()).to.equal(201);
+  });
+  test("Every field reads back null or its default", function() {
+    expect(res.body.connector.connectorType).to.equal("MQTT");
+    expect(res.body.connector).to.have.property('urls', null);
+    expect(res.body.connector).to.have.property('topics', null);
+    expect(res.body.connector).to.have.property('qos', null);
+    expect(res.body.connector).to.have.property('protocol_version', "3");
+    expect(res.body.connector).to.have.property('connect_timeout', null);
+    expect(res.body.connector).to.have.property('keepalive', null);
+    expect(res.body.connector).to.have.property('user', null);
+    expect(res.body.connector).to.have.property('password', null);
+    expect(res.body.connector.tls).to.deep.equal({ enabled: false });
   });
 }
 
 docs {
   Pins the deferred-validation contract: a DataSource in DRAFT status may
-  be saved with an incomplete or empty `configuration`. Required fields
-  on the MQTT connector (`urls`, `topics`, `qos`) carry
-  `@NotEmpty(groups = OnRelease.class)` / `@NotNull(groups = OnRelease.class)`
-  and are enforced at the release transition, not at create/update time.
+  be saved with an incomplete connector, here one with only
+  `connectorType`. The required MQTT fields (`urls`, `topics`, `qos`)
+  carry `@NotEmpty(groups = OnRelease.class)` /
+  `@NotNull(groups = OnRelease.class)` and are enforced at the release
+  transition, not at create/update time.
 
   The `qos` *range* check (must be 0/1/2) belongs to the `Default` group
   and runs eagerly — pinned by `mqtt-validation-qos-out-of-range.bru`.
   The release-time half of the deferred contract is pinned by
   `mqtt-release-rejects-empty-configuration-*.bru`.
-
-  Probing during #1391 phase 1 confirmed the DRAFT-side behaviour:
-  - POST with `configuration: {}` → 201 (all fields null, `tls.enabled = false`)
-  - POST without `urls` → 201 (urls null)
-  - POST without `topics` → 201 (topics null)
 }

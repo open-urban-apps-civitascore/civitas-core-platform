@@ -1,7 +1,7 @@
 'use client'
 import '@xyflow/react/dist/style.css'
 
-import { JSX } from 'react'
+import { JSX, ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
 
@@ -14,8 +14,8 @@ interface UmlModelerProps {
   isReadOnly?: boolean
   isMultiSessionMode?: boolean
   modelSessionManager?: UseMultiSessionReturn
-  canExportModel?: boolean
   placeHolder?: JSX.Element
+  toolbarContent?: ReactNode
   onImportFromDatastructure?: () => void
   dataStructureName?: string
   versionName?: string | null
@@ -29,8 +29,8 @@ export const UmlModeler = (props: UmlModelerProps) => {
     isReadOnly = false,
     isMultiSessionMode = true,
     modelSessionManager,
-    canExportModel = true,
     placeHolder,
+    toolbarContent,
     onImportFromDatastructure,
     dataStructureName,
     versionName,
@@ -45,9 +45,9 @@ export const UmlModeler = (props: UmlModelerProps) => {
             className="rounded-xl"
             externalSessionManager={modelSessionManager}
             isMultiSessionMode={isMultiSessionMode}
-            canExportModel={canExportModel}
             canExportDiagram={canExportDiagram}
             placeHolder={placeHolder}
+            toolbarContent={toolbarContent}
             onImportFromDatastructure={onImportFromDatastructure}
             dataStructureName={dataStructureName}
             versionName={versionName}

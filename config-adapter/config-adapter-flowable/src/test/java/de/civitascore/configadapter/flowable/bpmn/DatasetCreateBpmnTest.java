@@ -506,7 +506,7 @@ class DatasetCreateBpmnTest {
     variables.put("hasLayers", hasLayers);
     if (hasPipelines) {
       variables.put("dataPipelines", List.of(Map.of("id", "p-1", "data", "{}")));
-      variables.put("datasources", List.of(Map.of("id", "src-1", "type", "postgresql")));
+      variables.put("artifacts", Map.of());
     }
     // Keep the sink list consistent with the flags the consumer would have derived from it.
     List<Map<String, Object>> datasinks = new ArrayList<>();

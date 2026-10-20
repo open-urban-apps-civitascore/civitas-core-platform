@@ -13,6 +13,7 @@
 import type { MappingArtifactBody } from '@/app/services/api/mappings/clientRequests'
 import { DataSinkDraftSchema, MappingDraftSchema, PipelineDraftSchema } from '@/generated/core'
 import { DATASINK_TYPES, type DataSinkPayload } from '@/types/datasinks'
+import { latestUrnOf } from '@/utils/coreUrn'
 
 import type { DataSourceNodeData, PipelineNodeData } from '../_types/nodes'
 import {
@@ -108,7 +109,7 @@ export const buildPipelineModel = (pipeline: Pipeline): CorePipelineModel => {
     if (node.data.label) coreNode.label = node.data.label
 
     if (isDataSourceNodeData(node.data)) {
-      if (node.data.configurationUrn) coreNode.sourceRef = node.data.configurationUrn
+      if (node.data.configurationUrn) coreNode.sourceRef = latestUrnOf(node.data.configurationUrn)
     } else if (isFrostNodeData(node.data) || isGeoPersistenceNodeData(node.data)) {
       if (node.data.configurationUrn) coreNode.sinkRef = node.data.configurationUrn
     } else if (isMappingNodeData(node.data)) {

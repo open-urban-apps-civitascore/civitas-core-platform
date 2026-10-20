@@ -30,12 +30,17 @@ const createDatasource = (dataSourceStatus: DatasourceStatusType): Datasource =>
   name: 'Test Datasource',
   description: 'A test datasource',
   dataSourceStatus,
-  connectorType: 'MQTT',
-  configuration: {
+  connector: {
+    connectorType: 'MQTT',
     urls: ['mqtt://localhost:1883'],
     topics: ['sensors'],
     qos: 0,
     protocol_version: '3',
+    connect_timeout: null,
+    keepalive: null,
+    tls: { enabled: false },
+    user: 'mqtt-user',
+    password: '********',
   },
   dataStructureVersion: {
     id: 'version-1',
@@ -82,8 +87,7 @@ describe('useDatasourceForm', () => {
     expect(mockUpdateDatasourceReleased).toHaveBeenCalledTimes(1)
     const payload = mockUpdateDatasourceReleased.mock.calls[0][0]
     expect(payload).toMatchObject({ id: 'ds-1', name: 'Test Datasource', description: 'Changed description' })
-    expect(payload).not.toHaveProperty('connectorType')
-    expect(payload).not.toHaveProperty('configuration')
+    expect(payload).not.toHaveProperty('connector')
     expect(payload).not.toHaveProperty('dataStructureVersionId')
   })
 
@@ -101,9 +105,109 @@ describe('useDatasourceForm', () => {
     expect(mockUpdateDatasource).toHaveBeenCalledWith(
       expect.objectContaining({
         description: 'Changed description',
-        configuration: expect.objectContaining({ topics: ['other-topic'] }),
+        connector: expect.objectContaining({ connectorType: 'MQTT', topics: ['other-topic'] }),
         dataStructureVersionId: 'version-2',
       }),
     )
+  })
+
+  it('sends every field of the connector in API format when one connector field changed', async () => {
+    const datasource = createDatasource('DRAFT')
+    mockUpdateDatasource.mockResolvedValue({ data: datasource })
+    const { result } = renderDatasourceForm(datasource)
+    act(() => {
+      result.current.form.setValue('configuration.topics', 'other-topic', { shouldDirty: true })
+    })
+
+    await act(async () => {
+      await result.current.submitDatasource()
+    })
+
+    const payload = mockUpdateDatasource.mock.calls[0][0]
+    expect(payload.connector).toEqual({
+      connectorType: 'MQTT',
+      urls: ['mqtt://localhost:1883'],
+      topics: ['other-topic'],
+      qos: 0,
+      protocol_version: '3',
+      tls: { enabled: false },
+      user: 'mqtt-user',
+      password: '********',
+    })
+    expect(payload).not.toHaveProperty('connectorType')
+    expect(payload).not.toHaveProperty('configuration')
+  })
+
+  it('sends a cleared connector field as blank so the backend clears it', async () => {
+    const datasource = createDatasource('DRAFT')
+    mockUpdateDatasource.mockResolvedValue({ data: datasource })
+    const { result } = renderDatasourceForm(datasource)
+    act(() => {
+      result.current.form.setValue('configuration.user', '', { shouldDirty: true })
+    })
+
+    await act(async () => {
+      await result.current.submitDatasource()
+    })
+
+    expect(mockUpdateDatasource.mock.calls[0][0].connector).toMatchObject({ connectorType: 'MQTT', user: '' })
+  })
+
+  it('sends the full field set of the new type when the connector type changes', async () => {
+    const datasource = createDatasource('DRAFT')
+    mockUpdateDatasource.mockResolvedValue({ data: datasource })
+    const { result } = renderDatasourceForm(datasource)
+    act(() => {
+      result.current.form.setValue('connectorType', 'SQL', { shouldDirty: true })
+    })
+
+    await act(async () => {
+      await result.current.submitDatasource()
+    })
+
+    expect(mockUpdateDatasource.mock.calls[0][0].connector).toEqual({
+      connectorType: 'SQL',
+      driver: 'postgres',
+      dsn: '',
+      user: '',
+      password: '',
+      table: '',
+      columns: ['*'],
+      where: '',
+    })
+  })
+
+  it('does not send the connector when no connector field changed', async () => {
+    const datasource = createDatasource('DRAFT')
+    mockUpdateDatasource.mockResolvedValue({ data: datasource })
+    const { result } = renderDatasourceForm(datasource)
+    act(() => {
+      result.current.form.setValue('description', 'Changed description', { shouldDirty: true })
+    })
+
+    await act(async () => {
+      await result.current.submitDatasource()
+    })
+
+    expect(mockUpdateDatasource.mock.calls[0][0]).not.toHaveProperty('connector')
+  })
+
+  // The backend rejects an unknown key, so a status in the update would block the save before the release.
+  it('does not send the status in the draft update when the status changes together with another field', async () => {
+    const datasource = createDatasource('DRAFT')
+    mockUpdateDatasource.mockResolvedValue({ data: datasource })
+    const { result } = renderDatasourceForm(datasource)
+    act(() => {
+      result.current.form.setValue('description', 'Changed description', { shouldDirty: true })
+      result.current.handleStatusChange('AVAILABLE')
+    })
+
+    await act(async () => {
+      await result.current.submitDatasource()
+    })
+
+    const payload = mockUpdateDatasource.mock.calls[0][0]
+    expect(payload).toMatchObject({ description: 'Changed description' })
+    expect(payload).not.toHaveProperty('dataSourceStatus')
   })
 })

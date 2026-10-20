@@ -14,8 +14,8 @@ body:json {
   {
     "name": "TAF10 Energy Meter",
     "description": "HiveMQ public MQTT broker — TAF10 energy meter demo data",
-    "connectorType": "MQTT",
-    "configuration": {
+    "connector": {
+      "connectorType": "MQTT",
       "urls": ["tcp://broker.hivemq.com:1883"],
       "topics": ["+/civitas+/civitas/core/energy/meter/+/taf10"],
       "qos": 1,

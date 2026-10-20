@@ -2,7 +2,7 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.civitascore.portal.model.embedded.ConnectorType;
+import de.civitascore.portal.model.connector.MqttConnectorConfiguration;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
 import de.civitascore.portal.repository.DataSourceRepository;
@@ -50,9 +50,17 @@ class DataSourceScopeFilteringIntegrationTest
     DataSourceInputDTO input = new DataSourceInputDTO();
     input.setName("scope_test_datasource_" + System.currentTimeMillis());
     input.setDescription("DataSource for scope filtering test");
-    input.setConnectorType(ConnectorType.MQTT);
-    input.setConfiguration(
-        Map.of("urls", List.of("tcp://broker:1883"), "topics", List.of("sensor/data"), "qos", 1));
+    input.setConnector(
+        new MqttConnectorConfiguration(
+            List.of("tcp://broker:1883"),
+            List.of("sensor/data"),
+            1,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null));
     return input;
   }
 
@@ -66,7 +74,8 @@ class DataSourceScopeFilteringIntegrationTest
     DataSourceInputDTO input = new DataSourceInputDTO();
     input.setName("updated_scope_datasource");
     input.setDescription("Updated");
-    input.setConnectorType(ConnectorType.MQTT);
+    input.setConnector(
+        new MqttConnectorConfiguration(null, null, null, null, null, null, null, null, null));
     return input;
   }
 
@@ -203,9 +212,17 @@ class DataSourceScopeFilteringIntegrationTest
     DataSourceInputDTO input = new DataSourceInputDTO();
     input.setName(name);
     input.setDescription("Test data source");
-    input.setConnectorType(ConnectorType.MQTT);
-    input.setConfiguration(
-        Map.of("urls", List.of("tcp://broker:1883"), "topics", List.of("sensor/data"), "qos", 1));
+    input.setConnector(
+        new MqttConnectorConfiguration(
+            List.of("tcp://broker:1883"),
+            List.of("sensor/data"),
+            1,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null));
 
     ResponseEntity<DataSourceOutputDTO> response = performCreate(input);
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);

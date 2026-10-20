@@ -89,7 +89,7 @@ export const PipelineList = ({
   const datasourceConnectors = useMemo(() => {
     const map = new Map<string, string>()
     for (const ds of datasourcesData?.data ?? []) {
-      if (ds.connectorType) map.set(ds.id, ds.connectorType)
+      if (ds.connector) map.set(ds.id, ds.connector.connectorType)
     }
     return map
   }, [datasourcesData?.data])

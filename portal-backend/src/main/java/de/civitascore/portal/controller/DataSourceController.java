@@ -1,5 +1,8 @@
 package de.civitascore.portal.controller;
 
+import de.civitascore.portal.model.connector.ConnectorJson;
+import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
+import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
@@ -27,7 +30,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
 /** REST controller for managing data source resources, including release/unrelease lifecycle. */
 @RestController
@@ -99,10 +104,7 @@ public class DataSourceController
         name = "connectorType",
         description = "Filter by connector type (exact match).",
         in = ParameterIn.QUERY,
-        schema =
-            @Schema(
-                type = "string",
-                allowableValues = {"MQTT", "SQL"})),
+        schema = @Schema(implementation = ConnectorType.class)),
     @Parameter(
         name = "datapoolId",
         description =
@@ -140,18 +142,27 @@ public class DataSourceController
   }
 
   /**
-   * Merges connector-specific configuration fields during a JSON-merge patch.
-   *
-   * <p>Delegates to {@link DataSourceService#mergeConfigurationForPatch} after the standard Jackson
-   * merge so that nested connector properties are handled correctly.
+   * Applies the {@code connector} member as a JSON merge patch of the stored connector, and the
+   * other members as usual. A {@code connector} with another {@code connectorType} replaces the
+   * stored one.
    *
    * <p>{@inheritDoc}
    */
   @Override
   protected DataSourceInputDTO patchInput(
       DataSourceInputDTO currentDto, DataSource entity, JsonNode updates) throws IOException {
-    DataSourceInputDTO patchedDto = super.patchInput(currentDto, entity, updates);
-    getService().mergeConfigurationForPatch(patchedDto, entity, updates);
+    JsonNode otherMembers =
+        updates instanceof ObjectNode object
+            ? object.deepCopy().without(ConnectorJson.ROOT)
+            : updates;
+    DataSourceInputDTO patchedDto;
+    // Jackson wraps the exception that the any-setter of the input throws for an unknown key.
+    try {
+      patchedDto = super.patchInput(currentDto, entity, otherMembers);
+    } catch (JacksonException e) {
+      throw e.getCause() instanceof MalformedDataSourceRequestException malformed ? malformed : e;
+    }
+    patchedDto.setConnector(getService().patchConnector(entity, updates.path(ConnectorJson.ROOT)));
     return patchedDto;
   }
 }

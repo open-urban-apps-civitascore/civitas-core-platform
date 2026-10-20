@@ -112,6 +112,13 @@ class CoreUrnTest {
   }
 
   @Test
+  @DisplayName("logicalUrn strips the trailing :latest token")
+  void logicalUrn_stripsLatest() {
+    String logical = "urn:core:platform:civitas:datasource:common:" + ID;
+    assertEquals(logical, CoreUrn.logicalUrn(logical + ":latest"));
+  }
+
+  @Test
   @DisplayName(
       "logicalUrn returns an already-logical URN (no version tail) unchanged, and null for null")
   void logicalUrn_passthroughAndNull() {
@@ -134,5 +141,16 @@ class CoreUrnTest {
     assertFalse(CoreUrn.sameArtifact(v1, other));
     assertFalse(CoreUrn.sameArtifact(v1, null));
     assertFalse(CoreUrn.sameArtifact(null, v1));
+  }
+
+  @Test
+  @DisplayName("sameArtifact matches a :latest reference to a version of the same artifact only")
+  void sameArtifact_latest() {
+    String logical = "urn:core:tenant:stadt:datasource:mobility:" + ID;
+    assertTrue(CoreUrn.sameArtifact(logical + ":1.2.0", logical + ":latest"));
+    assertFalse(
+        CoreUrn.sameArtifact(
+            "urn:core:tenant:stadt:datasource:mobility:00000000-0000-0000-0000-000000000002:1.2.0",
+            logical + ":latest"));
   }
 }

@@ -113,7 +113,7 @@ export interface PipelineStylesPayload {
 export type CorePipelineNodeKind = 'source' | 'sink' | 'mapping' | 'cron' | 'start' | 'end'
 
 /**
- * A single node of the clean CORE Pipeline document. References are versioned CORE URNs
+ * A single node of the clean CORE Pipeline document. References are CORE URNs
  * (`sourceRef`/`sinkRef`/`mappingRef`) and are omitted when the node is not yet configured.
  * `x-ui-position` carries the canvas position; `id`/`kind`/`label` are the stable identity.
  */
@@ -121,7 +121,7 @@ export interface CorePipelineNode {
   id: string
   kind: CorePipelineNodeKind
   label?: string
-  /** Versioned CORE URN of the referenced DataSource (source nodes). */
+  /** `:latest` CORE URN of the referenced DataSource (source nodes). */
   sourceRef?: string
   /** Versioned CORE URN of the referenced DataSink (sink nodes). */
   sinkRef?: string

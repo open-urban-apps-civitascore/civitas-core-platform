@@ -101,7 +101,7 @@ export const datasourceToSelectable = (ds: Datasource): SelectableEntity => ({
   id: ds.id,
   name: ds.name,
   metadata: {
-    connectorType: ds.connectorType,
+    connectorType: ds.connector?.connectorType,
     status: ds.dataSourceStatus,
     description: ds.description,
   },

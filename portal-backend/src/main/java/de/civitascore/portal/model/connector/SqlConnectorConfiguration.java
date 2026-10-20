@@ -1,81 +1,52 @@
 package de.civitascore.portal.model.connector;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import de.civitascore.portal.model.embedded.ConnectorType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.List;
-import lombok.Data;
 
-@Data
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class SqlConnectorConfiguration implements ConnectorConfiguration {
+/** Connector configuration of an SQL Data source. */
+@Schema(name = "SqlConnector", description = "Connector of an SQL Data source.")
+public record SqlConnectorConfiguration(
+    @Schema(description = "Database driver type.", example = "postgres")
+        @NotBlank(groups = OnRelease.class, message = "'driver' is required and must not be blank") String driver,
+    @Schema(
+            description =
+                "Connection URL. Embedded credentials and a jdbc: prefix are removed; use user and"
+                    + " password instead.",
+            example = "postgres://localhost:5432/mydb")
+        @NotBlank(groups = OnRelease.class, message = "'dsn' is required and must not be blank") String dsn,
+    @Schema(description = "Target table name.", example = "sensor_readings")
+        @NotBlank(groups = OnRelease.class, message = "'table' is required and must not be blank") String table,
+    @Schema(description = "Column names to select.", example = "[\"id\", \"value\", \"timestamp\"]")
+        @NotEmpty(
+            groups = OnRelease.class,
+            message = "'columns' is required and must be a non-empty list")
+        List<String> columns,
+    @Schema(description = "SQL WHERE clause.", example = "id > :last_id") String where,
+    @Schema(description = "Database username.", example = "dbuser") String user,
+    @Schema(
+            description = "Database password. Responses show \"********\" for a stored password.",
+            implementation = String.class,
+            accessMode = Schema.AccessMode.WRITE_ONLY,
+            format = "password",
+            example = "secret")
+        Secret password)
+    implements ConnectorConfiguration {
 
-  @Schema(description = "Database driver type.", example = "postgres")
-  @NotBlank(groups = OnRelease.class, message = "'driver' is required and must not be blank") private String driver;
-
-  @Schema(
-      description =
-          "Connection URL. Embedded credentials are stripped — use user/password instead.",
-      example = "postgres://localhost:5432/mydb")
-  @NotBlank(groups = OnRelease.class, message = "'dsn' is required and must not be blank") private String dsn;
-
-  @Schema(description = "Target table name.", example = "sensor_readings")
-  @NotBlank(groups = OnRelease.class, message = "'table' is required and must not be blank") private String table;
-
-  @Schema(description = "Column names to select.", example = "[\"id\", \"value\", \"timestamp\"]")
-  @NotEmpty(
-      groups = OnRelease.class,
-      message = "'columns' is required and must be a non-empty list")
-  private List<String> columns;
-
-  @JsonProperty("where")
-  @Schema(description = "SQL WHERE clause.", example = "id > :last_id")
-  private String where;
-
-  @Schema(description = "Database username.", example = "dbuser")
-  private String user;
-
-  @Schema(
-      description = "Database password. Write-only — returned as \"********\" in responses.",
-      accessMode = Schema.AccessMode.WRITE_ONLY,
-      example = "secret")
-  private String password;
-
-  public void setPassword(String password) {
-    this.password = (password != null && password.isBlank()) ? null : password;
+  public SqlConnectorConfiguration {
+    driver = ConnectorValues.blankToNull(driver);
+    dsn = ConnectorUris.dsnWithoutCredentials(dsn, "dsn");
+    table = ConnectorValues.blankToNull(table);
+    columns = ConnectorValues.listOf(columns, "columns");
+    where = ConnectorValues.blankToNull(where);
+    user = ConnectorValues.blankToNull(user);
   }
 
-  // Validates DSN with java.net.URI and strips any embedded credentials (discarding them).
-  // Strips "jdbc:" prefix if present since Redpanda Connect (Go) doesn't use it.
-  public void setDsn(String dsn) {
-    if (dsn == null || dsn.isEmpty()) {
-      this.dsn = dsn;
-      return;
-    }
-    try {
-      String toParse = dsn.toLowerCase().startsWith("jdbc:") ? dsn.substring(5) : dsn;
-      URI uri = new URI(toParse);
-      if (uri.getHost() == null) {
-        throw new IllegalArgumentException("Invalid DSN: could not parse host");
-      }
-      if (uri.getUserInfo() != null) {
-        uri =
-            new URI(
-                uri.getScheme(),
-                null,
-                uri.getHost(),
-                uri.getPort(),
-                uri.getPath(),
-                uri.getQuery(),
-                uri.getFragment());
-      }
-      this.dsn = uri.toString();
-    } catch (URISyntaxException e) {
-      throw new IllegalArgumentException("Invalid DSN: could not parse URI", e);
-    }
+  @Override
+  @Schema(allowableValues = "SQL", requiredMode = Schema.RequiredMode.REQUIRED)
+  public ConnectorType connectorType() {
+    return ConnectorType.SQL;
   }
 }

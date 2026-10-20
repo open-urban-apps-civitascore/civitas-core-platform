@@ -15,6 +15,10 @@ import org.springframework.validation.annotation.Validated;
  *
  * <p>It is therefore also a limit on how deep a flow may be and still be released: a flow reaching
  * past the bound is refused, because everything beyond it went unexamined.
+ *
+ * <p>The same bound limits the walk that collects a flow's artifacts into the saga payload on
+ * release and update, so a flow too deep for that walk is refused too rather than published
+ * incomplete.
  */
 @Validated
 @ConfigurationProperties(prefix = "dataset.closure-validation")

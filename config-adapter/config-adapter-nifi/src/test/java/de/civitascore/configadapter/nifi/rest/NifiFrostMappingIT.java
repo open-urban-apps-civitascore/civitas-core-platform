@@ -1099,7 +1099,10 @@ class NifiFrostMappingIT extends AbstractNifiIT {
   }
 
   private static void deploy(
-      String pipelineId, Map<String, Object> graph, Datasource source, Map<String, Object> mappings)
+      String pipelineId,
+      Map<String, Object> graph,
+      Datasource source,
+      Map<String, Map<String, Object>> mappings)
       throws Exception {
     byte[] key = CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
     try (CredentialResolver resolver = new CredentialResolver(key)) {
@@ -1141,9 +1144,9 @@ class NifiFrostMappingIT extends AbstractNifiIT {
                   StaJsonType.RAW_JSON,
                   TargetKind.OPTIONAL)));
 
-  /** A single-entry mappings catalog keyed by {@code map-1} (the graphs' mappingRef). */
-  private static Map<String, Object> frostMapping(String fieldsJson) throws Exception {
-    return json("{ \"map-1\": { \"fields\": " + fieldsJson + " } }");
+  /** A single-entry artifacts map keyed by {@code map-1} (the graphs' mappingRef). */
+  private static Map<String, Map<String, Object>> frostMapping(String fieldsJson) throws Exception {
+    return NifiTestFixtures.artifacts("{ \"map-1\": { \"fields\": " + fieldsJson + " } }");
   }
 
   // ─── FROST fixtures & queries ───────────────────────────────────────────────

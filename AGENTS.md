@@ -17,6 +17,11 @@ components plus custom management layer plus glue components.
 images. Hosting, monitoring, backup and incident response belong to the
 operator. We never see production data; telemetry is opt-in.
 
+**One release for all components.** We release and deploy all our components
+together, and only in versions that work together. Thus, interfaces between our
+components do not need backward compatibility. Change component versions only
+at release.
+
 ## Sprint Priorities (2.10.–22.10.2026)
 Sprint goal: **Release CIVITAS/CORE 2.0, add the HTTP connector and improve
 quality of life in the platform.**

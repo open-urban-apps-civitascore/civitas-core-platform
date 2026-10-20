@@ -14,9 +14,8 @@ post {
 body:json {
   {
     "name": "contract_sql_release_empty",
-    "description": "Pins that release rejects empty configuration on SQL",
-    "connectorType": "SQL",
-    "configuration": {},
+    "description": "Pins that release rejects an empty SQL connector",
+    "connector": { "connectorType": "SQL" },
     "dataStructureVersionId": "{{contractSqlReleaseEmptyDsvId}}"
   }
 }
@@ -28,7 +27,7 @@ script:post-response {
 }
 
 tests {
-  test("DataSource created in DRAFT with empty configuration (201)", function() {
+  test("DataSource created in DRAFT with empty connector (201)", function() {
     expect(res.getStatus()).to.equal(201);
   });
   test("Status is DRAFT", function() {
@@ -37,7 +36,7 @@ tests {
 }
 
 docs {
-  Creates a SQL DataSource with `configuration: {}` (the deferred-validation
-  contract permits this on DRAFT). Step 5 then attempts to release it and
-  pins the rejection contract.
+  Creates an SQL DataSource with `connector: { "connectorType": "SQL" }`
+  (the deferred-validation contract permits this on DRAFT). Step 5 attempts
+  to release it and pins the rejection contract.
 }

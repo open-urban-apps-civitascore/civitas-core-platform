@@ -56,12 +56,12 @@ class MappingNodeTypeTest {
     return new GraphNode(id, "mapping", null, null, mappingRef, null);
   }
 
-  /** A shipped mapping document ({@code fields} only) for the catalog. */
+  /** A mapping document ({@code fields} only). */
   private static Map<String, Object> mappingDoc(Map<String, Object> fields) {
     return Map.of("fields", fields);
   }
 
-  /** A shipped mapping document that declares the structures it reads and writes. */
+  /** A mapping document that declares the structures it reads and writes. */
   private static Map<String, Object> mappingDoc(
       String source, String target, Map<String, Object> fields) {
     return Map.of("source", source, "target", target, "fields", fields);
@@ -72,7 +72,7 @@ class MappingNodeTypeTest {
     // The FROST compiler derives match keys from the mapping's target structure — a datasink
     // without it cannot deploy a mapped flow, only a passthrough.
     GraphNode mapping = mappingNode("m1", REF_1);
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> artifacts =
         Map.of(REF_1, mappingDoc(Map.of("$.properties.reference", "$.ref")));
 
     FatalAdapterException ex =
@@ -83,7 +83,7 @@ class MappingNodeTypeTest {
                     List.of(mapping),
                     envelopeSink,
                     new FrostSinkSpec("1", SinkPort.THING_TREE, null),
-                    mappings));
+                    artifacts));
     assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
   }
 
@@ -93,7 +93,7 @@ class MappingNodeTypeTest {
     // against the FROST catalog.
     GraphNode first = mappingNode("m1", REF_1);
     GraphNode last = mappingNode("m2", REF_2);
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> artifacts =
         Map.of(
             REF_1, mappingDoc(Map.of("$.stationName", "$.raw")),
             REF_2, mappingDoc(Map.of("$.properties.reference", "$.stationName")));
@@ -104,7 +104,7 @@ class MappingNodeTypeTest {
             envelopeSink,
             new FrostSinkSpec(
                 "1", SinkPort.THING_TREE, StaProperties.ofKeys(List.of("reference"), List.of())),
-            mappings);
+            artifacts);
 
     assertEquals(2, compilation.units().size());
   }
@@ -131,33 +131,12 @@ class MappingNodeTypeTest {
   }
 
   @Test
-  void mappingRefNotShippedInCatalogIsRejected() {
-    // The config-adapter is callback-free — a mappingRef whose document did not travel in the
-    // pipeline's mappings catalog cannot be resolved and must fail the deploy.
-    GraphNode mapping = mappingNode("m1", REF_1);
-
-    FatalAdapterException ex =
-        assertThrows(
-            FatalAdapterException.class,
-            () ->
-                mappingNodeType.compile(
-                    List.of(mapping),
-                    envelopeSink,
-                    new FrostSinkSpec(
-                        "1",
-                        SinkPort.THING_TREE,
-                        StaProperties.ofKeys(List.of("reference"), List.of())),
-                    Map.of()));
-    assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
-  }
-
-  @Test
   void handoverNamingTheRootElementOfTheStructureDeploysUnchanged() throws Exception {
     // A grouping and its root Element share UUID and version, so they describe one shape. Comparing
     // the URNs verbatim would fail a correct deploy whose mappings name the two sides differently.
     GraphNode first = mappingNode("m1", REF_1);
     GraphNode last = mappingNode("m2", REF_2);
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> artifacts =
         Map.of(
             REF_1, mappingDoc(STRUCTURE_A, STRUCTURE_B_ROOT_ELEMENT, Map.of("$.name", "$.raw")),
             REF_2,
@@ -169,7 +148,7 @@ class MappingNodeTypeTest {
             envelopeSink,
             new FrostSinkSpec(
                 "1", SinkPort.THING_TREE, StaProperties.ofKeys(List.of("reference"), List.of())),
-            mappings);
+            artifacts);
 
     assertEquals(2, compilation.units().size());
   }
@@ -180,7 +159,7 @@ class MappingNodeTypeTest {
     // CONFLICT DO UPDATE — so N elements sharing the parent's key overwrite each other down to one
     // row, last element winning, with no failure route and no bulletin.
     GraphNode mapping = mappingNode("m1", REF_1);
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> artifacts =
         Map.of(
             REF_1,
             mappingDoc(Map.of("$.stationid", "$.stationid", "$.value", "$.measurements[].value")));
@@ -193,7 +172,7 @@ class MappingNodeTypeTest {
                     List.of(mapping),
                     new PostgisSinkStage(null),
                     new PostgisSinkSpec("readings", List.of("stationid")),
-                    mappings));
+                    artifacts));
 
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
     assertTrue(ex.getMessage().contains("every primary-key column"), ex.getMessage());
@@ -204,7 +183,7 @@ class MappingNodeTypeTest {
     // The counterpart: one key column read from below the array makes the rows distinct, which is
     // the shape the IT deploys.
     GraphNode mapping = mappingNode("m1", REF_1);
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> artifacts =
         Map.of(
             REF_1,
             mappingDoc(
@@ -218,13 +197,13 @@ class MappingNodeTypeTest {
             List.of(mapping),
             new PostgisSinkStage(null),
             new PostgisSinkSpec("readings", List.of("stationid", "measured_at")),
-            mappings);
+            artifacts);
 
     assertEquals(1, compilation.units().size());
   }
 
   private FatalAdapterException compileExpectingRejection(
-      Map<String, Object> mappings, GraphNode... nodes) {
+      Map<String, Map<String, Object>> artifacts, GraphNode... nodes) {
     return assertThrows(
         FatalAdapterException.class,
         () ->
@@ -235,20 +214,20 @@ class MappingNodeTypeTest {
                     "1",
                     SinkPort.THING_TREE,
                     StaProperties.ofKeys(List.of("reference"), List.of())),
-                mappings));
+                artifacts));
   }
 
   @Test
   void aChainWhoseNeighboursDisagreeOnTheStructureBetweenThemIsRejected() {
     GraphNode first = mappingNode("m1", REF_1);
     GraphNode last = mappingNode("m2", REF_2);
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> artifacts =
         Map.of(
             REF_1, mappingDoc(STRUCTURE_A, STRUCTURE_B, Map.of("$.name", "$.raw")),
             REF_2,
                 mappingDoc(STRUCTURE_A, STRUCTURE_B, Map.of("$.properties.reference", "$.name")));
 
-    FatalAdapterException ex = compileExpectingRejection(mappings, first, last);
+    FatalAdapterException ex = compileExpectingRejection(artifacts, first, last);
 
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
     // Asserted on the message, not the code alone: four other compilers share NIFI_MAPPING_ERROR,
@@ -261,13 +240,13 @@ class MappingNodeTypeTest {
     // A version bump is a different shape, so a comparison that ignored the version would pass.
     GraphNode first = mappingNode("m1", REF_1);
     GraphNode last = mappingNode("m2", REF_2);
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> artifacts =
         Map.of(
             REF_1, mappingDoc(STRUCTURE_A, STRUCTURE_B_V2, Map.of("$.name", "$.raw")),
             REF_2,
                 mappingDoc(STRUCTURE_B, STRUCTURE_A, Map.of("$.properties.reference", "$.name")));
 
-    FatalAdapterException ex = compileExpectingRejection(mappings, first, last);
+    FatalAdapterException ex = compileExpectingRejection(artifacts, first, last);
 
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
     assertTrue(ex.getMessage().contains("mapping node 'm2'"), ex.getMessage());
@@ -280,14 +259,14 @@ class MappingNodeTypeTest {
     GraphNode first = mappingNode("m1", REF_1);
     GraphNode second = mappingNode("m2", REF_2);
     GraphNode third = mappingNode("m3", REF_3);
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> artifacts =
         Map.of(
             REF_1, mappingDoc(STRUCTURE_A, STRUCTURE_B, Map.of("$.name", "$.raw")),
             REF_2, mappingDoc(STRUCTURE_B, STRUCTURE_A, Map.of("$.label", "$.name")),
             REF_3,
                 mappingDoc(STRUCTURE_B, STRUCTURE_A, Map.of("$.properties.reference", "$.label")));
 
-    FatalAdapterException ex = compileExpectingRejection(mappings, first, second, third);
+    FatalAdapterException ex = compileExpectingRejection(artifacts, first, second, third);
 
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
     assertTrue(ex.getMessage().contains("mapping node 'm3'"), ex.getMessage());
@@ -299,12 +278,12 @@ class MappingNodeTypeTest {
     // legacy one — and its paths are as unverifiable as an outright mismatch.
     GraphNode first = mappingNode("m1", REF_1);
     GraphNode last = mappingNode("m2", REF_2);
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> artifacts =
         Map.of(
             REF_1, mappingDoc(STRUCTURE_A, STRUCTURE_B, Map.of("$.name", "$.raw")),
             REF_2, mappingDoc(Map.of("$.properties.reference", "$.name")));
 
-    FatalAdapterException ex = compileExpectingRejection(mappings, first, last);
+    FatalAdapterException ex = compileExpectingRejection(artifacts, first, last);
 
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
     assertTrue(ex.getMessage().contains("no source structure"), ex.getMessage());
@@ -315,13 +294,13 @@ class MappingNodeTypeTest {
     // The mirror case, which a single null-check on the downstream side alone would let through.
     GraphNode first = mappingNode("m1", REF_1);
     GraphNode last = mappingNode("m2", REF_2);
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> artifacts =
         Map.of(
             REF_1, mappingDoc(Map.of("$.name", "$.raw")),
             REF_2,
                 mappingDoc(STRUCTURE_B, STRUCTURE_A, Map.of("$.properties.reference", "$.name")));
 
-    FatalAdapterException ex = compileExpectingRejection(mappings, first, last);
+    FatalAdapterException ex = compileExpectingRejection(artifacts, first, last);
 
     assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
     assertTrue(ex.getMessage().contains("no target structure"), ex.getMessage());
@@ -331,7 +310,7 @@ class MappingNodeTypeTest {
   void aChainThatHandsOverTheSameStructureCompiles() throws Exception {
     GraphNode first = mappingNode("m1", REF_1);
     GraphNode last = mappingNode("m2", REF_2);
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> artifacts =
         Map.of(
             REF_1, mappingDoc(STRUCTURE_A, STRUCTURE_B, Map.of("$.name", "$.raw")),
             REF_2,
@@ -343,7 +322,7 @@ class MappingNodeTypeTest {
             envelopeSink,
             new FrostSinkSpec(
                 "1", SinkPort.THING_TREE, StaProperties.ofKeys(List.of("reference"), List.of())),
-            mappings);
+            artifacts);
 
     assertEquals(2, compilation.units().size());
   }
@@ -353,7 +332,7 @@ class MappingNodeTypeTest {
     // The URNs are optional on a mapping, so a chain that declares none must keep deploying.
     GraphNode first = mappingNode("m1", REF_1);
     GraphNode last = mappingNode("m2", REF_2);
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> artifacts =
         Map.of(
             REF_1, mappingDoc(Map.of("$.stationName", "$.raw")),
             REF_2, mappingDoc(Map.of("$.properties.reference", "$.stationName")));
@@ -364,7 +343,7 @@ class MappingNodeTypeTest {
             envelopeSink,
             new FrostSinkSpec(
                 "1", SinkPort.THING_TREE, StaProperties.ofKeys(List.of("reference"), List.of())),
-            mappings);
+            artifacts);
 
     assertEquals(2, compilation.units().size());
   }

@@ -17,7 +17,6 @@ export const StructureDefinitionTab = (props: StructureDefinitionTabProps) => {
       isReadOnly={isReadOnly || isAvailable}
       modelSessionManager={modelSessionManager}
       isMultiSessionMode={false}
-      canExportModel={false}
       dataStructureName={dataStructureName}
       versionName={versionName}
       datastructureId={datastructureId}

@@ -82,7 +82,7 @@ public class FlowDeploymentPlanner {
     Optional<String> sourceCron = validatedTriggerCron(path);
     SinkSpec sink = request.sink();
     SinkStage<?> sinkStage = registry.sink(sink.type());
-    Compilation chain = compileTransforms(path, sinkStage, sink, request.mappings());
+    Compilation chain = compileTransforms(path, sinkStage, sink, request.artifacts());
 
     Datasource source = request.source();
     if (source == null) {
@@ -151,7 +151,10 @@ public class FlowDeploymentPlanner {
    * mapped FROST sink.
    */
   private Compilation compileTransforms(
-      FlowPath path, SinkStage<?> sinkStage, SinkSpec sinkSpec, Map<String, Object> mappings)
+      FlowPath path,
+      SinkStage<?> sinkStage,
+      SinkSpec sinkSpec,
+      Map<String, Map<String, Object>> artifacts)
       throws FatalAdapterException {
     Map<NodeKind, List<GraphNode>> byKind = new LinkedHashMap<>();
     for (GraphNode node : path.transforms()) {
@@ -161,7 +164,7 @@ public class FlowDeploymentPlanner {
     SinkPreRegionPlan sinkPreRegion = null;
     for (Map.Entry<NodeKind, List<GraphNode>> entry : byKind.entrySet()) {
       TransformNodeType nodeType = registry.transformNodeType(entry.getKey());
-      Compilation compilation = nodeType.compile(entry.getValue(), sinkStage, sinkSpec, mappings);
+      Compilation compilation = nodeType.compile(entry.getValue(), sinkStage, sinkSpec, artifacts);
       // The reassembly below consumes exactly one unit per node; a miscounting kind would
       // otherwise drop surplus units silently or exhaust the iterator with a bare
       // NoSuchElementException.

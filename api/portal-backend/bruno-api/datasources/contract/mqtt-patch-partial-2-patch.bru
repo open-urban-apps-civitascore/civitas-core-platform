@@ -24,16 +24,16 @@ tests {
   test("Only description changed; other fields preserved", function() {
     expect(res.body.name).to.equal("contract_mqtt_patch");
     expect(res.body.description).to.equal("contract — MQTT patched");
-    expect(res.body.connectorType).to.equal("MQTT");
+    expect(res.body.connector.connectorType).to.equal("MQTT");
     expect(res.body.dataSourceStatus).to.equal("DRAFT");
     expect(res.body.inUse).to.equal(false);
   });
-  test("Configuration unchanged", function() {
-    expect(res.body.configuration.urls).to.deep.equal(["tcp://broker:1883"]);
-    expect(res.body.configuration.topics).to.deep.equal(["sensor/data"]);
-    expect(res.body.configuration.qos).to.equal(1);
-    expect(res.body.configuration.tls).to.deep.equal({ enabled: false });
-    expect(res.body.configuration).to.have.property('user', null);
-    expect(res.body.configuration).to.have.property('password', null);
+  test("Connector unchanged", function() {
+    expect(res.body.connector.urls).to.deep.equal(["tcp://broker:1883"]);
+    expect(res.body.connector.topics).to.deep.equal(["sensor/data"]);
+    expect(res.body.connector.qos).to.equal(1);
+    expect(res.body.connector.tls).to.deep.equal({ enabled: false });
+    expect(res.body.connector).to.have.property('user', null);
+    expect(res.body.connector).to.have.property('password', null);
   });
 }

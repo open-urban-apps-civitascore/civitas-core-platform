@@ -17,8 +17,10 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
@@ -36,10 +38,10 @@ import org.springframework.stereotype.Component;
  * flow reaches does not block it.
  *
  * <p>Every Data source of a participating Pipeline must be AVAILABLE. Every registry artifact must
- * resolve. An artifact with a Data structure version row must also be readable and released. The
- * row, not the URN's kind, gives it a lifecycle and a Scope. An artifact without a row is held to
- * resolvability alone. Elements are reusable, so inheriting a lifecycle would block a shared
- * element on an unrelated draft.
+ * resolve. An artifact with a Data structure version row must also be released, and readable unless
+ * a Data source of the flow names it. The row, not the URN's kind, gives it a lifecycle and a
+ * Scope. An artifact without a row is held to resolvability alone. Elements are reusable, so
+ * inheriting a lifecycle would block a shared element on an unrelated draft.
  *
  * <p>Findings are collected across every flow and reported together.
  */
@@ -109,10 +111,18 @@ public class PipelineClosureValidator {
     if (resolved.isEmpty()) {
       return blocks;
     }
+    Set<String> dataSourceStructures = dataSourceStructures(pipeline);
     Map<String, List<DataStructureVersion>> governed = governingVersions.governingAll(resolved);
     for (String urn : resolved) {
       List<DataStructureVersion> records = governed.get(urn);
-      if (records != null && governedBlocks(pipeline.getId(), urn, records, structureReadability)) {
+      if (records == null) {
+        continue;
+      }
+      boolean urnBlocks =
+          dataSourceStructures.contains(urn)
+              ? unreleased(pipeline.getId(), urn, records)
+              : governedBlocks(pipeline.getId(), urn, records, structureReadability);
+      if (urnBlocks) {
         blocks = true;
       }
     }
@@ -139,11 +149,21 @@ public class PipelineClosureValidator {
   }
 
   /**
+   * The Data structure versions that the Data sources of this flow name. The caller needs no
+   * permission to read them: they chose the Data source, not the Data structure it delivers.
+   */
+  private static Set<String> dataSourceStructures(Pipeline pipeline) {
+    return pipeline.getDataSources().stream()
+        .map(DataSource::getDataStructureVersion)
+        .filter(Objects::nonNull)
+        .map(DataStructureVersion::getModelUrn)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toSet());
+  }
+
+  /**
    * Holds one governed artifact to what a released flow needs of it. Readability is judged first:
    * reporting a draft state to a caller who may not read the artifact would confirm it exists.
-   *
-   * <p>Several records can pin the same artifact, so it carries a release as soon as one record the
-   * caller may read says so.
    */
   private boolean governedBlocks(
       UUID pipelineId,
@@ -160,7 +180,13 @@ public class PipelineClosureValidator {
           pipelineId);
       return true;
     }
-    if (readable.stream().noneMatch(PipelineClosureValidator::isReleased)) {
+    return unreleased(pipelineId, urn, readable);
+  }
+
+  /** Several records can pin the same artifact, so one released record is enough. */
+  private static boolean unreleased(
+      UUID pipelineId, String urn, List<DataStructureVersion> records) {
+    if (records.stream().noneMatch(PipelineClosureValidator::isReleased)) {
       log.info(
           "Closure validation: {} reached by pipeline {} is still a draft",
           Encode.forJava(urn),

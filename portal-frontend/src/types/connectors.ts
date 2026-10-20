@@ -226,10 +226,24 @@ const connectorUnion = <T extends Record<ConnectorType, z.ZodTypeAny>>(schemas: 
     z.object({ connectorType: z.literal(CONNECTOR_TYPES.SQL), configuration: schemas.SQL }),
   ])
 
-export const ConnectorApiResponseSchema = connectorUnion({ MQTT: MqttApiResponseSchema, SQL: SqlApiResponseSchema })
+// Keeps the type's fields unvalidated, so a connector the form schemas reject does not stop the Data
+// source from loading; ConnectorApiToFormSchema validates them per type.
+export const ConnectorApiResponseSchema = z.looseObject({ connectorType: z.enum(CONNECTOR_TYPES) })
+
+export type ConnectorApiResponse = z.infer<typeof ConnectorApiResponseSchema>
+
+export const toConnectorFormShape = ({ connectorType, ...configuration }: ConnectorApiResponse) => ({
+  connectorType,
+  configuration,
+})
+
 export const ConnectorLooseSchema = connectorUnion({ MQTT: MqttLooseSchema, SQL: SqlLooseSchema })
 export const ConnectorStrictSchema = connectorUnion({ MQTT: MqttStrictSchema, SQL: SqlStrictSchema })
 export const ConnectorApiToFormSchema = connectorUnion({ MQTT: MqttApiToFormSchema, SQL: SqlApiToFormSchema })
-export const ConnectorFormToApiSchema = connectorUnion({ MQTT: MqttFormToApiSchema, SQL: SqlLooseSchema })
+
+/** Maps the form's `connectorType` and `configuration` to the API `connector` member. */
+export const ConnectorFormToApiSchema = connectorUnion({ MQTT: MqttFormToApiSchema, SQL: SqlLooseSchema }).transform(
+  ({ connectorType, configuration }) => ({ connectorType, ...(configuration as Record<string, unknown>) }),
+)
 
 export type ConnectorDraft = z.infer<typeof ConnectorLooseSchema>

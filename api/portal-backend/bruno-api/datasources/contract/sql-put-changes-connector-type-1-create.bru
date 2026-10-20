@@ -15,8 +15,8 @@ body:json {
   {
     "name": "contract_sql_put_type_change",
     "description": "contract — SQL (will be PUT'd to MQTT)",
-    "connectorType": "SQL",
-    "configuration": {
+    "connector": {
+      "connectorType": "SQL",
       "driver": "postgres",
       "dsn": "postgres://example:5432/db",
       "user": "alice",
@@ -40,7 +40,7 @@ tests {
     expect(res.getStatus()).to.equal(201);
   });
   test("Created as SQL in DRAFT", function() {
-    expect(res.body.connectorType).to.equal("SQL");
+    expect(res.body.connector.connectorType).to.equal("SQL");
     expect(res.body.dataSourceStatus).to.equal("DRAFT");
   });
 }

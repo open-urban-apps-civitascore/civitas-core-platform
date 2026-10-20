@@ -2,7 +2,6 @@ package de.civitascore.portal.messaging.saga;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import de.civitascore.configadapter.model.dataset.DataPipeline;
-import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.model.dataset.NamedApi;
 import de.civitascore.configadapter.model.saga.SagaType;
 import de.civitascore.portal.model.saga.DataSinkPayload;
@@ -51,12 +50,12 @@ public sealed interface SagaTrigger
       String datasetId,
       String datasetName,
       String description,
-      List<Datasource> datasources,
       List<DataSinkPayload> datasinks,
       List<LayerPayload> layers,
       List<StylePayload> styles,
       List<DataPipeline> dataPipelines,
-      List<NamedApi> namedApis)
+      List<NamedApi> namedApis,
+      Map<String, Map<String, Object>> artifacts)
       implements SagaTrigger {
 
     public DatasetCreate {
@@ -71,23 +70,23 @@ public sealed interface SagaTrigger
         String datasetId,
         String datasetName,
         String description,
-        List<Datasource> datasources,
         List<DataSinkPayload> datasinks,
         List<LayerPayload> layers,
         List<StylePayload> styles,
         List<DataPipeline> dataPipelines,
-        List<NamedApi> namedApis) {
+        List<NamedApi> namedApis,
+        Map<String, Map<String, Object>> artifacts) {
       return new DatasetCreate(
           SagaType.DATASET_CREATE,
           datasetId,
           datasetName,
           description,
-          datasources,
           datasinks,
           layers,
           styles,
           dataPipelines,
-          namedApis);
+          namedApis,
+          artifacts);
     }
   }
 
@@ -101,12 +100,12 @@ public sealed interface SagaTrigger
       Map<String, String> routeIds,
       String serviceId,
       List<String> pipelineIds,
-      List<Datasource> datasources,
       List<DataSinkPayload> datasinks,
       List<LayerPayload> layers,
       List<StylePayload> styles,
       List<DataPipeline> dataPipelines,
-      List<NamedApi> namedApis)
+      List<NamedApi> namedApis,
+      Map<String, Map<String, Object>> artifacts)
       implements SagaTrigger {
 
     public DatasetUpdate {
@@ -125,12 +124,12 @@ public sealed interface SagaTrigger
         Map<String, String> routeIds,
         String serviceId,
         List<String> pipelineIds,
-        List<Datasource> datasources,
         List<DataSinkPayload> datasinks,
         List<LayerPayload> layers,
         List<StylePayload> styles,
         List<DataPipeline> dataPipelines,
-        List<NamedApi> namedApis) {
+        List<NamedApi> namedApis,
+        Map<String, Map<String, Object>> artifacts) {
       return new DatasetUpdate(
           SagaType.DATASET_UPDATE,
           datasetId,
@@ -140,12 +139,12 @@ public sealed interface SagaTrigger
           routeIds,
           serviceId,
           pipelineIds,
-          datasources,
           datasinks,
           layers,
           styles,
           dataPipelines,
-          namedApis);
+          namedApis,
+          artifacts);
     }
   }
 

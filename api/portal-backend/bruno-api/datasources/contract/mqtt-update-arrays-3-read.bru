@@ -17,8 +17,8 @@ tests {
   });
   test("Updated state persisted", function() {
     expect(res.body.description).to.equal("contract — MQTT updated");
-    expect(res.body.configuration.topics).to.deep.equal(["sensor/data", "sensor/heartbeat"]);
-    expect(res.body.configuration.urls).to.deep.equal(["tcp://broker:1883"]);
-    expect(res.body.configuration.qos).to.equal(1);
+    expect(res.body.connector.topics).to.deep.equal(["sensor/data", "sensor/heartbeat"]);
+    expect(res.body.connector.urls).to.deep.equal(["tcp://broker:1883"]);
+    expect(res.body.connector.qos).to.equal(1);
   });
 }

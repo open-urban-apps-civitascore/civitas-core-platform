@@ -15,8 +15,8 @@ body:json {
   {
     "name": "contract_sql_sslmode",
     "description": "contract — SQL sslmode",
-    "connectorType": "SQL",
-    "configuration": {
+    "connector": {
+      "connectorType": "SQL",
       "driver": "postgres",
       "dsn": "postgres://reader:secret@db:5432/in?sslmode=require",
       "user": "reader",
@@ -41,7 +41,7 @@ tests {
   test("sslmode is preserved in the dsn while embedded credentials are stripped", function() {
     // SSL to the source DB rides in the dsn's sslmode; the credential-stripping URI round-trip
     // must keep the query so it survives to the deployed JDBC connection
-    expect(res.body.configuration.dsn).to.equal("postgres://db:5432/in?sslmode=require");
+    expect(res.body.connector.dsn).to.equal("postgres://db:5432/in?sslmode=require");
   });
 }
 

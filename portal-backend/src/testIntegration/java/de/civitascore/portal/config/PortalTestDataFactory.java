@@ -179,9 +179,9 @@ public class PortalTestDataFactory {
    */
   public DataSource attachSourceConfiguration(
       DataSource dataSource, Map<String, Object> configuration) {
-    // Mirror DataSourceService: the stored CORE payload carries connectionType (derived from the
-    // connector type); Model Forge stamps $schema + id on write and validates against
-    // datasource.schema.json.
+    // Raw on purpose: callers store documents as an earlier release or the registry holds them
+    // (ciphertext, extra keys), which ConnectorJson.writeDocument would encrypt again or reject.
+    // Only the connectionType stamping copies writeDocument.
     Map<String, Object> payload = new LinkedHashMap<>(configuration);
     if (dataSource.getConnectorType() != null) {
       payload.put("connectionType", dataSource.getConnectorType().name().toLowerCase(Locale.ROOT));

@@ -41,7 +41,7 @@ class StageRegistryTest {
           List<GraphNode> ownNodes,
           SinkStage<?> sink,
           SinkSpec sinkSpec,
-          Map<String, Object> mappings) {
+          Map<String, Map<String, Object>> mappings) {
         throw new UnsupportedOperationException();
       }
     };

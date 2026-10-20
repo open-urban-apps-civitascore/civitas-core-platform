@@ -15,42 +15,36 @@ tests {
   test("Status is 400", function() {
     expect(res.getStatus()).to.equal(400);
   });
-  test("Problem Detail type is INVALID_INPUT", function() {
-    expect(res.body.type).to.equal("urn:civitas:error:INVALID_INPUT");
-  });
-  test("Problem Detail title is Bad Request", function() {
+  test("Problem Detail matches the VALIDATION_FAILED contract", function() {
+    expect(res.body.type).to.equal("urn:civitas:error:VALIDATION_FAILED");
     expect(res.body.title).to.equal("Bad Request");
-  });
-  test("Problem Detail status is 400", function() {
     expect(res.body.status).to.equal(400);
   });
-  test("Detail names the OnRelease validation failures for MQTT", function() {
-    // POSTing `configuration: {}` produces a configuration that materializes
-    // default values for the MQTT connector schema. Release then triggers
-    // the @NotEmpty(groups = OnRelease.class) / @NotNull(groups = OnRelease.class)
-    // violations on the required fields (urls, topics, qos). Pin the
-    // OnRelease-group invocation by name-checking the required MQTT fields
-    // the user must fill in before releasing.
-    expect(res.body.detail).to.match(/Invalid configuration/);
-    expect(res.body.detail).to.match(/'urls'/);
-    expect(res.body.detail).to.match(/'topics'/);
-    expect(res.body.detail).to.match(/'qos'/);
+  test("fieldErrors name every missing required MQTT field by its connector path", function() {
+    const fields = res.body.fieldErrors.map(function(error) { return error.field; });
+    expect(fields).to.include.members([
+      "connector.urls",
+      "connector.topics",
+      "connector.qos"
+    ]);
+    res.body.fieldErrors.forEach(function(error) {
+      expect(error.field).to.match(/^connector\./);
+      expect(error.message).to.be.a('string').and.not.empty;
+    });
   });
 }
 
 docs {
   Pins the release-time half of the deferred-validation contract for MQTT.
 
-  An empty `configuration: {}` is accepted on DRAFT (the deferred-validation
-  contract — see `mqtt-empty-config-accepted-1-create.bru`). On release, the
-  configuration's `@NotEmpty(groups = OnRelease.class)` / `@NotNull(groups =
-  OnRelease.class)` constraints on `urls`, `topics`, `qos` fire and the
-  request fails with HTTP 400 / `urn:civitas:error:INVALID_INPUT`, raised
-  from `DataSourceService.validateConfiguration` via
-  `DataSourceService.validateRelease`.
+  An MQTT connector with only `connectorType` is accepted on DRAFT (see
+  `mqtt-empty-config-accepted-1-create.bru`). On release, the `OnRelease`
+  constraints on `urls`, `topics`, `qos` fire and the request fails with HTTP 400 /
+  `urn:civitas:error:VALIDATION_FAILED`. Each entry of `fieldErrors` names
+  the key path in the request body (`connector.<key>`), so a client can
+  show the error at the field.
 
-  Note: see the analogous `sql-release-rejects-empty-configuration-5-
-  release-fails.bru` for why this test asserts the OnRelease field-level
-  failures rather than the "Configuration is required for releasing"
-  branch — the connector handler materializes defaults during create.
+  A Data source whose connector was never stored fails earlier, with
+  `urn:civitas:error:INVALID_INPUT` "Configuration is required for
+  releasing".
 }

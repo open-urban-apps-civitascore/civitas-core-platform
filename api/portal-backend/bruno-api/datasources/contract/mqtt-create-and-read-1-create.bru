@@ -15,8 +15,8 @@ body:json {
   {
     "name": "contract_mqtt_create",
     "description": "contract — MQTT",
-    "connectorType": "MQTT",
-    "configuration": {
+    "connector": {
+      "connectorType": "MQTT",
       "urls": ["tcp://broker:1883"],
       "topics": ["sensor/data"],
       "qos": 1
@@ -39,29 +39,38 @@ tests {
   test("Top-level fields match contract", function() {
     expect(res.body.name).to.equal("contract_mqtt_create");
     expect(res.body.description).to.equal("contract — MQTT");
-    expect(res.body.connectorType).to.equal("MQTT");
+    expect(res.body.connector.connectorType).to.equal("MQTT");
     expect(res.body.dataSourceStatus).to.equal("DRAFT");
     expect(res.body.inUse).to.equal(false);
   });
   test("Submitted urls/topics/qos preserved", function() {
-    expect(res.body.configuration.urls).to.deep.equal(["tcp://broker:1883"]);
-    expect(res.body.configuration.topics).to.deep.equal(["sensor/data"]);
-    expect(res.body.configuration.qos).to.equal(1);
+    expect(res.body.connector.urls).to.deep.equal(["tcp://broker:1883"]);
+    expect(res.body.connector.topics).to.deep.equal(["sensor/data"]);
+    expect(res.body.connector.qos).to.equal(1);
   });
-  test("Unsubmitted fields default to null / tls.enabled=false", function() {
-    expect(res.body.configuration).to.have.property('user', null);
-    expect(res.body.configuration).to.have.property('password', null);
-    expect(res.body.configuration).to.have.property('keepalive', null);
-    expect(res.body.configuration).to.have.property('connect_timeout', null);
-    expect(res.body.configuration.tls).to.deep.equal({ enabled: false });
+  test("Unsubmitted fields default to null / protocol_version=3 / tls.enabled=false", function() {
+    expect(res.body.connector).to.have.property('protocol_version', "3");
+    expect(res.body.connector).to.have.property('user', null);
+    expect(res.body.connector).to.have.property('password', null);
+    expect(res.body.connector).to.have.property('keepalive', null);
+    expect(res.body.connector).to.have.property('connect_timeout', null);
+    expect(res.body.connector.tls).to.deep.equal({ enabled: false });
+  });
+  test("No top-level connectorType or configuration", function() {
+    expect(res.body).to.not.have.property('connectorType');
+    expect(res.body).to.not.have.property('configuration');
   });
 }
 
 docs {
   Pins the MQTT POST response shape against the current contract. Findings:
 
+  - The connector is one `connector` object that carries `connectorType`
+    and every field of the type; there is no top-level `connectorType` or
+    `configuration`.
   - Submitted `urls`, `topics`, `qos` round-trip unchanged.
   - Unsubmitted scalar fields default to `null`.
+  - `protocol_version` defaults to `"3"`.
   - `tls` defaults to `{ "enabled": false }` (object), not `null`.
 
   Paired follow-ups:

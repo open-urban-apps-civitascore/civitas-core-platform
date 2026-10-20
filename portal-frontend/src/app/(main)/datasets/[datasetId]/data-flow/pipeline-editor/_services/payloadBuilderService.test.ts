@@ -229,11 +229,18 @@ describe('buildPipelinePayload — clean CORE Pipeline document', () => {
     }
 
     const src = model.nodes.find(n => n.id === 'src-1')
-    expect(src).toMatchObject({ kind: 'source', sourceRef: DS_URN, 'x-ui-position': { x: 10, y: 20 } })
+    expect(src).toMatchObject({ kind: 'source', 'x-ui-position': { x: 10, y: 20 } })
     expect(src).not.toHaveProperty('sinkRef')
 
     expect(model.nodes.find(n => n.id === 'sink-1')).toMatchObject({ kind: 'sink', sinkRef: SINK_URN })
     expect(model.nodes.find(n => n.id === 'map-1')).toMatchObject({ kind: 'mapping', mappingRef: MAPPING_URN })
+  })
+
+  it('names the data source by its latest configuration, so the pipeline follows later edits', () => {
+    const { model } = buildPipelinePayload(pipeline([sourceNode(DS_URN)], []))
+    expect(model.nodes.find(n => n.id === 'src-1')?.sourceRef).toBe(
+      'urn:core:platform:civitas:datasource:common:56c71886-6233-8eb0-9033-d69d254841d1:latest',
+    )
   })
 
   it('maps cron nodes to a cron kind carrying the cron expression', () => {

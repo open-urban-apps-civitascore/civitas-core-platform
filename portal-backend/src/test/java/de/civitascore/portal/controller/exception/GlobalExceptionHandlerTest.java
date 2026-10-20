@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.model.embedded.PendingSagaType;
+import de.civitascore.portal.service.connector.StoredConnectorUnreadableException;
 import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
@@ -386,6 +387,21 @@ class GlobalExceptionHandlerTest {
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
       assertThat(response.getBody().getType()).hasToString("urn:civitas:error:PERSISTENCE_ERROR");
+    }
+
+    @Test
+    void storedConnectorUnreadable_returns500WithoutTheUrn() {
+      String urn = "urn:core:platform:civitas:datasource:common:" + UUID.randomUUID() + ":1.0.0";
+      StoredConnectorUnreadableException ex =
+          new StoredConnectorUnreadableException(UUID.randomUUID(), urn);
+
+      ResponseEntity<ProblemDetail> response =
+          handler.handleStoredConnectorUnreadable(ex, mockRequest());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:PERSISTENCE_ERROR");
+      assertThat(response.getBody().getDetail()).doesNotContain(urn);
+      assertThat(response.getBody().getInstance()).isEqualTo(URI.create(TEST_URI));
     }
   }
 

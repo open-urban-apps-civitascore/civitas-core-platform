@@ -335,24 +335,5 @@ const buildDefs = (
   return defs
 }
 
-/**
- * Triggers a download of the JSON Schema content as a file.
- */
-export const downloadJsonSchema = (diagram: UMLDiagram, filename?: string): void => {
-  const schema = exportToJsonSchema(diagram)
-  const content = JSON.stringify(schema, null, 2)
-  const blob = new Blob([content], { type: 'application/schema+json' })
-  const url = URL.createObjectURL(blob)
-
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename || `${diagram.name.replace(/[^a-zA-Z0-9]/g, '_')}.schema.json`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-
-  URL.revokeObjectURL(url)
-}
-
 // Avoid unused-variable lint for UMLRelationship import used only in JSDoc-typed contexts.
 export type { UMLRelationship }

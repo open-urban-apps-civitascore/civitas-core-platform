@@ -47,6 +47,7 @@ public final class CoreUrn {
   private static final String DOMAIN = SLUG + "(?:\\." + SLUG + ")*";
   private static final String ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   private static final String VERSION = "\\d+\\.\\d+\\.\\d+";
+  private static final String LATEST = "latest";
 
   /** Regex matching a full CORE URN, with named {@code id} and {@code version} groups. */
   public static final String PATTERN =
@@ -73,10 +74,10 @@ public final class CoreUrn {
   }
 
   /**
-   * The logical (version-stripped) form of a CORE URN: the value without its trailing {@code
-   * :<major>.<minor>.<patch>} version segment. A URN that carries no recognizable SemVer tail (an
-   * already-logical URN, or an opaque correlation key) is returned unchanged, so two URNs can be
-   * compared on their logical form even when one is already logical.
+   * The logical (version-stripped) form of a CORE URN: the value without its trailing version
+   * segment, a {@code :<major>.<minor>.<patch>} or the {@code :latest} token. A URN that carries
+   * neither tail (an already-logical URN, or an opaque correlation key) is returned unchanged, so
+   * two URNs can be compared on their logical form even when one is already logical.
    *
    * @param urn the URN (nullable)
    * @return the version-stripped URN, or the input unchanged when it has no version tail
@@ -89,14 +90,15 @@ public final class CoreUrn {
     if (lastColon < 0) {
       return urn;
     }
-    return urn.substring(lastColon + 1).matches(VERSION) ? urn.substring(0, lastColon) : urn;
+    String tail = urn.substring(lastColon + 1);
+    return tail.matches(VERSION) || tail.equals(LATEST) ? urn.substring(0, lastColon) : urn;
   }
 
   /**
-   * Whether two references identify the same artifact, tolerating a version drift between a
-   * pinned-at-authoring-time reference and a resolved-at-publish-time catalog key: equal verbatim,
-   * or equal once both are reduced to their {@link #logicalUrn(String) logical} form. Two nulls (or
-   * a null on either side) never match.
+   * Whether two references identify the same artifact, tolerating that a reference names another
+   * version, or {@code :latest}, than the catalog key it is resolved to: equal verbatim, or equal
+   * once both are reduced to their {@link #logicalUrn(String) logical} form. Two nulls (or a null
+   * on either side) never match.
    *
    * @param a the first reference (nullable)
    * @param b the second reference (nullable)

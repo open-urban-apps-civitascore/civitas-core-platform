@@ -25,16 +25,15 @@ import java.util.Objects;
  * @param graphData the CORE Pipeline graph ({@code dataPipelines[].data})
  * @param source the resolved source datasource (with possibly encrypted credentials)
  * @param sink the resolved, typed sink specification
- * @param mappings the pipeline's shipped mappings catalog (Mapping CORE URN → mapping document),
- *     the callback-free source of a {@code mappingRef}'s {@code fields}/{@code source}/{@code
- *     target}; empty when the pipeline has no mapping nodes
+ * @param artifacts the trigger's artifacts (CORE URN → document), the callback-free source of a
+ *     {@code mappingRef}'s {@code fields}/{@code source}/{@code target}
  */
 public record PipelineDeploymentRequest(
     String pipelineId,
     Map<String, Object> graphData,
     Datasource source,
     SinkSpec sink,
-    Map<String, Object> mappings) {
+    Map<String, Map<String, Object>> artifacts) {
 
   public PipelineDeploymentRequest {
     if (pipelineId == null || pipelineId.isBlank()) {
@@ -46,13 +45,11 @@ public record PipelineDeploymentRequest(
     // values that arbitrary JSON graphs may carry; Map.copyOf would reject those.
     graphData =
         graphData == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(graphData));
-    mappings =
-        mappings == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(mappings));
+    artifacts =
+        artifacts == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(artifacts));
   }
 
-  /**
-   * Convenience for a pipeline with no shipped mappings (e.g. a passthrough or mapping-free flow).
-   */
+  /** Convenience for a pipeline that resolves no artifact (e.g. a passthrough flow). */
   public PipelineDeploymentRequest(
       String pipelineId, Map<String, Object> graphData, Datasource source, SinkSpec sink) {
     this(pipelineId, graphData, source, sink, Map.of());

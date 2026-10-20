@@ -163,8 +163,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
             """);
-    Map<String, Object> mappings =
-        map(
+    Map<String, Map<String, Object>> mappings =
+        NifiTestFixtures.artifacts(
             """
             { "map-1": { "fields": { "$.stationid": "$.stationid", "$.count": "$.count",
                                      "$.meta": "$.meta" } } }
@@ -222,8 +222,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
             """);
-    Map<String, Object> mappings =
-        map(
+    Map<String, Map<String, Object>> mappings =
+        NifiTestFixtures.artifacts(
             """
             { "map-1": { "fields": { "$.stationid": "$.stationid",
                                      "$.items[].name": "$.items[].sourceName" } } }
@@ -286,8 +286,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
             """);
-    Map<String, Object> mappings =
-        map(
+    Map<String, Map<String, Object>> mappings =
+        NifiTestFixtures.artifacts(
             """
             { "map-1": { "fields": { "$.stationid": "$.stationid",
                                      "$.temperature": { "op": "toFloat", "input": "$.temp" },
@@ -357,8 +357,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
             """);
-    Map<String, Object> mappings =
-        map(
+    Map<String, Map<String, Object>> mappings =
+        NifiTestFixtures.artifacts(
             """
             { "map-1": { "fields": { "$.stationid": "$.stationid",
                                      "$.day": { "op": "toDate", "input": "$.day",
@@ -430,8 +430,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
             """);
-    Map<String, Object> mappings =
-        map(
+    Map<String, Map<String, Object>> mappings =
+        NifiTestFixtures.artifacts(
             """
             { "map-1": { "fields": { "$.stationid": "$.stationid", "$.id": "$.uid",
                                      "$.day": "$.day", "$.observed": "$.observed" } } }
@@ -483,7 +483,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
   void deployedFlowWritesOneRowPerSourceArrayElement() throws Exception {
     // An array source mapped onto a flat target must fan out — one row per element — with the
     // parent-level fields repeated on every row.
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> mappings =
         fanoutMappings(
             """
             { "$.stationid": "$.stationid",
@@ -531,8 +531,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
   }
 
   /** Wraps a fan-out scenario's field map into the catalog entry the graph's node refers to. */
-  private Map<String, Object> fanoutMappings(String fields) throws Exception {
-    return map(
+  private Map<String, Map<String, Object>> fanoutMappings(String fields) throws Exception {
+    return NifiTestFixtures.artifacts(
         """
         { "map-1": { "fields": %s } }
         """
@@ -545,7 +545,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     // rows, so the primary key must include an element-level column. Keyed on (stationid,
     // measured_at) a redelivery must UPSERT the same 3 rows — not append 3 more (INSERT semantics),
     // and not collapse them into 1 (which a parent-only key would do, silently losing readings).
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> mappings =
         fanoutMappings(
             """
             { "$.stationid": "$.stationid",
@@ -589,7 +589,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     // ForkRecord's Include Parent Fields is documented to let the child win on a name clash. That
     // claim is load-bearing here: if the precedence were reversed, every row would silently carry
     // the parent's id instead of the element's.
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> mappings =
         fanoutMappings(
             """
             { "$.stationid": "$.stationid",
@@ -619,7 +619,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     // mapped field is the case most likely to break at runtime rather than at compile time. The
     // well-formed elements must still land and the flow must stay alive — proven by a later
     // payload.
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> mappings =
         fanoutMappings(
             """
             { "$.stationid": "$.stationid",
@@ -661,7 +661,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
     // geoPoint renders a concat over two nested copies. A rewrite that handles a top-level CopyNode
     // but not the copies inside GeoPointNode would emit POINT(null null), or broadcast the first
     // element's coordinates onto every row — distinct per-row geometries prove neither happened.
-    Map<String, Object> mappings =
+    Map<String, Map<String, Object>> mappings =
         fanoutMappings(
             """
             { "$.stationid": "$.stationid",
@@ -719,8 +719,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                 { "id": "e4", "source": "m2", "target": "k" },
                 { "id": "e5", "source": "k", "target": "e" } ] }
             """);
-    Map<String, Object> mappings =
-        map(
+    Map<String, Map<String, Object>> mappings =
+        NifiTestFixtures.artifacts(
             """
             { "map-1": { "fields": { "$.stationid": "$.stationid",
                                      "$.measured_at": "$.measurements[].ts" } },
@@ -767,8 +767,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
             """);
-    Map<String, Object> mappings =
-        map(
+    Map<String, Map<String, Object>> mappings =
+        NifiTestFixtures.artifacts(
             """
             { "map-1": { "fields": { "$.stationid": "$.stationid",
                           "$.geom": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" } } } }
@@ -825,8 +825,8 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
                 { "id": "e3", "source": "m", "target": "k" },
                 { "id": "e4", "source": "k", "target": "e" } ] }
             """);
-    Map<String, Object> mappings =
-        map(
+    Map<String, Map<String, Object>> mappings =
+        NifiTestFixtures.artifacts(
             """
             { "map-1": { "fields": { "$.stationid": "$.stationid",
                           "$.geom": { "op": "geoPoint", "lon": "$.lon", "lat": "$.lat" } } } }
@@ -912,7 +912,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
       String pipelineId,
       String topic,
       Map<String, Object> graph,
-      Map<String, Object> mappings,
+      Map<String, Map<String, Object>> mappings,
       PostgisSinkSpec sinkSpec,
       String payload,
       PollStep step)

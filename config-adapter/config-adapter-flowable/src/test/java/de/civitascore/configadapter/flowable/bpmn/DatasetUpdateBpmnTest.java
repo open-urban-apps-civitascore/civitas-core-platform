@@ -295,7 +295,7 @@ class DatasetUpdateBpmnTest {
     variables.put("hasFrostSink", hasFrostSink);
     if (hasPipelines) {
       variables.put("dataPipelines", List.of(Map.of("id", "p-1", "action", "UPDATE")));
-      variables.put("datasources", List.of(Map.of("id", "src-1")));
+      variables.put("artifacts", Map.of());
       variables.put("pipelineIds", List.of("p-1"));
     }
     return runtimeService.startProcessInstanceByKey("dataset-update", variables);

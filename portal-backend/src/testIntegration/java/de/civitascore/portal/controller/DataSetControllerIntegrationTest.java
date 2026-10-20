@@ -1,6 +1,7 @@
 package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.tuple;
 
 import de.civitascore.portal.config.PortalTestDataFactory;
@@ -14,9 +15,11 @@ import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
+import de.civitascore.portal.model.embedded.RoleDefault;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
@@ -37,8 +40,11 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.repository.UserRepository;
+import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.AllowedScopesFilter;
+import de.civitascore.portal.security.dto.PrincipalUserDetails;
 import de.civitascore.portal.service.DataSetService;
+import de.civitascore.portal.service.validation.PipelineClosureValidator;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
 import java.util.List;
@@ -62,6 +68,11 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 @DisplayName("DataSet Controller Integration Tests")
 class DataSetControllerIntegrationTest
@@ -76,6 +87,8 @@ class DataSetControllerIntegrationTest
   @Autowired private UserRepository userRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
   @Autowired private DataSetService dataSetService;
+  @Autowired private PipelineClosureValidator pipelineClosureValidator;
+  @Autowired private AllowedScopes allowedScopes;
   @Autowired private CivitasProperties civitasProperties;
   @Autowired private org.springframework.transaction.support.TransactionTemplate txTemplate;
 
@@ -2206,6 +2219,95 @@ class DataSetControllerIntegrationTest
       assertReleaseRefused(
           dataSetReachingStructure(
               DataSetStatus.READY, DataStructureVersionStatus.AVAILABLE, DataSourceStatus.DRAFT));
+    }
+
+    /**
+     * Calls the validator directly, because the release publishes to a broker this context lacks.
+     */
+    private void validateReleaseAsPoolScopedCaller(UUID callerId, DataPool pool, UUID dataSetId) {
+      RequestContextHolder.setRequestAttributes(
+          new ServletRequestAttributes(new MockHttpServletRequest()));
+      SecurityContextHolder.getContext()
+          .setAuthentication(
+              new UsernamePasswordAuthenticationToken(
+                  PrincipalUserDetails.builder().userId(callerId).build(), null, List.of()));
+      try {
+        allowedScopes.setScopeIds(Set.of());
+        allowedScopes.setPoolIds(Set.of(pool.getId()));
+        txTemplate.executeWithoutResult(
+            status ->
+                pipelineClosureValidator.validate(
+                    dataSetRepository.findById(dataSetId).orElseThrow().getPipelines()));
+      } finally {
+        SecurityContextHolder.clearContext();
+        RequestContextHolder.resetRequestAttributes();
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "Should pass the release check for a caller scoped to the data pool who may not read the"
+            + " data structure of the data source")
+    void shouldPassReleaseCheckForPoolScopedCallerWithoutReadAccessToDataSourceStructure() {
+      DataPool pool = portalData.dataPool();
+      DataStructureVersion version =
+          portalData.attachModel(
+              portalData.dataStructureVersion(
+                  portalData.dataStructure(
+                      b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE)),
+                  b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)),
+              portalData.dataStructureVersionModel("Sensor"));
+      DataSource dataSource =
+          portalData.attachSourceConfiguration(
+              portalData.dataSource(
+                  b ->
+                      b.connectorType(ConnectorType.MQTT)
+                          .dataSourceStatus(DataSourceStatus.AVAILABLE)
+                          .dataStructureVersion(version)),
+              Map.of(
+                  "urls",
+                  List.of("mqtt://mqtt-broker:1883"),
+                  "topics",
+                  List.of("sensors/pool"),
+                  "element",
+                  version.getModelUrn()));
+      DataSet dataSet =
+          portalData.dataSet(b -> b.dataPool(pool).dataSetStatus(DataSetStatus.READY));
+      Pipeline pipeline = portalData.pipeline(dataSet, b -> b.dataSources(Set.of(dataSource)));
+      DataSink frostSink =
+          portalData.attachSinkConfiguration(portalData.dataSink(dataSet, pipeline), Map.of());
+      portalData.attachPipelineDefinition(
+          pipeline,
+          Map.of(
+              "nodes",
+              List.of(
+                  Map.of(
+                      "id",
+                      "src-1",
+                      "kind",
+                      "source",
+                      "label",
+                      "Source",
+                      "sourceRef",
+                      dataSource.getConfigurationUrn()),
+                  Map.of(
+                      "id",
+                      "sink-1",
+                      "kind",
+                      "sink",
+                      "label",
+                      "Sink",
+                      "sinkRef",
+                      frostSink.getConfigurationUrn())),
+              "edges",
+              List.of(Map.of("id", "edge-1", "source", "src-1", "target", "sink-1"))),
+          createSampleStyles());
+      UUID callerId = UUID.randomUUID();
+      portalData.assignment(
+          portalData.groupOf(callerId.toString()), portalData.role(RoleDefault.DATA_OWNER), pool);
+
+      assertThatCode(() -> validateReleaseAsPoolScopedCaller(callerId, pool, dataSet.getId()))
+          .doesNotThrowAnyException();
     }
   }
 
