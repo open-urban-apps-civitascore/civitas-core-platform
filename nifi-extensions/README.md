@@ -201,8 +201,9 @@ in one batch, which proves the isolation of the groups, not the limit.
 ## GetHttpApiCall
 
 A source processor: it takes no input, and each run sends one HTTP GET request for one API call of
-an HTTP/REST Data source. It runs on the primary node alone, because each node of a cluster would
-call the API otherwise, and one run at a time. The cron schedule of the flow decides when it runs.
+an HTTP/REST Data source, or one request for each page when the API call has a pagination. It runs
+on the primary node alone, because each node of a cluster would call the API otherwise, and one run
+at a time. The cron schedule of the flow decides when it runs.
 
 | Property | Means |
 |---|---|
@@ -213,6 +214,7 @@ call the API otherwise, and one run at a time. The cron schedule of the flow dec
 | `Authentication Type` | `NONE` (default) or `BASIC`. |
 | `Basic Auth Username` / `Basic Auth Password` | Required with `BASIC`, which also requires an `https` Base URL. The username contains no colon; the password is sensitive. |
 | `Record Schema` | The JSON Schema of the Data structure of the Data source, with its imports inlined. Required. |
+| `Max Pages` | The most pages of one paginated run, `1000` by default. The config-adapter does not set it, and the portal does not show it. |
 
 No property supports Expression Language.
 
@@ -223,14 +225,25 @@ No property supports Expression Language.
   "path": "/stations",
   "queryParameters": [{ "name": "status", "value": "active" }],
   "headers": [{ "name": "Accept", "value": "application/json" }],
-  "pagination": null
+  "pagination": {
+    "type": "PAGE_NUMBER",
+    "pageParameter": "page",
+    "pageSizeParameter": "size",
+    "pageSize": 100,
+    "startPage": 0,
+    "endPage": null
+  }
 }
 ```
 
 The processor checks the rules of the portal backend again, because it builds the request and the
 credentials from them. `method` is `GET` or absent, `path` matches `^/[A-Za-z0-9._~:/-]*$`, a header
-name is a token and not `Authorization`, `Proxy-Authorization` or `Cookie`, and `pagination` is
-absent or null. A header must also be one the JDK HTTP client behind the web client service sends:
+name is a token and not `Authorization`, `Proxy-Authorization` or `Cookie`. A `pagination` is absent,
+null or of the type `PAGE_NUMBER`, with a `pageParameter`, a `pageSizeParameter` and a `pageSize` of
+at least 1. An absent `startPage` is 0, and an `endPage` is at least the `startPage`. The two
+parameter names differ from each other and from the name of each query parameter of the API call;
+the comparison is case-sensitive, as HTTP query parameter names are. A header must also be one the
+JDK HTTP client behind the web client service sends:
 not `Connection`, `Content-Length`, `Expect`, `Host` or `Upgrade`, and a value of printable
 ISO-8859-1 characters, spaces and tabs only. An unknown key fails. A broken rule makes the
 processor invalid, and the explanation names the key path, for example `headers[1].name`, never the
@@ -259,12 +272,14 @@ attempt. `stop` carries an error that the next run cannot repair: the flow stops
 A 3xx is fatal because the processor expects a web client service that does not follow
 redirects (`Redirect Handling Strategy` = `IGNORED`), so a redirect shows a wrong host or path.
 
-A FlowFile on `success` carries `http.status.code` and `http.request.path`. A FlowFile on `stop` or
+A FlowFile on `success` carries `http.status.code` and `http.request.path`, and with pagination
+`http.page`, the page number. A FlowFile on `stop` or
 `failure` is empty and carries `http.request.path`, `http.error.status` and `http.error.message`.
 `http.error.status` is the status of the response, or `0` when no response came. The message is the
-one the log entry and the bulletin show. It names the API call and its path, never the base URL. A
-control character or line separator in the message appears as `\r`, `\n` or `\uXXXX`, so no part
-of it can start a forged log line; every other character stays as entered:
+one the log entry and the bulletin show. It names the API call and its path, never the base URL,
+and on a page of a paginated run the page number. A control character or line separator in the
+message appears as `\r`, `\n` or `\uXXXX`, so no part of it can start a forged log line; every
+other character stays as entered:
 
 ```text
 API call "Get stations": GET /stations failed with status 404
@@ -272,6 +287,10 @@ API call "Get stations": GET /stations failed: ConnectException
 API call "Get stations": 2 of 50 records violate the Data structure: record 3: /lat type; record 7: required stationid
 API call "Get stations": the response is a JSON string, not an object or an array
 API call "Get stations": the response is not JSON
+API call "Get stations": GET /stations page 3 failed with status 404
+API call "Get stations": page 3: 2 of 50 records violate the Data structure: record 3: /lat type; record 7: required stationid
+API call "Get stations": page 3 is a JSON object, not an array
+API call "Get stations": no stop condition after 1000 pages (Max Pages)
 ```
 
 A transient message keeps the word `failed`: the runtime monitor of the NiFi config-adapter counts a
@@ -314,6 +333,48 @@ processor stays valid and scheduled but sends no request, NiFi raises an error b
 tries again after the `Administrative Yield Duration`. The runtime monitor publishes this bulletin
 as an `ERROR` event of the Pipeline.
 
-The request code knows no NiFi session, so the page loop of a later step can send each page through
-it as a request of its own. A new authentication type adds a value of `Authentication Type`, its
-properties and a class that implements `Authentication`.
+### Pagination
+
+A `PAGE_NUMBER` pagination makes a run read the pages one after the other. Each page is a request
+of its own, through the same request code as an API call without pagination, with the page
+parameter and the page size parameter after the query parameters of the API call. The first page
+is `startPage`, and the page number increases by 1. The run stops after the first page that meets
+one of these conditions, and the records of that page are part of the run:
+
+- The page number is the `endPage`.
+- The page has no records.
+- The page has fewer records than `pageSize`.
+
+A page with more records than `pageSize` is not an error. The page number is a `long`, so a
+`startPage` near the `int` maximum does not overflow.
+
+A page must be a JSON array of records. An API call without pagination keeps the rules above: a JSON
+object is one record, and `[]` gives one FlowFile `[]`.
+
+| 2xx response of a page | Result |
+|---|---|
+| A JSON array, each record agrees with the `Record Schema` | one FlowFile on `success`, the body unchanged |
+| `[]`, or no body | no FlowFile; the run stops there |
+| A JSON object, a JSON scalar, or not JSON | `stop` |
+| An array with a record that violates the `Record Schema` | `stop` |
+
+**A run delivers all its pages or none.** The page FlowFiles of a run stay in one session, which
+the processor commits when the loop ends. An error on any page, fatal or transient, removes the page
+FlowFiles of the run and sends the one error FlowFile to `stop` or `failure`, so each failed run
+still gives one FlowFile. The next run starts again at `startPage`. The pages of a run wait in the
+content repository until the commit. This
+applies to what the processor sends: the Data sink writes the pages one FlowFile after the other,
+so a Data sink error on a page leaves the pages before it in the Data storage.
+
+`Max Pages` limits a run, also one with an `endPage`. A run that reads `Max Pages` pages and meets no
+stop condition goes to `stop`, and none of its pages reaches `success`. This guards against an API
+that ignores the page parameter.
+
+**Known limit:** a `pageSize` larger than the maximum page size of the API ends the run after the
+first page, because the API sends fewer records than `pageSize`. The processor cannot tell this from
+a last page, so no error shows.
+
+The request code knows no NiFi session and no pagination; the page loop asks a `Pagination` for the
+first page and, from the record count of a page, for the next one. A new pagination method adds an
+implementation of `Pagination`, and the page loop stays as it is. A new authentication type adds a
+value of `Authentication Type`, its properties and a class that implements `Authentication`.
