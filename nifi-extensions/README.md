@@ -212,6 +212,7 @@ call the API otherwise, and one run at a time. The cron schedule of the flow dec
 | `API Call` | The API call as JSON, in the form the portal stores it. |
 | `Authentication Type` | `NONE` (default) or `BASIC`. |
 | `Basic Auth Username` / `Basic Auth Password` | Required with `BASIC`, which also requires an `https` Base URL. The username contains no colon; the password is sensitive. |
+| `Record Schema` | The JSON Schema of the Data structure of the Data source, with its imports inlined. Required. |
 
 No property supports Expression Language.
 
@@ -240,31 +241,66 @@ space is `%20` and `&`, `=` and `+` in a value stay part of the value. The param
 order, repeated names included. `HttpUriBuilder.addQueryParameter` is not used for this: NiFi's
 implementation does not encode `&`, `=` and `+` in a value.
 
-Relationships: `success` and `failure`. There is no `retry`; the next cron run is the next attempt.
+Relationships: `success`, `stop` and `failure`. There is no `retry`; the next cron run is the next
+attempt. `stop` carries an error that the next run cannot repair: the flow stops the Pipeline on it.
+`failure` carries an error that the next run can repair.
 
-| Result | Outcome |
-|---|---|
-| 2xx with a body | `success`, the body unchanged, `mime.type` `application/json` |
-| 2xx without a body, for example 204 | No FlowFile, a debug log entry |
-| 3xx, 4xx except 408 and 429 | `failure`, `fatal`, an error log entry |
-| 408, 429, 5xx, any other status | `failure`, `transient`, a warn log entry |
-| Connection refused, timeout, TLS error | `failure`, `transient`, status `0` |
+| Result | Relationship | Log level |
+|---|---|---|
+| 2xx, each record agrees with the `Record Schema` | `success`, the body unchanged, `mime.type` `application/json` | none |
+| 2xx without a body, for example 204 | none, no FlowFile | debug |
+| 3xx, 4xx except 408 and 429 | `stop` | error |
+| A request that the web client refuses, status `0` | `stop` | error |
+| 2xx, the body is not JSON, or is a JSON scalar | `stop` | error |
+| 2xx, a record violates the `Record Schema` | `stop` | error |
+| 408, 429, 5xx, any other status | `failure` | warn |
+| Connection error, timeout, TLS error, body read error, status `0` | `failure` | warn |
 
 A 3xx is fatal because the processor expects a web client service that does not follow
 redirects (`Redirect Handling Strategy` = `IGNORED`), so a redirect shows a wrong host or path.
 
-A FlowFile on `success` carries `http.status.code` and `http.request.path`. A FlowFile on `failure`
-is empty and carries `http.request.path`, `http.error.kind`, `http.error.status` and
-`http.error.message`. The message is the one the log entry and the bulletin show:
+A FlowFile on `success` carries `http.status.code` and `http.request.path`. A FlowFile on `stop` or
+`failure` is empty and carries `http.request.path`, `http.error.status` and `http.error.message`.
+`http.error.status` is the status of the response, or `0` when no response came. The message is the
+one the log entry and the bulletin show. It names the API call and its path, never the base URL:
 
 ```text
-GET https://api.example.org/v1/stations failed with status 404
-GET https://api.example.org/v1/stations failed: ConnectException
+API call "Get stations": GET /stations failed with status 404
+API call "Get stations": GET /stations failed: ConnectException
+API call "Get stations": 2 of 50 records violate the Data structure: record 3: /lat type; record 7: required stationid
+API call "Get stations": the response is a JSON string, not an object or an array
+API call "Get stations": the response is not JSON
 ```
 
-No attribute and no message contains the query, a header value, the username, the password or the
-response body. An exception reaches no logger, because its message can hold the URI with its query;
-the message names its class alone.
+A transient message keeps the word `failed`: the runtime monitor of the NiFi config-adapter counts a
+warn bulletin only when its text names a failure.
+
+No attribute and no message contains the query, a header value, the username, the password or a
+value of the response. An exception reaches no logger, because its message can hold the URI with its
+query; the message names its class alone.
+
+### Response validation
+
+The processor reads a 2xx body into memory and parses it once. A JSON array holds one record in each
+element, and `[]` holds none. A JSON object is one record. A JSON scalar, or a body that is not JSON,
+goes to `stop`. Each record is validated against `Record Schema`; one invalid record sends the whole
+response to `stop`, and no FlowFile goes to `success`. A body that passes is an object or an array of
+objects, so the record reader behind the processor skips no data.
+
+The cause names the number of invalid records and at most the first 3 violations: the index of the
+record from 0, the JSON Pointer inside the record and the keyword. For `required`, it also names the
+missing property, which comes from the schema. It never uses the message of the validator, because
+some messages quote the value.
+
+The validator is the networknt `json-schema-validator` in the version of Model Forge, with draft
+2020-12 and the keyword and format settings of Model Forge. The `x-core-*` keywords and `crs` validate
+nothing.
+
+A `$ref` resolves inside the schema, to an embedded resource of the schema with its own `$id`, or to
+one of the seven GeoJSON geometry schemas `https://geojson.org/schema/<Type>.json`. The NAR holds
+copies of those, identical to the ones Model Forge vendors (`GeoJsonCopiesTest` checks that), and the
+processor never fetches a schema over the network. Any other reference makes the processor invalid,
+as does a `Record Schema` that is not a JSON object or that the validator cannot compile.
 
 The request code knows no NiFi session, so the page loop of a later step can send each page through
 it as a request of its own. A new authentication type adds a value of `Authentication Type`, its

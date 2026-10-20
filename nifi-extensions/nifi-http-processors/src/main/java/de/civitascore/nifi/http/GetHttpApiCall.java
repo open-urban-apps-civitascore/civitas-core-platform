@@ -37,7 +37,6 @@ import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
-import org.apache.nifi.processor.exception.FlowFileAccessException;
 import org.apache.nifi.processor.util.StandardValidators;
 import org.apache.nifi.web.client.provider.api.WebClientServiceProvider;
 
@@ -50,8 +49,8 @@ import org.apache.nifi.web.client.provider.api.WebClientServiceProvider;
 @Tags({"HTTP", "REST", "API", "GET", "source", "civitas"})
 @CapabilityDescription(
     "Sends the HTTP GET request of one API call of an HTTP/REST Data source. A 2xx response with a"
-        + " body becomes a FlowFile on success. An error becomes a FlowFile on failure that says"
-        + " whether it is fatal or transient.")
+        + " body becomes a FlowFile on success. An error that the next run cannot repair becomes a"
+        + " FlowFile on stop, any other error a FlowFile on failure.")
 @InputRequirement(Requirement.INPUT_FORBIDDEN)
 @PrimaryNodeOnly
 @TriggerSerially
@@ -64,21 +63,18 @@ import org.apache.nifi.web.client.provider.api.WebClientServiceProvider;
       attribute = GetHttpApiCall.REQUEST_PATH,
       description = "The path of the API call, without the query."),
   @WritesAttribute(
-      attribute = GetHttpApiCall.ERROR_KIND,
-      description =
-          "fatal or transient, on failure. A fatal error needs a change to the configuration."),
-  @WritesAttribute(
       attribute = GetHttpApiCall.ERROR_STATUS,
-      description = "The status of the response, or 0 when no response came, on failure."),
+      description = "The status of the response, or 0 when no response came, on stop and failure."),
   @WritesAttribute(
       attribute = GetHttpApiCall.ERROR_MESSAGE,
-      description = "The method, the URL without the query, and the status or the exception class.")
+      description =
+          "The cause, on stop and failure. It names the API call and never the base URL, the"
+              + " query, a header value, a credential or a value of the response.")
 })
 public class GetHttpApiCall extends AbstractProcessor {
 
   public static final String STATUS_CODE = "http.status.code";
   public static final String REQUEST_PATH = "http.request.path";
-  public static final String ERROR_KIND = "http.error.kind";
   public static final String ERROR_STATUS = "http.error.status";
   public static final String ERROR_MESSAGE = "http.error.message";
 
@@ -88,6 +84,9 @@ public class GetHttpApiCall extends AbstractProcessor {
 
   private static final Validator USERNAME_VALIDATOR =
       (subject, input, context) -> result(subject, usernameViolation(input));
+
+  private static final Validator RECORD_SCHEMA_VALIDATOR =
+      (subject, input, context) -> result(subject, RecordSchema.violation(input));
 
   static final PropertyDescriptor WEB_CLIENT_SERVICE =
       new PropertyDescriptor.Builder()
@@ -166,18 +165,43 @@ public class GetHttpApiCall extends AbstractProcessor {
           .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
           .build();
 
+  static final PropertyDescriptor RECORD_SCHEMA =
+      new PropertyDescriptor.Builder()
+          .name("Record Schema")
+          .displayName("Record Schema")
+          .description(
+              "The JSON Schema of the Data structure, with its imports inlined. Each record of a"
+                  + " response must agree with it: each element of a JSON array, or a JSON"
+                  + " object as one record. A $ref resolves only inside the schema or to a GeoJSON"
+                  + " geometry of https://geojson.org/schema/, which the NAR holds.")
+          .required(true)
+          .addValidator(RECORD_SCHEMA_VALIDATOR)
+          .build();
+
   static final Relationship SUCCESS =
       new Relationship.Builder()
           .name("success")
-          .description("One FlowFile for each 2xx response with a body. The content is the body.")
+          .description(
+              "One FlowFile for each 2xx response with a body whose records all agree with the"
+                  + " Record Schema. The content is the body.")
+          .build();
+
+  static final Relationship STOP =
+      new Relationship.Builder()
+          .name("stop")
+          .description(
+              "One empty FlowFile for each run with an error that needs a change to the"
+                  + " configuration or to the Data structure: 3xx, 4xx except 408 and 429, a"
+                  + " request the web client refuses, and a response that is not JSON or does not"
+                  + " agree with the Record Schema.")
           .build();
 
   static final Relationship FAILURE =
       new Relationship.Builder()
           .name("failure")
           .description(
-              "One FlowFile for each failed run, with empty content. The error attributes say"
-                  + " whether the error is fatal or transient.")
+              "One empty FlowFile for each run with an error that the next run can repair: 408,"
+                  + " 429, 5xx, a failed connection, a timeout.")
           .build();
 
   private static final List<PropertyDescriptor> PROPERTIES =
@@ -188,13 +212,15 @@ public class GetHttpApiCall extends AbstractProcessor {
           API_CALL,
           AUTHENTICATION_TYPE,
           BASIC_AUTH_USERNAME,
-          BASIC_AUTH_PASSWORD);
+          BASIC_AUTH_PASSWORD,
+          RECORD_SCHEMA);
 
-  private static final Set<Relationship> RELATIONSHIPS = Set.of(SUCCESS, FAILURE);
+  private static final Set<Relationship> RELATIONSHIPS = Set.of(SUCCESS, STOP, FAILURE);
 
   private static final String JSON = "application/json";
 
   private volatile ApiCall apiCall;
+  private volatile ApiCallClient client;
 
   @Override
   protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
@@ -231,20 +257,22 @@ public class GetHttpApiCall extends AbstractProcessor {
   }
 
   @OnScheduled
-  public void readApiCall(ProcessContext context) throws InvalidApiCallException {
+  public void readConfiguration(ProcessContext context)
+      throws InvalidApiCallException, InvalidRecordSchemaException {
     apiCall = ApiCallParser.parse(context.getProperty(API_CALL).getValue());
-  }
-
-  @Override
-  public void onTrigger(ProcessContext context, ProcessSession session) {
-    ApiCallClient client =
+    client =
         new ApiCallClient(
             context
                 .getProperty(WEB_CLIENT_SERVICE)
                 .asControllerService(WebClientServiceProvider.class)
                 .getWebClientService(),
             context.getProperty(BASE_URL).getValue(),
-            context.getProperty(BODY_READ_TIMEOUT).asDuration());
+            context.getProperty(BODY_READ_TIMEOUT).asDuration(),
+            RecordSchema.compile(context.getProperty(RECORD_SCHEMA).getValue()));
+  }
+
+  @Override
+  public void onTrigger(ProcessContext context, ProcessSession session) {
     Authentication authentication =
         context
             .getProperty(AUTHENTICATION_TYPE)
@@ -252,48 +280,37 @@ public class GetHttpApiCall extends AbstractProcessor {
             .authentication(context);
 
     switch (client.send(apiCall, authentication)) {
-      case ApiCallOutcome.Body body -> {
-        try (body) {
-          transferBody(session, client, body);
-        }
-      }
+      case ApiCallOutcome.Body body -> transferBody(session, body);
       case ApiCallOutcome.NoBody noBody ->
-          getLogger()
-              .debug("{} returned {} without a body", client.describe(apiCall), noBody.status());
+          getLogger().debug("{} returned {} without a body", apiCall.describe(), noBody.status());
       case ApiCallOutcome.Failure failure -> transferFailure(session, failure);
     }
   }
 
-  private void transferBody(
-      ProcessSession session, ApiCallClient client, ApiCallOutcome.Body body) {
-    FlowFile flowFile = session.create();
-    try {
-      flowFile = session.importFrom(body.content(), flowFile);
-    } catch (FlowFileAccessException e) {
-      session.remove(flowFile);
-      transferFailure(session, ApiCallOutcome.Failure.ofTransport(client.describe(apiCall), e));
-      return;
-    }
+  private void transferBody(ProcessSession session, ApiCallOutcome.Body body) {
     Map<String, String> attributes = new LinkedHashMap<>();
     attributes.put(CoreAttributes.MIME_TYPE.key(), JSON);
     attributes.put(STATUS_CODE, Integer.toString(body.status()));
     attributes.put(REQUEST_PATH, apiCall.path());
+    FlowFile flowFile = session.importFrom(body.content(), session.create());
     session.transfer(session.putAllAttributes(flowFile, attributes), SUCCESS);
   }
 
   /** Logs the error, which raises the bulletin, and sends an empty FlowFile that describes it. */
   private void transferFailure(ProcessSession session, ApiCallOutcome.Failure failure) {
-    if (failure.kind() == ErrorKind.FATAL) {
+    Relationship relationship;
+    if (failure.fatal()) {
       getLogger().error(failure.message());
+      relationship = STOP;
     } else {
       getLogger().warn(failure.message());
+      relationship = FAILURE;
     }
     Map<String, String> attributes = new LinkedHashMap<>();
     attributes.put(REQUEST_PATH, apiCall.path());
-    attributes.put(ERROR_KIND, failure.kind().attributeValue());
     attributes.put(ERROR_STATUS, Integer.toString(failure.status()));
     attributes.put(ERROR_MESSAGE, failure.message());
-    session.transfer(session.putAllAttributes(session.create(), attributes), FAILURE);
+    session.transfer(session.putAllAttributes(session.create(), attributes), relationship);
   }
 
   private static String baseUrlViolation(String input) {

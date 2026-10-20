@@ -29,6 +29,19 @@ record ApiCall(
     headers = List.copyOf(headers);
   }
 
+  /**
+   * The name, the method and the path, for example {@code API call "Stations": GET /stations}. The
+   * base URL stays out, so that no host reaches the portal.
+   */
+  String describe() {
+    return label() + ": " + method.name() + " " + path;
+  }
+
+  /** The name alone, for example {@code API call "Stations"}. */
+  String label() {
+    return "API call \"" + name + "\"";
+  }
+
   /** A query parameter or a header. The value is never null. */
   record Parameter(String name, String value) {}
 }
