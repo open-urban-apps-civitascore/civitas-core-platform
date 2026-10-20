@@ -19,8 +19,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import de.civitascore.configadapter.model.dataset.Datasource;
+import de.civitascore.configadapter.nifi.RuntimeMonitorProbe;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
 import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import de.civitascore.configadapter.nifi.flow.NifiTestFixtures;
@@ -29,6 +31,7 @@ import de.civitascore.configadapter.nifi.flow.PlatformSinkConfig;
 import de.civitascore.configadapter.nifi.flow.SqlSourceProbe;
 import de.civitascore.configadapter.nifi.flow.stage.sink.PostgisSinkSpec;
 import de.civitascore.configadapter.nifi.rest.NifiRestClient.RuntimeStatus;
+import de.civitascore.configadapter.nifi.rest.NifiRestClient.RuntimeStatus.State;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
 import java.io.File;
 import java.sql.Connection;
@@ -39,8 +42,12 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.postgresql.Driver;
 import org.testcontainers.containers.GenericContainer;
@@ -52,7 +59,7 @@ import org.testcontainers.utility.MountableFile;
 
 /**
  * Runs a Pipeline from an HTTP/REST Data source through a cron node and a Mapping to a PostGIS Data
- * storage in a real NiFi, with WireMock as the API.
+ * storage in a real NiFi, with WireMock as the API, and watches it with the runtime monitor.
  */
 class NifiHttpDataFlowIT extends AbstractNifiIT {
 
@@ -61,11 +68,14 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
   private static final String DB = "nifi_demo";
   private static final String DB_USER = "nifi";
   private static final String DB_PASSWORD = "nifi-db-secret";
+  private static final String DATASET_ID = "ds-1";
 
   private static Network network;
   private static GenericContainer<?> api;
   private static PostgreSQLContainer<?> postgres;
   private static WireMock wireMock;
+
+  private RuntimeMonitorProbe monitor;
 
   @BeforeAll
   static void startStack() throws Exception {
@@ -121,6 +131,16 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
     }
   }
 
+  @BeforeEach
+  void startMonitor() {
+    monitor = new RuntimeMonitorProbe(client);
+  }
+
+  @AfterEach
+  void stopMonitor() {
+    monitor.close();
+  }
+
   @Test
   void jsonArrayGivesOneRowForEachElement() throws Exception {
     wireMock.register(
@@ -164,7 +184,7 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
   }
 
   @Test
-  void redirectGoesToTheErrorSinkAndIsNotFollowed() throws Exception {
+  void redirectStopsThePipelineAndIsNotFollowed() throws Exception {
     wireMock.register(
         get(urlPathEqualTo("/moved"))
             .willReturn(aResponse().withStatus(302).withHeader("Location", "/target")));
@@ -172,17 +192,68 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
 
     String processGroupId = deploy("http-redirect", "/moved", "http_redirect");
 
-    awaitPipelineError(processGroupId, "failed with status 302");
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(2))
+        .ignoreExceptions()
+        .until(
+            () -> {
+              RuntimeStatus status = client.readRuntimeStatus(processGroupId);
+              return status.state() == State.STOPPED
+                  && status.message().contains("failed with status 302");
+            });
     assertEquals(0, wireMock.find(getRequestedFor(urlPathEqualTo("/target"))).size());
   }
 
   @Test
-  void temporaryErrorOfTheApiSetsThePipelineToError() throws Exception {
+  void notFoundStopsTheProcessGroupAndPublishesStoppedWithTheCause() throws Exception {
+    wireMock.register(get(urlPathEqualTo("/gone")).willReturn(aResponse().withStatus(404)));
+    String pipelineId = UUID.randomUUID().toString();
+
+    String processGroupId = deploy(pipelineId, "/gone", "http_gone");
+
+    Map<String, Object> stopped = awaitEvent(pipelineId, processGroupId, "STOPPED");
+    assertEquals("API call \"readings\": GET /gone failed with status 404", stopped.get("message"));
+    assertEquals("", stopped.get("stacktrace"));
+    assertEquals(DATASET_ID, stopped.get("datasetId"));
+    assertTrue(
+        stopSinkBulletinTimes(processGroupId).contains(stopped.get("occurredAt")),
+        "occurredAt " + stopped.get("occurredAt") + " is the time of no bulletin of the stop sink");
+    assertRequestsStay("/gone");
+  }
+
+  @Test
+  void invalidRecordWritesNoRowAndStopsTheProcessGroup() throws Exception {
+    wireMock.register(
+        get(urlPathEqualTo("/invalid"))
+            .willReturn(okJson("[{\"id\":\"s1\",\"name\":\"North\"},{\"id\":\"s2\",\"name\":7}]")));
+    String pipelineId = UUID.randomUUID().toString();
+
+    String processGroupId = deploy(pipelineId, "/invalid", "http_invalid");
+
+    Map<String, Object> stopped = awaitEvent(pipelineId, processGroupId, "STOPPED");
+    assertEquals(
+        "API call \"readings\": 1 of 2 records violate the Data structure: record 1: /name type",
+        stopped.get("message"));
+    assertRequestsStay("/invalid");
+    assertEquals(0, rowCount("http_invalid"));
+  }
+
+  @Test
+  void temporaryErrorOfTheApiPublishesErrorAndKeepsTheProcessGroupRunning() throws Exception {
     wireMock.register(get(urlPathEqualTo("/unavailable")).willReturn(aResponse().withStatus(503)));
+    String pipelineId = UUID.randomUUID().toString();
 
-    String processGroupId = deploy("http-unavailable", "/unavailable", "http_unavailable");
+    String processGroupId = deploy(pipelineId, "/unavailable", "http_unavailable");
 
-    awaitPipelineError(processGroupId, "failed with status 503");
+    Map<String, Object> error = awaitEvent(pipelineId, processGroupId, "ERROR");
+    assertTrue(
+        ((String) error.get("message")).contains("failed with status 503"),
+        String.valueOf(error.get("message")));
+    awaitRequests("/unavailable", requests("/unavailable") + 3);
+    assertTrue(
+        monitor.poll(pipelineId).stream()
+            .noneMatch(event -> "STOPPED".equals(event.get("status"))));
   }
 
   @Test
@@ -255,16 +326,37 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
     return client.deployFlow(plan);
   }
 
-  private void awaitPipelineError(String processGroupId, String message) {
-    await()
+  private Map<String, Object> awaitEvent(String pipelineId, String processGroupId, String status) {
+    monitor.register(pipelineId, DATASET_ID, processGroupId);
+    return await()
         .atMost(Duration.ofSeconds(120))
         .pollInterval(Duration.ofSeconds(2))
-        .ignoreExceptions()
         .until(
-            () -> {
-              RuntimeStatus status = client.readRuntimeStatus(processGroupId);
-              return !status.healthy() && status.message().contains(message);
-            });
+            () ->
+                monitor.poll(pipelineId).stream()
+                    .filter(event -> status.equals(event.get("status")))
+                    .findFirst(),
+            Optional::isPresent)
+        .orElseThrow();
+  }
+
+  private static List<String> stopSinkBulletinTimes(String processGroupId) throws Exception {
+    List<String> times = new ArrayList<>();
+    for (JsonNode entry : client.readBulletins()) {
+      JsonNode bulletin = entry.path("bulletin");
+      if (processGroupId.equals(bulletin.path("groupId").asText())
+          && NifiRestClient.STOP_SINK.equals(bulletin.path("sourceName").asText())) {
+        times.add(bulletin.path("timestampIso").asText());
+      }
+    }
+    return times;
+  }
+
+  private static void assertRequestsStay(String path) throws InterruptedException {
+    int before = requests(path);
+    // A negative assertion: a request of a process group that still runs can only show over time.
+    Thread.sleep(Duration.ofSeconds(5).toMillis());
+    assertEquals(before, requests(path), "requests to " + path + " after the stop");
   }
 
   private static void awaitRequests(String path, int count) {
@@ -307,6 +399,8 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
               "http_object",
               "http_empty",
               "http_redirect",
+              "http_gone",
+              "http_invalid",
               "http_unavailable",
               "http_slow")) {
         st.execute("CREATE TABLE " + table + " (id text PRIMARY KEY, name text)");
