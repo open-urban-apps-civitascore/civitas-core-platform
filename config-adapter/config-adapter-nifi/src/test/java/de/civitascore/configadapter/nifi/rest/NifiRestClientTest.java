@@ -1028,9 +1028,17 @@ class NifiRestClientTest {
 
   private static com.fasterxml.jackson.databind.JsonNode bulletinOf(
       String sourceId, String level, String message, String timestampIso) throws Exception {
+    return bulletinOf("pg-1", sourceId, level, message, timestampIso);
+  }
+
+  private static com.fasterxml.jackson.databind.JsonNode bulletinOf(
+      String groupId, String sourceId, String level, String message, String timestampIso)
+      throws Exception {
     return new com.fasterxml.jackson.databind.ObjectMapper()
         .readTree(
-            "[ { \"bulletin\": { \"groupId\": \"pg-1\", \"sourceId\": \""
+            "[ { \"bulletin\": { \"groupId\": \""
+                + groupId
+                + "\", \"sourceId\": \""
                 + sourceId
                 + "\", \"level\": \""
                 + level
@@ -1081,13 +1089,39 @@ class NifiRestClientTest {
 
   @Test
   void anErrorBulletinOfAnotherProcessorIsNoStop() throws Exception {
-    stubHealthyProcessorsForBulletinTests();
+    stubProcessorsWithStopSink("Running");
 
     NifiRestClient.RuntimeStatus status =
         client.readRuntimeStatus(
             "pg-1", bulletinOf("proc-1", "ERROR", "Pipeline record dropped", ""));
 
     assertEquals(NifiRestClient.RuntimeStatus.State.ERROR, status.state());
+  }
+
+  @Test
+  void anErrorBulletinOfAnotherProcessGroupIsNoStop() throws Exception {
+    // NiFi has one bulletin board for all process groups, so without this an error in any
+    // Tenant's flow could stop every HTTP/REST Pipeline.
+    stubProcessorsWithStopSink("Running");
+
+    NifiRestClient.RuntimeStatus status =
+        client.readRuntimeStatus(
+            "pg-1", bulletinOf("pg-other", "proc-foreign", "ERROR", "Something failed", ""));
+
+    assertEquals(NifiRestClient.RuntimeStatus.State.HEALTHY, status.state());
+  }
+
+  @Test
+  void anErrorEventCarriesTheTimeOfItsBulletin() throws Exception {
+    stubHealthyProcessorsForBulletinTests();
+
+    NifiRestClient.RuntimeStatus status =
+        client.readRuntimeStatus(
+            "pg-1",
+            bulletinOf("proc-1", "ERROR", "Pipeline record dropped", "2026-10-20T08:00:00.123Z"));
+
+    assertEquals(NifiRestClient.RuntimeStatus.State.ERROR, status.state());
+    assertEquals(java.time.Instant.parse("2026-10-20T08:00:00.123Z"), status.occurredAt());
   }
 
   @Test

@@ -243,18 +243,12 @@ public class NifiRestClient implements AutoCloseable {
   }
 
   private static Instant occurredAt(JsonNode bulletin) {
-    for (String field : List.of("timestampIso", "timestamp")) {
-      String timestamp = bulletin.path(field).asText();
-      if (!timestamp.isBlank()) {
-        try {
-          return Instant.parse(timestamp);
-        } catch (DateTimeParseException ignored) {
-          // NiFi writes "timestamp" as a time of day without a date; the next field or now
-          // stands in for it.
-        }
-      }
+    // The field "timestamp" holds only a time of day, without a date.
+    try {
+      return Instant.parse(bulletin.path("timestampIso").asText());
+    } catch (DateTimeParseException e) {
+      return Instant.now();
     }
-    return Instant.now();
   }
 
   private ProcessorInspection readProcessorStatus(JsonNode processors) {

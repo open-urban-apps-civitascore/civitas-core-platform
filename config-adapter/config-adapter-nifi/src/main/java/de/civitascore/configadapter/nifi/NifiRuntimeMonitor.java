@@ -126,6 +126,10 @@ final class NifiRuntimeMonitor implements AutoCloseable {
   private void stop(Pipeline pipeline, RuntimeStatus status)
       throws FatalAdapterException, RetryableAdapterException {
     client.stopProcessGroup(pipeline.processGroupId());
+    LOG.info(
+        "Stopped process group {} of pipeline {} on a fatal error of its flow",
+        Encode.forJava(pipeline.processGroupId()),
+        Encode.forJava(pipeline.pipelineId()));
     publish(event(pipeline, status));
     stoppedPipelines.add(pipeline.pipelineId());
     pipelines.remove(pipeline.pipelineId(), pipeline);
