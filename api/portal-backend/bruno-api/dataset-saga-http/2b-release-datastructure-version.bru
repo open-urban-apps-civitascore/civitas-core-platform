@@ -1,0 +1,22 @@
+meta {
+  name: 2b. Release DataStructure Version
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{httpSagaDataStructureId}}
+  versionId: {{httpSagaDataStructureVersionId}}
+}
+
+tests {
+  test("Version released", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

@@ -1,0 +1,23 @@
+meta {
+  name: 12. Cleanup - Unrelease DataSource
+  type: http
+  seq: 24
+}
+
+post {
+  url: {{baseUrl}}/datasources/:id/unrelease
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{httpSagaDataSourceId}}
+}
+
+tests {
+  test("Unreleased or already draft", function() {
+    const status = res.getStatus();
+    // 200=unreleased, 400=not AVAILABLE (already draft or never created), 409=still in use
+    expect(status === 200 || status === 400 || status === 409).to.be.true;
+  });
+}

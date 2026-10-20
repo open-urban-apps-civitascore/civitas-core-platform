@@ -1,0 +1,31 @@
+meta {
+  name: 2. Create DataStructure
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/datastructures
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "HTTP Saga Thing",
+    "description": "A Thing as the things API call delivers it",
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('httpSagaDataStructureId', res.body.id);
+  }
+}
+
+tests {
+  test("DataStructure created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

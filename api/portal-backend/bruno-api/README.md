@@ -96,6 +96,7 @@ bruno-api/
 │   ├── 9..10-verify-*.bru       # Verify state after saga (incl. named-API gateway behaviour)
 │   ├── 11-unrelease / 12-unstage # Reverse lifecycle
 │   └── 13..17-cleanup-*.bru     # Delete all created entities
+├── dataset-saga-http/           # End-to-end test of HTTP/REST Pipelines (CI stack only)
 ├── zz-teardown/                 # Delete setup entities
 ├── environments/
 │   └── local-direct.bru         # localhost:8089 (direct, no gateway)
@@ -170,6 +171,12 @@ Uses Docker Compose service names to reach containers within the CI network.
 | `realm`        | `civitas-core`                     |
 | `username`     | `dev@civitas.local`                |
 | `password`     | `dev123`                           |
+| `wiremockUrl`  | `http://wiremock:8080`            |
+
+`dataset-saga-http` needs `wiremockUrl`, the WireMock of the CI stack, which both the Bruno runner
+and NiFi reach. The folder registers the responses of its API calls through the WireMock admin API
+and removes them at the end, so a new test case changes only Bruno files. The local environments
+have no WireMock.
 
 Authentication is handled automatically via OAuth2 password grant (configured in `collection.bru`).
 
