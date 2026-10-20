@@ -321,6 +321,9 @@
             "errorLabel": "Error",
             "errorDetails": "Error details for {name}",
             "errorToast": "Pipeline \"{name}\": {message}",
+            "stoppedLabel": "Stopped",
+            "stoppedDetails": "Stop details for {name}",
+            "restartHint": "Unrelease and release the Dataset to run this Pipeline again.",
             "menuLabel": "Actions for {name}",
             "actions": {
               "open": "Open",
