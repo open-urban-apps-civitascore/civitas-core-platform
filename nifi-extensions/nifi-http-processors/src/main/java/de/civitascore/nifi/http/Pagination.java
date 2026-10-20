@@ -24,6 +24,12 @@ sealed interface Pagination permits PageNumberPagination, SinglePage {
   boolean pagesAreArrays();
 
   /**
+   * Whether an error status of {@code page} says that the page lies past the last page, so that the
+   * run ends with the pages before it.
+   */
+  boolean isPastTheEnd(Page page, int status);
+
+  /**
    * The page after {@code page}, or empty when the run ends with {@code page}.
    *
    * @param records the number of records of {@code page}

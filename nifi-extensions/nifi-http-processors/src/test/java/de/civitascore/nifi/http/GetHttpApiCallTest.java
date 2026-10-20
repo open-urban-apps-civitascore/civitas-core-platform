@@ -989,7 +989,7 @@ class GetHttpApiCallTest {
   void onTrigger_whenPage2NeedsAChangeOfTheConfiguration_routesTheRunToStopWithoutPage1()
       throws InitializationException {
     try (ApiEndpoint endpoint =
-        ApiEndpoint.answeringInTurn(Response.json(FULL_PAGE), Response.status(404))) {
+        ApiEndpoint.answeringInTurn(Response.json(FULL_PAGE), Response.status(403))) {
       TestRunner runner = paginatedRunner(endpoint, ", \"startPage\": 1");
 
       runner.run();
@@ -997,8 +997,41 @@ class GetHttpApiCallTest {
       assertRouted(
           runner,
           GetHttpApiCall.STOP,
-          404,
-          "API call \"Stations\": GET /stations page 2 failed with status 404");
+          403,
+          "API call \"Stations\": GET /stations page 2 failed with status 403");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {400, 404})
+  void onTrigger_whenAPageAfterTheFirstIsPastTheLastPage_routesTheEarlierPagesToSuccess(int status)
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(fullPage(0)), Response.json(fullPage(1)), Response.status(status))) {
+      TestRunner runner = paginatedRunner(endpoint, "");
+
+      runner.run();
+
+      assertEquals(3, endpoint.requests().size());
+      assertPages(runner, "0", "1");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {400, 404})
+  void onTrigger_whenTheFirstPageAnswers400Or404_routesTheRunToStop(int status)
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(status, "{}")) {
+      TestRunner runner = paginatedRunner(endpoint, "");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          status,
+          "API call \"Stations\": GET /stations page 0 failed with status " + status);
     }
   }
 

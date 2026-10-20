@@ -115,7 +115,18 @@ final class PageLoop {
       List<FlowFile> pages,
       PageBodies bodies) {
     return switch (outcome) {
-      case ApiCallOutcome.Failure failure -> new PageRead.Failed(failure);
+      case ApiCallOutcome.Failure failure -> {
+        if (apiCall.pagination().isPastTheEnd(page, failure.status())) {
+          log.debug(
+              "{} {}{} returned {}: past the last page",
+              apiCall.method().name(),
+              apiCall.path(),
+              page.title().map(title -> " " + title).orElse(""),
+              failure.status());
+          yield new PageRead.Records(0);
+        }
+        yield new PageRead.Failed(failure);
+      }
       case ApiCallOutcome.NoBody noBody -> {
         logNoBody(page, noBody.status());
         yield new PageRead.Records(0);

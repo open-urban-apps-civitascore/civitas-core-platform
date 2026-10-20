@@ -212,7 +212,8 @@ public class GetHttpApiCall extends AbstractProcessor {
                   + " request the web client refuses, a response that is not JSON or does not"
                   + " agree with the Record Schema, a page that is not a JSON array, a page that"
                   + " repeats an earlier page of the run, and a run that reads Max Pages pages"
-                  + " and meets no stop condition.")
+                  + " and meets no stop condition. With pagination, a 400 or 404 on a page after"
+                  + " the first ends the run and is no error.")
           .build();
 
   static final Relationship FAILURE =

@@ -45,6 +45,15 @@ record PageNumberPagination(
     return true;
   }
 
+  /**
+   * Some APIs answer a page past the last page with 400 or 404 instead of {@code []}; on the first
+   * page the same status is a configuration error.
+   */
+  @Override
+  public boolean isPastTheEnd(Page page, int status) {
+    return page.index() > 0 && (status == 400 || status == 404);
+  }
+
   @Override
   public Optional<Page> next(Page page, int records) {
     boolean endPageDone = endPage.isPresent() && number(page.index()) >= endPage.getAsInt();

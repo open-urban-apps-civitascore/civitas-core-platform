@@ -287,7 +287,7 @@ API call "Get stations": GET /stations failed: ConnectException
 API call "Get stations": 2 of 50 records violate the Data structure: record 3: /lat type; record 7: required stationid
 API call "Get stations": the response is a JSON string, not an object or an array
 API call "Get stations": the response is not JSON
-API call "Get stations": GET /stations page 3 failed with status 404
+API call "Get stations": GET /stations page 3 failed with status 403
 API call "Get stations": GET /stations page 3 failed: ConnectException
 API call "Get stations": page 3: 2 of 50 records violate the Data structure: record 3: /lat type; record 7: required stationid
 API call "Get stations": page 3 is a JSON object, not an array
@@ -348,6 +348,9 @@ one of these conditions, and the records of that page are part of the run:
 - The page number is the `endPage`.
 - The page has no records.
 - The page has fewer records than `pageSize`.
+- A page after the first page answers 400 or 404. Some APIs, for example WordPress, answer a page
+  past the last page so, and not with `[]`. On the first page, 400 and 404 go to `stop`, as in the
+  table above.
 
 A page with more records than `pageSize` is not an error. The page number is a `long`, so a
 `startPage` near the `int` maximum does not overflow.

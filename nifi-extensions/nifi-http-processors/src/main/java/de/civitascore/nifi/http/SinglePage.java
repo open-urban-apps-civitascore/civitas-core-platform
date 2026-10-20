@@ -28,6 +28,11 @@ record SinglePage() implements Pagination {
   }
 
   @Override
+  public boolean isPastTheEnd(Page page, int status) {
+    return false;
+  }
+
+  @Override
   public Optional<Page> next(Page page, int records) {
     return Optional.empty();
   }
