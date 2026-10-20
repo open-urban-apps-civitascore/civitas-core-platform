@@ -66,18 +66,10 @@ public class HttpConnectorRules implements ConnectorRules {
       String apiCallPath,
       List<ConnectorViolation> violations) {
     String paginationPath = apiCallPath + ".pagination.";
-    if (namesAQueryParameter(page.pageParameter(), queryParameters)) {
-      violations.add(
-          ConnectorViolation.at(
-              paginationPath + "pageParameter",
-              "'pageParameter' must differ from the name of each query parameter"));
-    }
-    if (namesAQueryParameter(page.pageSizeParameter(), queryParameters)) {
-      violations.add(
-          ConnectorViolation.at(
-              paginationPath + "pageSizeParameter",
-              "'pageSizeParameter' must differ from the name of each query parameter"));
-    }
+    addQueryParameterCollision(
+        "pageParameter", page.pageParameter(), queryParameters, paginationPath, violations);
+    addQueryParameterCollision(
+        "pageSizeParameter", page.pageSizeParameter(), queryParameters, paginationPath, violations);
     if (page.pageParameter() != null && page.pageParameter().equals(page.pageSizeParameter())) {
       violations.add(
           ConnectorViolation.at(
@@ -91,10 +83,20 @@ public class HttpConnectorRules implements ConnectorRules {
     }
   }
 
-  private static boolean namesAQueryParameter(String name, List<Parameter> queryParameters) {
-    return name != null
+  private static void addQueryParameterCollision(
+      String field,
+      String name,
+      List<Parameter> queryParameters,
+      String paginationPath,
+      List<ConnectorViolation> violations) {
+    if (name != null
         && queryParameters != null
-        && queryParameters.stream().anyMatch(parameter -> name.equals(parameter.name()));
+        && queryParameters.stream().anyMatch(parameter -> name.equals(parameter.name()))) {
+      violations.add(
+          ConnectorViolation.at(
+              paginationPath + field,
+              "'" + field + "' must differ from the name of each query parameter"));
+    }
   }
 
   private static boolean sendsCredentialsInClearText(HttpConnectorConfiguration http) {
