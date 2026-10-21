@@ -133,6 +133,15 @@ class SqlConnectorValuesTest {
     assertEquals("readings", SqlConnectorValues.read(connector("driver", driver)).table());
   }
 
+  /** Everything after '#' would otherwise name the host the driver connects to. */
+  @Test
+  void readRejectsDsnWithFragment() {
+    ConnectorValueException e =
+        rejected(connector("dsn", "postgres://db.example:5432#@attacker.example/city"));
+
+    assertTrue(e.getMessage().contains("'dsn'"), e.getMessage());
+  }
+
   @Test
   void readRejectsBlankDsn() {
     ConnectorValueException e = rejected(connector("dsn", " "));

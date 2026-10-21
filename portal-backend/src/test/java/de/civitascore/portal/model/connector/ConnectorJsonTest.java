@@ -139,6 +139,8 @@ class ConnectorJsonTest {
         "{'connectorType':'MQTT','urls':['tcp://u:pw@broker:1883','no url']}"
             + " | Invalid value: connector.urls[1]",
         "{'connectorType':'SQL','dsn':'postgres://u:pw@ bad'} | Invalid value: connector.dsn",
+        "{'connectorType':'SQL','dsn':'postgres://db.example:5432#@attacker.example/city'}"
+            + " | Invalid value: connector.dsn",
         "['SQL'] | Invalid value: connector",
         "{'connectorType':'HTTP','apiCalls':[{'foo':1}]} | Unknown key: connector.apiCalls[0].foo",
         "{'connectorType':'HTTP','authentication':{'type':'OAUTH2'}}"

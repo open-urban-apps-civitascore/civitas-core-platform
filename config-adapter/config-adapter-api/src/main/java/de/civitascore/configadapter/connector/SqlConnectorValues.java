@@ -75,6 +75,10 @@ public record SqlConnectorValues(String jdbcUrl, String table, List<String> colu
           "SQL 'where' must be literal SQL without bind placeholders (':name' or '?')");
     }
     String dsn = trimmedString(connector.get("dsn"));
+    // The JDBC URL takes the host after the last '@' of the authority, also behind a '#'.
+    if (dsn.indexOf('#') >= 0) {
+      throw new ConnectorValueException("SQL 'dsn' must not contain a fragment ('#')");
+    }
     rejectUnknownDsnParams(dsn);
 
     String table = trimmedString(connector.get("table"));
