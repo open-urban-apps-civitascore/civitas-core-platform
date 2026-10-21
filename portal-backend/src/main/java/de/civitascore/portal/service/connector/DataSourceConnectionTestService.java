@@ -28,6 +28,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
@@ -65,6 +67,7 @@ public class DataSourceConnectionTestService {
   private final Optional<ConnectionTestClient> client;
 
   private final Set<String> usersTesting = ConcurrentHashMap.newKeySet();
+  private final AtomicInteger running = new AtomicInteger();
 
   /**
    * Tests connector values that no data source holds yet.
@@ -76,7 +79,7 @@ public class DataSourceConnectionTestService {
    * @throws ExternalSystemTimeoutException if no answer arrives in time
    */
   public ConnectionTestResultDTO test(ConnectionTestInputDTO input) {
-    return audited(null, null, null, input);
+    return bounded(() -> audited(null, null, null, input));
   }
 
   /**
@@ -89,16 +92,37 @@ public class DataSourceConnectionTestService {
    * @see #test(ConnectionTestInputDTO)
    */
   public ConnectionTestResultDTO test(UUID dataSourceId, ConnectionTestInputDTO input) {
-    DataSource dataSource = dataSourceService.findByIdOrThrow(dataSourceId);
-    boolean draft = dataSource.getDataSourceStatus() == DataSourceStatus.DRAFT;
-    if (mayKeepStoredSecrets(draft, input.getConnector(), connectorStore.read(dataSource))) {
-      return audited(dataSourceId, connectorStore.storedDocument(dataSource), null, input);
+    return bounded(
+        () -> {
+          DataSource dataSource = dataSourceService.findByIdOrThrow(dataSourceId);
+          boolean draft = dataSource.getDataSourceStatus() == DataSourceStatus.DRAFT;
+          if (mayKeepStoredSecrets(draft, input.getConnector(), connectorStore.read(dataSource))) {
+            return audited(dataSourceId, connectorStore.storedDocument(dataSource), null, input);
+          }
+          return audited(
+              dataSourceId,
+              null,
+              draft ? STORED_SECRET_FOR_STORED_DESTINATION : STORED_SECRET_FOR_RELEASED_CONNECTOR,
+              input);
+        });
+  }
+
+  /**
+   * Runs {@code test} unless {@code max-concurrent} tests wait on this instance already. Checked
+   * before the data source is read, because a waiting test keeps its database connection.
+   */
+  private ConnectionTestResultDTO bounded(Supplier<ConnectionTestResultDTO> test) {
+    try {
+      if (running.incrementAndGet() > properties.maxConcurrent()) {
+        log.info(
+            "Connection test: user={} outcome=BUSY",
+            Encode.forJava(currentUser.getCurrentAuditor().map(UUID::toString).orElse(UNKNOWN)));
+        throw new ConnectionTestBusyException(ADAPTER_BUSY);
+      }
+      return test.get();
+    } finally {
+      running.decrementAndGet();
     }
-    return audited(
-        dataSourceId,
-        null,
-        draft ? STORED_SECRET_FOR_STORED_DESTINATION : STORED_SECRET_FOR_RELEASED_CONNECTOR,
-        input);
   }
 
   private static boolean mayKeepStoredSecrets(
@@ -129,6 +153,9 @@ public class DataSourceConnectionTestService {
           run(user, requestId, storedDocument, placeholderRefusal, input);
       outcome = answer.success() ? "SUCCESS" : "FAILURE:" + answer.reason();
       return answer;
+    } catch (StoredSecretRefusedException e) {
+      outcome = "REFUSED";
+      throw e;
     } catch (ConnectorValidationException | MalformedDataSourceRequestException e) {
       outcome = "INVALID";
       throw e;
@@ -145,8 +172,8 @@ public class DataSourceConnectionTestService {
       // TR-03187 L-1/L-6: who tested which destination and how it ended, without secrets, query
       // or preview. The request id finds the matching line in config-adapter's log.
       log.info(
-          "Connection test: user={} requestId={} dataSource={} connectorType={} destination={}"
-              + " target={} outcome={}",
+          "Connection test: user={} requestId={} dataSource={} connectorType={}"
+              + " destination=\"{}\" target=\"{}\" outcome={}",
           Encode.forJava(user),
           requestId,
           dataSourceId == null ? UNSAVED : dataSourceId,
@@ -168,7 +195,7 @@ public class DataSourceConnectionTestService {
     connectorValidator.requireValid(connector, ConnectorValidator.Stage.RELEASE);
     requireFittingApiCall(connector, apiCall);
     if (placeholderRefusal != null && ConnectorJson.hasPlaceholder(connector)) {
-      throw new MalformedDataSourceRequestException(placeholderRefusal);
+      throw new StoredSecretRefusedException(placeholderRefusal);
     }
     ConnectorJson.requireStoredSecrets(connector, storedDocument);
     Map<String, Object> document =

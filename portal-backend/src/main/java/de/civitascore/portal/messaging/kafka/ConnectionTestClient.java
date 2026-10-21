@@ -78,8 +78,8 @@ public class ConnectionTestClient implements ConsumerSeekAware {
   /**
    * Sends {@code request} and waits for its result until {@link ConnectionTestRequest#expiresAt()}.
    *
-   * @throws ExternalSystemRejectionException if the request cannot be sent, or the result
-   *     partitions are not assigned yet
+   * @throws ExternalSystemRejectionException if the request cannot be sent, the result partitions
+   *     are not assigned yet, or the answer cannot be read
    * @throws ExternalSystemTimeoutException if no result arrives before the request expires
    */
   public ConnectionTestResult test(ConnectionTestRequest request) {
@@ -102,7 +102,10 @@ public class ConnectionTestClient implements ConsumerSeekAware {
       throw new ExternalSystemTimeoutException(
           "Interrupted while waiting for connection test " + requestId, e);
     } catch (ExecutionException e) {
-      throw new IllegalStateException("A connection test result never completes exceptionally", e);
+      if (e.getCause() instanceof ExternalSystemRejectionException rejection) {
+        throw rejection;
+      }
+      throw new IllegalStateException("Connection test " + requestId + " failed unexpectedly", e);
     } finally {
       pending.remove(requestId);
     }
@@ -127,6 +130,13 @@ public class ConnectionTestClient implements ConsumerSeekAware {
           "Dropped unreadable connection test result {}: {}",
           KafkaUtils.format(record),
           e.getClass().getSimpleName());
+      // The key is the request id, so a waiting request fails at once instead of timing out.
+      CompletableFuture<ConnectionTestResult> waiting =
+          record.key() == null ? null : pending.get(record.key());
+      if (waiting != null) {
+        waiting.completeExceptionally(
+            new ExternalSystemRejectionException("The connection test answer cannot be read"));
+      }
       return;
     }
     CompletableFuture<ConnectionTestResult> waiting =

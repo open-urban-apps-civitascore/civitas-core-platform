@@ -23,6 +23,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -71,7 +72,7 @@ class ConnectionTestClientTest {
     return new ConnectionTestClient(
         kafkaTemplate,
         objectMapper,
-        new ConnectionTestProperties(REQUEST_TOPIC, RESULT_TOPIC, 20),
+        new ConnectionTestProperties(REQUEST_TOPIC, RESULT_TOPIC, 20, 4),
         "portal");
   }
 
@@ -247,6 +248,29 @@ class ConnectionTestClientTest {
     client.handleResult(record(success(request.requestId())));
 
     assertThat(answer.get(5, TimeUnit.SECONDS).outcome()).isEqualTo(Outcome.SUCCESS);
+  }
+
+  @Test
+  @DisplayName("an unreadable result for a waiting request fails it at once")
+  void handleResult_withUnreadableResultOfAWaitingRequest_failsItAtOnce() throws Exception {
+    acknowledgeSends();
+    ConnectionTestRequest request = request(Duration.ofSeconds(10));
+    Future<ConnectionTestResult> answer = testInBackground(request);
+    await().atMost(Duration.ofSeconds(5)).until(() -> client.pendingCount() == 1);
+
+    client.handleResult(
+        new ConsumerRecord<>(
+            RESULT_TOPIC,
+            0,
+            0L,
+            request.requestId(),
+            "{\"requestId\":\""
+                + request.requestId()
+                + "\",\"outcome\":\"FAILURE\",\"reason\":\"FROM_A_NEWER_SERVICE\"}"));
+
+    assertThatThrownBy(() -> answer.get(2, TimeUnit.SECONDS))
+        .isInstanceOf(ExecutionException.class)
+        .hasCauseInstanceOf(ExternalSystemRejectionException.class);
   }
 
   @Test

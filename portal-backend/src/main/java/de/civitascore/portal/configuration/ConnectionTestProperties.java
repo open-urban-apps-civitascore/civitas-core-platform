@@ -17,7 +17,8 @@ import org.springframework.validation.annotation.Validated;
 public record ConnectionTestProperties(
     @NotBlank @DefaultValue(ConnectionTestTopics.REQUEST) String requestTopic,
     @NotBlank @DefaultValue(ConnectionTestTopics.RESULT) String resultTopic,
-    @Positive @DefaultValue("20") int waitSeconds) {
+    @Positive @DefaultValue("20") int waitSeconds,
+    @Positive @DefaultValue("4") int maxConcurrent) {
 
   public Duration waitTime() {
     return Duration.ofSeconds(waitSeconds);

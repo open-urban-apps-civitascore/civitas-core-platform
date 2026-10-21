@@ -113,6 +113,8 @@ connection-test:
   result-topic: ${CONNECTION_TEST_RESULT_TOPIC:de.civitascore.connectiontest.result}
   # How long a test waits for its result (seconds); config-adapter stops a test before then.
   wait-seconds: ${CONNECTION_TEST_WAIT_SECONDS:20}
+  # Tests that wait on one backend instance at the same time; each holds a request thread.
+  max-concurrent: ${CONNECTION_TEST_MAX_CONCURRENT:4}
 
 # Model Forge — embedded schema/model registry.
 # Reuses the host spring.datasource; owns a separate `model_forge` schema migrated by its own

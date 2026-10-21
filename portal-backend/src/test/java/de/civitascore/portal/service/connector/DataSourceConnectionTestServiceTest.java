@@ -92,13 +92,18 @@ class DataSourceConnectionTestServiceTest {
   }
 
   private DataSourceConnectionTestService service(Optional<ConnectionTestClient> kafka) {
+    return service(kafka, 4);
+  }
+
+  private DataSourceConnectionTestService service(
+      Optional<ConnectionTestClient> kafka, int maxConcurrent) {
     return new DataSourceConnectionTestService(
         dataSourceService,
         connectorStore,
         new ConnectorValidator(List.of(new HttpConnectorRules())),
         encryptor,
         () -> Optional.of(USER),
-        new ConnectionTestProperties("request", "result", 20),
+        new ConnectionTestProperties("request", "result", 20, maxConcurrent),
         kafka);
   }
 
@@ -419,7 +424,7 @@ class DataSourceConnectionTestServiceTest {
           .isInstanceOf(MalformedDataSourceRequestException.class)
           .hasMessage(DataSourceConnectionTestService.STORED_SECRET_FOR_STORED_DESTINATION);
       verify(client, never()).test(any());
-      assertThat(singleAuditLine()).endsWith("outcome=INVALID");
+      assertThat(singleAuditLine()).endsWith("outcome=REFUSED");
     }
 
     @ParameterizedTest
@@ -479,7 +484,7 @@ class DataSourceConnectionTestServiceTest {
           .isInstanceOf(MalformedDataSourceRequestException.class)
           .hasMessage(DataSourceConnectionTestService.STORED_SECRET_FOR_RELEASED_CONNECTOR);
       verify(client, never()).test(any());
-      assertThat(singleAuditLine()).endsWith("outcome=INVALID");
+      assertThat(singleAuditLine()).endsWith("outcome=REFUSED");
     }
 
     @ParameterizedTest
@@ -610,6 +615,39 @@ class DataSourceConnectionTestServiceTest {
   }
 
   @Nested
+  @DisplayName("Tests per backend instance")
+  class TestsPerInstance {
+
+    @Test
+    @DisplayName("a test beyond the instance limit is refused before the data source is read")
+    void testBeyondTheInstanceLimit_isTooManyRequestsWithoutReadingTheDataSource()
+        throws Exception {
+      DataSourceConnectionTestService limited = service(Optional.of(client), 1);
+      CountDownLatch running = new CountDownLatch(1);
+      CountDownLatch release = new CountDownLatch(1);
+      answer(
+          request -> {
+            running.countDown();
+            await().atMost(Duration.ofSeconds(10)).until(() -> release.getCount() == 0);
+            return success(request);
+          });
+      CompletableFuture<ConnectionTestResultDTO> first =
+          CompletableFuture.supplyAsync(() -> limited.test(sql(PLAIN_PASSWORD)));
+      assertThat(running.await(5, TimeUnit.SECONDS)).isTrue();
+      UUID id = UUID.randomUUID();
+
+      assertThatThrownBy(() -> limited.test(id, sql(PLAIN_PASSWORD)))
+          .isInstanceOf(ConnectionTestBusyException.class)
+          .hasMessage(DataSourceConnectionTestService.ADAPTER_BUSY);
+      verify(dataSourceService, never()).findByIdOrThrow(id);
+      release.countDown();
+
+      assertThat(first.get(5, TimeUnit.SECONDS).success()).isTrue();
+      assertThat(auditLines()).hasSize(2).anyMatch(line -> line.endsWith("outcome=BUSY"));
+    }
+  }
+
+  @Nested
   @DisplayName("One test per user")
   class OneTestPerUser {
 
@@ -672,8 +710,8 @@ class DataSourceConnectionTestServiceTest {
                   + USER
                   + " requestId="
                   + sentRequest().requestId()
-                  + " dataSource=unsaved connectorType=SQL destination=db.example:5432"
-                  + " target=readings outcome=SUCCESS");
+                  + " dataSource=unsaved connectorType=SQL destination=\"db.example:5432\""
+                  + " target=\"readings\" outcome=SUCCESS");
     }
 
     @Test
@@ -698,7 +736,7 @@ class DataSourceConnectionTestServiceTest {
 
       service.test(mqtt(null));
 
-      assertThat(singleAuditLine()).contains("connectorType=MQTT destination=broker-a:1883 ");
+      assertThat(singleAuditLine()).contains("connectorType=MQTT destination=\"broker-a:1883\" ");
     }
 
     @Test
@@ -708,7 +746,7 @@ class DataSourceConnectionTestServiceTest {
 
       service.test(http("stations"));
 
-      assertThat(singleAuditLine()).contains("destination=api.example.org ");
+      assertThat(singleAuditLine()).contains("destination=\"api.example.org\" ");
     }
 
     @Test
@@ -717,7 +755,7 @@ class DataSourceConnectionTestServiceTest {
       assertThatThrownBy(() -> service.test(input("{'connectorType':'SQL'}", null)))
           .isInstanceOf(ConnectorValidationException.class);
 
-      assertThat(singleAuditLine()).contains("destination=unknown ");
+      assertThat(singleAuditLine()).contains("destination=\"unknown\" ");
     }
   }
 }
