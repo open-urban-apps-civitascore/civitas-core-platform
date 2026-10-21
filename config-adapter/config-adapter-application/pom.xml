@@ -52,6 +52,11 @@
             <artifactId>config-adapter-flowable</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>de.civitas-core</groupId>
+            <artifactId>config-adapter-connection-test</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <!-- Saga command handlers (apisix, frost, nifi) are bundled at runtime via the
              dist profile below. They are also needed on the TEST classpath so the bootstrap

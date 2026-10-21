@@ -109,7 +109,7 @@ At least one of basic auth or API key must be set, or startup fails. If both are
 
 This is read **directly from the environment** — it is not a configuration property and cannot be placed in `application.properties`. A value that does not decode to exactly 32 bytes fails with an explicit error. On the NiFi path only, the ordinary property `nifi.master-key` (`NIFI_MASTER_KEY`) overrides it, so key material can live in the properties file there; an invalid value drops the NiFi saga handler with a warning rather than failing startup.
 
-Properties that accept an `ENC(...)` value: `geoserver.admin.password`, `geoserver.postgis.password`, `nifi.frost.basic.auth.username` / `.password` — which fall back to the unprefixed `frost.basic.auth.*` — PostGIS **role** passwords carried in event payloads, and NiFi datasource credentials carried in saga payloads.
+Properties that accept an `ENC(...)` value: `geoserver.admin.password`, `geoserver.postgis.password`, `nifi.frost.basic.auth.username` / `.password` — which fall back to the unprefixed `frost.basic.auth.*` — PostGIS **role** passwords carried in event payloads, NiFi datasource credentials carried in saga payloads, and the datasource credentials of a connection test request.
 
 Everything else takes its value verbatim — notably `postgis.jdbc.password`, `flowable.jdbc.password`, `keycloak.password`, `apisix.admin.key`, `frost.api.key` and `nifi.oidc.client-secret`. Two asymmetries follow from that: the same `frost.basic.auth.password` is decrypted on the NiFi sink path but consumed verbatim by the FROST adapter, and a datasource credential arriving in a saga payload is decrypted while the `nifi.postgis.password` **property** is forwarded to NiFi as-is.
 
@@ -249,6 +249,58 @@ Most NiFi misconfiguration fails the first affected pipeline deployment rather t
 
 **Flowable** — see [§1.3](#13-flowable-state-database).
 
+### 2.5 Connection Test
+
+The connection test answers the portal's "test connection". It connects to the data source with its own SQL, MQTT and HTTP clients. [config-adapter-connection-test/README.md](config-adapter-connection-test/README.md) describes what it checks.
+
+It runs as a **workload of its own**, never inside config-adapter. The workload uses the same image with another main class:
+
+```
+java $JAVA_OPTS -cp /civitas/config-adapter.jar de.civitascore.configadapter.application.ConnectionTestApplication
+```
+
+- **Requirements:** `kafka.bootstrap.servers` and `CIVITAS_MASTER_KEY`. The key decrypts the passwords in a request. The workload reads the same `application.properties` layering as config-adapter.
+- **Without the workload**, the portal answers every test with 504.
+- **Probes:** `/health/live` and `/health/ready` on `healthcheck.port` (packaged default `8280`). Set `HEALTHCHECK_PORT` to the port the probes use, as for config-adapter. `/health` reports `DOWN`, because the workload runs no adapter consumer.
+
+| Property | Env var | Default | Description |
+|---|---|---|---|
+| `connectiontest.kafka.request-topic` | `CONNECTIONTEST_KAFKA_REQUEST_TOPIC` | `de.civitascore.connectiontest.request` | Must match portal-backend's `connection-test.request-topic`. |
+| `connectiontest.kafka.result-topic` | `CONNECTIONTEST_KAFKA_RESULT_TOPIC` | `de.civitascore.connectiontest.result` | Must match portal-backend's `connection-test.result-topic`. |
+| `connectiontest.kafka.group.id` | `CONNECTIONTEST_KAFKA_GROUP_ID` | `config-adapter-connection-test` | Consumer group on the request topic. |
+| `connectiontest.timeout-seconds` | `CONNECTIONTEST_TIMEOUT_SECONDS` | `15` | Longest time one test may take. Then its connections are closed. Keep it below portal-backend's `connection-test.wait-seconds` (20). A request that expires sooner gets less time. |
+| `connectiontest.max-concurrent` | `CONNECTIONTEST_MAX_CONCURRENT` | `4` | Tests that run at the same time. A request above this limit gets the answer `BUSY` at once. |
+| `connectiontest.denied-networks` | `CONNECTIONTEST_DENIED_NETWORKS` | `none` | CIDR networks a test never connects to. Loopback, link-local, any-local and multicast addresses are always refused. |
+| `connectiontest.denied-host-suffixes` | `CONNECTIONTEST_DENIED_HOST_SUFFIXES` | `none` | Host name suffixes refused before name resolution. The match uses the name as the user typed it, so a short name that the cluster DNS completes (`gateway.civitas`) or an IP address passes. To refuse a network, use `denied-networks`. `localhost` is always refused. |
+
+**Kafka**
+
+- The consumer starts at the latest offset and commits automatically. A request runs at most once, and a restart replays no request. A request whose `expiresAt` has passed is dropped.
+- On SIGTERM the consumer leaves its group at once. A new pod takes requests when it has joined the group, about 5–8 s after its start. After a crash, the group first waits for its 10 s session timeout.
+- Readiness is reported when the consumer subscribes, not when it has joined the group.
+- The workload creates no topics. Create both topics with `retention.ms=60000` **and** `segment.ms=60000`: a result can carry up to 8 KB of source data. Kafka deletes only closed segments. Without the short `segment.ms`, the open segment rolls after 7 days.
+
+**Network position**
+
+- The workload carries its own pod labels, never config-adapter's. Every platform service that admits config-adapter (PostgreSQL, FROST, GeoServer, Keycloak, the APISIX Admin API, NiFi) would otherwise admit the connection test too.
+- Kafka must admit the workload. The workload accepts no incoming connections.
+- A source inside the cluster answers a test only if its ingress policy admits the workload, as it admits NiFi for the pipeline.
+
+**Egress policy (required)**
+
+Ingress policies do not protect all destinations:
+
+- Node addresses (Kubernetes API server, kubelets, NodePorts) are not pods, so no ingress policy protects them.
+- Namespaces without a default-deny policy answer every client. Typical examples: `kube-system`, cert-manager, the ingress controller.
+
+Restrict the workload's egress in every deployment:
+
+- Allow DNS, Kafka and the namespaces of in-cluster sources by selector.
+- Allow the internet as `0.0.0.0/0` minus the cluster's pod, service and node networks.
+- Do not allow in-cluster destinations by `ipBlock`. Kubernetes intends `ipBlock` for cluster-external addresses, and the network plugin decides whether a Service address is translated before or after the policy check. A selector works in both cases.
+
+If the cluster cannot enforce an egress policy, set `connectiontest.denied-networks` to the pod, service and node networks. This setting has no exceptions, so it also refuses in-cluster sources.
+
 ## 3. Security Hardening
 
 Four settings ship with development-friendly defaults that are wrong for production.
@@ -260,7 +312,9 @@ Four settings ship with development-friendly defaults that are wrong for product
 | 3 | Kafka transport | PLAINTEXT only | *(not configurable)* | No TLS or SASL support exists. Isolate the broker at the network level. |
 | 4 | Every `localhost` default | `localhost` | real hostnames | `kafka.bootstrap.servers`, `keycloak.url`, `apisix.admin.url`, `frost.url`, `geoserver.url`, `nifi.url`, `nifi.oidc.token-uri`, `postgis.jdbc.url` and `flowable.jdbc.url` all default to a local address. |
 
-Custom certificate authorities: only NiFi has a verification flag. The APISIX, FROST, GeoServer and Keycloak clients use the JVM default trust store, so a private CA needs either `-Djavax.net.ssl.trustStore…` in `JAVA_OPTS` or a trust store baked into the image. MQTT-over-TLS trust is evaluated inside NiFi, against a truststore the deployment provides and the adapter only names via `nifi.mqtt.truststore.*`. The default is NiFi's node truststore, which also backs cluster-internal TLS and the OIDC back-channel; a dedicated store keeps external-broker trust separate — see [§2.4](#24-per-adapter-connection-settings).
+Custom certificate authorities: only NiFi has a verification flag. The APISIX, FROST, GeoServer and Keycloak clients use the JVM default trust store, so a private CA needs either `-Djavax.net.ssl.trustStore…` in `JAVA_OPTS` or a trust store baked into the image. MQTT-over-TLS trust is evaluated inside NiFi, against a truststore the deployment provides and the adapter only names via `nifi.mqtt.truststore.*`. The default is the JVM trust store of the NiFi image, not NiFi's node truststore — see [§2.4](#24-per-adapter-connection-settings).
+
+**Connection test destinations.** The connection test connects to hosts that the user enters. Give it its own pod labels and an egress policy, as [§2.5](#25-connection-test) describes.
 
 Secrets to inject rather than bake in: `CIVITAS_MASTER_KEY`, `APISIX_ADMIN_KEY`, `KEYCLOAK_PASSWORD`, `FLOWABLE_JDBC_PASSWORD`, `POSTGIS_JDBC_PASSWORD`, `GEOSERVER_ADMIN_PASSWORD`, `GEOSERVER_POSTGIS_PASSWORD`, `NIFI_OIDC_CLIENT_SECRET`, `NIFI_POSTGIS_PASSWORD`, and the FROST credentials.
 

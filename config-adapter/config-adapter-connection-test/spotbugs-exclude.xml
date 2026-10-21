@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+  <!-- Connector maps and the request and result records are shared by reference, never mutated. -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    <Package name="~de\.civitascore\.configadapter\.connectiontest"/>
+  </Match>
+
+  <!-- The row query holds only catalog names quoted by quote_ident, and binds its row limit. -->
+  <Match>
+    <Bug pattern="SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING"/>
+    <Class name="de.civitascore.configadapter.connectiontest.SqlProber"/>
+    <Method name="readRows"/>
+  </Match>
+</FindBugsFilter>

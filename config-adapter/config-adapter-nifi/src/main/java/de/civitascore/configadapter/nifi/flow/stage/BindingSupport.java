@@ -9,8 +9,8 @@
  */
 package de.civitascore.configadapter.nifi.flow.stage;
 
+import de.civitascore.configadapter.connector.ConnectorValues;
 import java.util.List;
-import java.util.Objects;
 import java.util.function.BiConsumer;
 
 /** Shared value coercions for the plan-time binding halves of the stages. */
@@ -20,19 +20,12 @@ public final class BindingSupport {
 
   /** A value as a trimmed string, or {@code ""} for null. */
   public static String trimmedString(Object value) {
-    return value == null ? "" : String.valueOf(value).trim();
+    return ConnectorValues.trimmedString(value);
   }
 
   /** A scalar or list value as trimmed, non-blank strings (empty for null/all-blank). */
   public static List<String> trimmedNonBlank(Object value) {
-    if (value == null) {
-      return List.of();
-    }
-    List<String> raw =
-        value instanceof List<?> list
-            ? list.stream().filter(Objects::nonNull).map(String::valueOf).toList()
-            : List.of(String.valueOf(value));
-    return raw.stream().map(String::trim).filter(s -> !s.isEmpty()).toList();
+    return ConnectorValues.trimmedNonBlank(value);
   }
 
   public static void putIfPresent(BiConsumer<String, String> target, String key, Object value) {
@@ -42,6 +35,6 @@ public final class BindingSupport {
   }
 
   public static boolean isEncrypted(Object value) {
-    return value instanceof String text && text.startsWith("ENC(") && text.endsWith(")");
+    return ConnectorValues.isEncrypted(value);
   }
 }
