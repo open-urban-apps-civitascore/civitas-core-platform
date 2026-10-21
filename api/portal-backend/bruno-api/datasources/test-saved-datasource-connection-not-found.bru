@@ -1,0 +1,36 @@
+meta {
+  name: Test Saved Data Source Connection (not found)
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/datasources/:id/connection-test
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: 00000000-0000-0000-0000-000000000000
+}
+
+body:json {
+  {
+    "connector": {
+      "connectorType": "MQTT",
+      "urls": ["tcp://broker:1883"],
+      "topics": ["sensor/#"],
+      "qos": 1
+    }
+  }
+}
+
+tests {
+  test("An unknown data source is not found", function() {
+    expect(res.getStatus()).to.equal(404);
+  });
+}
+
+docs {
+  **Expected Response:** 404 Not Found.
+}

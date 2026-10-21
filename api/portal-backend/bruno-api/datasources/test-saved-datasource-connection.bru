@@ -1,0 +1,67 @@
+meta {
+  name: Test Saved Data Source Connection
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/datasources/:id/connection-test
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSourceId}}
+}
+
+body:json {
+  {
+    "connector": {
+      "connectorType": "MQTT",
+      "urls": ["tcp://broker:1883"],
+      "topics": ["sensor/#"],
+      "qos": 1,
+      "user": "mqttuser",
+      "password": "********"
+    }
+  }
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Body has the connection test result shape", function() {
+    const body = res.body;
+    expect(body.success).to.be.a('boolean');
+    expect(body.previewTruncated).to.be.a('boolean');
+    expect(body).to.have.property('message');
+    expect(body).to.have.property('preview');
+    expect(body).to.have.property('rowCount');
+    expect(body).to.have.property('httpStatus');
+    if (body.success) {
+      expect(body.reason).to.equal(null);
+    } else {
+      expect(["INVALID_CONNECTOR", "SOURCE_ERROR", "TIMEOUT"]).to.include(body.reason);
+    }
+  });
+}
+
+docs {
+  **Precondition:** `dataSourceId` is set and stores an MQTT password
+  (`create-datasource`).
+
+  `"********"` keeps the stored password only for a draft's stored scheme,
+  host and port, or a released data source's unchanged connector.
+
+  **Expected Response:** 200 OK with a connection test result. 400 for
+  `"********"` with another destination, 404 for an unknown id.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Nothing stored; one audit log line |
+  | Config Adapter | Runs the test with the stored, encrypted password |
+  | External System | Read once by config-adapter |
+}

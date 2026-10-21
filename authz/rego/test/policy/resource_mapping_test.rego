@@ -245,6 +245,8 @@ test_sub_resource_paths if {
 		["/v1/datasets/abc/pipelines", "/v1/datasets/{id}/pipelines"],
 		["/v1/datasources/abc/release", "/v1/datasources/{id}/release"],
 		["/v1/datasources/abc/unrelease", "/v1/datasources/{id}/unrelease"],
+		["/v1/datasources/abc/connection-test", "/v1/datasources/{id}/connection-test"],
+		["/v1/datasources/connection-test", "/v1/datasources/connection-test"],
 		["/v1/datastructures/abc/versions", "/v1/datastructures/{id}/versions"],
 	]
 	every pattern in patterns {

@@ -1,0 +1,39 @@
+meta {
+  name: Contract SQL — connection test rejects an incomplete connector
+  type: http
+  seq: 133
+}
+
+post {
+  url: {{baseUrl}}/datasources/connection-test
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "connector": {
+      "connectorType": "SQL",
+      "driver": "postgres",
+      "dsn": "postgres://db.invalid:5432/city"
+    }
+  }
+}
+
+tests {
+  test("Status is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Error body names the missing fields", function() {
+    expect(res.body.type).to.equal("urn:civitas:error:VALIDATION_FAILED");
+    const fields = res.body.fieldErrors.map(function(e) { return e.field; });
+    expect(fields).to.include("connector.table");
+    expect(fields).to.include("connector.columns");
+  });
+}
+
+docs {
+  A connection test applies the release rules, so a draft-only connector
+  is rejected untested.
+}

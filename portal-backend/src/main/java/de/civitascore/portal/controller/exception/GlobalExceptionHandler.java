@@ -3,6 +3,7 @@ package de.civitascore.portal.controller.exception;
 import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
 import de.civitascore.portal.service.connector.ConnectorValidationException;
 import de.civitascore.portal.service.connector.StoredConnectorUnreadableException;
+import de.civitascore.portal.util.ConnectionTestBusyException;
 import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
@@ -405,6 +406,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         "EXTERNAL_SYSTEM_TIMEOUT",
         "An external system did not respond in time",
         request);
+  }
+
+  @ExceptionHandler(ConnectionTestBusyException.class)
+  @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+  public ProblemDetail handleConnectionTestBusy(
+      ConnectionTestBusyException ex, HttpServletRequest request) {
+    log.warn("Connection test rejected: {}", Encode.forJava(ex.getMessage()));
+    // TR-03187 W-18/W-19: the detail is one of two fixed constants with no runtime data.
+    return createProblemDetail(
+        HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS", ex.getMessage(), request);
   }
 
   /**

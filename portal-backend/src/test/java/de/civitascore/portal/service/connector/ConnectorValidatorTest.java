@@ -1,6 +1,7 @@
 package de.civitascore.portal.service.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -220,6 +221,24 @@ class ConnectorValidatorTest {
   @Test
   void validate_withoutConnector_returnsNoViolations() {
     assertThat(validator.validate(null, ConnectorValidator.Stage.RELEASE)).isEmpty();
+  }
+
+  @Test
+  void requireValid_withViolations_throwsThemAll() {
+    TestConnector connector =
+        new TestConnector(null, null, List.of(new Call("a", new Auth(null, List.of()))));
+
+    assertThatThrownBy(() -> validator.requireValid(connector, ConnectorValidator.Stage.RELEASE))
+        .isInstanceOfSatisfying(
+            ConnectorValidationException.class,
+            e ->
+                assertThat(e.getViolations())
+                    .isEqualTo(validator.validate(connector, ConnectorValidator.Stage.RELEASE)));
+  }
+
+  @Test
+  void requireValid_withoutViolations_passes() {
+    validator.requireValid(validConnector(), ConnectorValidator.Stage.RELEASE);
   }
 
   /**

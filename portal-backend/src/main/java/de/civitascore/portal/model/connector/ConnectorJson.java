@@ -2,6 +2,7 @@ package de.civitascore.portal.model.connector;
 
 import de.civitascore.portal.model.embedded.ConnectorType;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -125,6 +126,28 @@ public final class ConnectorJson {
       Map<String, Object> storedDocument,
       UnaryOperator<String> encrypt) {
     return writeDocument(connector, readStoredDocument(storedDocument), encrypt);
+  }
+
+  /**
+   * Requires a stored secret for every {@value Secret#PLACEHOLDER}, which {@link #toDocument} would
+   * otherwise turn into no secret.
+   *
+   * @param storedDocument the current registry document, or null if none is stored
+   * @throws MalformedDataSourceRequestException naming the key path of each placeholder without a
+   *     stored secret
+   */
+  public static void requireStoredSecrets(
+      ConnectorConfiguration connector, Map<String, Object> storedDocument) {
+    List<String> unresolved =
+        PlaceholderResolver.unresolvedPlaceholders(connector, readStoredDocument(storedDocument));
+    if (!unresolved.isEmpty()) {
+      throw new MalformedDataSourceRequestException(
+          "No stored secret for " + Secret.PLACEHOLDER + " at " + String.join(", ", unresolved));
+    }
+  }
+
+  public static boolean hasPlaceholder(ConnectorConfiguration connector) {
+    return !PlaceholderResolver.unresolvedPlaceholders(connector, null).isEmpty();
   }
 
   static Map<String, Object> writeDocument(

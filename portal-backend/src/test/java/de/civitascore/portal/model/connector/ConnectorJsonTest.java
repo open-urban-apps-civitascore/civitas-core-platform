@@ -3,6 +3,7 @@ package de.civitascore.portal.model.connector;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import io.swagger.v3.oas.annotations.media.DiscriminatorMapping;
@@ -255,6 +256,73 @@ class ConnectorJsonTest {
     Map<String, Object> document = ConnectorJson.toDocument(connector, stored, ENCRYPT);
 
     assertThat(document).containsEntry("password", null);
+  }
+
+  @Test
+  void requireStoredSecrets_withPlaceholderAndNoStoredDocument_namesThePlaceholder() {
+    ConnectorConfiguration connector =
+        ConnectorJson.read(json("{'connectorType':'SQL','password':'********'}"));
+
+    assertThatThrownBy(() -> ConnectorJson.requireStoredSecrets(connector, null))
+        .isInstanceOf(MalformedDataSourceRequestException.class)
+        .hasMessage("No stored secret for ******** at connector.password");
+  }
+
+  @Test
+  void requireStoredSecrets_withPlaceholderAndStoredSecret_passes() {
+    ConnectorConfiguration connector =
+        ConnectorJson.read(json("{'connectorType':'SQL','password':'********'}"));
+    Map<String, Object> stored = Map.of("connectionType", "sql", "password", "ENC(sql)");
+
+    ConnectorJson.requireStoredSecrets(connector, stored);
+
+    assertThat(ConnectorJson.toDocument(connector, stored, ENCRYPT))
+        .containsEntry("password", "ENC(sql)");
+  }
+
+  @Test
+  void requireStoredSecrets_withStoredDocumentOfOtherType_namesThePlaceholder() {
+    ConnectorConfiguration connector =
+        ConnectorJson.read(json("{'connectorType':'MQTT','password':'********'}"));
+    Map<String, Object> stored = Map.of("connectionType", "sql", "password", "ENC(sql)");
+
+    assertThatThrownBy(() -> ConnectorJson.requireStoredSecrets(connector, stored))
+        .isInstanceOf(MalformedDataSourceRequestException.class)
+        .hasMessage("No stored secret for ******** at connector.password");
+  }
+
+  @Test
+  void requireStoredSecrets_withClearTextSecretsOnly_passes() {
+    ConnectorConfiguration connector =
+        ConnectorJson.read(json("{'connectorType':'SQL','password':'s3cret'}"));
+
+    ConnectorJson.requireStoredSecrets(connector, null);
+  }
+
+  @Test
+  void unresolvedPlaceholders_namesNestedAndListElementPlaceholdersByKeyPath() {
+    NestedSecretsConnector stored = withCalls(STORED_A);
+    Secret placeholder = Secret.of(Secret.PLACEHOLDER);
+
+    assertThat(
+            PlaceholderResolver.unresolvedPlaceholders(
+                withCalls(call("a", placeholder), call("new", placeholder)), stored))
+        .containsExactly("connector.auth.password", "connector.calls[1].apiKey");
+  }
+
+  @Test
+  void unresolvedPlaceholders_withJsonPropertyName_namesTheKeyOfTheRequest() {
+    record Renamed(@JsonProperty("api_key") Secret apiKey) implements ConnectorConfiguration {
+      @Override
+      public ConnectorType connectorType() {
+        return ConnectorType.HTTP;
+      }
+    }
+
+    assertThat(
+            PlaceholderResolver.unresolvedPlaceholders(
+                new Renamed(Secret.of(Secret.PLACEHOLDER)), null))
+        .containsExactly("connector.api_key");
   }
 
   @Test
