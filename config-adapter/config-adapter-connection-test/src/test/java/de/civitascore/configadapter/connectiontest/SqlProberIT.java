@@ -11,21 +11,27 @@ package de.civitascore.configadapter.connectiontest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.civitascore.configadapter.model.connectiontest.ConnectionTestResult.Reason;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.channels.ServerSocketChannel;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -247,6 +253,7 @@ class SqlProberIT {
 
     long seconds = Duration.ofNanos(System.nanoTime() - begin).toSeconds();
     assertTrue(seconds < 10, "ended after " + seconds + " s: " + failure.getMessage());
+    assertEquals(Reason.TIMEOUT, failure.reason(), failure.getMessage());
   }
 
   @Test
@@ -288,12 +295,61 @@ class SqlProberIT {
       long begin = System.nanoTime();
 
       // Preemptive, so that a regression fails the test instead of hanging the build.
-      assertTimeoutPreemptively(
-          Duration.ofSeconds(20),
-          () -> assertThrows(ConnectionTestFailure.class, () -> probe(connector)));
+      ConnectionTestFailure failure =
+          assertTimeoutPreemptively(
+              Duration.ofSeconds(20),
+              () -> assertThrows(ConnectionTestFailure.class, () -> probe(connector)));
 
       long seconds = Duration.ofNanos(System.nanoTime() - begin).toSeconds();
       assertTrue(seconds < 8, "ended after " + seconds + " s");
+      assertEquals(Reason.TIMEOUT, failure.reason(), failure.getMessage());
+    }
+  }
+
+  @Test
+  void aRefusedDestinationIsNeverContacted() throws Exception {
+    try (ServerSocketChannel listener = loopbackListener()) {
+      Map<String, Object> connector = connector("readings", List.of(), "owner", "owner-secret");
+      connector.put("dsn", "postgres://" + address(listener) + "/source");
+      SqlProber guarded =
+          new SqlProber(
+              new DestinationGuard(List.of(), List.of(), InetAddress::getAllByName),
+              Duration.ofSeconds(3));
+
+      ConnectionTestFailure failure =
+          assertThrows(
+              ConnectionTestFailure.class,
+              () -> guarded.probe(connector, null, new Cancellation()));
+
+      assertEquals(Reason.INVALID_CONNECTOR, failure.reason(), failure.getMessage());
+      assertNull(listener.accept(), "no connection was opened");
+    }
+  }
+
+  @Test
+  void everyHostOfAFailOverDsnIsCheckedBeforeTheFirstIsContacted() throws Exception {
+    try (ServerSocketChannel first = loopbackListener()) {
+      List<String> checked = new ArrayList<>();
+      SqlProber guarded =
+          new SqlProber(
+              host -> {
+                checked.add(host);
+                if ("refused.example".equals(host)) {
+                  throw ConnectionTestFailure.invalid("refused " + host);
+                }
+              },
+              Duration.ofSeconds(3));
+      Map<String, Object> connector = connector("readings", List.of(), "owner", "owner-secret");
+      connector.put("dsn", "postgres://" + address(first) + ",refused.example:5432/source");
+
+      ConnectionTestFailure failure =
+          assertThrows(
+              ConnectionTestFailure.class,
+              () -> guarded.probe(connector, null, new Cancellation()));
+
+      assertEquals("refused refused.example", failure.getMessage());
+      assertEquals(List.of(loopback(), "refused.example"), checked);
+      assertNull(first.accept(), "the allowed first host was not contacted");
     }
   }
 
@@ -314,6 +370,22 @@ class SqlProberIT {
     connector.put("user", user);
     connector.put("password", password);
     return connector;
+  }
+
+  /** A non-blocking listener, whose {@code accept()} returns null when nobody connected. */
+  private static ServerSocketChannel loopbackListener() throws IOException {
+    ServerSocketChannel listener = ServerSocketChannel.open();
+    listener.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
+    listener.configureBlocking(false);
+    return listener;
+  }
+
+  private static String address(ServerSocketChannel listener) throws IOException {
+    return loopback() + ":" + ((InetSocketAddress) listener.getLocalAddress()).getPort();
+  }
+
+  private static String loopback() {
+    return InetAddress.getLoopbackAddress().getHostAddress();
   }
 
   private static Connection ownerConnection() throws SQLException {

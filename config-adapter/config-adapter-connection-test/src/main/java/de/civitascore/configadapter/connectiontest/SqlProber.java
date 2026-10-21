@@ -65,6 +65,12 @@ final class SqlProber implements ConnectionProber {
    */
   private static final String MAX_RESULT_BUFFER = "16M";
 
+  /** PostgreSQL's code for a statement that the query timeout cancelled. */
+  private static final String QUERY_CANCELED = "57014";
+
+  /** pgjdbc's code for a connection it could not open, a run-out login timeout included. */
+  private static final String UNABLE_TO_CONNECT = "08001";
+
   private static final String RESOLVE_TABLE =
       "SELECT c.oid, c.relkind, quote_ident(n.nspname) || '.' || quote_ident(c.relname)"
           + " FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace"
@@ -170,6 +176,7 @@ final class SqlProber implements ConnectionProber {
     properties.setProperty("socketTimeout", seconds);
     properties.setProperty("ApplicationName", "civitas-connection-test");
     properties.setProperty("maxResultBuffer", MAX_RESULT_BUFFER);
+    long begin = System.nanoTime();
     try {
       // The driver instance, not DriverManager: its login timeout is global to the JVM.
       Connection connection = new Driver().connect(jdbcUrl, properties);
@@ -178,7 +185,11 @@ final class SqlProber implements ConnectionProber {
       }
       return connection;
     } catch (SQLException e) {
-      throw failure(e);
+      // A run-out login timeout carries no cause, so only its time tells it from a refusal.
+      boolean loginTimedOut =
+          UNABLE_TO_CONNECT.equals(e.getSQLState())
+              && System.nanoTime() - begin >= Duration.ofSeconds(timeoutSeconds).toNanos();
+      throw loginTimedOut ? ConnectionTestFailure.timeout(databaseMessage(e), e) : failure(e);
     }
   }
 
@@ -317,7 +328,7 @@ final class SqlProber implements ConnectionProber {
 
   /** The database's answer, or a timeout when the database did not answer in time. */
   private static ConnectionTestFailure failure(SQLException e) {
-    return ConnectionTestFailure.timedOut(e)
+    return ConnectionTestFailure.timedOut(e) || QUERY_CANCELED.equals(e.getSQLState())
         ? ConnectionTestFailure.timeout(databaseMessage(e), e)
         : new ConnectionTestFailure(databaseMessage(e), e);
   }
