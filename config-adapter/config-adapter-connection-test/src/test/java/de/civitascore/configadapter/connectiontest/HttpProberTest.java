@@ -17,13 +17,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpsConfigurator;
+import com.sun.net.httpserver.HttpsServer;
 import de.civitascore.configadapter.model.connectiontest.ConnectionTestResult.Reason;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.KeyStore;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,10 +38,14 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.zip.GZIPOutputStream;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /** The HTTP prober against an in-process server on the loopback interface. */
 class HttpProberTest {
@@ -240,12 +250,46 @@ class HttpProberTest {
   }
 
   @Test
-  void masksTheBasicCredentialAnEchoingApiReturns() {
-    String echoed = "{\"Authorization\": [\"Basic dXNlcjpzM2NyZXQ=\"]}";
+  void masksTheBasicCredentialAnEchoingApiReturns(@TempDir Path dir) throws Exception {
+    SSLContext tls = selfSignedTls(dir);
+    HttpsServer echo =
+        HttpsServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+    echo.setHttpsConfigurator(new HttpsConfigurator(tls));
+    echo.createContext(
+        "/headers",
+        exchange ->
+            respond(
+                exchange,
+                200,
+                "application/json",
+                "{\"Authorization\": \""
+                    + exchange.getRequestHeaders().getFirst("Authorization")
+                    + "\"}"));
+    echo.start();
+    Map<String, Object> connector = connector(call("headers", "/headers"));
+    connector.put(
+        "baseUrl",
+        "https://"
+            + InetAddress.getLoopbackAddress().getHostAddress()
+            + ":"
+            + echo.getAddress().getPort());
+    connector.put(
+        "authentication", Map.of("type", "BASIC", "username", "user", "password", "s3cret"));
+    SSLContext jvmDefault = SSLContext.getDefault();
+    // The prober trusts the JVM's default context, so the test certificate must be in it.
+    SSLContext.setDefault(tls);
+    try {
+      ProbeResult result = prober.probe(connector, "headers", new Cancellation());
 
-    assertEquals(
-        "{\"Authorization\": [\"Basic ********\"]}",
-        HttpProber.maskCredential(echoed, "dXNlcjpzM2NyZXQ="));
+      assertTrue(result.success(), result.message());
+      assertEquals(
+          "Basic dXNlcjpzM2NyZXQ=", REQUESTS.get(0).getRequestHeaders().getFirst("Authorization"));
+      assertEquals("{\"Authorization\": \"Basic ********\"}", result.preview());
+      assertFalse(result.preview().contains("dXNlcjpzM2NyZXQ="));
+    } finally {
+      SSLContext.setDefault(jvmDefault);
+      echo.stop(0);
+    }
   }
 
   @Test
@@ -365,6 +409,48 @@ class HttpProberTest {
     parameter.put("name", name);
     parameter.put("value", value);
     return parameter;
+  }
+
+  /** A context that serves and trusts one self-signed certificate for the loopback address. */
+  private static SSLContext selfSignedTls(Path dir) throws Exception {
+    Path keystore = dir.resolve("echo.p12");
+    char[] password = "changeit".toCharArray();
+    Process keytool =
+        new ProcessBuilder(
+                Path.of(System.getProperty("java.home"), "bin", "keytool").toString(),
+                "-genkeypair",
+                "-alias",
+                "echo",
+                "-keyalg",
+                "EC",
+                "-dname",
+                "CN=localhost",
+                "-ext",
+                "SAN=ip:127.0.0.1,ip:::1",
+                "-validity",
+                "1",
+                "-storetype",
+                "PKCS12",
+                "-keystore",
+                keystore.toString(),
+                "-storepass",
+                new String(password))
+            .redirectErrorStream(true)
+            .start();
+    String output = new String(keytool.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+    assertEquals(0, keytool.waitFor(), output);
+    KeyStore store = KeyStore.getInstance("PKCS12");
+    try (InputStream in = Files.newInputStream(keystore)) {
+      store.load(in, password);
+    }
+    KeyManagerFactory keys = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+    keys.init(store, password);
+    TrustManagerFactory trust =
+        TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+    trust.init(store);
+    SSLContext tls = SSLContext.getInstance("TLS");
+    tls.init(keys.getKeyManagers(), trust.getTrustManagers(), null);
+    return tls;
   }
 
   private static String baseUrl() {

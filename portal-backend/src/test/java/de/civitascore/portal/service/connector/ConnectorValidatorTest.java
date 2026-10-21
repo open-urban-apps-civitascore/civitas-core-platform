@@ -233,7 +233,8 @@ class ConnectorValidatorTest {
             ConnectorValidationException.class,
             e ->
                 assertThat(e.getViolations())
-                    .isEqualTo(validator.validate(connector, ConnectorValidator.Stage.RELEASE)));
+                    .extracting(ConnectorViolation::path)
+                    .containsExactly("connector.api_calls[0].auth.token", "connector.name"));
   }
 
   @Test

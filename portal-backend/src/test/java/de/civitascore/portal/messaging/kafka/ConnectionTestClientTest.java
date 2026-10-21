@@ -25,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.BeforeEach;
@@ -214,11 +215,22 @@ class ConnectionTestClientTest {
   }
 
   @Test
-  @DisplayName("handleResult ignores a result that no request waits for")
-  void handleResult_forUnknownRequest_isIgnored() {
+  @DisplayName("handleResult ignores a result for another request, which keeps waiting")
+  void handleResult_forAnotherRequest_leavesTheWaitingRequestOpen() throws Exception {
+    acknowledgeSends();
+    ConnectionTestRequest request = request(Duration.ofSeconds(10));
+    Future<ConnectionTestResult> answer = testInBackground(request);
+    await().atMost(Duration.ofSeconds(5)).until(() -> client.pendingCount() == 1);
+
     client.handleResult(record(success(UUID.randomUUID().toString())));
 
-    assertThat(client.pendingCount()).isZero();
+    assertThatThrownBy(() -> answer.get(300, TimeUnit.MILLISECONDS))
+        .isInstanceOf(TimeoutException.class);
+    assertThat(client.pendingCount()).isEqualTo(1);
+
+    client.handleResult(record(success(request.requestId())));
+
+    assertThat(answer.get(5, TimeUnit.SECONDS)).isEqualTo(success(request.requestId()));
   }
 
   @Test

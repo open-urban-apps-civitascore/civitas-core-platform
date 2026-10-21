@@ -17,7 +17,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.civitascore.configadapter.model.connectiontest.ConnectionTestResult.Reason;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.nio.channels.ServerSocketChannel;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -215,6 +218,36 @@ class MqttProberIT {
                     connector("tcp", ANONYMOUS, "3", "sensors/#/temp"), null, new Cancellation()));
 
     assertTrue(failure.getMessage().contains("sensors/#/temp"), failure.getMessage());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"3", "5"})
+  void aRefusedDestinationIsNeverContacted(String version) throws Exception {
+    try (ServerSocketChannel listener = ServerSocketChannel.open()) {
+      listener.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
+      // Non-blocking, so that accept() returns null when nobody connected.
+      listener.configureBlocking(false);
+      Map<String, Object> connector = connector("tcp", ANONYMOUS, version, "sensors/#");
+      connector.put(
+          "urls",
+          List.of(
+              "tcp://"
+                  + InetAddress.getLoopbackAddress().getHostAddress()
+                  + ":"
+                  + ((InetSocketAddress) listener.getLocalAddress()).getPort()));
+      MqttProber guarded =
+          new MqttProber(
+              new DestinationGuard(List.of(), List.of(), InetAddress::getAllByName),
+              Duration.ofSeconds(5));
+
+      ConnectionTestFailure failure =
+          assertThrows(
+              ConnectionTestFailure.class,
+              () -> guarded.probe(connector, null, new Cancellation()));
+
+      assertEquals(Reason.INVALID_CONNECTOR, failure.reason(), failure.getMessage());
+      assertNull(listener.accept(), "no connection was opened");
+    }
   }
 
   private static Map<String, Object> connector(

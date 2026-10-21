@@ -9,10 +9,12 @@
  */
 package de.civitascore.configadapter.connectiontest;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.net.InetAddress;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -29,9 +31,18 @@ class ConnectionTestFactoryTest {
     assertTrue(ConnectionTestFactory.list(" None ").isEmpty());
   }
 
+  /** The guard is built as the factory builds it from {@code connectiontest.denied-networks}. */
   @Test
   void deniedNetworksAreReadFromAList() {
-    assertEquals(2, ConnectionTestFactory.deniedNetworks("10.0.0.0/8, fc00::/7").size());
+    DestinationGuard guard =
+        new DestinationGuard(
+            ConnectionTestFactory.deniedNetworks("10.0.0.0/8, fc00::/7"),
+            List.of(),
+            InetAddress::getAllByName);
+
+    assertThrows(ConnectionTestFailure.class, () -> guard.check("10.1.2.3"));
+    assertThrows(ConnectionTestFailure.class, () -> guard.check("fd00::1"));
+    assertDoesNotThrow(() -> guard.check("93.184.216.34"));
   }
 
   @Test

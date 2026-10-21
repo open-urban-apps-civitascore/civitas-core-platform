@@ -3,6 +3,7 @@ package de.civitascore.portal.service.connector;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -21,6 +22,7 @@ import de.civitascore.portal.configuration.ConnectionTestProperties;
 import de.civitascore.portal.messaging.kafka.ConnectionTestClient;
 import de.civitascore.portal.model.connector.ConnectorJson;
 import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
+import de.civitascore.portal.model.connector.Secret;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.ConnectionTestInputDTO;
@@ -40,13 +42,16 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
@@ -57,6 +62,7 @@ class DataSourceConnectionTestServiceTest {
 
   private static final UUID USER = UUID.randomUUID();
   private static final String PLAIN_PASSWORD = "s3cret-plain";
+  private static final String STORED_SECRET = "ENC(stored)";
   private static final JsonMapper MAPPER = new JsonMapper();
 
   private final DataSourceService dataSourceService = mock(DataSourceService.class);
@@ -145,17 +151,70 @@ class DataSourceConnectionTestServiceTest {
   }
 
   /**
-   * A saved data source whose stored connector is {@code stored}, its password {@code ENC(stored)}.
+   * A saved data source whose stored connector is {@code stored}, every secret {@code ENC(stored)}.
    */
   private UUID savedDataSource(DataSourceStatus status, ConnectionTestInputDTO stored) {
     UUID id = UUID.randomUUID();
     DataSource dataSource = new DataSource();
     dataSource.setDataSourceStatus(status);
+    Map<String, Object> document =
+        ConnectorJson.toDocument(stored.getConnector(), null, secret -> STORED_SECRET);
     when(dataSourceService.findByIdOrThrow(id)).thenReturn(dataSource);
-    when(connectorStore.read(dataSource)).thenReturn(stored.getConnector());
-    when(connectorStore.storedDocument(dataSource))
-        .thenReturn(Map.of("connectionType", "sql", "password", "ENC(stored)"));
+    when(connectorStore.read(dataSource))
+        .thenReturn(ConnectorJson.readStored(stored.getConnector().connectorType(), document));
+    when(connectorStore.storedDocument(dataSource)).thenReturn(document);
     return id;
+  }
+
+  /** A saved connector of each type, its secret as the placeholder that a client sends back. */
+  enum Saved {
+    SQL(
+        "{'connectorType':'SQL','driver':'postgres','dsn':'postgres://db.example:5432/city',"
+            + "'table':'readings','columns':['id','value'],'user':'reader','password':'********'}",
+        null,
+        "/password"),
+    MQTT(
+        "{'connectorType':'MQTT','urls':['tcp://broker-a:1883','tcp://broker-b:1883'],"
+            + "'topics':['sensor/#'],'qos':1,'user':'reader','password':'********'}",
+        null,
+        "/password"),
+    HTTP(
+        "{'connectorType':'HTTP','baseUrl':'https://api.example.org/v1',"
+            + "'authentication':{'type':'BASIC','username':'reader','password':'********'},"
+            + "'apiCalls':[{'name':'stations','path':'/stations'}]}",
+        "stations",
+        "/authentication/password");
+
+    private final String json;
+    private final String apiCall;
+    private final String secretPointer;
+
+    Saved(String json, String apiCall, String secretPointer) {
+      this.json = json;
+      this.apiCall = apiCall;
+      this.secretPointer = secretPointer;
+    }
+
+    /** The connector as it was saved, with its secret in clear text. */
+    ConnectionTestInputDTO stored() {
+      return input(json.replace(Secret.PLACEHOLDER, PLAIN_PASSWORD), apiCall);
+    }
+
+    /** The saved connector as a client sends it back unchanged. */
+    ConnectionTestInputDTO requested() {
+      return input(json, apiCall);
+    }
+
+    /** The saved connector as a client sends it back, with {@code from} replaced by {@code to}. */
+    ConnectionTestInputDTO requested(String from, String to) {
+      assertThat(json).contains(from);
+      return input(json.replace(from, to), apiCall);
+    }
+
+    /** The secret of the request that config-adapter receives. */
+    String sentSecret(ConnectionTestRequest request) {
+      return MAPPER.valueToTree(request.connector()).at(secretPointer).asString();
+    }
   }
 
   private ConnectionTestRequest sentRequest() {
@@ -299,7 +358,7 @@ class DataSourceConnectionTestServiceTest {
 
       service.test(id, sql("********"));
 
-      assertThat(sentRequest().connector()).containsEntry("password", "ENC(stored)");
+      assertThat(sentRequest().connector()).containsEntry("password", STORED_SECRET);
       assertThat(singleAuditLine()).contains("dataSource=" + id);
     }
 
@@ -318,36 +377,79 @@ class DataSourceConnectionTestServiceTest {
       verify(client, never()).test(any());
     }
 
-    @Test
-    @DisplayName("stored secret of a draft is not sent to another destination")
-    void placeholderForAnotherDestination_isRejected() {
-      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
-      ConnectionTestInputDTO elsewhere =
-          input(
-              "{'connectorType':'SQL','driver':'postgres','dsn':'postgres://attacker.example:5432/city',"
-                  + "'table':'readings','columns':['id'],'user':'reader','password':'********'}",
-              null);
+    static Stream<Arguments> otherDestinations() {
+      return Stream.of(
+          arguments(Saved.SQL, "another host", "db.example", "attacker.example"),
+          arguments(Saved.SQL, "another port", "db.example:5432", "db.example:5433"),
+          arguments(Saved.SQL, "another scheme", "postgres://", "postgresql://"),
+          arguments(Saved.SQL, "the port left out", "db.example:5432", "db.example"),
+          arguments(Saved.MQTT, "another host", "broker-b:1883", "broker-c:1883"),
+          arguments(Saved.MQTT, "another port", "broker-a:1883", "broker-a:8883"),
+          arguments(
+              Saved.MQTT,
+              "an added URL",
+              "'tcp://broker-b:1883'",
+              "'tcp://broker-b:1883','tcp://broker-c:1883'"),
+          arguments(Saved.MQTT, "a removed URL", ",'tcp://broker-b:1883'", ""),
+          arguments(Saved.HTTP, "another host", "api.example.org", "api.attacker.example"),
+          arguments(Saved.HTTP, "another port", "api.example.org/", "api.example.org:8443/"));
+    }
 
-      assertThatThrownBy(() -> service.test(id, elsewhere))
+    static Stream<Arguments> otherValuesAtTheSameDestination() {
+      return Stream.of(
+          arguments(Saved.SQL, "another table", "'readings'", "'stations'"),
+          arguments(Saved.SQL, "other columns", "['id','value']", "['id']"),
+          arguments(Saved.SQL, "another database", ":5432/city", ":5432/archive"),
+          arguments(Saved.MQTT, "another topic", "sensor/#", "weather/#"),
+          arguments(Saved.HTTP, "another API call path", "'/stations'", "'/stations/active'"));
+    }
+
+    static Stream<Arguments> changedValues() {
+      return Stream.concat(otherDestinations(), otherValuesAtTheSameDestination());
+    }
+
+    @ParameterizedTest(name = "{0} with {1}")
+    @MethodSource("otherDestinations")
+    @DisplayName("stored secret of a draft is not sent to another destination")
+    void placeholderOfDraftForAnotherDestination_isRejected(
+        Saved saved, String change, String from, String to) {
+      UUID id = savedDataSource(DataSourceStatus.DRAFT, saved.stored());
+
+      assertThatThrownBy(() -> service.test(id, saved.requested(from, to)))
           .isInstanceOf(MalformedDataSourceRequestException.class)
           .hasMessage(DataSourceConnectionTestService.STORED_SECRET_FOR_STORED_DESTINATION);
       verify(client, never()).test(any());
+      assertThat(singleAuditLine()).endsWith("outcome=INVALID");
     }
 
-    @Test
+    @ParameterizedTest
+    @EnumSource(DataSourceStatus.class)
+    @DisplayName("stored secret of an HTTP connector is not sent over http")
+    void placeholderOfHttpOverHttp_isRejected(DataSourceStatus status) {
+      UUID id = savedDataSource(status, Saved.HTTP.stored());
+
+      // Authentication needs https, so validation refuses the scheme before the secret is resolved.
+      assertThatThrownBy(() -> service.test(id, Saved.HTTP.requested("https://", "http://")))
+          .isInstanceOfSatisfying(
+              ConnectorValidationException.class,
+              e ->
+                  assertThat(e.getViolations())
+                      .extracting(ConnectorViolation::path)
+                      .containsExactly("connector.baseUrl"));
+      verify(client, never()).test(any());
+    }
+
+    @ParameterizedTest(name = "{0} with {1}")
+    @MethodSource("otherValuesAtTheSameDestination")
     @DisplayName("stored secret of a draft serves other values at the same destination")
-    void placeholderForTheSameDestination_takesStoredCiphertext() {
-      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
+    void placeholderOfDraftForTheSameDestination_takesStoredCiphertext(
+        Saved saved, String change, String from, String to) {
+      UUID id = savedDataSource(DataSourceStatus.DRAFT, saved.stored());
       answer(DataSourceConnectionTestServiceTest::success);
-      ConnectionTestInputDTO otherTable =
-          input(
-              "{'connectorType':'SQL','driver':'postgres','dsn':'postgres://db.example:5432/city',"
-                  + "'table':'stations','columns':['id'],'user':'reader','password':'********'}",
-              null);
 
-      service.test(id, otherTable);
+      service.test(id, saved.requested(from, to));
 
-      assertThat(sentRequest().connector()).containsEntry("password", "ENC(stored)");
+      assertThat(saved.sentSecret(sentRequest())).isEqualTo(STORED_SECRET);
     }
 
     @Test
@@ -366,31 +468,30 @@ class DataSourceConnectionTestServiceTest {
       assertThat(sentRequest().connector()).containsEntry("password", "ENC(terces-wen)");
     }
 
-    @Test
+    @ParameterizedTest(name = "{0} with {1}")
+    @MethodSource("changedValues")
     @DisplayName("stored secret of a released data source serves only its connector as released")
-    void placeholderOfReleasedDataSourceWithOtherValues_isRejected() {
-      UUID id = savedDataSource(DataSourceStatus.AVAILABLE, sql(PLAIN_PASSWORD));
-      ConnectionTestInputDTO otherTable =
-          input(
-              "{'connectorType':'SQL','driver':'postgres','dsn':'postgres://db.example:5432/city',"
-                  + "'table':'residents','columns':['id'],'user':'reader','password':'********'}",
-              null);
+    void placeholderOfReleasedDataSourceWithChangedValues_isRejected(
+        Saved saved, String change, String from, String to) {
+      UUID id = savedDataSource(DataSourceStatus.AVAILABLE, saved.stored());
 
-      assertThatThrownBy(() -> service.test(id, otherTable))
+      assertThatThrownBy(() -> service.test(id, saved.requested(from, to)))
           .isInstanceOf(MalformedDataSourceRequestException.class)
           .hasMessage(DataSourceConnectionTestService.STORED_SECRET_FOR_RELEASED_CONNECTOR);
       verify(client, never()).test(any());
+      assertThat(singleAuditLine()).endsWith("outcome=INVALID");
     }
 
-    @Test
+    @ParameterizedTest
+    @EnumSource(Saved.class)
     @DisplayName("stored secret of a released data source tests its connector as released")
-    void placeholderOfReleasedDataSourceAsReleased_takesStoredCiphertext() {
-      UUID id = savedDataSource(DataSourceStatus.AVAILABLE, sql(PLAIN_PASSWORD));
+    void placeholderOfReleasedDataSourceAsReleased_takesStoredCiphertext(Saved saved) {
+      UUID id = savedDataSource(DataSourceStatus.AVAILABLE, saved.stored());
       answer(DataSourceConnectionTestServiceTest::success);
 
-      service.test(id, sql("********"));
+      service.test(id, saved.requested());
 
-      assertThat(sentRequest().connector()).containsEntry("password", "ENC(stored)");
+      assertThat(saved.sentSecret(sentRequest())).isEqualTo(STORED_SECRET);
     }
 
     @Test
@@ -473,13 +574,18 @@ class DataSourceConnectionTestServiceTest {
     }
 
     @Test
-    @DisplayName("no result in time is a gateway timeout")
-    void noResultInTime_isGatewayTimeout() {
-      when(client.test(any())).thenThrow(new ExternalSystemTimeoutException("no result", null));
+    @DisplayName("no result in time is audited as TIMEOUT and lets the user test again")
+    void noResultInTime_isAuditedAndFreesTheUsersSlot() {
+      when(client.test(any()))
+          .thenThrow(new ExternalSystemTimeoutException("no result", null))
+          .thenAnswer(call -> success(call.getArgument(0)));
 
       assertThatThrownBy(() -> service.test(sql(PLAIN_PASSWORD)))
           .isInstanceOf(ExternalSystemTimeoutException.class);
       assertThat(singleAuditLine()).endsWith("outcome=TIMEOUT");
+
+      assertThat(service.test(sql(PLAIN_PASSWORD)).success()).isTrue();
+      assertThat(auditLines()).last().asString().endsWith("outcome=SUCCESS");
     }
 
     @Test

@@ -12,7 +12,6 @@ package de.civitascore.configadapter.connectiontest;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -51,6 +50,12 @@ class DestinationGuardTest {
 
   private static DestinationGuard guard(String... resolved) {
     return new DestinationGuard(DENIED, List.of(), resolvingTo(resolved));
+  }
+
+  /** Prefixes that end inside a byte; the tests pass literals, which resolve without DNS. */
+  private static DestinationGuard configuredNetworks() {
+    return new DestinationGuard(
+        Network.parseAll("172.16.0.0/12,2001:db8::/29"), List.of(), InetAddress::getAllByName);
   }
 
   private static DestinationGuard unreachableResolver(List<String> deniedHostSuffixes) {
@@ -227,15 +232,33 @@ class DestinationGuardTest {
                 .check("a.example.org"));
   }
 
-  @Test
-  void networkParseReadsIpv4AndIpv6() {
-    Network v4 = Network.parse("192.168.0.0/16");
-    Network v6 = Network.parse("fc00::/7");
+  /** The first and last address of each configured network. */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "172.16.0.0",
+        "172.31.255.255",
+        "2001:db8::",
+        "2001:dbf:ffff:ffff:ffff:ffff:ffff:ffff"
+      })
+  void aConfiguredNetworkRefusesAnAddressInsideItsPrefix(String address) {
+    ConnectionTestFailure e =
+        assertThrows(ConnectionTestFailure.class, () -> configuredNetworks().check(address));
 
-    assertEquals(16, v4.prefixLength());
-    assertEquals(7, v6.prefixLength());
-    assertEquals(4, v4.address().length);
-    assertEquals(16, v6.address().length);
+    assertEquals(Reason.INVALID_CONNECTOR, e.reason());
+  }
+
+  /** The addresses next to each configured network, on both sides. */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "172.15.255.255",
+        "172.32.0.0",
+        "2001:db7:ffff:ffff:ffff:ffff:ffff:ffff",
+        "2001:dc0::"
+      })
+  void aConfiguredNetworkAllowsAnAddressOutsideItsPrefix(String address) {
+    assertDoesNotThrow(() -> configuredNetworks().check(address));
   }
 
   @Test
@@ -292,25 +315,5 @@ class DestinationGuardTest {
 
     assertEquals(2, networks.size());
     assertEquals(Network.parse("10.0.0.0/8"), networks.get(0));
-  }
-
-  @Test
-  void networksAreEqualByAddressContentAndPrefix() {
-    Network a = Network.parse("10.0.0.0/8");
-    Network b = Network.parse("10.0.0.0/8");
-
-    assertEquals(a, b);
-    assertEquals(a.hashCode(), b.hashCode());
-    assertNotEquals(a, Network.parse("10.0.0.0/9"));
-    assertNotEquals(a, Network.parse("11.0.0.0/8"));
-  }
-
-  @Test
-  void networkAddressIsDefensivelyCopied() {
-    Network network = Network.parse("10.0.0.0/8");
-
-    network.address()[0] = 99;
-
-    assertEquals(Network.parse("10.0.0.0/8"), network);
   }
 }

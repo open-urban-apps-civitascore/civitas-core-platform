@@ -9,12 +9,12 @@
  */
 package de.civitascore.configadapter.connectiontest;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.kafka.clients.consumer.MockConsumer;
 import org.apache.kafka.clients.producer.MockProducer;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -25,9 +25,8 @@ class ConnectionTestConsumerTest {
   /** The shutdown hook and the normal path may both close it; the second close does nothing. */
   @Test
   void closingTwiceClosesTheClientsOnce() {
-    MockConsumer<String, String> kafka = new MockConsumer<>("latest");
-    MockProducer<String, String> producer =
-        new MockProducer<>(true, null, new StringSerializer(), new StringSerializer());
+    CountingConsumer kafka = new CountingConsumer();
+    CountingProducer producer = new CountingProducer();
     ConnectionTestConsumer consumer =
         new ConnectionTestConsumer(
             kafka,
@@ -40,9 +39,41 @@ class ConnectionTestConsumerTest {
     consumer.start();
 
     consumer.close();
+    consumer.close();
 
-    assertTrue(kafka.closed());
-    assertTrue(producer.closed());
-    assertDoesNotThrow(consumer::close);
+    assertEquals(1, kafka.closes.get());
+    assertEquals(1, producer.closes.get());
+  }
+
+  /** Counts calls of {@code close()}, which the mock accepts any number of times. */
+  private static final class CountingConsumer extends MockConsumer<String, String> {
+
+    private final AtomicInteger closes = new AtomicInteger();
+
+    CountingConsumer() {
+      super("latest");
+    }
+
+    @Override
+    public void close() {
+      closes.incrementAndGet();
+      super.close();
+    }
+  }
+
+  /** Counts calls of {@code close(Duration)}, which the mock accepts any number of times. */
+  private static final class CountingProducer extends MockProducer<String, String> {
+
+    private final AtomicInteger closes = new AtomicInteger();
+
+    CountingProducer() {
+      super(true, null, new StringSerializer(), new StringSerializer());
+    }
+
+    @Override
+    public void close(Duration timeout) {
+      closes.incrementAndGet();
+      super.close(timeout);
+    }
   }
 }
