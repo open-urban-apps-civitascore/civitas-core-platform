@@ -75,7 +75,6 @@ const mockDatastructure: Datastructure = {
   id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
   name: 'Test Datastructure',
   description: 'Test Description',
-  dataStructureStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
   dataStructureVersions: [],
   createdAt: '2024-01-01',
   modifiedAt: '2024-01-01',
@@ -407,21 +406,21 @@ describe('VersionOverview - hasUserChanges Modal', () => {
       expect(screen.getByTestId('statusOption-draft')).not.toHaveAttribute('data-disabled')
     })
 
-    it('disables DRAFT option when this is the last available version in an available datastructure', async () => {
+    it('keeps DRAFT selectable for the only available version of a datastructure', async () => {
       const user = userEvent.setup()
-      const availableDatastructure: Datastructure = {
-        ...mockDatastructure,
-        dataStructureStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
-        dataStructureVersions: [],
+
+      const onlyAvailableVersion: DatastructureVersion = {
+        ...mockVersion,
+        dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
       }
-      renderComponent({ datastructure: availableDatastructure })
+      renderComponent({ version: onlyAvailableVersion })
 
       await openStatusDropdown(user)
 
-      expect(screen.getByTestId('statusOption-draft')).toHaveAttribute('data-disabled')
+      expect(screen.getByTestId('statusOption-draft')).not.toHaveAttribute('data-disabled')
     })
 
-    it('enables DRAFT option when the version has no released referrer and is not the last available version', async () => {
+    it('enables DRAFT option when the version has no released referrer', async () => {
       const user = userEvent.setup()
       renderComponent()
 

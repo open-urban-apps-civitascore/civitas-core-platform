@@ -1,7 +1,6 @@
 package de.civitascore.portal.service;
 
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
@@ -39,7 +38,8 @@ import org.springframework.stereotype.Component;
  * <p>Only direct referrers are judged. Releasing an entity requires everything it references to be
  * released, so a DRAFT artifact has no released referrer and is answered without classifying one. A
  * Mapping has no row and no status, so it counts as released when a Pipeline or Dataset that
- * references it does.
+ * references it does. A Data structure has no status of its own; it counts as released when one of
+ * its versions is.
  *
  * <p>A Dataset counts as released until its unrelease saga completes, because a failed saga
  * restores it to AVAILABLE.
@@ -127,7 +127,7 @@ public class ArtifactUsageLookup {
     DATA_SINK("a Data sink of a released Dataset"),
     MAPPING("a Mapping used by a released Dataset"),
     DATA_SET("a released Dataset"),
-    DATA_STRUCTURE("a released Data structure"),
+    DATA_STRUCTURE("a Data structure with a released version"),
     UNKNOWN("an artifact the platform keeps no record of");
 
     private final String description;
@@ -154,11 +154,6 @@ public class ArtifactUsageLookup {
     return new ArtifactUsage(true, released);
   }
 
-  /** How one Data structure version is used. */
-  public ArtifactUsage of(DataStructureVersion version) {
-    return ofVersion(version.getDataStructure(), version);
-  }
-
   /** How a Data structure is used: through any of its versions. */
   public ArtifactUsage of(DataStructure dataStructure) {
     return ArtifactUsage.anyOf(ofEachVersion(dataStructure).values());
@@ -169,15 +164,13 @@ public class ArtifactUsageLookup {
     Map<UUID, ArtifactUsage> usageByVersion = new LinkedHashMap<>();
     dataStructure
         .getDataStructureVersions()
-        .forEach(version -> usageByVersion.put(version.getId(), ofVersion(dataStructure, version)));
+        .forEach(version -> usageByVersion.put(version.getId(), of(version)));
     return usageByVersion;
   }
 
-  private ArtifactUsage ofVersion(DataStructure dataStructure, DataStructureVersion version) {
-    boolean released =
-        dataStructure.getDataStructureStatus() == DataStructureStatus.AVAILABLE
-            && version.getDataStructureVersionStatus() == DataStructureVersionStatus.AVAILABLE;
-    if (!released) {
+  /** How one Data structure version is used. */
+  public ArtifactUsage of(DataStructureVersion version) {
+    if (version.getDataStructureVersionStatus() != DataStructureVersionStatus.AVAILABLE) {
       return new ArtifactUsage(isReferenced(version), List.of());
     }
 
@@ -267,7 +260,7 @@ public class ArtifactUsageLookup {
               hostsByReferrer,
               found ->
                   dataStructureRepository.findReleaseStatesByModelLogicalUrnIn(
-                      found, DataStructureStatus.AVAILABLE)));
+                      found, DataStructureVersionStatus.AVAILABLE)));
     }
     return released;
   }

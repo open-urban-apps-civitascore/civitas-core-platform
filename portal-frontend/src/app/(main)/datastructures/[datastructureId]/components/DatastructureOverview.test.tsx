@@ -50,19 +50,14 @@ const mockForm = {
 vi.mock('../hooks/useDatastructure', () => ({
   useDatastructure: () => ({
     areAssignmentsDirty: false,
-    canStage: false,
-    canSetDraft: true,
     completedTabs: [],
     form: mockForm,
-    handleStatusChange: vi.fn(),
     isConfirmButtonDisabled: true,
     isLoading: false,
     resetToInitialState: vi.fn(),
     saveDatastructure: vi.fn(),
     selectedTab: 'basicInfo',
     setSelectedTab: vi.fn(),
-    statusHint: undefined,
-    statusWatch: 'DRAFT',
   }),
 }))
 
@@ -154,7 +149,6 @@ const datastructure = {
   id: 'test-id',
   name: 'Test Datastructure',
   description: 'A test datastructure',
-  dataStructureStatus: 'DRAFT' as const,
   createdAt: '2024-01-01',
   modifiedAt: '2024-01-01',
   dataStructureVersions: [],
@@ -207,23 +201,31 @@ describe('DatastructureOverview', () => {
       })
     })
 
-    describe('Edit button gating when AVAILABLE', () => {
-      const availableDatastructure = {
-        ...datastructure,
-        dataStructureStatus: 'AVAILABLE' as const,
-      }
-      const availableProps = { ...defaultProps, datastructure: availableDatastructure }
-
-      it('shows Edit button when AVAILABLE and user has both UPDATE and RELEASE', () => {
-        mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_UPDATE, PERMISSION_NAMES.DATASTRUCTURE_RELEASE])
-        render(<DatastructureOverview {...availableProps} />)
-        expect(screen.getByTestId('editButton')).toBeInTheDocument()
+    describe('Status', () => {
+      it('renders no status dropdown', () => {
+        render(<DatastructureOverview {...defaultProps} />)
+        expect(screen.queryByTestId('statusDropdown')).not.toBeInTheDocument()
       })
 
-      it('hides Edit button when AVAILABLE and user has UPDATE but lacks RELEASE', () => {
+      it('shows Edit button for a datastructure with an available version without the RELEASE permission', () => {
         mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_UPDATE])
-        render(<DatastructureOverview {...availableProps} />)
-        expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+        const withAvailableVersion = {
+          ...datastructure,
+          dataStructureVersions: [
+            {
+              id: 'version-1',
+              version: '1.0.0',
+              description: null,
+              dataStructureVersionStatus: 'AVAILABLE' as const,
+              dataStructureVersionSource: 'OWN' as const,
+              dataStructureId: 'test-id',
+              createdAt: '2024-01-01',
+              modifiedAt: '2024-01-01',
+            },
+          ],
+        }
+        render(<DatastructureOverview {...defaultProps} datastructure={withAvailableVersion} />)
+        expect(screen.getByTestId('editButton')).toBeInTheDocument()
       })
     })
   })

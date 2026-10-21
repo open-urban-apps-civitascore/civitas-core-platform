@@ -7,7 +7,6 @@ import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.RoleDefault;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataPool;
@@ -64,8 +63,7 @@ class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrati
     DATAPOOL_PATCH(ScopeType.DATAPOOL, "/datapools/%s"),
     DATASOURCE_PATCH(ScopeType.DATASOURCE, "/datasources/%s"),
     DATASOURCE_RELEASED_META(ScopeType.DATASOURCE, "/datasources/%s/released/meta"),
-    DATASTRUCTURE_PATCH(ScopeType.DATASTRUCTURE, "/datastructures/%s"),
-    DATASTRUCTURE_RELEASED_META(ScopeType.DATASTRUCTURE, "/datastructures/%s/released/meta");
+    DATASTRUCTURE_PATCH(ScopeType.DATASTRUCTURE, "/datastructures/%s");
 
     private final ScopeType scopeType;
     private final String pathTemplate;
@@ -350,8 +348,6 @@ class AssignmentChangeAuthorizationIntegrationTest extends BaseKeycloakIntegrati
       case DATASOURCE_RELEASED_META ->
           portalData.dataSource(b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE));
       case DATASTRUCTURE_PATCH -> portalData.dataStructure();
-      case DATASTRUCTURE_RELEASED_META ->
-          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
     };
   }
 

@@ -18,7 +18,6 @@ import de.civitascore.portal.model.connector.Secret;
 import de.civitascore.portal.model.connector.SqlConnectorConfiguration;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.ScopeType;
@@ -190,24 +189,6 @@ class DataSourceServiceTest {
       assertThatThrownBy(() -> dataSourceService.release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("DataStructureVersion")
-          .hasMessageContaining("AVAILABLE");
-    }
-
-    @Test
-    @DisplayName("Should reject release when the parent DataStructure is DRAFT")
-    void shouldRejectReleaseWithDraftParentDataStructure() {
-      UUID id = UUID.randomUUID();
-      DataSource entity = createMqttDataSource(id);
-      entity
-          .getDataStructureVersion()
-          .getDataStructure()
-          .setDataStructureStatus(DataStructureStatus.DRAFT);
-
-      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
-
-      assertThatThrownBy(() -> dataSourceService.release(id))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("parent DataStructure")
           .hasMessageContaining("AVAILABLE");
     }
 
@@ -843,35 +824,6 @@ class DataSourceServiceTest {
       dsv.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       DataStructure ds = new DataStructure();
       ds.setId(UUID.randomUUID());
-      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
-      dsv.setDataStructure(ds);
-
-      DataSourceInputDTO input = new DataSourceInputDTO();
-      input.setName("test");
-      input.setDataStructureVersionId(dsvId);
-
-      DataSource entity = new DataSource();
-      entity.setId(UUID.randomUUID());
-
-      when(dataSourceMapper.toEntity(any())).thenReturn(entity);
-      when(dataStructureVersionService.findByIdOrThrow(dsvId)).thenReturn(dsv);
-      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-      DataSource result = dataSourceService.create(input);
-
-      assertThat(result.getDataStructureVersion()).isSameAs(dsv);
-    }
-
-    @Test
-    @DisplayName("Should link a version whose parent DataStructure is DRAFT")
-    void shouldLinkVersionWithDraftParentDataStructure() {
-      UUID dsvId = UUID.randomUUID();
-      DataStructureVersion dsv = createDataStructureVersion();
-      dsv.setId(dsvId);
-      dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-      DataStructure ds = new DataStructure();
-      ds.setId(UUID.randomUUID());
-      ds.setDataStructureStatus(DataStructureStatus.DRAFT);
       dsv.setDataStructure(ds);
 
       DataSourceInputDTO input = new DataSourceInputDTO();
@@ -897,7 +849,6 @@ class DataSourceServiceTest {
       DataStructureVersion dsv = createDataStructureVersion();
       dsv.setId(dsvId);
       dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-      dsv.getDataStructure().setDataStructureStatus(DataStructureStatus.AVAILABLE);
 
       DataSourceInputDTO input = new DataSourceInputDTO();
       input.setName("test");
@@ -1315,7 +1266,6 @@ class DataSourceServiceTest {
     dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
     DataStructure parent = new DataStructure();
     parent.setId(UUID.randomUUID());
-    parent.setDataStructureStatus(DataStructureStatus.AVAILABLE);
     dsv.setDataStructure(parent);
     return dsv;
   }

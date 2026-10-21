@@ -175,15 +175,6 @@
       "PATCH": "DATASTRUCTURE_UPDATE",
       "DELETE": "DATASTRUCTURE_DELETE"
     },
-    "/v1/datastructures/{id}/release": {
-      "POST": "DATASTRUCTURE_RELEASE"
-    },
-    "/v1/datastructures/{id}/unrelease": {
-      "POST": "DATASTRUCTURE_RELEASE"
-    },
-    "/v1/datastructures/{id}/released/meta": {
-      "PATCH": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]
-    },
     "/v1/datastructures/{id}/assignments": {
       "GET": "DATASTRUCTURE_READ"
     },

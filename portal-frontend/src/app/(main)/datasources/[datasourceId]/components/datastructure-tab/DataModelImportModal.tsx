@@ -185,6 +185,7 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
       header: tDatastructures('tableHeaders.status'),
       cell: info => {
         const status = info.getValue()
+        if (!status) return '-'
         return (
           <div className="flex items-center gap-2">
             {status === DATASTRUCTURE_STATUS_TYPES.DRAFT ? (
@@ -192,7 +193,7 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
             ) : (
               <CircleCheckBig className="text-muted-foreground" size={16} />
             )}
-            {tCommon(`status.${info.getValue()}`)}
+            {tCommon(`status.${status}`)}
           </div>
         )
       },

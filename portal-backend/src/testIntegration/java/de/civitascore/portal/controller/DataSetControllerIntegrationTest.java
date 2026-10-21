@@ -11,7 +11,6 @@ import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
@@ -2106,8 +2105,7 @@ class DataSetControllerIntegrationTest
         DataSetStatus dataSetStatus,
         DataStructureVersionStatus versionStatus,
         DataSourceStatus sourceStatus) {
-      DataStructure structure =
-          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructure structure = portalData.dataStructure();
       DataStructureVersion version =
           portalData.attachModel(
               portalData.dataStructureVersion(
@@ -2253,8 +2251,7 @@ class DataSetControllerIntegrationTest
       DataStructureVersion version =
           portalData.attachModel(
               portalData.dataStructureVersion(
-                  portalData.dataStructure(
-                      b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE)),
+                  portalData.dataStructure(),
                   b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)),
               portalData.dataStructureVersionModel("Sensor"));
       DataSource dataSource =

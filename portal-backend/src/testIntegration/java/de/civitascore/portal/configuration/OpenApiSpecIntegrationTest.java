@@ -51,7 +51,6 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
     "/datasets/{id}/released/meta, name",
     "/datasets/{id}/ready/meta, openDataAccess",
     "/datasources/{id}/released/meta, datapoolScope",
-    "/datastructures/{id}/released/meta, name",
     "/datastructures/{dataStructureId}/versions/{versionId}/released/meta, description"
   })
   @DisplayName("Should describe the metadata patch body with only optional metadata fields")

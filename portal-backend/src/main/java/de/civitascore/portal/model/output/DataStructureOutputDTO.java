@@ -1,6 +1,5 @@
 package de.civitascore.portal.model.output;
 
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.output.summary.DataStructureVersionUsageSummaryDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.ArrayList;
@@ -19,9 +18,6 @@ public class DataStructureOutputDTO extends BaseOutputDTO {
   @Schema(example = "Schema for traffic sensor readings")
   private String description;
 
-  @Schema(example = "ACTIVE")
-  private DataStructureStatus dataStructureStatus;
-
   private List<DataStructureVersionUsageSummaryDTO> dataStructureVersions = new ArrayList<>();
 
   @Schema(
@@ -34,7 +30,7 @@ public class DataStructureOutputDTO extends BaseOutputDTO {
   @Schema(
       description =
           "Whether a released entity references one of this data structure's versions. While"
-              + " true, it cannot be unreleased",
+              + " true, those versions cannot be unreleased",
       accessMode = Schema.AccessMode.READ_ONLY)
   private boolean inUseByReleased;
 }

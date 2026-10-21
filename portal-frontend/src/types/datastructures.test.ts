@@ -1,22 +1,15 @@
-import {
-  DatastructureCreateDataSchema,
-  DatastructureCreateFormSchema,
-  DatastructureFormAvailableSchema,
-  DatastructureFormDraftSchema,
-} from './datastructures'
+import { DatastructureCreateDataSchema, DatastructureCreateFormSchema, DatastructureFormSchema } from './datastructures'
 
-const baseDraft = {
+const baseDatastructure = {
   id: 'ds-1',
   name: 'A data structure',
-  dataStructureStatus: 'DRAFT',
   dataStructureVersionIds: [],
 }
 
 describe.each([
   ['DatastructureCreateFormSchema', DatastructureCreateFormSchema, { name: 'A data structure' }],
   ['DatastructureCreateDataSchema', DatastructureCreateDataSchema, { name: 'A data structure' }],
-  ['DatastructureFormDraftSchema', DatastructureFormDraftSchema, baseDraft],
-  ['DatastructureFormAvailableSchema', DatastructureFormAvailableSchema, baseDraft],
+  ['DatastructureFormSchema', DatastructureFormSchema, baseDatastructure],
 ])('%s description validation', (_name, schema, base) => {
   it('rejects a missing description', () => {
     const result = schema.safeParse(base)

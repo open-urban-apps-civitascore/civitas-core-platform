@@ -7,8 +7,7 @@ import { DirtyField } from '@/components/uml-modeler/types/session'
 import { SelectOption } from '@/types/common'
 import {
   Datastructure,
-  DATASTRUCTURE_STATUS_TYPES,
-  DatastructureFormDraft,
+  DatastructureFormData,
   DatastructuresListData,
   DatastructureVersion,
   DatastructureVersionFormAvailableSchema,
@@ -19,11 +18,10 @@ import {
   DatastructureVersionSummary,
 } from '@/types/datastructures'
 
-export const mapDatastructureApiToFormData = (datastructure: Datastructure): DatastructureFormDraft => ({
+export const mapDatastructureApiToFormData = (datastructure: Datastructure): DatastructureFormData => ({
   id: datastructure.id,
   name: datastructure.name ?? '',
   description: datastructure.description ?? '',
-  dataStructureStatus: datastructure.dataStructureStatus ?? DATASTRUCTURE_STATUS_TYPES.DRAFT,
 })
 
 export const mapDatastructuresApiToListData = (datastructures: Datastructure[]): DatastructuresListData[] => {
@@ -40,7 +38,7 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
       dataStructureId: datastructure.id,
       name: datastructure.name,
       description: datastructure.description || '-',
-      status: datastructure.dataStructureStatus,
+      status: null,
       versionNumber: highestVersion?.version ?? null,
       source: highestVersion?.dataStructureVersionSource || null,
       inUse: datastructure.inUse,
@@ -114,12 +112,8 @@ export const parseDatastructureVersionFormData = (values: DatastructureVersionFo
     : DatastructureVersionFormAvailableSchema.safeParse(values)
 }
 
-type FormFields = DatastructureFormDraft | DatastructureVersionFormData
-
-export const containsNonStatusField = <TData extends FormFields>(fieldsToUpdate: Partial<TData>) =>
-  (Object.keys(fieldsToUpdate) as (keyof TData)[]).some(
-    key => key !== 'dataStructureStatus' && key !== 'dataStructureVersionStatus',
-  )
+export const containsNonStatusField = (fieldsToUpdate: Partial<DatastructureVersionFormData>) =>
+  Object.keys(fieldsToUpdate).some(key => key !== 'dataStructureVersionStatus')
 
 /**
  * The diagram of a version, drawn or derived.

@@ -39,7 +39,6 @@ const createDatastructure = (versions: string[], datastructureId = 'ds1'): Datas
   id: datastructureId,
   name: `Datastructure ${datastructureId}`,
   description: 'Datastructure Description',
-  dataStructureStatus: 'DRAFT',
   inUse: false,
   dataStructureVersions: versions.map(version => createVersion(version, datastructureId)),
   assignments: [],
@@ -108,7 +107,7 @@ describe('mapDatastructuresApiToListData', () => {
       dataStructureId: datastructure.id,
       name: datastructure.name,
       description: datastructure.description,
-      status: datastructure.dataStructureStatus,
+      status: null,
       source: datastructure.dataStructureVersions[0].dataStructureVersionSource,
       versionNumber: '1.0',
       inUse: datastructure.inUse,
@@ -125,7 +124,7 @@ describe('mapDatastructuresApiToListData', () => {
       name: datastructure.name,
       description: datastructure.description as string,
       source: expectedVersions[0].dataStructureVersionSource,
-      status: datastructure.dataStructureStatus,
+      status: null,
       versionNumber: expectedVersions[0].version,
       versions: [
         {

@@ -159,7 +159,6 @@ describe('GeoPersistencePanel data structure selection', () => {
     id: DATASTRUCTURE_ID,
     name: 'Test Structure',
     description: 'Test description',
-    dataStructureStatus: 'AVAILABLE' as const,
     dataStructureVersions: [
       {
         id: FIRST_VERSION_ID,

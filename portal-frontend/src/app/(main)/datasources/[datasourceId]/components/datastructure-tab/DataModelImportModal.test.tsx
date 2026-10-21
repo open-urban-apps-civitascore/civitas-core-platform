@@ -45,7 +45,6 @@ const mixedDatastructures = [
     id: 'ds-1',
     name: 'Available DS',
     description: 'First datastructure',
-    dataStructureStatus: 'AVAILABLE' as const,
     dataStructureVersions: [
       {
         id: 'v-1',
@@ -70,7 +69,6 @@ const mixedDatastructures = [
     id: 'ds-2',
     name: 'Draft DS',
     description: 'Draft datastructure',
-    dataStructureStatus: 'DRAFT' as const,
     dataStructureVersions: [
       {
         id: 'v-3',

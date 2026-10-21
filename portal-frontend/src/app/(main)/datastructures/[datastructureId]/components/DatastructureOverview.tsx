@@ -17,12 +17,7 @@ import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
-import {
-  Datastructure,
-  DATASTRUCTURE_STATUS_TYPES,
-  DatastructureStatusType,
-  DatastructureTab,
-} from '@/types/datastructures'
+import { Datastructure, DatastructureTab } from '@/types/datastructures'
 import { mapDatastructureVersionsApiToListData } from '@/utils/datastructures'
 
 import { useDatastructure } from '../hooks/useDatastructure'
@@ -59,19 +54,11 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
 
   const tCommon = useTranslations('common')
   const { hasScopedPermission } = usePermissions()
-  const canUpdate = hasScopedPermission(
+  const canEdit = hasScopedPermission(
     PERMISSION_NAMES.DATASTRUCTURE_UPDATE,
     ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
     datastructure.id,
   )
-  const canRelease = hasScopedPermission(
-    PERMISSION_NAMES.DATASTRUCTURE_RELEASE,
-    ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
-    datastructure.id,
-  )
-
-  const canEdit =
-    datastructure.dataStructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE ? canUpdate && canRelease : canUpdate
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit' || !canEdit)
@@ -98,21 +85,15 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
 
   const {
     areAssignmentsDirty,
-    canStage,
     completedTabs,
     form: datastructureForm,
-    handleStatusChange,
     isConfirmButtonDisabled,
     isLoading,
     resetToInitialState,
     saveDatastructure,
     selectedTab,
-    canSetDraft,
     setSelectedTab,
-    statusHint,
-    statusAvailableHint,
-    datastructureStatus,
-  } = useDatastructure({ datastructure, assignedGroups, initialAssignments, canRelease })
+  } = useDatastructure({ datastructure, assignedGroups, initialAssignments })
 
   const hasUnsavedChanges = datastructureForm.formState.isDirty || areAssignmentsDirty
 
@@ -192,17 +173,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
           hasCompletionStatus: true,
         }}
         customElement={
-          <PageEditControls<DatastructureStatusType>
-            statusProps={{
-              status: datastructureStatus,
-              onStatusChange: handleStatusChange,
-              statusOptions: Object.values(DATASTRUCTURE_STATUS_TYPES),
-              canStage,
-              canRelease,
-              canSetDraft,
-              statusHint,
-              availableHint: statusAvailableHint,
-            }}
+          <PageEditControls
             confirmButtonType="button"
             onConfirmClick={() => handleSave()}
             isConfirmButtonDisabled={isConfirmButtonDisabled}

@@ -1,7 +1,6 @@
 package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.DataPoolMapper;
-import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.DataPoolInputDTO;
@@ -21,8 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
  * be deleted while datasets are still assigned to it or while datasources are still scoped to it.
  */
 @Service
-public class DataPoolService
-    extends BaseDataEntityService<DataPool, DataPoolInputDTO, DataPoolInputDTO> {
+public class DataPoolService extends BaseDataEntityService<DataPool, DataPoolInputDTO> {
 
   private final DataPoolRepository dataPoolRepository;
   private final DataPoolMapper dataPoolMapper;
@@ -72,36 +70,6 @@ public class DataPoolService
   @Override
   protected AssignmentChangeAuthorizer getAssignmentChangeAuthorizer() {
     return assignmentChangeAuthorizer;
-  }
-
-  @Override
-  protected ReleasableStatus getEntityStatus(DataPool entity) {
-    throw new UnsupportedOperationException("DataPool does not support release lifecycle");
-  }
-
-  @Override
-  protected void setEntityStatus(DataPool entity, ReleasableStatus status) {
-    throw new UnsupportedOperationException("DataPool does not support release lifecycle");
-  }
-
-  @Override
-  protected ReleasableStatus getDraftStatus() {
-    throw new UnsupportedOperationException("DataPool does not support release lifecycle");
-  }
-
-  @Override
-  protected ReleasableStatus getAvailableStatus() {
-    throw new UnsupportedOperationException("DataPool does not support release lifecycle");
-  }
-
-  @Override
-  public DataPool updateReleasedMeta(UUID id, DataPoolInputDTO meta) {
-    throw new UnsupportedOperationException("DataPool does not support release lifecycle");
-  }
-
-  @Override
-  public DataPoolInputDTO toMetaInput(DataPool entity) {
-    throw new UnsupportedOperationException("DataPool does not support release lifecycle");
   }
 
   /**
