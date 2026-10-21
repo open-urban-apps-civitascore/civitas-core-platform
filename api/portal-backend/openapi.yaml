@@ -11042,7 +11042,7 @@ components:
         preview:
           type: string
           description: "What the source returned: the first rows as CSV with a header\
-            \ line for SQL, the body of a successful call for HTTP; null otherwise."
+            \ line for SQL, the body of the call for HTTP, for any status; null otherwise."
           example: |-
             id,value
             1,20.5

@@ -33,8 +33,9 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Sends connection test requests to config-adapter and waits for their results. Each backend
- * instance has its own consumer group, because only the sending instance waits for a result.
+ * Sends connection test requests to the connection test service and waits for their results. Each
+ * backend instance has its own consumer group, because only the sending instance waits for a
+ * result.
  */
 @Slf4j
 @Component

@@ -28,7 +28,7 @@ public record ConnectionTestResultDTO(
     @Schema(
             description =
                 "What the source returned: the first rows as CSV with a header line for SQL, the"
-                    + " body of a successful call for HTTP; null otherwise.",
+                    + " body of the call for HTTP, for any status; null otherwise.",
             example = "id,value\n1,20.5\n2,21.0")
         String preview,
     @Schema(description = "Whether the preview was cut at its size limit.", example = "false")

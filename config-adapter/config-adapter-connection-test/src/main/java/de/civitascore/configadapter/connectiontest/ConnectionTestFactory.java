@@ -114,7 +114,7 @@ public final class ConnectionTestFactory {
     props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
     props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
     props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-    // At most once: a request from before a restart has no caller left.
+    // A new group starts at the end: a request from before its start has no caller left.
     props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
     props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
     // A crashed pod cannot leave the group, so a short session timeout frees its partitions.

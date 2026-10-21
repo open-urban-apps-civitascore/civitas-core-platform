@@ -49,12 +49,12 @@ final class ConnectionTestFailure extends Exception {
     this.destinationRefused = destinationRefused;
   }
 
-  /** The connector values do not make a source the test can run; nothing was contacted. */
+  /** The connector values do not make a source the test can run. */
   static ConnectionTestFailure invalid(String message) {
     return new ConnectionTestFailure(Reason.INVALID_CONNECTOR, message, null);
   }
 
-  /** The connector values do not make a source the test can run; nothing was contacted. */
+  /** The connector values do not make a source the test can run. */
   static ConnectionTestFailure invalid(String message, Throwable cause) {
     return new ConnectionTestFailure(Reason.INVALID_CONNECTOR, message, cause);
   }

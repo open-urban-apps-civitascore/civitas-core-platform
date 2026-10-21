@@ -10,7 +10,7 @@ import org.springframework.validation.annotation.Validated;
 
 /**
  * Connection test properties bound from the {@code connection-test.*} namespace. The topics must
- * match the ones config-adapter uses.
+ * match the ones of the connection test service.
  */
 @Validated
 @ConfigurationProperties(prefix = "connection-test")

@@ -29,8 +29,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Runs each connection test on its own virtual thread and publishes exactly one result per test. A
- * test that runs out of time fails, and its connections are closed.
+ * Runs each connection test on its own virtual thread and publishes one result per test, none for a
+ * test that a shutdown interrupts. A test that runs out of time fails, and its connections are
+ * closed.
  */
 final class ConnectionTestDispatcher implements AutoCloseable {
 

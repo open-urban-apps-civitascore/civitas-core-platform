@@ -106,12 +106,12 @@ event:
   # Timeout waiting for config-adapter to process event (seconds)
   config-adapter-timeout-seconds: 10
 
-# Data source connection test, run by a separate config-adapter workload. The topics must match
-# its connectiontest.kafka.*-topic.
+# Data source connection test, run by the connection test service (config-adapter image).
+# The topics must match its connectiontest.kafka.*-topic.
 connection-test:
   request-topic: ${CONNECTION_TEST_REQUEST_TOPIC:de.civitascore.connectiontest.request}
   result-topic: ${CONNECTION_TEST_RESULT_TOPIC:de.civitascore.connectiontest.result}
-  # How long a test waits for its result (seconds); config-adapter stops a test before then.
+  # How long a test waits for its result (seconds); the service stops a test before then.
   wait-seconds: ${CONNECTION_TEST_WAIT_SECONDS:20}
   # Tests that wait on one backend instance at the same time; each holds a request thread.
   max-concurrent: ${CONNECTION_TEST_MAX_CONCURRENT:4}

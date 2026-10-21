@@ -38,8 +38,8 @@ import org.springframework.security.crypto.encrypt.TextEncryptor;
 import org.springframework.stereotype.Service;
 
 /**
- * Tests connector values against their source through a request to config-adapter. Every test
- * writes one audit log line.
+ * Tests connector values against their source through a request to the connection test service.
+ * Every test writes one audit log line.
  */
 @Slf4j
 @Service
@@ -170,7 +170,7 @@ public class DataSourceConnectionTestService {
       throw e;
     } finally {
       // TR-03187 L-1/L-6: who tested which destination and how it ended, without secrets, query
-      // or preview. The request id finds the matching line in config-adapter's log.
+      // or preview. The request id finds the matching line in the connection test service's log.
       log.info(
           "Connection test: user={} requestId={} dataSource={} connectorType={}"
               + " destination=\"{}\" target=\"{}\" outcome={}",
@@ -241,7 +241,9 @@ public class DataSourceConnectionTestService {
     }
     if (result.reason() == null) {
       throw new ExternalSystemRejectionException(
-          "config-adapter answered connection test " + result.requestId() + " without a reason");
+          "The connection test service answered connection test "
+              + result.requestId()
+              + " without a reason");
     }
     return switch (result.reason()) {
       case INVALID_CONNECTOR, SOURCE_ERROR, TIMEOUT ->
@@ -249,7 +251,7 @@ public class DataSourceConnectionTestService {
       case BUSY -> throw new ConnectionTestBusyException(ADAPTER_BUSY);
       case UNAVAILABLE ->
           throw new ExternalSystemRejectionException(
-              "config-adapter could not run connection test "
+              "The connection test service could not run connection test "
                   + result.requestId()
                   + ": "
                   + result.message());

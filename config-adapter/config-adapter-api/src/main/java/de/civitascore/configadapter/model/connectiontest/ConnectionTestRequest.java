@@ -15,8 +15,8 @@ import java.time.Instant;
 import java.util.Map;
 
 /**
- * Asks config-adapter to test whether a data source answers with the given connector values. The
- * test moves no data into the platform and changes nothing.
+ * Asks the connection test service to test whether a data source answers with the given connector
+ * values. The test moves no data into the platform and changes nothing.
  *
  * @param requestId correlates the {@link ConnectionTestResult}
  * @param expiresAt when the requester stops waiting; a request received later is not run

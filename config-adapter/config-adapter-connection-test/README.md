@@ -17,14 +17,14 @@ It is neither a `ConfigAdapter` nor a `SagaCommandHandler`. It runs as a workloa
 
 Delivery:
 
-- Delivery is at most once. A request is dropped when less than a second is left before its `expiresAt`, because portal-backend then stops waiting.
+- A request is dropped when less than a second is left before its `expiresAt`, because portal-backend then stops waiting. After a crash of the service, a request it read shortly before can run again if time is left.
 - A request above `connectiontest.max-concurrent` gets the answer `BUSY` at once.
 - A test that runs longer than `connectiontest.timeout-seconds`, or longer than its request allows, gets the answer `TIMEOUT`. Its connections are then closed from outside. Exception: an MQTT connection that the broker has not answered yet ends by itself after 13 s (see the known differences).
-- Exactly one result is published for each test that runs.
+- Each test that runs publishes one result. A test that runs while the service shuts down publishes none; portal-backend then answers 504.
 
 | `reason` of a failure | When |
 |---|---|
-| `INVALID_CONNECTOR` | The values make no source the test can run, or the destination is refused. Nothing was contacted. |
+| `INVALID_CONNECTOR` | The values make no source the test can run, or the destination is refused. |
 | `SOURCE_ERROR` | The source answered with an error (authentication, missing table, refused subscription, non-2xx status) or could not be reached. |
 | `TIMEOUT` | The source did not answer in time. |
 | `BUSY` | Too many tests run. Nothing was attempted. |
@@ -66,7 +66,7 @@ Delivery:
 
 - Network rules decide which cluster services a test reaches. Platform services do not admit the connection test workload. An egress rule on the workload keeps it off the node addresses and off namespaces without a default-deny policy ([DEPLOYMENT.md §2.5](../DEPLOYMENT.md#25-connection-test)).
 - A source inside the cluster can be tested when its policy admits the workload.
-- Before it connects, the test checks every address that the host resolves to. Always refused: loopback, link-local (including cloud metadata), any-local and multicast addresses, and `localhost`. An operator can refuse more networks with `connectiontest.denied-networks`.
+- Before it connects, the test checks every address that the host resolves to. Always refused: loopback, link-local (with the cloud metadata address `169.254.169.254`), any-local and multicast addresses, and `localhost`. Metadata addresses of other providers, such as `100.100.100.200`, are refused only through `connectiontest.denied-networks`. An operator can refuse more networks with `connectiontest.denied-networks`.
 
 The client resolves the name again when it connects. `GuardedResolver` is installed as the JVM's resolver through `java.net.spi.InetAddressResolverProvider`. For two minutes it checks every resolution of a name that a test let through, for every client, thread and spelling of the name. Thus the name cannot give the check a public address and the connection an internal one (DNS rebinding). All other names resolve unchanged through the built-in resolver.
 
