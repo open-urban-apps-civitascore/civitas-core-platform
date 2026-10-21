@@ -271,7 +271,6 @@ java $JAVA_OPTS -cp /civitas/config-adapter.jar de.civitascore.configadapter.app
 | `connectiontest.timeout-seconds` | `CONNECTIONTEST_TIMEOUT_SECONDS` | `15` | Longest time one test may take. Then its connections are closed. Keep it below portal-backend's `connection-test.wait-seconds` (20). A request that expires sooner gets less time. |
 | `connectiontest.max-concurrent` | `CONNECTIONTEST_MAX_CONCURRENT` | `4` | Tests that run at the same time. A request above this limit gets the answer `BUSY` at once. |
 | `connectiontest.denied-networks` | `CONNECTIONTEST_DENIED_NETWORKS` | `none` | CIDR networks a test never connects to. Loopback, link-local, any-local and multicast addresses are always refused. |
-| `connectiontest.denied-host-suffixes` | `CONNECTIONTEST_DENIED_HOST_SUFFIXES` | `none` | Host name suffixes refused before name resolution. The match uses the name as the user typed it, so a short name that the cluster DNS completes (`gateway.civitas`) or an IP address passes. To refuse a network, use `denied-networks`. `localhost` is always refused. |
 
 **Kafka**
 

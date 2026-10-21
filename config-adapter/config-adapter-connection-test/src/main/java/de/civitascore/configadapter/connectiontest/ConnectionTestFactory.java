@@ -55,7 +55,6 @@ public final class ConnectionTestFactory {
     DestinationGuard guard =
         new DestinationGuard(
             deniedNetworks(config.getProperty("connectiontest.denied-networks", NONE)),
-            list(config.getProperty("connectiontest.denied-host-suffixes", NONE)),
             InetAddress::getAllByName);
 
     // Stretched once: PBKDF2 with 600k iterations is too slow to repeat per test.

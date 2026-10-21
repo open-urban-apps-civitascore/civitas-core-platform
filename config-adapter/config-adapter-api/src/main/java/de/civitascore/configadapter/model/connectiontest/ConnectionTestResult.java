@@ -47,41 +47,22 @@ public record ConnectionTestResult(
   /** Why a test failed. Derived from where the test stopped, never from message text. */
   public enum Reason {
     /** The connector values do not make a runnable source. */
-    INVALID_CONNECTOR("The connector values do not make a data source that can run."),
+    INVALID_CONNECTOR,
     /** The source answered with an error, or could not be reached. */
-    SOURCE_ERROR("The data source answered with an error."),
+    SOURCE_ERROR,
     /** The source did not answer within the time limit of the test. */
-    TIMEOUT("The data source did not answer within the time limit of the test."),
+    TIMEOUT,
     /** Too many tests run at the moment; nothing was attempted. */
-    BUSY("Too many connection tests are running. Try again shortly."),
+    BUSY,
     /** The test could not be run, for a reason on the platform's side. */
-    UNAVAILABLE("The connection test could not be run.");
-
-    private final String defaultMessage;
-
-    Reason(String defaultMessage) {
-      this.defaultMessage = defaultMessage;
-    }
-
-    /** The message of a failure that has no more specific one. */
-    public String defaultMessage() {
-      return defaultMessage;
-    }
+    UNAVAILABLE
   }
 
-  /** A failure that carries no preview; a null message stands for the reason's default. */
+  /** A failure that carries no preview. */
   public static ConnectionTestResult failure(
       String requestId, Reason reason, String message, long durationMillis) {
     return new ConnectionTestResult(
-        requestId,
-        Outcome.FAILURE,
-        reason,
-        message == null ? reason.defaultMessage() : message,
-        null,
-        false,
-        null,
-        null,
-        durationMillis);
+        requestId, Outcome.FAILURE, reason, message, null, false, null, null, durationMillis);
   }
 
   /** Keeps the preview, which holds data of the source, and the message out of logs. */

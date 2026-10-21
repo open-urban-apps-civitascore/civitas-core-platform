@@ -12,7 +12,6 @@ package de.civitascore.configadapter.connectiontest;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -38,18 +37,13 @@ final class DestinationGuard implements DestinationCheck {
   private static final Network SIX_TO_FOUR = Network.parse("2002::/16");
 
   private final List<Network> deniedNetworks;
-  private final List<String> deniedHostSuffixes;
   private final HostResolver resolver;
 
   /**
    * @param deniedNetworks networks refused in addition to the ones that hold no data source
-   * @param deniedHostSuffixes host name suffixes refused before the name is resolved, such as
-   *     {@code .svc.cluster.local}
    */
-  DestinationGuard(
-      List<Network> deniedNetworks, List<String> deniedHostSuffixes, HostResolver resolver) {
+  DestinationGuard(List<Network> deniedNetworks, HostResolver resolver) {
     this.deniedNetworks = List.copyOf(deniedNetworks);
-    this.deniedHostSuffixes = deniedHostSuffixes.stream().map(DestinationGuard::suffix).toList();
     this.resolver = resolver;
   }
 
@@ -116,17 +110,8 @@ final class DestinationGuard implements DestinationCheck {
     }
   }
 
-  private boolean isDeniedName(String name) {
-    return "localhost".equals(name)
-        || name.endsWith(".localhost")
-        || deniedHostSuffixes.stream()
-            .anyMatch(suffix -> name.endsWith(suffix) || name.equals(suffix.substring(1)));
-  }
-
-  /** A suffix as a name ending: lower case, with one leading dot and no trailing dot. */
-  private static String suffix(String value) {
-    String name = normalize(value);
-    return name.startsWith(".") ? name : "." + name;
+  private static boolean isDeniedName(String name) {
+    return "localhost".equals(name) || name.endsWith(".localhost");
   }
 
   /** Lower case, without IPv6 brackets and trailing dots: one spelling per name. */
@@ -196,17 +181,6 @@ final class DestinationGuard implements DestinationCheck {
         throw new IllegalArgumentException("prefix length out of range: " + text);
       }
       return new Network(bytes, prefix);
-    }
-
-    /** Parses a comma-separated list; blank entries are skipped. */
-    static List<Network> parseAll(String cidrs) {
-      List<Network> networks = new ArrayList<>();
-      for (String cidr : cidrs.split(",")) {
-        if (!cidr.isBlank()) {
-          networks.add(parse(cidr));
-        }
-      }
-      return networks;
     }
 
     boolean contains(InetAddress candidate) {

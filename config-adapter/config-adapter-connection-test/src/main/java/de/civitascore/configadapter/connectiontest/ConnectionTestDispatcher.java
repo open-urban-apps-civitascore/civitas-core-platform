@@ -36,6 +36,8 @@ final class ConnectionTestDispatcher implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(ConnectionTestDispatcher.class);
 
+  static final String BUSY_MESSAGE = "Too many connection tests are running. Try again shortly.";
+
   /** Left for the result to reach the requester before it stops waiting. */
   private static final Duration REPLY_MARGIN = Duration.ofSeconds(1);
 
@@ -72,7 +74,7 @@ final class ConnectionTestDispatcher implements AutoCloseable {
       return;
     }
     if (!permits.tryAcquire()) {
-      publish(ConnectionTestResult.failure(requestId, Reason.BUSY, null, 0));
+      publish(ConnectionTestResult.failure(requestId, Reason.BUSY, BUSY_MESSAGE, 0));
       return;
     }
     executor.execute(() -> supervise(request, budget));

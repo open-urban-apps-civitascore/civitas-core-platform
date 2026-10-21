@@ -37,7 +37,6 @@ class ConnectionTestFactoryTest {
     DestinationGuard guard =
         new DestinationGuard(
             ConnectionTestFactory.deniedNetworks("10.0.0.0/8, fc00::/7"),
-            List.of(),
             InetAddress::getAllByName);
 
     assertThrows(ConnectionTestFailure.class, () -> guard.check("10.1.2.3"));

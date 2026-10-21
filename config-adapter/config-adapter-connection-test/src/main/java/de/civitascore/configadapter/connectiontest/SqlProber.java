@@ -51,7 +51,7 @@ final class SqlProber implements ConnectionProber {
    * limits. A {@code socketTimeout=0} waits forever on a host that never answers.
    */
   private static final Set<String> TIMEOUT_PARAMETERS =
-      Set.of("connecttimeout", "sockettimeout", "logintimeout", "cancelsignaltimeout");
+      Set.of("connecttimeout", "sockettimeout", "logintimeout");
 
   /**
    * The database cuts each value to one character more than the preview holds, so a wide value such

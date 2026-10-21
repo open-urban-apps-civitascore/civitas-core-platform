@@ -237,8 +237,7 @@ class MqttProberIT {
                   + ((InetSocketAddress) listener.getLocalAddress()).getPort()));
       MqttProber guarded =
           new MqttProber(
-              new DestinationGuard(List.of(), List.of(), InetAddress::getAllByName),
-              Duration.ofSeconds(5));
+              new DestinationGuard(List.of(), InetAddress::getAllByName), Duration.ofSeconds(5));
 
       ConnectionTestFailure failure =
           assertThrows(

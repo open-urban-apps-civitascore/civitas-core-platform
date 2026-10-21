@@ -203,7 +203,7 @@ class ConnectionTestDispatcherTest {
     assertEquals("r3", published.get(0).requestId());
     assertEquals(Outcome.FAILURE, published.get(0).outcome());
     assertEquals(Reason.BUSY, published.get(0).reason());
-    assertEquals(Reason.BUSY.defaultMessage(), published.get(0).message());
+    assertEquals(ConnectionTestDispatcher.BUSY_MESSAGE, published.get(0).message());
 
     release.countDown();
     await().atMost(Duration.ofSeconds(5)).until(() -> published.size() == 3);

@@ -313,8 +313,7 @@ class SqlProberIT {
       connector.put("dsn", "postgres://" + address(listener) + "/source");
       SqlProber guarded =
           new SqlProber(
-              new DestinationGuard(List.of(), List.of(), InetAddress::getAllByName),
-              Duration.ofSeconds(3));
+              new DestinationGuard(List.of(), InetAddress::getAllByName), Duration.ofSeconds(3));
 
       ConnectionTestFailure failure =
           assertThrows(

@@ -47,8 +47,7 @@ class GuardedResolverTest {
   private final GuardedResolver resolver = new GuardedResolver(dns);
   private final DestinationGuard guard =
       new DestinationGuard(
-          DestinationGuard.Network.parseAll("10.0.0.0/8"),
-          List.of(),
+          ConnectionTestFactory.deniedNetworks("10.0.0.0/8"),
           host -> new InetAddress[] {answer.get()});
 
   @Test
