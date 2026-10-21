@@ -50,8 +50,8 @@ final class PathRewrite {
   /**
    * Pattern/replacement pairs for {@code proxy-rewrite.regex_uri}. APISIX tries them in order and
    * keeps the first match, so the bare address and the trailing-slash form reach one upstream path,
-   * while an STA sub-path keeps its suffix. An STA route also drops a version segment ({@code
-   * /v1.0}) that clients add after the address.
+   * while an STA sub-path keeps its suffix. An STA route also drops a version segment after the
+   * address.
    */
   static String[] pairs(String routePath, String upstreamPath, RouteUpstreamKind kind) {
     if (kind == RouteUpstreamKind.OWS) {

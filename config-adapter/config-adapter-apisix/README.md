@@ -59,9 +59,8 @@ Publication is per named API, not per dataset.
 - Every dataset route pins `hosts` to `apisix.api.host` and carries `service_id` from `apisix.service.id`
   plus `status: 1`. Host pinning and the `/v1/datasets/{id}` prefix — strictly more specific than a `/v1/*`
   catch-all — make dispatch deterministic without a second virtual host.
-- `proxy-rewrite` maps gateway path to upstream path via
-  `regex_uri: ["^{routePath}/?$", "{upstreamPath}", "^{routePath}(/.+)$", "{upstreamPath}$1"]` (shape per
-  standard below), and APISIX
+- `proxy-rewrite` maps gateway path to upstream path via `regex_uri` pairs (one shape per standard
+  below), and APISIX
   preserves the query string. The upstream path is the FROST project path for `STA` and
   `{geoserver path}/{workspace}/ows` for `OWS`, the workspace name deriving from the dataset id by the same
   rule the GeoServer adapter applies.

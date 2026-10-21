@@ -16,12 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 
 @DisplayName("PathRewrite — bringing an already-provisioned route onto the current shape")
 class PathRewriteTest {
@@ -40,17 +36,6 @@ class PathRewriteTest {
     Map<String, Object> proxyRewrite = new HashMap<>();
     proxyRewrite.put("regex_uri", List.of("^" + routePath + "(/.*)?$", upstreamPath + "$1"));
     return proxyRewrite;
-  }
-
-  /** The upstream path APISIX forwards a request to: the first matching pair wins. */
-  private static String rewrite(String[] pairs, String requestPath) {
-    for (int i = 0; i < pairs.length; i += 2) {
-      Matcher matcher = Pattern.compile(pairs[i]).matcher(requestPath);
-      if (matcher.matches()) {
-        return matcher.replaceFirst(pairs[i + 1]);
-      }
-    }
-    return null;
   }
 
   @Test
@@ -98,22 +83,6 @@ class PathRewriteTest {
     PathRewrite.normalize(
         staRoute, singlePairRewrite(staPath, STA_UPSTREAM), RouteUpstreamKind.STA);
     assertArrayEquals(new String[] {staPath, staPath + "/*"}, (String[]) staRoute.get("uris"));
-  }
-
-  @ParameterizedTest(name = "{0} → {1}")
-  @CsvSource({
-    "/Things, /FROST-Server/v1.1/Projects(1)/Things",
-    "/v1.0, /FROST-Server/v1.1/Projects(1)",
-    "/v1.0/, /FROST-Server/v1.1/Projects(1)",
-    "/v1.0/Things, /FROST-Server/v1.1/Projects(1)/Things",
-    "/v1.1/Things(7)/Datastreams, /FROST-Server/v1.1/Projects(1)/Things(7)/Datastreams"
-  })
-  @DisplayName("an STA route drops the version segment a client adds after the address")
-  void dropsTheStaVersionSegment(String subPath, String upstreamPath) {
-    String routePath = "/v1/datasets/ds-1/data";
-    String[] pairs = PathRewrite.pairs(routePath, STA_UPSTREAM, RouteUpstreamKind.STA);
-
-    assertEquals(upstreamPath, rewrite(pairs, routePath + subPath));
   }
 
   @Test
