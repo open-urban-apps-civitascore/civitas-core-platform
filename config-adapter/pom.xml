@@ -354,6 +354,7 @@
 						<ignoredUnusedDeclaredDependency>commons-beanutils:commons-beanutils</ignoredUnusedDeclaredDependency>
 						<ignoredUnusedDeclaredDependency>org.postgresql:postgresql</ignoredUnusedDeclaredDependency>
 						<ignoredUnusedDeclaredDependency>com.h2database:h2</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>com.hivemq:hivemq-mqtt-client-websocket</ignoredUnusedDeclaredDependency>
 					</ignoredUnusedDeclaredDependencies>
 					<!-- Required at runtime by the adapters' REST clients and JSON mapping;
 					     the analyzer sees direct imports only in test code. -->
