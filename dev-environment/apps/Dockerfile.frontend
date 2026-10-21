@@ -27,7 +27,8 @@ RUN corepack enable
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nextjs -u 1001
 
-# Copy only what's needed for production
+USER nextjs
+
 COPY --chown=nextjs:nodejs --from=builder /app/package.json ./package.json
 COPY --chown=nextjs:nodejs --from=builder /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --chown=nextjs:nodejs --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
@@ -35,9 +36,7 @@ COPY --chown=nextjs:nodejs --from=builder /app/.next ./.next
 COPY --chown=nextjs:nodejs --from=builder /app/public ./public
 COPY --chown=nextjs:nodejs --from=builder /app/node_modules ./node_modules
 
-# Create non-root user
 RUN mkdir -p .next/cache/images
-USER nextjs
 
 EXPOSE 3000
 
