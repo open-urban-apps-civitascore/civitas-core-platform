@@ -397,6 +397,11 @@
                         <ignoredNonTestScopedDependency>com.nimbusds:nimbus-jose-jwt</ignoredNonTestScopedDependency>
                         <ignoredNonTestScopedDependency>ch.qos.logback:*</ignoredNonTestScopedDependency>
                         <ignoredNonTestScopedDependency>org.springframework.boot:spring-boot-restclient</ignoredNonTestScopedDependency>
+                        <!-- Jackson 2 comes with config-adapter-api; the connection test IT uses it to
+                             play the connection test service, which serializes with Jackson 2. -->
+                        <ignoredNonTestScopedDependency>com.fasterxml.jackson.core:jackson-databind</ignoredNonTestScopedDependency>
+                        <ignoredNonTestScopedDependency>com.fasterxml.jackson.core:jackson-core</ignoredNonTestScopedDependency>
+                        <ignoredNonTestScopedDependency>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</ignoredNonTestScopedDependency>
                     </ignoredNonTestScopedDependencies>
                     <!-- The used-undeclared check is off: compiling against a starter's or aggregator's
                          transitive closure is deliberate here, so every finding is a false positive. -->

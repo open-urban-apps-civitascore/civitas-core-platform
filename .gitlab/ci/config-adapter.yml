@@ -261,7 +261,7 @@ integration-test-config-adapter-gateway-idm:
 integration-test-config-adapter-data-services:
   extends: .integration-test-config-adapter
   variables:
-    MODULES: config-adapter-frost,config-adapter-geoserver,config-adapter-postgis,config-adapter-flowable,event-handler-kafka,config-adapter-application
+    MODULES: config-adapter-frost,config-adapter-geoserver,config-adapter-postgis,config-adapter-flowable,event-handler-kafka,config-adapter-application,config-adapter-connection-test
 
 build-config-adapter:
   extends: .api-test-stack-changes
