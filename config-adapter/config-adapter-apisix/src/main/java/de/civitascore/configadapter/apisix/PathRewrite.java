@@ -32,6 +32,9 @@ final class PathRewrite {
   /** Back-reference carrying a sub-path through to the upstream path. */
   private static final String SUB_PATH_GROUP = "$1";
 
+  /** Optional version segment an STA client adds after the address, e.g. {@code /v1.0}. */
+  private static final String VERSION_SEGMENT = "(?:/v\\d+\\.\\d+)?";
+
   /** A {@code regex_uri} entry is a pattern followed by its replacement. */
   private static final int PAIR_SIZE = 2;
 
@@ -47,15 +50,16 @@ final class PathRewrite {
   /**
    * Pattern/replacement pairs for {@code proxy-rewrite.regex_uri}. APISIX tries them in order and
    * keeps the first match, so the bare address and the trailing-slash form reach one upstream path,
-   * while an STA sub-path keeps its suffix.
+   * while an STA sub-path keeps its suffix. An STA route also drops a version segment after the
+   * address.
    */
   static String[] pairs(String routePath, String upstreamPath, RouteUpstreamKind kind) {
-    String exact = "^" + routePath + "/?$";
     if (kind == RouteUpstreamKind.OWS) {
-      return new String[] {exact, upstreamPath};
+      return new String[] {"^" + routePath + "/?$", upstreamPath};
     }
+    String address = "^" + routePath + VERSION_SEGMENT;
     return new String[] {
-      exact, upstreamPath, "^" + routePath + "(/.+)$", upstreamPath + SUB_PATH_GROUP
+      address + "/?$", upstreamPath, address + "(/.+)$", upstreamPath + SUB_PATH_GROUP
     };
   }
 

@@ -127,9 +127,9 @@ class ApisixSagaHandlerIT extends AbstractApisixIT {
     JsonNode regexUri = value.get("plugins").get("proxy-rewrite").get("regex_uri");
     assertEquals(
         List.of(
-            "^/v1/datasets/" + datasetId + "/" + SLUG + "/?$",
+            "^/v1/datasets/" + datasetId + "/" + SLUG + "(?:/v\\d+\\.\\d+)?/?$",
             UPSTREAM_PATH,
-            "^/v1/datasets/" + datasetId + "/" + SLUG + "(/.+)$",
+            "^/v1/datasets/" + datasetId + "/" + SLUG + "(?:/v\\d+\\.\\d+)?(/.+)$",
             UPSTREAM_PATH + "$1"),
         textValues(regexUri),
         "both rewrite pairs must be present — the first alone would drop every sub-path");
@@ -194,9 +194,9 @@ class ApisixSagaHandlerIT extends AbstractApisixIT {
 
     assertEquals(
         List.of(
-            "^/v1/datasets/" + datasetId + "/" + SLUG + "/?$",
+            "^/v1/datasets/" + datasetId + "/" + SLUG + "(?:/v\\d+\\.\\d+)?/?$",
             UPSTREAM_PATH,
-            "^/v1/datasets/" + datasetId + "/" + SLUG + "(/.+)$",
+            "^/v1/datasets/" + datasetId + "/" + SLUG + "(?:/v\\d+\\.\\d+)?(/.+)$",
             UPSTREAM_PATH + "$1"),
         textValues(proxyRewrite.get("regex_uri")),
         "UPDATE must keep the whole path rewrite mapping this route — a PATCH would have wiped it");

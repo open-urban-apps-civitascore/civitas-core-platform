@@ -157,6 +157,23 @@ class ApisixSagaHandlerRoutingIT extends AbstractApisixIT {
   }
 
   @Test
+  void shouldDropStaVersionSegmentAtGateway() throws Exception {
+    String datasetId = "ver-" + UUID.randomUUID();
+    createRouteAndAwaitGateway(datasetId);
+
+    // The Masterportal adds /v1.0 after the named-API address; the upstream path already carries
+    // the FROST version, so the gateway must drop the segment.
+    HttpResponse<String> response =
+        sendGatewayRequest("/v1/datasets/" + datasetId + "/" + SLUG + "/v1.0/Things", API_HOST);
+
+    assertEquals(200, response.statusCode(), "got: " + response.body());
+    assertEquals(
+        "/FROST-Server/v1.1/Projects(1)/Things",
+        objectMapper.readTree(response.body()).get("path").asText(),
+        "the version segment must not reach FROST");
+  }
+
+  @Test
   void shouldReturn404ForLegacyPathWithoutV1Prefix() throws Exception {
     String datasetId = "hi-" + UUID.randomUUID();
     createRouteAndAwaitGateway(datasetId);
