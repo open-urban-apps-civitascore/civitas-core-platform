@@ -6,6 +6,7 @@ import {
   CONNECTOR_TYPES,
   DEFAULT_START_PAGE,
   HTTP_AUTHENTICATION_TYPES,
+  HTTP_METHODS,
   HTTP_PAGINATION_TYPES,
   MAX_HTTP_API_CALLS,
 } from '@/const/connectors'
@@ -13,6 +14,8 @@ import {
 export type ConnectorTypeKey = keyof typeof CONNECTOR_TYPES
 
 export type ConnectorType = (typeof CONNECTOR_TYPES)[keyof typeof CONNECTOR_TYPES]
+
+export type HttpMethod = (typeof HTTP_METHODS)[keyof typeof HTTP_METHODS]
 
 const QosSchema = z.preprocess(
   v => (typeof v === 'string' ? Number(v) : v),
@@ -289,13 +292,15 @@ const HttpParameterApiResponseSchema = z
 const HttpApiCallApiResponseSchema = z
   .object({
     name: z.string().nullable().optional(),
+    method: z.enum(HTTP_METHODS).nullable().optional().catch(undefined),
     path: z.string().nullable().optional(),
     queryParameters: z.array(HttpParameterApiResponseSchema).nullable().optional(),
     headers: z.array(HttpParameterApiResponseSchema).nullable().optional(),
     pagination: HttpPaginationApiResponseSchema.nullable().optional(),
   })
-  .transform(({ name, path, queryParameters, headers, pagination }) => ({
+  .transform(({ name, method, path, queryParameters, headers, pagination }) => ({
     name: name ?? '',
+    method: method ?? undefined,
     path: path ?? '',
     queryParameters: queryParameters ?? [],
     headers: headers ?? [],

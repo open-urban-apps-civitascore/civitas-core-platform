@@ -63,7 +63,8 @@ interface PipelineEditorLayoutInnerProps {
  */
 const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ className = '', sessionManager }) => {
   const t = useTranslations('pipelineEditor')
-  const { isLoadingEditor, saveAllPipelines, isSavingAll, hasAnyDirtySession } = useActivePipeline()
+  const { isLoadingEditor, saveAllPipelines, isSavingAll, hasAnyDirtySession, sessionIdsWithErrors } =
+    useActivePipeline()
   const { isReadOnly } = useReadOnly()
   const router = useRouter()
   const params = useParams<{ datasetId: string }>()
@@ -139,6 +140,7 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
             <PipelineTabBar
               sessions={sessionManager.sessions}
               activeSessionId={sessionManager.activeSessionId}
+              sessionIdsWithErrors={sessionIdsWithErrors}
               onSelectSession={handleSelectSession}
               onCreateSession={handleCreateSession}
               canCreate={canCreate && !isReadOnly}

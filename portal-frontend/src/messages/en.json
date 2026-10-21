@@ -1433,7 +1433,11 @@
       "tags": "Tags",
       "showDataStructure": "Show Data Structure",
       "noPermission": "No permission to read datasources",
-      "anonymousName": "Anonymous Data Source"
+      "anonymousName": "Anonymous Data Source",
+      "apiCall": "API call",
+      "apiCallPlaceholder": "Select an API call...",
+      "noApiCalls": "No API calls",
+      "apiCallNotFound": "This API call does not exist in the Data source. Select another API call."
     },
     "sink": {
       "locked": {
@@ -1551,8 +1555,11 @@
         "orphanNode": "{label} is not connected to any other node",
         "minimumFunctionalNodes": "Pipeline must have at least one functional node between Start and End",
         "duplicateTableName": "The table name \"{tableName}\" is already used in pipeline \"{pipeline}\"",
-        "cronMqttIncompatible": "A CRON trigger cannot be used with an MQTT Data source. Use a SQL (pull) source instead.",
-        "cronSourceConnectorUnknown": "Could not verify the source connector; a CRON trigger only works with a SQL (pull) source, not MQTT.",
+        "cronMqttIncompatible": "A CRON trigger cannot be used with an MQTT Data source. Use a pull source (SQL or HTTP) instead.",
+        "cronSourceConnectorUnknown": "Could not verify the source connector; a CRON trigger only works with a pull source (SQL or HTTP), not MQTT.",
+        "sourceRequiresCron": "{label} needs a CRON trigger. Connect a CRON node to this Data source.",
+        "apiCallMissing": "{label} has no API call. Select an API call.",
+        "apiCallNotFound": "The API call \"{apiCallName}\" of {label} does not exist in the Data source. Select an API call.",
         "sqlSourceNoScheduleDefaultPoll": "This SQL source has no CRON node and will poll on the default schedule (every 5 minutes). Add a CRON node to set an explicit schedule.",
         "frostMappingUnknownStaTarget": "{label} maps {path} — not a valid SensorThings target path; allowed are the catalog paths of the Thing-shaped target model (e.g. $.name, $.Datastreams[].name, $.Datastreams[].Observations[].result) plus its match keys",
         "frostMappingMissingMatchKeys": "{label} must map the {entity} match keys: {fields} — they identify the entity during find-or-create",
@@ -1614,6 +1621,7 @@
       "savingAll": "Saving...",
       "exit": "Exit",
       "validationFailed": "Validation failed for: {names}",
+      "unchangedPipelinesInvalid": "These pipelines are not valid: {names}. Fix the errors.",
       "duplicateNames": "Duplicate pipeline names: {names}",
       "saveFailed": "Failed to save: {names}",
       "saveSuccess": "Pipeline \"{name}\" saved successfully",
@@ -1632,7 +1640,8 @@
     "tabs": {
       "closeTab": "Close tab",
       "newPipeline": "New pipeline",
-      "untitledPipeline": "Untitled Pipeline"
+      "untitledPipeline": "Untitled Pipeline",
+      "hasErrors": "This pipeline has errors"
     },
     "nodeLabels": {
       "notConfigured": "Not configured"

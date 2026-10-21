@@ -28,6 +28,8 @@ interface EntitySelectorProps {
   onChange: (entity: SelectableEntity | undefined) => void
   isDisabled?: boolean
   fallbackName?: string
+  renderEntityName?: (entity: SelectableEntity) => React.ReactNode
+  errorMessage?: string
 }
 
 // ============================================================================
@@ -44,6 +46,8 @@ export const EntitySelector: React.FC<EntitySelectorProps> = ({
   onChange,
   isDisabled = false,
   fallbackName,
+  renderEntityName = entity => entity.name,
+  errorMessage,
 }) => {
   const t = useTranslations('pipelineEditor')
   const tCommon = useTranslations('common')
@@ -61,6 +65,7 @@ export const EntitySelector: React.FC<EntitySelectorProps> = ({
   }
 
   const selectedValue = selectedId !== undefined ? String(selectedId) : undefined
+  const hasError = Boolean(errorMessage)
 
   const hasSelectedEntity = entities.some(e => String(e.id) === selectedValue)
   const displayEntities =
@@ -83,7 +88,7 @@ export const EntitySelector: React.FC<EntitySelectorProps> = ({
       ) : (
         <div className="relative">
           <Select value={selectedValue} onValueChange={handleValueChange} disabled={isDisabled}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full" aria-invalid={hasError}>
               <SelectValue placeholder={resolvedPlaceholder} />
             </SelectTrigger>
             <SelectContent>
@@ -97,11 +102,12 @@ export const EntitySelector: React.FC<EntitySelectorProps> = ({
               )}
               {displayEntities.map(entity => (
                 <SelectItem key={String(entity.id)} value={String(entity.id)}>
-                  {entity.name}
+                  {renderEntityName(entity)}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {hasError && <p className="mt-2 text-xs text-destructive">{errorMessage}</p>}
         </div>
       )}
     </div>

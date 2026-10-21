@@ -11,6 +11,7 @@
  */
 
 import type { MappingArtifactBody } from '@/app/services/api/mappings/clientRequests'
+import { CONNECTOR_TYPES } from '@/const/connectors'
 import { DataSinkDraftSchema, MappingDraftSchema, PipelineDraftSchema } from '@/generated/core'
 import { DATASINK_TYPES, type DataSinkPayload } from '@/types/datasinks'
 
@@ -109,6 +110,9 @@ export const buildPipelineModel = (pipeline: Pipeline): CorePipelineModel => {
 
     if (isDataSourceNodeData(node.data)) {
       if (node.data.configurationUrn) coreNode.sourceRef = node.data.configurationUrn
+      if (node.data.entityMetadata?.connector === CONNECTOR_TYPES.HTTP && node.data.apiCallName) {
+        coreNode.apiCallName = node.data.apiCallName
+      }
     } else if (isFrostNodeData(node.data) || isGeoPersistenceNodeData(node.data)) {
       if (node.data.configurationUrn) coreNode.sinkRef = node.data.configurationUrn
     } else if (isMappingNodeData(node.data)) {

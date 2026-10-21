@@ -123,6 +123,8 @@ export interface CorePipelineNode {
   label?: string
   /** Versioned CORE URN of the referenced DataSource (source nodes). */
   sourceRef?: string
+  /** Name of the API call the source reads (HTTP source nodes). */
+  apiCallName?: string
   /** Versioned CORE URN of the referenced DataSink (sink nodes). */
   sinkRef?: string
   /** Versioned CORE URN of the referenced Mapping (mapping nodes). */

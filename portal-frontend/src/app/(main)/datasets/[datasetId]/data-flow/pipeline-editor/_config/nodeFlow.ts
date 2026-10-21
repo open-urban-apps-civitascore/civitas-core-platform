@@ -44,6 +44,8 @@ export interface SourceFlowDeclaration {
    * `undefined` when the connector is unknown and it cannot be verified either way.
    */
   readonly acceptsSchedule: (data: PipelineNodeData) => boolean | undefined
+  /** Whether the node only runs when a cron schedule is wired to its trigger port. */
+  readonly requiresSchedule: (data: PipelineNodeData) => boolean
 }
 
 export interface TransformFlowDeclaration {
@@ -74,6 +76,7 @@ export type NodeFlowDeclaration =
   | PassiveFlowDeclaration
 
 const DATA_SOURCE_OUTPUT_BY_CONNECTOR: Record<string, PayloadForm> = {
+  HTTP: 'RAW_JSON',
   MQTT: 'STA_ENVELOPE',
   SQL: 'RECORDS',
 }
@@ -93,17 +96,19 @@ export const NODE_FLOW_DECLARATIONS: Readonly<Record<PipelineNodeType, NodeFlowD
     },
     acceptsSchedule: data => {
       // MQTT is push-based (it self-triggers on broker messages), so a cron there would only
-      // throttle the drain, not the data. Cron belongs on a pull source (SQL). A connector this
-      // table does not know cannot be verified either way.
+      // throttle the drain, not the data. Cron belongs on a pull source (SQL, HTTP). A connector
+      // this table does not know cannot be verified either way.
       switch (dataSourceConnector(data)) {
         case 'MQTT':
           return false
         case 'SQL':
+        case 'HTTP':
           return true
         default:
           return undefined
       }
     },
+    requiresSchedule: data => dataSourceConnector(data) === 'HTTP',
   },
   [PIPELINE_NODE_TYPES.Mapping]: {
     role: 'transform',
