@@ -872,6 +872,7 @@ echo "Checking for leftover application processes..."
 
 # Stop any leftover Docker app containers from previous run
 docker rm -f civitas-config-adapter 2>/dev/null || true
+docker rm -f civitas-connection-tester 2>/dev/null || true
 docker rm -f civitas-portal-backend 2>/dev/null || true
 docker rm -f civitas-portal-frontend 2>/dev/null || true
 sleep 1
@@ -967,7 +968,7 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ] || [ "$STAR
     # Build compose services list based on user selection
     COMPOSE_SERVICES=""
     if [ "$config_adapter_option" = "1" ]; then
-        COMPOSE_SERVICES="$COMPOSE_SERVICES config-adapter"
+        COMPOSE_SERVICES="$COMPOSE_SERVICES config-adapter connection-tester"
     fi
     if [ "$backend_option" = "1" ]; then
         COMPOSE_SERVICES="$COMPOSE_SERVICES portal-backend"
@@ -1108,6 +1109,8 @@ export POSTGIS_JDBC_URL=jdbc:postgresql://localhost:5432/geoserver
 export POSTGIS_JDBC_USER=geoserver
 export POSTGIS_JDBC_PASSWORD=${GEOSERVER_DB_PASSWORD:-geoserver}
 
+# Data source connection test: same JAR, its own main class and health port.
+HEALTHCHECK_PORT=8087 java -cp "$CONFIG_ADAPTER_JAR" de.civitascore.configadapter.application.ConnectionTestApplication > /tmp/connection-tester.log 2>&1 &
 java -jar "$CONFIG_ADAPTER_JAR"
 exec bash
 SCRIPT_EOF
@@ -1205,6 +1208,10 @@ if [ "$config_adapter_option" = "3" ]; then
     echo "  POSTGIS_JDBC_URL=jdbc:postgresql://localhost:5432/geoserver"
     echo "  POSTGIS_JDBC_USER=geoserver"
     echo "  POSTGIS_JDBC_PASSWORD=\${GEOSERVER_DB_PASSWORD:-geoserver}"
+    echo
+    echo "Data source connection test: a second run configuration in the same module"
+    echo "  Main class: de.civitascore.configadapter.application.ConnectionTestApplication"
+    echo "  HEALTHCHECK_PORT=8087, KAFKA_BOOTSTRAP_SERVERS=localhost:9092, CIVITAS_MASTER_KEY as above"
     echo
 fi
 
