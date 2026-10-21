@@ -1,13 +1,8 @@
 # Config Adapter Connection Test
 
-Answers the portal's "test connection" of a data source. It connects to the source with the
-connector values of the form and reports whether the source answers. The test reads no data into
-the platform, starts no saga and stores nothing.
+Answers the portal's "test connection" of a data source. It connects to the source with the connector values of the form and reports whether the source answers. The test reads no data into the platform, starts no saga and stores nothing.
 
-It is neither a `ConfigAdapter` nor a `SagaCommandHandler`. It runs as a workload of its own, from
-the config-adapter image with the main class `ConnectionTestApplication`. Thus it shares neither
-config-adapter's process nor its network identity. Deployment and properties:
-[DEPLOYMENT.md §2.5](../DEPLOYMENT.md#25-connection-test).
+It is neither a `ConfigAdapter` nor a `SagaCommandHandler`. It runs as a workload of its own, from the config-adapter image with the main class `ConnectionTestApplication`. Thus it shares neither config-adapter's process nor its network identity. Deployment and properties: [DEPLOYMENT.md §2.5](../DEPLOYMENT.md#25-connection-test).
 
 ## Contract
 
@@ -18,18 +13,13 @@ config-adapter's process nor its network identity. Deployment and properties:
 
 - Both records are in `config-adapter-api` (`model.connectiontest`) and travel as plain JSON.
 - The topic names are the defaults of `connectiontest.kafka.request-topic` / `result-topic`.
-- `connector` is the connector document as the portal stores it, the same document a saga carries.
-  Every secret in it is `ENC(...)`. A plaintext password is refused.
+- `connector` is the connector document as the portal stores it, the same document a saga carries. Every secret in it is `ENC(...)`. A plaintext password is refused.
 
 Delivery:
 
-- Delivery is at most once. A request is dropped when less than a second is left before its
-  `expiresAt`, because portal-backend then stops waiting.
+- Delivery is at most once. A request is dropped when less than a second is left before its `expiresAt`, because portal-backend then stops waiting.
 - A request above `connectiontest.max-concurrent` gets the answer `BUSY` at once.
-- A test that runs longer than `connectiontest.timeout-seconds`, or longer than its request
-  allows, gets the answer `TIMEOUT`. Its connections are then closed from outside. Exception: an
-  MQTT connection that the broker has not answered yet ends by itself after 13 s (see the known
-  differences).
+- A test that runs longer than `connectiontest.timeout-seconds`, or longer than its request allows, gets the answer `TIMEOUT`. Its connections are then closed from outside. Exception: an MQTT connection that the broker has not answered yet ends by itself after 13 s (see the known differences).
 - Exactly one result is published for each test that runs.
 
 | `reason` of a failure | When |
@@ -50,65 +40,37 @@ Delivery:
 | HTTP | JDK `HttpClient`, request built as the `GetHttpApiCall` processor builds it | a 2xx status with a body the pipeline reads | the body, as text |
 
 - **SQL runs no configured text as SQL.**
-  - The table and each column go to the database only as bind parameters of `to_regclass(?)` and
-    `parse_ident(?)`. These resolve them with the parser's quoting, case folding and search path.
-  - The query uses the names that the catalog returns, quoted by `quote_ident`, with `LIMIT ?`. It
-    runs in a read-only transaction that is always rolled back.
+  - The table and each column go to the database only as bind parameters of `to_regclass(?)` and `parse_ident(?)`. These resolve them with the parser's quoting, case folding and search path.
+  - The query uses the names that the catalog returns, quoted by `quote_ident`, with `LIMIT ?`. It runs in a read-only transaction that is always rolled back.
   - The `where` clause is free SQL and is **not** part of the test. The result says so.
-  - The test drops the DSN's own `connectTimeout`, `socketTimeout` and `loginTimeout`, because the
-    driver prefers them to the test's limits.
-  - Each value is read as text and cut by the database to one character more than the preview
-    holds. The rows come one per fetch. Thus a table of wide rows (PostGIS polygons) costs no more
-    than its preview.
-- **MQTT checks the SUBACK code.** A refused subscription is a failure. The test waits for no
-  message. MQTT 5 asks for no retained messages, and messages that arrive before the disconnect are
-  dropped. A broker with a Mosquitto `acl_file` grants a subscription and then delivers nothing to
-  it, so such a test succeeds. The dynamic security plugin refuses the subscription in the SUBACK.
+  - The test drops the DSN's own `connectTimeout`, `socketTimeout` and `loginTimeout`, because the driver prefers them to the test's limits.
+  - Each value is read as text and cut by the database to one character more than the preview holds. The rows come one per fetch. Thus a table of wide rows (PostGIS polygons) costs no more than its preview.
+- **MQTT checks the SUBACK code.** A refused subscription is a failure. The test waits for no message. MQTT 5 asks for no retained messages, and messages that arrive before the disconnect are dropped. A broker with a Mosquitto `acl_file` grants a subscription and then delivers nothing to it, so such a test succeeds. The dynamic security plugin refuses the subscription in the SUBACK.
 - **HTTP follows no redirect.** It reads the body up to the preview limit.
-  - A `gzip` or `deflate` body is decompressed for the preview. Another content encoding is
-    described, not shown.
+  - A `gzip` or `deflate` body is decompressed for the preview. Another content encoding is described, not shown.
   - Basic authentication is sent only over https.
   - A non-2xx status is a failure that keeps status and body.
-  - A 2xx body is judged as the pipeline reads it. Not JSON, or compressed: failure, because the
-    pipeline's web client does not unpack it. JSON without an object (`[]`, scalars): success, with
-    a note that the pipeline reads no record from it.
-- **A value with `${` or `#{` is refused**, as a release refuses it, because the pipeline engine
-  would evaluate it. The message names the field, never the value.
+  - A 2xx body is judged as the pipeline reads it. Not JSON, or compressed: failure, because the pipeline's web client does not unpack it. JSON without an object (`[]`, scalars): success, with a note that the pipeline reads no record from it.
+- **A value with `${` or `#{` is refused**, as a release refuses it, because the pipeline engine would evaluate it. The message names the field, never the value.
 
-`SqlConnectorValues` and `MqttConnectorValues` in `config-adapter-api` read the connector values.
-The NiFi source stages use the same parsers.
+`SqlConnectorValues` and `MqttConnectorValues` in `config-adapter-api` read the connector values. The NiFi source stages use the same parsers.
 
 ## Limits and secrets
 
-- A message has at most 500 characters. A preview has at most 8 KB of UTF-8, with a
-  `[truncated]` marker. A body that is not text is described, not shown.
-- Every decrypted secret is masked in message and preview. A basic credential that an API echoes
-  back is masked in the preview too.
-- A message never carries a cause chain. It keeps the source's own reason (`password
-  authentication failed`, `Not authorized`), because that is the answer the user asked for.
-- Logs carry the request id, outcome and duration. At DEBUG they also carry the masked failure
-  message.
+- A message has at most 500 characters. A preview has at most 8 KB of UTF-8, with a `[truncated]` marker. A body that is not text is described, not shown.
+- Every decrypted secret is masked in message and preview. A basic credential that an API echoes back is masked in the preview too.
+- A message never carries a cause chain. It keeps the source's own reason (`password authentication failed`, `Not authorized`), because that is the answer the user asked for.
+- Logs carry the request id, outcome and duration. At DEBUG they also carry the masked failure message.
 
 ## Destinations
 
-- Network policy decides which cluster services a test reaches. Platform services do not admit
-  the connection test workload. An egress policy on the workload keeps it off the host network and
-  off namespaces without a default-deny policy ([DEPLOYMENT.md §2.5](../DEPLOYMENT.md#25-connection-test)).
+- Network policy decides which cluster services a test reaches. Platform services do not admit the connection test workload. An egress policy on the workload keeps it off the host network and off namespaces without a default-deny policy ([DEPLOYMENT.md §2.5](../DEPLOYMENT.md#25-connection-test)).
 - A source inside the cluster can be tested when its policy admits the workload.
-- Before it connects, the test checks every address that the host resolves to. Always refused:
-  loopback, link-local (including cloud metadata), any-local and multicast addresses, and
-  `localhost`. An operator can refuse more with `connectiontest.denied-networks` and
-  `connectiontest.denied-host-suffixes`.
+- Before it connects, the test checks every address that the host resolves to. Always refused: loopback, link-local (including cloud metadata), any-local and multicast addresses, and `localhost`. An operator can refuse more with `connectiontest.denied-networks` and `connectiontest.denied-host-suffixes`.
 
-The client resolves the name again when it connects. `GuardedResolver` is installed as the JVM's
-resolver through `java.net.spi.InetAddressResolverProvider`. For two minutes it checks every
-resolution of a name that a test let through, for every client, thread and spelling of the name.
-Thus the name cannot give the check a public address and the connection an internal one (DNS
-rebinding). All other names resolve unchanged through the built-in resolver.
+The client resolves the name again when it connects. `GuardedResolver` is installed as the JVM's resolver through `java.net.spi.InetAddressResolverProvider`. For two minutes it checks every resolution of a name that a test let through, for every client, thread and spelling of the name. Thus the name cannot give the check a public address and the connection an internal one (DNS rebinding). All other names resolve unchanged through the built-in resolver.
 
-BSI TR-03187 W-16 asks for an allowlist of destinations. Data sources are arbitrary hosts, so the
-test relies on the network position of its own workload. The same control applies to the pipeline
-in NiFi.
+BSI TR-03187 W-16 asks for an allowlist of destinations. Data sources are arbitrary hosts, so the test relies on the network position of its own workload. The same control applies to the pipeline in NiFi.
 
 ## Known differences from the pipeline
 

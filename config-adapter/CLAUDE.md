@@ -48,6 +48,7 @@ PMD, CPD and SpotBugs are bound per-module at `verify` with `failOnViolation`/`f
 - **GeoServer style upsert**: a style POST for a name that already exists returns **403**, not 409, on GeoServer Cloud. The upsert branches on 403 and refreshes the SLD via PUT. A genuine authorisation 403 is indistinguishable from an exists-403 by status code alone, so it falls through to the same PUT and surfaces only if that PUT also fails — inspect the response body rather than trusting the status code.
 
 - **A SIGTERM runs only shutdown hooks**: a `finally` after `Thread.currentThread().join()` never runs, so a Kafka consumer closed there never leaves its group and the next pod waits `session.timeout.ms` (45 s) for its partitions. Close consumers in a shutdown hook, as `ConnectionTestApplication` does. `Application` closes them in `finally` and has this delay.
+
 ## Testing
 
 - Unit tests: JUnit 5 + Mockito. Pattern: mock `AdapterConfig`, create adapter, verify behavior with `ArgumentCaptor`
