@@ -3,7 +3,7 @@
 # it into a volume, and NiFi reads that volume as a custom NAR library directory. See components/
 # nifi in the civitas-core-deployment repository.
 #
-# The NAR is built before the image, and the build context holds nothing else (.dockerignore):
+# The NARs are built before the image, and the build context holds nothing else (.dockerignore):
 #   mvn -f nifi-extensions/pom.xml package -DskipTests
 
 FROM alpine:3.23.5
@@ -13,6 +13,6 @@ FROM alpine:3.23.5
 RUN mkdir -p /opt/civitas/nars
 
 # World-readable: the pod that copies them runs as the operator's user, not as a user of this image.
-COPY --chmod=444 nifi-frost-nar/target/*.nar /opt/civitas/nars/
+COPY --chmod=444 nifi-*-nar/target/*.nar /opt/civitas/nars/
 
 USER 1000:1000

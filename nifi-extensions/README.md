@@ -6,7 +6,9 @@ that use them; the components themselves know nothing about the adapter.
 | Module | Holds |
 |---|---|
 | `nifi-frost-processors` | The code: `PutFrostRecord`, the ports and the batch builder |
-| `nifi-frost-nar` | The NiFi archive that carries the code into an installation |
+| `nifi-frost-nar` | The NiFi archive that carries the FROST code into an installation |
+| `nifi-http-processors` | The code: `GetHttpApiCall`, the request of one API call of an HTTP/REST Data source |
+| `nifi-http-nar` | The NiFi archive that carries the HTTP code into an installation |
 
 ## Build
 
@@ -21,7 +23,7 @@ mvn verify -DskipITs       # skip the integration test when no Docker daemon is 
 through Testcontainers. Without a Docker daemon it skips, so `mvn verify` still passes on a
 workstation without one — check the failsafe report when you need to know whether it ran.
 
-The NAR is at `nifi-frost-nar/target/nifi-frost-nar-<version>.nar`.
+Each NAR is at `nifi-<name>-nar/target/nifi-<name>-nar-<version>.nar`.
 
 **This tree compiles to Java 21**, while the rest of the repository is on 25. That is the NiFi
 extension API level: every NiFi 2.x release, including the newest, compiles to release 21, and the
@@ -31,13 +33,13 @@ follows the NiFi baseline, not the repository.
 
 ## Install into the development NiFi
 
-`start-portal-dev.sh` builds the NAR and copies it to `dev-environment/nifi/extensions`. That
+`start-portal-dev.sh` builds the NARs and copies them to `dev-environment/nifi/extensions`. That
 directory is mounted as the NiFi container's NAR autoload directory, and NiFi loads a NAR dropped
 there without a restart. To install a changed NAR into a running NiFi:
 
 ```bash
 mvn -q package -DskipTests
-cp nifi-frost-nar/target/nifi-frost-nar-*.nar ../dev-environment/nifi/extensions/
+cp nifi-*-nar/target/nifi-*-nar-*.nar ../dev-environment/nifi/extensions/
 ```
 
 ## Install into a deployed NiFi
@@ -195,3 +197,210 @@ FROST, not sub-requests in a document.
 One assumption stays open: **the batch size a server accepts.** The specification names none, and
 the cap of 100 here is a guard rather than a measurement. The integration test sends three records
 in one batch, which proves the isolation of the groups, not the limit.
+
+## GetHttpApiCall
+
+A source processor: it takes no input, and each run sends one HTTP GET request for one API call of
+an HTTP/REST Data source, or one request for each page when the API call has a pagination. It runs
+on the primary node alone, because each node of a cluster would call the API otherwise, and one run
+at a time. The cron schedule of the flow decides when it runs.
+
+| Property | Means |
+|---|---|
+| `Web Client Service Provider` | The HTTP client. Its properties carry the TLS material, the proxy, the timeouts and the redirect handling. |
+| `Body Read Timeout` | The longest wait for the next bytes of the response body, `15 secs` by default. A longer wait is a transient error. The `Read Timeout` of the web client service ends when the response headers arrive. |
+| `Base URL` | Scheme `http` or `https`, a host, an optional port and an optional path. No user info, no query, no fragment. A trailing `/` is removed. |
+| `API Call` | The API call as JSON, in the form the portal stores it. |
+| `Authentication Type` | `NONE` (default) or `BASIC`. |
+| `Basic Auth Username` / `Basic Auth Password` | Required with `BASIC`, which also requires an `https` Base URL. The username contains no colon; the password is sensitive. |
+| `Record Schema` | The JSON Schema of the Data structure of the Data source, with its imports inlined. Required. |
+| `Max Pages` | The maximum number of pages in one paginated run, `1000` by default. The config-adapter does not set it, and the portal does not show it. |
+
+No property supports Expression Language.
+
+```json
+{
+  "name": "Get all weather stations",
+  "method": "GET",
+  "path": "/stations",
+  "queryParameters": [{ "name": "status", "value": "active" }],
+  "headers": [{ "name": "Accept", "value": "application/json" }],
+  "pagination": {
+    "type": "PAGE_NUMBER",
+    "pageParameter": "page",
+    "pageSizeParameter": "size",
+    "pageSize": 100,
+    "startPage": 0,
+    "endPage": null
+  }
+}
+```
+
+The processor checks the rules of the portal backend again, because it builds the request and the
+credentials from them. `method` is `GET` or absent, `path` matches `^/[A-Za-z0-9._~:/-]*$`, a header
+name is a token and not `Authorization`, `Proxy-Authorization` or `Cookie`. A `pagination` is absent,
+null or of the type `PAGE_NUMBER`, with a `pageParameter`, a `pageSizeParameter` and a `pageSize` of
+at least 1. An absent `startPage` is 0, and an `endPage` is at least the `startPage`. The two
+parameter names differ from each other and from the name of each query parameter of the API call;
+the comparison is case-sensitive, as HTTP query parameter names are. A header must also be one the
+JDK HTTP client behind the web client service sends:
+not `Connection`, `Content-Length`, `Expect`, `Host` or `Upgrade`, and a value of printable
+ISO-8859-1 characters, spaces and tabs only. An unknown key fails. A broken rule makes the
+processor invalid, and the explanation names the key path, for example `headers[1].name`, never the
+value.
+
+The query is percent-encoded with only the unreserved characters of RFC 3986 left as they are, so a
+space is `%20` and `&`, `=` and `+` in a value stay part of the value. The parameters keep their
+order, repeated names included. `HttpUriBuilder.addQueryParameter` is not used for this: NiFi's
+implementation does not encode `&`, `=` and `+` in a value.
+
+Relationships: `success`, `stop` and `failure`. There is no `retry`; the next cron run is the next
+attempt. `stop` carries an error that the next run cannot repair: the flow stops the Pipeline on it.
+`failure` carries an error that the next run can repair.
+
+| Result | Relationship | Log level |
+|---|---|---|
+| 2xx, each record agrees with the `Record Schema` | `success`, the body unchanged, `mime.type` `application/json` | none |
+| 2xx without a body or with only whitespace, for example 204 | none, no FlowFile | debug |
+| 3xx, 4xx except 408 and 429 | `stop` | error |
+| A request that the web client refuses, status `0` | `stop` | error |
+| 2xx, the body is not JSON, or is a JSON scalar | `stop` | error |
+| 2xx, a record violates the `Record Schema` | `stop` | error |
+| 408, 429, 5xx, any other status | `failure` | warn |
+| Connection error, timeout, TLS error, body read error, status `0` | `failure` | warn |
+
+A 3xx is fatal because the processor expects a web client service that does not follow
+redirects (`Redirect Handling Strategy` = `IGNORED`), so a redirect shows a wrong host or path.
+
+A FlowFile on `success` carries `http.status.code` and `http.request.path`, and with pagination
+`http.page`, the page number. A FlowFile on `stop` or
+`failure` is empty and carries `http.request.path`, `http.error.status` and `http.error.message`.
+`http.error.status` is the status of the response, or `0` when no response came. The message is the
+one the log entry and the bulletin show. It names the API call and its path, never the base URL,
+and on a page of a paginated run the page number. A control character or line separator in the
+message appears as `\r`, `\n` or `\uXXXX`, so no part of it can start a forged log line; every
+other character stays as entered:
+
+```text
+API call "Get stations": GET /stations failed with status 404
+API call "Get stations": GET /stations failed: ConnectException
+API call "Get stations": 2 of 50 records violate the Data structure: record 3: /lat type; record 7: required stationid
+API call "Get stations": the response is a JSON string, not an object or an array
+API call "Get stations": the response is not JSON
+API call "Get stations": GET /stations page 3 failed with status 403
+API call "Get stations": GET /stations page 3 failed: ConnectException
+API call "Get stations": page 3: 2 of 50 records violate the Data structure: record 3: /lat type; record 7: required stationid
+API call "Get stations": page 3 is a JSON object, not an array
+API call "Get stations": page 3 repeats page 2
+API call "Get stations": no stop condition after 1000 pages (Max Pages)
+API call "Get stations": GET /stations page 3 not sent, because the processor stopped
+```
+
+A transient message keeps the word `failed`: the runtime monitor of the NiFi config-adapter counts a
+warn bulletin only when its text names a failure. The message of a stop has no such word, because a
+stop is not an error of the Pipeline.
+
+No attribute and no message contains the query, a header value, the username, the password or a
+value of the response. An exception reaches no logger, because its message can hold the URI with its
+query; the message names its class alone.
+
+### Response validation
+
+The processor writes a 2xx body into its FlowFile and then reads it one record at a time, so only
+one record is in memory. A JSON array holds one record in each element, and `[]` holds none. A JSON
+object is one record. A JSON scalar, or a body that is not JSON, goes to `stop`. Each record is
+validated against `Record Schema`; one invalid record sends the whole response to `stop`, and no
+FlowFile goes to `success`. An array element that is not a JSON object is an invalid record with the
+keyword `type`, also when `Record Schema` allows it. A body that passes is an object or an array of
+objects, so the record reader behind the processor skips no data.
+
+The cause names the number of invalid records and at most the first 3 violations: the index of the
+record from 0, the JSON Pointer inside the record and the keyword. In the JSON Pointer, a property
+name that no `properties` of the schema declares appears as `*`, because it comes from the response.
+For `required`, it also names the missing property, which comes from the schema. It never uses the
+message of the validator, because some messages quote the value.
+
+The validator is the networknt `json-schema-validator` in the version of Model Forge, with draft
+2020-12 and the keyword and format settings of Model Forge (`ModelForgeKeywordsTest` checks that the
+keyword lists agree). The `x-core-*` keywords and `crs` validate nothing.
+
+A `$ref` resolves inside the schema, to an embedded resource of the schema with its own `$id`, or to
+one of the seven GeoJSON geometry schemas `https://geojson.org/schema/<Type>.json`. The NAR holds
+copies of those, identical to the ones Model Forge vendors (`GeoJsonCopiesTest` checks that), and the
+processor never fetches a schema over the network.
+
+The processor compiles `Record Schema` when it starts. It does not check the schema when NiFi
+validates the processor: Model Forge validates the Data structure. A `Record Schema` that is not
+JSON, that the validator cannot compile, or that has any other reference stops the start: the
+processor stays valid and scheduled but sends no request, NiFi raises an error bulletin
+`Failed to properly initialize Processor` with the `InvalidRecordSchemaException` as its cause and
+tries again after the `Administrative Yield Duration`. The runtime monitor publishes this bulletin
+as an `ERROR` event of the Pipeline.
+
+### Pagination
+
+A `PAGE_NUMBER` pagination makes a run read the pages one after the other. Each page is a request
+of its own, through the same request code as an API call without pagination, with the page
+parameter and the page size parameter after the query parameters of the API call. The first page
+is `startPage`, and the page number increases by 1. The run stops after the first page that meets
+one of these conditions, and the records of that page are part of the run:
+
+- The page number is the `endPage`.
+- The page has no records.
+- The page has fewer records than `pageSize`.
+- A page after the first page answers 400 or 404. Some APIs, for example WordPress, answer a page
+  past the last page so, and not with `[]`. On the first page, 400 and 404 go to `stop`, as in the
+  table above.
+
+A page with more records than `pageSize` is not an error. The page number is a `long`, so a
+`startPage` near the `int` maximum does not overflow.
+
+A page must be a JSON array of records. An API call without pagination keeps the rules above: a JSON
+object is one record, and `[]` gives one FlowFile `[]`.
+
+| 2xx response of a page | Result |
+|---|---|
+| A JSON array, each record agrees with the `Record Schema` | one FlowFile on `success`, the body unchanged |
+| `[]`, or no body | no FlowFile; the run stops there |
+| A JSON object, a JSON scalar, or not JSON | `stop` |
+| An array with a record that violates the `Record Schema` | `stop` |
+
+**A run delivers all its pages or none.** The page FlowFiles of a run stay in one session, which
+the processor commits when the loop ends. An error on any page, fatal or transient, removes the page
+FlowFiles of the run. The processor then sends one error FlowFile to `stop` or `failure`. Thus each
+failed run gives one FlowFile. The next run starts again at `startPage`. The pages of a run wait in
+the content repository until the commit. This
+applies to what the processor sends: the Data sink writes the pages one FlowFile after the other,
+so a Data sink error on a page leaves the pages before it in the Data storage.
+
+A page whose body is the same as the body of an earlier page of the run goes to `stop`, also in a
+run with an `endPage`, and none of the pages of the run reaches `success`. The same body means that
+the API ignores the page parameter, so the run would deliver the same records again until the
+`endPage` or `Max Pages`. Thus such an API stops at the second page. The processor compares a
+SHA-256 of each body, which it computes while it writes the body into its FlowFile.
+
+`Max Pages` limits a run, also one with an `endPage`. A run that reads `Max Pages` pages and meets no
+stop condition goes to `stop`, and none of its pages reaches `success`. This guards against an API
+that ignores the page parameter and changes its response on each request, for example with a
+timestamp in each record.
+
+**Page limit:** a run reads at most `Max Pages` pages, 1000 by default. When the page at
+`Max Pages` is full, the run also goes to `stop`, because it cannot know that no further page
+exists. The first run of an API with more pages stops the Pipeline. The config-adapter does not set
+`Max Pages`, and each deployment of the Pipeline replaces a value set in the NiFi UI, so only a code
+change raises the limit.
+
+When NiFi stops the processor during a run, the processor sends no further page. It removes the
+pages of the run and sends one FlowFile to `failure`, as for a transient error. Thus a stop of the
+process group waits for one page at most, not for the whole run.
+
+**Known limit:** a `pageSize` larger than the maximum page size of the API ends the run after the
+first page, because the API sends fewer records than `pageSize`. The processor cannot tell this from
+a last page, so no error shows.
+
+The request code knows no NiFi session. The page loop asks a `Pagination` for the first page and,
+from the record count of a page, for the next one. The `Pagination` also tells if each page must be
+a JSON array. An offset pagination adds an implementation of `Pagination`, and the page loop stays
+as it is. A cursor or a link header needs the response of a page, which `Pagination` does not get.
+A new authentication type adds a
+value of `Authentication Type`, its properties and a class that implements `Authentication`.

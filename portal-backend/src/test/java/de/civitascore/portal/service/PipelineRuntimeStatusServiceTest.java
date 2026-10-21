@@ -22,6 +22,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -195,6 +197,112 @@ class PipelineRuntimeStatusServiceTest {
       service.markDeploymentSucceeded(null);
 
       verify(statusRepository, never()).save(any());
+    }
+  }
+
+  @Nested
+  @DisplayName("a stopped pipeline")
+  class StoppedPipeline {
+
+    private static final String CAUSE =
+        "API call \"Get stations\": GET /stations failed with status 404";
+
+    @Test
+    @DisplayName("stores STOPPED with the cause")
+    void storesStoppedWithCause() {
+      UUID id = UUID.randomUUID();
+      pipelineWithStatus(id);
+      Instant occurredAt = Instant.parse("2026-10-20T08:00:00Z");
+
+      service.apply(
+          id,
+          PipelineRuntimeState.STOPPED,
+          PipelineRuntimeSource.RUNTIME,
+          CAUSE,
+          null,
+          occurredAt,
+          UUID.randomUUID());
+
+      PipelineRuntimeStatus saved = captureSaved();
+      assertThat(saved.getState()).isEqualTo(PipelineRuntimeState.STOPPED);
+      assertThat(saved.getMessage()).isEqualTo(CAUSE);
+      assertThat(saved.getSanitizedStacktrace()).isNull();
+      assertThat(saved.getOccurredAt()).isEqualTo(occurredAt);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+        value = PipelineRuntimeState.class,
+        names = {"OK", "ERROR"})
+    @DisplayName("keeps STOPPED when the runtime monitor reports another state")
+    void keepsStoppedOnRuntimeEvent(PipelineRuntimeState reported) {
+      UUID id = UUID.randomUUID();
+      Pipeline pipeline = pipelineWithStatus(id);
+      pipeline.setRuntimeStatus(stopped());
+
+      service.apply(
+          id,
+          reported,
+          PipelineRuntimeSource.RUNTIME,
+          "Processor 'GetHttpApiCall' is Stopped",
+          null,
+          Instant.now(),
+          UUID.randomUUID());
+
+      verify(statusRepository, never()).save(any());
+      assertThat(pipeline.getRuntimeStatus().getState()).isEqualTo(PipelineRuntimeState.STOPPED);
+      assertThat(pipeline.getRuntimeStatus().getMessage()).isEqualTo(CAUSE);
+    }
+
+    @Test
+    @DisplayName("changes STOPPED to OK after a successful deployment")
+    void successfulDeploymentReplacesStopped() {
+      UUID id = UUID.randomUUID();
+      pipelineWithStatus(id).setRuntimeStatus(stopped());
+
+      service.markDeploymentSucceeded(List.of(id.toString()));
+
+      PipelineRuntimeStatus saved = captureSaved();
+      assertThat(saved.getState()).isEqualTo(PipelineRuntimeState.OK);
+      assertThat(saved.getSource()).isEqualTo(PipelineRuntimeSource.DEPLOYMENT);
+      assertThat(saved.getMessage()).isNull();
+    }
+
+    @Test
+    @DisplayName("changes STOPPED to ERROR after a failed deployment")
+    void failedDeploymentReplacesStopped() {
+      UUID id = UUID.randomUUID();
+      pipelineWithStatus(id).setRuntimeStatus(stopped());
+
+      service.apply(
+          id,
+          PipelineRuntimeState.ERROR,
+          PipelineRuntimeSource.DEPLOYMENT,
+          "deploy failed: processor invalid",
+          null,
+          Instant.now(),
+          UUID.randomUUID());
+
+      PipelineRuntimeStatus saved = captureSaved();
+      assertThat(saved.getState()).isEqualTo(PipelineRuntimeState.ERROR);
+      assertThat(saved.getSource()).isEqualTo(PipelineRuntimeSource.DEPLOYMENT);
+      assertThat(saved.getMessage()).isEqualTo("deploy failed: processor invalid");
+    }
+
+    private PipelineRuntimeStatus captureSaved() {
+      ArgumentCaptor<PipelineRuntimeStatus> captor =
+          ArgumentCaptor.forClass(PipelineRuntimeStatus.class);
+      verify(statusRepository).save(captor.capture());
+      return captor.getValue();
+    }
+
+    private PipelineRuntimeStatus stopped() {
+      PipelineRuntimeStatus status = new PipelineRuntimeStatus();
+      status.setState(PipelineRuntimeState.STOPPED);
+      status.setSource(PipelineRuntimeSource.RUNTIME);
+      status.setMessage(CAUSE);
+      status.setLastEventId(UUID.randomUUID());
+      return status;
     }
   }
 

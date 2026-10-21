@@ -18,6 +18,7 @@ export interface DynamicFormFieldProps<T extends FieldValues> extends InputProps
   options?: SelectOption[]
   shouldShowErrors: boolean
   className?: string
+  normalize?: (value: string) => string
 }
 export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldProps<T>) => {
   const {
@@ -33,6 +34,8 @@ export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldP
     shouldShowErrors,
     className,
     disabled,
+    autoComplete,
+    normalize,
   } = props
   switch (type) {
     case 'textArea':
@@ -86,6 +89,8 @@ export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldP
           formItemProps={{ className }}
           disabled={disabled}
           type={inputType}
+          autoComplete={autoComplete}
+          normalize={normalize}
         />
       )
   }

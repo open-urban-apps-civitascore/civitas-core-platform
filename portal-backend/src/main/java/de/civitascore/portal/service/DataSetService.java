@@ -32,6 +32,7 @@ import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.SagaInFlightException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -676,7 +677,9 @@ public class DataSetService
         log.info("Saga CREATE completed for dataset {}, infrastructure provisioned", datasetId);
       }
       case UPDATE -> {
+        List<String> deployedBefore = dataSet.getPipelineIds();
         applyInfrastructureResult(dataSet, result);
+        retainPipelinesLeftOutOfUpdate(dataSet, deployedBefore);
         markProvisioned(dataSet);
         pipelineRuntimeStatusService.markDeploymentSucceeded(deployedPipelineIds(dataSet, result));
         log.info("Saga UPDATE completed for dataset {}", datasetId);
@@ -943,13 +946,31 @@ public class DataSetService
     if (result.pipelineIds() == null) {
       return List.of();
     }
-    Set<String> attached =
-        dataSet.getPipelines().stream()
-            .map(Pipeline::getId)
-            .filter(Objects::nonNull)
-            .map(UUID::toString)
-            .collect(Collectors.toSet());
+    Set<String> attached = attachedPipelineIds(dataSet);
     return result.pipelineIds().stream().filter(attached::contains).toList();
+  }
+
+  /**
+   * A STOPPED pipeline that the UPDATE trigger left out keeps its deployed process group; without
+   * its id, an unrelease or a delete would not tear that group down.
+   */
+  private void retainPipelinesLeftOutOfUpdate(DataSet dataSet, List<String> deployedBefore) {
+    if (deployedBefore == null) {
+      return;
+    }
+    Set<String> attached = attachedPipelineIds(dataSet);
+    Set<String> deployed =
+        new LinkedHashSet<>(Objects.requireNonNullElse(dataSet.getPipelineIds(), List.of()));
+    deployedBefore.stream().filter(attached::contains).forEach(deployed::add);
+    dataSet.setPipelineIds(List.copyOf(deployed));
+  }
+
+  private static Set<String> attachedPipelineIds(DataSet dataSet) {
+    return dataSet.getPipelines().stream()
+        .map(Pipeline::getId)
+        .filter(Objects::nonNull)
+        .map(UUID::toString)
+        .collect(Collectors.toSet());
   }
 
   private void applyInfrastructureResult(DataSet dataSet, SagaResultPayload result) {

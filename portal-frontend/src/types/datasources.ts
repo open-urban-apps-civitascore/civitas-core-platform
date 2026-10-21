@@ -1,3 +1,4 @@
+import { HTMLInputAutoCompleteAttribute } from 'react'
 import z from 'zod'
 
 import { CONNECTOR_TYPES } from '@/const/connectors'
@@ -21,7 +22,7 @@ import {
 } from './connectors'
 import { DatastructureVersionSummaryApiResponseSchema } from './datastructures'
 
-export type DatasourceTab = 'basicInfo' | 'connector' | 'dataStructure' | 'datapools' | 'accessManagement'
+export type DatasourceTab = 'basicInfo' | 'connector' | 'dataStructure' | 'apiCalls' | 'datapools' | 'accessManagement'
 
 export const DATASOURCE_STATUS_TYPES = {
   DRAFT: 'DRAFT',
@@ -43,12 +44,22 @@ export type FormInputType = 'text' | 'password'
 // Keys are relative to the `datasources.connectorTab` namespace, e.g. `mqtt.urls.label`.
 export type ConnectorFieldLabel = { labelKey: string; hintKey?: string }
 
+// `labelKey` is relative to the `datasources.connectorTab` namespace.
+export type ConnectorFieldOption = string | { value: string; labelKey: string }
+
+export type ConnectorFieldVisibility = { key: string; value: string }
+
 export type ConnectorField = {
+  // A dot path such as `authentication.type` addresses a nested configuration field.
   key: string
   type: FormFieldType
   inputType?: FormInputType
+  autoComplete?: HTMLInputAutoCompleteAttribute
+  normalize?: (value: string) => string
   label: ConnectorFieldLabel
-  options?: string[]
+  options?: ConnectorFieldOption[]
+  // Shows the field only while the configuration field `key` has the given `value`.
+  visibleWhen?: ConnectorFieldVisibility
   defaultValue?: unknown
   required?: boolean
   // Set `placeholderKey` to use a translation string for the placeholder

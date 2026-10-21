@@ -52,8 +52,7 @@ class NifiDeploymentIT extends AbstractNifiIT {
   static void startStack() {
     assumeTrue(dockerAvailable(), "Docker not available — skipping NiFi IT");
     // The FROST flow writes through PutFrostRecord; the PostGIS flow does not need the NAR.
-    startNifi(
-        HOST_PORT, null, container -> frostNar().ifPresent(nar -> installFrostNar(container, nar)));
+    startNifi(HOST_PORT, null, container -> installExtensionNars(container));
   }
 
   @AfterAll

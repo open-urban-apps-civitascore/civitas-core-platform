@@ -130,13 +130,31 @@ class ConnectorJsonTest {
         "{'connectorType':'SQL','table':'t','tabel':'t'} | Unknown key: connector.tabel",
         "{'connectorType':'MQTT','tls':{'enabled':true,'verify':false}}"
             + " | Unknown key: connector.tls.verify",
-        "{'connectorType':'HTTP'} | Unknown connectorType: HTTP",
+        "{'connectorType':'FTP'} | Unknown connectorType: FTP",
         "{'dsn':'postgres://db/x'} | Missing connector.connectorType",
         "{'connectorType':'MQTT','qos':'high'} | Invalid value: connector.qos",
+        "{'connectorType':'MQTT','qos':1.5} | Invalid value: connector.qos",
+        "{'connectorType':'MQTT','qos':'1'} | Invalid value: connector.qos",
         "{'connectorType':'MQTT','urls':['tcp://u:pw@broker:1883','no url']}"
             + " | Invalid value: connector.urls[1]",
         "{'connectorType':'SQL','dsn':'postgres://u:pw@ bad'} | Invalid value: connector.dsn",
-        "['SQL'] | Invalid value: connector"
+        "['SQL'] | Invalid value: connector",
+        "{'connectorType':'HTTP','apiCalls':[{'foo':1}]} | Unknown key: connector.apiCalls[0].foo",
+        "{'connectorType':'HTTP','authentication':{'type':'OAUTH2'}}"
+            + " | Unknown connector.authentication.type: OAUTH2",
+        "{'connectorType':'HTTP','apiCalls':[{'pagination':{'pageSize':1}}]}"
+            + " | Missing connector.apiCalls[0].pagination.type",
+        "{'connectorType':'HTTP','apiCalls':[{'pagination':{'type':'PAGE_NUMBER','pageSize':1.5}}]}"
+            + " | Invalid value: connector.apiCalls[0].pagination.pageSize",
+        "{'connectorType':'HTTP','apiCalls':[{'pagination':{'type':'PAGE_NUMBER','startPage':'abc'}}]}"
+            + " | Invalid value: connector.apiCalls[0].pagination.startPage",
+        "{'connectorType':'HTTP','apiCalls':[{'pagination':{'type':'PAGE_NUMBER','startPage':'5'}}]}"
+            + " | Invalid value: connector.apiCalls[0].pagination.startPage",
+        "{'connectorType':'HTTP','apiCalls':[{'pagination':{'type':'PAGE_NUMBER','pageSize':''}}]}"
+            + " | Invalid value: connector.apiCalls[0].pagination.pageSize",
+        "{'connectorType':'HTTP','apiCalls':[{},{'headers':[{'name':'a'},null]}]}"
+            + " | Invalid value: connector.apiCalls[1].headers[1]",
+        "{'connectorType':'HTTP','baseUrl':'ftp://api.example.org'} | Invalid value: connector.baseUrl"
       })
   void read_withInvalidConnector_namesTheKeyButNoValue(String connector, String message) {
     assertThatThrownBy(() -> ConnectorJson.read(json(connector)))
@@ -339,6 +357,87 @@ class ConnectorJsonTest {
     assertThat(ConnectorJson.patch(current, json("null"))).isNull();
   }
 
+  private static final String HTTP_BASIC =
+      "{'connectorType':'HTTP','baseUrl':'https://api.example.org',"
+          + "'authentication':{'type':'BASIC','username':'reader','password':'%s'},"
+          + "'apiCalls':[{'name':'a','path':'/x'}]}";
+
+  private static Map<String, Object> storedHttpBasic() {
+    return ConnectorJson.toDocument(
+        ConnectorJson.read(json(HTTP_BASIC.formatted("secret"))), null, ENCRYPT);
+  }
+
+  @Test
+  void httpBasicPassword_isMaskedInResponseEncryptedInDocumentAndKeptForPlaceholder() {
+    Map<String, Object> stored = storedHttpBasic();
+    ConnectorConfiguration placeholder = ConnectorJson.read(json(HTTP_BASIC.formatted("********")));
+
+    assertThat(
+            ConnectorJson.toMaskedTree(ConnectorJson.readStored(ConnectorType.HTTP, stored))
+                .at("/authentication/password")
+                .asString())
+        .isEqualTo(Secret.PLACEHOLDER);
+    assertThat(MAPPER.valueToTree(stored).at("/authentication/password").asString())
+        .isEqualTo("ENC(secret)");
+    assertThat(
+            MAPPER
+                .valueToTree(ConnectorJson.toDocument(placeholder, stored, ENCRYPT))
+                .at("/authentication/password")
+                .asString())
+        .isEqualTo("ENC(secret)");
+  }
+
+  @Test
+  void patch_withOtherAuthenticationType_dropsTheStoredPassword() {
+    Map<String, Object> stored = storedHttpBasic();
+    ConnectorConfiguration withoutAuthentication =
+        ConnectorJson.patch(
+            ConnectorJson.readStored(ConnectorType.HTTP, stored),
+            json("{'authentication':{'type':'NONE'}}"));
+    Map<String, Object> storedWithoutAuthentication =
+        ConnectorJson.toDocument(withoutAuthentication, stored, ENCRYPT);
+
+    ConnectorConfiguration basicAgain =
+        ConnectorJson.patch(
+            ConnectorJson.readStored(ConnectorType.HTTP, storedWithoutAuthentication),
+            json("{'authentication':{'type':'BASIC','username':'reader','password':'********'}}"));
+
+    assertThat(MAPPER.valueToTree(storedWithoutAuthentication).path("authentication"))
+        .isEqualTo(json("{'type':'NONE'}"));
+    assertThat(
+            MAPPER
+                .valueToTree(
+                    ConnectorJson.toDocument(basicAgain, storedWithoutAuthentication, ENCRYPT))
+                .at("/authentication/password")
+                .isNull())
+        .isTrue();
+  }
+
+  @Test
+  void patch_ofStoredHttpConnector_acceptsTheMethodOfTheResponseForm() {
+    ConnectorConfiguration stored = ConnectorJson.readStored(ConnectorType.HTTP, storedHttpBasic());
+
+    HttpConnectorConfiguration patched =
+        (HttpConnectorConfiguration)
+            ConnectorJson.patch(stored, json("{'baseUrl':'https://other.example.org'}"));
+
+    assertThat(ConnectorJson.toMaskedTree(stored).at("/apiCalls/0/method").asString())
+        .isEqualTo("GET");
+    assertThat(patched.baseUrl()).isEqualTo("https://other.example.org");
+    assertThat(patched.apiCalls())
+        .extracting(HttpConnectorConfiguration.ApiCall::name)
+        .containsExactly("a");
+  }
+
+  @Test
+  void toMaskedTree_ofHttpConnectorWithOnlyItsType_showsTheDefaults() {
+    assertThat(ConnectorJson.toMaskedTree(ConnectorJson.read(json("{'connectorType':'HTTP'}"))))
+        .isEqualTo(
+            json(
+                "{'connectorType':'HTTP','baseUrl':null,'authentication':{'type':'NONE'},"
+                    + "'apiCalls':null}"));
+  }
+
   /**
    * Without this test, a connector type added to one listing but not to another would be rejected,
    * undocumented or unreadable from the registry only at runtime.
@@ -391,16 +490,84 @@ class ConnectorJsonTest {
     try (InputStream schema =
         ConnectorJsonTest.class.getClassLoader().getResourceAsStream("datasource.schema.json")) {
       assertThat(schema).as("datasource.schema.json on the class path").isNotNull();
+      JsonNode root = MAPPER.readTree(schema);
       List<String> connectionTypes = new ArrayList<>();
-      MAPPER
-          .readTree(schema)
-          .path("$defs")
+      root.path("oneOf")
           .forEach(
               variant ->
                   connectionTypes.add(
-                      variant.path("properties").path("connectionType").path("const").asString()));
+                      root.at(variant.path("$ref").asString().substring(1))
+                          .path("properties")
+                          .path("connectionType")
+                          .path("const")
+                          .asString()));
       return connectionTypes;
     }
+  }
+
+  /**
+   * Without this test, a variant of a nested type added to one listing but not to another would be
+   * rejected or undocumented only at runtime.
+   */
+  @Test
+  void nestedVariants_areListedInEveryPlaceThatListsThem() {
+    SoftAssertions listings = new SoftAssertions();
+    List<String> checked = new ArrayList<>();
+    Deque<Class<?>> pending = new ArrayDeque<>();
+    Arrays.stream(ConnectorConfiguration.class.getAnnotation(JsonSubTypes.class).value())
+        .forEach(type -> pending.add(type.value()));
+    Set<Class<?>> seen = new HashSet<>();
+    while (!pending.isEmpty()) {
+      Class<?> type = pending.pop();
+      if (!seen.add(type) || !type.isRecord()) {
+        continue;
+      }
+      for (RecordComponent component : type.getRecordComponents()) {
+        Class<?> valueType = listElementType(component.getGenericType());
+        if (valueType != null && valueType.isSealed()) {
+          String name = type.getSimpleName() + "." + component.getName();
+          checked.add(name);
+          assertVariantListings(listings, name, component, valueType);
+          pending.addAll(Arrays.asList(valueType.getPermittedSubclasses()));
+        } else if (valueType != null && valueType.isRecord()) {
+          pending.add(valueType);
+        }
+      }
+    }
+    listings.assertAll();
+    assertThat(checked).contains("HttpConnectorConfiguration.authentication", "ApiCall.pagination");
+  }
+
+  private static void assertVariantListings(
+      SoftAssertions listings, String name, RecordComponent component, Class<?> variantType) {
+    JsonSubTypes subTypesAnnotation = variantType.getAnnotation(JsonSubTypes.class);
+    listings.assertThat(subTypesAnnotation).as("@JsonSubTypes of %s", name).isNotNull();
+    if (subTypesAnnotation == null) {
+      return;
+    }
+    Map<String, Class<?>> subTypes =
+        Arrays.stream(subTypesAnnotation.value())
+            .collect(Collectors.toMap(JsonSubTypes.Type::name, JsonSubTypes.Type::value));
+    listings
+        .assertThat(subTypes.values())
+        .as("@JsonSubTypes of %s", name)
+        .hasSameElementsAs(List.of(variantType.getPermittedSubclasses()));
+    Schema typeSchema = variantType.getAnnotation(Schema.class);
+    listings
+        .assertThat(
+            typeSchema == null
+                ? Map.of()
+                : Arrays.stream(typeSchema.discriminatorMapping())
+                    .collect(
+                        Collectors.toMap(
+                            DiscriminatorMapping::value, DiscriminatorMapping::schema)))
+        .as("@Schema discriminatorMapping of %s", variantType.getSimpleName())
+        .containsExactlyInAnyOrderEntriesOf(subTypes);
+    Schema propertySchema = component.getAccessor().getAnnotation(Schema.class);
+    listings
+        .assertThat(propertySchema == null ? List.of() : List.of(propertySchema.oneOf()))
+        .as("@Schema oneOf of %s", name)
+        .hasSameElementsAs(subTypes.values());
   }
 
   /**

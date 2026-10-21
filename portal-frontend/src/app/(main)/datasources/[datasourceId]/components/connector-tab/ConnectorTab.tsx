@@ -1,6 +1,6 @@
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef } from 'react'
-import { Path, UseFormReturn, useWatch } from 'react-hook-form'
+import { get, Path, UseFormReturn, useWatch } from 'react-hook-form'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { FormSelect } from '@/components/form/fields/FormSelect'
@@ -10,7 +10,7 @@ import { InfoBox } from '@/components/text-box/TextBox'
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 import { CONNECTOR_FIELD_REVALIDATION_RULES, ConnectorType } from '@/types/connectors'
-import { ConnectorFieldLabel, DatasourceFormDraft } from '@/types/datasources'
+import { ConnectorFieldLabel, ConnectorFieldOption, DatasourceFormDraft } from '@/types/datasources'
 
 import { CONNECTOR_INPUTS } from './connectorSources'
 import { DynamicFormField } from './DynamicFormField'
@@ -27,7 +27,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
   const t = useTranslations('datasources.connectorTab')
   const connectorTypeOptions: SelectOption[] = Object.keys(CONNECTOR_INPUTS).map(type => ({
     value: type as ConnectorType,
-    label: type,
+    label: t(`types.${type}`),
   }))
 
   const connectorConfig = useMemo(() => (connectorType ? CONNECTOR_INPUTS[connectorType] : []), [connectorType])
@@ -45,6 +45,11 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
   })
   const isFirstRevalidationRender = useRef(true)
 
+  const configuration = useWatch({ control: form.control, name: 'configuration' })
+  const visibleFields = connectorConfig.filter(
+    field => !field.visibleWhen || get(configuration, field.visibleWhen.key) === field.visibleWhen.value,
+  )
+
   useEffect(() => {
     if (isFirstRevalidationRender.current) {
       isFirstRevalidationRender.current = false
@@ -60,6 +65,9 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
     const hint = label.hintKey ? `(${t(label.hintKey)})` : ''
     return `${t(label.labelKey)} ${hint}`.trim()
   }
+
+  const toSelectOption = (option: ConnectorFieldOption): SelectOption =>
+    typeof option === 'string' ? { value: option, label: option } : { value: option.value, label: t(option.labelKey) }
 
   return (
     <div>
@@ -87,7 +95,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
       {connectorConfig.length > 0 && (
         <ContentCard className={cn('h-full overflow-auto')} footerElement={<FooterElement />}>
           <SubHeader title={t('title2')} className="pb-4  border-b-1 mb-3" />
-          {connectorConfig.map(property => (
+          {visibleFields.map(property => (
             <DynamicFormField<DatasourceFormDraft>
               key={property.key}
               id={property.key}
@@ -97,7 +105,9 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
               placeholder={property.placeholderKey ? t(property.placeholderKey) : (property.placeholder ?? '')}
               type={property.type}
               inputType={property.inputType}
-              options={property.options?.map(option => ({ value: option, label: option }))}
+              autoComplete={property.autoComplete}
+              normalize={property.normalize}
+              options={property.options?.map(toSelectOption)}
               shouldShowErrors
               required={property.required}
               className="py-3"

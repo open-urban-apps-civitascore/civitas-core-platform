@@ -25,6 +25,7 @@ import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -38,10 +39,13 @@ import de.civitascore.configadapter.nifi.flow.DeploymentPlan;
 import de.civitascore.configadapter.nifi.rest.NifiRestClient;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedConstruction;
@@ -556,6 +560,180 @@ class NifiSagaHandlerTest {
     assertEquals(failedType, result.type());
     assertEquals(operation + " failed: Unsupported pipeline combination", result.error());
     verify(restClient, never()).deployFlow(any());
+  }
+
+  /**
+   * The deploy command with a second pipeline from an HTTP/REST Data source through a cron node to
+   * the PostGIS sink. Its source node {@code http-src} reads the API call {@code stations}.
+   */
+  private Map<String, Object> deployPayloadWithHttpPipeline() throws Exception {
+    Map<String, Object> payload = deployPayload();
+    artifacts(payload)
+        .put(
+            "ds-http",
+            map(
+                """
+                { "id": "ds-http", "connectionType": "http", "element": "el-http",
+                  "baseUrl": "https://api.example.org/v1",
+                  "authentication": { "type": "NONE" },
+                  "apiCalls": [ { "name": "stations", "method": "GET", "path": "/stations",
+                    "headers": [ { "name": "Accept", "value": "application/json" } ] } ] }
+                """));
+    artifacts(payload)
+        .put(
+            "el-http",
+            map(
+                """
+                { "type": "object", "properties": { "stationid": { "type": "string" } } }
+                """));
+    pipelines(payload)
+        .add(
+            map(
+                """
+                { "id": "p-2", "version": "1", "action": "ADD",
+                  "dataSourceIds": ["ds-http"], "dataSinkIds": ["sk-1"],
+                  "data": { "nodes": [
+                      { "id": "start", "kind": "start" },
+                      { "id": "cron", "kind": "cron", "cronExpression": "0 */10 * * * ?" },
+                      { "id": "http-src", "kind": "source", "sourceRef": "ds-http",
+                        "apiCallName": "stations" },
+                      { "id": "sink", "kind": "sink", "sinkRef": "sk-1" } ],
+                    "edges": [
+                      { "id": "e0", "source": "start", "target": "cron" },
+                      { "id": "e1", "source": "cron", "target": "http-src" },
+                      { "id": "e2", "source": "http-src", "target": "sink" } ] } }
+                """));
+    return payload;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<Map<String, Object>> pipelines(Map<String, Object> payload) {
+    return (List<Map<String, Object>>) payload.get("dataPipelines");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> graph(Map<String, Object> payload, int pipeline) {
+    return (Map<String, Object>) pipelines(payload).get(pipeline).get("data");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<Map<String, Object>> nodes(Map<String, Object> payload, int pipeline) {
+    return (List<Map<String, Object>>) graph(payload, pipeline).get("nodes");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> httpSource(Map<String, Object> payload) {
+    return (Map<String, Object>) artifacts(payload).get("ds-http");
+  }
+
+  @Test
+  void deployWithHttpPipelineDeploysBothPipelines() throws Exception {
+    when(restClient.deployFlow(any())).thenReturn("pg-1", "pg-2");
+
+    SagaCommandResult result =
+        handler.handle(SagaCommandMessage.fromMap(deployPayloadWithHttpPipeline()));
+
+    assertEquals("STEP_COMPLETED", result.type());
+    assertEquals(List.of("p-1", "p-2"), result.resultData().get("pipelineIds"));
+  }
+
+  @SuppressWarnings("unchecked")
+  static List<Arguments> refusedHttpPipelines() {
+    return List.of(
+        Arguments.of(
+            "unknown API call",
+            (Consumer<Map<String, Object>>)
+                payload -> nodes(payload, 1).get(2).put("apiCallName", "readings"),
+            List.of("'http-src'", "'readings'")),
+        Arguments.of(
+            "no API call",
+            (Consumer<Map<String, Object>>)
+                payload -> nodes(payload, 1).get(2).remove("apiCallName"),
+            List.of("'http-src'", "names no API call")),
+        Arguments.of(
+            "API call on an MQTT source node",
+            (Consumer<Map<String, Object>>)
+                payload -> nodes(payload, 0).getFirst().put("apiCallName", "stations"),
+            List.of("'src'", "names an API call")),
+        Arguments.of(
+            "no cron node",
+            (Consumer<Map<String, Object>>)
+                payload -> {
+                  nodes(payload, 1).remove(1);
+                  graph(payload, 1)
+                      .put(
+                          "edges",
+                          List.of(
+                              Map.of("id", "e1", "source", "start", "target", "http-src"),
+                              Map.of("id", "e2", "source", "http-src", "target", "sink")));
+                },
+            List.of("'http-src'", "has no cron node")),
+        Arguments.of(
+            "password in plain text",
+            (Consumer<Map<String, Object>>)
+                payload ->
+                    httpSource(payload)
+                        .put(
+                            "authentication",
+                            Map.of("type", "BASIC", "username", "reader", "password", "pw")),
+            List.of("password must be encrypted")),
+        Arguments.of(
+            "parameter reference in a header value",
+            (Consumer<Map<String, Object>>)
+                payload -> {
+                  List<Map<String, Object>> calls =
+                      (List<Map<String, Object>>) httpSource(payload).get("apiCalls");
+                  ((List<Map<String, Object>>) calls.getFirst().get("headers"))
+                      .getFirst()
+                      .put("value", "#{secret}");
+                },
+            List.of("API Call")));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("refusedHttpPipelines")
+  void refusedHttpPipelineStopsTheDeploymentAndNamesTheCause(
+      String condition, Consumer<Map<String, Object>> defect, List<String> named) throws Exception {
+    Map<String, Object> payload = deployPayloadWithHttpPipeline();
+    defect.accept(payload);
+
+    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+
+    assertEquals("DEPLOY_PIPELINES failed: Unsupported pipeline combination", result.error());
+    @SuppressWarnings("unchecked")
+    Map<String, Object> status = (Map<String, Object>) result.resultData().get("pipelineStatus");
+    String detail = String.valueOf(status.get("stacktrace"));
+    for (String expected : named) {
+      assertTrue(detail.contains(expected), detail);
+    }
+    verifyNoInteractions(restClient);
+  }
+
+  static List<Arguments> httpPipelinesWithoutTheirDataStructure() {
+    return List.of(
+        Arguments.of(
+            "no element",
+            (Consumer<Map<String, Object>>) payload -> httpSource(payload).remove("element")),
+        Arguments.of(
+            "no artifact for the element",
+            (Consumer<Map<String, Object>>) payload -> artifacts(payload).remove("el-http")));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("httpPipelinesWithoutTheirDataStructure")
+  void httpPipelineWithoutItsDataStructureIsRefusedBeforeTheFirstNifiCall(
+      String condition, Consumer<Map<String, Object>> defect) throws Exception {
+    Map<String, Object> payload = deployPayloadWithHttpPipeline();
+    defect.accept(payload);
+
+    SagaCommandResult result = handler.handle(SagaCommandMessage.fromMap(payload));
+
+    assertEquals(INVALID_PAYLOAD_ERROR, result.error());
+    @SuppressWarnings("unchecked")
+    Map<String, Object> status = (Map<String, Object>) result.resultData().get("pipelineStatus");
+    String detail = String.valueOf(status.get("stacktrace"));
+    assertTrue(detail.contains("'ds-http'"), detail);
+    verifyNoInteractions(restClient);
   }
 
   @Test

@@ -1,0 +1,70 @@
+meta {
+  name: 9. Verify DataSet (release saga complete)
+  type: http
+  seq: 19
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{httpSagaDataSetId}}
+}
+
+script:pre-request {
+  const axios = require('axios');
+  const baseUrl = bru.getEnvVar('baseUrl');
+  const datasetId = bru.getVar('httpSagaDataSetId');
+
+  // Bruno's QuickJS sandbox has no URLSearchParams — build the form body by hand.
+  const form = [
+    ['grant_type', 'password'],
+    ['client_id', bru.getEnvVar('clientId')],
+    ['client_secret', bru.getEnvVar('clientSecret')],
+    ['username', bru.getEnvVar('username')],
+    ['password', bru.getEnvVar('password')],
+  ].map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+  const tokenResp = await axios.post(
+    `${bru.getEnvVar('keycloakUrl')}/realms/${bru.getEnvVar('realm')}/protocol/openid-connect/token`,
+    form,
+    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+  );
+  const token = tokenResp.data.access_token;
+
+  for (let i = 0; i < 30; i++) {
+    // The QuickJS sandbox does not honour validateStatus across the VM boundary, so a transient
+    // 401/403 while OPA data propagates rejects the promise and must not end the poll.
+    let resp;
+    try {
+      resp = await axios.get(`${baseUrl}/datasets/${datasetId}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+    } catch (e) { /* transient; retry */ }
+    if (resp && resp.status === 200 && resp.data && resp.data.pendingSagaType === null) {
+      if (resp.data.publicUrl) {
+        bru.setVar('httpSagaPublicUrl', resp.data.publicUrl);
+      }
+      break;
+    }
+    await new Promise(r => setTimeout(r, 2000));
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Release saga settled", function() {
+    expect(res.body.pendingSagaType).to.be.null;
+  });
+
+  test("Status is AVAILABLE (the four HTTP/REST Pipelines deployed)", function() {
+    // READY means that the saga failed and compensated, for example because the NiFi
+    // config-adapter refused an HTTP/REST Data source without its Data structure.
+    expect(res.body.dataSetStatus).to.equal('AVAILABLE');
+  });
+}

@@ -16,7 +16,7 @@ export * from './datastructure'
 
 import { MappingSchema } from './mapping'
 import { PipelineSchema } from './pipeline'
-import { MqttDataSourceSchema, SqlDataSourceSchema } from './datasource'
+import { HttpDataSourceSchema, MqttDataSourceSchema, SqlDataSourceSchema } from './datasource'
 import { FrostDataSinkSchema, PostgisDataSinkSchema } from './datasink'
 import { DataStructureSchema } from './datastructure'
 
@@ -40,6 +40,7 @@ export const MappingDraftSchema = MappingSchema.omit({ $schema: true, id: true }
 export const DataSourceDraftSchema = z.discriminatedUnion('connectionType', [
   MqttDataSourceSchema.omit({ $schema: true, id: true }),
   SqlDataSourceSchema.omit({ $schema: true, id: true }),
+  HttpDataSourceSchema.omit({ $schema: true, id: true }),
 ])
 
 export const DataSinkDraftSchema = z.discriminatedUnion('connectionType', [

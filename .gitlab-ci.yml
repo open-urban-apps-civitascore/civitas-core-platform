@@ -40,6 +40,7 @@ include:
         - portal-backend/**/*
         - config-adapter/**/*
         - authz/**/*
+        - nifi-extensions/**/*
         - api/portal-backend/bruno-api/**/*
         - dev-environment/ci/**/*
         - dev-environment/apisix/**/*

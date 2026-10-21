@@ -1,0 +1,21 @@
+meta {
+  name: 10. Unrelease DataSet (triggers unrelease saga)
+  type: http
+  seq: 22
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/unrelease
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{httpSagaDataSetId}}
+}
+
+tests {
+  test("Unrelease saga triggered", function() {
+    expect(res.getStatus()).to.equal(202);
+  });
+}

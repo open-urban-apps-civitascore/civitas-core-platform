@@ -21,6 +21,7 @@ import de.civitascore.portal.model.embedded.ConnectorType;
 @JsonSubTypes({
   @JsonSubTypes.Type(value = MqttConnectorConfiguration.class, name = "MQTT"),
   @JsonSubTypes.Type(value = SqlConnectorConfiguration.class, name = "SQL"),
+  @JsonSubTypes.Type(value = HttpConnectorConfiguration.class, name = "HTTP"),
 })
 public interface ConnectorConfiguration {
 

@@ -7,6 +7,7 @@ import de.civitascore.portal.configuration.SagaProperties;
 import de.civitascore.portal.model.datasink.PostgisConfiguration;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.PipelineAction;
+import de.civitascore.portal.model.embedded.PipelineRuntimeState;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
@@ -107,6 +108,10 @@ public class DataSetSagaPublisher {
    * Publishes a {@code DATASET_UPDATE} saga trigger with a pipeline diff against {@code
    * previousPipelines}. Toggling {@code openDataAccess} does not trigger any route/FROST change —
    * it only changes what OPA reads per request (see {@link #publishCreateRequested}).
+   *
+   * <p>A {@code STOPPED} pipeline is left out of the trigger, with its artifacts: the update does
+   * not replace or restart its process group, and the saga result does not list it. It runs again
+   * only after an unrelease and a release.
    */
   public void publishUpdateRequested(DataSet dataset, Set<Pipeline> previousPipelines) {
     verifyLayerStyleReferences(dataset);
@@ -124,7 +129,7 @@ public class DataSetSagaPublisher {
             buildStyles(dataset),
             buildPipelineDiff(previousPipelines, dataset.getPipelines()),
             buildNamedApis(dataset),
-            buildArtifacts(dataset.getPipelines()));
+            buildArtifacts(withoutStopped(dataset.getPipelines())));
     sendTrigger(trigger);
   }
 
@@ -448,10 +453,10 @@ public class DataSetSagaPublisher {
 
     List<DataPipeline> result = new ArrayList<>();
 
-    for (var entry : currentMap.entrySet()) {
+    for (Pipeline pipeline : withoutStopped(currentMap.values())) {
       PipelineAction action =
-          previousIds.contains(entry.getKey()) ? PipelineAction.UPDATE : PipelineAction.ADD;
-      result.add(toPipelineEntry(entry.getValue(), action));
+          previousIds.contains(pipeline.getId()) ? PipelineAction.UPDATE : PipelineAction.ADD;
+      result.add(toPipelineEntry(pipeline, action));
     }
 
     for (UUID id : previousIds) {
@@ -463,6 +468,15 @@ public class DataSetSagaPublisher {
     }
 
     return result;
+  }
+
+  private static List<Pipeline> withoutStopped(Collection<Pipeline> pipelines) {
+    return pipelines.stream()
+        .filter(
+            pipeline ->
+                pipeline.getRuntimeStatus() == null
+                    || pipeline.getRuntimeStatus().getState() != PipelineRuntimeState.STOPPED)
+        .toList();
   }
 
   /** Returns {@code null} when the dataset has no named APIs, so the JSON field is omitted. */

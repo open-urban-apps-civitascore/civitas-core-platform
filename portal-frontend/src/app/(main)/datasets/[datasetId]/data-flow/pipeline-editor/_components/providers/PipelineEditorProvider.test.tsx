@@ -17,13 +17,16 @@ import {
   useGetPipelines,
   useUpdatePipeline,
 } from '@/app/services/api/pipelines/clientRequests'
+import type { Datasource } from '@/types/datasources'
 
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
+import { useNodeValidationSeverity } from '../../_hooks/use-node-validation-severity'
 import { usePipelineSession } from '../../_hooks/use-pipeline-session'
 import {
   buildDataSinkPayloads,
   buildMappingArtifacts,
+  buildPipelinePayload,
   createMappingSnapshot,
   getRemovedDataSinkIds,
   getRemovedMappingUrns,
@@ -36,7 +39,7 @@ import {
 } from '../../_services/payloadBuilderService'
 import { createEmptyPipeline } from '../../_services/pipelineService'
 import { getNodeValidationSeverity, validatePipelineWithNodeStatus } from '../../_services/validationService'
-import type { ControlNodeData } from '../../_types/nodes'
+import type { ControlNodeData, DataSourceNodeData } from '../../_types/nodes'
 import type { PipelineNode, PipelineNodeType, PipelineOutputDTO } from '../../_types/pipeline'
 import { PIPELINE_NODE_TYPES } from '../../_types/pipeline'
 import type { PipelineSession } from '../../_types/session'
@@ -67,6 +70,11 @@ vi.mock('../../_hooks/use-pipeline-read-only', () => ({
 }))
 
 const mockDatasetPermissions = vi.hoisted(() => ({ canDeletePipeline: true }))
+
+const mockDatasources = vi.hoisted(() => ({ entities: [] as Datasource[], isLoading: false }))
+vi.mock('../../_hooks/use-pipeline-datasources', () => ({
+  usePipelineDatasources: () => mockDatasources,
+}))
 
 vi.mock('@/hooks/use-dataset-permissions', () => ({
   useDatasetPermissions: () => mockDatasetPermissions,
@@ -141,8 +149,11 @@ vi.mock('../../_services/payloadBuilderService', async importOriginal => ({
 
 const contextRef = { current: null as ReturnType<typeof useActivePipeline> | null }
 
+const nodeSeverityRef = { current: null as ReturnType<typeof useNodeValidationSeverity> | null }
+
 const Consumer: React.FC = () => {
   contextRef.current = useActivePipeline()
+  nodeSeverityRef.current = useNodeValidationSeverity('node-1')
   return null
 }
 
@@ -197,7 +208,8 @@ const renderProvider = (initialSession?: PipelineSession) => {
       </PipelineEditorProviderComponent>
     )
   }
-  render(<Wrapper />)
+  const view = render(<Wrapper />)
+  return { rerender: () => view.rerender(<Wrapper />) }
 }
 
 const renderProviderWithSessions = (sessions: PipelineSession[]) => {
@@ -226,6 +238,8 @@ beforeEach(() => {
 
   mockReadOnly.isReadOnly = false
   mockDatasetPermissions.canDeletePipeline = true
+  mockDatasources.entities = []
+  mockDatasources.isLoading = false
 
   vi.mocked(buildDataSinkPayloads).mockReturnValue([])
   vi.mocked(buildMappingArtifacts).mockReturnValue([])
@@ -1033,8 +1047,10 @@ describe('PipelineEditorProviderComponent', () => {
     })
   })
 
-  describe('getNodeValidationSeverity', () => {
-    it('returns the severity for the given node from the validation service', () => {
+  describe('node validation context', () => {
+    it('provides the severity of the active validation result to the nodes', () => {
+      const result = { isValid: false, errors: [], warnings: [], nodeStatuses: new Map() }
+      vi.mocked(validatePipelineWithNodeStatus).mockReturnValue(result)
       vi.mocked(getNodeValidationSeverity).mockReturnValue('error')
       renderProvider()
 
@@ -1042,7 +1058,8 @@ describe('PipelineEditorProviderComponent', () => {
         contextRef.current?.runValidation()
       })
 
-      expect(contextRef.current?.getNodeValidationSeverity('node-1')).toBe('error')
+      expect(getNodeValidationSeverity).toHaveBeenLastCalledWith('node-1', result)
+      expect(nodeSeverityRef.current).toBe('error')
     })
   })
 
@@ -1089,9 +1106,31 @@ describe('PipelineEditorProviderComponent', () => {
         contextRef.current?.runValidation()
       })
 
-      expect(vi.mocked(validatePipelineWithNodeStatus)).toHaveBeenLastCalledWith(expect.anything(), {
-        tableNameOwners: { rivers: 'session-2' },
+      expect(vi.mocked(validatePipelineWithNodeStatus)).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.objectContaining({ tableNameOwners: { rivers: 'session-2' } }),
+      )
+    })
+
+    it('passes the API call names of the HTTP data sources to the validation service', () => {
+      const { rerender } = renderProvider(sessionWithGeoNode('session-1', 'persist-1', 'roads'))
+      mockDatasources.entities = [
+        {
+          id: 'http-1',
+          connector: { connectorType: 'HTTP', apiCalls: [{ name: 'Test Call 1', path: '/items' }] },
+        } as unknown as Datasource,
+        { id: 'sql-1', connector: { connectorType: 'SQL' } } as unknown as Datasource,
+      ]
+      rerender()
+
+      act(() => {
+        contextRef.current?.runValidation()
       })
+
+      expect(vi.mocked(validatePipelineWithNodeStatus)).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.objectContaining({ apiCallNamesByDatasourceId: new Map([['http-1', ['Test Call 1']]]) }),
+      )
     })
   })
 
@@ -2615,6 +2654,275 @@ describe('PipelineEditorProviderComponent', () => {
       })
 
       expect(mockUpdatePipelineMutateAsync).toHaveBeenCalled()
+    })
+  })
+
+  describe('validation of all pipelines', () => {
+    const INVALID_RESULT = {
+      isValid: false,
+      errors: [{ id: 'error-1', type: 'structure' as const, messageKey: 'test', severity: 'error' as const }],
+      warnings: [],
+      nodeStatuses: new Map(),
+    }
+
+    const dataSourceNode = (connector: string): PipelineNode => ({
+      id: 'src-1',
+      type: PIPELINE_NODE_TYPES.DataSource,
+      position: { x: 0, y: 0 },
+      data: {
+        label: 'Source',
+        configured: true,
+        entityType: 'datasource',
+        entityId: 'ds-1',
+        entityMetadata: { connector },
+      } satisfies DataSourceNodeData,
+    })
+
+    const pipelineDto = (id: string, nodes: PipelineNode[] = []): PipelineOutputDTO => ({
+      id,
+      name: id,
+      description: '',
+      styles: { nodes, edges: [], nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } },
+      dataSources: [],
+      apis: [],
+      dataSinks: [],
+      model: {},
+      createdAt: '2024-01-01T00:00:00Z',
+      modifiedAt: '2024-01-01T00:00:00Z',
+    })
+
+    const loadPipelines = (dtos: PipelineOutputDTO[]) => {
+      vi.mocked(useGetPipelines).mockReturnValue({
+        data: { data: dtos },
+        isLoading: false,
+      } as unknown as ReturnType<typeof useGetPipelines>)
+      renderProvider()
+    }
+
+    const failValidationFor = (pipelineIds: string[]) => {
+      vi.mocked(validatePipelineWithNodeStatus).mockImplementation(pipeline =>
+        pipelineIds.includes(String(pipeline.id))
+          ? INVALID_RESULT
+          : { isValid: true, errors: [], warnings: [], nodeStatuses: new Map() },
+      )
+    }
+
+    const validatedPipelineIds = () =>
+      vi.mocked(validatePipelineWithNodeStatus).mock.calls.map(([pipeline]) => pipeline.id)
+
+    const sessionManagerRef = { current: null as ReturnType<typeof usePipelineSession> | null }
+
+    const renderSessions = (sessions: PipelineSession[]) => {
+      const Wrapper: React.FC = () => {
+        const sessionManager = usePipelineSession()
+        sessionManagerRef.current = sessionManager
+        const { loadSessions } = sessionManager
+        React.useEffect(() => {
+          loadSessions(sessions, sessions[0]?.id ?? null)
+        }, [loadSessions])
+        return (
+          <PipelineEditorProviderComponent sessionManager={sessionManager}>
+            <Consumer />
+          </PipelineEditorProviderComponent>
+        )
+      }
+      render(<Wrapper />)
+    }
+
+    const savedSession = (id: string, isDirty = false, nodes: PipelineNode[] = []) =>
+      makeSession({ id, name: id, isDirty, pipeline: { ...createEmptyPipeline(id), id, nodes } })
+
+    const saveAll = async () => {
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+    }
+
+    describe('on load', () => {
+      it('validates every loaded pipeline once', () => {
+        loadPipelines([pipelineDto('pipeline-a'), pipelineDto('pipeline-b')])
+
+        expect(validatedPipelineIds()).toEqual(['pipeline-a', 'pipeline-b'])
+      })
+
+      it('does not validate in read-only mode', () => {
+        mockReadOnly.isReadOnly = true
+
+        loadPipelines([pipelineDto('pipeline-a')])
+
+        expect(validatePipelineWithNodeStatus).not.toHaveBeenCalled()
+      })
+
+      it('validates the loaded pipelines when a refetch returns an additional pipeline', () => {
+        mockDatasources.isLoading = true
+        vi.mocked(useGetPipelines).mockReturnValue({
+          data: { data: [pipelineDto('pipeline-a')] },
+          isLoading: false,
+        } as unknown as ReturnType<typeof useGetPipelines>)
+        const { rerender } = renderProvider()
+
+        vi.mocked(useGetPipelines).mockReturnValue({
+          data: { data: [pipelineDto('pipeline-a'), pipelineDto('pipeline-b')] },
+          isLoading: false,
+        } as unknown as ReturnType<typeof useGetPipelines>)
+        mockDatasources.isLoading = false
+        rerender()
+
+        expect(validatedPipelineIds()).toEqual(['pipeline-a'])
+      })
+
+      it('waits until the data sources are loaded', () => {
+        mockDatasources.isLoading = true
+
+        loadPipelines([pipelineDto('pipeline-a')])
+
+        expect(validatePipelineWithNodeStatus).not.toHaveBeenCalled()
+      })
+
+      it('does not validate the default session when there are no pipelines', () => {
+        loadPipelines([])
+
+        expect(validatePipelineWithNodeStatus).not.toHaveBeenCalled()
+      })
+
+      it('opens the validation panel when the active pipeline has errors', () => {
+        failValidationFor(['pipeline-a'])
+
+        loadPipelines([pipelineDto('pipeline-a'), pipelineDto('pipeline-b')])
+
+        expect(contextRef.current?.pipeline?.id).toBe('pipeline-a')
+        expect(contextRef.current?.shouldShowValidationPanel).toBe(true)
+        expect(contextRef.current?.sessionIdsWithErrors).toEqual(new Set([contextRef.current?.activeSessionId]))
+      })
+
+      it('clears the stored selection when it opens the validation panel', () => {
+        failValidationFor(['pipeline-a'])
+
+        loadPipelines([pipelineDto('pipeline-a', [{ ...dataSourceNode('SQL'), selected: true }])])
+
+        expect(contextRef.current?.shouldShowValidationPanel).toBe(true)
+        expect(contextRef.current?.pipeline?.nodes.every(node => !node.selected)).toBe(true)
+        expect(contextRef.current?.isDirty).toBe(false)
+      })
+
+      it('keeps the active tab and the panel closed when only another pipeline has errors', () => {
+        failValidationFor(['pipeline-b'])
+
+        loadPipelines([pipelineDto('pipeline-a'), pipelineDto('pipeline-b')])
+
+        expect(contextRef.current?.pipeline?.id).toBe('pipeline-a')
+        expect(contextRef.current?.shouldShowValidationPanel).toBe(false)
+        expect(contextRef.current?.sessionIdsWithErrors.size).toBe(1)
+        expect(contextRef.current?.sessionIdsWithErrors.has(String(contextRef.current?.activeSessionId))).toBe(false)
+      })
+
+      it('validates with the current connector type of the data source', () => {
+        mockDatasources.entities = [{ id: 'ds-1', connector: { connectorType: 'HTTP' } } as unknown as Datasource]
+
+        loadPipelines([pipelineDto('pipeline-a', [dataSourceNode('SQL')])])
+
+        const [validatedPipeline] = vi.mocked(validatePipelineWithNodeStatus).mock.calls[0]
+        expect(validatedPipeline.nodes[0].data).toMatchObject({ entityMetadata: { connector: 'HTTP' } })
+      })
+    })
+
+    describe('on save', () => {
+      it('saves nothing when a changed pipeline has errors', async () => {
+        failValidationFor(['changed'])
+        renderSessions([savedSession('changed', true), savedSession('unchanged', false)])
+
+        await saveAll()
+
+        expect(mockUpdatePipelineMutateAsync).not.toHaveBeenCalled()
+        expect(toast.error).toHaveBeenCalledWith('header.validationFailed')
+      })
+
+      it('saves the changed pipelines and reports unchanged pipelines with errors', async () => {
+        failValidationFor(['unchanged'])
+        renderSessions([savedSession('changed', true), savedSession('unchanged', false)])
+
+        await saveAll()
+
+        expect(mockUpdatePipelineMutateAsync).toHaveBeenCalledOnce()
+        expect(toast.success).toHaveBeenCalledWith('header.saveSuccess')
+        expect(toast.error).toHaveBeenCalledWith('header.unchangedPipelinesInvalid')
+        expect(contextRef.current?.sessionIdsWithErrors).toEqual(new Set(['unchanged']))
+      })
+
+      it('shows the error toast for unchanged pipelines before the success toast', async () => {
+        failValidationFor(['unchanged'])
+        renderSessions([savedSession('changed', true), savedSession('unchanged', false)])
+
+        await saveAll()
+
+        const [errorOrder] = vi.mocked(toast.error).mock.invocationCallOrder
+        const [successOrder] = vi.mocked(toast.success).mock.invocationCallOrder
+        expect(errorOrder).toBeLessThan(successOrder)
+      })
+
+      it('does not validate an unchanged pipeline that was never saved', async () => {
+        const neverSaved = makeSession({ id: 'new', isDirty: false, pipeline: createEmptyPipeline('new') })
+        renderSessions([savedSession('changed', true), neverSaved])
+
+        await saveAll()
+
+        expect(validatedPipelineIds()).toEqual(['changed'])
+      })
+
+      it('builds the payload with the current connector type of the data source', async () => {
+        mockDatasources.entities = [{ id: 'ds-1', connector: { connectorType: 'HTTP' } } as unknown as Datasource]
+        renderSessions([savedSession('changed', true, [dataSourceNode('SQL')])])
+
+        await saveAll()
+
+        const [savedPipeline] = vi.mocked(buildPipelinePayload).mock.calls[0]
+        expect(savedPipeline.nodes[0].data).toMatchObject({ entityMetadata: { connector: 'HTTP' } })
+      })
+    })
+
+    it('shows the validation result of the new active pipeline after a tab switch', () => {
+      failValidationFor(['pipeline-1'])
+      renderSessions([savedSession('pipeline-1'), savedSession('pipeline-2')])
+
+      act(() => {
+        contextRef.current?.runValidation()
+      })
+      expect(contextRef.current?.validationResult).toBe(INVALID_RESULT)
+
+      act(() => {
+        sessionManagerRef.current?.switchToSession('pipeline-2')
+      })
+
+      expect(contextRef.current?.validationResult).toBeNull()
+    })
+
+    it('keeps the validation result of a changed pipeline when the user switches to its tab', async () => {
+      failValidationFor(['pipeline-2'])
+      renderSessions([savedSession('pipeline-1', true), savedSession('pipeline-2', true)])
+      await saveAll()
+
+      act(() => {
+        sessionManagerRef.current?.switchToSession('pipeline-2')
+      })
+
+      expect(contextRef.current?.validationResult).toBe(INVALID_RESULT)
+      expect(contextRef.current?.sessionIdsWithErrors).toEqual(new Set(['pipeline-2']))
+    })
+
+    it('clears the validation result when the user edits the pipeline after a tab switch', async () => {
+      failValidationFor(['pipeline-2'])
+      renderSessions([savedSession('pipeline-1', true), savedSession('pipeline-2', true)])
+      await saveAll()
+      act(() => {
+        sessionManagerRef.current?.switchToSession('pipeline-2')
+      })
+
+      act(() => {
+        contextRef.current?.addNode({ nodeType: PIPELINE_NODE_TYPES.Start, position: { x: 0, y: 0 } })
+      })
+
+      expect(contextRef.current?.validationResult).toBeNull()
+      expect(contextRef.current?.sessionIdsWithErrors.has('pipeline-2')).toBe(false)
     })
   })
 })

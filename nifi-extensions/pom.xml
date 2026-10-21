@@ -23,6 +23,8 @@
 	<modules>
 		<module>nifi-frost-processors</module>
 		<module>nifi-frost-nar</module>
+		<module>nifi-http-processors</module>
+		<module>nifi-http-nar</module>
 	</modules>
 
 	<properties>
@@ -45,6 +47,9 @@
 		<nifi.version>2.9.0</nifi.version>
 
 		<jackson.version>2.21.6</jackson.version>
+		<!-- The version of model-forge-runtime: GetHttpApiCall validates a response against a Data
+		     structure as Model Forge validates data against it, so the two must not disagree. -->
+		<networknt.version>1.5.8</networknt.version>
 		<slf4j.version>2.0.18</slf4j.version>
 		<junit.version>5.14.4</junit.version>
 		<!-- The platform line that belongs to the JUnit version above. nifi-mock carries a newer
@@ -129,6 +134,18 @@
 				<groupId>com.fasterxml.jackson.core</groupId>
 				<artifactId>jackson-core</artifactId>
 				<version>${jackson.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.networknt</groupId>
+				<artifactId>json-schema-validator</artifactId>
+				<version>${networknt.version}</version>
+				<exclusions>
+					<!-- Reads YAML schemas only; the processors read JSON alone. -->
+					<exclusion>
+						<groupId>com.fasterxml.jackson.dataformat</groupId>
+						<artifactId>jackson-dataformat-yaml</artifactId>
+					</exclusion>
+				</exclusions>
 			</dependency>
 			<dependency>
 				<groupId>org.slf4j</groupId>

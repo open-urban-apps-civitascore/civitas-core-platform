@@ -1,0 +1,57 @@
+meta {
+  name: 3. Create DataSource (HTTP/REST)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "HTTP Saga Source",
+    "description": "HTTP/REST Data source on the WireMock of the API test stack",
+    "connector": {
+      "connectorType": "HTTP",
+      "baseUrl": "{{wiremockUrl}}/dataset-saga-http",
+      "authentication": { "type": "NONE" },
+      "apiCalls": [
+        { "name": "things", "path": "/things" },
+        { "name": "missing", "path": "/missing" },
+        { "name": "invalid", "path": "/invalid" },
+        {
+          "name": "pages",
+          "path": "/pages",
+          "pagination": {
+            "type": "PAGE_NUMBER",
+            "pageParameter": "page",
+            "pageSizeParameter": "size",
+            "pageSize": 2
+          }
+        }
+      ]
+    },
+    "dataStructureVersionId": "{{httpSagaDataStructureVersionId}}",
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('httpSagaDataSourceId', res.body.id);
+  }
+}
+
+tests {
+  test("DataSource created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
+
+docs {
+  `NONE` authentication, because `BASIC` requires `https`, and NiFi trusts only the default trust
+  store of its JVM, which does not hold a certificate of WireMock.
+}

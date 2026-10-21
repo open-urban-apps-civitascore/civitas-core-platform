@@ -1,2 +1,2 @@
 *
-!nifi-frost-nar/target/*.nar
+!nifi-*-nar/target/*.nar

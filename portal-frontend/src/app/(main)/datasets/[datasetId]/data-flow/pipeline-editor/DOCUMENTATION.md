@@ -99,7 +99,8 @@ pipeline-editor/
 │       └── PipelineEditorProvider.tsx  # Main context provider
 ├── _hooks/
 │   ├── use-pipeline-session.ts         # Multi-session management
-│   └── use-active-pipeline.ts          # Active pipeline context hook
+│   ├── use-active-pipeline.ts          # Active pipeline context hook
+│   └── use-node-validation-severity.ts # Validation severity of a node
 ├── _services/
 │   ├── pipelineService.ts              # Pipeline state operations
 │   ├── sessionService.ts               # Session management
@@ -283,20 +284,21 @@ All activity-style nodes extend from `BasePipelineNode`. It provides:
 - Connection handles (input on left, output on right)
 - Configured/unconfigured visual states
 - Selection highlighting
-- Validation severity indicator
+- Validation border: red for errors, orange for warnings
 
 ```typescript
 <BasePipelineNode
-  nodeId="node-1"
   category="sources"
   label="DataSource"
   sublabel="sensor-data"
-  icon={<Database size={18} />}
-  configured={true}
-  selected={false}
+  icon={Database}
+  isConfigured={true}
+  isSelected={false}
   validationSeverity="none"
 />
 ```
+
+`ActivityNode` reads the severity with `useNodeValidationSeverity(id)`. This hook reads a small separate context, so changes elsewhere in the editor context do not re-render the node.
 
 ### Inspector Panels
 
@@ -350,12 +352,13 @@ Reusable dropdown component for selecting entities (datasources, APIs, FROST ser
 
 ### Validation Flow
 
-1. User clicks "Validate" in toolbar
-2. `runValidation()` executes validation rules
-3. Results stored in context (`validationResult`)
-4. Inspector shows `ValidationPanel` with issues
-5. Nodes display validation severity indicators
-6. If valid, `canSave` becomes `true`
+1. The editor validates every saved pipeline once after load (not in read-only mode). It waits until the Data sources are loaded.
+2. The user clicks "Validate" in the toolbar to validate the active pipeline again (`runValidation()`).
+3. Validation and save use the current connector type from the Data source list, on a copy of the pipeline.
+4. Each pipeline keeps its own result. `validationResult` in the context is the result of the active pipeline.
+5. The inspector shows `ValidationPanel` after "Validate", and after load when the active pipeline has errors.
+6. Nodes show a red border for errors and an orange border for warnings. Tabs of pipelines with errors show a red dot.
+7. When the active pipeline becomes dirty, or a node or edge is added or removed, its result is cleared. A tab switch keeps the result.
 
 ---
 
@@ -411,11 +414,11 @@ case 'newNodeType':
 import { memo } from 'react'
 import { NodeProps } from 'reactflow'
 import { BasePipelineNode } from '../base/BasePipelineNode'
-import { useActivePipeline } from '../../../_hooks'
+import { useNodeValidationSeverity } from '../../../_hooks/use-node-validation-severity'
 import { SomeIcon } from 'lucide-react'
 
 export const NewNode = memo(function NewNode({ id, data, selected }: NodeProps) {
-  const { getNodeValidationSeverity } = useActivePipeline()
+  const validationSeverity = useNodeValidationSeverity(id)
 
   return (
     <BasePipelineNode
@@ -426,7 +429,7 @@ export const NewNode = memo(function NewNode({ id, data, selected }: NodeProps) 
       icon={<SomeIcon size={18} />}
       configured={data.configured}
       selected={selected}
-      validationSeverity={getNodeValidationSeverity(id)}
+      validationSeverity={validationSeverity}
     />
   )
 })
@@ -524,20 +527,23 @@ for (const node of newNodes) {
 
 ### Rules
 
-| Rule                         | Severity | Description                              |
-| ---------------------------- | -------- | ---------------------------------------- |
-| Missing Start node           | Error    | Pipeline must have at least one Start    |
-| Missing End node             | Error    | Pipeline must have at least one End      |
-| API Request without Response | Error    | ApiRequest requires matching ApiResponse |
-| Unconfigured entity node     | Error    | Entity-referencing nodes need selection  |
-| Disconnected nodes           | Error    | All nodes must be connected to the flow  |
+| Rule                         | Severity | Description                                  |
+| ---------------------------- | -------- | -------------------------------------------- |
+| Missing Start node           | Error    | Pipeline must have at least one Start        |
+| Missing End node             | Error    | Pipeline must have at least one End          |
+| API Request without Response | Error    | ApiRequest requires matching ApiResponse     |
+| Unconfigured entity node     | Error    | Entity-referencing nodes need selection      |
+| Disconnected nodes           | Error    | All nodes must be connected to the flow      |
+| Source requires CRON         | Error    | An HTTP source needs a CRON node wired to it |
+| API call missing             | Error    | An HTTP source needs an API call             |
+| API call not found           | Error    | The API call must exist in the Data source   |
 
 ### Validation & Save Behavior
 
-- Save button is disabled until validation passes
-- After any pipeline change, validation must be re-run before save
-- Validation results appear in the inspector panel
-- Nodes with errors show a red indicator
+- Save All validates every changed pipeline and every saved pipeline without changes.
+- An error in a changed pipeline blocks the save. Nothing is saved.
+- An error in an unchanged pipeline does not block the save. An extra error toast names these pipelines.
+- Results of the save validation appear as node borders and as a red dot on the tab. The inspector shows them after "Validate".
 
 ---
 

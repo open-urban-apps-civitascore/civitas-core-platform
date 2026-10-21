@@ -2,7 +2,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { useGetDatastructures } from '@/app/services/api/datastructures/clientRequests'
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
+import { ConnectorType } from '@/types/connectors'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 import { DATAPOOL_SCOPE_TYPES } from '@/types/datasources'
 
@@ -14,6 +16,10 @@ vi.mock('@/app/services/api/users/clientRequests', () => ({
 
 vi.mock('@/app/services/api/datapools/clientRequests', () => ({
   useGetDatapools: vi.fn().mockReturnValue({ data: undefined, isLoading: false }),
+}))
+
+vi.mock('@/app/services/api/datastructures/clientRequests', () => ({
+  useGetDatastructures: vi.fn().mockReturnValue({ data: undefined }),
 }))
 
 const mockCurrentUser = (permissions: PermissionName[]) => {
@@ -85,11 +91,13 @@ const mockForm = {
 const mockSubmitDatasource = vi.fn()
 const mockHandleStatusChange = vi.fn()
 let mockCanSetDraft = true
+let mockSelectedConnectorType: ConnectorType = 'MQTT'
 
 vi.mock('../hooks/useDatasourceForm', () => ({
   useDatasourceForm: () => ({
     form: mockForm,
     readyConnectorType: 'MQTT',
+    selectedConnectorType: mockSelectedConnectorType,
     dataSourceStatus: 'DRAFT',
     hasStatusChanged: false,
     handleStatusChange: mockHandleStatusChange,
@@ -101,6 +109,7 @@ vi.mock('../hooks/useDatasourceForm', () => ({
     isLoading: false,
     areAssignmentsDirty: false,
     areDatapoolsDirty: false,
+    isFormDirty: mockForm.formState.isDirty,
   }),
 }))
 
@@ -113,6 +122,12 @@ vi.mock('./basic-info/BasicInfoTab', () => ({
 vi.mock('./connector-tab/ConnectorTab', () => ({
   ConnectorTab: ({ isReadOnly, isDatasourceReleased }: { isReadOnly: boolean; isDatasourceReleased: boolean }) => (
     <div data-testid="connectorTab" data-readonly={isReadOnly} data-released={isDatasourceReleased} />
+  ),
+}))
+
+vi.mock('./api-calls-tab/ApiCallsTab', () => ({
+  ApiCallsTab: ({ dataStructureName }: { dataStructureName?: string }) => (
+    <div data-testid="apiCallsTab" data-datastructure-name={dataStructureName} />
   ),
 }))
 
@@ -230,8 +245,10 @@ const defaultProps = {
 describe('DatasourceOverview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(useGetDatastructures).mockReturnValue({ data: undefined } as ReturnType<typeof useGetDatastructures>)
     mockSearchParams = new URLSearchParams()
     mockCanSetDraft = true
+    mockSelectedConnectorType = 'MQTT'
     mockForm.formState.isDirty = false
     mockCurrentUser([
       PERMISSION_NAMES.DATASOURCE_UPDATE,
@@ -378,6 +395,96 @@ describe('DatasourceOverview', () => {
       fireEvent.click(screen.getByTestId('tab-dataStructure'))
 
       expect(screen.getByTestId('datastructureTab')).toHaveAttribute('data-readonly', 'false')
+    })
+  })
+
+  describe('API calls tab', () => {
+    const tabOrder = () => screen.getAllByTestId(/^tab-/).map(tab => tab.dataset.testid)
+
+    it('shows the API calls tab after the dataStructure tab for an HTTP connector', () => {
+      mockSelectedConnectorType = 'HTTP'
+      render(<DatasourceOverview {...defaultProps} />)
+
+      expect(tabOrder()).toEqual([
+        'tab-basicInfo',
+        'tab-connector',
+        'tab-dataStructure',
+        'tab-apiCalls',
+        'tab-datapools',
+        'tab-accessManagement',
+      ])
+    })
+
+    it.each(['MQTT', 'SQL'] as const)('hides the API calls tab for a %s connector', connectorType => {
+      mockSelectedConnectorType = connectorType
+      render(<DatasourceOverview {...defaultProps} />)
+
+      expect(screen.queryByTestId('tab-apiCalls')).not.toBeInTheDocument()
+    })
+
+    it('switches to the API calls tab when clicked', () => {
+      mockSelectedConnectorType = 'HTTP'
+      render(<DatasourceOverview {...defaultProps} />)
+      fireEvent.click(screen.getByTestId('tab-apiCalls'))
+
+      expect(screen.getByTestId('apiCallsTab')).toBeInTheDocument()
+    })
+
+    it('switches to the connector tab when the connector type changes away from HTTP', () => {
+      mockSelectedConnectorType = 'HTTP'
+      const { rerender } = render(<DatasourceOverview {...defaultProps} />)
+      fireEvent.click(screen.getByTestId('tab-apiCalls'))
+
+      mockSelectedConnectorType = 'MQTT'
+      rerender(<DatasourceOverview {...defaultProps} />)
+
+      expect(screen.queryByTestId('apiCallsTab')).not.toBeInTheDocument()
+      expect(screen.getByTestId('connectorTab')).toBeInTheDocument()
+    })
+
+    const withDatastructure = {
+      ...datasource,
+      dataStructureVersion: {
+        id: 'version-1',
+        version: '1.0.0',
+        description: null,
+        dataStructureVersionStatus: 'AVAILABLE' as const,
+        dataStructureVersionSource: 'OWN' as const,
+        createdAt: '2024-01-01',
+        modifiedAt: '2024-01-01',
+        dataStructureId: 'structure-1',
+      },
+    }
+
+    const lastDatastructureQuery = () => vi.mocked(useGetDatastructures).mock.lastCall?.[0]
+
+    it('loads the selected data structure for an HTTP connector', () => {
+      mockSelectedConnectorType = 'HTTP'
+      render(<DatasourceOverview datasource={withDatastructure} initialAssignments={[]} />)
+
+      expect(lastDatastructureQuery()?.params?.get('id')).toBe('structure-1')
+      expect(lastDatastructureQuery()?.isEnabled).toBe(true)
+    })
+
+    it.each([
+      ['the loaded data structure is the selected one', 'structure-1', 'Charging Station'],
+      ['the loaded data structure is a previous one', 'structure-0', undefined],
+    ])('passes the data structure name when %s', (_name, loadedId, expectedName) => {
+      mockSelectedConnectorType = 'HTTP'
+      vi.mocked(useGetDatastructures).mockReturnValue({
+        data: { data: [{ id: loadedId, name: 'Charging Station' }] },
+      } as unknown as ReturnType<typeof useGetDatastructures>)
+      render(<DatasourceOverview datasource={withDatastructure} initialAssignments={[]} />)
+      fireEvent.click(screen.getByTestId('tab-apiCalls'))
+
+      const passedName = screen.getByTestId('apiCallsTab').getAttribute('data-datastructure-name') ?? undefined
+      expect(passedName).toBe(expectedName)
+    })
+
+    it('does not load the data structure for an MQTT connector', () => {
+      render(<DatasourceOverview datasource={withDatastructure} initialAssignments={[]} />)
+
+      expect(lastDatastructureQuery()?.isEnabled).toBe(false)
     })
   })
 
