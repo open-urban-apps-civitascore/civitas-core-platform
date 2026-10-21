@@ -54,7 +54,7 @@ export interface BasePipelineNodeProps {
   children?: ReactNode
   /** Additional CSS class */
   className?: string
-  /** Validation severity for visual indicator (Phase 5) */
+  /** Validation severity, shown as the border color */
   validationSeverity?: ValidationSeverity
 }
 

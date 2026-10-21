@@ -21,6 +21,7 @@ import type { Datasource } from '@/types/datasources'
 
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
+import { useNodeValidationSeverity } from '../../_hooks/use-node-validation-severity'
 import { usePipelineSession } from '../../_hooks/use-pipeline-session'
 import {
   buildDataSinkPayloads,
@@ -148,8 +149,11 @@ vi.mock('../../_services/payloadBuilderService', async importOriginal => ({
 
 const contextRef = { current: null as ReturnType<typeof useActivePipeline> | null }
 
+const nodeSeverityRef = { current: null as ReturnType<typeof useNodeValidationSeverity> | null }
+
 const Consumer: React.FC = () => {
   contextRef.current = useActivePipeline()
+  nodeSeverityRef.current = useNodeValidationSeverity('node-1')
   return null
 }
 
@@ -1043,8 +1047,10 @@ describe('PipelineEditorProviderComponent', () => {
     })
   })
 
-  describe('getNodeValidationSeverity', () => {
-    it('returns the severity for the given node from the validation service', () => {
+  describe('node validation context', () => {
+    it('provides the severity of the active validation result to the nodes', () => {
+      const result = { isValid: false, errors: [], warnings: [], nodeStatuses: new Map() }
+      vi.mocked(validatePipelineWithNodeStatus).mockReturnValue(result)
       vi.mocked(getNodeValidationSeverity).mockReturnValue('error')
       renderProvider()
 
@@ -1052,7 +1058,8 @@ describe('PipelineEditorProviderComponent', () => {
         contextRef.current?.runValidation()
       })
 
-      expect(contextRef.current?.getNodeValidationSeverity('node-1')).toBe('error')
+      expect(getNodeValidationSeverity).toHaveBeenLastCalledWith('node-1', result)
+      expect(nodeSeverityRef.current).toBe('error')
     })
   })
 

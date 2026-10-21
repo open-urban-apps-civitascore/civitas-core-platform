@@ -8,24 +8,23 @@ import { MARKUP_NAME } from '@/test-support/markup'
 import { mappingNode } from '@/test-support/pipelineFixtures'
 
 import { PIPELINE_COLORS } from '../../_constants/pipelineStyles'
-import { ActivePipelineContext } from '../../_hooks/use-active-pipeline'
-import type { ActivePipelineContextValue } from '../../_types/context'
+import { NodeValidationContext } from '../../_hooks/use-node-validation-severity'
 import { PIPELINE_NODE_TYPES } from '../../_types/pipeline'
 import { createActivityNode } from './ActivityNode'
+import type { ValidationSeverity } from './base/BasePipelineNode'
 
 const MappingActivityNode = createActivityNode(PIPELINE_NODE_TYPES.Mapping)
 
-const renderNode = (label: string, severity: 'error' | 'warning' | 'none' = 'none') => {
+const renderNode = (label: string, severity: ValidationSeverity = 'none') => {
   const node = mappingNode({ data: { label, configured: false } })
-  const contextValue = { getNodeValidationSeverity: () => severity } as unknown as ActivePipelineContextValue
 
   return render(
     <NextIntlClientProvider locale="de" messages={messages}>
-      <ActivePipelineContext.Provider value={contextValue}>
+      <NodeValidationContext.Provider value={() => severity}>
         <ReactFlowProvider>
           <MappingActivityNode {...({ id: node.id, data: node.data } as unknown as NodeProps)} />
         </ReactFlowProvider>
-      </ActivePipelineContext.Provider>
+      </NodeValidationContext.Provider>
     </NextIntlClientProvider>,
   )
 }
@@ -47,7 +46,7 @@ describe('ActivityNode', () => {
     expect(screen.queryByText('!')).not.toBeInTheDocument()
   })
 
-  it('marks a node with a validation warning with a yellow border and no badge', () => {
+  it('marks a node with a validation warning with an orange border and no badge', () => {
     const { container } = renderNode('Test Mapping', 'warning')
 
     expect(container.querySelector('.pipeline-node')).toHaveStyle({

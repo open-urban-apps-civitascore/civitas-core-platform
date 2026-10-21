@@ -11,7 +11,7 @@
 import type { NodeProps } from '@xyflow/react'
 
 import { getNodeDef } from '../../_config/nodeRegistry'
-import { useActivePipeline } from '../../_hooks/use-active-pipeline'
+import { useNodeValidationSeverity } from '../../_hooks/use-node-validation-severity'
 import type { PipelineNodeData } from '../../_types/nodes'
 import type { PipelineNodeType } from '../../_types/pipeline'
 import { BasePipelineNode } from './base/BasePipelineNode'
@@ -23,7 +23,7 @@ export const createActivityNode = (type: PipelineNodeType) => {
   const def = getNodeDef(type)
 
   const ActivityNode: React.FC<NodeProps> = ({ id, data, selected: isSelected = false }) => {
-    const { getNodeValidationSeverity } = useActivePipeline()
+    const validationSeverity = useNodeValidationSeverity(id)
     const nodeData = data as PipelineNodeData
     const isConfigured = Boolean(nodeData.configured)
 
@@ -52,7 +52,7 @@ export const createActivityNode = (type: PipelineNodeType) => {
         icon={def?.icon}
         hasLeftHandle={def?.handles.left ?? true}
         hasRightHandle={def?.handles.right ?? true}
-        validationSeverity={getNodeValidationSeverity(id)}
+        validationSeverity={validationSeverity}
       />
     )
   }

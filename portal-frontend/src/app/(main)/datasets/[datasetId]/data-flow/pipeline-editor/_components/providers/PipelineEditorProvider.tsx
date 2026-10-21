@@ -44,6 +44,7 @@ import {
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
 import { useDataSinkLocks } from '../../_hooks/use-datasink-locks'
+import { NodeValidationContext } from '../../_hooks/use-node-validation-severity'
 import { usePipelineDatasources } from '../../_hooks/use-pipeline-datasources'
 import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
 import { tableNameOwnerOutsideNode, tableNameOwnersOutsideSession } from '../../_services/dataSinkNameService'
@@ -86,6 +87,7 @@ import type { ActivePipelineContextValue, PipelineStats } from '../../_types/con
 import type { PipelineNodeData } from '../../_types/nodes'
 import type { NodeCreationContext, Pipeline, PipelineEdge, PipelineNode, PipelineNodeType } from '../../_types/pipeline'
 import type { UsePipelineSessionReturn } from '../../_types/session'
+import type { ValidationSeverity } from '../nodes/base/BasePipelineNode'
 
 const withoutSelection = (pipeline: Pipeline): Pipeline => ({
   ...pipeline,
@@ -496,7 +498,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   }, [activeSession, setValidationResultFor])
 
   const getNodeValidationSeverity = useCallback(
-    (nodeId: string): 'error' | 'warning' | 'none' => {
+    (nodeId: string): ValidationSeverity => {
       return getNodeValidationSeverityFn(nodeId, validationResult)
     },
     [validationResult],
@@ -938,7 +940,6 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       validationResult,
       runValidation,
       clearValidation,
-      getNodeValidationSeverity,
       pipelineUsingTableName,
       isValidationRequired,
       canSave,
@@ -989,7 +990,6 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       validationResult,
       runValidation,
       clearValidation,
-      getNodeValidationSeverity,
       pipelineUsingTableName,
       isValidationRequired,
       canSave,
@@ -1013,7 +1013,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   return (
     <ActivePipelineProvider value={contextValue}>
-      {children}
+      <NodeValidationContext.Provider value={getNodeValidationSeverity}>{children}</NodeValidationContext.Provider>
       <WarningModal
         open={isDataLossDialogOpen}
         onOpenChange={open => {
