@@ -57,4 +57,30 @@ export const mockDatasources: Datasource[] = [
     inUseByReleased: false,
     datapoolScope: { type: DATAPOOL_SCOPE_TYPES.NONE },
   },
+  {
+    id: '00000000-0000-0000-0000-000000000004',
+    createdAt: '2024-02-01T08:00:00Z',
+    modifiedAt: '2024-02-02T08:00:00Z',
+    name: 'HTTP Weather API',
+    description: 'Weather stations via HTTP/REST',
+    dataSourceStatus: 'DRAFT',
+    connector: {
+      connectorType: 'HTTP',
+      baseUrl: 'https://api.example.org/v1',
+      authentication: { type: 'BASIC', username: 'reader', password: '********' },
+      apiCalls: [
+        {
+          name: 'Get all stations',
+          method: 'GET',
+          path: '/stations',
+          queryParameters: [{ name: 'status', value: 'active' }],
+          headers: [{ name: 'Accept', value: 'application/json' }],
+        },
+      ],
+    },
+    dataStructureVersion: null,
+    inUse: false,
+    inUseByReleased: false,
+    datapoolScope: { type: DATAPOOL_SCOPE_TYPES.NONE },
+  },
 ]

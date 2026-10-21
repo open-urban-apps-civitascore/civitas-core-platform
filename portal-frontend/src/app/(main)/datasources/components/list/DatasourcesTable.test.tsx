@@ -67,7 +67,7 @@ describe('DatasourcesTable', () => {
   it('renders the rows and row content correctly', () => {
     renderTable()
     const rows = screen.getAllByRole('row')
-    expect(rows).toHaveLength(4) // 1 header + 3 data rows
+    expect(rows).toHaveLength(5) // 1 header + 4 data rows
 
     const dataRow1 = rows[1]
     const cells1 = within(dataRow1).getAllByRole('cell')
@@ -82,6 +82,10 @@ describe('DatasourcesTable', () => {
     expect(cells2[1]).toHaveTextContent('Importing data from PostgreSQL')
     expect(cells2[2]).toHaveTextContent('SQL')
     expect(cells2[5]).toHaveTextContent('Verfügbar')
+
+    const cells4 = within(rows[4]).getAllByRole('cell')
+    expect(cells4[0]).toHaveTextContent('HTTP Weather API')
+    expect(cells4[2]).toHaveTextContent('HTTP/REST')
   })
 
   it('renders dash for null connectorType', () => {
@@ -104,7 +108,7 @@ describe('DatasourcesTable', () => {
   it('renders an action menu button for each row', () => {
     renderTable()
     const menuButtons = screen.getAllByRole('button', { name: 'Open menu' })
-    expect(menuButtons).toHaveLength(3)
+    expect(menuButtons).toHaveLength(4)
   })
 
   describe('Permission gating', () => {

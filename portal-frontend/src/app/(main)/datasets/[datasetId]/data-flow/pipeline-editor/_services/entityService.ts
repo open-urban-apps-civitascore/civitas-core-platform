@@ -9,9 +9,14 @@
 import { useCallback, useMemo } from 'react'
 
 import { useGetDatasources } from '@/app/services/api/datasources/clientRequests'
+import { CONNECTOR_TYPES } from '@/const/connectors'
 import { DATASOURCE_FILTER_PARAMS, QUERY_PARAMS } from '@/const/searchParams'
+import { HttpApiResponseSchema, type HttpMethod } from '@/types/connectors'
 import type { Datasource } from '@/types/datasources'
 import { DATAPOOL_SCOPE_TYPES } from '@/types/datasources'
+
+import { isDataSourceNodeData } from '../_types/nodes'
+import type { Pipeline } from '../_types/pipeline'
 
 // ============================================================================
 // Types
@@ -105,4 +110,32 @@ export const datasourceToSelectable = (ds: Datasource): SelectableEntity => ({
     status: ds.dataSourceStatus,
     description: ds.description,
   },
+})
+
+export interface ApiCallSummary {
+  name: string
+  method?: HttpMethod
+}
+
+export const apiCallsOf = (datasource: Datasource): ApiCallSummary[] => {
+  if (datasource.connector?.connectorType !== CONNECTOR_TYPES.HTTP) return []
+  const parsed = HttpApiResponseSchema.safeParse(datasource.connector)
+  if (!parsed.success) return []
+  const apiCalls = (parsed.data.apiCalls ?? []).map(({ name, method }) => ({ name, method }))
+  return apiCalls.filter(apiCall => apiCall.name !== '')
+}
+
+export const apiCallNamesOf = (datasource: Datasource): string[] => apiCallsOf(datasource).map(apiCall => apiCall.name)
+
+export const withCurrentConnectorTypes = (
+  pipeline: Pipeline,
+  connectorTypeById: ReadonlyMap<string, string>,
+): Pipeline => ({
+  ...pipeline,
+  nodes: pipeline.nodes.map(node => {
+    if (!isDataSourceNodeData(node.data) || node.data.entityId === undefined) return node
+    const connector = connectorTypeById.get(node.data.entityId)
+    if (connector === undefined) return node
+    return { ...node, data: { ...node.data, entityMetadata: { ...node.data.entityMetadata, connector } } }
+  }),
 })

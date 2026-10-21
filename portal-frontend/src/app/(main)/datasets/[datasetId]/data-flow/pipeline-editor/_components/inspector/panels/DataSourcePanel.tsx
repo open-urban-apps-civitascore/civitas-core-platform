@@ -9,8 +9,15 @@
  */
 import { useTranslations } from 'next-intl'
 
+import { CONNECTOR_TYPES } from '@/const/connectors'
+
 import { usePipelineDatasources } from '../../../_hooks/use-pipeline-datasources'
-import { datasourceToSelectable } from '../../../_services/entityService'
+import {
+  apiCallNamesOf,
+  apiCallsOf,
+  datasourceToSelectable,
+  type SelectableEntity,
+} from '../../../_services/entityService'
 import type { DataSourceNodeData } from '../../../_types/nodes'
 import { EntityMetadata } from '../components/EntityMetadata'
 import { EntitySelector } from '../components/EntitySelector'
@@ -29,10 +36,12 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
   const handleEntityChange = (entity: { id: string; name: string } | undefined) => {
     if (entity) {
       const fullEntity = getEntityById(entity.id)
+      const apiCallNames = fullEntity ? apiCallNamesOf(fullEntity) : []
       onUpdate({
         entityId: entity.id,
         entityName: entity.name,
         configurationUrn: fullEntity?.configurationUrn ?? undefined,
+        apiCallName: apiCallNames.length === 1 ? apiCallNames[0] : undefined,
         configured: true,
         entityMetadata: fullEntity?.connector ? { connector: fullEntity.connector.connectorType } : undefined,
       })
@@ -41,6 +50,7 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
         entityId: undefined,
         entityName: undefined,
         configurationUrn: undefined,
+        apiCallName: undefined,
         entityMetadata: undefined,
         configured: false,
       })
@@ -48,6 +58,24 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
   }
 
   const selectableEntities = entities.map(datasourceToSelectable)
+
+  const isHttpSource = selectedEntity?.connector?.connectorType === CONNECTOR_TYPES.HTTP
+  const apiCalls = selectedEntity ? apiCallsOf(selectedEntity) : []
+  const selectableApiCalls = apiCalls.map(apiCall => ({ id: apiCall.name, name: apiCall.name }))
+  const methodByApiCallName = new Map(apiCalls.map(apiCall => [apiCall.name, apiCall.method]))
+  const isApiCallNotFound = data.apiCallName !== undefined && !methodByApiCallName.has(data.apiCallName)
+
+  const renderApiCallName = (apiCall: SelectableEntity) => {
+    if (!methodByApiCallName.has(apiCall.name)) {
+      return <span className="text-muted-foreground">{apiCall.name}</span>
+    }
+    const method = methodByApiCallName.get(apiCall.name)
+    return (
+      <>
+        {method && <span className="text-sm font-semibold text-primary">{method}</span>} {apiCall.name}
+      </>
+    )
+  }
 
   return (
     <div className="space-y-4 p-4">
@@ -61,6 +89,23 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
         onChange={handleEntityChange}
         fallbackName={getName(data.entityId)}
       />
+
+      {isHttpSource && (
+        <EntitySelector
+          label={t('dataSourcePanel.apiCall')}
+          placeholder={
+            selectableApiCalls.length > 0 ? t('dataSourcePanel.apiCallPlaceholder') : t('dataSourcePanel.noApiCalls')
+          }
+          entities={selectableApiCalls}
+          selectedId={data.apiCallName}
+          isLoading={isLoading}
+          isError={isError}
+          onChange={apiCall => onUpdate({ apiCallName: apiCall?.name })}
+          fallbackName={data.apiCallName}
+          renderEntityName={renderApiCallName}
+          errorMessage={isApiCallNotFound ? t('dataSourcePanel.apiCallNotFound') : undefined}
+        />
+      )}
 
       {selectedEntity && (
         <>

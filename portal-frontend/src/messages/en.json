@@ -1003,6 +1003,18 @@
       "brokerTlsMismatch": "The broker URL and TLS setting do not match.",
       "topicInvalidChars": "The topic must not contain commas, semicolons or spaces.",
       "topicSingle": "Only one topic is allowed.",
+      "invalidBaseUrl": "Enter a valid http or https URL without query or fragment (e.g. https://api.example.org/v1).",
+      "baseUrlCredentials": "Do not put credentials into the API host. Enter them in the authentication.",
+      "usernameColon": "The username must not contain a colon (:).",
+      "invalidPath": "The path must start with / and contain only allowed characters.",
+      "apiCallsMax": "Only one API call is possible.",
+      "invalidHeaderName": "Allowed in the header name: a–z A–Z 0–9 and ! # $ % & ' * + - . ^ _ ` | ~. No spaces.",
+      "credentialHeader": "Use the authentication for credentials.",
+      "headerValueLineBreak": "The header value must not contain a line break.",
+      "pageNumberInteger": "Enter a whole number of 0 or more.",
+      "pageNumberMax": "Enter a number up to 2147483647.",
+      "pageSizeMin": "The page size must be at least 1.",
+      "endPageBeforeStartPage": "The end page must not be lower than the start page.",
       "creationError": "An error occurred while creating the Data source.",
       "updateError": "An error occurred while updating the Data source.",
       "inUseError": "This Data source is still used by a pipeline.",
@@ -1031,6 +1043,7 @@
       "basicInfo": "Base Information",
       "connector": "Connector",
       "dataStructure": "Data structure",
+      "apiCalls": "API calls",
       "accessManagement": "Access",
       "datapools": "Data pools"
     },
@@ -1044,6 +1057,70 @@
       "description": "There are unsaved changes. \"Discard\" cannot be undone.",
       "discard": "Discard"
     },
+    "apiCallsTab": {
+      "title": "API calls",
+      "availableInfo": "This Data source has the status \"Available\". To change the API calls, set it to \"Draft\" first.",
+      "copyUrl": "Copy URL",
+      "copySuccess": "URL copied to clipboard.",
+      "add": "Create API call",
+      "empty": {
+        "title": "No API call yet"
+      },
+      "unnamed": "Unnamed API call",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all",
+      "request": {
+        "title": "Request",
+        "question": "Which endpoint should be called?"
+      },
+      "method": {
+        "label": "Method"
+      },
+      "path": {
+        "label": "Path",
+        "hint": "Allowed: a–z A–Z 0–9 - _ . ~ : /. Starts with /."
+      },
+      "name": {
+        "label": "Name",
+        "placeholder": "Name of API call"
+      },
+      "parameters": {
+        "query": "query",
+        "header": "header",
+        "addQuery": "+ Query parameter",
+        "addHeader": "+ Header",
+        "name": "Name",
+        "value": "Value",
+        "remove": "Remove"
+      },
+      "delete": {
+        "title": "Delete API call?",
+        "description": "Pipelines that use \"{name}\" stop working."
+      },
+      "pagination": {
+        "title": "Pagination",
+        "enable": "Use pagination",
+        "type": {
+          "label": "Pagination type",
+          "pageNumber": "Page Number"
+        },
+        "pageParameter": {
+          "label": "Page parameter"
+        },
+        "pageSizeParameter": {
+          "label": "Page size parameter"
+        },
+        "pageSize": {
+          "label": "Page size"
+        },
+        "startPage": {
+          "label": "Start page"
+        },
+        "endPage": {
+          "label": "End page"
+        }
+      }
+    },
     "connectorTab": {
       "title1": "Connector",
       "title2": "Configuration",
@@ -1052,6 +1129,11 @@
       "connection": "Connection",
       "establishConnection": "Establish Connection",
       "availableInfo": "This Data source has the status \"Available\". To change the connector, set it to \"Draft\" first.",
+      "types": {
+        "MQTT": "MQTT",
+        "SQL": "SQL",
+        "HTTP": "HTTP/REST"
+      },
       "mqtt": {
         "urls": {
           "label": "Brokers",
@@ -1108,6 +1190,22 @@
         },
         "where": {
           "label": "WHERE"
+        }
+      },
+      "http": {
+        "baseUrl": {
+          "label": "API host"
+        },
+        "authentication": {
+          "label": "Authentication",
+          "none": "None",
+          "basic": "Basic"
+        },
+        "username": {
+          "label": "Username"
+        },
+        "password": {
+          "label": "Password"
         }
       }
     },
@@ -1343,7 +1441,11 @@
       "tags": "Tags",
       "showDataStructure": "Show Data Structure",
       "noPermission": "No permission to read datasources",
-      "anonymousName": "Anonymous Data Source"
+      "anonymousName": "Anonymous Data Source",
+      "apiCall": "API call",
+      "apiCallPlaceholder": "Select an API call...",
+      "noApiCalls": "No API calls",
+      "apiCallNotFound": "This API call does not exist in the Data source. Select another API call."
     },
     "sink": {
       "locked": {
@@ -1461,8 +1563,11 @@
         "orphanNode": "{label} is not connected to any other node",
         "minimumFunctionalNodes": "Pipeline must have at least one functional node between Start and End",
         "duplicateTableName": "The table name \"{tableName}\" is already used in pipeline \"{pipeline}\"",
-        "cronMqttIncompatible": "A CRON trigger cannot be used with an MQTT Data source. Use a SQL (pull) source instead.",
-        "cronSourceConnectorUnknown": "Could not verify the source connector; a CRON trigger only works with a SQL (pull) source, not MQTT.",
+        "cronMqttIncompatible": "A CRON trigger cannot be used with an MQTT Data source. Use a pull source (SQL or HTTP) instead.",
+        "cronSourceConnectorUnknown": "Could not verify the source connector; a CRON trigger only works with a pull source (SQL or HTTP), not MQTT.",
+        "sourceRequiresCron": "{label} needs a CRON trigger. Connect a CRON node to this Data source.",
+        "apiCallMissing": "{label} has no API call. Select an API call.",
+        "apiCallNotFound": "The API call \"{apiCallName}\" of {label} does not exist in the Data source. Select an API call.",
         "sqlSourceNoScheduleDefaultPoll": "This SQL source has no CRON node and will poll on the default schedule (every 5 minutes). Add a CRON node to set an explicit schedule.",
         "frostMappingUnknownStaTarget": "{label} maps {path} — not a valid SensorThings target path; allowed are the catalog paths of the Thing-shaped target model (e.g. $.name, $.Datastreams[].name, $.Datastreams[].Observations[].result) plus its match keys",
         "frostMappingMissingMatchKeys": "{label} must map the {entity} match keys: {fields} — they identify the entity during find-or-create",
@@ -1524,6 +1629,7 @@
       "savingAll": "Saving...",
       "exit": "Exit",
       "validationFailed": "Validation failed for: {names}",
+      "unchangedPipelinesInvalid": "These pipelines are not valid: {names}. Fix the errors.",
       "duplicateNames": "Duplicate pipeline names: {names}",
       "saveFailed": "Failed to save: {names}",
       "saveSuccess": "Pipeline \"{name}\" saved successfully",
@@ -1542,7 +1648,8 @@
     "tabs": {
       "closeTab": "Close tab",
       "newPipeline": "New pipeline",
-      "untitledPipeline": "Untitled Pipeline"
+      "untitledPipeline": "Untitled Pipeline",
+      "hasErrors": "This pipeline has errors"
     },
     "nodeLabels": {
       "notConfigured": "Not configured"

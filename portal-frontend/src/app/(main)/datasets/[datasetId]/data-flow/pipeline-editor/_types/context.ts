@@ -91,8 +91,6 @@ export interface ActivePipelineContextValue {
   runValidation: () => ValidationResultWithNodeStatus
   /** Clear validation state */
   clearValidation: () => void
-  /** Get validation severity for a specific node */
-  getNodeValidationSeverity: (nodeId: string) => 'error' | 'warning' | 'none'
   /** Name of the pipeline that already uses this table name in another node, or null */
   pipelineUsingTableName: (nodeId: string, tableName: string) => string | null
   /** Whether validation is required before save (true when pipeline changed since last validation) */
@@ -103,6 +101,8 @@ export interface ActivePipelineContextValue {
   shouldShowValidationPanel: boolean
   /** Hide the validation panel (called when user selects a node/edge) */
   hideValidationPanel: () => void
+  /** Sessions whose last validation result has errors */
+  sessionIdsWithErrors: ReadonlySet<string>
 
   // ===== Pipeline Operations =====
   /** Rename the active pipeline. Persisted on the next Save All, like any other edit. */
