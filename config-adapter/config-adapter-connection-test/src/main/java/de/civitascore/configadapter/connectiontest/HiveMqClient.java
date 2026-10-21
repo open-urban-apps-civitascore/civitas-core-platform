@@ -50,7 +50,10 @@ import java.util.function.Supplier;
  */
 final class HiveMqClient {
 
-  /** A retained message may arrive right after the SUBACK; no test needs a large one. */
+  /**
+   * MQTT 5 only: a retained message may arrive right after the SUBACK. The MQTT 3 client offers no
+   * limit for incoming packets.
+   */
   private static final int MAX_PACKET_SIZE = 64 * 1024;
 
   /**

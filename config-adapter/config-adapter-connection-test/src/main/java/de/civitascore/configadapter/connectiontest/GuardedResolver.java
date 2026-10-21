@@ -18,6 +18,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
+import org.owasp.encoder.Encode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Checks every later resolution of a name the guard let through, from any client or thread. Without
@@ -25,6 +28,8 @@ import java.util.stream.Stream;
  * rebinding).
  */
 final class GuardedResolver implements InetAddressResolver {
+
+  private static final Logger LOG = LoggerFactory.getLogger(GuardedResolver.class);
 
   /** Longer than a test runs plus the 30 s the JVM caches an answer. */
   private static final Duration GUARD_PERIOD = Duration.ofMinutes(2);
@@ -57,6 +62,7 @@ final class GuardedResolver implements InetAddressResolver {
     }
     List<InetAddress> resolved = addresses.toList();
     if (resolved.stream().anyMatch(guard.get()::isDenied)) {
+      LOG.warn("Refused a resolution of {} to a denied address", Encode.forJava(host));
       throw new UnknownHostException(host + ": not an allowed destination of a connection test");
     }
     return resolved.stream();

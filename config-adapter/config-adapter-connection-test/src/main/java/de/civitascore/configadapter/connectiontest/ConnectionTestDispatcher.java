@@ -120,6 +120,10 @@ final class ConnectionTestDispatcher implements AutoCloseable {
               "The test did not finish within " + inWholeSeconds(budget) + ".",
               ConnectionTestService.millisSince(begin));
     } catch (ExecutionException e) {
+      LOG.error(
+          "Connection test {} failed unexpectedly",
+          Encode.forJava(request.requestId()),
+          ConnectionTestFailure.withoutText(e.getCause()));
       result =
           ConnectionTestResult.failure(
               request.requestId(),

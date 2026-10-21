@@ -208,6 +208,29 @@ class MqttConnectorValuesTest {
     assertTrue(rejected(connector).getMessage().contains("Keep Alive"));
   }
 
+  /** MQTT carries the keep-alive as an unsigned 16-bit value. */
+  @Test
+  void keepAliveAboveTheProtocolRangeIsRejected() throws ConnectorValueException {
+    Map<String, Object> connector = connector("tcp://b:1883");
+    connector.put("keepalive", "65536s");
+
+    assertTrue(rejected(connector).getMessage().contains("Keep Alive"));
+    connector.put("keepalive", "65535s");
+    assertEquals(65535, MqttConnectorValues.read(connector).keepAliveSeconds());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"tcp://b:0", "tcp://b:65536", "ws://b:99999/mqtt", "tcp://[::1]:70000"})
+  void brokerPortOutsideTheTcpRangeIsRejected(String url) {
+    assertTrue(rejected(connector(url)).getMessage().contains(url));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"tcp://b:65535", "tcp://b", "tcp://u:p@b:1", "tcp://[::1]:1883"})
+  void brokerPortInsideTheTcpRangeIsAccepted(String url) throws ConnectorValueException {
+    assertEquals(1, MqttConnectorValues.read(connector(url)).brokers().size());
+  }
+
   @Test
   void blankDurationIsAbsent() throws ConnectorValueException {
     Map<String, Object> connector = connector("tcp://b:1883");

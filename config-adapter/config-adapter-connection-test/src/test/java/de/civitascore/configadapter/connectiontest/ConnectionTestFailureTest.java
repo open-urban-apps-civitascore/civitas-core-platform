@@ -62,26 +62,37 @@ class ConnectionTestFailureTest {
         ConnectionTestFailure.describe(new IOException("connection reset")));
   }
 
-  /** The JDK's HTTP client reports a refusal as a ConnectException whose text is in its cause. */
+  /** The JDK's HTTP client reports a refusal as a ConnectException without any text. */
   @Test
-  void aRefusedHttpConnectionNamesTheRefusal() throws IOException, InterruptedException {
+  void aRefusedHttpConnectionNamesTheRefusal() throws IOException {
     int closedPort;
     try (ServerSocket socket = new ServerSocket(0)) {
       closedPort = socket.getLocalPort();
     }
-    HttpRequest request =
-        HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + closedPort + "/")).build();
 
-    ExecutionException failure;
-    try (HttpClient client = HttpClient.newHttpClient()) {
-      failure =
-          assertThrows(
-              ExecutionException.class,
-              () -> client.sendAsync(request, BodyHandlers.discarding()).get());
-    }
+    Throwable failure = httpFailure("http://127.0.0.1:" + closedPort + "/");
+
+    assertEquals("ConnectException: Connection refused", ConnectionTestFailure.describe(failure));
+  }
+
+  /** The same text-less ConnectException, with an unresolved address below it. */
+  @Test
+  void anUnresolvableHttpHostIsNotNamedAsARefusal() {
+    Throwable failure = httpFailure("http://connection-test.invalid/");
 
     assertEquals(
-        "ConnectException: Connection refused", ConnectionTestFailure.describe(failure.getCause()));
+        "ConnectException: The host name could not be resolved",
+        ConnectionTestFailure.describe(failure));
+  }
+
+  private static Throwable httpFailure(String url) {
+    HttpRequest request = HttpRequest.newBuilder(URI.create(url)).build();
+    try (HttpClient client = HttpClient.newHttpClient()) {
+      return assertThrows(
+              ExecutionException.class,
+              () -> client.sendAsync(request, BodyHandlers.discarding()).get())
+          .getCause();
+    }
   }
 
   @Test

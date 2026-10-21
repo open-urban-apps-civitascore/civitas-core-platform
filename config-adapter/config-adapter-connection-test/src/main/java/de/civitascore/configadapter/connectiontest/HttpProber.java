@@ -44,6 +44,9 @@ final class HttpProber implements ConnectionProber {
   /** The connect timeout of the pipeline's web client. */
   private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
 
+  /** Read past the preview limit, longer than any credential, so the cut cannot split one. */
+  private static final int MASK_MARGIN_BYTES = 1024;
+
   private static final char[] HEX = "0123456789ABCDEF".toCharArray();
 
   /** Content encodings whose body the preview can show. */
@@ -73,7 +76,7 @@ final class HttpProber implements ConnectionProber {
     guard.check(uri.getHost());
     Map<String, Object> authentication = objectOrEmpty(connector.get("authentication"));
     boolean basic = "BASIC".equals(authentication.get("type"));
-    if (basic && !"https".equals(uri.getScheme())) {
+    if (basic && !"https".equalsIgnoreCase(uri.getScheme())) {
       throw ConnectionTestFailure.invalid("Basic authentication needs an https base URL.");
     }
     String credential = basic ? credential(authentication) : null;
@@ -228,8 +231,8 @@ final class HttpProber implements ConnectionProber {
   }
 
   /**
-   * Reads one byte more than the preview holds, to tell whether the body is longer. The limit
-   * applies to the decompressed bytes.
+   * Reads beyond the preview limit, to tell whether the body is longer and to keep a secret that
+   * crosses the limit whole for masking. The limit applies to the decompressed bytes.
    */
   private static Body read(HttpResponse<InputStream> response) throws ConnectionTestFailure {
     String contentType =
@@ -244,7 +247,8 @@ final class HttpProber implements ConnectionProber {
     byte[] bytes;
     try (InputStream body = response.body()) {
       bytes =
-          (decodable ? decoded(body, encoding) : body).readNBytes(ResultText.MAX_PREVIEW_BYTES + 1);
+          (decodable ? decoded(body, encoding) : body)
+              .readNBytes(ResultText.MAX_PREVIEW_BYTES + MASK_MARGIN_BYTES);
     } catch (IOException e) {
       throw new ConnectionTestFailure(
           "The API answered with HTTP "
@@ -267,11 +271,7 @@ final class HttpProber implements ConnectionProber {
           encoding);
     }
     return new Body(
-        new String(bytes, 0, length, charset(contentType)),
-        length,
-        truncated,
-        "of " + contentType,
-        encoding);
+        new String(bytes, charset(contentType)), length, truncated, "of " + contentType, encoding);
   }
 
   private static InputStream decoded(InputStream body, String encoding) throws IOException {

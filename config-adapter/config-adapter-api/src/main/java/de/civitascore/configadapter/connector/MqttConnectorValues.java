@@ -64,6 +64,13 @@ public record MqttConnectorValues(
   /** The path of a scheme-stripped broker URL: after host[:port], before any query/fragment. */
   private static final Pattern BROKER_PATH = Pattern.compile("^[^/?#]*([^?#]*)");
 
+  /** The port of a scheme-stripped broker URL, after any userinfo and an IPv6 literal. */
+  private static final Pattern BROKER_PORT =
+      Pattern.compile("^(?:[^@/?#]*@)?(?:\\[[^\\]]*\\]|[^:/?#]*)(?::(\\d*))?");
+
+  /** MQTT carries the keep-alive, and TCP the port, as an unsigned 16-bit value. */
+  private static final int MAX_UNSIGNED_SHORT = 65535;
+
   /** A plain seconds value, optionally with a seconds unit suffix (e.g. {@code 5}, {@code 5s}). */
   private static final Pattern SECONDS =
       Pattern.compile("(\\d+)\\s*(?:s|sec|secs|second|seconds)?", Pattern.CASE_INSENSITIVE);
@@ -94,13 +101,18 @@ public record MqttConnectorValues(
               + " filter): "
               + topics);
     }
+    Integer keepAlive = seconds("Keep Alive", connector.get("keepalive"));
+    if (keepAlive != null && keepAlive > MAX_UNSIGNED_SHORT) {
+      throw new ConnectorValueException(
+          "MQTT 'Keep Alive' must not exceed " + MAX_UNSIGNED_SHORT + " seconds: " + keepAlive);
+    }
     return new MqttConnectorValues(
         brokers,
         topics.get(0),
         tls,
         protocolVersion(connector.get("protocol_version")),
         seconds("Connection Timeout", connector.get("connect_timeout")),
-        seconds("Keep Alive", connector.get("keepalive")));
+        keepAlive);
   }
 
   private static boolean tlsEnabled(Object tls) {
@@ -147,6 +159,10 @@ public record MqttConnectorValues(
                 + "' does not accept a path, use a 'ws'/'wss' URL for a path-addressed broker: "
                 + broker);
       }
+      if (!validPort(remainder)) {
+        throw new ConnectorValueException(
+            "MQTT broker port must be between 1 and " + MAX_UNSIGNED_SHORT + ": " + broker);
+      }
       normalized.add(SCHEME_ALIASES.getOrDefault(scheme, scheme) + "://" + remainder);
     }
     Set<String> transports =
@@ -160,6 +176,20 @@ public record MqttConnectorValues(
           "all MQTT brokers must use the same transport, got " + transports + ": " + normalized);
     }
     return List.copyOf(normalized);
+  }
+
+  /** Whether the URL names no port, or one between 1 and 65535. */
+  private static boolean validPort(String authorityAndPath) {
+    Matcher matcher = BROKER_PORT.matcher(authorityAndPath);
+    if (!matcher.find() || matcher.group(1) == null) {
+      return true;
+    }
+    try {
+      int port = Integer.parseInt(matcher.group(1));
+      return port >= 1 && port <= MAX_UNSIGNED_SHORT;
+    } catch (NumberFormatException e) {
+      return false;
+    }
   }
 
   /** A bare {@code /} is what Paho itself produces for an empty path, so it does not count. */

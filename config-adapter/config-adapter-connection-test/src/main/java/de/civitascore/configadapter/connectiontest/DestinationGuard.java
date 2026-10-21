@@ -142,7 +142,7 @@ final class DestinationGuard implements DestinationCheck {
   }
 
   private static ConnectionTestFailure notAllowed(String name) {
-    return ConnectionTestFailure.invalid(
+    return ConnectionTestFailure.refused(
         "The host '" + name + "' is not an allowed destination for a connection test.");
   }
 

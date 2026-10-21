@@ -12,6 +12,7 @@ package de.civitascore.configadapter.connectiontest;
 import de.civitascore.configadapter.model.connectiontest.ConnectionTestResult.Reason;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
+import java.nio.channels.UnresolvedAddressException;
 import java.security.cert.CertPathBuilderException;
 import java.security.cert.CertPathValidatorException;
 import java.security.cert.CertificateExpiredException;
@@ -25,6 +26,7 @@ final class ConnectionTestFailure extends Exception {
   private static final long serialVersionUID = 1L;
 
   private final Reason reason;
+  private final boolean destinationRefused;
 
   /** The source answered with an error or could not be reached. */
   ConnectionTestFailure(String message) {
@@ -37,8 +39,14 @@ final class ConnectionTestFailure extends Exception {
   }
 
   ConnectionTestFailure(Reason reason, String message, Throwable cause) {
+    this(reason, message, cause, false);
+  }
+
+  private ConnectionTestFailure(
+      Reason reason, String message, Throwable cause, boolean destinationRefused) {
     super(message, cause);
     this.reason = reason;
+    this.destinationRefused = destinationRefused;
   }
 
   /** The connector values do not make a source the test can run; nothing was contacted. */
@@ -51,6 +59,11 @@ final class ConnectionTestFailure extends Exception {
     return new ConnectionTestFailure(Reason.INVALID_CONNECTOR, message, cause);
   }
 
+  /** The destination check refused the host; a security event, not a typo. */
+  static ConnectionTestFailure refused(String message) {
+    return new ConnectionTestFailure(Reason.INVALID_CONNECTOR, message, null, true);
+  }
+
   /** The source did not answer within the time the test allows. */
   static ConnectionTestFailure timeout(String message, Throwable cause) {
     return new ConnectionTestFailure(Reason.TIMEOUT, message, cause);
@@ -60,6 +73,17 @@ final class ConnectionTestFailure extends Exception {
     return reason;
   }
 
+  boolean destinationRefused() {
+    return destinationRefused;
+  }
+
+  /** The type and stack of {@code e} without its text, which may quote connector values. */
+  static Throwable withoutText(Throwable e) {
+    Throwable copy = new Throwable(e.getClass().getName());
+    copy.setStackTrace(e.getStackTrace());
+    return copy;
+  }
+
   /**
    * A client exception's type and text, after a plain hint when the server's certificate was
    * refused.
@@ -67,8 +91,11 @@ final class ConnectionTestFailure extends Exception {
   static String describe(Throwable cause) {
     String message = cause.getMessage();
     if ((message == null || message.isBlank()) && cause instanceof ConnectException) {
-      // The JDK's HTTP client reports a refusal without any text, down to the last cause.
-      message = "Connection refused";
+      // The JDK's HTTP client reports both without any text; only the deepest cause differs.
+      message =
+          inChain(cause, UnresolvedAddressException.class)
+              ? "The host name could not be resolved"
+              : "Connection refused";
     }
     String text =
         message == null || message.isBlank()

@@ -83,4 +83,16 @@ public record ConnectionTestResult(
         null,
         durationMillis);
   }
+
+  /** Keeps the preview, which holds data of the source, and the message out of logs. */
+  @Override
+  public String toString() {
+    return "ConnectionTestResult[requestId="
+        + requestId
+        + ", outcome="
+        + outcome
+        + ", reason="
+        + reason
+        + "]";
+  }
 }

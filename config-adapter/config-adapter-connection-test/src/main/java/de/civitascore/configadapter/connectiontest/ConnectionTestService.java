@@ -77,7 +77,12 @@ final class ConnectionTestService {
           probe.httpStatus(),
           millisSince(begin));
     } catch (ConnectionTestFailure e) {
-      if (LOG.isDebugEnabled()) {
+      if (e.destinationRefused()) {
+        LOG.warn(
+            "Connection test {} refused: {}",
+            Encode.forJava(requestId),
+            Encode.forJava(text.message(e.getMessage())));
+      } else if (LOG.isDebugEnabled()) {
         LOG.debug(
             "Connection test {} failed: {}",
             Encode.forJava(requestId),
@@ -86,11 +91,10 @@ final class ConnectionTestService {
       return ConnectionTestResult.failure(
           requestId, e.reason(), text.message(e.getMessage()), millisSince(begin));
     } catch (RuntimeException e) {
-      // The exception text may quote connector values, so only its type is logged.
-      LOG.warn(
-          "Connection test {} failed unexpectedly: {}",
+      LOG.error(
+          "Connection test {} failed unexpectedly",
           Encode.forJava(requestId),
-          e.getClass().getName());
+          ConnectionTestFailure.withoutText(e));
       return ConnectionTestResult.failure(
           requestId, Reason.UNAVAILABLE, "The test failed unexpectedly.", millisSince(begin));
     }

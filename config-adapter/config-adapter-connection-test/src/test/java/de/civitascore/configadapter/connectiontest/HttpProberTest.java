@@ -26,6 +26,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -251,6 +252,50 @@ class HttpProberTest {
 
   @Test
   void masksTheBasicCredentialAnEchoingApiReturns(@TempDir Path dir) throws Exception {
+    ProbeResult result = probeEchoingApi(dir, "");
+
+    assertTrue(result.success(), result.message());
+    assertEquals(
+        "Basic dXNlcjpzM2NyZXQ=", REQUESTS.get(0).getRequestHeaders().getFirst("Authorization"));
+    assertEquals("{\"pad\": \"\", \"Authorization\": \"Basic ********\"}", result.preview());
+  }
+
+  /**
+   * The credential starts 10 bytes before the preview limit, so a cut there leaves "Basic dXNl".
+   */
+  @Test
+  void masksAnEchoedCredentialThatCrossesThePreviewLimit(@TempDir Path dir) throws Exception {
+    int before = "{\"pad\": \"".length() + "\", \"Authorization\": \"".length();
+    String pad = "x".repeat(ResultText.MAX_PREVIEW_BYTES - 10 - before);
+
+    ProbeResult result = probeEchoingApi(dir, pad);
+
+    assertTrue(
+        result.preview().contains("\"Authorization\": \"Basic ********\""), result.message());
+    assertFalse(result.preview().contains("dXNl"));
+  }
+
+  @Test
+  void basicAuthenticationAcceptsAnUpperCaseHttpsScheme() throws IOException {
+    int closedPort;
+    try (ServerSocket socket = new ServerSocket(0)) {
+      closedPort = socket.getLocalPort();
+    }
+    Map<String, Object> connector = connector(call("root", "/"));
+    connector.put(
+        "baseUrl",
+        "HTTPS://" + InetAddress.getLoopbackAddress().getHostAddress() + ":" + closedPort);
+    connector.put("authentication", Map.of("type", "BASIC", "username", "u", "password", "p"));
+
+    ConnectionTestFailure failure =
+        assertThrows(
+            ConnectionTestFailure.class, () -> prober.probe(connector, "root", new Cancellation()));
+
+    assertEquals(Reason.SOURCE_ERROR, failure.reason(), failure.getMessage());
+  }
+
+  /** Probes an HTTPS API that answers with the Authorization header it received. */
+  private ProbeResult probeEchoingApi(Path dir, String pad) throws Exception {
     SSLContext tls = selfSignedTls(dir);
     HttpsServer echo =
         HttpsServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
@@ -262,7 +307,9 @@ class HttpProberTest {
                 exchange,
                 200,
                 "application/json",
-                "{\"Authorization\": \""
+                "{\"pad\": \""
+                    + pad
+                    + "\", \"Authorization\": \""
                     + exchange.getRequestHeaders().getFirst("Authorization")
                     + "\"}"));
     echo.start();
@@ -279,13 +326,7 @@ class HttpProberTest {
     // The prober trusts the JVM's default context, so the test certificate must be in it.
     SSLContext.setDefault(tls);
     try {
-      ProbeResult result = prober.probe(connector, "headers", new Cancellation());
-
-      assertTrue(result.success(), result.message());
-      assertEquals(
-          "Basic dXNlcjpzM2NyZXQ=", REQUESTS.get(0).getRequestHeaders().getFirst("Authorization"));
-      assertEquals("{\"Authorization\": \"Basic ********\"}", result.preview());
-      assertFalse(result.preview().contains("dXNlcjpzM2NyZXQ="));
+      return prober.probe(connector, "headers", new Cancellation());
     } finally {
       SSLContext.setDefault(jvmDefault);
       echo.stop(0);
