@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -109,30 +108,23 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
 
   @Override
   protected ConfigValue toConfigValuePreSave(User entity, UserInputDTO input) {
-    // Capture the current email before the entity is mutated so that toConfigValuePostSave
-    // can reliably detect whether the email address was changed by the update.
     UserConfig config = new UserConfig();
-
-    Set<String> requiredActions = new HashSet<>();
 
     boolean isNewUser = entity.getExternalId() == null || entity.getExternalId().isBlank();
 
     if (isNewUser) {
-      requiredActions.add("VERIFY_EMAIL");
-      requiredActions.add("UPDATE_PASSWORD");
+      List<String> requiredActions = new ArrayList<>(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"));
       if (keycloakProperties.enforceOtp()) {
         requiredActions.add("CONFIGURE_TOTP");
       }
+      config.setRequiredActions(requiredActions);
+      config.setEmailVerified(false);
+    } else if (!Objects.equals(entity.getEmail(), input.getEmail())) {
+      // An update leaves requiredActions null: Keycloak replaces the stored list with any non-null
+      // one, which drops pending onboarding actions. The realm's verifyEmail setting makes
+      // Keycloak require VERIFY_EMAIL at the next login.
+      config.setEmailVerified(false);
     }
-
-    boolean hasEmailChanged = !Objects.equals(entity.getEmail(), input.getEmail());
-
-    if (hasEmailChanged) {
-      requiredActions.add("VERIFY_EMAIL");
-    }
-
-    config.setEmailVerified(!isNewUser && !hasEmailChanged);
-    config.setRequiredActions(new ArrayList<>(requiredActions));
 
     return config;
   }
