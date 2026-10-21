@@ -497,8 +497,10 @@ sbom-opa-image:
     expire_in: 1 month
     paths:
       - authz/repository/target/opa-image.cdx.json
-    reports:
-      cyclonedx: authz/repository/target/opa-image.cdx.json
+    # TODO: https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/issues/728
+    # Fix license name resolution
+    # reports:
+    #   cyclonedx: authz/repository/target/opa-image.cdx.json
 
 sbom-authz-image:
   extends: .only-authz-changes
@@ -527,5 +529,7 @@ sbom-authz-image:
     expire_in: 1 month
     paths:
       - authz/repository/target/authz-image.cdx.json
-    reports:
-      cyclonedx: authz/repository/target/authz-image.cdx.json
+    # TODO: https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/issues/728
+    # Fix license name resolution
+    # reports:
+    #   cyclonedx: authz/repository/target/authz-image.cdx.json
