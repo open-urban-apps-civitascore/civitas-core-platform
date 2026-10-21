@@ -12,10 +12,13 @@ package de.civitascore.configadapter.connectiontest;
 import de.civitascore.configadapter.model.connectiontest.ConnectionTestResult.Reason;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
+import java.net.http.HttpTimeoutException;
 import java.nio.channels.UnresolvedAddressException;
 import java.security.cert.CertPathBuilderException;
 import java.security.cert.CertPathValidatorException;
 import java.security.cert.CertificateExpiredException;
+import javax.net.ssl.SSLException;
 
 /**
  * A connection test that ended without the answer of a working source. The message says why and is
@@ -84,37 +87,31 @@ final class ConnectionTestFailure extends Exception {
     return copy;
   }
 
-  /**
-   * A client exception's type and text, after a plain hint when the server's certificate was
-   * refused.
-   */
+  /** A fixed sentence for a client exception, read from its types, never from its text. */
   static String describe(Throwable cause) {
-    String message = cause.getMessage();
-    if ((message == null || message.isBlank()) && cause instanceof ConnectException) {
-      // The JDK's HTTP client reports both without any text; only the deepest cause differs.
-      message =
-          inChain(cause, UnresolvedAddressException.class)
-              ? "The host name could not be resolved"
-              : "Connection refused";
-    }
-    String text =
-        message == null || message.isBlank()
-            ? cause.getClass().getSimpleName()
-            : cause.getClass().getSimpleName() + ": " + message;
-    return trustHint(cause) + text;
-  }
-
-  /** Read from the exception types, never from their text, which the JDK may word differently. */
-  private static String trustHint(Throwable cause) {
     // An expired certificate also fails path validation, so expiry is checked first.
     if (inChain(cause, CertificateExpiredException.class)) {
-      return "The server's certificate has expired. ";
+      return "The server's certificate has expired.";
     }
     if (inChain(cause, CertPathBuilderException.class)
         || inChain(cause, CertPathValidatorException.class)) {
-      return "The server's certificate is not issued by a trusted certificate authority. ";
+      return "The server's certificate is not issued by a trusted certificate authority.";
     }
-    return "";
+    if (inChain(cause, SSLException.class)) {
+      return "The TLS handshake with the server failed.";
+    }
+    if (inChain(cause, UnresolvedAddressException.class)
+        || inChain(cause, UnknownHostException.class)) {
+      return "The host name could not be resolved.";
+    }
+    // The JDK's HTTP client puts a ConnectException below its connect timeout.
+    if (timedOut(cause)) {
+      return "The connection timed out.";
+    }
+    if (inChain(cause, ConnectException.class)) {
+      return "The connection was refused.";
+    }
+    return "The connection failed.";
   }
 
   private static boolean inChain(Throwable cause, Class<? extends Throwable> type) {
@@ -126,9 +123,10 @@ final class ConnectionTestFailure extends Exception {
     return false;
   }
 
-  /** Whether a socket timed out somewhere below {@code cause}. */
+  /** Whether a socket or an HTTP exchange timed out somewhere below {@code cause}. */
   static boolean timedOut(Throwable cause) {
-    return inChain(cause, SocketTimeoutException.class);
+    return inChain(cause, SocketTimeoutException.class)
+        || inChain(cause, HttpTimeoutException.class);
   }
 
   /** The cause of {@code t}, or null at the end of the chain. */

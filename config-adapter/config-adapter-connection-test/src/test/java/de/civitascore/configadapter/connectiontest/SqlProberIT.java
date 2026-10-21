@@ -243,6 +243,21 @@ class SqlProberIT {
   }
 
   @Test
+  void namesARefusedConnectionWithoutTheDriverText() throws Exception {
+    int closedPort;
+    try (ServerSocket socket = new ServerSocket(0)) {
+      closedPort = socket.getLocalPort();
+    }
+    Map<String, Object> connector = connector("readings", List.of(), "reader", "reader-secret");
+    connector.put("dsn", "postgres://localhost:" + closedPort + "/source");
+
+    ConnectionTestFailure failure =
+        assertThrows(ConnectionTestFailure.class, () -> probe(connector));
+
+    assertEquals("The database did not answer: The connection was refused.", failure.getMessage());
+  }
+
+  @Test
   void aQueryThatHangsEndsAtTheClientTimeout() {
     long begin = System.nanoTime();
 

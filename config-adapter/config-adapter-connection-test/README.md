@@ -59,7 +59,8 @@ Delivery:
 
 - A message has at most 500 characters. A preview has at most 8 KB of UTF-8, with a `[truncated]` marker. A body that is not text is described, not shown.
 - Every decrypted secret is masked in message and preview. A basic credential that an API echoes back is masked in the preview too.
-- A message never carries a cause chain. It keeps the source's own reason (`password authentication failed`, `Not authorized`), because that is the answer the user asked for.
+- A message keeps the source's own answer (`password authentication failed`, `NOT_AUTHORIZED`, the HTTP status). A failure of the test's own client is named by its type, never by its text.
+- An MQTT connection that fails after its connect timeout is `TIMEOUT`.
 - Logs carry the request id, outcome and duration. At DEBUG they also carry the masked failure message.
 
 ## Destinations

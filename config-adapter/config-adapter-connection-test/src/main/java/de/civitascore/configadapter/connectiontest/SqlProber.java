@@ -333,18 +333,15 @@ final class SqlProber implements ConnectionProber {
         : new ConnectionTestFailure(databaseMessage(e), e);
   }
 
-  /** The database's own message, which says what is wrong (password, database, host, privilege). */
+  /** The database's own message, or a fixed sentence for a failure below the driver. */
   private static String databaseMessage(SQLException e) {
+    if (e.getCause() != null) {
+      return "The database did not answer: " + ConnectionTestFailure.describe(e);
+    }
     String message = e.getMessage();
-    if (message == null || message.isBlank()) {
-      message = "The database refused the connection (" + e.getSQLState() + ").";
-    }
-    // "The connection attempt failed." says nothing more; the network error behind it does.
-    Throwable cause = e;
-    while (cause.getCause() != null && !cause.getCause().equals(cause)) {
-      cause = cause.getCause();
-    }
-    return cause.equals(e) ? message : message + " " + ConnectionTestFailure.describe(cause);
+    return message == null || message.isBlank()
+        ? "The database refused the connection (" + e.getSQLState() + ")."
+        : message;
   }
 
   private static void putIfPresent(Properties properties, String key, Object value) {

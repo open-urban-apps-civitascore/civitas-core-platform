@@ -204,8 +204,35 @@ class MqttProberIT {
         assertThrows(
             ConnectionTestFailure.class, () -> prober.probe(connector, null, new Cancellation()));
 
-    assertTrue(failure.getMessage().startsWith("The broker did not accept the connection"));
+    assertEquals(
+        "The broker did not accept the connection: The connection was refused.",
+        failure.getMessage());
     assertTrue(Duration.ofNanos(System.nanoTime() - begin).toSeconds() < 5);
+  }
+
+  /** The client gives up waiting for the CONNACK after the connect timeout. */
+  @ParameterizedTest
+  @ValueSource(strings = {"3", "5"})
+  void aBrokerThatNeverAnswersIsATimeout(String version) throws Exception {
+    // The kernel completes the TCP handshake for a listener that never accepts.
+    try (ServerSocket silent = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+      Map<String, Object> connector = connector("tcp", ANONYMOUS, version, "sensors/#");
+      connector.put(
+          "urls",
+          List.of(
+              "tcp://"
+                  + InetAddress.getLoopbackAddress().getHostAddress()
+                  + ":"
+                  + silent.getLocalPort()));
+      connector.put("connect_timeout", "1s");
+
+      ConnectionTestFailure failure =
+          assertThrows(
+              ConnectionTestFailure.class, () -> prober.probe(connector, null, new Cancellation()));
+
+      assertEquals(Reason.TIMEOUT, failure.reason());
+      assertEquals("The broker did not answer in time.", failure.getMessage());
+    }
   }
 
   @Test

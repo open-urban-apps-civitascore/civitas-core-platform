@@ -421,6 +421,50 @@ class HttpProberTest {
     assertTrue(REQUESTS.isEmpty());
   }
 
+  @Test
+  void namesARefusedConnectionWithoutTheClientText() throws IOException {
+    int closedPort;
+    try (ServerSocket socket = new ServerSocket(0)) {
+      closedPort = socket.getLocalPort();
+    }
+    Map<String, Object> connector = connector(call("root", "/"));
+    connector.put(
+        "baseUrl",
+        "http://" + InetAddress.getLoopbackAddress().getHostAddress() + ":" + closedPort);
+
+    ConnectionTestFailure failure =
+        assertThrows(ConnectionTestFailure.class, () -> probe(connector, "root"));
+
+    assertEquals("The API did not answer: The connection was refused.", failure.getMessage());
+  }
+
+  @Test
+  void namesAnUntrustedCertificateWithoutTheClientText(@TempDir Path dir) throws Exception {
+    HttpsServer untrusted =
+        HttpsServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+    untrusted.setHttpsConfigurator(new HttpsConfigurator(selfSignedTls(dir)));
+    untrusted.start();
+    try {
+      Map<String, Object> connector = connector(call("root", "/"));
+      connector.put(
+          "baseUrl",
+          "https://"
+              + InetAddress.getLoopbackAddress().getHostAddress()
+              + ":"
+              + untrusted.getAddress().getPort());
+
+      ConnectionTestFailure failure =
+          assertThrows(ConnectionTestFailure.class, () -> probe(connector, "root"));
+
+      assertEquals(
+          "The API did not answer: The server's certificate is not issued by a trusted"
+              + " certificate authority.",
+          failure.getMessage());
+    } finally {
+      untrusted.stop(0);
+    }
+  }
+
   private ProbeResult probe(Map<String, Object> callOrConnector, String apiCall)
       throws ConnectionTestFailure {
     Map<String, Object> connector =

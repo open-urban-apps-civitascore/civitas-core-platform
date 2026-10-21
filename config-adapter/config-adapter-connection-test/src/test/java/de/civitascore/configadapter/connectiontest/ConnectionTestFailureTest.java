@@ -15,10 +15,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.net.ConnectException;
 import java.net.ServerSocket;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.security.cert.CertPathBuilderException;
@@ -39,9 +41,8 @@ class ConnectionTestFailureTest {
     SSLHandshakeException handshake = new SSLHandshakeException("certificate_expired");
     handshake.initCause(new CertificateException(validation));
 
-    String text = ConnectionTestFailure.describe(handshake);
-
-    assertTrue(text.startsWith("The server's certificate has expired. "), text);
+    assertEquals(
+        "The server's certificate has expired.", ConnectionTestFailure.describe(handshake));
   }
 
   @Test
@@ -49,17 +50,19 @@ class ConnectionTestFailureTest {
     SSLHandshakeException handshake = new SSLHandshakeException("certificate_unknown");
     handshake.initCause(new CertificateException(new CertPathBuilderException("no path")));
 
-    String text = ConnectionTestFailure.describe(handshake);
-
-    assertTrue(
-        text.startsWith("The server's certificate is not issued by a trusted certificate"), text);
+    assertEquals(
+        "The server's certificate is not issued by a trusted certificate authority.",
+        ConnectionTestFailure.describe(handshake));
   }
 
+  /** The chain the JDK builds for a certificate issued for another host name. */
   @Test
-  void anOtherFailureKeepsItsTypeAndTextOnly() {
+  void anyOtherFailedHandshakeIsNamedWithoutTheClientText() {
+    SSLHandshakeException handshake = new SSLHandshakeException("No subject alternative names");
+    handshake.initCause(new CertificateException("No subject alternative DNS name matching x"));
+
     assertEquals(
-        "IOException: connection reset",
-        ConnectionTestFailure.describe(new IOException("connection reset")));
+        "The TLS handshake with the server failed.", ConnectionTestFailure.describe(handshake));
   }
 
   /** The JDK's HTTP client reports a refusal as a ConnectException without any text. */
@@ -72,7 +75,7 @@ class ConnectionTestFailureTest {
 
     Throwable failure = httpFailure("http://127.0.0.1:" + closedPort + "/");
 
-    assertEquals("ConnectException: Connection refused", ConnectionTestFailure.describe(failure));
+    assertEquals("The connection was refused.", ConnectionTestFailure.describe(failure));
   }
 
   /** The same text-less ConnectException, with an unresolved address below it. */
@@ -80,9 +83,24 @@ class ConnectionTestFailureTest {
   void anUnresolvableHttpHostIsNotNamedAsARefusal() {
     Throwable failure = httpFailure("http://connection-test.invalid/");
 
+    assertEquals("The host name could not be resolved.", ConnectionTestFailure.describe(failure));
+  }
+
+  /** The chain the JDK's HTTP client builds for a connect timeout. */
+  @Test
+  void aConnectTimeoutIsNotNamedAsARefusal() {
+    HttpConnectTimeoutException timeout = new HttpConnectTimeoutException("HTTP connect timed out");
+    timeout.initCause(new ConnectException("HTTP connect timed out"));
+
+    assertEquals("The connection timed out.", ConnectionTestFailure.describe(timeout));
+  }
+
+  @Test
+  void anUnknownFailureShowsNeitherItsTypeNorItsText() {
     assertEquals(
-        "ConnectException: The host name could not be resolved",
-        ConnectionTestFailure.describe(failure));
+        "The connection failed.",
+        ConnectionTestFailure.describe(
+            new IllegalStateException("com.example.InternalClient failed on db-1.internal")));
   }
 
   private static Throwable httpFailure(String url) {
@@ -98,6 +116,7 @@ class ConnectionTestFailureTest {
   @Test
   void aSocketTimeoutBelowIsATimeout() {
     assertTrue(ConnectionTestFailure.timedOut(new IOException(new SocketTimeoutException("read"))));
+    assertTrue(ConnectionTestFailure.timedOut(new HttpConnectTimeoutException("connect")));
     assertFalse(ConnectionTestFailure.timedOut(new IOException("refused")));
   }
 }

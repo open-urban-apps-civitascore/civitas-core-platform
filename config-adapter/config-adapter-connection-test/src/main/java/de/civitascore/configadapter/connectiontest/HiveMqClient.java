@@ -148,7 +148,8 @@ final class HiveMqClient {
       Function<ExecutionException, ConnectionTestFailure> failure)
       throws ConnectionTestFailure {
     cancellation.register(disconnect::run);
-    long deadline = System.nanoTime() + subscription.timeout().toNanos();
+    long begin = System.nanoTime();
+    long deadline = begin + subscription.timeout().toNanos();
     AtomicBoolean ended = new AtomicBoolean();
     CompletableFuture<?> connecting = connect.get();
     // disconnect() is a no-op before the CONNACK, so a late connection is closed once it completes.
@@ -164,6 +165,12 @@ final class HiveMqClient {
     } catch (ExecutionException e) {
       if (e.getCause() instanceof ConnectionTestFailure refused) {
         throw new ConnectionTestFailure(refused.reason(), refused.getMessage(), e);
+      }
+      // Socket and CONNACK timeouts have no type of their own, so only the time tells.
+      if (connecting.isCompletedExceptionally()
+          && System.nanoTime() - begin
+              >= TimeUnit.SECONDS.toNanos(subscription.connectTimeoutSeconds())) {
+        throw ConnectionTestFailure.timeout("The broker did not answer in time.", e);
       }
       throw failure.apply(e);
     } catch (TimeoutException e) {
