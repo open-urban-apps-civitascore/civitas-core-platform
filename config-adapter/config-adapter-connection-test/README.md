@@ -64,7 +64,7 @@ Delivery:
 
 ## Destinations
 
-- Network policy decides which cluster services a test reaches. Platform services do not admit the connection test workload. An egress policy on the workload keeps it off the host network and off namespaces without a default-deny policy ([DEPLOYMENT.md §2.5](../DEPLOYMENT.md#25-connection-test)).
+- Network rules decide which cluster services a test reaches. Platform services do not admit the connection test workload. An egress rule on the workload keeps it off the node addresses and off namespaces without a default-deny policy ([DEPLOYMENT.md §2.5](../DEPLOYMENT.md#25-connection-test)).
 - A source inside the cluster can be tested when its policy admits the workload.
 - Before it connects, the test checks every address that the host resolves to. Always refused: loopback, link-local (including cloud metadata), any-local and multicast addresses, and `localhost`. An operator can refuse more with `connectiontest.denied-networks` and `connectiontest.denied-host-suffixes`.
 

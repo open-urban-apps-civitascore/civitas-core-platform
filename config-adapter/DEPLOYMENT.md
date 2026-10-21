@@ -280,26 +280,12 @@ java $JAVA_OPTS -cp /civitas/config-adapter.jar de.civitascore.configadapter.app
 - Readiness is reported when the consumer subscribes, not when it has joined the group.
 - The workload creates no topics. Create both topics with `retention.ms=60000` **and** `segment.ms=60000`: a result can carry up to 8 KB of source data. Kafka deletes only closed segments. Without the short `segment.ms`, the open segment rolls after 7 days.
 
-**Network position**
+**Network requirements**
 
 - The workload carries its own pod labels, never config-adapter's. Every platform service that admits config-adapter (PostgreSQL, FROST, GeoServer, Keycloak, the APISIX Admin API, NiFi) would otherwise admit the connection test too.
-- Kafka must admit the workload. The workload accepts no incoming connections.
-- A source inside the cluster answers a test only if its ingress policy admits the workload, as it admits NiFi for the pipeline.
-
-**Egress policy (required)**
-
-Ingress policies do not protect all destinations:
-
-- Node addresses (Kubernetes API server, kubelets, NodePorts) are not pods, so no ingress policy protects them.
-- Namespaces without a default-deny policy answer every client. Typical examples: `kube-system`, cert-manager, the ingress controller.
-
-Restrict the workload's egress in every deployment:
-
-- Allow DNS, Kafka and the namespaces of in-cluster sources by selector.
-- Allow the internet as `0.0.0.0/0` minus the cluster's pod, service and node networks.
-- Do not allow in-cluster destinations by `ipBlock`. Kubernetes intends `ipBlock` for cluster-external addresses, and the network plugin decides whether a Service address is translated before or after the policy check. A selector works in both cases.
-
-If the cluster cannot enforce an egress policy, set `connectiontest.denied-networks` to the pod, service and node networks. This setting has no exceptions, so it also refuses in-cluster sources.
+- It needs to reach DNS, Kafka and the data sources: the internet, and tenant sources in the cluster whose ingress rule admits it. It accepts no incoming connections.
+- It must not reach platform services, the Kubernetes API, node addresses or other namespaces. Ingress rules alone do not ensure this: node addresses and namespaces without a default-deny policy answer every client. The workload therefore needs an egress rule.
+- If the cluster cannot enforce egress rules, set `connectiontest.denied-networks` to the pod, service and node networks. This also refuses tenant sources in the cluster.
 
 ## 3. Security Hardening
 
@@ -314,7 +300,7 @@ Four settings ship with development-friendly defaults that are wrong for product
 
 Custom certificate authorities: only NiFi has a verification flag. The APISIX, FROST, GeoServer and Keycloak clients use the JVM default trust store, so a private CA needs either `-Djavax.net.ssl.trustStore…` in `JAVA_OPTS` or a trust store baked into the image. MQTT-over-TLS trust is evaluated inside NiFi, against a truststore the deployment provides and the adapter only names via `nifi.mqtt.truststore.*`. The default is the JVM trust store of the NiFi image, not NiFi's node truststore — see [§2.4](#24-per-adapter-connection-settings).
 
-**Connection test destinations.** The connection test connects to hosts that the user enters. Give it its own pod labels and an egress policy, as [§2.5](#25-connection-test) describes.
+**Connection test destinations.** The connection test connects to hosts that the user enters. Give it its own pod labels and an egress rule, as [§2.5](#25-connection-test) describes.
 
 Secrets to inject rather than bake in: `CIVITAS_MASTER_KEY`, `APISIX_ADMIN_KEY`, `KEYCLOAK_PASSWORD`, `FLOWABLE_JDBC_PASSWORD`, `POSTGIS_JDBC_PASSWORD`, `GEOSERVER_ADMIN_PASSWORD`, `GEOSERVER_POSTGIS_PASSWORD`, `NIFI_OIDC_CLIENT_SECRET`, `NIFI_POSTGIS_PASSWORD`, and the FROST credentials.
 
