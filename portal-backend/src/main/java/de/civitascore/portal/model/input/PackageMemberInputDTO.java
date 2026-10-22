@@ -22,26 +22,29 @@ public class PackageMemberInputDTO {
 
   @NotBlank(message = "urn is required") @Size(max = InstalledArtifact.URN_LENGTH, message = "urn must not exceed {max} characters") @Schema(
       description =
-          "The identity of the member in the package. The journal keeps it as the origin of the"
-              + " copy. It does not have to be a CORE URN.")
+          "The identity of the member in the package. The other members reference the member by"
+              + " this identity, and the journal keeps it as the origin of the copy. It does not"
+              + " have to be a CORE URN.")
   private String urn;
 
   @Size(max = InstalledArtifact.NAME_LENGTH, message = "name must not exceed {max} characters") @Schema(
       description =
-          "The display name. When it is empty, the install uses the title of the document.",
+          "The display name. When it is empty, the install uses the title in the document, or"
+              + " the name in the document of a named API.",
       example = "Tree cadastre")
   private String name;
 
   @Schema(
       description =
-          "The description of the Data structure. When it is empty, the install uses the"
-              + " description in the document. One of the two is necessary.")
+          "The description of the copy. When it is empty, the install uses the description in"
+              + " the document. A Data structure, a Data source and a Dataset need one of the two.")
   private String description;
 
   @NotEmpty(message = "content is required") @Schema(
       description =
-          "The CORE document of the member: the JSON Schema of a Data structure. The backend"
-              + " replaces the $id of the document and of its $defs members with URNs of this"
-              + " instance.")
+          "The CORE document of the member, for example the JSON Schema of a Data structure or"
+              + " the document of a Data source. The backend gives each copy a URN of this"
+              + " instance. In a Data structure, it replaces the $id of the document and of its"
+              + " $defs members.")
   private Map<String, Object> content;
 }

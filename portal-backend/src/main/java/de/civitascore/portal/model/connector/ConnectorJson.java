@@ -21,13 +21,15 @@ import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Converts a {@link ConnectorConfiguration} between its three JSON forms:
+ * Converts a {@link ConnectorConfiguration} between its JSON forms:
  *
  * <ul>
  *   <li>the request form, read strictly: an unknown key at any level is an error;
  *   <li>the response form, with every secret as {@value Secret#PLACEHOLDER};
  *   <li>the registry document, which follows {@code datasource.schema.json}: {@code connectionType}
- *       in lower case instead of {@code connectorType}, every secret encrypted.
+ *       in lower case instead of {@code connectorType}, every secret encrypted;
+ *   <li>the document in a package, which has the form of the registry document with every secret in
+ *       clear text, read as strictly as the request form.
  * </ul>
  */
 public final class ConnectorJson {
@@ -93,6 +95,24 @@ public final class ConnectorJson {
     } catch (JacksonException | IllegalArgumentException e) {
       throw new IllegalStateException("Stored " + type + " connector cannot be read", e);
     }
+  }
+
+  /**
+   * Reads the connector of a Data source document whose secrets are in clear text, for example a
+   * document in a package. The keys that the registry and the shared schema own are not part of the
+   * connector. The other keys are read as strictly as a request.
+   *
+   * @param document a document that follows {@code datasource.schema.json}
+   * @throws MalformedDataSourceRequestException for an unknown key at any level, an unknown or
+   *     missing {@code connectionType}, or a value of the wrong form
+   */
+  public static ConnectorConfiguration readDocument(Map<String, Object> document) {
+    ObjectNode tree = LENIENT.valueToTree(document);
+    tree.remove(DOCUMENT_KEYS);
+    if (document.get(DOCUMENT_TYPE_PROPERTY) instanceof String type) {
+      tree.put(TYPE_PROPERTY, type.toUpperCase(Locale.ROOT));
+    }
+    return read(tree);
   }
 
   /** The response form, with every secret as {@value Secret#PLACEHOLDER}. */
