@@ -5,5 +5,8 @@ package de.civitascore.portal.model.embedded;
  * type needs no migration.
  */
 public enum InstalledArtifactType {
-  DATA_STRUCTURE
+  DATA_STRUCTURE,
+  DATA_SOURCE,
+  DATA_SET,
+  NAMED_API
 }
