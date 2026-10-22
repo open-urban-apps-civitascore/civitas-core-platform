@@ -63,6 +63,44 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
       "urn:core:standard:test:dataset:environment:trees:q1w2e3r4t5";
   private static final String API_URN = "urn:core:standard:test:api:environment:map:y6u7i8o9p0";
 
+  /** The members of a tree map package, in the form of the catalogue. */
+  private static final String ROW_URN =
+      "urn:core:standard:test:datastructure:environment:cadastrerow:ny4qd9zowt";
+
+  private static final String STREET_TREE_URN =
+      "urn:core:standard:test:datastructure:environment:streettree:f1i2sjhgvq";
+  private static final String CADASTRE_URN =
+      "urn:core:standard:test:datasource:environment:cadastredb:b7cx8sr5i1";
+  private static final String CADASTRE_MAPPING_URN =
+      "urn:core:standard:test:mapping:environment:cadastretotree:jd1uf7qtd1";
+  private static final String TREE_TABLE_URN =
+      "urn:core:standard:test:datasink:environment:treetable:x9dj5i0jl2";
+  private static final String CADASTRE_IMPORT_URN =
+      "urn:core:standard:test:pipeline:environment:cadastreimport:c2d3e4f5g6";
+  private static final String GREEN_URN =
+      "urn:core:standard:test:style:environment:treesgreen:h7i8j9k0l1";
+  private static final String ORANGE_URN =
+      "urn:core:standard:test:style:environment:treesorange:m2n3o4p5q6";
+  private static final String TREES_LAYER_URN =
+      "urn:core:standard:test:layer:environment:streettrees:r7s8t9u0v1";
+
+  /** The members of an air quality package, in the form of the catalogue. */
+  private static final String MEASUREMENT_URN =
+      "urn:core:standard:test:datastructure:environment:airmeasurement:8vuby3re7d";
+
+  private static final String STATION_URN =
+      "urn:core:standard:test:datastructure:environment:airstation:v6lve8eqmu";
+  private static final String AIR_FEED_URN =
+      "urn:core:standard:test:datasource:environment:airmeasurementfeed:w2x3y4z5a6";
+  private static final String AIR_DATASET_URN =
+      "urn:core:standard:test:dataset:environment:airquality:b7c8d9e0f1";
+  private static final String AIR_MAPPING_URN =
+      "urn:core:standard:test:mapping:environment:measurementtostation:qguc1fua9r";
+  private static final String SENSOR_STORE_URN =
+      "urn:core:standard:test:datasink:environment:sensorstore:s53sq3rtwj";
+  private static final String AIR_IMPORT_URN =
+      "urn:core:standard:test:pipeline:environment:airimport:g2h3i4j5k6";
+
   @Autowired private PortalTestDataFactory portalData;
   @Autowired private InstallationRepository installationRepository;
   @Autowired private DataStructureRepository dataStructureRepository;
@@ -262,6 +300,109 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
     assertThat(dataStructureRepository.count()).isEqualTo(structures);
   }
 
+  @Test
+  @DisplayName("POST installs a whole use case with its data flow and its map, as DRAFT")
+  void install_whenPackageIsAWholeUseCase_bindsEachReferenceToTheCopies() {
+    DataPool pool = portalData.dataPool();
+
+    ResponseEntity<String> installed =
+        post(
+            request(
+                pool.getId(),
+                "tree-map",
+                member("datastructure", ROW_URN, "Cadastre row", "One row", rowModel()),
+                member("datastructure", STREET_TREE_URN, "Street tree", "One tree", treeTarget()),
+                cadastreSource(),
+                dataSet(),
+                treeMap(),
+                cadastreMapping(),
+                treeTable(),
+                cadastreImport(),
+                style(GREEN_URN, "trees-green", "#2E7D32"),
+                style(ORANGE_URN, "trees-orange", "#EF6C00"),
+                treesLayer()));
+
+    assertThat(installed.getStatusCode())
+        .as("%s", installed.getBody())
+        .isEqualTo(HttpStatus.CREATED);
+    List<JsonNode> lines = linesOf(installed);
+    assertThat(lines)
+        .extracting(line -> line.get("artifactType").asString())
+        .containsExactly(
+            "DATA_STRUCTURE",
+            "DATA_STRUCTURE",
+            "DATA_SOURCE",
+            "DATA_SET",
+            "NAMED_API",
+            "MAPPING",
+            "DATA_SINK",
+            "PIPELINE",
+            "STYLE",
+            "STYLE",
+            "LAYER");
+
+    Map<String, Object> mapping = storedContent(lineFor(lines, CADASTRE_MAPPING_URN));
+    assertThat(mapping)
+        .containsEntry("source", lineFor(lines, ROW_URN).get("versionedUrn").asString())
+        .containsEntry("target", lineFor(lines, STREET_TREE_URN).get("versionedUrn").asString());
+    Map<String, Object> pipeline = storedContent(lineFor(lines, CADASTRE_IMPORT_URN));
+    assertThat(nodeOfKind(pipeline, "source"))
+        .containsEntry("sourceRef", lineFor(lines, CADASTRE_URN).get("urn").asString() + ":latest");
+    assertThat(nodeOfKind(pipeline, "mapping"))
+        .containsEntry(
+            "mappingRef", lineFor(lines, CADASTRE_MAPPING_URN).get("versionedUrn").asString());
+    assertThat(nodeOfKind(pipeline, "sink"))
+        .containsEntry("sinkRef", lineFor(lines, TREE_TABLE_URN).get("versionedUrn").asString());
+    assertThat(lineFor(lines, TREES_LAYER_URN).get("name").asString()).isEqualTo("street_trees");
+    JsonNode dataSet =
+        json(get("/datasets/" + lineFor(lines, DATASET_URN).get("shellId").asString()).getBody());
+    assertThat(dataSet.get("dataSetStatus").asString()).isEqualTo("DRAFT");
+  }
+
+  @Test
+  @DisplayName("POST installs a data flow into a FROST sink with its port")
+  void install_whenPackageWritesToFrost_bindsTheSinkToTheStructureCopy() {
+    DataPool pool = portalData.dataPool();
+
+    ResponseEntity<String> installed =
+        post(
+            request(
+                pool.getId(),
+                "air-quality",
+                member("datastructure", MEASUREMENT_URN, "Air measurement", "Raw", measurement()),
+                member("datastructure", STATION_URN, "Air station", "SensorThings", station()),
+                airFeed(),
+                member(
+                    "dataset",
+                    AIR_DATASET_URN,
+                    "Air quality",
+                    "Air quality of the stations",
+                    Map.of("openDataAccess", false)),
+                airMapping(),
+                sensorStore(),
+                airImport()));
+
+    assertThat(installed.getStatusCode())
+        .as("%s", installed.getBody())
+        .isEqualTo(HttpStatus.CREATED);
+    List<JsonNode> lines = linesOf(installed);
+    assertThat(lines)
+        .extracting(line -> line.get("artifactType").asString())
+        .containsExactly(
+            "DATA_STRUCTURE",
+            "DATA_STRUCTURE",
+            "DATA_SOURCE",
+            "DATA_SET",
+            "MAPPING",
+            "DATA_SINK",
+            "PIPELINE");
+    assertThat(storedContent(lineFor(lines, SENSOR_STORE_URN)))
+        .containsEntry("port", "ThingTree")
+        .containsEntry("element", lineFor(lines, STATION_URN).get("versionedUrn").asString());
+    assertThat(nodeOfKind(storedContent(lineFor(lines, AIR_IMPORT_URN)), "sink"))
+        .containsEntry("sinkRef", lineFor(lines, SENSOR_STORE_URN).get("versionedUrn").asString());
+  }
+
   /**
    * A Data structure from another instance. The root and the member {@code Tree} carry the URNs of
    * that instance. {@code Tree} references {@code Location} in the same document.
@@ -302,6 +443,260 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
         "object",
         "properties",
         Map.of("name", Map.of("type", "string")));
+  }
+
+  private static Map<String, Object> rowModel() {
+    return objectSchema(
+        ROW_URN,
+        "Cadastre row",
+        Map.of(
+            "tree_id", Map.of("type", "string"),
+            "species", Map.of("type", "string"),
+            "lon", Map.of("type", "number"),
+            "lat", Map.of("type", "number")));
+  }
+
+  private static Map<String, Object> treeTarget() {
+    return objectSchema(
+        STREET_TREE_URN,
+        "Street tree",
+        Map.of(
+            "treeId", Map.of("type", "string"),
+            "species", Map.of("type", "string"),
+            "position", Map.of("type", "object")));
+  }
+
+  private static Map<String, Object> measurement() {
+    return objectSchema(
+        MEASUREMENT_URN,
+        "Air measurement",
+        Map.of("stationId", Map.of("type", "string"), "pm25", Map.of("type", "number")));
+  }
+
+  private static Map<String, Object> station() {
+    return objectSchema(
+        STATION_URN,
+        "Air station",
+        Map.of("name", Map.of("type", "string"), "properties", Map.of("type", "object")));
+  }
+
+  private static Map<String, Object> objectSchema(
+      String id, String title, Map<String, Object> properties) {
+    return Map.of(
+        "$schema", SCHEMA, "$id", id, "title", title, "type", "object", "properties", properties);
+  }
+
+  private static Map<String, Object> cadastreSource() {
+    Map<String, Object> document = new LinkedHashMap<>();
+    document.put("$schema", DATASOURCE_SCHEMA);
+    document.put("id", CADASTRE_URN);
+    document.put("title", "Cadastre database");
+    document.put("description", "Reads the tree cadastre from the database of the city");
+    document.put("connectionType", "sql");
+    document.put("element", ROW_URN);
+    document.put("driver", "postgres");
+    document.put("dsn", "postgres://cadastre-db:5432/cadastre");
+    document.put("table", "cadastre.trees");
+    document.put("columns", List.of("tree_id", "species", "lon", "lat"));
+    return member("datasource", CADASTRE_URN, null, null, document);
+  }
+
+  private static Map<String, Object> airFeed() {
+    Map<String, Object> document = new LinkedHashMap<>();
+    document.put("$schema", DATASOURCE_SCHEMA);
+    document.put("id", AIR_FEED_URN);
+    document.put("title", "Air measurement feed");
+    document.put("description", "Receives the measurements of the stations from the broker");
+    document.put("connectionType", "mqtt");
+    document.put("element", MEASUREMENT_URN);
+    document.put("urls", List.of("tcp://broker:1883"));
+    document.put("topics", List.of("air-quality/+"));
+    document.put("qos", 1);
+    return member("datasource", AIR_FEED_URN, null, null, document);
+  }
+
+  private static Map<String, Object> cadastreMapping() {
+    Map<String, Object> fields = new LinkedHashMap<>();
+    fields.put("$.treeId", "$.tree_id");
+    fields.put("$.species", "$.species");
+    fields.put("$.position", Map.of("op", "geoPoint", "lon", "$.lon", "lat", "$.lat"));
+    return member(
+        "mapping",
+        CADASTRE_MAPPING_URN,
+        "Cadastre to street tree",
+        null,
+        Map.of(
+            "title",
+            "Cadastre to street tree",
+            "source",
+            ROW_URN,
+            "target",
+            STREET_TREE_URN,
+            "fields",
+            fields));
+  }
+
+  private static Map<String, Object> airMapping() {
+    Map<String, Object> fields = new LinkedHashMap<>();
+    fields.put("$.properties.reference", "$.stationId");
+    fields.put(
+        "$.name",
+        Map.of(
+            "op",
+            "concat",
+            "separator",
+            " ",
+            "inputs",
+            List.of(Map.of("op", "const", "value", "Station"), "$.stationId")));
+    return member(
+        "mapping",
+        AIR_MAPPING_URN,
+        "Measurement to station",
+        null,
+        Map.of(
+            "title",
+            "Measurement to station",
+            "source",
+            MEASUREMENT_URN,
+            "target",
+            STATION_URN,
+            "fields",
+            fields));
+  }
+
+  private static Map<String, Object> treeTable() {
+    return member(
+        "datasink",
+        TREE_TABLE_URN,
+        null,
+        null,
+        Map.of(
+            "$schema",
+            "https://civitasconnect.digital/core/datasink/v1",
+            "id",
+            TREE_TABLE_URN,
+            "title",
+            "Tree table",
+            "description",
+            "Writes the trees into a table with a geometry column",
+            "connectionType",
+            "postgis",
+            "tableName",
+            "street_trees",
+            "element",
+            STREET_TREE_URN));
+  }
+
+  /** A FROST sink with the port that a find-or-create of the whole SensorThings tree needs. */
+  private static Map<String, Object> sensorStore() {
+    return member(
+        "datasink",
+        SENSOR_STORE_URN,
+        null,
+        null,
+        Map.of(
+            "$schema",
+            "https://civitasconnect.digital/core/datasink/v1",
+            "id",
+            SENSOR_STORE_URN,
+            "title",
+            "Sensor store",
+            "connectionType",
+            "frost",
+            "port",
+            "ThingTree",
+            "element",
+            STATION_URN));
+  }
+
+  /** The pipeline of the tree map: a cron trigger, the source, the mapping and the sink. */
+  private static Map<String, Object> cadastreImport() {
+    List<Map<String, Object>> nodes =
+        List.of(
+            node("n-start", "start", Map.of()),
+            node(
+                "n-cron",
+                "cron",
+                Map.of("cronExpression", "0 * * * * ?", "cronPreview", "every minute")),
+            node("n-source", "source", Map.of("sourceRef", CADASTRE_URN)),
+            node("n-mapping", "mapping", Map.of("mappingRef", CADASTRE_MAPPING_URN)),
+            node("n-sink", "sink", Map.of("sinkRef", TREE_TABLE_URN)),
+            node("n-end", "end", Map.of()));
+    return member(
+        "pipeline",
+        CADASTRE_IMPORT_URN,
+        "Cadastre import",
+        "Reads the cadastre each minute and writes the trees into the table",
+        Map.of("nodes", nodes, "edges", edgesThrough(nodes)));
+  }
+
+  /** The pipeline of the air quality package: the feed, the mapping and the FROST sink. */
+  private static Map<String, Object> airImport() {
+    List<Map<String, Object>> nodes =
+        List.of(
+            node("n-start", "start", Map.of()),
+            node("n-source", "source", Map.of("sourceRef", AIR_FEED_URN)),
+            node("n-mapping", "mapping", Map.of("mappingRef", AIR_MAPPING_URN)),
+            node("n-sink", "sink", Map.of("sinkRef", SENSOR_STORE_URN)),
+            node("n-end", "end", Map.of()));
+    return member(
+        "pipeline",
+        AIR_IMPORT_URN,
+        "Air quality import",
+        null,
+        Map.of("nodes", nodes, "edges", edgesThrough(nodes)));
+  }
+
+  private static Map<String, Object> node(String id, String kind, Map<String, Object> fields) {
+    Map<String, Object> node = new LinkedHashMap<>();
+    node.put("id", id);
+    node.put("kind", kind);
+    node.put("label", id);
+    node.putAll(fields);
+    node.put("x-ui-position", Map.of("x", 0, "y", 120));
+    return node;
+  }
+
+  /** The edges that connect the nodes in their order. */
+  private static List<Map<String, Object>> edgesThrough(List<Map<String, Object>> nodes) {
+    List<Map<String, Object>> edges = new ArrayList<>();
+    for (int index = 1; index < nodes.size(); index++) {
+      Object source = nodes.get(index - 1).get("id");
+      Object target = nodes.get(index).get("id");
+      edges.add(Map.of("id", "e-" + index, "source", source, "target", target));
+    }
+    return edges;
+  }
+
+  private static Map<String, Object> style(String urn, String name, String color) {
+    String sld =
+        ("<StyledLayerDescriptor version=\"1.0.0\" xmlns=\"http://www.opengis.net/sld\">"
+                + "<NamedLayer><Name>%s</Name><UserStyle><FeatureTypeStyle><Rule>"
+                + "<PointSymbolizer><Graphic><Mark><WellKnownName>circle</WellKnownName><Fill>"
+                + "<CssParameter name=\"fill\">%s</CssParameter></Fill></Mark><Size>12</Size>"
+                + "</Graphic></PointSymbolizer></Rule></FeatureTypeStyle></UserStyle>"
+                + "</NamedLayer></StyledLayerDescriptor>")
+            .formatted(name, color);
+    return member("style", urn, name, null, Map.of("name", name, "sldContent", sld));
+  }
+
+  /** The map layer of the trees, with its sink and its styles by their identities. */
+  private static Map<String, Object> treesLayer() {
+    Map<String, Object> box = Map.of("minX", 7.625, "minY", 51.95, "maxX", 7.645, "maxY", 51.972);
+    Map<String, Object> document = new LinkedHashMap<>();
+    document.put("layerName", "street_trees");
+    document.put("title", "Street trees");
+    document.put("description", "The street trees of the district");
+    document.put("keywords", List.of("tree", "green"));
+    document.put("sinkRef", TREE_TABLE_URN);
+    document.put("attribute", List.of("treeId", "species", "position"));
+    document.put("geometryColumnRef", "position");
+    document.put("defaultStyleRef", GREEN_URN);
+    document.put("alternativeStyleRefs", List.of(ORANGE_URN));
+    document.put("crs", "EPSG:4326");
+    document.put("nativeBoundingBox", box);
+    document.put("latLonBoundingBox", box);
+    return member("layer", TREES_LAYER_URN, "street_trees", null, document);
   }
 
   /**
@@ -420,6 +815,25 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
     List<JsonNode> lines = new ArrayList<>();
     json(installed.getBody()).get("artifacts").forEach(lines::add);
     return lines;
+  }
+
+  /** The line of the artifact that the install created from the member with the identity. */
+  private static JsonNode lineFor(List<JsonNode> lines, String origin) {
+    return lines.stream()
+        .filter(line -> origin.equals(line.get("origin").asString()))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  /** The document that the registry keeps for the version of a line. */
+  private Map<String, Object> storedContent(JsonNode line) {
+    return registry.fetchPayload(line.get("versionedUrn").asString()).orElseThrow().content();
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> nodeOfKind(Map<String, Object> pipeline, String kind) {
+    return ((List<Map<String, Object>>) pipeline.get("nodes"))
+        .stream().filter(node -> kind.equals(node.get("kind"))).findFirst().orElseThrow();
   }
 
   /** The {@code $ref} of a property of a stored document. */

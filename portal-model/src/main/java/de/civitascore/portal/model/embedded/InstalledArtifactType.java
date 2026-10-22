@@ -8,5 +8,10 @@ public enum InstalledArtifactType {
   DATA_STRUCTURE,
   DATA_SOURCE,
   DATA_SET,
-  NAMED_API
+  NAMED_API,
+  MAPPING,
+  DATA_SINK,
+  PIPELINE,
+  STYLE,
+  LAYER
 }

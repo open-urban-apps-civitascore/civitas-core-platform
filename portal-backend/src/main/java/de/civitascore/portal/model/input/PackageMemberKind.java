@@ -18,5 +18,15 @@ public enum PackageMemberKind {
   @JsonProperty("dataset")
   DATASET,
   @JsonProperty("api")
-  API
+  API,
+  @JsonProperty("mapping")
+  MAPPING,
+  @JsonProperty("datasink")
+  DATASINK,
+  @JsonProperty("pipeline")
+  PIPELINE,
+  @JsonProperty("style")
+  STYLE,
+  @JsonProperty("layer")
+  LAYER
 }
