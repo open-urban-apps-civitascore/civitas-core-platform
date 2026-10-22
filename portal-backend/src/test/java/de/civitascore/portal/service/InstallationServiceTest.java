@@ -2,9 +2,12 @@ package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.entry;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -14,23 +17,32 @@ import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.model.connector.SqlConnectorConfiguration;
 import de.civitascore.portal.model.embedded.ApiStandard;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.InstalledArtifactType;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Installation;
 import de.civitascore.portal.model.entity.InstalledArtifact;
+import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.NamedApi;
+import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.input.InstallationInputDTO;
+import de.civitascore.portal.model.input.LayerInputDTO;
 import de.civitascore.portal.model.input.PackageManifestInputDTO;
 import de.civitascore.portal.model.input.PackageMemberInputDTO;
 import de.civitascore.portal.model.input.PackageMemberKind;
+import de.civitascore.portal.model.input.PipelineInputDTO;
+import de.civitascore.portal.model.input.StyleInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.InstallationRepository;
@@ -92,12 +104,42 @@ class InstallationServiceTest {
   private static final String SOURCE_LOGICAL_URN =
       "urn:core:platform:civitas:datasource:common:66666666-6666-4000-8000-000000000006";
 
+  private static final String MAPPING_URN =
+      "urn:core:standard:test:mapping:environment:rowtotree:p1q2r3s4t5";
+  private static final String SINK_URN =
+      "urn:core:standard:test:datasink:environment:treetable:u6v7w8x9y0";
+  private static final String PIPELINE_URN =
+      "urn:core:standard:test:pipeline:environment:treeimport:a9b8c7d6e5";
+  private static final String GREEN_STYLE_URN =
+      "urn:core:standard:test:style:environment:treesgreen:f4g3h2i1j0";
+  private static final String ORANGE_STYLE_URN =
+      "urn:core:standard:test:style:environment:treesorange:k9l8m7n6o5";
+  private static final String LAYER_URN =
+      "urn:core:standard:test:layer:environment:trees:p4q3r2s1t0";
+
+  private static final UUID SINK_ID = UUID.fromString("99999999-9999-4000-8000-00000000000a");
+  private static final UUID PIPELINE_ID = UUID.fromString("99999999-9999-4000-8000-00000000000b");
+  private static final UUID GREEN_ID = UUID.fromString("99999999-9999-4000-8000-00000000000c");
+  private static final UUID ORANGE_ID = UUID.fromString("99999999-9999-4000-8000-00000000000d");
+  private static final UUID LAYER_ID = UUID.fromString("99999999-9999-4000-8000-00000000000e");
+  private static final String MAPPING_LOGICAL_URN =
+      "urn:core:platform:civitas:mapping:common:99999999-9999-4000-8000-00000000000f";
+  private static final String MAPPING_VERSIONED_URN = MAPPING_LOGICAL_URN + ":1.0.0";
+  private static final String SINK_LOGICAL_URN =
+      "urn:core:platform:civitas:datasink:common:99999999-9999-4000-8000-00000000000a";
+  private static final String SINK_VERSIONED_URN = SINK_LOGICAL_URN + ":1.0.0";
+
   @Mock private InstallationRepository installationRepository;
   @Mock private DataPoolRepository dataPoolRepository;
   @Mock private DataStructureService dataStructureService;
   @Mock private DataStructureVersionService dataStructureVersionService;
   @Mock private DataSourceService dataSourceService;
   @Mock private DataSetService dataSetService;
+  @Mock private MappingService mappingService;
+  @Mock private DataSinkService dataSinkService;
+  @Mock private PipelineService pipelineService;
+  @Mock private StyleService styleService;
+  @Mock private LayerService layerService;
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Spy private ConnectorValidator connectorValidator = new ConnectorValidator(List.of());
   @Spy private Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
@@ -108,6 +150,10 @@ class InstallationServiceTest {
   @Captor private ArgumentCaptor<DataStructureVersionInputDTO> versionCaptor;
   @Captor private ArgumentCaptor<DataSourceInputDTO> sourceCaptor;
   @Captor private ArgumentCaptor<DataSetInputDTO> dataSetCaptor;
+  @Captor private ArgumentCaptor<Map<String, Object>> documentCaptor;
+  @Captor private ArgumentCaptor<DataSinkInputDTO> sinkCaptor;
+  @Captor private ArgumentCaptor<PipelineInputDTO> pipelineCaptor;
+  @Captor private ArgumentCaptor<LayerInputDTO> layerCaptor;
 
   /** The identities in these tests have no version, so the registry gives them back unchanged. */
   @BeforeEach
@@ -427,6 +473,173 @@ class InstallationServiceTest {
   }
 
   @Test
+  void install_whenPackageHasADataFlow_bindsEachReferenceToItsCopy() {
+    stubCreate();
+    stubDatapool();
+    stubDataSource();
+    stubDataSet();
+    stubMapping();
+    stubDataSink();
+    stubPipeline();
+
+    Installation installation =
+        installationService.install(
+            request(
+                DATAPOOL_ID,
+                pipeline(SINK_URN),
+                postgisSink(),
+                mapping(),
+                dataSet(),
+                sqlSource(FOREIGN_URN),
+                tree()));
+
+    verify(mappingService).store(eq(DATASET_ID), isNull(), documentCaptor.capture());
+    assertThat(documentCaptor.getValue())
+        .containsEntry("source", VERSIONED_URN)
+        .containsEntry("target", VERSIONED_URN)
+        .doesNotContainKeys("$schema", "id");
+    verify(dataSinkService).create(sinkCaptor.capture());
+    assertThat(sinkCaptor.getValue().getDataSetId()).isEqualTo(DATASET_ID);
+    assertThat(sinkCaptor.getValue().getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
+    assertThat(sinkCaptor.getValue().getConfiguration())
+        .containsOnly(entry("tableName", "trees"), entry("element", VERSIONED_URN));
+    verify(pipelineService).create(pipelineCaptor.capture());
+    PipelineInputDTO pipeline = pipelineCaptor.getValue();
+    assertThat(pipeline.getDataSetId()).isEqualTo(DATASET_ID);
+    assertThat(pipeline.getName()).isEqualTo("Tree import");
+    assertThat(pipeline.getDataSourceIds()).containsExactly(SOURCE_ID);
+    assertThat(pipeline.getDataSinkIds()).containsExactly(SINK_ID);
+    assertThat(pipeline.getModel()).doesNotContainKey("x-ui-styles").containsKey("edges");
+    List<Map<String, Object>> nodes = nodesOf(pipeline);
+    assertThat(nodes.get(1))
+        .containsEntry("sourceRef", SOURCE_LOGICAL_URN + ":latest")
+        .containsKey("x-ui-position");
+    assertThat(nodes.get(2)).containsEntry("mappingRef", MAPPING_VERSIONED_URN);
+    assertThat(nodes.get(3)).containsEntry("sinkRef", SINK_VERSIONED_URN);
+    assertThat(installation.getArtifacts())
+        .extracting(InstalledArtifact::getArtifactType)
+        .containsExactly(
+            InstalledArtifactType.DATA_STRUCTURE,
+            InstalledArtifactType.DATA_SOURCE,
+            InstalledArtifactType.DATA_SET,
+            InstalledArtifactType.MAPPING,
+            InstalledArtifactType.DATA_SINK,
+            InstalledArtifactType.PIPELINE);
+  }
+
+  @Test
+  void install_whenPackageHasAMap_createsTheLayerWithTheIdsOfTheCopies() {
+    stubDatapool();
+    stubDataSet();
+    stubDataSink();
+    stubStyles();
+    stubLayer();
+    stubSave();
+
+    Installation installation =
+        installationService.install(
+            request(
+                DATAPOOL_ID,
+                layer("trees", GREEN_STYLE_URN, List.of(ORANGE_STYLE_URN)),
+                style(ORANGE_STYLE_URN, "trees-orange"),
+                style(GREEN_STYLE_URN, "trees-green"),
+                frostSink(),
+                dataSet()));
+
+    verify(layerService).create(layerCaptor.capture());
+    LayerInputDTO layer = layerCaptor.getValue();
+    assertThat(layer.getDataSetId()).isEqualTo(DATASET_ID);
+    assertThat(layer.getDataSinkId()).isEqualTo(SINK_ID);
+    assertThat(layer.getDefaultStyleId()).isEqualTo(GREEN_ID);
+    assertThat(layer.getAlternativeStyleIds()).containsExactly(ORANGE_ID);
+    assertThat(layer.getLayerName()).isEqualTo("trees");
+    assertThat(layer.getTitle()).isEqualTo("Street trees");
+    assertThat(layer.getAttribute()).containsExactly("treeId", "position");
+    assertThat(layer.getNativeBoundingBox()).containsEntry("minX", 7.625);
+    assertThat(installation.getArtifacts())
+        .extracting(InstalledArtifact::getArtifactType, InstalledArtifact::getName)
+        .containsExactly(
+            tuple(InstalledArtifactType.DATA_SET, "Trees"),
+            tuple(InstalledArtifactType.DATA_SINK, "Sensor store"),
+            tuple(InstalledArtifactType.STYLE, "trees-orange"),
+            tuple(InstalledArtifactType.STYLE, "trees-green"),
+            tuple(InstalledArtifactType.LAYER, "trees"));
+  }
+
+  @Test
+  void install_whenMappingHasNoDataSet_changesNothing() {
+    assertThatThrownBy(() -> installationService.install(request(tree(), mapping())))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("it has no Dataset");
+
+    verifyNoChange();
+  }
+
+  @Test
+  void install_whenPipelineReferencesAMemberOfAnotherKind_changesNothing() {
+    stubDatapool();
+
+    assertThatThrownBy(
+            () ->
+                installationService.install(
+                    request(
+                        DATAPOOL_ID,
+                        tree(),
+                        sqlSource(FOREIGN_URN),
+                        dataSet(),
+                        mapping(),
+                        pipeline(MAPPING_URN))))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("nodes[3].sinkRef")
+        .hasMessageContaining("is not of the kind datasink");
+
+    verifyNoChange();
+  }
+
+  @Test
+  void install_whenLayerReferencesAStyleThatThePackageDoesNotHave_changesNothing() {
+    stubDatapool();
+    String unknown = "urn:core:standard:test:style:environment:other:z9y8x7w6v5";
+
+    assertThatThrownBy(
+            () ->
+                installationService.install(
+                    request(DATAPOOL_ID, dataSet(), frostSink(), layer("trees", unknown, null))))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("defaultStyleRef")
+        .hasMessageContaining("the package has no member with this identity");
+
+    verifyNoChange();
+  }
+
+  @Test
+  void install_whenSinkTypeIsUnknown_changesNothing() {
+    stubDatapool();
+
+    assertThatThrownBy(
+            () -> installationService.install(request(DATAPOOL_ID, dataSet(), sink("kafka"))))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("unknown sink type 'kafka'");
+
+    verifyNoChange();
+  }
+
+  @Test
+  void install_whenLayerNameIsInvalid_changesNothingAndNamesTheField() {
+    stubDatapool();
+
+    assertThatThrownBy(
+            () ->
+                installationService.install(
+                    request(DATAPOOL_ID, dataSet(), frostSink(), layer("1trees", null, null))))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining(LAYER_URN)
+        .hasMessageContaining("field 'layerName'");
+
+    verifyNoChange();
+  }
+
+  @Test
   void findByIdOrThrow_whenInstallationDoesNotExist_throwsResourceNotFound() {
     UUID unknownId = UUID.fromString("99999999-9999-4000-8000-000000000009");
     when(installationRepository.findById(unknownId)).thenReturn(Optional.empty());
@@ -443,7 +656,15 @@ class InstallationServiceTest {
 
   private void verifyNoArtifactCreated() {
     verifyNoInteractions(
-        dataStructureService, dataStructureVersionService, dataSourceService, dataSetService);
+        dataStructureService,
+        dataStructureVersionService,
+        dataSourceService,
+        dataSetService,
+        mappingService,
+        dataSinkService,
+        pipelineService,
+        styleService,
+        layerService);
   }
 
   private void stubCreate() {
@@ -487,6 +708,167 @@ class InstallationServiceTest {
     dataSet.setId(DATASET_ID);
     dataSet.getNamedApis().add(api);
     when(dataSetService.create(any())).thenReturn(dataSet);
+  }
+
+  private void stubMapping() {
+    when(mappingService.store(any(), any(), any()))
+        .thenReturn(
+            new ModelRegistryGateway.ModelPin(MAPPING_LOGICAL_URN, MAPPING_VERSIONED_URN, "1.0.0"));
+  }
+
+  private void stubDataSink() {
+    DataSink sink = new DataSink();
+    sink.setId(SINK_ID);
+    sink.setConfigurationLogicalUrn(SINK_LOGICAL_URN);
+    sink.setConfigurationUrn(SINK_VERSIONED_URN);
+    when(dataSinkService.create(any())).thenReturn(sink);
+  }
+
+  private void stubPipeline() {
+    Pipeline pipeline = Pipeline.builder().name("Tree import").build();
+    pipeline.setId(PIPELINE_ID);
+    when(pipelineService.create(any())).thenReturn(pipeline);
+  }
+
+  /** The style service gives each style the id that belongs to its name. */
+  private void stubStyles() {
+    when(styleService.create(any()))
+        .thenAnswer(
+            invocation -> {
+              StyleInputDTO input = invocation.getArgument(0);
+              Style style = new Style();
+              style.setId("trees-green".equals(input.getName()) ? GREEN_ID : ORANGE_ID);
+              style.setName(input.getName());
+              return style;
+            });
+  }
+
+  private void stubLayer() {
+    Layer layer = new Layer();
+    layer.setId(LAYER_ID);
+    layer.setLayerName("trees");
+    when(layerService.create(any())).thenReturn(layer);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<Map<String, Object>> nodesOf(PipelineInputDTO pipeline) {
+    return (List<Map<String, Object>>) pipeline.getModel().get("nodes");
+  }
+
+  /** A Mapping document as a package carries it, with its Data structures by their identity. */
+  private static PackageMemberInputDTO mapping() {
+    Map<String, Object> document = new LinkedHashMap<>();
+    document.put("$schema", "https://civitasconnect.digital/core/mapping/v1");
+    document.put("id", MAPPING_URN);
+    document.put(TITLE, "Row to tree");
+    document.put("source", FOREIGN_URN);
+    document.put("target", FOREIGN_URN);
+    document.put("fields", Map.of("$.treeId", "$.tree_id"));
+    return member(PackageMemberKind.MAPPING, MAPPING_URN, null, null, document);
+  }
+
+  private static PackageMemberInputDTO postgisSink() {
+    Map<String, Object> document = new LinkedHashMap<>();
+    document.put("$schema", "https://civitasconnect.digital/core/datasink/v1");
+    document.put("id", SINK_URN);
+    document.put(TITLE, "Tree table");
+    document.put("description", "Writes the trees into a table");
+    document.put("connectionType", "postgis");
+    document.put("tableName", "trees");
+    document.put("element", FOREIGN_URN);
+    return member(PackageMemberKind.DATASINK, SINK_URN, null, null, document);
+  }
+
+  private static PackageMemberInputDTO frostSink() {
+    return member(
+        PackageMemberKind.DATASINK,
+        SINK_URN,
+        null,
+        null,
+        Map.of(TITLE, "Sensor store", "connectionType", "frost", "port", "ThingTree"));
+  }
+
+  private static PackageMemberInputDTO sink(String connectionType) {
+    return member(
+        PackageMemberKind.DATASINK,
+        SINK_URN,
+        null,
+        null,
+        Map.of(TITLE, "Sensor store", "connectionType", connectionType));
+  }
+
+  /** A Pipeline document whose sink node references the member with the identity. */
+  private static PackageMemberInputDTO pipeline(String sinkReference) {
+    Map<String, Object> position = Map.of("x", 0, "y", 120);
+    List<Map<String, Object>> nodes =
+        List.of(
+            Map.of("id", "n-start", "kind", "start", "label", "Start"),
+            Map.of(
+                "id",
+                "n-source",
+                "kind",
+                "source",
+                "label",
+                "Tree database",
+                "sourceRef",
+                SOURCE_URN,
+                "x-ui-position",
+                position),
+            Map.of(
+                "id",
+                "n-mapping",
+                "kind",
+                "mapping",
+                "label",
+                "Row to tree",
+                "mappingRef",
+                MAPPING_URN),
+            Map.of("id", "n-sink", "kind", "sink", "label", "Tree table", "sinkRef", sinkReference),
+            Map.of("id", "n-end", "kind", "end", "label", "End"));
+    List<Map<String, Object>> edges =
+        List.of(
+            Map.of("id", "e-1", "source", "n-start", "target", "n-source"),
+            Map.of("id", "e-2", "source", "n-source", "target", "n-mapping"),
+            Map.of("id", "e-3", "source", "n-mapping", "target", "n-sink"),
+            Map.of("id", "e-4", "source", "n-sink", "target", "n-end"));
+    return member(
+        PackageMemberKind.PIPELINE,
+        PIPELINE_URN,
+        "Tree import",
+        null,
+        Map.of("nodes", nodes, "edges", edges, "x-ui-styles", Map.of("nodes", List.of())));
+  }
+
+  private static PackageMemberInputDTO style(String urn, String name) {
+    return member(
+        PackageMemberKind.STYLE,
+        urn,
+        null,
+        null,
+        Map.of("name", name, "sldContent", "<StyledLayerDescriptor/>"));
+  }
+
+  /** A layer document with its references by the identities in the package. */
+  private static PackageMemberInputDTO layer(
+      String layerName, String defaultStyle, List<String> alternativeStyles) {
+    Map<String, Object> document = new LinkedHashMap<>();
+    document.put("layerName", layerName);
+    document.put(TITLE, "Street trees");
+    document.put("keywords", List.of("tree"));
+    document.put("sinkRef", SINK_URN);
+    if (defaultStyle != null) {
+      document.put("defaultStyleRef", defaultStyle);
+    }
+    if (alternativeStyles != null) {
+      document.put("alternativeStyleRefs", alternativeStyles);
+    }
+    document.put("attribute", List.of("treeId", "position"));
+    document.put("geometryColumnRef", "position");
+    document.put("crs", "EPSG:4326");
+    Map<String, Object> box = Map.of("minX", 7.625, "minY", 51.95, "maxX", 7.645, "maxY", 51.972);
+    document.put("nativeBoundingBox", box);
+    document.put("latLonBoundingBox", box);
+    return member(PackageMemberKind.LAYER, LAYER_URN, null, null, document);
   }
 
   /** A Data structure document as a package from another instance carries it. */
