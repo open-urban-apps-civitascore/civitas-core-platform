@@ -65,6 +65,7 @@ interface MappingEditorModalProps {
   target: SchemaRef
   config: MappingConfig
   onSave: (config: MappingConfig, targetRequiredFields: string[], staMatchKeys: StaTargetVocabulary) => void
+  isReadOnly?: boolean
 }
 
 const FULLSCREEN =
@@ -88,6 +89,7 @@ export const MappingEditorModal = ({
   target,
   config,
   onSave,
+  isReadOnly = false,
 }: MappingEditorModalProps) => {
   const t = useTranslations('pipelineEditor.mappingEditor')
   const tCommon = useTranslations('common')
@@ -489,7 +491,7 @@ export const MappingEditorModal = ({
 
   // Warn before leaving if unconnected transforms would be discarded; otherwise exit directly.
   const requestExit = (action: 'apply' | 'close') => {
-    if (unconnectedTransforms.length > 0) {
+    if (!isReadOnly && unconnectedTransforms.length > 0) {
       setPendingExit(action)
       return
     }
@@ -509,9 +511,11 @@ export const MappingEditorModal = ({
         )}
       </span>
       <div className="flex items-center justify-end gap-2">
-        <Button size="sm" onClick={() => requestExit('apply')} disabled={!isReady || errorCount > 0}>
-          {tCommon('actions.apply')}
-        </Button>
+        {!isReadOnly && (
+          <Button size="sm" onClick={() => requestExit('apply')} disabled={!isReady || errorCount > 0}>
+            {tCommon('actions.apply')}
+          </Button>
+        )}
         <Button size="sm" variant="outline" onClick={() => requestExit('close')}>
           {tCommon('actions.close')}
         </Button>
@@ -540,7 +544,7 @@ export const MappingEditorModal = ({
         >
           <EditorLayout
             toolbar={toolbar}
-            palette={<PaletteShell registry={translatedRegistry} title={t('palette.title')} />}
+            palette={<PaletteShell registry={translatedRegistry} title={t('palette.title')} isDisabled={isReadOnly} />}
             inspector={
               <InspectorShell
                 title={t('inspector.title')}
@@ -553,6 +557,7 @@ export const MappingEditorModal = ({
                     config={selectedData.config}
                     onChange={updateConfig}
                     errors={selectedErrors}
+                    isReadOnly={isReadOnly}
                   />
                 )}
               </InspectorShell>
@@ -572,6 +577,7 @@ export const MappingEditorModal = ({
               onDropNode={onDropNode}
               onSelectionChange={setSelectedId}
               deleteKeyCode={['Delete', 'Backspace']}
+              canEdit={!isReadOnly}
             />
           </EditorLayout>
         </DialogContent>

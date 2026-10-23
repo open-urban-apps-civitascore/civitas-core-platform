@@ -5,7 +5,7 @@ import { NextIntlClientProvider } from 'next-intl'
 
 import messages from '@/messages/de.json'
 import { MARKUP_NAME } from '@/test-support/markup'
-import { mappingNode } from '@/test-support/pipelineFixtures'
+import { cronNode, mappingNode } from '@/test-support/pipelineFixtures'
 
 import { PIPELINE_COLORS } from '../../_constants/pipelineStyles'
 import { NodeValidationContext } from '../../_hooks/use-node-validation-severity'
@@ -64,5 +64,21 @@ describe('ActivityNode', () => {
     expect(container.querySelector('.pipeline-node')).not.toHaveStyle({
       border: `2px solid ${PIPELINE_COLORS.validationWarning}`,
     })
+  })
+
+  it('shows the translated type name while the node keeps its default label', () => {
+    const CronActivityNode = createActivityNode(PIPELINE_NODE_TYPES.Cron)
+    const node = cronNode()
+
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <ReactFlowProvider>
+          <CronActivityNode {...({ id: node.id, data: node.data } as unknown as NodeProps)} />
+        </ReactFlowProvider>
+      </NextIntlClientProvider>,
+    )
+
+    expect(screen.getByText('Geplanter Trigger')).toBeInTheDocument()
+    expect(screen.queryByText('Scheduled Trigger')).not.toBeInTheDocument()
   })
 })

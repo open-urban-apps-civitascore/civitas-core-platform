@@ -44,6 +44,7 @@ import {
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
 import { useDataSinkLocks } from '../../_hooks/use-datasink-locks'
+import { useNodeName } from '../../_hooks/use-node-name'
 import { NodeValidationContext } from '../../_hooks/use-node-validation-severity'
 import { usePipelineDatasources } from '../../_hooks/use-pipeline-datasources'
 import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
@@ -123,6 +124,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const searchParams = useSearchParams()
   const requestedPipelineId = searchParams.get('pipeline')
   const t = useTranslations('pipelineEditor')
+  const nodeName = useNodeName()
   const datasetId = params.datasetId
   const activeSession = sessionManager.getActiveSession()
   const pipeline = activeSession?.pipeline || createEmptyPipeline()
@@ -468,9 +470,10 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         apiCallNamesByDatasourceId: new Map(
           httpDatasources.map(datasource => [datasource.id, apiCallNamesOf(datasource)]),
         ),
+        nodeName,
       }
     },
-    [sessionManager.sessions, datasources],
+    [sessionManager.sessions, datasources, nodeName],
   )
 
   const pipelineUsingTableName = useCallback(

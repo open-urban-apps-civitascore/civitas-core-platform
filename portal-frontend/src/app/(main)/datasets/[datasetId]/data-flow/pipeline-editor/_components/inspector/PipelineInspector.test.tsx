@@ -128,4 +128,48 @@ describe('PipelineInspector', () => {
 
     expect(updateNode).toHaveBeenCalled()
   })
+
+  it('disables the panel fields in a read-only pipeline', () => {
+    renderInspector(null, vi.fn(), true)
+
+    expect(screen.getByLabelText('geoPersistencePanel.tableName')).toBeDisabled()
+  })
+})
+
+describe('PipelineInspector edge properties', () => {
+  const sourceNode = {
+    ...selectedNode,
+    id: 'geo-1',
+    data: { ...nodeData, label: 'Geospatial Data Storage' },
+  } as PipelineNode
+  const mappingNode = {
+    ...selectedNode,
+    id: 'mapping-1',
+    type: 'mapping',
+    data: { label: 'Roads mapping' },
+  } as PipelineNode
+
+  it('shows the names of source and target instead of their ids', () => {
+    const contextValue = {
+      pipeline: { nodes: [sourceNode, mappingNode] },
+      selectedNode: null,
+      selectedEdge: { id: 'edge-1', source: 'geo-1', target: 'mapping-1' },
+      shouldShowValidationPanel: false,
+      validationResult: null,
+      getSinkLockReason: () => null,
+    } as unknown as ActivePipelineContextValue
+
+    render(
+      <ReadOnlyProvider isReadOnly={false}>
+        <ActivePipelineContext.Provider value={contextValue}>
+          <PipelineInspector />
+        </ActivePipelineContext.Provider>
+      </ReadOnlyProvider>,
+    )
+
+    expect(screen.getByText('nodeTypes.geoPersistence')).toBeInTheDocument()
+    expect(screen.getByText('Roads mapping')).toBeInTheDocument()
+    expect(screen.queryByText('geo-1')).not.toBeInTheDocument()
+    expect(screen.queryByText('mapping-1')).not.toBeInTheDocument()
+  })
 })

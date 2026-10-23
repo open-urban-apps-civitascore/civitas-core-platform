@@ -80,7 +80,7 @@ pipeline-editor/
 │   │   ├── PipelineInspector.tsx       # Right sidebar
 │   │   ├── components/
 │   │   │   ├── InspectorHeader.tsx
-│   │   │   ├── EntitySelector.tsx
+│   │   │   ├── DataSourceSelectModal.tsx
 │   │   │   └── EntityMetadata.tsx
 │   │   ├── panels/
 │   │   │   ├── ControlPanel.tsx
@@ -307,24 +307,26 @@ Each node type has a corresponding inspector panel:
 | Node Type   | Panel Component   | Features                                 |
 | ----------- | ----------------- | ---------------------------------------- |
 | Start/End   | `ControlPanel`    | Static description                       |
-| DataSource  | `DataSourcePanel` | Entity dropdown + metadata               |
+| DataSource  | `DataSourcePanel` | Selection dialog + metadata              |
 | ApiRequest  | `ApiPanel`        | Entity dropdown + metadata               |
 | ApiResponse | `ApiPanel`        | Entity dropdown + metadata               |
 | Cron        | `CronPanel`       | Expression input                         |
 | Frost       | `FrostPanel`      | Entity dropdown + metadata               |
 | Mapping     | `MappingPanel`    | Source/target selectors + mapping editor |
 
-### EntitySelector
+### DataSourceSelectModal
 
-Reusable dropdown component for selecting entities (datasources, APIs, FROST servers).
+Selection dialog for the Data source of a Data source node: search, sortable table, single selection.
+Unchecking the selected Data source and confirming clears the selection.
 
 ```typescript
-<EntitySelector
-  label="Select DataSource"
-  entities={entities}
-  selectedId={nodeData.entityId}
+<DataSourceSelectModal
+  isOpen={isOpen}
+  onOpenChange={setIsOpen}
+  datasources={entities}
   isLoading={isLoading}
-  onChange={(entity) => onUpdate({ entityId: entity?.id })}
+  selectedId={nodeData.entityId}
+  onSelect={datasource => onUpdate({ entityId: datasource?.id })}
 />
 ```
 
@@ -703,6 +705,7 @@ In read-only mode:
 - Nodes cannot be added, moved, connected or deleted. Changes in the inspector are ignored.
 - "Save all", the "New pipeline" tab button and the pipeline menu (rename, delete) are hidden. `deletePipeline` also returns early.
 - "Validate" stays available.
+- The inspector panels disable their edit fields (`isLocked`). "Show Data structure" and "Open Mapping Editor" stay available. The Mapping Editor opens without "Apply".
 
 A failed refetch after a successful first load does not change the mode. The editor keeps the data of the first load.
 

@@ -8,10 +8,16 @@ interface PaletteShellProps {
   registry: NodeRegistry
   title?: string
   width?: number
+  isDisabled?: boolean
 }
 
 /** Lists registry entries grouped by category. Domain-agnostic. */
-export const PaletteShell = ({ registry, title = 'Transforms', width = 240 }: PaletteShellProps) => (
+export const PaletteShell = ({
+  registry,
+  title = 'Transforms',
+  width = 240,
+  isDisabled = false,
+}: PaletteShellProps) => (
   <div className="flex h-full flex-col" style={{ width }}>
     <div className="border-b border-border px-3 py-2">
       <h3 className="text-sm font-medium text-foreground">{title}</h3>
@@ -28,6 +34,7 @@ export const PaletteShell = ({ registry, title = 'Transforms', width = 240 }: Pa
                 label={def.label}
                 description={def.description}
                 icon={def.icon}
+                isDisabled={isDisabled}
               />
             ))}
         </PaletteCategory>

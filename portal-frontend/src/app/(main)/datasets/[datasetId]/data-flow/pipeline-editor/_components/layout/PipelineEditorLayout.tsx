@@ -127,12 +127,7 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
 
   return (
     <>
-      <PageHeader
-        title={t('title')}
-        subtitle={t('subtitle')}
-        customElement={!isReadOnly ? customElement : undefined}
-        className="!pb-2 !gap-2"
-      />
+      <PageHeader title={t('title')} customElement={!isReadOnly ? customElement : undefined} />
       <div className="h-full w-full overflow-hidden rounded-xl border bg-background">
         <div className={cn('flex h-full w-full flex-col', className)}>
           {/* Tab Bar */}

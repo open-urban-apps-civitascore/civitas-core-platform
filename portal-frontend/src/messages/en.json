@@ -1364,12 +1364,11 @@
   },
   "pipelineEditor": {
     "title": "Pipeline Editor",
-    "subtitle": "Defines how data is ingested, transformed, and stored",
     "canvas": {
       "noPipeline": "No pipeline available"
     },
     "inspector": {
-      "edgeProperties": "Edge Properties",
+      "edgeProperties": "Edge properties",
       "source": "Source",
       "target": "Target",
       "properties": "Properties",
@@ -1383,8 +1382,8 @@
       "end": "End",
       "dataSource": "Data source",
       "cronTrigger": "Scheduled Trigger",
-      "frostStorage": "Sensor Data Storage",
-      "geoPersistence": "Geospatial Data Storage",
+      "frostStorage": "Sensor Data storage",
+      "geoPersistence": "Geospatial Data storage",
       "mapping": "Mapping"
     },
     "palette": {
@@ -1406,9 +1405,9 @@
       "dataSourceDesc": "Select Data source.",
       "cron": "Scheduled Trigger",
       "cronDesc": "Run pipeline on schedule",
-      "frostServer": "Sensor Data Storage",
+      "frostServer": "Sensor Data storage",
       "frostServerDesc": "For SensorThings API",
-      "geoPersistence": "Geospatial Data Storage",
+      "geoPersistence": "Geospatial Data storage",
       "geoPersistenceDesc": "For WFS/WMS API",
       "mapping": "Mapping",
       "mappingDesc": "Map Data structures"
@@ -1433,19 +1432,28 @@
     "dataSourcePanel": {
       "label": "Data source",
       "placeholder": "Select a Data source...",
-      "details": "Data source details",
+      "details": "Details",
       "connector": "Connector",
       "connection": "Connection",
       "status": "Status",
       "description": "Description",
+      "dataStructure": "Data structure",
+      "dataStructureVersion": "Data structure version",
+      "dataStructureVersionStatus": "Data structure version status",
       "tags": "Tags",
-      "showDataStructure": "Show Data Structure",
-      "noPermission": "No permission to read datasources",
-      "anonymousName": "Anonymous Data Source",
+      "showDataSource": "Show Data source",
+      "showDataStructure": "Show Data structure",
+      "noPermission": "No permission to read Data sources",
+      "anonymousName": "Anonymous Data source",
       "apiCall": "API call",
       "apiCallPlaceholder": "Select an API call...",
       "noApiCalls": "No API calls",
-      "apiCallNotFound": "This API call does not exist in the Data source. Select another API call."
+      "apiCallNotFound": "This API call does not exist in the Data source. Select another API call.",
+      "selectDialog": {
+        "title": "Select Data source",
+        "description": "Select the Data source this Pipeline reads from.",
+        "confirm": "Select"
+      }
     },
     "sink": {
       "locked": {
@@ -1474,14 +1482,13 @@
       }
     },
     "frostPanel": {
-      "details": "Sensor Data Storage Details",
-      "serverName": "Server Name",
+      "details": "Details",
       "serverUrl": "Server URL",
       "internalServer": "Internal Server",
       "version": "Version",
       "port": "Port",
-      "portPlaceholder": "Select what this sink writes",
-      "portHelp": "The port decides what the sink writes. There is no default: without one the Dataset does not publish.",
+      "portPlaceholder": "Select a Port",
+      "portHelp": "The Port determines whether the incoming data is stored as Things, Observations, or ThingTrees.",
       "expects": "Expects:",
       "logic": {
         "ownKey": "Upsert with its own key",
@@ -1511,17 +1518,17 @@
       "reference": "Reference"
     },
     "geoPersistencePanel": {
-      "title": "Geospatial Data Storage",
+      "title": "Geospatial Data storage",
       "tableName": "Table Name",
       "tableNamePlaceholder": "Enter table name...",
       "tableNameInvalid": "Only letters (a–z, A–Z), digits and underscores are allowed. The first character must be a letter or an underscore.",
-      "dataStructureVersion": "Data Structure Version",
-      "importDataStructure": "Import Data Structure",
-      "changeDataStructure": "Change Data Structure",
-      "details": "Data Structure Details",
-      "dataStructureName": "Data Structure",
+      "dataStructureVersion": "Data structure version",
+      "importDataStructure": "Import Data structure",
+      "changeDataStructure": "Change Data structure",
+      "details": "Details",
+      "dataStructureName": "Data structure",
       "versionNumber": "Version",
-      "anonymousDataStructure": "Anonymous Data Structure",
+      "anonymousDataStructure": "Anonymous Data structure",
       "status": "Status"
     },
     "mappingPanel": {
@@ -1533,18 +1540,18 @@
       "noMappingDefined": "No mapping defined",
       "name": "Name",
       "namePlaceholder": "Mapping name",
-      "selectDatastructure": "Select datastructure…",
-      "inputDatastructure": "Input datastructure",
-      "outputDatastructure": "Output datastructure",
-      "openMappingEditor": "Open mapping editor",
-      "details": "Referenced Data Structures",
-      "inputStatus": "Input datastructure status",
-      "outputStatus": "Output datastructure status"
+      "selectDatastructure": "Select Data structure…",
+      "inputDatastructure": "Input Data structure",
+      "outputDatastructure": "Output Data structure",
+      "openMappingEditor": "Open Mapping Editor",
+      "details": "Referenced Data structures",
+      "inputVersion": "Input Data structure version",
+      "inputStatus": "Input Data structure status",
+      "outputVersion": "Output Data structure version",
+      "outputStatus": "Output Data structure status"
     },
     "entitySelector": {
-      "selectEntity": "Select an entity...",
-      "errorLoading": "Error loading entities",
-      "clearSelection": "Clear selection"
+      "errorLoading": "Error loading entities"
     },
     "validation": {
       "results": "Validation Results",
@@ -1592,7 +1599,7 @@
         "multipleSinkNodes": "{label} is an additional data storage node; a pipeline supports exactly one",
         "nodeUnsupportedPosition": "{label} is wired in an unsupported position",
         "unknownNodeInFlow": "{label} has an unsupported node type and cannot be wired into the data flow",
-        "flowBranches": "The data flow branches at {label}; a linear source-to-sink flow is required",
+        "flowBranches": "The data flow branches at {label}; a linear flow from Data source to Data storage is required",
         "flowCycle": "The data flow contains a cycle at {label}",
         "noDataPath": "There is no data path from the Data source to the data storage",
         "mappingNotOnPath": "{label} is not on the data path between the Data source and the data storage",
