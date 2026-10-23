@@ -20,13 +20,22 @@ tests {
     expect(res.body.title).to.equal("Bad Request");
     expect(res.body.status).to.equal(400);
   });
-  test("fieldErrors name the missing path and pagination fields by their connector path", function() {
+  test("fieldErrors name the missing authentication, path and pagination fields by their connector path", function() {
     const fields = res.body.fieldErrors.map(function(error) { return error.field; });
     expect(fields).to.have.members([
+      "connector.authentication.token",
       "connector.apiCalls[0].path",
       "connector.apiCalls[0].pagination.pageSizeParameter",
-      "connector.apiCalls[0].pagination.pageSize"
+      "connector.apiCalls[0].pagination.pageSize",
+      "connector.apiCalls[1].pagination",
+      "connector.apiCalls[2].pagination.cursorParameter",
+      "connector.apiCalls[2].pagination.limitParameter",
+      "connector.apiCalls[2].pagination.limit"
     ]);
+  });
+  test("A limit/offset pagination without any field points to disabling the pagination", function() {
+    const error = res.body.fieldErrors.find(function(e) { return e.field === "connector.apiCalls[1].pagination"; });
+    expect(error.message).to.equal("A limit/offset pagination needs at least one field; without one, disable the pagination");
   });
 }
 

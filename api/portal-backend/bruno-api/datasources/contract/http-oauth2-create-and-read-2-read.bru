@@ -1,0 +1,30 @@
+meta {
+  name: Contract HTTP — OAuth2 create + read (2/3 read)
+  type: http
+  seq: 131
+}
+
+get {
+  url: {{baseUrl}}/datasources/{{contractHttpOauth2Id}}
+  body: none
+  auth: inherit
+}
+
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("The authentication reads back with the OAuth2 secret masked", function() {
+    expect(res.body.connector.authentication).to.deep.equal({
+      "type": "OAUTH2",
+      "tokenUrl": "https://auth.example.org/oauth2/token",
+      "clientId": "civitas-core",
+      "clientSecret": "********",
+      "scope": "read"
+    });
+  });
+  test("No response field holds the secret in clear text", function() {
+    expect(JSON.stringify(res.body)).to.not.include("http-s3cret");
+  });
+}

@@ -1,0 +1,28 @@
+meta {
+  name: Contract HTTP — pagination create + read (2/3 read)
+  type: http
+  seq: 137
+}
+
+get {
+  url: {{baseUrl}}/datasources/{{contractHttpPaginationId}}
+  body: none
+  auth: inherit
+}
+
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Each pagination reads back as sent, with unset fields null", function() {
+    expect(res.body.connector.apiCalls[0].pagination).to.deep.equal({
+      type: "LIMIT_OFFSET", limitParameter: "limit", offsetParameter: "offset",
+      limit: 20, offset: null, countPath: "$.meta.count"
+    });
+    expect(res.body.connector.apiCalls[1].pagination).to.deep.equal({
+      type: "CURSOR", cursorPath: "$.next_cursor", cursorParameter: "X-Cursor",
+      cursorIn: "HEADER", limitParameter: "limit", limit: 20
+    });
+  });
+}
