@@ -34,9 +34,7 @@ tests {
   test("Body has the connection test result shape", function() {
     const body = res.body;
     expect(body.success).to.be.a('boolean');
-    expect(body.previewTruncated).to.be.a('boolean');
     expect(body).to.have.property('message');
-    expect(body).to.have.property('preview');
     expect(body).to.have.property('rowCount');
     expect(body).to.have.property('httpStatus');
     if (body.success) {

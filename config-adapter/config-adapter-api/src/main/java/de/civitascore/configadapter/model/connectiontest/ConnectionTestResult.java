@@ -19,10 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * @param outcome whether the source answered as configured
  * @param reason why the test failed, null on success
  * @param message what happened, at most 500 characters; never a secret or a platform internal
- * @param preview what the source returned: rows as CSV for SQL, the body of an HTTP call for any
- *     status; null otherwise
- * @param previewTruncated whether the preview was cut at its size limit
- * @param rowCount the number of rows in the preview, SQL only
+ * @param rowCount the number of rows read, SQL only
  * @param httpStatus the HTTP status code, when the source answered an HTTP call with one
  * @param durationMillis how long the test took in the connection test service
  */
@@ -32,8 +29,6 @@ public record ConnectionTestResult(
     Outcome outcome,
     Reason reason,
     String message,
-    String preview,
-    boolean previewTruncated,
     Integer rowCount,
     Integer httpStatus,
     long durationMillis) {
@@ -58,14 +53,14 @@ public record ConnectionTestResult(
     UNAVAILABLE
   }
 
-  /** A failure that carries no preview. */
+  /** A failure without a row count or an HTTP status. */
   public static ConnectionTestResult failure(
       String requestId, Reason reason, String message, long durationMillis) {
     return new ConnectionTestResult(
-        requestId, Outcome.FAILURE, reason, message, null, false, null, null, durationMillis);
+        requestId, Outcome.FAILURE, reason, message, null, null, durationMillis);
   }
 
-  /** Keeps the preview, which holds data of the source, and the message out of logs. */
+  /** Keeps the message, which can quote the source, out of logs. */
   @Override
   public String toString() {
     return "ConnectionTestResult[requestId="

@@ -9,7 +9,7 @@ It is neither a `ConfigAdapter` nor a `SagaCommandHandler`. It runs as a workloa
 | Topic | Message | Key |
 |---|---|---|
 | `de.civitascore.connectiontest.request` | `ConnectionTestRequest`: `requestId`, `expiresAt`, `connector`, `apiCall` | request id |
-| `de.civitascore.connectiontest.result` | `ConnectionTestResult`: `requestId`, `outcome` (`SUCCESS`/`FAILURE`), `reason`, `message`, `preview`, `previewTruncated`, `rowCount`, `httpStatus`, `durationMillis` | request id |
+| `de.civitascore.connectiontest.result` | `ConnectionTestResult`: `requestId`, `outcome` (`SUCCESS`/`FAILURE`), `reason`, `message`, `rowCount`, `httpStatus`, `durationMillis` | request id |
 
 - Both records are in `config-adapter-api` (`model.connectiontest`) and travel as plain JSON.
 - The topic names are the defaults of `connectiontest.kafka.request-topic` / `result-topic`.
@@ -32,24 +32,23 @@ Delivery:
 
 ## What each type tests
 
-| Type | Client | Success | Preview |
-|---|---|---|---|
-| SQL | PostgreSQL JDBC driver, as NiFi's `QueryDatabaseTableRecord` | up to 5 rows read | rows as RFC 4180 CSV with a header; each value is sent cut to the preview size |
-| MQTT 3 | HiveMQ client, MQTT 3.1.1 | the broker grants the subscription | — |
-| MQTT 5 | HiveMQ client, as NiFi's `ConsumeMQTT` | the broker grants the subscription | — |
-| HTTP | JDK `HttpClient`, request built as the `GetHttpApiCall` processor builds it | a 2xx status with a body the pipeline reads | the body, as text |
+| Type | Client | Success |
+|---|---|---|
+| SQL | PostgreSQL JDBC driver, as NiFi's `QueryDatabaseTableRecord` | up to 5 rows read |
+| MQTT 3 | HiveMQ client, MQTT 3.1.1 | the broker grants the subscription |
+| MQTT 5 | HiveMQ client, as NiFi's `ConsumeMQTT` | the broker grants the subscription |
+| HTTP | JDK `HttpClient`, request built as the `GetHttpApiCall` processor builds it | a 2xx status with a body the pipeline reads |
 
 - **SQL runs no configured text as SQL.**
   - The table and each column go to the database only as bind parameters of `to_regclass(?)` and `parse_ident(?)`. These resolve them with the parser's quoting, case folding and search path.
   - The query uses the names that the catalog returns, quoted by `quote_ident`, with `LIMIT ?`. It runs in a read-only transaction that is always rolled back.
   - The `where` clause is free SQL and is **not** part of the test. The result says so.
   - The test drops the DSN's own `connectTimeout`, `socketTimeout` and `loginTimeout`, because the driver prefers them to the test's limits.
-  - Each value is read as text and cut by the database to one character more than the preview holds. The rows come one per fetch. Thus a table of wide rows (PostGIS polygons) costs no more than its preview.
+  - Each value is read as text, of which the database sends one character. Thus a table of wide rows (PostGIS polygons) costs little.
 - **MQTT checks the SUBACK code.** A refused subscription is a failure. The test waits for no message. MQTT 5 asks for no retained messages, and messages that arrive before the disconnect are dropped. A broker with a Mosquitto `acl_file` grants a subscription and then delivers nothing to it, so such a test succeeds. The dynamic security plugin refuses the subscription in the SUBACK.
-- **HTTP follows no redirect.** It reads the body up to the preview limit.
-  - A `gzip` or `deflate` body is decompressed for the preview. Another content encoding is described, not shown.
+- **HTTP follows no redirect.** It reads the first 8 KB of the body to tell whether the pipeline reads it.
   - Basic authentication is sent only over https.
-  - A non-2xx status is a failure that keeps status and body.
+  - A non-2xx status is a failure that keeps the status.
   - A 2xx body is judged as the pipeline reads it. Not JSON, or compressed: failure, because the pipeline's web client does not unpack it. JSON without an object (`[]`, scalars): success, with a note that the pipeline reads no record from it.
 - **A value with `${` or `#{` is refused**, as a release refuses it, because the pipeline engine would evaluate it. The message names the field, never the value.
 
@@ -57,8 +56,8 @@ Delivery:
 
 ## Limits and secrets
 
-- A message has at most 500 characters. A preview has at most 8 KB of UTF-8, with a `[truncated]` marker. A body that is not text is described, not shown.
-- Every decrypted secret is masked in message and preview. A basic credential that an API echoes back is masked in the preview too.
+- A message has at most 500 characters. A result holds no rows and no body of the source.
+- Every decrypted secret is masked in the message.
 - A message keeps the source's own answer (`password authentication failed`, `NOT_AUTHORIZED`, the HTTP status). A failure of the test's own client is named by its type, never by its text.
 - An MQTT connection that fails after its connect timeout is `TIMEOUT`.
 - Logs carry the request id, outcome and duration. At DEBUG they also carry the masked failure message.

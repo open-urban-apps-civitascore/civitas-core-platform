@@ -77,8 +77,7 @@ final class MqttProber implements ConnectionProber {
             + subscription.topic()
             + "' (granted QoS "
             + granted
-            + ").",
-        null);
+            + ").");
   }
 
   /** The connector's connect timeout, but never beyond the budget of the test. */

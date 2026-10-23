@@ -72,11 +72,8 @@ class SqlProberIT {
       sql.execute(
           "INSERT INTO \"Weather\".\"Daily\" VALUES ('2026-10-01', 'dry, \"sunny\"'),"
               + " ('2026-10-02', E'line\\nbreak')");
-      sql.execute("CREATE TABLE wide (id int, blob text)");
-      // Five rows of 300,000 characters: more than the driver's result buffer holds at once.
-      sql.execute("INSERT INTO wide SELECT i, repeat('x', 300000) FROM generate_series(1, 5) i");
-      sql.execute("CREATE TABLE notes (id int, note text)");
-      sql.execute("INSERT INTO notes VALUES (1, NULL), (2, '')");
+      sql.execute("CREATE TABLE partial (id int, secret text)");
+      sql.execute("INSERT INTO partial VALUES (1, 'hidden')");
       sql.execute("CREATE TABLE audit (entry text)");
       sql.execute(
           "CREATE FUNCTION write_audit() RETURNS int LANGUAGE sql VOLATILE AS"
@@ -86,29 +83,18 @@ class SqlProberIT {
       sql.execute("CREATE SEQUENCE counter");
       sql.execute("CREATE USER reader PASSWORD 'reader-secret'");
       sql.execute("GRANT SELECT ON readings TO reader");
+      sql.execute("GRANT SELECT (id) ON partial TO reader");
     }
   }
 
   @Test
-  void readsAtMostFiveRowsOfTheConfiguredColumnsAsCsv() throws Exception {
+  void readsAtMostFiveRowsOfTheConfiguredColumns() throws Exception {
     ProbeResult result =
         probe(connector("readings", List.of("id", "station"), "reader", "reader-secret"));
 
     assertTrue(result.success(), result.message());
-    assertEquals(
-        "id,station\r\n1,station 1\r\n2,station 2\r\n3,station 3\r\n4,station 4\r\n5,station 5\r\n",
-        result.preview());
-    assertEquals("Connected and read 5 row(s) from public.readings.", result.message());
-  }
-
-  @Test
-  void readsWideRowsAsTheirCutStartAndSaysThePreviewIsCut() throws Exception {
-    ProbeResult result = probe(connector("wide", List.of("id", "blob"), "owner", "owner-secret"));
-
-    assertTrue(result.success(), result.message());
     assertEquals(5, result.rowCount());
-    assertTrue(result.truncated());
-    assertTrue(result.preview().length() < 6 * SqlProber.VALUE_CHARS, "values arrive cut");
+    assertEquals("Connected and read 5 row(s) from public.readings.", result.message());
   }
 
   @Test
@@ -122,13 +108,21 @@ class SqlProberIT {
     assertTrue(failure.getMessage().contains("write \"Day\""), failure.getMessage());
   }
 
+  /** The reader may read only the column id, so reading every column is refused. */
   @Test
   void readsAllColumnsForAStarOrNoColumn() throws Exception {
-    ProbeResult star = probe(connector("readings", List.of("*"), "reader", "reader-secret"));
-    ProbeResult none = probe(connector("readings", List.of(), "reader", "reader-secret"));
+    ConnectionTestFailure star =
+        assertThrows(
+            ConnectionTestFailure.class,
+            () -> probe(connector("partial", List.of("*"), "reader", "reader-secret")));
+    ConnectionTestFailure none =
+        assertThrows(
+            ConnectionTestFailure.class,
+            () -> probe(connector("partial", List.of(), "reader", "reader-secret")));
 
-    assertTrue(star.preview().startsWith("id,station,value\r\n1,station 1,1.5\r\n"));
-    assertEquals(star.preview(), none.preview());
+    assertTrue(star.getMessage().contains("permission denied"), star.getMessage());
+    assertTrue(none.getMessage().contains("permission denied"), none.getMessage());
+    assertTrue(probe(connector("partial", List.of("id"), "reader", "reader-secret")).success());
   }
 
   @Test
@@ -142,16 +136,6 @@ class SqlProberIT {
 
     assertTrue(unquoted.success(), unquoted.message());
     assertTrue(quoted.success(), quoted.message());
-    assertEquals(
-        "Day,note\r\n2026-10-01,\"dry, \"\"sunny\"\"\"\r\n2026-10-02,\"line\nbreak\"\r\n",
-        quoted.preview());
-  }
-
-  @Test
-  void tellsAnEmptyStringFromNull() throws Exception {
-    ProbeResult result = probe(connector("notes", List.of(), "owner", "owner-secret"));
-
-    assertEquals("id,note\r\n1,\r\n2,\"\"\r\n", result.preview());
   }
 
   @Test
@@ -163,7 +147,7 @@ class SqlProberIT {
 
     assertTrue(result.success(), result.message());
     assertTrue(result.message().endsWith("The where clause is not part of the test."));
-    assertTrue(result.preview().contains("\r\n1\r\n"), "the filter is not applied");
+    assertEquals(5, result.rowCount(), "the filter is not applied");
     assertEquals(0, auditEntries());
   }
 

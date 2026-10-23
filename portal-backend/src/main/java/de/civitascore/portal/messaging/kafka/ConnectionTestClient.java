@@ -126,7 +126,7 @@ public class ConnectionTestClient implements ConsumerSeekAware {
     try {
       result = objectMapper.readValue(record.value(), ConnectionTestResult.class);
     } catch (JacksonException e) {
-      // The exception message can quote the record, whose preview may hold source data.
+      // The exception message can quote the record, whose message may quote the source.
       log.error(
           "Dropped unreadable connection test result {}: {}",
           KafkaUtils.format(record),

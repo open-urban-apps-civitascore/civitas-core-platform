@@ -140,15 +140,7 @@ class DataSourceConnectionTestServiceTest {
 
   private static ConnectionTestResult success(ConnectionTestRequest request) {
     return new ConnectionTestResult(
-        request.requestId(),
-        Outcome.SUCCESS,
-        null,
-        "1 row",
-        "id,value\n1,20.5\n",
-        false,
-        1,
-        null,
-        9);
+        request.requestId(), Outcome.SUCCESS, null, "1 row", 1, null, 9);
   }
 
   private void answer(Function<ConnectionTestRequest, ConnectionTestResult> f) {
@@ -517,16 +509,13 @@ class DataSourceConnectionTestServiceTest {
   class Result {
 
     @Test
-    @DisplayName("success answers with the preview")
-    void success_answersWithThePreview() {
+    @DisplayName("success answers with the message and the row count")
+    void success_answersWithTheMessageAndTheRowCount() {
       answer(DataSourceConnectionTestServiceTest::success);
 
       ConnectionTestResultDTO answer = service.test(sql(PLAIN_PASSWORD));
 
-      assertThat(answer)
-          .isEqualTo(
-              new ConnectionTestResultDTO(
-                  true, null, "1 row", "id,value\n1,20.5\n", false, 1, null));
+      assertThat(answer).isEqualTo(new ConnectionTestResultDTO(true, null, "1 row", 1, null));
       assertThat(singleAuditLine()).endsWith("outcome=SUCCESS");
     }
 
@@ -715,7 +704,7 @@ class DataSourceConnectionTestServiceTest {
     }
 
     @Test
-    @DisplayName("no log line carries the connector's secret, query or the preview")
+    @DisplayName("no log line carries the connector's secret or query")
     void logs_carryNoConnectorValues() {
       answer(DataSourceConnectionTestServiceTest::success);
 
@@ -725,7 +714,6 @@ class DataSourceConnectionTestServiceTest {
           .extracting(ILoggingEvent::getFormattedMessage)
           .noneMatch(message -> message.contains(PLAIN_PASSWORD))
           .noneMatch(message -> message.contains("secret_column"))
-          .noneMatch(message -> message.contains("20.5"))
           .noneMatch(message -> message.contains("ENC("));
     }
 

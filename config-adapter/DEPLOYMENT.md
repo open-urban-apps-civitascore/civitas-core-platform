@@ -277,7 +277,7 @@ java $JAVA_OPTS -cp /civitas/config-adapter.jar de.civitascore.configadapter.app
 - The consumer starts at the latest offset and commits automatically. A request whose `expiresAt` has passed is dropped. After a crash, a request read shortly before can run again if time is left.
 - On SIGTERM the consumer leaves its group at once. A new pod takes requests when it has joined the group, about 5–8 s after its start. After a crash, the group first waits for its 10 s session timeout.
 - Readiness is reported when the consumer subscribes, not when it has joined the group.
-- The workload creates no topics. Create both topics with `retention.ms=60000` **and** `segment.ms=60000`: a result can carry up to 8 KB of source data. Kafka deletes only closed segments. Without the short `segment.ms`, the open segment rolls after 7 days.
+- The workload creates no topics. Create both topics with `retention.ms=60000` **and** `segment.ms=60000`: a request carries the connector's secrets as `ENC(...)`. Kafka deletes only closed segments. Without the short `segment.ms`, the open segment rolls after 7 days.
 
 **Network requirements**
 

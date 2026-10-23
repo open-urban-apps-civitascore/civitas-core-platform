@@ -169,8 +169,8 @@ public class DataSourceConnectionTestService {
       outcome = "UNAVAILABLE";
       throw e;
     } finally {
-      // TR-03187 L-1/L-6: who tested which destination and how it ended, without secrets, query
-      // or preview. The request id finds the matching line in the connection test service's log.
+      // TR-03187 L-1/L-6: who tested which destination and how it ended, without secrets or
+      // query. The request id finds the matching line in the connection test service's log.
       log.info(
           "Connection test: user={} requestId={} dataSource={} connectorType={}"
               + " destination=\"{}\" target=\"{}\" outcome={}",
@@ -261,13 +261,7 @@ public class DataSourceConnectionTestService {
   private static ConnectionTestResultDTO answer(
       boolean success, String reason, ConnectionTestResult result) {
     return new ConnectionTestResultDTO(
-        success,
-        reason,
-        result.message(),
-        result.preview(),
-        result.previewTruncated(),
-        result.rowCount(),
-        result.httpStatus());
+        success, reason, result.message(), result.rowCount(), result.httpStatus());
   }
 
   /** What the test reads: the SQL table, the first MQTT topic, or the HTTP API call. */

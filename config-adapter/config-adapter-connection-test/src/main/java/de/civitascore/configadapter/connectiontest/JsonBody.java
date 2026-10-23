@@ -27,11 +27,13 @@ enum JsonBody {
   private static final JsonFactory FACTORY = new JsonFactory();
 
   /**
-   * @param text the body, or its first part
-   * @param truncated whether {@code text} is only the first part; its end is then not judged
+   * Reads the bytes as the pipeline does, which lets the parser detect UTF-8, UTF-16 or UTF-32.
+   *
+   * @param body the body, or its first part
+   * @param truncated whether {@code body} is only the first part; its end is then not judged
    */
-  static JsonBody classify(String text, boolean truncated) {
-    try (JsonParser parser = FACTORY.createParser(text)) {
+  static JsonBody classify(byte[] body, boolean truncated) {
+    try (JsonParser parser = FACTORY.createParser(body)) {
       JsonToken root = parser.nextToken();
       if (root == null) {
         return NOT_JSON;
@@ -47,15 +49,15 @@ enum JsonBody {
               || root == JsonToken.START_ARRAY && first == JsonToken.START_OBJECT;
       return records ? RECORDS : NO_RECORDS;
     } catch (JsonEOFException e) {
-      return truncated ? recordsSoFar(text) : NOT_JSON;
+      return truncated ? recordsSoFar(body) : NOT_JSON;
     } catch (IOException e) {
       return NOT_JSON;
     }
   }
 
   /** A cut body is judged by its start: the rest was not read. */
-  private static JsonBody recordsSoFar(String text) {
-    try (JsonParser parser = FACTORY.createParser(text)) {
+  private static JsonBody recordsSoFar(byte[] body) {
+    try (JsonParser parser = FACTORY.createParser(body)) {
       JsonToken root = parser.nextToken();
       if (root == JsonToken.START_OBJECT) {
         return RECORDS;

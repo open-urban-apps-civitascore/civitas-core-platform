@@ -19,39 +19,32 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.InflaterInputStream;
 
 /**
- * Runs the named API call of an HTTP connector once and returns its status code and body. A
- * redirect is not followed, and the body is read up to the preview limit.
+ * Runs the named API call of an HTTP connector once and returns its status code. A redirect is not
+ * followed, and the start of the body tells whether the pipeline can read it.
  */
 final class HttpProber implements ConnectionProber {
 
   /** The connect timeout of the pipeline's web client. */
   private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
 
-  /** Read past the preview limit, longer than any credential, so the cut cannot split one. */
-  private static final int MASK_MARGIN_BYTES = 1024;
+  /** The start of the body that is read to tell whether the pipeline can read it. */
+  static final int MAX_BODY_BYTES = 8 * 1024;
 
   private static final char[] HEX = "0123456789ABCDEF".toCharArray();
-
-  /** Content encodings whose body the preview can show. */
-  private static final Set<String> DECODABLE_ENCODINGS =
-      Set.of("identity", "gzip", "x-gzip", "deflate");
 
   private final DestinationCheck guard;
   private final Duration timeout;
@@ -93,7 +86,7 @@ final class HttpProber implements ConnectionProber {
       CompletableFuture<HttpResponse<InputStream>> exchange =
           client.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream());
       HttpResponse<InputStream> response = exchange.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
-      return result(response, credential);
+      return result(response);
     } catch (ExecutionException e) {
       throw new ConnectionTestFailure(
           "The API did not answer: " + ConnectionTestFailure.describe(e.getCause()), e);
@@ -171,12 +164,7 @@ final class HttpProber implements ConnectionProber {
     }
   }
 
-  /** An API that echoes the request would return the basic credential, which is a secret. */
-  static String maskCredential(String text, String credential) {
-    return credential == null ? text : text.replace(credential, ResultText.MASK);
-  }
-
-  private static ProbeResult result(HttpResponse<InputStream> response, String credential)
+  private static ProbeResult result(HttpResponse<InputStream> response)
       throws ConnectionTestFailure {
     int status = response.statusCode();
     boolean success = status >= 200 && status < 300;
@@ -185,35 +173,17 @@ final class HttpProber implements ConnectionProber {
       message += " The pipeline does not follow redirects.";
     }
     Body body = read(response);
-    if (success && body.bytes() > 0) {
+    if (success && body.bytes().length > 0) {
       String unreadable = unreadableByPipeline(body);
       if (unreadable != null) {
         success = false;
         message += " " + unreadable;
-      } else if (JsonBody.classify(body.text(), body.truncated()) == JsonBody.NO_RECORDS) {
+      } else if (JsonBody.classify(body.bytes(), body.truncated()) == JsonBody.NO_RECORDS) {
         message +=
             " The pipeline reads no record from it: it reads JSON objects, alone or in an array.";
       }
     }
-    if (body.text() != null) {
-      return new ProbeResult(
-          success,
-          message,
-          maskCredential(body.text(), credential),
-          body.truncated(),
-          null,
-          status);
-    }
-    String preview =
-        body.bytes() == 0
-            ? null
-            : "("
-                + (body.truncated() ? "more than " : "")
-                + body.bytes()
-                + " bytes "
-                + body.kind()
-                + ", not shown)";
-    return new ProbeResult(success, message, preview, false, null, status);
+    return new ProbeResult(success, message, null, status);
   }
 
   /** Why the pipeline cannot read a body, or null if it can. */
@@ -223,32 +193,23 @@ final class HttpProber implements ConnectionProber {
           + body.encoding()
           + "), which the pipeline does not unpack.";
     }
-    if (body.text() == null
-        || JsonBody.classify(body.text(), body.truncated()) == JsonBody.NOT_JSON) {
+    if (JsonBody.classify(body.bytes(), body.truncated()) == JsonBody.NOT_JSON) {
       return "The body is not JSON; the pipeline reads JSON only.";
     }
     return null;
   }
 
-  /**
-   * Reads beyond the preview limit, to tell whether the body is longer and to keep a secret that
-   * crosses the limit whole for masking. The limit applies to the decompressed bytes.
-   */
+  /** Reads one byte beyond {@value #MAX_BODY_BYTES}, to tell whether there is more. */
   private static Body read(HttpResponse<InputStream> response) throws ConnectionTestFailure {
-    String contentType =
-        response.headers().firstValue("Content-Type").orElse("").toLowerCase(Locale.ROOT);
     String encoding =
         response
             .headers()
             .firstValue("Content-Encoding")
             .map(value -> value.trim().toLowerCase(Locale.ROOT))
             .orElse("identity");
-    boolean decodable = DECODABLE_ENCODINGS.contains(encoding);
     byte[] bytes;
     try (InputStream body = response.body()) {
-      bytes =
-          (decodable ? decoded(body, encoding) : body)
-              .readNBytes(ResultText.MAX_PREVIEW_BYTES + MASK_MARGIN_BYTES);
+      bytes = body.readNBytes(MAX_BODY_BYTES + 1);
     } catch (IOException e) {
       throw new ConnectionTestFailure(
           "The API answered with HTTP "
@@ -257,61 +218,10 @@ final class HttpProber implements ConnectionProber {
               + ConnectionTestFailure.describe(e),
           e);
     }
-    boolean truncated = bytes.length > ResultText.MAX_PREVIEW_BYTES;
-    int length = Math.min(bytes.length, ResultText.MAX_PREVIEW_BYTES);
-    if (!decodable) {
-      return new Body(null, length, truncated, "encoded as " + encoding, encoding);
-    }
-    if (length == 0 || !isText(contentType, bytes)) {
-      return new Body(
-          null,
-          length,
-          truncated,
-          "of " + (contentType.isEmpty() ? "binary data" : contentType),
-          encoding);
-    }
     return new Body(
-        new String(bytes, charset(contentType)), length, truncated, "of " + contentType, encoding);
-  }
-
-  private static InputStream decoded(InputStream body, String encoding) throws IOException {
-    return switch (encoding) {
-      case "gzip", "x-gzip" -> new GZIPInputStream(body);
-      case "deflate" -> new InflaterInputStream(body);
-      default -> body;
-    };
-  }
-
-  private static boolean isText(String contentType, byte[] bytes) {
-    if (contentType.isEmpty()) {
-      for (byte b : bytes) {
-        if (b == 0) {
-          return false;
-        }
-      }
-      return true;
-    }
-    return contentType.startsWith("text/")
-        || contentType.contains("json")
-        || contentType.contains("xml")
-        || contentType.contains("csv")
-        || contentType.contains("javascript")
-        || contentType.contains("yaml");
-  }
-
-  private static Charset charset(String contentType) {
-    for (String part : contentType.split(";")) {
-      String trimmed = part.trim();
-      if (trimmed.startsWith("charset=")) {
-        String name = trimmed.substring("charset=".length()).replace("\"", "");
-        try {
-          return Charset.forName(name);
-        } catch (IllegalArgumentException e) {
-          return StandardCharsets.UTF_8;
-        }
-      }
-    }
-    return StandardCharsets.UTF_8;
+        Arrays.copyOf(bytes, Math.min(bytes.length, MAX_BODY_BYTES)),
+        bytes.length > MAX_BODY_BYTES,
+        encoding);
   }
 
   /** The parameters in their order; an entry that is not an object is skipped. */
@@ -365,11 +275,9 @@ final class HttpProber implements ConnectionProber {
   /**
    * The start of a response body.
    *
-   * @param text the body as text, or null if it is not text
-   * @param bytes the number of bytes kept
-   * @param truncated whether the body is longer than the bytes kept
-   * @param kind what the bytes are, e.g. "of application/zip" or "encoded as br"
+   * @param bytes the first bytes of the body
+   * @param truncated whether the body is longer than {@code bytes}
    * @param encoding the content encoding the server sent, {@code identity} if none
    */
-  private record Body(String text, int bytes, boolean truncated, String kind, String encoding) {}
+  private record Body(byte[] bytes, boolean truncated, String encoding) {}
 }

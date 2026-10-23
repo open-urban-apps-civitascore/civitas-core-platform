@@ -132,8 +132,7 @@ class ConnectionTestConsumerIT {
     ConnectionTestResult result = awaitResult(id);
 
     assertEquals(Outcome.SUCCESS, result.outcome(), result.message());
-    assertTrue(result.preview().startsWith("datname\r\n"), result.preview());
-    assertEquals(result.preview().split("\r\n").length - 1, result.rowCount());
+    assertTrue(result.rowCount() > 0, result.message());
   }
 
   @Test

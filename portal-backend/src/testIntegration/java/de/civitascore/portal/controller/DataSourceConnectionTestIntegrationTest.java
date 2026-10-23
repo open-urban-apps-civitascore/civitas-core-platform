@@ -238,27 +238,17 @@ class DataSourceConnectionTestIntegrationTest extends BaseKeycloakIntegrationTes
   }
 
   @Test
-  @DisplayName("success answers 200 with the CSV preview")
-  void success_answersWithThePreview() throws Exception {
+  @DisplayName("success answers 200 with the row count")
+  void success_answersWithTheRowCount() throws Exception {
     reply =
         request ->
             new ConnectionTestResult(
-                request.requestId(),
-                Outcome.SUCCESS,
-                null,
-                "2 rows",
-                "id,value\n1,20.5\n2,21.0\n",
-                false,
-                2,
-                null,
-                480);
+                request.requestId(), Outcome.SUCCESS, null, "2 rows", 2, null, 480);
 
     ResponseEntity<JsonNode> response = testUnsaved(body(sqlConnector(PLAIN_PASSWORD), null));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody().path("success").asBoolean()).isTrue();
-    assertThat(response.getBody().path("preview").asString())
-        .isEqualTo("id,value\n1,20.5\n2,21.0\n");
     assertThat(response.getBody().path("rowCount").asInt()).isEqualTo(2);
     assertThat(response.getBody().hasNonNull("reason")).isFalse();
   }
@@ -463,8 +453,7 @@ class DataSourceConnectionTestIntegrationTest extends BaseKeycloakIntegrationTes
     nextRequest();
     nextRequest();
     ConnectionTestResult result =
-        new ConnectionTestResult(
-            request.requestId(), Outcome.SUCCESS, null, "ok", null, false, null, null, 1);
+        new ConnectionTestResult(request.requestId(), Outcome.SUCCESS, null, "ok", null, null, 1);
 
     kafkaTemplate
         .send(ConnectionTestTopics.RESULT, request.requestId(), writeAsConfigAdapter(result))

@@ -86,8 +86,7 @@ class ConnectionTestServiceTest {
 
   private ConnectionTestService service(Decryptor decryptor) {
     return new ConnectionTestService(
-        List.of(prober("sql", connector -> ProbeResult.success("Connected.", "a,b\n1,2"))),
-        decryptor);
+        List.of(prober("sql", connector -> ProbeResult.success("Connected."))), decryptor);
   }
 
   private static ConnectionTestRequest request(Map<String, Object> connector) {
@@ -137,7 +136,7 @@ class ConnectionTestServiceTest {
   void connectionTypeIsMatchedCaseInsensitively() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("sql", connector -> ProbeResult.success("ok", null))), IDENTITY);
+            List.of(prober("sql", connector -> ProbeResult.success("ok"))), IDENTITY);
 
     ConnectionTestResult result = run(service, Map.of("connectionType", " SQL "));
 
@@ -149,7 +148,7 @@ class ConnectionTestServiceTest {
   void plaintextPasswordAtTopLevelFailsWithoutProbing() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("sql", connector -> ProbeResult.success("ok", null))), IDENTITY);
+            List.of(prober("sql", connector -> ProbeResult.success("ok"))), IDENTITY);
 
     ConnectionTestResult result =
         run(service, Map.of("connectionType", "sql", "password", PASSWORD));
@@ -165,7 +164,7 @@ class ConnectionTestServiceTest {
   void plaintextPasswordNestedFailsWithoutProbing() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("sql", connector -> ProbeResult.success("ok", null))), IDENTITY);
+            List.of(prober("sql", connector -> ProbeResult.success("ok"))), IDENTITY);
 
     ConnectionTestResult result =
         run(
@@ -181,7 +180,7 @@ class ConnectionTestServiceTest {
   void encryptedPasswordPassesAndProberGetsDecryptedConnector() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("sql", connector -> ProbeResult.success("ok", null))), decrypting());
+            List.of(prober("sql", connector -> ProbeResult.success("ok"))), decrypting());
 
     ConnectionTestResult result =
         run(
@@ -208,7 +207,7 @@ class ConnectionTestServiceTest {
         };
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("sql", connector -> ProbeResult.success("ok", null))), failing);
+            List.of(prober("sql", connector -> ProbeResult.success("ok"))), failing);
 
     ConnectionTestResult result =
         run(service, Map.of("connectionType", "sql", "password", "ENC(abc)"));
@@ -221,14 +220,11 @@ class ConnectionTestServiceTest {
   }
 
   @Test
-  void probeSuccessMapsOutcomeMessagePreviewAndRequestId() {
+  void probeSuccessMapsOutcomeMessageStatusAndRequestId() {
     ConnectionTestService service =
         new ConnectionTestService(
             List.of(
-                prober(
-                    "http",
-                    connector ->
-                        new ProbeResult(true, "Got a response.", "{\"a\":1}", false, null, 200))),
+                prober("http", connector -> new ProbeResult(true, "Got a response.", null, 200))),
             IDENTITY);
 
     ConnectionTestResult result = run(service, Map.of("connectionType", "http"));
@@ -237,20 +233,16 @@ class ConnectionTestServiceTest {
     assertEquals(Outcome.SUCCESS, result.outcome());
     assertNull(result.reason());
     assertEquals("Got a response.", result.message());
-    assertEquals("{\"a\":1}", result.preview());
     assertEquals(200, result.httpStatus());
     assertEquals("call", probedApiCall.get());
   }
 
   @Test
-  void unsuccessfulProbeResultIsFailureWithPreviewAndStatusKept() {
+  void unsuccessfulProbeResultIsFailureWithStatusKept() {
     ConnectionTestService service =
         new ConnectionTestService(
             List.of(
-                prober(
-                    "http",
-                    connector ->
-                        new ProbeResult(false, "Unauthorized.", "denied", false, null, 401))),
+                prober("http", connector -> new ProbeResult(false, "Unauthorized.", null, 401))),
             IDENTITY);
 
     ConnectionTestResult result = run(service, Map.of("connectionType", "http"));
@@ -258,32 +250,21 @@ class ConnectionTestServiceTest {
     assertEquals(Outcome.FAILURE, result.outcome());
     assertEquals(Reason.SOURCE_ERROR, result.reason());
     assertEquals("Unauthorized.", result.message());
-    assertEquals("denied", result.preview());
     assertEquals(401, result.httpStatus());
   }
 
   @Test
-  void secretsAreMaskedInProbeMessageAndPreview() {
+  void secretsAreMaskedInTheProbeMessage() {
     ConnectionTestService service =
         new ConnectionTestService(
             List.of(
-                prober(
-                    "http",
-                    connector ->
-                        new ProbeResult(
-                            true,
-                            "echo " + PASSWORD,
-                            "{\"seen\":\"" + PASSWORD + "\"}",
-                            false,
-                            null,
-                            200))),
+                prober("http", connector -> new ProbeResult(true, "echo " + PASSWORD, null, 200))),
             decrypting());
 
     ConnectionTestResult result =
         run(service, Map.of("connectionType", "http", "password", "ENC(abc)"));
 
     assertFalse(result.message().contains(PASSWORD));
-    assertFalse(result.preview().contains(PASSWORD));
     assertTrue(result.message().contains("********"));
   }
 
@@ -305,14 +286,13 @@ class ConnectionTestServiceTest {
     assertEquals(Outcome.FAILURE, result.outcome());
     assertEquals("login failed for ********", result.message());
     assertEquals(Reason.SOURCE_ERROR, result.reason());
-    assertNull(result.preview());
   }
 
   @Test
   void aReferenceInADecryptedPasswordIsRefusedLikeTheReleaseWithoutQuotingIt() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("mqtt", connector -> ProbeResult.success("ok", null))),
+            List.of(prober("mqtt", connector -> ProbeResult.success("ok"))),
             connector -> {
               Map<String, Object> plain = new HashMap<>(connector);
               plain.put("password", "pw-#{x}-tail");
@@ -332,7 +312,7 @@ class ConnectionTestServiceTest {
   void aReferenceInAListValueIsRefusedNamingItsPlace() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("mqtt", connector -> ProbeResult.success("ok", null))), IDENTITY);
+            List.of(prober("mqtt", connector -> ProbeResult.success("ok"))), IDENTITY);
 
     ConnectionTestResult result =
         run(service, Map.of("connectionType", "mqtt", "topics", List.of("sensors/${x}")));
