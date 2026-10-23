@@ -1,35 +1,12 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended",
-    "gitlab>civitas-connect/civitas-core/civitas-core-v2/renovate-config//platform.json#main"
-  ],
-  "baseBranchPatterns": ["develop"],
-  "labels": ["v::2", "dependencies"],
-  "rangeStrategy": "bump",
-  "semanticCommits": "enabled",
+  "extends": ["gitlab>civitas-connect/civitas-core/civitas-core-v2/renovate-config//platform.json#main"],
   "packageRules": [
     {
-      "description": "Backend dependencies (Spring Boot): reviewers only. The OpenAPI bot (.gitlab/ci/scripts/update-openapi-spec.mjs) also takes its reviewers from this rule. Everything else about backend dependencies is in the renovate-config preset.",
+      "description": "Reviewers for backend dependency MRs. They stay in this file because .gitlab/ci/scripts/update-openapi-spec.mjs reads them from here. Everything else is in the renovate-config preset.",
       "matchFileNames": ["portal-backend/**"],
       "reviewers": ["franklex", "jonasfrz"],
       "reviewersSampleSize": 1
     }
-  ],
-  "customManagers": [
-    {
-      "description": "Track Docker image versions declared as Testcontainers Java constants. Lines annotated with '// renovate: datasource=docker' immediately above a 'public static final String NAME = \"image:tag\"' constant are matched. The existing pinDigests rule additionally appends @sha256: digests for full reproducibility.",
-      "customType": "regex",
-      "fileMatch": [
-        "portal-backend/src/testIntegration/.*TestContainerImages\\.java$",
-        "config-adapter/.*/src/test/.*TestContainerImages\\.java$"
-      ],
-      "matchStrings": [
-        "// renovate: datasource=(?<datasource>[^\\n]+)\\n\\s+public static final String \\w+ = \"(?<depName>[^:\"]+):(?<currentValue>[^\"]+)\";"
-      ]
-    }
-  ],
-  "postUpdateOptions": [
-    "npmDedupe"
   ]
 }
