@@ -22,22 +22,18 @@ together, and only in versions that work together. Thus, interfaces between our
 components do not need backward compatibility. Change component versions only
 at release.
 
-## Sprint Priorities (2.10.–22.10.2026)
-Sprint goal: **Release CIVITAS/CORE 2.0, add the HTTP connector and improve
-quality of life in the platform.**
+## Sprint Priorities (23.10.–12.11.2026)
+Sprint goal: **Finish the REST connector implementation and allow for persisting
+and serving NGSI-LD data.**
 
-- **Week one (2.10.–8.10.):** Complete every `v::2.0` issue:
-  correct version usage, naming and release rules; APIs in sync with the
-  pipeline sinks; Kyverno enforcement, compliance evidence, documentation,
-  glossary.
-- **After week one:**
-  - HTTP/REST connector
-  - the planned data-integrity and permission bugs
-  - QA of the platform development: better pipelines, more E2E tests
+- Deliver the second half of the HTTP/REST connector: more options for
+  authentication and pagination.
+- Integrate the NGSI prototype until a Pipeline can ingest data with an NGSI
+  Data storage node and serve it through an NGSI API.
 
 **Everything else can generally wait.** Don't start work outside the sprint
 goal, don't refactor beyond the task, don't tidy up on the side. When in doubt,
-propose rather than start. Close to a release, scatter costs more than it gains.
+propose rather than start.
 
 ## Governance
 - Steward: **Civitas Connect e.V.**, consists of several dozens municipalities and municipal utilities who give the requirements.
@@ -77,6 +73,8 @@ propose rather than start. Close to a release, scatter costs more than it gains.
 |---|---|
 | Backend | [Java Style Guide](./shared-context/guidelines/backend-style-guide.md) |
 | Frontend | [Frontend Style Guide](./shared-context/guidelines/frontend-style-guide.md) |
+| UI texts, user documentation, issues, release notes | [Terminology & Conventions](./shared-context/guidelines/terminology-and-naming.md) |
+| Merge requests, code review, code comments, dependencies, AI tools and agent configuration | [AI Usage Policy](./shared-context/guidelines/ai-usage-policy-purpose-and-responsibility.md) · [Collaboration](./shared-context/guidelines/ai-usage-policy-collaboration.md) · [Quality & Review](./shared-context/guidelines/ai-usage-policy-quality-and-review.md) · [Security Guardrails](./shared-context/guidelines/ai-usage-policy-security-and-exceptions.md) |
 | Container images | [Secure Container Image Guidelines](./shared-context/guidelines/container-image-guidelines.md) |
 | Deployment, Helm, cluster | [Deployment Requirements](./shared-context/guidelines/deployment-requirements.md) |
 | Authorization, permissions, roles | [Authorization Data Model](./shared-context/guidelines/authorization-data-model.md) |
@@ -110,28 +108,16 @@ other artefacts. In GitLab the labels are scoped: `AI::RED`, `AI::AMBER`, `AI::G
 | **AI:WHITE** | Written without substantial AI use. |
 
 Do not ask others to read AI-generated content that you did not read yourself.
-Issues, descriptions, documentation and chat messages must be at least **AI:AMBER**
-before you pass them on. You can share an **AI:RED** draft for early discussion.
-When a person must work on the issue, the AI:AMBER minimum applies.
+Issues, descriptions, documentation and chat messages should be at least **AI:AMBER**
+before you pass them on. You can pass on **AI:RED** content. The recipient does not
+usually do the work to bring it to AI:AMBER, and can always reject it.
+AI:RED issues do not go into sprint planning.
+The [AI Usage Policy](./shared-context/guidelines/ai-usage-policy-purpose-and-responsibility.md) gives the full rules.
 
 # Glossary
-| Term | Meaning |
-|---|---|
-| **Tenant** | The platform's top-level separation. Data and permissions stop at the tenant boundary. |
-| **Data pool** (FKA Dataspace) | Groups related Datasets and carries permissions. |
-| **Dataset** | A single body of data within a Data pool. Also includes metadata, dataflow definitions and access configurations. |
-| **Data source** | A definition of how to integrate data from an external system into the platform. Uses various connectors. |
-| **Data structure** | A versioned schema or data model for data moving through the platform. Used for Data sources, Data sinks and Mappings. |
-| **Pipeline** | A graph-based ETL definition of a data flow within a Dataset to extract data from a Data source, optionally map it and write it to a Data sink. |
-| **Data sink** | A definition of where a Pipeline writes its data. Technical 'in code' term for data storage |
-| **Data storage** | A kind of Data sink that persists data inside the platform, e.g. in a database. FrostSink and PostGisSink are both Data storages. User facing version of data sinks |
-| **Mapping** | A definition of how to transform data from a defined Data structure to another. |
-| **Connector** | A building block of a Data source providing access through various protocols or systems, e.g. SQL or MQTT. |
-| **Scope** | Where an Assignment applies: Platform (the whole Tenant), Data pool, Dataset, Data source or Data structure. The code calls the Platform scope `TENANT`. |
-| **Permission** | The right to perform an operation on a resource type. |
-| **Role** | A bundle of permissions. |
-| **Assignment** | Gives a Role to a Group, within a Scope. A User gets Roles only through Groups. |
-| **Group** | A set of Users within a Tenant. Roles are assigned to Groups, not to Users. |
-| **Status** | The lifecycle stage of an element. Dataset: `DRAFT` → `READY` → `AVAILABLE`. Data source, Data structure and Data structure version: `DRAFT` → `AVAILABLE`. Only available elements can be used. |
-| **Operation** | Abstract action (read, create, update, delete) that HTTP methods map onto. |
+The [CIVITAS/CORE V2 Glossary](./shared-context/guidelines/glossary.md) defines the domain terms,
+for example Tenant, Data pool, Dataset, Data source, Data structure, Pipeline,
+Data storage, Mapping, Connector, Scope, Permission, Role, Assignment, Group and Status.
+Terms in CamelCase (DataStructure, DataSink) are Model Management artifact types.
+Before you use a domain term, read its definition there.
 <!-- END shared-context -->

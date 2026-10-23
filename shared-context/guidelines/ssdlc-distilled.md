@@ -1,8 +1,9 @@
-<!-- VENDORED from agent-context@42d8321b — DO NOT EDIT HERE.
+<!-- VENDORED from agent-context@b924326c — DO NOT EDIT HERE.
      Change it in civitas-connect/civitas-core/civitas-core-v2/agent-context, then run ./sync-to-targets.sh -->
 
 <!-- COPY — DO NOT EDIT HERE. Refresh with ./sync-guidelines.sh
-     Source: documentation@9ba48deb · version next · Development/security/ssdlc-distilled.md
+     Source: documentation@6847d4f0 · version next · Development/security/ssdlc-distilled.md
+     Raw:    https://gitlab.com/civitas-connect/civitas-core/documentation/-/raw/6847d4f0ad9bda2133fcff49b3048e4f571966f6/docs_v2/Development/security/ssdlc-distilled.md
      Web:    https://docs.core.civitasconnect.digital/docs_v2/next/Development/security/ssdlc-distilled -->
 
 ---
@@ -20,12 +21,12 @@ This document itself includes only information and prescriptions for the entire 
 
 This document is meant to be used in conjunction with the following team specific guidelines:
 * [Security Architecture Principles](./security-architecture-principles.md): This document needs to be followed by everyone creating a ticket. It includes architecture-wide/overarching design principles that need to be incorporated into requirements and designs; they affect the coding phase only via the specifications from the ticket.
-* [Java Style Guide](https://docs.core.civitasconnect.digital/docs_v2/next/Development/backend-development/java-development/java-style-guide): This document is intended for Team 1 and the backend developers of Team 2
+* [Java Style Guide](./backend-style-guide.md): This document is intended for Team 1 and the backend developers of Team 2
 * [Frontend-Style Guide](./frontend-style-guide.md): This document is intended for the Frontend developers of Team 2
 * [DevOps Deployment Standards](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-deployment/-/blob/main/docs/deplyoment-standards.md): This document contains prescriptions for Team 3.
 * [Open Source Standards](https://docs.core.civitasconnect.digital/docs_v2/next/Architecture/platform-architecture/open-source-standards): This policy is to followed whenever new open source components are selected
 
-## 1. Scope & Roles (developer view)
+## Scope & Roles (developer view)
 
 **Developer responsibilities**
 
@@ -60,11 +61,11 @@ You **do** need to:
 
 Operators are responsible for hosting, monitoring, backups, incident response, and their local ISMS. We are responsible for enabling them through documentation and guidance.
 
-## 2. Working with the MR checklists
+## Working with the MR checklists
 
 When merging from your feature branch to the dev branch, you SHOULD fill in the non functional requirement checklist. As this may not be feasible in early stages of work on a feature, it is not mandatory. Before closing a ticket, you MUST refer to the MR (e.g. using the `Closes` functionality in Gitlab) and the checklist MUST be filled out.
 
-## 3. Requirements you need to fulfill
+## Requirements you need to fulfill
 
 ### Keep defaults secure
 
@@ -127,7 +128,7 @@ catch (SQLException e) {
 - Exceptions up to level high need approval from an additional developer
 - Exceptions for level Critical need approval from product owner
 
-## 4. When to involve security
+## When to involve security
 
 Always involve the security team when:
 - You modify authentication, authorization, cryptography, or secret handling.
@@ -137,7 +138,7 @@ Always involve the security team when:
 
 A short summary and a tag in the PR description is sufficient; the aim is early, focused feedback.
 
-## 5. Further references
+## Further references
 
 - [**SSDLC document** – full process, TR-03187 mapping, and artefact descriptions](https://docs.core.civitasconnect.digital/docs_v2/next/Development/security/ssdlc).
 - [**Threat landscape** – documentation of who might be potential attackers](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/wikis/home/Information-Security/Threat-Landscape).
