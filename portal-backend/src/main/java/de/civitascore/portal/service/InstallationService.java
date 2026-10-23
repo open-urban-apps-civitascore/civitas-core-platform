@@ -194,7 +194,7 @@ public class InstallationService {
    *
    * @param input the package to install, and the Data pool for its Data sources and its Dataset
    * @return the record, with one line for each artifact that the install created
-   * @throws UniqueConstraintViolationException if this instance has an installation of the package
+   * @throws UniqueConstraintViolationException if the package is installed and not uninstalled
    * @throws org.springframework.dao.DataIntegrityViolationException if an install of the same
    *     package that runs at the same time commits first
    * @throws InvalidInputException if the package or one of its members fails a check, or if the
@@ -203,7 +203,7 @@ public class InstallationService {
   @Transactional
   public Installation install(InstallationInputDTO input) {
     PackageManifestInputDTO manifest = input.getPackageManifest();
-    if (installationRepository.existsByPackageId(manifest.getId())) {
+    if (installationRepository.existsByPackageIdAndUninstalledAtIsNull(manifest.getId())) {
       throw alreadyInstalled(manifest.getId());
     }
     UUID datapoolId = input.getDatapoolId();
@@ -273,9 +273,9 @@ public class InstallationService {
 
   /**
    * Writes the record before the first artifact. The unique index on the package id allows one
-   * record for each package. A second install of the same package that runs at the same time waits
-   * here until the first install commits. Then the database refuses the record, before the install
-   * changes the registry.
+   * active record for each package. A second install of the same package that runs at the same time
+   * waits here until the first install commits. Then the database refuses the record, before the
+   * install changes the registry.
    */
   private void claim(Installation installation) {
     installationRepository.saveAndFlush(installation);
