@@ -297,3 +297,94 @@ test_install_denied_unauthenticated if {
 	result := authz.decision with input as portal_request_no_auth("POST", "/v1/installations")
 	result.allow == false
 }
+
+# An uninstall removes what the install created: the Dataset with its
+# sub-resources, the Data sources and the Data structures. So
+# DELETE /v1/installations/{id} needs all permissions in uninstaller_permissions
+# (an AND list in data.json): the permissions that the API needs to delete
+# the same artifacts.
+
+uninstaller_permissions := [
+	"INSTALLATION_DELETE",
+	"DATASET_DELETE",
+	"DATASOURCE_DELETE",
+	"DATASTRUCTURE_DELETE",
+]
+
+# The uninstaller permissions without the given one.
+uninstaller_permissions_without(name) := [permission | some permission in uninstaller_permissions; permission != name]
+
+mock_send_uninstaller(_) := {"status_code": 200, "body": mock_http.user_with_permissions(uninstaller_permissions)}
+mock_send_uninstaller_without_installation_delete(_) := {"status_code": 200, "body": mock_http.user_with_permissions(uninstaller_permissions_without("INSTALLATION_DELETE"))}
+mock_send_uninstaller_without_dataset_delete(_) := {"status_code": 200, "body": mock_http.user_with_permissions(uninstaller_permissions_without("DATASET_DELETE"))}
+mock_send_uninstaller_without_datasource_delete(_) := {"status_code": 200, "body": mock_http.user_with_permissions(uninstaller_permissions_without("DATASOURCE_DELETE"))}
+mock_send_uninstaller_without_datastructure_delete(_) := {"status_code": 200, "body": mock_http.user_with_permissions(uninstaller_permissions_without("DATASTRUCTURE_DELETE"))}
+mock_send_pool_uninstaller(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(uninstaller_permissions, "DATAPOOL", "pool-1")}
+
+test_uninstall_allowed_with_all_required_permissions if {
+	result := authz.decision with http.send as mock_send_uninstaller
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/installations/installation-1")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.required_permissions == {permission | some permission in uninstaller_permissions}
+}
+
+# The permissions for the artifacts of a package do not include the permission to uninstall.
+test_uninstall_denied_without_installation_delete if {
+	result := authz.decision with http.send as mock_send_uninstaller_without_installation_delete
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/installations/installation-1")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# The permission to uninstall does not include the permission to delete Datasets.
+test_uninstall_denied_without_dataset_delete if {
+	result := authz.decision with http.send as mock_send_uninstaller_without_dataset_delete
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/installations/installation-1")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# The permission to uninstall does not include the permission to delete Data sources.
+test_uninstall_denied_without_datasource_delete if {
+	result := authz.decision with http.send as mock_send_uninstaller_without_datasource_delete
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/installations/installation-1")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# The permission to uninstall does not include the permission to delete Data structures.
+test_uninstall_denied_without_datastructure_delete if {
+	result := authz.decision with http.send as mock_send_uninstaller_without_datastructure_delete
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/installations/installation-1")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# The permissions to install do not include the permission to uninstall.
+test_uninstall_denied_with_installer_permissions if {
+	result := authz.decision with http.send as mock_send_installer
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/installations/installation-1")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# A grant on one data pool is not tenant-wide, so it does not reach the installations.
+test_uninstall_denied_with_pool_grant if {
+	result := authz.decision with http.send as mock_send_pool_uninstaller
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/installations/installation-1")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+test_uninstall_denied_unauthenticated if {
+	result := authz.decision with input as portal_request_no_auth("DELETE", "/v1/installations/installation-1")
+	result.allow == false
+}
