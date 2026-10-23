@@ -14,6 +14,7 @@ import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.ConnectionTestInputDTO;
 import de.civitascore.portal.model.output.ConnectionTestResultDTO;
+import de.civitascore.portal.model.output.ConnectionTestResultDTO.Reason;
 import de.civitascore.portal.service.DataSourceService;
 import de.civitascore.portal.util.ConnectionTestBusyException;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
@@ -127,7 +128,7 @@ public class DataSourceConnectionTestService {
 
   private static boolean mayKeepStoredSecrets(
       boolean draft, ConnectorConfiguration requested, ConnectorConfiguration stored) {
-    if (requested == null || stored == null) {
+    if (stored == null) {
       return false;
     }
     return draft
@@ -147,6 +148,9 @@ public class DataSourceConnectionTestService {
     String user = currentUser.getCurrentAuditor().map(UUID::toString).orElse(UNKNOWN);
     String requestId = UUID.randomUUID().toString();
     ConnectorConfiguration connector = input.getConnector();
+    // Read before the test runs, so that an unknown connector type fails before anything is sent.
+    String destination = destinationHost(connector);
+    String target = target(connector, input.getApiCall());
     String outcome = "ERROR";
     try {
       ConnectionTestResultDTO answer =
@@ -177,9 +181,9 @@ public class DataSourceConnectionTestService {
           Encode.forJava(user),
           requestId,
           dataSourceId == null ? UNSAVED : dataSourceId,
-          connector == null ? UNKNOWN : connector.connectorType(),
-          Encode.forJava(destinationHost(connector)),
-          Encode.forJava(target(connector, input.getApiCall())),
+          connector.connectorType(),
+          Encode.forJava(destination),
+          Encode.forJava(target),
           outcome);
     }
   }
@@ -246,8 +250,9 @@ public class DataSourceConnectionTestService {
               + " without a reason");
     }
     return switch (result.reason()) {
-      case INVALID_CONNECTOR, SOURCE_ERROR, TIMEOUT ->
-          answer(false, result.reason().name(), result);
+      case INVALID_CONNECTOR -> answer(false, Reason.INVALID_CONNECTOR, result);
+      case SOURCE_ERROR -> answer(false, Reason.SOURCE_ERROR, result);
+      case TIMEOUT -> answer(false, Reason.TIMEOUT, result);
       case BUSY -> throw new ConnectionTestBusyException(ADAPTER_BUSY);
       case UNAVAILABLE ->
           throw new ExternalSystemRejectionException(
@@ -259,7 +264,7 @@ public class DataSourceConnectionTestService {
   }
 
   private static ConnectionTestResultDTO answer(
-      boolean success, String reason, ConnectionTestResult result) {
+      boolean success, Reason reason, ConnectionTestResult result) {
     return new ConnectionTestResultDTO(
         success, reason, result.message(), result.rowCount(), result.httpStatus());
   }
@@ -272,22 +277,32 @@ public class DataSourceConnectionTestService {
           case MqttConnectorConfiguration mqtt ->
               mqtt.topics() == null || mqtt.topics().isEmpty() ? null : mqtt.topics().getFirst();
           case HttpConnectorConfiguration http -> apiCall;
-          case null, default -> null;
+          default -> null;
         };
     return target == null || target.isBlank() ? UNKNOWN : target;
   }
 
+  /**
+   * Every address the connector connects to, in its order. Throws for an unknown connector type, so
+   * that it cannot keep a stored secret.
+   */
+  private static List<String> addresses(ConnectorConfiguration connector) {
+    List<String> addresses =
+        switch (connector) {
+          case SqlConnectorConfiguration sql -> sql.dsn() == null ? null : List.of(sql.dsn());
+          case MqttConnectorConfiguration mqtt -> mqtt.urls();
+          case HttpConnectorConfiguration http ->
+              http.baseUrl() == null ? null : List.of(http.baseUrl());
+          default ->
+              throw new IllegalArgumentException(
+                  "No addresses of " + connector.getClass().getSimpleName());
+        };
+    return addresses == null ? List.of() : addresses;
+  }
+
   /** Scheme, host and port of every place the connector connects to, in its order. */
   private static List<String> destinations(ConnectorConfiguration connector) {
-    List<String> urls =
-        switch (connector) {
-          case SqlConnectorConfiguration sql -> sql.dsn() == null ? List.of() : List.of(sql.dsn());
-          case MqttConnectorConfiguration mqtt -> mqtt.urls() == null ? List.of() : mqtt.urls();
-          case HttpConnectorConfiguration http ->
-              http.baseUrl() == null ? List.of() : List.of(http.baseUrl());
-          case null, default -> List.of();
-        };
-    return urls.stream().map(DataSourceConnectionTestService::origin).toList();
+    return addresses(connector).stream().map(DataSourceConnectionTestService::origin).toList();
   }
 
   /**
@@ -305,19 +320,15 @@ public class DataSourceConnectionTestService {
     }
   }
 
-  /** The host and port, if any, that the connector reaches, or {@code unknown}. */
+  /** The host and port, if any, of the first address of the connector, or {@code unknown}. */
   static String destinationHost(ConnectorConfiguration connector) {
-    String url =
-        switch (connector) {
-          case SqlConnectorConfiguration sql -> sql.dsn();
-          case MqttConnectorConfiguration mqtt ->
-              mqtt.urls() == null || mqtt.urls().isEmpty() ? null : mqtt.urls().getFirst();
-          case HttpConnectorConfiguration http -> http.baseUrl();
-          case null, default -> null;
-        };
-    if (url == null) {
-      return UNKNOWN;
-    }
+    return addresses(connector).stream()
+        .findFirst()
+        .map(DataSourceConnectionTestService::hostAndPort)
+        .orElse(UNKNOWN);
+  }
+
+  private static String hostAndPort(String url) {
     try {
       URI uri = new URI(url);
       if (uri.getHost() == null) {

@@ -59,7 +59,7 @@ Delivery:
 - A message has at most 500 characters. A result holds no rows and no body of the source.
 - Every decrypted secret is masked in the message.
 - A message keeps the source's own answer (`password authentication failed`, `NOT_AUTHORIZED`, the HTTP status). A failure of the test's own client is named by its type, never by its text.
-- An MQTT connection that fails after its connect timeout is `TIMEOUT`.
+- A connection that fails after its connect timeout is `TIMEOUT`, for every connector type.
 - Logs carry the request id, outcome and duration. At DEBUG they also carry the masked failure message.
 
 ## Destinations

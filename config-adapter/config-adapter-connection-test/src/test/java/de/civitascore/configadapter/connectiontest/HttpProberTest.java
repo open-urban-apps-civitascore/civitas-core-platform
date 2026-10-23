@@ -23,9 +23,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.net.http.HttpConnectTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,6 +38,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.zip.GZIPOutputStream;
 import javax.net.ssl.KeyManagerFactory;
@@ -365,6 +368,18 @@ class HttpProberTest {
         assertThrows(ConnectionTestFailure.class, () -> probe(connector, "root"));
 
     assertEquals("The API did not answer: The connection was refused.", failure.getMessage());
+  }
+
+  /** The chain the JDK's HTTP client builds for a connect timeout. */
+  @Test
+  void aConnectTimeoutOfTheClientIsATimeout() {
+    HttpConnectTimeoutException timeout = new HttpConnectTimeoutException("HTTP connect timed out");
+    timeout.initCause(new ConnectException("HTTP connect timed out"));
+
+    ConnectionTestFailure failure = HttpProber.failure(new ExecutionException(timeout));
+
+    assertEquals(Reason.TIMEOUT, failure.reason());
+    assertEquals("The API did not answer: The connection timed out.", failure.getMessage());
   }
 
   @Test

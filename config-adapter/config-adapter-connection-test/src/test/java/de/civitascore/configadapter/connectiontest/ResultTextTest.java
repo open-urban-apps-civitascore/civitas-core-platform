@@ -76,7 +76,7 @@ class ResultTextTest {
 
   @Test
   void messageOfExactlyMaximumLengthIsKept() {
-    String exact = "a".repeat(ResultText.MAX_MESSAGE_CHARS);
+    String exact = "a".repeat(500);
 
     assertEquals(exact, new ResultText(List.of()).message(exact));
   }
@@ -85,7 +85,7 @@ class ResultTextTest {
   void longMessageIsCutToMaximumWithEllipsis() {
     String result = new ResultText(List.of()).message("a".repeat(2000));
 
-    assertEquals(ResultText.MAX_MESSAGE_CHARS, result.length());
+    assertEquals(500, result.length());
     assertTrue(result.endsWith("…"));
   }
 

@@ -88,8 +88,7 @@ final class HttpProber implements ConnectionProber {
       HttpResponse<InputStream> response = exchange.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
       return result(response);
     } catch (ExecutionException e) {
-      throw new ConnectionTestFailure(
-          "The API did not answer: " + ConnectionTestFailure.describe(e.getCause()), e);
+      throw failure(e);
     } catch (TimeoutException e) {
       throw ConnectionTestFailure.timeout("The API did not answer in time.", e);
     } catch (InterruptedException e) {
@@ -162,6 +161,14 @@ final class HttpProber implements ConnectionProber {
       // The JDK HTTP client puts the header value into this message, so it is not passed on.
       throw ConnectionTestFailure.invalid("The API call has a header that cannot be sent.", e);
     }
+  }
+
+  /** The client's failure, with the reason TIMEOUT when the client timed out. */
+  static ConnectionTestFailure failure(ExecutionException failed) {
+    String message = "The API did not answer: " + ConnectionTestFailure.describe(failed.getCause());
+    return ConnectionTestFailure.timedOut(failed)
+        ? ConnectionTestFailure.timeout(message, failed)
+        : new ConnectionTestFailure(message, failed);
   }
 
   private static ProbeResult result(HttpResponse<InputStream> response)

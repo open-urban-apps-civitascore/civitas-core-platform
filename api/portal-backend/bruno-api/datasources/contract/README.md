@@ -109,6 +109,6 @@ Range checks such as MQTT `qos` run on every write
 | `sql-unknown-fields-rejected`, `mqtt-unknown-nested-key-rejected`, `http-unknown-nested-key-rejected` | Unknown keys are rejected |
 | `sql-validation-*`, `mqtt-validation-*`, `http-validation-*` | Error responses for an unreadable or invalid connector |
 | `http-release-rejects-invalid-configuration-*` | Release names each missing field of an API call by its path |
-| `sql-connection-test-answers`, `mqtt-connection-test-answers`, `http-connection-test-answers` | Answer shape of a connection test of unsaved values; any outcome, since it depends on the source |
+| `sql-connection-test-answers`, `mqtt-connection-test-answers`, `http-connection-test-answers` | A connection test of unsaved values with a `.invalid` host answers `SOURCE_ERROR` |
 | `sql-connection-test-rejects-*`, `http-connection-test-rejects-*` | A connection test rejects incomplete values, a placeholder of unsaved values and a missing `apiCall` before it runs |
 | `sql-connection-test-saved-masked-password-*` | A connection test of a saved data source keeps the stored password for `"********"` |

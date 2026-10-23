@@ -316,6 +316,34 @@ class DataSourceConnectionTestIntegrationTest extends BaseKeycloakIntegrationTes
   }
 
   @Test
+  @DisplayName("body without connector answers 400 with a field error")
+  void missingConnector_answers400() {
+    ResponseEntity<JsonNode> response = testUnsaved(new HashMap<>());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(response.getBody().path("type").asString())
+        .isEqualTo("urn:civitas:error:VALIDATION_FAILED");
+    assertThat(response.getBody().path("fieldErrors").findValuesAsString("field"))
+        .contains("connector");
+    assertThat(REQUESTS).isEmpty();
+  }
+
+  @Test
+  @DisplayName("unknown top-level key answers 400 naming the key")
+  void unknownTopLevelKey_answers400() {
+    Map<String, Object> body = body(sqlConnector(PLAIN_PASSWORD), null);
+    body.put("extra", 1);
+
+    ResponseEntity<JsonNode> response = testUnsaved(body);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(response.getBody().path("type").asString())
+        .isEqualTo("urn:civitas:error:MALFORMED_REQUEST");
+    assertThat(response.getBody().path("detail").asString()).isEqualTo("Unknown key: extra");
+    assertThat(REQUESTS).isEmpty();
+  }
+
+  @Test
   @DisplayName("placeholder of an unsaved connector answers 400")
   void placeholderOfUnsavedConnector_answers400() {
     ResponseEntity<JsonNode> response = testUnsaved(body(sqlConnector("********"), null));

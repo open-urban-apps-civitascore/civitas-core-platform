@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.connectiontest;
 
+import static de.civitascore.configadapter.connector.ConnectorValues.containsNifiReference;
 import static de.civitascore.configadapter.connector.ConnectorValues.isEncrypted;
 import static de.civitascore.configadapter.connector.ConnectorValues.trimmedString;
 
@@ -22,7 +23,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
@@ -35,9 +35,6 @@ import org.slf4j.LoggerFactory;
 final class ConnectionTestService {
 
   private static final Logger LOG = LoggerFactory.getLogger(ConnectionTestService.class);
-
-  /** The start of a NiFi expression or parameter reference. */
-  private static final Pattern REFERENCE_START = Pattern.compile("[$#]\\{");
 
   private final Map<String, ConnectionProber> probers;
   private final Decryptor decryptor;
@@ -142,7 +139,7 @@ final class ConnectionTestService {
       for (int i = 0; i < list.size(); i++) {
         rejectReferences(path + "[" + i + "]", list.get(i));
       }
-    } else if (value instanceof String string && REFERENCE_START.matcher(string).find()) {
+    } else if (value instanceof String string && containsNifiReference(string)) {
       throw ConnectionTestFailure.invalid(
           "'" + path + "' contains '${' or '#{', which the pipeline does not accept in a value.");
     }

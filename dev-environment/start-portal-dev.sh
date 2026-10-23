@@ -877,9 +877,10 @@ docker rm -f civitas-portal-backend 2>/dev/null || true
 docker rm -f civitas-portal-frontend 2>/dev/null || true
 sleep 1
 
-# Now kill any remaining non-Docker processes on these ports (8092 = Model Forge Admin UI,
-# which local-demo.md/vertical-slice.sh also run by hand outside Docker)
-for port in 8088 8089 3000 8092; do
+# Now kill any remaining non-Docker processes on these ports (8087 = connection tester health
+# port in cmd mode; 8092 = Model Forge Admin UI, which local-demo.md/vertical-slice.sh also run
+# by hand outside Docker)
+for port in 8087 8088 8089 3000 8092; do
     if [ "$OS_TYPE" = "Darwin" ]; then
         pid=$(lsof -ti :"$port" 2>/dev/null | head -1)
     else

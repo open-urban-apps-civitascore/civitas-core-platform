@@ -23,6 +23,7 @@ import de.civitascore.portal.messaging.kafka.ConnectionTestClient;
 import de.civitascore.portal.model.connector.ConnectorJson;
 import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
 import de.civitascore.portal.model.connector.Secret;
+import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.ConnectionTestInputDTO;
@@ -252,6 +253,16 @@ class DataSourceConnectionTestServiceTest {
                       .contains("connector.dsn", "connector.table"));
       verify(client, never()).test(any());
       assertThat(singleAuditLine()).endsWith("outcome=INVALID");
+    }
+
+    @Test
+    @DisplayName("connector of an unknown type is refused before anything is sent")
+    void connectorOfUnknownType_isRefusedBeforeSending() {
+      ConnectionTestInputDTO input = new ConnectionTestInputDTO();
+      input.setConnector(() -> ConnectorType.SQL);
+
+      assertThatThrownBy(() -> service.test(input)).isInstanceOf(IllegalArgumentException.class);
+      verify(client, never()).test(any());
     }
 
     @Test
@@ -530,7 +541,7 @@ class DataSourceConnectionTestServiceTest {
       ConnectionTestResultDTO answer = service.test(sql(PLAIN_PASSWORD));
 
       assertThat(answer.success()).isFalse();
-      assertThat(answer.reason()).isEqualTo(reason.name());
+      assertThat(answer.reason().name()).isEqualTo(reason.name());
       assertThat(answer.message()).isEqualTo("no");
       assertThat(singleAuditLine()).endsWith("outcome=FAILURE:" + reason.name());
     }
@@ -633,6 +644,32 @@ class DataSourceConnectionTestServiceTest {
 
       assertThat(first.get(5, TimeUnit.SECONDS).success()).isTrue();
       assertThat(auditLines()).hasSize(2).anyMatch(line -> line.endsWith("outcome=BUSY"));
+    }
+
+    @Test
+    @DisplayName("the instance slot is free again after a refused, a finished and a rejected test")
+    void slot_isFreeAgainAfterEveryEndOfATest() throws Exception {
+      DataSourceConnectionTestService limited = service(Optional.of(client), 1);
+      CountDownLatch running = new CountDownLatch(1);
+      CountDownLatch release = new CountDownLatch(1);
+      answer(
+          request -> {
+            running.countDown();
+            await().atMost(Duration.ofSeconds(10)).until(() -> release.getCount() == 0);
+            return success(request);
+          });
+      CompletableFuture<ConnectionTestResultDTO> first =
+          CompletableFuture.supplyAsync(() -> limited.test(sql(PLAIN_PASSWORD)));
+      assertThat(running.await(5, TimeUnit.SECONDS)).isTrue();
+      assertThatThrownBy(() -> limited.test(sql(PLAIN_PASSWORD)))
+          .isInstanceOf(ConnectionTestBusyException.class);
+      release.countDown();
+      assertThat(first.get(5, TimeUnit.SECONDS).success()).isTrue();
+      assertThatThrownBy(
+              () -> limited.test(input("{'connectorType':'SQL','driver':'postgres'}", null)))
+          .isInstanceOf(ConnectorValidationException.class);
+
+      assertThat(limited.test(sql(PLAIN_PASSWORD)).success()).isTrue();
     }
   }
 

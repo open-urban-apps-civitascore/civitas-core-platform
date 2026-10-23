@@ -35,15 +35,17 @@ tests {
     expect(body).to.have.property('message');
     expect(body).to.have.property('rowCount');
     expect(body).to.have.property('httpStatus');
-    if (body.success) {
-      expect(body.reason).to.equal(null);
-    } else {
-      expect(["INVALID_CONNECTOR", "SOURCE_ERROR", "TIMEOUT"]).to.include(body.reason);
-    }
+  });
+  test("The connection test service answers that the host is unknown", function() {
+    expect(res.body.success).to.equal(false);
+    expect(res.body.reason).to.equal("SOURCE_ERROR");
+    expect(res.body.message).to.equal("The host 'api.invalid' is unknown.");
   });
 }
 
 docs {
-  Pins the answer shape of a connection test for unsaved HTTP values. An
-  HTTP connector runs the one API call that `apiCall` names.
+  Pins the answer of a connection test for unsaved HTTP values. An
+  HTTP connector runs the one API call that `apiCall` names. The
+  `.invalid` host never resolves (RFC 6761), so the connection test
+  service answers `SOURCE_ERROR`.
 }

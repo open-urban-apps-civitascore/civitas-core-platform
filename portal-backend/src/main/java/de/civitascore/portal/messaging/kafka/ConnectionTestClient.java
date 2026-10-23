@@ -89,9 +89,7 @@ public class ConnectionTestClient implements ConsumerSeekAware {
     }
     String requestId = request.requestId();
     CompletableFuture<ConnectionTestResult> result = new CompletableFuture<>();
-    if (pending.putIfAbsent(requestId, result) != null) {
-      throw new IllegalStateException("A connection test with this request id is already waiting");
-    }
+    pending.put(requestId, result);
     try {
       send(request);
       return result.get(remainingMillis(request), TimeUnit.MILLISECONDS);
@@ -197,7 +195,7 @@ public class ConnectionTestClient implements ConsumerSeekAware {
 
   private static String rootCauseOf(Throwable e) {
     Throwable root = e;
-    while (root.getCause() != null && root.getCause() != root) {
+    while (root.getCause() != null) {
       root = root.getCause();
     }
     return root.getClass().getSimpleName();

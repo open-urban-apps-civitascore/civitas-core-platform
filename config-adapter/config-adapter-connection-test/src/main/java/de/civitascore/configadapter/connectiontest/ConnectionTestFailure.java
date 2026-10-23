@@ -115,7 +115,7 @@ final class ConnectionTestFailure extends Exception {
   }
 
   private static boolean inChain(Throwable cause, Class<? extends Throwable> type) {
-    for (Throwable t = cause; t != null; t = next(t)) {
+    for (Throwable t = cause; t != null; t = t.getCause()) {
       if (type.isInstance(t)) {
         return true;
       }
@@ -127,11 +127,5 @@ final class ConnectionTestFailure extends Exception {
   static boolean timedOut(Throwable cause) {
     return inChain(cause, SocketTimeoutException.class)
         || inChain(cause, HttpTimeoutException.class);
-  }
-
-  /** The cause of {@code t}, or null at the end of the chain. */
-  private static Throwable next(Throwable t) {
-    Throwable cause = t.getCause();
-    return cause == null || cause.equals(t) ? null : cause;
   }
 }

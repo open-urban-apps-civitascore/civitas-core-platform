@@ -12,9 +12,12 @@ package de.civitascore.configadapter.connector;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 /** Reads single values of a connector document, as the portal stores it. */
 public final class ConnectorValues {
+
+  private static final Pattern NIFI_REFERENCE_START = Pattern.compile("[$#]\\{");
 
   private ConnectorValues() {}
 
@@ -33,6 +36,11 @@ public final class ConnectorValues {
             ? list.stream().filter(Objects::nonNull).map(String::valueOf).toList()
             : List.of(String.valueOf(value));
     return raw.stream().map(String::trim).filter(s -> !s.isEmpty()).toList();
+  }
+
+  /** Whether NiFi would evaluate a {@code ${...}} or {@code #{...}} reference in a value. */
+  public static boolean containsNifiReference(String value) {
+    return value != null && NIFI_REFERENCE_START.matcher(value).find();
   }
 
   /** Whether a value is an {@code ENC(...)} ciphertext. */
