@@ -8,10 +8,6 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for all environment variables and deployment 
 
 ### Prerequisites
 
-Use Node.js 22.23.4 or a later patched 22.x release. Run `nvm install && nvm use`
-in `portal-frontend` to use the version in `.nvmrc`. This version includes the
-fix for [CVE-2026-111497](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases).
-
 Add the following entry to your `/etc/hosts` file:
 
 ```
