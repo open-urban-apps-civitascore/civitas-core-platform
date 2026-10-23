@@ -126,6 +126,50 @@ export const HttpBasicAuthenticationSchema = z
   })
   .strict()
 
+export const HttpBearerTokenAuthenticationSchema = z
+  .object({
+    type: z.literal('BEARER_TOKEN'),
+    /** Bearer token, sent as 'Authorization: Bearer <token>'. Stored ENCRYPTED by the host; null/absent when unset. */
+    token: z.union([z.string(), z.null()]).optional(),
+  })
+  .strict()
+
+export const HttpApiTokenAuthenticationSchema = z
+  .object({
+    type: z.literal('API_TOKEN'),
+    /** Name of the header or query parameter that carries the token. */
+    name: z.union([z.string(), z.null()]).optional(),
+    /** API token. Stored ENCRYPTED by the host; null/absent when unset. */
+    value: z.union([z.string(), z.null()]).optional(),
+    /** Where each request sends the token. */
+    in: z.union([z.literal('HEADER'), z.literal('QUERY'), z.null()]).optional(),
+  })
+  .strict()
+
+export const HttpOAuth2AuthenticationSchema = z
+  .object({
+    type: z.literal('OAUTH2'),
+    /** Token endpoint of the client credentials grant: an https URL without user info, query or fragment. */
+    tokenUrl: z.union([z.string(), z.null()]).optional(),
+    /** Client ID. */
+    clientId: z.union([z.string(), z.null()]).optional(),
+    /** Client secret. Stored ENCRYPTED by the host; null/absent when unset. */
+    clientSecret: z.union([z.string(), z.null()]).optional(),
+    /** Scope of the access token, space-separated; null for none. */
+    scope: z.union([z.string(), z.null()]).optional(),
+  })
+  .strict()
+
+export const HttpClientCertificateAuthenticationSchema = z
+  .object({
+    type: z.literal('CLIENT_CERTIFICATE'),
+    /** Client certificate in PEM, optionally followed by its chain. */
+    certificate: z.union([z.string(), z.null()]).optional(),
+    /** Private key of the certificate in PEM, without a passphrase. Stored ENCRYPTED by the host; null/absent when unset. */
+    privateKey: z.union([z.string(), z.null()]).optional(),
+  })
+  .strict()
+
 export const HttpParameterSchema = z
   .object({
     name: z.union([z.string(), z.null()]).optional(),
@@ -149,6 +193,38 @@ export const HttpPageNumberPaginationSchema = z
   })
   .strict()
 
+export const HttpLimitOffsetPaginationSchema = z
+  .object({
+    type: z.literal('LIMIT_OFFSET'),
+    /** Query parameter that carries the limit. */
+    limitParameter: z.union([z.string(), z.null()]).optional(),
+    /** Query parameter that carries the offset. */
+    offsetParameter: z.union([z.string(), z.null()]).optional(),
+    /** Number of records per request. */
+    limit: z.union([z.number().int(), z.null()]).optional(),
+    /** Offset of the first request. */
+    offset: z.union([z.number().int(), z.null()]).optional(),
+    /** JSON path in the response to the number of records, or to an array whose length is that number; null counts the elements of the response, which is then an array. */
+    countPath: z.union([z.string(), z.null()]).optional(),
+  })
+  .strict()
+
+export const HttpCursorPaginationSchema = z
+  .object({
+    type: z.literal('CURSOR'),
+    /** JSON path in the response to the cursor of the next request. */
+    cursorPath: z.union([z.string(), z.null()]).optional(),
+    /** Name of the query parameter or header that carries the cursor. */
+    cursorParameter: z.union([z.string(), z.null()]).optional(),
+    /** Where each request sends the cursor. */
+    cursorIn: z.union([z.literal('QUERY'), z.literal('HEADER'), z.null()]).optional(),
+    /** Query parameter that carries the limit. */
+    limitParameter: z.union([z.string(), z.null()]).optional(),
+    /** Number of records per request. */
+    limit: z.union([z.number().int(), z.null()]).optional(),
+  })
+  .strict()
+
 export const HttpApiCallSchema = z
   .object({
     /** Name of the API call, unique within the DataSource. */
@@ -162,7 +238,9 @@ export const HttpApiCallSchema = z
     /** Request headers, in clear text. */
     headers: z.union([z.array(HttpParameterSchema), z.null()]).optional(),
     /** Pagination of the API call, chosen by 'type'; null for none. */
-    pagination: z.union([HttpPageNumberPaginationSchema, z.null()]).optional(),
+    pagination: z
+      .union([HttpPageNumberPaginationSchema, HttpLimitOffsetPaginationSchema, HttpCursorPaginationSchema, z.null()])
+      .optional(),
   })
   .strict()
 
@@ -199,7 +277,17 @@ export const HttpDataSourceSchema = z
     /** API host: an http or https URL without user info, query, fragment or trailing '/'. */
     baseUrl: z.union([z.string(), z.null()]).optional(),
     /** Authentication of every API call, chosen by 'type'. */
-    authentication: z.union([HttpNoAuthenticationSchema, HttpBasicAuthenticationSchema, z.null()]).optional(),
+    authentication: z
+      .union([
+        HttpNoAuthenticationSchema,
+        HttpBasicAuthenticationSchema,
+        HttpBearerTokenAuthenticationSchema,
+        HttpApiTokenAuthenticationSchema,
+        HttpOAuth2AuthenticationSchema,
+        HttpClientCertificateAuthenticationSchema,
+        z.null(),
+      ])
+      .optional(),
     /** The GET API calls. A source node names the one it reads by 'apiCallName'. */
     apiCalls: z.union([z.array(HttpApiCallSchema), z.null()]).optional(),
   })
@@ -207,7 +295,7 @@ export const HttpDataSourceSchema = z
 
 // ── Root schema ────────────────────────────────────────────────────────────
 
-/** Configuration for a data source that feeds data into a CORE pipeline. The connector-specific fields are chosen by 'connectionType' (mqtt | sql | http); each variant declares exactly the fields the host persists (the connector configuration POJO). Only the fields named 'password', at any depth, are stored ENCRYPTED by the host — every other field is stored as-is. 'element' references the DataStructure describing the payload format by versioned CORE URN. */
+/** Configuration for a data source that feeds data into a CORE pipeline. The connector-specific fields are chosen by 'connectionType' (mqtt | sql | http); each variant declares exactly the fields the host persists (the connector configuration POJO). Only the fields whose description says 'Stored ENCRYPTED' are stored ENCRYPTED by the host — every other field is stored as-is. 'element' references the DataStructure describing the payload format by versioned CORE URN. */
 export const DataSourceSchema = z.discriminatedUnion('connectionType', [
   MqttDataSourceSchema,
   SqlDataSourceSchema,
@@ -220,8 +308,14 @@ export type MqttDataSource = z.infer<typeof MqttDataSourceSchema>
 export type SqlDataSource = z.infer<typeof SqlDataSourceSchema>
 export type HttpNoAuthentication = z.infer<typeof HttpNoAuthenticationSchema>
 export type HttpBasicAuthentication = z.infer<typeof HttpBasicAuthenticationSchema>
+export type HttpBearerTokenAuthentication = z.infer<typeof HttpBearerTokenAuthenticationSchema>
+export type HttpApiTokenAuthentication = z.infer<typeof HttpApiTokenAuthenticationSchema>
+export type HttpOAuth2Authentication = z.infer<typeof HttpOAuth2AuthenticationSchema>
+export type HttpClientCertificateAuthentication = z.infer<typeof HttpClientCertificateAuthenticationSchema>
 export type HttpParameter = z.infer<typeof HttpParameterSchema>
 export type HttpPageNumberPagination = z.infer<typeof HttpPageNumberPaginationSchema>
+export type HttpLimitOffsetPagination = z.infer<typeof HttpLimitOffsetPaginationSchema>
+export type HttpCursorPagination = z.infer<typeof HttpCursorPaginationSchema>
 export type HttpApiCall = z.infer<typeof HttpApiCallSchema>
 export type HttpDataSource = z.infer<typeof HttpDataSourceSchema>
 export type DataSource = z.infer<typeof DataSourceSchema>

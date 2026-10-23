@@ -5,6 +5,8 @@ import de.civitascore.modelforge.contract.Diagnostic;
 import de.civitascore.modelforge.testsupport.Fixtures;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -199,6 +201,44 @@ class CoreSchemaValidatorTest {
         ((ObjectNode) document.path("apiCalls").path(0)).put("foo", "bar");
 
         assertThat(validator.validate(ArtifactKind.DATA_SOURCE, document)).isNotEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        """
+        {"type": "BEARER_TOKEN", "token": "ENC(ciphertext)"}""",
+        """
+        {"type": "API_TOKEN", "name": "X-API-Key", "value": "ENC(ciphertext)", "in": "HEADER"}""",
+        """
+        {"type": "OAUTH2", "tokenUrl": "https://auth.example.org/token", "clientId": "core",
+         "clientSecret": "ENC(ciphertext)", "scope": null}""",
+        """
+        {"type": "CLIENT_CERTIFICATE", "certificate": "-----BEGIN CERTIFICATE-----",
+         "privateKey": "ENC(ciphertext)"}"""
+    })
+    @DisplayName("An HTTP/REST DataSource with each authentication the host stores is accepted")
+    void httpDataSourceWithEachAuthenticationIsAccepted(String authentication) {
+        ObjectNode document = (ObjectNode) Fixtures.json(mapper, "api/datasource-http.json");
+        document.set("authentication", mapper.readTree(authentication));
+
+        assertThat(validator.validate(ArtifactKind.DATA_SOURCE, document)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        """
+        {"type": "LIMIT_OFFSET", "limitParameter": "limit", "offsetParameter": "offset",
+         "limit": 100, "offset": null, "countPath": "$.meta.count"}""",
+        """
+        {"type": "CURSOR", "cursorPath": "$.next_cursor", "cursorParameter": "cursor",
+         "cursorIn": "QUERY", "limitParameter": "limit", "limit": 20}"""
+    })
+    @DisplayName("An HTTP/REST DataSource with each pagination the host stores is accepted")
+    void httpDataSourceWithEachPaginationIsAccepted(String pagination) {
+        ObjectNode document = (ObjectNode) Fixtures.json(mapper, "api/datasource-http.json");
+        ((ObjectNode) document.path("apiCalls").path(0)).set("pagination", mapper.readTree(pagination));
+
+        assertThat(validator.validate(ArtifactKind.DATA_SOURCE, document)).isEmpty();
     }
 
     // ── DataSet ─────────────────────────────────────────────────────────────────
