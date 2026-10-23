@@ -165,7 +165,8 @@ class InstallationServiceTest {
 
   @Test
   void install_whenPackageIsInstalled_throwsUniqueConstraintViolation() {
-    when(installationRepository.existsByPackageId(PACKAGE_ID)).thenReturn(true);
+    when(installationRepository.existsByPackageIdAndUninstalledAtIsNull(PACKAGE_ID))
+        .thenReturn(true);
 
     assertThatThrownBy(() -> installationService.install(request(tree())))
         .isInstanceOf(UniqueConstraintViolationException.class)
@@ -178,7 +179,7 @@ class InstallationServiceTest {
   void install_whenUniqueIndexRefusesTheRecord_createsNothing() {
     // The check passes, because the other install has not committed yet. The index refuses the row.
     when(installationRepository.saveAndFlush(any()))
-        .thenThrow(new DataIntegrityViolationException("uq_installations_package"));
+        .thenThrow(new DataIntegrityViolationException("uq_installations_active_package"));
 
     assertThatThrownBy(() -> installationService.install(request(tree())))
         .isInstanceOf(DataIntegrityViolationException.class);
