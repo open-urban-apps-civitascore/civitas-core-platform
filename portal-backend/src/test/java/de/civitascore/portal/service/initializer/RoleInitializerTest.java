@@ -281,6 +281,38 @@ class RoleInitializerTest {
   }
 
   @Test
+  @DisplayName(
+      "Should give INSTALLATION_DELETE only with all other permissions of the uninstall route")
+  void shouldGiveInstallationDeleteOnlyWithAllPermissionsOfTheUninstallRoute() {
+    // given
+    when(permissionRepository.findAll()).thenReturn(allPermissions);
+    when(roleRepository.findAll()).thenReturn(List.of());
+
+    // when
+    roleInitializer.initialize();
+
+    // then
+    verify(roleRepository).saveAll(rolesCaptor.capture());
+    List<Role> uninstallers =
+        rolesCaptor.getValue().stream()
+            .filter(
+                role ->
+                    role.getPermissions().stream()
+                        .anyMatch(permission -> "INSTALLATION_DELETE".equals(permission.getName())))
+            .toList();
+
+    // DELETE /v1/installations/{id} requires these permissions together with INSTALLATION_DELETE
+    // (the route map of the policy, authz/rego/data/backends/portal_backend/data.json).
+    assertThat(uninstallers)
+        .isNotEmpty()
+        .allSatisfy(
+            role ->
+                assertThat(role.getPermissions())
+                    .extracting(Permission::getName)
+                    .contains("DATASET_DELETE", "DATASOURCE_DELETE", "DATASTRUCTURE_DELETE"));
+  }
+
+  @Test
   @DisplayName("Should be idempotent when running multiple times")
   void shouldBeIdempotentWhenRunningMultipleTimes() {
     // given - first run with empty database

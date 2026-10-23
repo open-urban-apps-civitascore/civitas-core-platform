@@ -456,7 +456,10 @@ class AssignmentChangeAuthorizerTest {
    * does not use them.
    */
   private static final Set<PermissionName> TENANT_ONLY_DATA_PERMISSIONS =
-      Set.of(PermissionName.INSTALLATION_CREATE, PermissionName.INSTALLATION_READ);
+      Set.of(
+          PermissionName.INSTALLATION_CREATE,
+          PermissionName.INSTALLATION_READ,
+          PermissionName.INSTALLATION_DELETE);
 
   static Stream<PermissionName> dataPermissions() {
     return Arrays.stream(PermissionName.values())
