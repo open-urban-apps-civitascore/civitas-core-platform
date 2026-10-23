@@ -266,6 +266,90 @@ class ConnectorJsonTest {
     assertThat(document).containsEntry("password", null);
   }
 
+  private static final Map<String, Object> STORED_SQL =
+      Map.of(
+          "connectionType", "sql",
+          "dsn", "postgres://db.example:5432/city?sslmode=require",
+          "password", "ENC(sql)");
+
+  @ParameterizedTest
+  @CsvSource(
+      delimiter = '|',
+      value = {
+        "postgres://other.example:5432/city?sslmode=require",
+        "postgres://db.example:5433/city?sslmode=require",
+        "postgres://db.example:5432/city?sslmode=disable"
+      })
+  void toDocument_withStoredSecretForOtherDestination_refusesIt(String dsn) {
+    ConnectorConfiguration connector =
+        ConnectorJson.read(
+            json("{'connectorType':'SQL','dsn':'" + dsn + "','password':'********'}"));
+
+    assertThatThrownBy(() -> ConnectorJson.toDocument(connector, STORED_SQL, ENCRYPT))
+        .isInstanceOf(StoredSecretRefusedException.class)
+        .hasMessage(ConnectorJson.STORED_SECRET_FOR_STORED_DESTINATION);
+  }
+
+  /** A merge patch that omits the password keeps it as a placeholder. */
+  @Test
+  void toDocument_withPatchOfTheHostOnly_refusesTheStoredSecret() {
+    ConnectorConfiguration patched =
+        ConnectorJson.patch(
+            ConnectorJson.readStored(ConnectorType.SQL, STORED_SQL),
+            json("{'dsn':'postgres://other.example:5432/city?sslmode=require'}"));
+
+    assertThatThrownBy(() -> ConnectorJson.toDocument(patched, STORED_SQL, ENCRYPT))
+        .isInstanceOf(StoredSecretRefusedException.class);
+  }
+
+  @Test
+  void toDocument_withStoredSecretForSameDestination_keepsIt() {
+    ConnectorConfiguration connector =
+        ConnectorJson.read(
+            json(
+                "{'connectorType':'SQL','dsn':'postgres://db.example:5432/other?sslmode=require',"
+                    + "'table':'other','password':'********'}"));
+
+    assertThat(ConnectorJson.toDocument(connector, STORED_SQL, ENCRYPT))
+        .containsEntry("password", "ENC(sql)");
+  }
+
+  @Test
+  void toDocument_withNewSecretForOtherDestination_storesTheNewSecret() {
+    ConnectorConfiguration connector =
+        ConnectorJson.read(
+            json(
+                "{'connectorType':'SQL','dsn':'postgres://other.example:5432/city',"
+                    + "'password':'new-secret'}"));
+
+    assertThat(ConnectorJson.toDocument(connector, STORED_SQL, ENCRYPT))
+        .containsEntry("password", "ENC(new-secret)");
+  }
+
+  @Test
+  void toDocument_withStoredSecretForOtherBrokerOrApiHost_refusesIt() {
+    Map<String, Object> storedMqtt =
+        Map.of(
+            "connectionType",
+            "mqtt",
+            "urls",
+            List.of("tcp://broker.example:1883"),
+            "password",
+            "ENC(mqtt)");
+    ConnectorConfiguration mqtt =
+        ConnectorJson.read(
+            json(
+                "{'connectorType':'MQTT','urls':['tcp://other.example:1883'],'password':'********'}"));
+    ConnectorConfiguration http =
+        ConnectorJson.read(
+            json(HTTP_BASIC.formatted("********").replace("api.example.org", "other.example")));
+
+    assertThatThrownBy(() -> ConnectorJson.toDocument(mqtt, storedMqtt, ENCRYPT))
+        .isInstanceOf(StoredSecretRefusedException.class);
+    assertThatThrownBy(() -> ConnectorJson.toDocument(http, storedHttpBasic(), ENCRYPT))
+        .isInstanceOf(StoredSecretRefusedException.class);
+  }
+
   @Test
   void requireStoredSecrets_withPlaceholderAndNoStoredDocument_namesThePlaceholder() {
     ConnectorConfiguration connector =

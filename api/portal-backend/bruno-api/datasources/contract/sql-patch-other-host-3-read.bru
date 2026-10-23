@@ -1,0 +1,22 @@
+meta {
+  name: Contract SQL — PATCH of another host (3/4 read)
+  type: http
+  seq: 141
+}
+
+get {
+  url: {{baseUrl}}/datasources/{{contractSqlPatchOtherHostId}}
+  body: none
+  auth: inherit
+}
+
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("The refused write changed nothing", function() {
+    expect(res.body.connector.dsn).to.equal("postgres://example:5432/db?sslmode=require");
+    expect(res.body.connector.password).to.equal("********");
+  });
+}

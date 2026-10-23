@@ -27,7 +27,8 @@ public record SqlConnectorConfiguration(
     @Schema(description = "SQL WHERE clause.", example = "id > :last_id") String where,
     @Schema(description = "Database username.", example = "dbuser") String user,
     @Schema(
-            description = "Database password. Responses show \"********\" for a stored password.",
+            description =
+                "Database password. Responses show \"********\" for a stored password; a write keeps it with \"********\" while the destination stays.",
             implementation = String.class,
             accessMode = Schema.AccessMode.WRITE_ONLY,
             format = "password",

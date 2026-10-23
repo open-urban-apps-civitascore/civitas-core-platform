@@ -12274,8 +12274,8 @@ components:
           password:
             type: string
             format: password
-            description: Basic auth password. Responses show "********" for a stored
-              password.
+            description: "Basic auth password. Responses show \"********\" for a stored\
+              \ password; a write keeps it with \"********\" while the destination stays."
             example: secret
             writeOnly: true
           type:
@@ -12525,7 +12525,8 @@ components:
         password:
           type: string
           format: password
-          description: Broker password. Responses show "********" for a stored password.
+          description: "Broker password. Responses show \"********\" for a stored password;\
+            \ a write keeps it with \"********\" while the destination stays."
           example: secret
           writeOnly: true
         protocol_version:
@@ -13807,7 +13808,8 @@ components:
         password:
           type: string
           format: password
-          description: Database password. Responses show "********" for a stored password.
+          description: "Database password. Responses show \"********\" for a stored password;\
+            \ a write keeps it with \"********\" while the destination stays."
           example: secret
           writeOnly: true
         table:

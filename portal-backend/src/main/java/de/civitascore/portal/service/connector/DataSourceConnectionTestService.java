@@ -6,11 +6,12 @@ import de.civitascore.portal.configuration.ConnectionTestProperties;
 import de.civitascore.portal.messaging.kafka.ConnectionTestClient;
 import de.civitascore.portal.model.connector.ConnectorConfiguration;
 import de.civitascore.portal.model.connector.ConnectorJson;
+import de.civitascore.portal.model.connector.ConnectorUris;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration;
-import de.civitascore.portal.model.connector.HttpConnectorConfiguration.OAuth2;
 import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
 import de.civitascore.portal.model.connector.MqttConnectorConfiguration;
 import de.civitascore.portal.model.connector.SqlConnectorConfiguration;
+import de.civitascore.portal.model.connector.StoredSecretRefusedException;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.ConnectionTestInputDTO;
@@ -26,14 +27,12 @@ import java.net.URISyntaxException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
@@ -55,9 +54,6 @@ public class DataSourceConnectionTestService {
   static final String ADAPTER_BUSY = "Too many connection tests are running; try again later";
   private static final String UNSAVED = "unsaved";
   private static final String UNKNOWN = "unknown";
-  static final String STORED_SECRET_FOR_STORED_DESTINATION =
-      "The stored secret is kept only for the stored destination; enter it again to test another"
-          + " one";
   static final String STORED_SECRET_FOR_RELEASED_CONNECTOR =
       "The stored secret of a released data source is kept only to test its connector as released;"
           + " enter it again to test other values";
@@ -88,8 +84,9 @@ public class DataSourceConnectionTestService {
 
   /**
    * Tests connector values for a saved data source in any status. A {@code "********"} placeholder
-   * keeps the stored secret only for a draft's stored destination or a released source's unchanged
-   * connector, so the secret cannot reach another host or other data.
+   * keeps the stored secret only for the stored destinations of a draft, as every write does, or
+   * for the unchanged connector of a released source, so the secret cannot reach another host or
+   * other data.
    *
    * @throws ResourceNotFoundException if no such data source exists
    * @throws MalformedDataSourceRequestException for a placeholder the stored secret may not fill
@@ -99,15 +96,11 @@ public class DataSourceConnectionTestService {
     return bounded(
         () -> {
           DataSource dataSource = dataSourceService.findByIdOrThrow(dataSourceId);
-          boolean draft = dataSource.getDataSourceStatus() == DataSourceStatus.DRAFT;
-          if (mayKeepStoredSecrets(draft, input.getConnector(), connectorStore.read(dataSource))) {
+          if (dataSource.getDataSourceStatus() == DataSourceStatus.DRAFT
+              || unchanged(input.getConnector(), connectorStore.read(dataSource))) {
             return audited(dataSourceId, connectorStore.storedDocument(dataSource), null, input);
           }
-          return audited(
-              dataSourceId,
-              null,
-              draft ? STORED_SECRET_FOR_STORED_DESTINATION : STORED_SECRET_FOR_RELEASED_CONNECTOR,
-              input);
+          return audited(dataSourceId, null, STORED_SECRET_FOR_RELEASED_CONNECTOR, input);
         });
   }
 
@@ -129,14 +122,10 @@ public class DataSourceConnectionTestService {
     }
   }
 
-  private static boolean mayKeepStoredSecrets(
-      boolean draft, ConnectorConfiguration requested, ConnectorConfiguration stored) {
-    if (stored == null) {
-      return false;
-    }
-    return draft
-        ? destinations(requested).equals(destinations(stored))
-        : ConnectorJson.toMaskedTree(requested).equals(ConnectorJson.toMaskedTree(stored));
+  private static boolean unchanged(
+      ConnectorConfiguration requested, ConnectorConfiguration stored) {
+    return stored != null
+        && ConnectorJson.toMaskedTree(requested).equals(ConnectorJson.toMaskedTree(stored));
   }
 
   /**
@@ -285,51 +274,9 @@ public class DataSourceConnectionTestService {
     return target == null || target.isBlank() ? UNKNOWN : target;
   }
 
-  /**
-   * Every address the connector connects to, in its order. Throws for an unknown connector type, so
-   * that it cannot keep a stored secret.
-   */
-  private static List<String> addresses(ConnectorConfiguration connector) {
-    List<String> addresses =
-        switch (connector) {
-          case SqlConnectorConfiguration sql -> sql.dsn() == null ? null : List.of(sql.dsn());
-          case MqttConnectorConfiguration mqtt -> mqtt.urls();
-          case HttpConnectorConfiguration http ->
-              Stream.of(
-                      http.baseUrl(),
-                      http.authentication() instanceof OAuth2 oauth2 ? oauth2.tokenUrl() : null)
-                  .filter(Objects::nonNull)
-                  .toList();
-          default ->
-              throw new IllegalArgumentException(
-                  "No addresses of " + connector.getClass().getSimpleName());
-        };
-    return addresses == null ? List.of() : addresses;
-  }
-
-  /** Scheme, host and port of every place the connector connects to, in its order. */
-  private static List<String> destinations(ConnectorConfiguration connector) {
-    return addresses(connector).stream().map(DataSourceConnectionTestService::origin).toList();
-  }
-
-  /**
-   * An unparsable URL or a multi-host authority stands for itself and equals only the same text.
-   */
-  private static String origin(String url) {
-    try {
-      URI uri = new URI(url);
-      if (uri.getHost() == null) {
-        return uri.getScheme() + "://" + uri.getRawAuthority();
-      }
-      return uri.getScheme() + "://" + uri.getHost() + ":" + uri.getPort();
-    } catch (URISyntaxException e) {
-      return url;
-    }
-  }
-
   /** The host and port, if any, of the first address of the connector, or {@code unknown}. */
   static String destinationHost(ConnectorConfiguration connector) {
-    return addresses(connector).stream()
+    return ConnectorUris.addresses(connector).stream()
         .findFirst()
         .map(DataSourceConnectionTestService::hostAndPort)
         .orElse(UNKNOWN);

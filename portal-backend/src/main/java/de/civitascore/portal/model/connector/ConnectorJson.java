@@ -46,6 +46,9 @@ public final class ConnectorJson {
   /** The registry document member that names the Data structure version of the Data source. */
   public static final String ELEMENT = "element";
 
+  public static final String STORED_SECRET_FOR_STORED_DESTINATION =
+      "The stored secret is kept only for the stored destination; enter it again for another one";
+
   /**
    * Keys of a registry document that the registry and the shared schema own. A stored connector is
    * read without them.
@@ -122,12 +125,21 @@ public final class ConnectorJson {
    * if {@code storedDocument} has none there or belongs to another connector type.
    *
    * @param storedDocument the current registry document, or null if none is stored
+   * @throws StoredSecretRefusedException if a placeholder would take a stored secret to another
+   *     destination
    */
   public static Map<String, Object> toDocument(
       ConnectorConfiguration connector,
       Map<String, Object> storedDocument,
       UnaryOperator<String> encrypt) {
-    return writeDocument(connector, readStoredDocument(storedDocument), encrypt);
+    ConnectorConfiguration stored = readStoredDocument(storedDocument);
+    if (stored != null
+        && stored.connectorType() == connector.connectorType()
+        && hasPlaceholder(connector)
+        && !ConnectorUris.destinations(connector).equals(ConnectorUris.destinations(stored))) {
+      throw new StoredSecretRefusedException(STORED_SECRET_FOR_STORED_DESTINATION);
+    }
+    return writeDocument(connector, stored, encrypt);
   }
 
   /**

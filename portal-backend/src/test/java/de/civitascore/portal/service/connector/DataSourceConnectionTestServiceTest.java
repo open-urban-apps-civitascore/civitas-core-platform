@@ -398,6 +398,7 @@ class DataSourceConnectionTestServiceTest {
           arguments(Saved.SQL, "another port", "db.example:5432", "db.example:5433"),
           arguments(Saved.SQL, "another scheme", "postgres://", "postgresql://"),
           arguments(Saved.SQL, "the port left out", "db.example:5432", "db.example"),
+          arguments(Saved.SQL, "TLS turned off", "5432/city", "5432/city?sslmode=disable"),
           arguments(Saved.MQTT, "another host", "broker-b:1883", "broker-c:1883"),
           arguments(Saved.MQTT, "another port", "broker-a:1883", "broker-a:8883"),
           arguments(
@@ -438,7 +439,7 @@ class DataSourceConnectionTestServiceTest {
 
       assertThatThrownBy(() -> service.test(id, saved.requested(from, to)))
           .isInstanceOf(MalformedDataSourceRequestException.class)
-          .hasMessage(DataSourceConnectionTestService.STORED_SECRET_FOR_STORED_DESTINATION);
+          .hasMessage(ConnectorJson.STORED_SECRET_FOR_STORED_DESTINATION);
       verify(client, never()).test(any());
       assertThat(singleAuditLine()).endsWith("outcome=REFUSED");
     }

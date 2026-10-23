@@ -16,10 +16,9 @@ import java.util.function.Consumer;
 /**
  * Replaces each {@value Secret#PLACEHOLDER} of a connector with the stored secret at the same
  * place: the same record component, and in a list the stored element with the same {@link
- * IdentifiedElement#identity()}. A placeholder without such a stored secret becomes no secret. The
- * rest of the connector is not compared, so a placeholder keeps the stored secret also when the
- * connector's host changes: the right to update a Data source includes the use of its stored
- * credentials.
+ * IdentifiedElement#identity()}. A placeholder without such a stored secret becomes no secret.
+ * {@link ConnectorJson#toDocument} refuses a placeholder whose connector reaches other
+ * destinations.
  */
 final class PlaceholderResolver {
 
