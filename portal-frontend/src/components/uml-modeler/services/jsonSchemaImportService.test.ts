@@ -355,6 +355,89 @@ describe('importFromJsonSchema — designated root and inherited shapes', () => 
   })
 })
 
+describe('importFromJsonSchema - the canonical form', () => {
+  // The platform stores a model with its root element written out at the document root and kept as
+  // a member with its Element URN. A model that never passed the editor has no diagram, so the
+  // editor reads it from this form.
+  const record = {
+    type: 'object',
+    required: ['baumId'],
+    properties: {
+      baumId: { type: 'string', 'x-core-primaryKey': true },
+      gattung: { type: 'string' },
+    },
+  }
+  const canonical: JsonSchemaObject = {
+    $id: 'urn:core:platform:civitas:datastructure:common:8367c17f-913c-4b58-b6b4-a9f9fd7fb356',
+    title: 'Jungbaum (Zielformat)',
+    ...record,
+    $defs: {
+      Jungbaum: {
+        $id: 'urn:core:platform:civitas:element:common:28c920c0-d3d0-8644-8a3c-2efd4e5a2dcf',
+        title: 'Jungbaum',
+        ...record,
+      },
+    },
+  }
+
+  it('takes the member that holds the root record as the root, without a class of its own', () => {
+    const imported = importFromJsonSchema(canonical)
+
+    expect(imported.nodes.map(n => n.data.element.name)).toEqual(['Jungbaum'])
+    expect(imported.nodes[0].data.element.isRoot).toBe(true)
+  })
+
+  it('lifts the inline objects of that member once', () => {
+    const observation = {
+      type: 'object',
+      required: ['result', 'parameters'],
+      properties: {
+        result: {},
+        parameters: {
+          type: 'object',
+          title: 'ObservationParameters',
+          properties: { reference: { type: 'string', 'x-core-primaryKey': true } },
+        },
+      },
+    }
+    const document: JsonSchemaObject = {
+      title: 'Bodenfeuchte-Beobachtung (SensorThings)',
+      ...observation,
+      $defs: { Observation: { title: 'Observation', ...observation } },
+    }
+
+    const imported = importFromJsonSchema(document)
+
+    expect(imported.nodes.map(n => n.data.element.name)).toEqual(['Observation', 'ObservationParameters'])
+  })
+
+  it('still lifts the root when no member holds its record', () => {
+    const document: JsonSchemaObject = {
+      title: 'Station',
+      ...record,
+      $defs: { Owner: { type: 'object', title: 'Owner', properties: { name: { type: 'string' } } } },
+    }
+
+    const imported = importFromJsonSchema(document)
+    const root = imported.nodes.find(n => n.data.element.isRoot)
+
+    expect(imported.nodes.map(n => n.data.element.name)).toEqual(['Owner', 'Station'])
+    expect(root?.data.element.name).toBe('Station')
+  })
+
+  it('does not guess when two members hold the root record', () => {
+    const document: JsonSchemaObject = {
+      title: 'Station',
+      ...record,
+      $defs: { First: { title: 'First', ...record }, Second: { title: 'Second', ...record } },
+    }
+
+    const imported = importFromJsonSchema(document)
+
+    expect(imported.nodes.map(n => n.data.element.name)).toEqual(['First', 'Second', 'Station'])
+  })
+})
+
 describe('a free value', () => {
   const station: JsonSchemaObject = {
     $ref: '#/$defs/Station',

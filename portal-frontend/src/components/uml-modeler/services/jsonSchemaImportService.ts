@@ -385,6 +385,10 @@ const layout = (
  * nested classes inline. Both say the same thing, so the inline ones are lifted into the library
  * under `<Parent><Property>` and replaced by a reference — the form the editor writes back on the
  * next save.
+ *
+ * The platform stores every model in a canonical form. It writes the root element out at the
+ * document root and keeps the same element in the library, under its Element URN. Then the record
+ * is a member already: that member becomes the root, and the document root is not lifted again.
  */
 const normalize = (document: JsonSchemaObject): { defs: JsonSchemaObject; rootKey: string | null } => {
   const defs: JsonSchemaObject = { ...(asObject(document.$defs) ?? {}) }
@@ -396,13 +400,18 @@ const normalize = (document: JsonSchemaObject): { defs: JsonSchemaObject; rootKe
   let rootKey = designated
 
   if (!designated && asObject(document.properties)) {
-    rootKey = uniqueKey(defs, asString(document.title) ?? 'Record')
-    defs[rootKey] = {
-      type: 'object',
-      title: asString(document.title) ?? rootKey,
-      ...(asString(document.description) ? { description: document.description } : {}),
-      properties: document.properties,
-      ...(Array.isArray(document.required) ? { required: document.required } : {}),
+    const recordMember = memberHoldingRecord(document, defs)
+    if (recordMember) {
+      rootKey = recordMember
+    } else {
+      rootKey = uniqueKey(defs, asString(document.title) ?? 'Record')
+      defs[rootKey] = {
+        type: 'object',
+        title: asString(document.title) ?? rootKey,
+        ...(asString(document.description) ? { description: document.description } : {}),
+        properties: document.properties,
+        ...(Array.isArray(document.required) ? { required: document.required } : {}),
+      }
     }
   }
 
@@ -421,6 +430,19 @@ const memberUrns = (defs: JsonSchemaObject): Map<string, string> => {
     if (id) byUrn.set(id, key)
   }
   return byUrn
+}
+
+/**
+ * The member that holds the same record as the document root, or null when no single member does.
+ *
+ * In the canonical form the document root and its root element carry the same record. When two or
+ * more members qualify, the answer is null: the root is then lifted as before, rather than guessed.
+ */
+const memberHoldingRecord = (document: JsonSchemaObject, defs: JsonSchemaObject): string | null => {
+  // TODO: compare the record of the document root with the record of each member. Return the key of
+  // the one member that holds the same record, else null. The cases are in the test block
+  // 'importFromJsonSchema - the canonical form' in jsonSchemaImportService.test.ts.
+  return null
 }
 
 /** Replaces every inline object property of a class by a reference to a lifted class. */
