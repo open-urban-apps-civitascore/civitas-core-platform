@@ -912,8 +912,8 @@ class DataSourceConnectionTestServiceTest {
                   + USER
                   + " requestId="
                   + sentRequest().requestId()
-                  + " dataSource=unsaved connectorType=SQL destination=\"db.example:5432\""
-                  + " target=\"readings\" data=shown outcome=SUCCESS");
+                  + " dataSource=unsaved connectorType=SQL destination=\"db.example:5432/city\""
+                  + " target=\"readings\" account=\"reader\" data=shown outcome=SUCCESS");
     }
 
     @Test
@@ -953,6 +953,17 @@ class DataSourceConnectionTestServiceTest {
       service.test(mqtt(null));
 
       assertThat(singleAuditLine()).contains("connectorType=MQTT destination=\"broker-a:1883\" ");
+    }
+
+    @Test
+    @DisplayName("target of an HTTP connector is the base path and the path of the call")
+    void target_ofHttp_isTheBasePathAndThePathOfTheCall() {
+      answer(DataSourceConnectionTestServiceTest::success);
+
+      service.test(http("stations"));
+
+      assertThat(singleAuditLine())
+          .contains("destination=\"api.example.org\" target=\"/v1/stations\" account=\"none\" ");
     }
 
     @Test

@@ -183,8 +183,9 @@ public class DataSourceConnectionTestService {
     String requestId = UUID.randomUUID().toString();
     ConnectorConfiguration connector = input.getConnector();
     // Read before the test runs, so that an unknown connector type fails before anything is sent.
-    String destination = destinationHost(connector);
+    String destination = destination(connector);
     String target = target(connector, input.getApiCall());
+    String account = account(connector);
     String outcome = "ERROR";
     String data = "none";
     try {
@@ -211,18 +212,19 @@ public class DataSourceConnectionTestService {
       outcome = "UNAVAILABLE";
       throw e;
     } finally {
-      // TR-03187 L-1/L-6: who tested which destination, whether data of the source was shown and
-      // how it ended, without secrets, query or preview. The request id finds the matching line in
-      // the connection test service's log.
+      // TR-03187 L-1/L-6: who tested which destination and data with which account, whether data
+      // of the source was shown and how it ended, without secrets, query or preview. The request
+      // id finds the matching line in the connection test service's log.
       log.info(
           "Connection test: user={} requestId={} dataSource={} connectorType={}"
-              + " destination=\"{}\" target=\"{}\" data={} outcome={}",
+              + " destination=\"{}\" target=\"{}\" account=\"{}\" data={} outcome={}",
           Encode.forJava(user),
           requestId,
           dataSourceId == null ? UNSAVED : dataSourceId,
           connector.connectorType(),
           Encode.forJava(destination),
           Encode.forJava(target),
+          Encode.forJava(account),
           data,
           outcome);
     }
@@ -319,24 +321,74 @@ public class DataSourceConnectionTestService {
   }
 
   /** What the test reads: the SQL table, the first MQTT topic, or the HTTP API call. */
+  /** What the test reads: the table, the first topic, or the path an HTTP call requests. */
   static String target(ConnectorConfiguration connector, String apiCall) {
     String target =
         switch (connector) {
           case SqlConnectorConfiguration sql -> sql.table();
           case MqttConnectorConfiguration mqtt ->
               mqtt.topics() == null || mqtt.topics().isEmpty() ? null : mqtt.topics().getFirst();
-          case HttpConnectorConfiguration http -> apiCall;
+          case HttpConnectorConfiguration http -> requestedPath(http, apiCall);
           default -> null;
         };
     return target == null || target.isBlank() ? UNKNOWN : target;
   }
 
-  /** The host and port, if any, of the first address of the connector, or {@code unknown}. */
-  static String destinationHost(ConnectorConfiguration connector) {
+  /** The base URL's path and the path of the named call, without the query. */
+  private static String requestedPath(HttpConnectorConfiguration http, String apiCall) {
+    if (http.apiCalls() == null || http.baseUrl() == null) {
+      return null;
+    }
+    return http.apiCalls().stream()
+        .filter(call -> call.name() != null && call.name().equals(apiCall))
+        .findFirst()
+        .map(call -> basePath(http.baseUrl()) + (call.path() == null ? "" : call.path()))
+        .orElse(null);
+  }
+
+  private static String basePath(String baseUrl) {
+    try {
+      String path = new URI(baseUrl).getRawPath();
+      return path == null || "/".equals(path) ? "" : path.replaceAll("/+$", "");
+    } catch (URISyntaxException e) {
+      return "";
+    }
+  }
+
+  /** The account the test signs in with at the source, or {@code none}. */
+  static String account(ConnectorConfiguration connector) {
+    String account =
+        switch (connector) {
+          case SqlConnectorConfiguration sql -> sql.user();
+          case MqttConnectorConfiguration mqtt -> mqtt.user();
+          case HttpConnectorConfiguration http ->
+              http.authentication() instanceof HttpConnectorConfiguration.Basic basic
+                  ? basic.username()
+                  : null;
+          default -> null;
+        };
+    return account == null || account.isBlank() ? "none" : account;
+  }
+
+  /** Host and port of the first address, for SQL with the database, or {@code unknown}. */
+  static String destination(ConnectorConfiguration connector) {
     return ConnectorUris.addresses(connector).stream()
         .findFirst()
-        .map(DataSourceConnectionTestService::hostAndPort)
+        .map(
+            address ->
+                connector instanceof SqlConnectorConfiguration
+                    ? hostAndPort(address) + databasePath(address)
+                    : hostAndPort(address))
         .orElse(UNKNOWN);
+  }
+
+  private static String databasePath(String dsn) {
+    try {
+      String path = new URI(dsn).getRawPath();
+      return path == null ? "" : path;
+    } catch (URISyntaxException e) {
+      return "";
+    }
   }
 
   private static String hostAndPort(String url) {
