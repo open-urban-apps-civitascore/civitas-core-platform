@@ -192,18 +192,25 @@ class DataSourceConnectionTestIntegrationTest extends BaseKeycloakIntegrationTes
     return request;
   }
 
-  private HttpHeaders headers() {
+  /**
+   * @param scopes the scope ids OPA allows, {@code *} for a tenant-wide grant
+   */
+  private HttpHeaders headers(String scopes) {
     HttpHeaders headers = new HttpHeaders();
     headers.setBearerAuth(getValidAccessToken());
     headers.setContentType(MediaType.APPLICATION_JSON);
-    headers.set(AllowedScopesFilter.HEADER_NAME, "*");
+    headers.set(AllowedScopesFilter.HEADER_NAME, scopes);
     return headers;
   }
 
   private ResponseEntity<JsonNode> post(String path, Object body) {
+    return post(path, body, "*");
+  }
+
+  private ResponseEntity<JsonNode> post(String path, Object body, String scopes) {
     ResponseEntity<String> raw =
         restTemplate.exchange(
-            path, HttpMethod.POST, new HttpEntity<>(body, headers()), String.class);
+            path, HttpMethod.POST, new HttpEntity<>(body, headers(scopes)), String.class);
     JsonNode json = raw.getBody() == null ? null : objectMapper.readTree(raw.getBody());
     return ResponseEntity.status(raw.getStatusCode()).body(json);
   }
@@ -436,6 +443,36 @@ class DataSourceConnectionTestIntegrationTest extends BaseKeycloakIntegrationTes
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(REQUESTS).isEmpty();
+  }
+
+  @Test
+  @DisplayName("a reader of the saved data source only may not test another destination")
+  void readerOfTheDataSourceOnly_withAnotherDestination_answers403() {
+    UUID id = createSqlDataSource();
+    Map<String, Object> elsewhere = sqlConnector("typed-s3cret");
+    elsewhere.put("dsn", "postgres://capture.example:5432/city");
+
+    ResponseEntity<JsonNode> response =
+        post(DATASOURCES + "/" + id + "/connection-test", body(elsewhere, null), id.toString());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    assertThat(REQUESTS).isEmpty();
+  }
+
+  @Test
+  @DisplayName("a reader of the saved data source only tests other values at its destination")
+  void readerOfTheDataSourceOnly_atItsDestination_answers200() throws Exception {
+    UUID id = createSqlDataSource();
+    reply = request -> failure(request, Reason.SOURCE_ERROR);
+    Map<String, Object> otherTable = sqlConnector("typed-s3cret");
+    otherTable.put("table", "stations");
+
+    ResponseEntity<JsonNode> response =
+        post(DATASOURCES + "/" + id + "/connection-test", body(otherTable, null), id.toString());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(objectMapper.readTree(nextRequest()).at("/connector/table").asString())
+        .isEqualTo("stations");
   }
 
   @Test

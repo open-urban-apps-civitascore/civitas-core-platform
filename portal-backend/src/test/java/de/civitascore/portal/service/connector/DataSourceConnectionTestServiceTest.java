@@ -28,16 +28,19 @@ import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.ConnectionTestInputDTO;
 import de.civitascore.portal.model.output.ConnectionTestResultDTO;
+import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.service.DataSourceService;
 import de.civitascore.portal.util.ConnectionTestBusyException;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.ExternalSystemTimeoutException;
+import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -55,6 +58,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -70,6 +74,7 @@ class DataSourceConnectionTestServiceTest {
   private final DataSourceConnectorStore connectorStore = mock(DataSourceConnectorStore.class);
   private final ConnectionTestClient client = mock(ConnectionTestClient.class);
   private final TextEncryptor encryptor = mock(TextEncryptor.class);
+  private final AllowedScopes scopes = new AllowedScopes();
 
   private DataSourceConnectionTestService service;
   private ListAppender<ILoggingEvent> logs;
@@ -80,6 +85,7 @@ class DataSourceConnectionTestServiceTest {
     when(encryptor.encrypt(any()))
         .thenAnswer(
             call -> "ENC(" + new StringBuilder(call.<String>getArgument(0)).reverse() + ")");
+    scopes.setWildcard();
     service = service(Optional.of(client));
     serviceLogger = (Logger) LoggerFactory.getLogger(DataSourceConnectionTestService.class);
     logs = new ListAppender<>();
@@ -98,6 +104,9 @@ class DataSourceConnectionTestServiceTest {
 
   private DataSourceConnectionTestService service(
       Optional<ConnectionTestClient> kafka, int maxConcurrent) {
+    @SuppressWarnings("unchecked")
+    ObjectProvider<AllowedScopes> allowedScopes = mock(ObjectProvider.class);
+    when(allowedScopes.getObject()).thenAnswer(call -> scopes);
     return new DataSourceConnectionTestService(
         dataSourceService,
         connectorStore,
@@ -105,7 +114,8 @@ class DataSourceConnectionTestServiceTest {
         encryptor,
         () -> Optional.of(USER),
         new ConnectionTestProperties("request", "result", 20, maxConcurrent),
-        kafka);
+        kafka,
+        allowedScopes);
   }
 
   private static ConnectionTestInputDTO input(String connectorJson, String apiCall) {
@@ -539,6 +549,63 @@ class DataSourceConnectionTestServiceTest {
       assertThatThrownBy(() -> service.test(id, sql(PLAIN_PASSWORD)))
           .isInstanceOf(ResourceNotFoundException.class);
       verify(client, never()).test(any());
+    }
+  }
+
+  @Nested
+  @DisplayName("Destinations of a saved data source")
+  class SavedDestinations {
+
+    private ConnectionTestInputDTO sqlAt(String host, String password) {
+      return input(
+          "{'connectorType':'SQL','driver':'postgres','dsn':'postgres://"
+              + host
+              + ":5432/city','table':'stations','columns':['id'],'user':'reader','password':'"
+              + password
+              + "'}",
+          null);
+    }
+
+    private void readerOf(UUID dataSourceId) {
+      scopes.setScopeIds(Set.of(dataSourceId));
+    }
+
+    @Test
+    @DisplayName("a reader of this data source only may not test another destination")
+    void readerOfThisDataSource_withAnotherDestination_isDenied() {
+      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
+      readerOf(id);
+
+      assertThatThrownBy(() -> service.test(id, sqlAt("other.example", "typed-secret")))
+          .isInstanceOf(ForbiddenException.class)
+          .hasMessage(
+              "Testing values for another destination needs DATASOURCE_READ for the whole tenant");
+      verify(client, never()).test(any());
+      assertThat(singleAuditLine()).endsWith("outcome=DENIED");
+    }
+
+    @Test
+    @DisplayName("a reader of this data source only tests other values at its destination")
+    void readerOfThisDataSource_atTheStoredDestination_isTested() {
+      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
+      readerOf(id);
+      answer(DataSourceConnectionTestServiceTest::success);
+
+      service.test(id, sqlAt("db.example", "typed-secret"));
+
+      assertThat(sentRequest().connector()).containsEntry("table", "stations");
+    }
+
+    @Test
+    @DisplayName("a tenant-wide reader tests another destination")
+    void tenantWideReader_withAnotherDestination_isTested() {
+      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
+      answer(DataSourceConnectionTestServiceTest::success);
+
+      service.test(id, sqlAt("other.example", "typed-secret"));
+
+      assertThat(sentRequest().connector())
+          .containsEntry("dsn", "postgres://other.example:5432/city");
     }
   }
 
