@@ -64,9 +64,9 @@ class ModelRegistryExceptionHandlerTest {
     assertThat(problem.getDetail()).isEqualTo("Artifact does not satisfy its CORE schema");
   }
 
+  // Without this test, a regression would again reveal what holds the resource (W-18).
   @Test
-  @DisplayName("a delete blocked by other artifacts is a conflict listing what blocks it")
-  void blockedDeleteIsConflict() {
+  void handleArtifactInUse_whenDependentsBlockTheDelete_answersWithoutNamingThem() {
     ProblemDetail problem =
         handler.handleArtifactInUse(
             new ArtifactInUseException(
@@ -77,8 +77,7 @@ class ModelRegistryExceptionHandlerTest {
 
     assertThat(problem.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
     assertThat(problem.getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
-    assertThat(problem.getDetail())
-        .contains("urn:core:platform:civitas:pipeline:common:c71d3077-985f-85f7-b699-88738d3e0dd6");
+    assertThat(problem.getDetail()).doesNotContain("urn:core");
   }
 
   @Test

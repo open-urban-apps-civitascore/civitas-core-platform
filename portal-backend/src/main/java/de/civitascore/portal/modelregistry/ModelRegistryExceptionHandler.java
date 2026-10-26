@@ -52,11 +52,17 @@ public class ModelRegistryExceptionHandler {
     return problemDetails.of(ProblemType.INVALID_INPUT, instance(request), detail);
   }
 
-  /** A delete the registry refuses because other artifacts still reference the target. */
+  /**
+   * A delete the registry refuses because other artifacts still reference the target. What holds it
+   * goes to the log only.
+   */
   @ExceptionHandler(ArtifactInUseException.class)
   public ProblemDetail handleArtifactInUse(ArtifactInUseException ex, HttpServletRequest request) {
     log.warn("Registry refused a delete: {}", Encode.forJava(ex.getMessage()));
-    return problemDetails.of(ProblemType.RESOURCE_IN_USE, instance(request), ex.getMessage());
+    return problemDetails.of(
+        ProblemType.RESOURCE_IN_USE,
+        instance(request),
+        "The artifact is still referenced by another artifact");
   }
 
   /** A write that collides with data the registry already holds, such as a taken version. */
