@@ -268,7 +268,7 @@ public record HttpConnectorConfiguration(
               implementation = String.class,
               accessMode = Schema.AccessMode.WRITE_ONLY,
               format = "password",
-              example = "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----")
+              example = "secret")
           @NotNull(groups = OnRelease.class, message = "'privateKey' is required") Secret privateKey)
       implements Authentication {
     static final String TYPE = "CLIENT_CERTIFICATE";
