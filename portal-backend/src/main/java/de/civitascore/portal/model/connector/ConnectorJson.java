@@ -16,6 +16,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ValueDeserializer;
 import tools.jackson.databind.cfg.CoercionAction;
 import tools.jackson.databind.cfg.CoercionInputShape;
+import tools.jackson.databind.cfg.EnumFeature;
 import tools.jackson.databind.exc.InvalidTypeIdException;
 import tools.jackson.databind.exc.UnrecognizedPropertyException;
 import tools.jackson.databind.json.JsonMapper;
@@ -56,6 +57,7 @@ public final class ConnectorJson {
       JsonMapper.builder()
           .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
           .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
+          .enable(EnumFeature.FAIL_ON_NUMBERS_FOR_ENUMS)
           .withCoercionConfig(
               LogicalType.Integer,
               config -> {

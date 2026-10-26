@@ -161,7 +161,9 @@ class ConnectorJsonTest {
             + " | Invalid value: connector.apiCalls[0].pagination.pageSize",
         "{'connectorType':'HTTP','apiCalls':[{},{'headers':[{'name':'a'},null]}]}"
             + " | Invalid value: connector.apiCalls[1].headers[1]",
-        "{'connectorType':'HTTP','baseUrl':'ftp://api.example.org'} | Invalid value: connector.baseUrl"
+        "{'connectorType':'HTTP','baseUrl':'ftp://api.example.org'} | Invalid value: connector.baseUrl",
+        "{'connectorType':'HTTP','authentication':{'type':'API_TOKEN','in':1}}"
+            + " | Invalid value: connector.authentication.in"
       })
   void read_withInvalidConnector_namesTheKeyButNoValue(String connector, String message) {
     assertThatThrownBy(() -> ConnectorJson.read(json(connector)))
