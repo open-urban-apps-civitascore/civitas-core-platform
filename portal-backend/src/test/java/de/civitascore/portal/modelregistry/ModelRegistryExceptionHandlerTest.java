@@ -11,6 +11,7 @@ import de.civitascore.modelforge.contract.DiagnosticSeverity;
 import de.civitascore.modelforge.contract.RegistryConflictException;
 import de.civitascore.modelforge.contract.RegistryUnavailableException;
 import de.civitascore.modelforge.contract.ValidationFailedException;
+import de.civitascore.portal.problem.TestProblemDetails;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,7 +22,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 @DisplayName("Registry failures are given an HTTP meaning instead of surfacing unmapped")
 class ModelRegistryExceptionHandlerTest {
 
-  private final ModelRegistryExceptionHandler handler = new ModelRegistryExceptionHandler();
+  private final ModelRegistryExceptionHandler handler =
+      new ModelRegistryExceptionHandler(TestProblemDetails.create());
 
   private static MockHttpServletRequest request() {
     MockHttpServletRequest request = new MockHttpServletRequest();

@@ -17,7 +17,6 @@ tests {
   });
   test("Problem Detail matches the VALIDATION_FAILED contract", function() {
     expect(res.body.type).to.equal("urn:civitas:error:VALIDATION_FAILED");
-    expect(res.body.title).to.equal("Bad Request");
     expect(res.body.status).to.equal(400);
   });
   test("fieldErrors name every missing required MQTT field by its connector path", function() {

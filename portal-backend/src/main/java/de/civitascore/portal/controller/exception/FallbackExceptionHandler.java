@@ -1,5 +1,6 @@
 package de.civitascore.portal.controller.exception;
 
+import de.civitascore.portal.problem.ProblemDetails;
 import de.civitascore.portal.problem.ProblemType;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
@@ -24,10 +25,15 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 public class FallbackExceptionHandler {
 
+  private final ProblemDetails problemDetails;
+
+  public FallbackExceptionHandler(ProblemDetails problemDetails) {
+    this.problemDetails = problemDetails;
+  }
+
   @ExceptionHandler(Exception.class)
   public ProblemDetail handleUnexpected(Exception ex, HttpServletRequest request) {
     log.error("Unexpected error on {}", Encode.forJava(request.getRequestURI()), ex);
-    return ProblemType.INTERNAL_ERROR.problemDetail(
-        "An unexpected error occurred", URI.create(request.getRequestURI()));
+    return problemDetails.of(ProblemType.INTERNAL_ERROR, URI.create(request.getRequestURI()));
   }
 }

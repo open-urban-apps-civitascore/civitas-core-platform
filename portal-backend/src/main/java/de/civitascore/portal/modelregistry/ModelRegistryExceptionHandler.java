@@ -8,6 +8,7 @@ import de.civitascore.modelforge.contract.Diagnostic;
 import de.civitascore.modelforge.contract.RegistryConflictException;
 import de.civitascore.modelforge.contract.RegistryUnavailableException;
 import de.civitascore.modelforge.contract.ValidationFailedException;
+import de.civitascore.portal.problem.ProblemDetails;
 import de.civitascore.portal.problem.ProblemType;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
@@ -36,20 +37,26 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class ModelRegistryExceptionHandler {
 
+  private final ProblemDetails problemDetails;
+
+  public ModelRegistryExceptionHandler(ProblemDetails problemDetails) {
+    this.problemDetails = problemDetails;
+  }
+
   /** A document the registry refuses to store, reported with the paths it objected to. */
   @ExceptionHandler(ValidationFailedException.class)
   public ProblemDetail handleValidationFailed(
       ValidationFailedException ex, HttpServletRequest request) {
     String detail = withDiagnostics(ex);
     log.warn("Registry rejected a document: {}", Encode.forJava(detail));
-    return ProblemType.INVALID_INPUT.problemDetail(detail, instance(request));
+    return problemDetails.of(ProblemType.INVALID_INPUT, instance(request), detail);
   }
 
   /** A delete the registry refuses because other artifacts still reference the target. */
   @ExceptionHandler(ArtifactInUseException.class)
   public ProblemDetail handleArtifactInUse(ArtifactInUseException ex, HttpServletRequest request) {
     log.warn("Registry refused a delete: {}", Encode.forJava(ex.getMessage()));
-    return ProblemType.RESOURCE_IN_USE.problemDetail(ex.getMessage(), instance(request));
+    return problemDetails.of(ProblemType.RESOURCE_IN_USE, instance(request), ex.getMessage());
   }
 
   /** A write that collides with data the registry already holds, such as a taken version. */
@@ -65,8 +72,7 @@ public class ModelRegistryExceptionHandler {
   public ProblemDetail handleRegistryUnavailable(
       RegistryUnavailableException ex, HttpServletRequest request) {
     log.error("Model registry unavailable", ex);
-    return ProblemType.REGISTRY_UNAVAILABLE.problemDetail(
-        "The model registry is currently unavailable", instance(request));
+    return problemDetails.of(ProblemType.REGISTRY_UNAVAILABLE, instance(request));
   }
 
   /**

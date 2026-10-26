@@ -1,25 +1,9 @@
 package de.civitascore.portal.controller.exception;
 
 import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
+import de.civitascore.portal.problem.ProblemDetails;
+import de.civitascore.portal.problem.ProblemException;
 import de.civitascore.portal.problem.ProblemType;
-import de.civitascore.portal.service.connector.ConnectorValidationException;
-import de.civitascore.portal.service.connector.StoredConnectorUnreadableException;
-import de.civitascore.portal.service.removal.RemovalNotConfirmedException;
-import de.civitascore.portal.util.ConnectionTestBusyException;
-import de.civitascore.portal.util.DataSetNotEditableException;
-import de.civitascore.portal.util.DataSourceScopeViolationException;
-import de.civitascore.portal.util.ExternalSystemRejectionException;
-import de.civitascore.portal.util.ExternalSystemTimeoutException;
-import de.civitascore.portal.util.ForbiddenException;
-import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.ModelMemberUnreachableException;
-import de.civitascore.portal.util.ModelMissingException;
-import de.civitascore.portal.util.ModelReferenceNotAvailableException;
-import de.civitascore.portal.util.ModelRootMissingException;
-import de.civitascore.portal.util.PipelineClosureValidationException;
-import de.civitascore.portal.util.ResourceInUseException;
-import de.civitascore.portal.util.ResourceNotFoundException;
-import de.civitascore.portal.util.SagaInFlightException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import jakarta.persistence.PersistenceException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,7 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
 import org.jspecify.annotations.Nullable;
 import org.owasp.encoder.Encode;
-import org.springframework.beans.TypeMismatchException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -47,7 +30,6 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
@@ -68,202 +50,27 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   private static final String FOREIGN_KEY_VIOLATION_STATE = "23503";
   private static final String NOT_NULL_VIOLATION_STATE = "23502";
 
-  /**
-   * Handles resource-not-found exceptions and returns a 404 Problem Detail response.
-   *
-   * @param ex the resource not found exception
-   * @param request the current HTTP request
-   * @return a Problem Detail with HTTP 404 status
-   */
-  @ExceptionHandler(ResourceNotFoundException.class)
-  public ProblemDetail handleNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
-    log.warn("Resource not found: {}", Encode.forJava(ex.getMessage()));
-    // TR-03187 W-18/W-19: message echoes back the UUID the client already submitted in the URL.
-    // Resources are UUID-addressed (not enumerable), so returning it is not a disclosure.
-    return ProblemType.NOT_FOUND.problemDetail(ex.getMessage(), instance(request));
+  private final ProblemDetails problemDetails;
+
+  public GlobalExceptionHandler(ProblemDetails problemDetails) {
+    this.problemDetails = problemDetails;
   }
 
   /**
-   * Handles invalid input exceptions and returns a 400 Problem Detail response.
+   * Answers a typed problem with its catalog type, title, detail and extension members.
    *
-   * @param ex the invalid input exception
+   * @param ex the problem
    * @param request the current HTTP request
-   * @return a Problem Detail with HTTP 400 status
+   * @return the Problem Detail with the status of the problem type
    */
-  @ExceptionHandler(InvalidInputException.class)
-  public ProblemDetail handleInvalidInput(InvalidInputException ex, HttpServletRequest request) {
-    log.warn("Invalid input: {}", Encode.forJava(ex.getMessage()));
-    // TR-03187 W-18/W-19: message is constructed by our own validation code (not reflected from
-    // DB or framework internals). Clients rely on it to render actionable errors.
-    return ProblemType.INVALID_INPUT.problemDetail(ex.getMessage(), instance(request));
-  }
-
-  @ExceptionHandler(MalformedDataSourceRequestException.class)
-  public ProblemDetail handleMalformedDataSourceRequest(
-      MalformedDataSourceRequestException ex, HttpServletRequest request) {
-    log.warn("Malformed Data source request: {}", Encode.forJava(ex.getMessage()));
-    return ProblemType.MALFORMED_REQUEST.problemDetail(ex.getMessage(), instance(request));
-  }
-
-  @ExceptionHandler(ConnectorValidationException.class)
-  public ProblemDetail handleConnectorValidation(
-      ConnectorValidationException ex, HttpServletRequest request) {
-    log.warn("Connector validation failed: {} field error(s)", ex.getViolations().size());
-    ProblemDetail problemDetail =
-        ProblemType.VALIDATION_FAILED.problemDetail("Input validation failed", instance(request));
-    problemDetail.setProperty(
-        "fieldErrors",
-        ex.getViolations().stream()
-            .map(violation -> Map.of("field", violation.path(), "message", violation.message()))
-            .toList());
-    return problemDetail;
-  }
-
-  @ExceptionHandler(DataSetNotEditableException.class)
-  public ProblemDetail handleDataSetNotEditable(
-      DataSetNotEditableException ex, HttpServletRequest request) {
-    log.warn("DataSet not editable: {}", Encode.forJava(ex.getMessage()));
-    // TR-03187 W-18/W-19: the detail is a fixed constant with no runtime data interpolated.
-    return ProblemType.DATASET_NOT_EDITABLE.problemDetail(ex.getMessage(), instance(request));
-  }
-
-  @ExceptionHandler(ModelRootMissingException.class)
-  public ProblemDetail handleModelRootMissing(
-      ModelRootMissingException ex, HttpServletRequest request) {
-    log.warn("Model root missing: {}", Encode.forJava(ex.getMessage()));
-    // TR-03187 W-18/W-19: the detail is a fixed constant with no runtime data interpolated.
-    return ProblemType.MODEL_ROOT_MISSING.problemDetail(ex.getMessage(), instance(request));
-  }
-
-  @ExceptionHandler(ModelReferenceNotAvailableException.class)
-  public ProblemDetail handleModelReferenceNotAvailable(
-      ModelReferenceNotAvailableException ex, HttpServletRequest request) {
-    log.warn("Model reference not available");
-    // TR-03187 W-18/W-19: one fixed detail for every cause; it does not reveal if the model exists.
-    return ProblemType.MODEL_REFERENCE_NOT_AVAILABLE.problemDetail(
-        ex.getMessage(), instance(request));
-  }
-
-  @ExceptionHandler(ModelMemberUnreachableException.class)
-  public ProblemDetail handleModelMemberUnreachable(
-      ModelMemberUnreachableException ex, HttpServletRequest request) {
-    log.warn("Model member unreachable: {}", Encode.forJava(ex.getMessage()));
-    // TR-03187 W-18/W-19: the member names come from the model of the version the caller releases,
-    // which the caller can already read.
-    ProblemDetail problemDetail =
-        ProblemType.MODEL_MEMBER_UNREACHABLE.problemDetail(ex.getMessage(), instance(request));
-    problemDetail.setProperty("memberNames", ex.getMemberNames());
-    return problemDetail;
-  }
-
-  @ExceptionHandler(ModelMissingException.class)
-  public ProblemDetail handleModelMissing(ModelMissingException ex, HttpServletRequest request) {
-    log.warn("Model missing: {}", Encode.forJava(ex.getMessage()));
-    // TR-03187 W-18/W-19: the detail is a fixed constant with no runtime data interpolated.
-    return ProblemType.MODEL_MISSING.problemDetail(ex.getMessage(), instance(request));
-  }
-
-  /**
-   * Handles unique constraint violation exceptions and returns a 409 Problem Detail response.
-   *
-   * @param ex the unique constraint violation exception
-   * @param request the current HTTP request
-   * @return a Problem Detail with HTTP 409 status
-   */
-  @ExceptionHandler(UniqueConstraintViolationException.class)
-  public ProblemDetail handleUniqueConstraint(
-      UniqueConstraintViolationException ex, HttpServletRequest request) {
-    log.warn("Unique constraint violation: {}", Encode.forJava(ex.getMessage()));
-    // TR-03187 W-18/W-19: message contains the column name (public API schema) and the value the
-    // client just submitted. Required for clients to render which field collided.
-    return ProblemType.UNIQUE_CONSTRAINT_VIOLATION.problemDetail(
-        ex.getMessage(), instance(request));
-  }
-
-  /**
-   * Handles resource-in-use exceptions and returns a 409 Problem Detail response.
-   *
-   * @param ex the resource in use exception
-   * @param request the current HTTP request
-   * @return a Problem Detail with HTTP 409 status
-   */
-  @ExceptionHandler(ResourceInUseException.class)
-  public ProblemDetail handleResourceInUse(ResourceInUseException ex, HttpServletRequest request) {
-    // TR-03187 W-18/W-19: what holds the resource is logged, not returned — the URNs carry the
-    // names of artifacts the caller need not be scoped for.
-    log.warn(
-        "Resource in use: {} blockedBy={}",
-        Encode.forJava(ex.getMessage()),
-        Encode.forJava(ex.getBlockedBy().toString()));
-    return ProblemType.RESOURCE_IN_USE.problemDetail(ex.getMessage(), instance(request));
-  }
-
-  @ExceptionHandler(RemovalNotConfirmedException.class)
-  @ResponseStatus(HttpStatus.CONFLICT)
-  public ProblemDetail handleRemovalNotConfirmed(
-      RemovalNotConfirmedException ex, HttpServletRequest request) {
-    log.warn("Removal not confirmed in dataset {}", ex.getDataSetId());
-    // TR-03187 W-18/W-19: only a caller that may update the Dataset gets here, and the list names
-    // only that Dataset's own Data sinks, Layers and APIs, which it can read anyway.
-    ProblemDetail problemDetail =
-        createProblemDetail(HttpStatus.CONFLICT, "REMOVAL_NOT_CONFIRMED", ex.getMessage(), request);
-    problemDetail.setProperty("removal", ex.getRemoval());
-    return problemDetail;
-  }
-
-  @ExceptionHandler(SagaInFlightException.class)
-  public ProblemDetail handleSagaInFlight(SagaInFlightException ex, HttpServletRequest request) {
-    log.warn(
-        "Saga in flight on dataset {}: {}", ex.getDataSetId(), Encode.forJava(ex.getMessage()));
-    // TR-03187 W-18/W-19: the saga type is already part of the detail message, so promoting it to
-    // its own property discloses nothing further.
-    ProblemDetail problemDetail =
-        ProblemType.SAGA_IN_FLIGHT.problemDetail(ex.getMessage(), instance(request));
-    problemDetail.setProperty("pendingSagaType", ex.getPendingSagaType());
-    return problemDetail;
-  }
-
-  /**
-   * Handles forbidden exceptions and returns a 403 Problem Detail response.
-   *
-   * @param ex the forbidden exception
-   * @param request the current HTTP request
-   * @return a Problem Detail with HTTP 403 status
-   */
-  @ExceptionHandler(DataSourceScopeViolationException.class)
-  public ProblemDetail handleDataSourceScopeViolation(
-      DataSourceScopeViolationException ex, HttpServletRequest request) {
-    log.warn("DataSource scope violation: offending IDs {}", ex.getOffendingDataSourceIds());
-    ProblemDetail pd =
-        ProblemType.DATASOURCE_SCOPE_VIOLATION.problemDetail(ex.getMessage(), instance(request));
-    pd.setProperty("offendingDataSourceIds", ex.getOffendingDataSourceIds());
-    return pd;
-  }
-
-  /**
-   * Maps a failed participating-artifact validation onto 422 with every finding attached, so one
-   * release attempt tells the caller everything that needs repairing.
-   *
-   * @param ex the validation exception carrying the findings
-   * @param request the current HTTP request
-   * @return a Problem Detail with HTTP 422 status and an {@code offendingPipelineIds} property
-   */
-  @ExceptionHandler(PipelineClosureValidationException.class)
-  public ProblemDetail handlePipelineClosureValidation(
-      PipelineClosureValidationException ex, HttpServletRequest request) {
-    log.warn(
-        "Pipeline closure validation failed for {} pipeline(s)",
-        ex.getOffendingPipelineIds().size());
-    ProblemDetail pd =
-        ProblemType.PIPELINE_CLOSURE_INVALID.problemDetail(ex.getMessage(), instance(request));
-    pd.setProperty("offendingPipelineIds", ex.getOffendingPipelineIds());
-    return pd;
-  }
-
-  @ExceptionHandler(ForbiddenException.class)
-  public ProblemDetail handleForbidden(ForbiddenException ex, HttpServletRequest request) {
-    log.warn("Forbidden: {}", Encode.forJava(ex.getMessage()));
-    return ProblemType.FORBIDDEN.problemDetail(ex.getMessage(), instance(request));
+  @ExceptionHandler(ProblemException.class)
+  public ProblemDetail handleProblem(ProblemException ex, HttpServletRequest request) {
+    if (ex.type().status().is5xxServerError()) {
+      log.error("Answering {}: {}", ex.type(), Encode.forJava(ex.toString()));
+    } else {
+      log.warn("Answering {}: {}", ex.type(), Encode.forJava(ex.toString()));
+    }
+    return problemDetails.of(ex, instance(request));
   }
 
   /**
@@ -284,11 +91,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         String dbMessage = ex.getMostSpecificCause().getMessage();
         UniqueConstraintViolationException mapped = extractUniqueViolationException(dbMessage);
         log.warn("Unique constraint violation: {}", Encode.forJava(mapped.getMessage()));
-        // TR-03187 W-18/W-19: same rationale as handleUniqueConstraint — column name + submitted
-        // value are needed by clients; extracted via regex from the DB error, not the raw DB
-        // message.
-        return toProblemDetailResponse(
-            ProblemType.UNIQUE_CONSTRAINT_VIOLATION, mapped.getMessage(), request);
+        // TR-03187 W-18/W-19: column name and submitted value are needed by clients; extracted
+        // via regex from the DB error, not the raw DB message.
+        return toResponse(problemDetails.of(mapped, instance(request)));
       }
 
       if (FOREIGN_KEY_VIOLATION_STATE.equals(sqlState)) {
@@ -296,10 +101,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "Foreign key violation on constraint '{}': {}",
             Encode.forJava(cve.getConstraintName()),
             Encode.forJava(cve.getMessage()));
-        return toProblemDetailResponse(
-            ProblemType.FOREIGN_KEY_VIOLATION,
-            "Referenced entity does not exist or is still in use",
-            request);
+        return toProblemDetailResponse(ProblemType.FOREIGN_KEY_VIOLATION, request);
       }
 
       if (NOT_NULL_VIOLATION_STATE.equals(sqlState)) {
@@ -307,15 +109,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "Not-null violation on constraint '{}': {}",
             Encode.forJava(cve.getConstraintName()),
             Encode.forJava(cve.getMessage()));
-        return toProblemDetailResponse(
-            ProblemType.NOT_NULL_VIOLATION, "A required field is missing", request);
+        return toProblemDetailResponse(ProblemType.NOT_NULL_VIOLATION, request);
       }
     }
 
     log.error(
         "Data integrity violation: {}", Encode.forJava(ex.getMostSpecificCause().getMessage()));
-    return toProblemDetailResponse(
-        ProblemType.DATA_INTEGRITY_ERROR, "A data integrity error occurred", request);
+    return toProblemDetailResponse(ProblemType.DATA_INTEGRITY_ERROR, request);
   }
 
   /**
@@ -331,66 +131,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       PersistenceException ex, HttpServletRequest request) {
     if (ex.getCause() instanceof IllegalStateException ise) {
       log.warn("Entity validation failed: {}", Encode.forJava(ise.getMessage()));
-      return toProblemDetailResponse(
-          ProblemType.ENTITY_VALIDATION_FAILED, "Entity validation failed", request);
+      return toProblemDetailResponse(ProblemType.ENTITY_VALIDATION_FAILED, request);
     }
     log.error("Persistence error: {}", Encode.forJava(ex.getMessage()), ex);
-    return toProblemDetailResponse(
-        ProblemType.PERSISTENCE_ERROR, "A persistence error occurred", request);
-  }
-
-  /**
-   * Handles a Data source pinned to a stored connector that the registry does not hold, and returns
-   * the 500 Problem Detail of a persistence error.
-   *
-   * @param ex the stored connector unreadable exception
-   * @param request the current HTTP request
-   * @return a Problem Detail with HTTP 500 status
-   */
-  @ExceptionHandler(StoredConnectorUnreadableException.class)
-  public ResponseEntity<ProblemDetail> handleStoredConnectorUnreadable(
-      StoredConnectorUnreadableException ex, HttpServletRequest request) {
-    log.error("{}", Encode.forJava(ex.getMessage()));
-    return toProblemDetailResponse(
-        ProblemType.PERSISTENCE_ERROR, "A persistence error occurred", request);
-  }
-
-  /**
-   * Handles external system rejection exceptions and returns a 502 Problem Detail response.
-   *
-   * @param ex the external system rejection exception
-   * @param request the current HTTP request
-   * @return a Problem Detail with HTTP 502 status
-   */
-  @ExceptionHandler(ExternalSystemRejectionException.class)
-  public ProblemDetail handleExternalSystemRejection(
-      ExternalSystemRejectionException ex, HttpServletRequest request) {
-    log.error("External system rejected request: {}", Encode.forJava(ex.getMessage()));
-    return ProblemType.EXTERNAL_SYSTEM_ERROR.problemDetail(
-        "The request was rejected by an external system", instance(request));
-  }
-
-  /**
-   * Handles external system timeout exceptions and returns a 504 Problem Detail response.
-   *
-   * @param ex the external system timeout exception
-   * @param request the current HTTP request
-   * @return a Problem Detail with HTTP 504 status
-   */
-  @ExceptionHandler(ExternalSystemTimeoutException.class)
-  public ProblemDetail handleExternalSystemTimeout(
-      ExternalSystemTimeoutException ex, HttpServletRequest request) {
-    log.error("External system timed out: {}", Encode.forJava(ex.getMessage()));
-    return ProblemType.EXTERNAL_SYSTEM_TIMEOUT.problemDetail(
-        "An external system did not respond in time", instance(request));
-  }
-
-  @ExceptionHandler(ConnectionTestBusyException.class)
-  public ProblemDetail handleConnectionTestBusy(
-      ConnectionTestBusyException ex, HttpServletRequest request) {
-    log.warn("Connection test rejected: {}", Encode.forJava(ex.getMessage()));
-    // TR-03187 W-18/W-19: the detail is one of two fixed constants with no runtime data.
-    return ProblemType.TOO_MANY_REQUESTS.problemDetail(ex.getMessage(), instance(request));
+    return toProblemDetailResponse(ProblemType.PERSISTENCE_ERROR, request);
   }
 
   /**
@@ -420,8 +164,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                         fe.getDefaultMessage() != null ? fe.getDefaultMessage() : ""))
             .toList();
 
-    ProblemDetail problemDetail =
-        ProblemType.VALIDATION_FAILED.problemDetail("Input validation failed", null);
+    ProblemDetail problemDetail = problemDetails.of(ProblemType.VALIDATION_FAILED, null);
     problemDetail.setProperty("fieldErrors", fieldErrors);
 
     log.warn("Validation failed: {} field error(s)", fieldErrors.size());
@@ -446,15 +189,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     log.warn("Malformed request body: {}", Encode.forJava(ex.getMessage()));
     Optional<MalformedDataSourceRequestException> malformedRequest =
         malformedDataSourceRequestIn(ex);
-    if (malformedRequest.isPresent() && request instanceof ServletWebRequest servletRequest) {
-      return ResponseEntity.badRequest()
-          .body(
-              handleMalformedDataSourceRequest(
-                  malformedRequest.get(), servletRequest.getRequest()));
+    if (malformedRequest.isPresent()) {
+      return ResponseEntity.badRequest().body(problemDetails.of(malformedRequest.get(), null));
     }
-    ProblemDetail problemDetail =
-        ProblemType.MALFORMED_REQUEST.problemDetail("Request body is missing or malformed", null);
-    return ResponseEntity.badRequest().body(problemDetail);
+    return super.handleHttpMessageNotReadable(ex, headers, status, request);
   }
 
   private static Optional<MalformedDataSourceRequestException> malformedDataSourceRequestIn(
@@ -468,8 +206,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /**
-   * Gives an error that Spring MVC raises itself the catalog type for its status, and keeps the
-   * headers Spring MVC sets, such as {@code Allow} on a 405.
+   * Gives an error that Spring MVC raises itself the catalog type and title for its status, and
+   * keeps the detail from the message bundle and the headers Spring MVC sets, such as {@code Allow}
+   * on a 405.
    */
   @Override
   protected @Nullable ResponseEntity<Object> handleExceptionInternal(
@@ -483,16 +222,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     if (response != null
         && response.getBody() instanceof ProblemDetail problemDetail
         && isBlank(problemDetail.getType())) {
-      ProblemType.forFrameworkStatus(statusCode)
-          .ifPresent(
-              type -> {
-                problemDetail.setType(type.type());
-                problemDetail.setTitle(type.status().getReasonPhrase());
-              });
-      // TR-03187 W-18/W-19: Spring's detail echoes the raw value; the parameter name suffices.
-      if (ex instanceof TypeMismatchException mismatch) {
-        problemDetail.setDetail("Invalid value: " + mismatch.getPropertyName());
-      }
+      ProblemType.forFrameworkException(ex, statusCode)
+          .ifPresent(type -> problemDetails.stamp(problemDetail, type));
     }
     return response;
   }
@@ -500,14 +231,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(AccessDeniedException.class)
   public ProblemDetail handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
     log.warn("Access denied: {}", Encode.forJava(ex.getMessage()));
-    return ProblemType.ACCESS_DENIED.problemDetail("Insufficient privileges", instance(request));
+    return problemDetails.of(ProblemType.ACCESS_DENIED, instance(request));
   }
 
   @ExceptionHandler(AuthenticationException.class)
   public ProblemDetail handleAuthentication(
       AuthenticationException ex, HttpServletRequest request) {
     log.warn("Authentication failed: {}", Encode.forJava(ex.getMessage()));
-    return ProblemType.UNAUTHORIZED.problemDetail("Authentication required", instance(request));
+    return problemDetails.of(ProblemType.UNAUTHORIZED, instance(request));
   }
 
   /** Spring MVC leaves the type null, which RFC 9457 reads as {@code about:blank}. */
@@ -519,9 +250,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return URI.create(request.getRequestURI());
   }
 
-  private static ResponseEntity<ProblemDetail> toProblemDetailResponse(
-      ProblemType type, String detail, HttpServletRequest request) {
-    return ResponseEntity.status(type.status()).body(type.problemDetail(detail, instance(request)));
+  private ResponseEntity<ProblemDetail> toProblemDetailResponse(
+      ProblemType type, HttpServletRequest request) {
+    return toResponse(problemDetails.of(type, instance(request)));
+  }
+
+  private static ResponseEntity<ProblemDetail> toResponse(ProblemDetail problemDetail) {
+    return ResponseEntity.status(problemDetail.getStatus()).body(problemDetail);
   }
 
   private UniqueConstraintViolationException extractUniqueViolationException(String dbMessage) {

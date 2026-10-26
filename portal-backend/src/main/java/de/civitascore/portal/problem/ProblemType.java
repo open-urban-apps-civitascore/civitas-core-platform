@@ -2,15 +2,15 @@ package de.civitascore.portal.problem;
 
 import java.net.URI;
 import java.util.Optional;
-import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 
 /**
  * The catalog of every error answer of portal-backend. Each constant fixes the HTTP status and the
  * type URN {@code urn:civitas:error:<name>} of an RFC 9457 problem. portal-frontend reads the URNs,
- * so the name of a constant is part of the API.
+ * so the name of a constant is part of the API. Title and detail of each constant are in the
+ * message bundle, see {@link ProblemDetails}.
  */
 public enum ProblemType {
   INVALID_INPUT(HttpStatus.BAD_REQUEST),
@@ -32,6 +32,7 @@ public enum ProblemType {
   UNIQUE_CONSTRAINT_VIOLATION(HttpStatus.CONFLICT),
   FOREIGN_KEY_VIOLATION(HttpStatus.CONFLICT),
   RESOURCE_IN_USE(HttpStatus.CONFLICT),
+  REMOVAL_NOT_CONFIRMED(HttpStatus.CONFLICT),
   SAGA_IN_FLIGHT(HttpStatus.CONFLICT),
   MODEL_MISSING(HttpStatus.CONFLICT),
   PAYLOAD_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE),
@@ -64,25 +65,13 @@ public enum ProblemType {
   }
 
   /**
-   * Builds the problem with the status reason phrase as title.
-   *
-   * @param detail the explanation for the client; it must not reveal internal state
-   * @param instance the request URI, or {@code null} to let Spring MVC fill it in when it writes a
-   *     ProblemDetail returned by a handler
-   */
-  public ProblemDetail problemDetail(String detail, @Nullable URI instance) {
-    ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, detail);
-    problemDetail.setType(type());
-    problemDetail.setTitle(status.getReasonPhrase());
-    problemDetail.setInstance(instance);
-    return problemDetail;
-  }
-
-  /**
    * The problem type for an error that Spring MVC raises itself, which it answers with type {@code
    * about:blank}. Empty for a status that no framework error of this application produces.
    */
-  public static Optional<ProblemType> forFrameworkStatus(HttpStatusCode status) {
+  public static Optional<ProblemType> forFrameworkException(Exception ex, HttpStatusCode status) {
+    if (ex instanceof HttpMessageNotReadableException) {
+      return Optional.of(MALFORMED_REQUEST);
+    }
     return switch (status.value()) {
       case 400 -> Optional.of(INVALID_INPUT);
       case 404 -> Optional.of(NOT_FOUND);

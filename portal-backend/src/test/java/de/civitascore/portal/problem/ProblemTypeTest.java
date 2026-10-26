@@ -9,6 +9,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.http.MockHttpInputMessage;
 
 class ProblemTypeTest {
 
@@ -56,10 +58,11 @@ class ProblemTypeTest {
   @Test
   void problemDetail_carriesTypeTitleStatusDetailAndInstance() {
     ProblemDetail problemDetail =
-        ProblemType.RESOURCE_IN_USE.problemDetail("in use", URI.create("/v1/datasets"));
+        TestProblemDetails.create()
+            .of(ProblemType.RESOURCE_IN_USE, URI.create("/v1/datasets"), "in use");
 
     assertThat(problemDetail.getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
-    assertThat(problemDetail.getTitle()).isEqualTo("Conflict");
+    assertThat(problemDetail.getTitle()).isEqualTo("Resource in use");
     assertThat(problemDetail.getStatus()).isEqualTo(409);
     assertThat(problemDetail.getDetail()).isEqualTo("in use");
     assertThat(problemDetail.getInstance()).hasToString("/v1/datasets");
@@ -77,12 +80,28 @@ class ProblemTypeTest {
     "501, INTERNAL_ERROR",
     "503, SERVICE_UNAVAILABLE"
   })
-  void forFrameworkStatus_mapsStatusToCatalogType(int status, ProblemType expected) {
-    assertThat(ProblemType.forFrameworkStatus(HttpStatusCode.valueOf(status))).contains(expected);
+  void forFrameworkException_mapsStatusToCatalogType(int status, ProblemType expected) {
+    assertThat(
+            ProblemType.forFrameworkException(
+                new IllegalStateException(), HttpStatusCode.valueOf(status)))
+        .contains(expected);
   }
 
   @Test
-  void forFrameworkStatus_withStatusNoFrameworkErrorProduces_isEmpty() {
-    assertThat(ProblemType.forFrameworkStatus(HttpStatus.I_AM_A_TEAPOT)).isEmpty();
+  void forFrameworkException_unreadableBody_isMalformedRequest() {
+    HttpMessageNotReadableException ex =
+        new HttpMessageNotReadableException(
+            "JSON parse error", new MockHttpInputMessage(new byte[0]));
+
+    assertThat(ProblemType.forFrameworkException(ex, HttpStatus.BAD_REQUEST))
+        .contains(ProblemType.MALFORMED_REQUEST);
+  }
+
+  @Test
+  void forFrameworkException_withStatusNoFrameworkErrorProduces_isEmpty() {
+    assertThat(
+            ProblemType.forFrameworkException(
+                new IllegalStateException(), HttpStatus.I_AM_A_TEAPOT))
+        .isEmpty();
   }
 }

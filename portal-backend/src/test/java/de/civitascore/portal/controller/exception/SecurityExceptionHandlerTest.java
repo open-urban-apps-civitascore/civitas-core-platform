@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.portal.problem.TestProblemDetails;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -15,9 +16,6 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -28,12 +26,12 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
-@ExtendWith(MockitoExtension.class)
 class SecurityExceptionHandlerTest {
 
   private static final String TEST_URI = "/v1/datasets";
 
-  @InjectMocks private SecurityExceptionHandler SUT;
+  private final SecurityExceptionHandler SUT =
+      new SecurityExceptionHandler(TestProblemDetails.create());
 
   private HttpServletRequest request;
   private HttpServletResponse response;
@@ -70,7 +68,7 @@ class SecurityExceptionHandlerTest {
     assertThat(responseMap)
         .containsEntry("type", "urn:civitas:error:UNAUTHORIZED")
         .containsEntry("detail", "Authentication required")
-        .containsEntry("title", "Unauthorized")
+        .containsEntry("title", "Authentication required")
         .containsEntry("status", HttpStatus.UNAUTHORIZED.value())
         .containsEntry("instance", TEST_URI);
   }
@@ -98,7 +96,7 @@ class SecurityExceptionHandlerTest {
     assertThat(responseMap)
         .containsEntry("type", "urn:civitas:error:ACCESS_DENIED")
         .containsEntry("detail", "Insufficient privileges")
-        .containsEntry("title", "Forbidden")
+        .containsEntry("title", "Access denied")
         .containsEntry("status", HttpStatus.FORBIDDEN.value())
         .containsEntry("instance", TEST_URI);
   }
@@ -116,7 +114,7 @@ class SecurityExceptionHandlerTest {
     assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED.value());
     assertThat(problemDetail.getType()).hasToString("urn:civitas:error:INVALID_TOKEN");
     assertThat(problemDetail.getDetail()).isEqualTo("JWT validation failed");
-    assertThat(problemDetail.getTitle()).isEqualTo("Unauthorized");
+    assertThat(problemDetail.getTitle()).isEqualTo("Invalid token");
   }
 
   @Test

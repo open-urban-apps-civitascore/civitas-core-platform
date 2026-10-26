@@ -1,5 +1,6 @@
 package de.civitascore.portal.controller.exception;
 
+import de.civitascore.portal.problem.ProblemDetails;
 import de.civitascore.portal.problem.ProblemType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -35,6 +36,11 @@ import tools.jackson.databind.json.JsonMapper;
 public class SecurityExceptionHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
 
   private final ObjectMapper mapper = new JsonMapper();
+  private final ProblemDetails problemDetails;
+
+  public SecurityExceptionHandler(ProblemDetails problemDetails) {
+    this.problemDetails = problemDetails;
+  }
 
   /**
    * Handles unauthenticated requests by writing a 401 Problem Detail response.
@@ -49,8 +55,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
       HttpServletRequest request, HttpServletResponse response, AuthenticationException ex)
       throws IOException {
     log.warn("Authentication failed: {}", Encode.forJava(ex.getMessage()));
-    writeProblemDetailResponse(
-        request, response, ProblemType.UNAUTHORIZED, "Authentication required");
+    writeProblemDetailResponse(request, response, ProblemType.UNAUTHORIZED);
   }
 
   /**
@@ -66,8 +71,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
       HttpServletRequest request, HttpServletResponse response, AccessDeniedException ex)
       throws IOException {
     log.warn("Access denied: {}", Encode.forJava(ex.getMessage()));
-    writeProblemDetailResponse(
-        request, response, ProblemType.ACCESS_DENIED, "Insufficient privileges");
+    writeProblemDetailResponse(request, response, ProblemType.ACCESS_DENIED);
   }
 
   /**
@@ -80,14 +84,13 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
   @ExceptionHandler(JwtException.class)
   public ProblemDetail handleJwtException(JwtException ex, HttpServletRequest request) {
     log.warn("JWT validation failed: {}", Encode.forJava(ex.getMessage()));
-    return ProblemType.INVALID_TOKEN.problemDetail(
-        "JWT validation failed", URI.create(request.getRequestURI()));
+    return problemDetails.of(ProblemType.INVALID_TOKEN, URI.create(request.getRequestURI()));
   }
 
   private void writeProblemDetailResponse(
-      HttpServletRequest request, HttpServletResponse response, ProblemType type, String detail)
+      HttpServletRequest request, HttpServletResponse response, ProblemType type)
       throws IOException {
-    ProblemDetail problemDetail = type.problemDetail(detail, URI.create(request.getRequestURI()));
+    ProblemDetail problemDetail = problemDetails.of(type, URI.create(request.getRequestURI()));
 
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
     response.setStatus(type.status().value());

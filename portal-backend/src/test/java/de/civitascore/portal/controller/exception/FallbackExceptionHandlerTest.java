@@ -4,6 +4,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.civitascore.portal.problem.TestProblemDetails;
 import java.sql.SQLException;
 import org.hibernate.exception.JDBCConnectionException;
 import org.junit.jupiter.api.Test;
@@ -17,7 +18,9 @@ class FallbackExceptionHandlerTest {
 
   private final MockMvc mockMvc =
       MockMvcBuilders.standaloneSetup(new FailingController())
-          .setControllerAdvice(new FallbackExceptionHandler(), new GlobalExceptionHandler())
+          .setControllerAdvice(
+              new FallbackExceptionHandler(TestProblemDetails.create()),
+              new GlobalExceptionHandler(TestProblemDetails.create()))
           .build();
 
   @Test

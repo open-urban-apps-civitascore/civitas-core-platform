@@ -40,11 +40,13 @@ public class SecurityConfig {
    * permit paths, JWT-based OAuth2 resource server, and custom exception handling.
    *
    * @param http the Spring Security HTTP configuration builder
+   * @param securityExceptionHandler answers unauthenticated and forbidden requests
    * @return the configured security filter chain
    * @throws Exception if security configuration fails
    */
   @Bean
-  public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+  public SecurityFilterChain securityFilterChain(
+      HttpSecurity http, SecurityExceptionHandler securityExceptionHandler) throws Exception {
     http.csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -61,8 +63,8 @@ public class SecurityConfig {
             oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(customJwtConverter)))
         .exceptionHandling(
             ex ->
-                ex.authenticationEntryPoint(new SecurityExceptionHandler())
-                    .accessDeniedHandler(new SecurityExceptionHandler()));
+                ex.authenticationEntryPoint(securityExceptionHandler)
+                    .accessDeniedHandler(securityExceptionHandler));
 
     return http.build();
   }
