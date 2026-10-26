@@ -132,7 +132,8 @@ class ConnectionTestConsumerIT {
     ConnectionTestResult result = awaitResult(id);
 
     assertEquals(Outcome.SUCCESS, result.outcome(), result.message());
-    assertTrue(result.rowCount() > 0, result.message());
+    assertTrue(result.preview().startsWith("datname\r\n"), result.preview());
+    assertEquals(result.preview().split("\r\n").length - 1, result.rowCount());
   }
 
   @Test
@@ -160,7 +161,7 @@ class ConnectionTestConsumerIT {
     String stale = UUID.randomUUID().toString();
     ConnectionTestRequest request =
         new ConnectionTestRequest(
-            stale, Instant.now().minusSeconds(1), connector("owner-secret"), null);
+            stale, Instant.now().minusSeconds(1), connector("owner-secret"), null, false);
     requests
         .send(
             new ProducerRecord<>(
@@ -174,7 +175,7 @@ class ConnectionTestConsumerIT {
 
   private static String send(Map<String, Object> connector, String id) throws Exception {
     ConnectionTestRequest request =
-        new ConnectionTestRequest(id, Instant.now().plusSeconds(20), connector, null);
+        new ConnectionTestRequest(id, Instant.now().plusSeconds(20), connector, null, false);
     requests
         .send(
             new ProducerRecord<>(

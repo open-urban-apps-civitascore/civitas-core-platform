@@ -6140,7 +6140,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ConnectionTestResultDTO"
           description: "The test ran; success tells whether the source answered as\
-            \ configured, reason why not"
+            \ configured, reason why not, preview what it returned"
         "400":
           content:
             application/problem+json:
@@ -6771,7 +6771,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ConnectionTestResultDTO"
           description: "The test ran; success tells whether the source answered as\
-            \ configured, reason why not"
+            \ configured, reason why not, preview what it returned"
         "400":
           content:
             application/problem+json:
@@ -11371,6 +11371,18 @@ components:
           type: string
           description: "What happened, at most 500 characters."
           example: "FATAL: password authentication failed for user \"reader\""
+        preview:
+          type: string
+          description: "What the source returned: the first rows as CSV with a header\
+            \ line for SQL, the body of the call for HTTP, for any status; null otherwise."
+          example: |-
+            id,value
+            1,20.5
+            2,21.0
+        previewTruncated:
+          type: boolean
+          description: Whether the preview was cut at its size limit.
+          example: false
         reason:
           type: string
           description: "Why the test failed, null on success: INVALID_CONNECTOR the\
@@ -11385,8 +11397,8 @@ components:
         rowCount:
           type: integer
           format: int32
-          description: "Number of rows read, SQL only."
-          example: 5
+          description: "Number of rows in the preview, SQL only."
+          example: 2
         success:
           type: boolean
           description: Whether the source answered as configured.

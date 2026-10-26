@@ -24,7 +24,16 @@ public record ConnectionTestResultDTO(
             description = "What happened, at most 500 characters.",
             example = "FATAL: password authentication failed for user \"reader\"")
         String message,
-    @Schema(description = "Number of rows read, SQL only.", example = "5") Integer rowCount,
+    @Schema(
+            description =
+                "What the source returned: the first rows as CSV with a header line for SQL, the"
+                    + " body of the call for HTTP, for any status; null otherwise.",
+            example = "id,value\n1,20.5\n2,21.0")
+        String preview,
+    @Schema(description = "Whether the preview was cut at its size limit.", example = "false")
+        boolean previewTruncated,
+    @Schema(description = "Number of rows in the preview, SQL only.", example = "2")
+        Integer rowCount,
     @Schema(
             description = "HTTP status code of the call, when the source answered with one.",
             example = "200")

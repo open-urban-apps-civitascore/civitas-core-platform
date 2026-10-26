@@ -79,14 +79,14 @@ public class DataSourceConnectionTestService {
    * @throws ExternalSystemTimeoutException if no answer arrives in time
    */
   public ConnectionTestResultDTO test(ConnectionTestInputDTO input) {
-    return bounded(() -> audited(null, null, null, input));
+    return bounded(() -> audited(null, null, null, true, input));
   }
 
   /**
    * Tests connector values for a saved data source in any status. A {@code "********"} placeholder
    * keeps the stored secret only for the stored destinations of a draft, as every write does, or
    * for the unchanged connector of a released source, so the secret cannot reach another host or
-   * other data.
+   * other data. The where clause runs only as saved, or with secrets the caller typed.
    *
    * @throws ResourceNotFoundException if no such data source exists
    * @throws MalformedDataSourceRequestException for a placeholder the stored secret may not fill
@@ -96,11 +96,15 @@ public class DataSourceConnectionTestService {
     return bounded(
         () -> {
           DataSource dataSource = dataSourceService.findByIdOrThrow(dataSourceId);
-          if (dataSource.getDataSourceStatus() == DataSourceStatus.DRAFT
-              || unchanged(input.getConnector(), connectorStore.read(dataSource))) {
-            return audited(dataSourceId, connectorStore.storedDocument(dataSource), null, input);
+          boolean unchanged = unchanged(input.getConnector(), connectorStore.read(dataSource));
+          // A stored secret runs only a where clause that someone who may edit the source saved.
+          boolean applyWhere = unchanged || !ConnectorJson.hasPlaceholder(input.getConnector());
+          if (dataSource.getDataSourceStatus() == DataSourceStatus.DRAFT || unchanged) {
+            return audited(
+                dataSourceId, connectorStore.storedDocument(dataSource), null, applyWhere, input);
           }
-          return audited(dataSourceId, null, STORED_SECRET_FOR_RELEASED_CONNECTOR, input);
+          return audited(
+              dataSourceId, null, STORED_SECRET_FOR_RELEASED_CONNECTOR, applyWhere, input);
         });
   }
 
@@ -129,13 +133,17 @@ public class DataSourceConnectionTestService {
   }
 
   /**
+   * @param dataSourceId the saved data source, or null for unsaved values
    * @param storedDocument the document whose secrets a placeholder may keep, or null
    * @param placeholderRefusal why a placeholder may not keep the stored secret, or null
+   * @param applyWhere whether an SQL test runs the where clause
+   * @param input the values to test
    */
   private ConnectionTestResultDTO audited(
       UUID dataSourceId,
       Map<String, Object> storedDocument,
       String placeholderRefusal,
+      boolean applyWhere,
       ConnectionTestInputDTO input) {
     String user = currentUser.getCurrentAuditor().map(UUID::toString).orElse(UNKNOWN);
     String requestId = UUID.randomUUID().toString();
@@ -144,10 +152,12 @@ public class DataSourceConnectionTestService {
     String destination = destinationHost(connector);
     String target = target(connector, input.getApiCall());
     String outcome = "ERROR";
+    String data = "none";
     try {
       ConnectionTestResultDTO answer =
-          run(user, requestId, storedDocument, placeholderRefusal, input);
+          run(user, requestId, storedDocument, placeholderRefusal, applyWhere, input);
       outcome = answer.success() ? "SUCCESS" : "FAILURE:" + answer.reason();
+      data = answer.preview() == null ? "none" : "shown";
       return answer;
     } catch (StoredSecretRefusedException e) {
       outcome = "REFUSED";
@@ -165,17 +175,19 @@ public class DataSourceConnectionTestService {
       outcome = "UNAVAILABLE";
       throw e;
     } finally {
-      // TR-03187 L-1/L-6: who tested which destination and how it ended, without secrets or
-      // query. The request id finds the matching line in the connection test service's log.
+      // TR-03187 L-1/L-6: who tested which destination, whether data of the source was shown and
+      // how it ended, without secrets, query or preview. The request id finds the matching line in
+      // the connection test service's log.
       log.info(
           "Connection test: user={} requestId={} dataSource={} connectorType={}"
-              + " destination=\"{}\" target=\"{}\" outcome={}",
+              + " destination=\"{}\" target=\"{}\" data={} outcome={}",
           Encode.forJava(user),
           requestId,
           dataSourceId == null ? UNSAVED : dataSourceId,
           connector.connectorType(),
           Encode.forJava(destination),
           Encode.forJava(target),
+          data,
           outcome);
     }
   }
@@ -185,6 +197,7 @@ public class DataSourceConnectionTestService {
       String requestId,
       Map<String, Object> storedDocument,
       String placeholderRefusal,
+      boolean applyWhere,
       ConnectionTestInputDTO input) {
     ConnectorConfiguration connector = input.getConnector();
     String apiCall = blankToNull(input.getApiCall());
@@ -207,7 +220,7 @@ public class DataSourceConnectionTestService {
     try {
       ConnectionTestRequest request =
           new ConnectionTestRequest(
-              requestId, Instant.now().plus(properties.waitTime()), document, apiCall);
+              requestId, Instant.now().plus(properties.waitTime()), document, apiCall, applyWhere);
       return toAnswer(kafka.test(request));
     } finally {
       usersTesting.remove(user);
@@ -258,7 +271,13 @@ public class DataSourceConnectionTestService {
   private static ConnectionTestResultDTO answer(
       boolean success, Reason reason, ConnectionTestResult result) {
     return new ConnectionTestResultDTO(
-        success, reason, result.message(), result.rowCount(), result.httpStatus());
+        success,
+        reason,
+        result.message(),
+        result.preview(),
+        result.previewTruncated(),
+        result.rowCount(),
+        result.httpStatus());
   }
 
   /** What the test reads: the SQL table, the first MQTT topic, or the HTTP API call. */

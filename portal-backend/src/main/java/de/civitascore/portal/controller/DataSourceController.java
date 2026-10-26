@@ -164,7 +164,7 @@ public class DataSourceController
       responseCode = "200",
       description =
           "The test ran; success tells whether the source answered as configured, reason why"
-              + " not",
+              + " not, preview what it returned",
       content = @Content(schema = @Schema(implementation = ConnectionTestResultDTO.class)))
   @ApiResponse(
       responseCode = "400",
@@ -205,7 +205,7 @@ public class DataSourceController
       responseCode = "200",
       description =
           "The test ran; success tells whether the source answered as configured, reason why"
-              + " not",
+              + " not, preview what it returned",
       content = @Content(schema = @Schema(implementation = ConnectionTestResultDTO.class)))
   @ApiResponse(
       responseCode = "400",

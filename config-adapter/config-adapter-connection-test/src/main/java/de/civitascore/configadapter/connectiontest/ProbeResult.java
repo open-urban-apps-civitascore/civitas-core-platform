@@ -14,12 +14,20 @@ package de.civitascore.configadapter.connectiontest;
  *
  * @param success whether the answer is the one a working source gives
  * @param message what happened
+ * @param preview what the source returned, or null
+ * @param truncated whether the source returned more than the preview
  * @param rowCount the number of rows read, for SQL; null for other source types
  * @param httpStatus the HTTP status code, or null for other source types
  */
-record ProbeResult(boolean success, String message, Integer rowCount, Integer httpStatus) {
+record ProbeResult(
+    boolean success,
+    String message,
+    String preview,
+    boolean truncated,
+    Integer rowCount,
+    Integer httpStatus) {
 
-  static ProbeResult success(String message) {
-    return new ProbeResult(true, message, null, null);
+  static ProbeResult success(String message, String preview) {
+    return new ProbeResult(true, message, preview, false, null, null);
   }
 }

@@ -278,7 +278,7 @@ java $JAVA_OPTS -cp /civitas/config-adapter.jar de.civitascore.configadapter.app
 - On SIGTERM the consumer leaves its group at once. A new pod takes requests when it has joined the group, about 5–8 s after its start. After a crash, the group first waits for its 10 s session timeout.
 - Readiness is reported when the consumer subscribes, not when it has joined the group.
 - All replicas share one consumer group. A replica gets requests only from the partitions assigned to it. Give the request topic at least as many partitions as replicas. With one partition, all replicas together run at most `connectiontest.max-concurrent` tests at once.
-- The workload creates no topics. Create both topics with `retention.ms=60000` **and** `segment.ms=60000`: a request carries the connector's secrets as `ENC(...)`. Kafka deletes only closed segments. Without the short `segment.ms`, the open segment rolls after 7 days.
+- The workload creates no topics. Create both topics with `retention.ms=60000` **and** `segment.ms=60000`: a request carries the connector's secrets as `ENC(...)`, and a result can carry up to 8 KB of source data. Kafka deletes only closed segments. Without the short `segment.ms`, the open segment rolls after 7 days.
 
 **Network requirements**
 

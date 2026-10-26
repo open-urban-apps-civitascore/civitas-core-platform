@@ -81,11 +81,13 @@ class ConnectionTestClientTest {
         UUID.randomUUID().toString(),
         Instant.now().plus(wait),
         Map.of("connectionType", "sql", "password", "ENC(abc)"),
-        null);
+        null,
+        false);
   }
 
   private static ConnectionTestResult success(String requestId) {
-    return new ConnectionTestResult(requestId, Outcome.SUCCESS, null, "1 row", 1, null, 42);
+    return new ConnectionTestResult(
+        requestId, Outcome.SUCCESS, null, "1 row", "id\n1\n", false, 1, null, 42);
   }
 
   private void acknowledgeSends() {
@@ -148,7 +150,8 @@ class ConnectionTestClientTest {
             UUID.randomUUID().toString(),
             Instant.now().plusSeconds(10).truncatedTo(ChronoUnit.MILLIS),
             Map.of("connectionType", "http", "baseUrl", "https://api.example.org"),
-            "stations");
+            "stations",
+            false);
 
     Future<ConnectionTestResult> answer = testInBackground(request);
     await().atMost(Duration.ofSeconds(5)).until(() -> client.pendingCount() == 1);

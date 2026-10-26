@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class ConnectionTestServiceTest {
 
@@ -35,6 +37,7 @@ class ConnectionTestServiceTest {
   private final AtomicInteger probes = new AtomicInteger();
   private final AtomicReference<Map<String, Object>> probed = new AtomicReference<>();
   private final AtomicReference<String> probedApiCall = new AtomicReference<>();
+  private final AtomicReference<Boolean> probedApplyWhere = new AtomicReference<>();
 
   private static final Decryptor IDENTITY = connector -> connector;
 
@@ -69,11 +72,15 @@ class ConnectionTestServiceTest {
 
       @Override
       public ProbeResult probe(
-          Map<String, Object> connector, String apiCall, Cancellation cancellation)
+          Map<String, Object> connector,
+          String apiCall,
+          boolean applyWhere,
+          Cancellation cancellation)
           throws ConnectionTestFailure {
         probes.incrementAndGet();
         probed.set(connector);
         probedApiCall.set(apiCall);
+        probedApplyWhere.set(applyWhere);
         return behaviour.probe(connector);
       }
     };
@@ -86,11 +93,12 @@ class ConnectionTestServiceTest {
 
   private ConnectionTestService service(Decryptor decryptor) {
     return new ConnectionTestService(
-        List.of(prober("sql", connector -> ProbeResult.success("Connected."))), decryptor);
+        List.of(prober("sql", connector -> ProbeResult.success("Connected.", "a,b\n1,2"))),
+        decryptor);
   }
 
   private static ConnectionTestRequest request(Map<String, Object> connector) {
-    return new ConnectionTestRequest("req-1", Instant.EPOCH, connector, "call");
+    return new ConnectionTestRequest("req-1", Instant.EPOCH, connector, "call", false);
   }
 
   private ConnectionTestResult run(ConnectionTestService service, Map<String, Object> connector) {
@@ -136,7 +144,7 @@ class ConnectionTestServiceTest {
   void connectionTypeIsMatchedCaseInsensitively() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("sql", connector -> ProbeResult.success("ok"))), IDENTITY);
+            List.of(prober("sql", connector -> ProbeResult.success("ok", null))), IDENTITY);
 
     ConnectionTestResult result = run(service, Map.of("connectionType", " SQL "));
 
@@ -148,7 +156,7 @@ class ConnectionTestServiceTest {
   void plaintextPasswordAtTopLevelFailsWithoutProbing() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("sql", connector -> ProbeResult.success("ok"))), IDENTITY);
+            List.of(prober("sql", connector -> ProbeResult.success("ok", null))), IDENTITY);
 
     ConnectionTestResult result =
         run(service, Map.of("connectionType", "sql", "password", PASSWORD));
@@ -164,7 +172,7 @@ class ConnectionTestServiceTest {
   void plaintextPasswordNestedFailsWithoutProbing() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("sql", connector -> ProbeResult.success("ok"))), IDENTITY);
+            List.of(prober("sql", connector -> ProbeResult.success("ok", null))), IDENTITY);
 
     ConnectionTestResult result =
         run(
@@ -180,7 +188,7 @@ class ConnectionTestServiceTest {
   void encryptedPasswordPassesAndProberGetsDecryptedConnector() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("sql", connector -> ProbeResult.success("ok"))), decrypting());
+            List.of(prober("sql", connector -> ProbeResult.success("ok", null))), decrypting());
 
     ConnectionTestResult result =
         run(
@@ -207,7 +215,7 @@ class ConnectionTestServiceTest {
         };
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("sql", connector -> ProbeResult.success("ok"))), failing);
+            List.of(prober("sql", connector -> ProbeResult.success("ok", null))), failing);
 
     ConnectionTestResult result =
         run(service, Map.of("connectionType", "sql", "password", "ENC(abc)"));
@@ -220,11 +228,14 @@ class ConnectionTestServiceTest {
   }
 
   @Test
-  void probeSuccessMapsOutcomeMessageStatusAndRequestId() {
+  void probeSuccessMapsOutcomeMessagePreviewAndRequestId() {
     ConnectionTestService service =
         new ConnectionTestService(
             List.of(
-                prober("http", connector -> new ProbeResult(true, "Got a response.", null, 200))),
+                prober(
+                    "http",
+                    connector ->
+                        new ProbeResult(true, "Got a response.", "{\"a\":1}", false, null, 200))),
             IDENTITY);
 
     ConnectionTestResult result = run(service, Map.of("connectionType", "http"));
@@ -233,16 +244,33 @@ class ConnectionTestServiceTest {
     assertEquals(Outcome.SUCCESS, result.outcome());
     assertNull(result.reason());
     assertEquals("Got a response.", result.message());
+    assertEquals("{\"a\":1}", result.preview());
     assertEquals(200, result.httpStatus());
     assertEquals("call", probedApiCall.get());
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void theRequestDecidesWhetherTheWhereClauseApplies(boolean applyWhere) {
+    ConnectionTestService service = service(IDENTITY);
+
+    service.test(
+        new ConnectionTestRequest(
+            "req-1", Instant.EPOCH, Map.of("connectionType", "sql"), null, applyWhere),
+        new Cancellation());
+
+    assertEquals(applyWhere, probedApplyWhere.get());
+  }
+
   @Test
-  void unsuccessfulProbeResultIsFailureWithStatusKept() {
+  void unsuccessfulProbeResultIsFailureWithPreviewAndStatusKept() {
     ConnectionTestService service =
         new ConnectionTestService(
             List.of(
-                prober("http", connector -> new ProbeResult(false, "Unauthorized.", null, 401))),
+                prober(
+                    "http",
+                    connector ->
+                        new ProbeResult(false, "Unauthorized.", "denied", false, null, 401))),
             IDENTITY);
 
     ConnectionTestResult result = run(service, Map.of("connectionType", "http"));
@@ -250,21 +278,32 @@ class ConnectionTestServiceTest {
     assertEquals(Outcome.FAILURE, result.outcome());
     assertEquals(Reason.SOURCE_ERROR, result.reason());
     assertEquals("Unauthorized.", result.message());
+    assertEquals("denied", result.preview());
     assertEquals(401, result.httpStatus());
   }
 
   @Test
-  void secretsAreMaskedInTheProbeMessage() {
+  void secretsAreMaskedInProbeMessageAndPreview() {
     ConnectionTestService service =
         new ConnectionTestService(
             List.of(
-                prober("http", connector -> new ProbeResult(true, "echo " + PASSWORD, null, 200))),
+                prober(
+                    "http",
+                    connector ->
+                        new ProbeResult(
+                            true,
+                            "echo " + PASSWORD,
+                            "{\"seen\":\"" + PASSWORD + "\"}",
+                            false,
+                            null,
+                            200))),
             decrypting());
 
     ConnectionTestResult result =
         run(service, Map.of("connectionType", "http", "password", "ENC(abc)"));
 
     assertFalse(result.message().contains(PASSWORD));
+    assertFalse(result.preview().contains(PASSWORD));
     assertTrue(result.message().contains("********"));
   }
 
@@ -286,13 +325,14 @@ class ConnectionTestServiceTest {
     assertEquals(Outcome.FAILURE, result.outcome());
     assertEquals("login failed for ********", result.message());
     assertEquals(Reason.SOURCE_ERROR, result.reason());
+    assertNull(result.preview());
   }
 
   @Test
   void aReferenceInADecryptedPasswordIsRefusedLikeTheReleaseWithoutQuotingIt() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("mqtt", connector -> ProbeResult.success("ok"))),
+            List.of(prober("mqtt", connector -> ProbeResult.success("ok", null))),
             connector -> {
               Map<String, Object> plain = new HashMap<>(connector);
               plain.put("password", "pw-#{x}-tail");
@@ -312,7 +352,7 @@ class ConnectionTestServiceTest {
   void aReferenceInAListValueIsRefusedNamingItsPlace() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("mqtt", connector -> ProbeResult.success("ok"))), IDENTITY);
+            List.of(prober("mqtt", connector -> ProbeResult.success("ok", null))), IDENTITY);
 
     ConnectionTestResult result =
         run(service, Map.of("connectionType", "mqtt", "topics", List.of("sensors/${x}")));

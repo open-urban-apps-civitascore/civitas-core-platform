@@ -141,7 +141,15 @@ class DataSourceConnectionTestServiceTest {
 
   private static ConnectionTestResult success(ConnectionTestRequest request) {
     return new ConnectionTestResult(
-        request.requestId(), Outcome.SUCCESS, null, "1 row", 1, null, 9);
+        request.requestId(),
+        Outcome.SUCCESS,
+        null,
+        "1 row",
+        "id,value\n1,20.5\n",
+        false,
+        1,
+        null,
+        9);
   }
 
   private void answer(Function<ConnectionTestRequest, ConnectionTestResult> f) {
@@ -530,17 +538,79 @@ class DataSourceConnectionTestServiceTest {
   }
 
   @Nested
+  @DisplayName("Where clause")
+  class WhereClause {
+
+    private static ConnectionTestInputDTO sqlWhere(String where, String password) {
+      return input(
+          "{'connectorType':'SQL','driver':'postgres','dsn':'postgres://db.example:5432/city',"
+              + "'table':'readings','columns':['id','value'],'where':'"
+              + where
+              + "','user':'reader','password':'"
+              + password
+              + "'}",
+          null);
+    }
+
+    @Test
+    @DisplayName("unsaved values with a typed password apply their where clause")
+    void unsavedValues_applyTheWhereClause() {
+      answer(DataSourceConnectionTestServiceTest::success);
+
+      service.test(sql(PLAIN_PASSWORD));
+
+      assertThat(sentRequest().applyWhere()).isTrue();
+    }
+
+    @Test
+    @DisplayName("the stored secret applies the saved where clause")
+    void storedSecretWithTheSavedConnector_appliesTheWhereClause() {
+      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
+      answer(DataSourceConnectionTestServiceTest::success);
+
+      service.test(id, sql(Secret.PLACEHOLDER));
+
+      assertThat(sentRequest().applyWhere()).isTrue();
+    }
+
+    @Test
+    @DisplayName("the stored secret does not apply a where clause the caller changed")
+    void storedSecretWithAChangedWhere_doesNotApplyIt() {
+      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
+      answer(DataSourceConnectionTestServiceTest::success);
+
+      service.test(id, sqlWhere("id > 1", Secret.PLACEHOLDER));
+
+      assertThat(sentRequest().applyWhere()).isFalse();
+    }
+
+    @Test
+    @DisplayName("a typed password applies a changed where clause")
+    void typedPasswordWithAChangedWhere_appliesIt() {
+      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
+      answer(DataSourceConnectionTestServiceTest::success);
+
+      service.test(id, sqlWhere("id > 1", "new-secret"));
+
+      assertThat(sentRequest().applyWhere()).isTrue();
+    }
+  }
+
+  @Nested
   @DisplayName("Result")
   class Result {
 
     @Test
-    @DisplayName("success answers with the message and the row count")
-    void success_answersWithTheMessageAndTheRowCount() {
+    @DisplayName("success answers with the preview")
+    void success_answersWithThePreview() {
       answer(DataSourceConnectionTestServiceTest::success);
 
       ConnectionTestResultDTO answer = service.test(sql(PLAIN_PASSWORD));
 
-      assertThat(answer).isEqualTo(new ConnectionTestResultDTO(true, null, "1 row", 1, null));
+      assertThat(answer)
+          .isEqualTo(
+              new ConnectionTestResultDTO(
+                  true, null, "1 row", "id,value\n1,20.5\n", false, 1, null));
       assertThat(singleAuditLine()).endsWith("outcome=SUCCESS");
     }
 
@@ -738,7 +808,8 @@ class DataSourceConnectionTestServiceTest {
 
     @Test
     @DisplayName(
-        "audit line names user, request, data source, type, destination, target and outcome")
+        "audit line names user, request, data source, type, destination, target, data and"
+            + " outcome")
     void auditLine_namesWhoTestedWhatWhere() {
       answer(DataSourceConnectionTestServiceTest::success);
 
@@ -751,11 +822,25 @@ class DataSourceConnectionTestServiceTest {
                   + " requestId="
                   + sentRequest().requestId()
                   + " dataSource=unsaved connectorType=SQL destination=\"db.example:5432\""
-                  + " target=\"readings\" outcome=SUCCESS");
+                  + " target=\"readings\" data=shown outcome=SUCCESS");
     }
 
     @Test
-    @DisplayName("no log line carries the connector's secret or query")
+    @DisplayName("audit line says no data was shown when the answer has no preview")
+    void auditLine_withoutPreview_saysNoData() {
+      answer(
+          request ->
+              ConnectionTestResult.failure(request.requestId(), Reason.SOURCE_ERROR, "no", 3));
+
+      service.test(sql(PLAIN_PASSWORD));
+
+      assertThat(singleAuditLine())
+          .contains(" data=none ")
+          .endsWith("outcome=FAILURE:SOURCE_ERROR");
+    }
+
+    @Test
+    @DisplayName("no log line carries the connector's secret, query or the preview")
     void logs_carryNoConnectorValues() {
       answer(DataSourceConnectionTestServiceTest::success);
 
@@ -765,6 +850,7 @@ class DataSourceConnectionTestServiceTest {
           .extracting(ILoggingEvent::getFormattedMessage)
           .noneMatch(message -> message.contains(PLAIN_PASSWORD))
           .noneMatch(message -> message.contains("secret_column"))
+          .noneMatch(message -> message.contains("20.5"))
           .noneMatch(message -> message.contains("ENC("));
     }
 

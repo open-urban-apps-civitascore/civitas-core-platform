@@ -39,7 +39,8 @@ final class MqttProber implements ConnectionProber {
   }
 
   @Override
-  public ProbeResult probe(Map<String, Object> connector, String apiCall, Cancellation cancellation)
+  public ProbeResult probe(
+      Map<String, Object> connector, String apiCall, boolean applyWhere, Cancellation cancellation)
       throws ConnectionTestFailure {
     MqttConnectorValues values;
     try {
@@ -77,7 +78,8 @@ final class MqttProber implements ConnectionProber {
             + subscription.topic()
             + "' (granted QoS "
             + granted
-            + ").");
+            + ").",
+        null);
   }
 
   /** The connector's connect timeout, but never beyond the budget of the test. */

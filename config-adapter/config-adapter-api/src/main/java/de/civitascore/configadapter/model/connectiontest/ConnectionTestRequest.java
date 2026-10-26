@@ -23,13 +23,16 @@ import java.util.Map;
  * @param connector the connector as the registry stores it: {@code connectionType} in lower case,
  *     every secret as {@code ENC(...)}
  * @param apiCall the name of the API call to run for an HTTP connector, otherwise null
+ * @param applyWhere whether an SQL test applies the connector's where clause; the requester allows
+ *     it only for a clause it stores or for a connector whose secrets the caller typed
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ConnectionTestRequest(
     String requestId,
     @JsonFormat(shape = JsonFormat.Shape.STRING) Instant expiresAt,
     Map<String, Object> connector,
-    String apiCall) {
+    String apiCall,
+    boolean applyWhere) {
 
   /** Keeps the connector, and with it the encrypted secrets, out of logs. */
   @Override

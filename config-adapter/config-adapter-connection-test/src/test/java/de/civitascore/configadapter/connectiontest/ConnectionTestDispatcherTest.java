@@ -74,7 +74,10 @@ class ConnectionTestDispatcherTest {
 
       @Override
       public ProbeResult probe(
-          Map<String, Object> connector, String apiCall, Cancellation cancellation)
+          Map<String, Object> connector,
+          String apiCall,
+          boolean applyWhere,
+          Cancellation cancellation)
           throws ConnectionTestFailure {
         probes.incrementAndGet();
         try {
@@ -98,7 +101,7 @@ class ConnectionTestDispatcherTest {
           Thread.currentThread().interrupt();
           throw new ConnectionTestFailure("interrupted");
         }
-        return ProbeResult.success("ok");
+        return ProbeResult.success("ok", null);
       }
     };
   }
@@ -113,7 +116,8 @@ class ConnectionTestDispatcherTest {
   }
 
   private static ConnectionTestRequest request(String id, Instant expiresAt, String apiCall) {
-    return new ConnectionTestRequest(id, expiresAt, Map.of("connectionType", "sql"), apiCall);
+    return new ConnectionTestRequest(
+        id, expiresAt, Map.of("connectionType", "sql"), apiCall, false);
   }
 
   @Test
