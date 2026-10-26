@@ -213,7 +213,7 @@ class CoreSchemaValidatorTest {
         {"type": "OAUTH2", "tokenUrl": "https://auth.example.org/token", "clientId": "core",
          "clientSecret": "ENC(ciphertext)", "scope": null}""",
         """
-        {"type": "CLIENT_CERTIFICATE", "certificate": "-----BEGIN CERTIFICATE-----",
+        {"type": "CLIENT_CERTIFICATE", "certificate": "ENC(ciphertext)",
          "privateKey": "ENC(ciphertext)"}"""
     })
     @DisplayName("An HTTP/REST DataSource with each authentication the host stores is accepted")

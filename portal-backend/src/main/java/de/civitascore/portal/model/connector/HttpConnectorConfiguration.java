@@ -253,10 +253,13 @@ public record HttpConnectorConfiguration(
   public record ClientCertificate(
       @Schema(
               description =
-                  "The client certificate in PEM, optionally followed by its chain. Stored and"
-                      + " returned in clear text.",
+                  "The client certificate in PEM, optionally followed by its chain. Responses show"
+                      + " \"********\" for a stored certificate.",
+              implementation = String.class,
+              accessMode = Schema.AccessMode.WRITE_ONLY,
+              format = "password",
               example = "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----")
-          @NotNull(groups = OnRelease.class, message = "'certificate' is required") String certificate,
+          @NotNull(groups = OnRelease.class, message = "'certificate' is required") Secret certificate,
       @Schema(
               description =
                   "The private key of the certificate in PEM, without a passphrase. Responses show"
@@ -268,10 +271,6 @@ public record HttpConnectorConfiguration(
           @NotNull(groups = OnRelease.class, message = "'privateKey' is required") Secret privateKey)
       implements Authentication {
     static final String TYPE = "CLIENT_CERTIFICATE";
-
-    public ClientCertificate {
-      certificate = ConnectorValues.blankToNull(certificate);
-    }
 
     @Override
     @Schema(allowableValues = TYPE, requiredMode = Schema.RequiredMode.REQUIRED)

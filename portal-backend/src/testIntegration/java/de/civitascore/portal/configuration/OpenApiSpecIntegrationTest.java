@@ -97,6 +97,7 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
     "HttpConnectorBearerTokenAuthentication, token",
     "HttpConnectorApiTokenAuthentication, value",
     "HttpConnectorOAuth2Authentication, clientSecret",
+    "HttpConnectorClientCertificateAuthentication, certificate",
     "HttpConnectorClientCertificateAuthentication, privateKey"
   })
   @DisplayName("Should describe each connector secret as write-only")

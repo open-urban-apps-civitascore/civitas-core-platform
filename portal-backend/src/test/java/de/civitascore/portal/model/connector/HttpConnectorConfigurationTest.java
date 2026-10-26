@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ApiCall;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ApiToken;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Basic;
-import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ClientCertificate;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Cursor;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.LimitOffset;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Method;
@@ -87,7 +86,6 @@ class HttpConnectorConfigurationTest {
     Cursor cursor = new Cursor(" ", "", null, " ", null);
 
     assertThat(new ApiToken(" ", null, null).name()).isNull();
-    assertThat(new ClientCertificate(" ", null).certificate()).isNull();
     assertThat(oauth2).isEqualTo(new OAuth2(null, null, null, null));
     assertThat(limitOffset).isEqualTo(new LimitOffset(null, null, null, null, null));
     assertThat(cursor).isEqualTo(new Cursor(null, null, null, null, null));

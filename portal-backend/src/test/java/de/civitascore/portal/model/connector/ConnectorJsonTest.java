@@ -450,7 +450,8 @@ class ConnectorJsonTest {
         "'type':'BEARER_TOKEN' | token",
         "'type':'API_TOKEN','name':'X-API-Key','in':'HEADER' | value",
         "'type':'OAUTH2','tokenUrl':'https://auth.example.org/token','clientId':'c' | clientSecret",
-        "'type':'CLIENT_CERTIFICATE','certificate':'pem' | privateKey"
+        "'type':'CLIENT_CERTIFICATE','certificate':'pem' | privateKey",
+        "'type':'CLIENT_CERTIFICATE','privateKey':'pem' | certificate"
       })
   void httpAuthenticationSecret_isMaskedInResponseEncryptedInDocumentAndKeptForPlaceholder(
       String fields, String secret) {

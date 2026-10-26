@@ -194,7 +194,7 @@
       "required": ["type"],
       "properties": {
         "type":        { "const": "CLIENT_CERTIFICATE" },
-        "certificate": { "type": ["string", "null"], "description": "Client certificate in PEM, optionally followed by its chain." },
+        "certificate": { "type": ["string", "null"], "description": "Client certificate in PEM, optionally followed by its chain. Stored ENCRYPTED by the host; null/absent when unset." },
         "privateKey":  { "type": ["string", "null"], "description": "Private key of the certificate in PEM, without a passphrase. Stored ENCRYPTED by the host; null/absent when unset." }
       }
     },

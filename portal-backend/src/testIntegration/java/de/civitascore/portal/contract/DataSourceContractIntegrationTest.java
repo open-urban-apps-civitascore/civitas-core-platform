@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.jayway.jsonpath.JsonPath;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
-import de.civitascore.portal.model.connector.TestCertificates;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataSource;
@@ -588,36 +587,34 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
 
     private static Stream<Arguments> authenticationsWithSecret() throws JSONException {
       return Stream.of(
-          Arguments.of(new JSONObject().put("type", "BEARER_TOKEN"), "token"),
+          Arguments.of(new JSONObject().put("type", "BEARER_TOKEN"), List.of("token")),
           Arguments.of(
               new JSONObject()
                   .put("type", "API_TOKEN")
                   .put("name", "X-API-Key")
                   .put("in", "HEADER"),
-              "value"),
+              List.of("value")),
           Arguments.of(
               new JSONObject()
                   .put("type", "OAUTH2")
                   .put("tokenUrl", "https://auth.example.org/oauth2/token")
                   .put("clientId", "civitas-core")
                   .put("scope", "read"),
-              "clientSecret"),
+              List.of("clientSecret")),
           Arguments.of(
-              new JSONObject()
-                  .put("type", "CLIENT_CERTIFICATE")
-                  .put("certificate", TestCertificates.SELF_SIGNED),
-              "privateKey"));
+              new JSONObject().put("type", "CLIENT_CERTIFICATE"),
+              List.of("certificate", "privateKey")));
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("authenticationsWithSecret")
     @DisplayName("creates, reads, updates and releases each authentication with its secret masked")
-    void eachAuthenticationKeepsItsSecretMasked(JSONObject authentication, String secret)
+    void eachAuthenticationKeepsItsSecretMasked(JSONObject authentication, List<String> secrets)
         throws Exception {
       UUID dsvId = createAvailableDataStructureVersionId();
       String path = DATASOURCES_ENDPOINT + "/";
-      String secretPath = "$.authentication." + secret;
-      JSONObject expected = new JSONObject(authentication.toString()).put(secret, "********");
+      JSONObject expected =
+          withSecrets(new JSONObject(authentication.toString()), secrets, "********");
       List<String> responses = new ArrayList<>();
 
       responses.add(
@@ -626,10 +623,10 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
               DATASOURCES_ENDPOINT,
               body(
                   "contract_http_auth",
-                  withAuthentication(authentication.put(secret, PASSWORD)),
+                  withAuthentication(withSecrets(authentication, secrets, PASSWORD)),
                   dsvId)));
       String id = JsonPath.read(responses.getFirst(), "$.id");
-      String ciphertext = JsonPath.read(readStoredConfiguration(id), secretPath);
+      List<String> ciphertexts = storedSecrets(id, secrets);
       responses.add(exchange(HttpMethod.GET, path + id, null));
       responses.add(
           exchange(
@@ -637,7 +634,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
               path + id,
               body(
                   "contract_http_auth",
-                  withAuthentication(authentication.put(secret, "********")),
+                  withAuthentication(withSecrets(authentication, secrets, "********")),
                   dsvId)));
       responses.add(exchange(HttpMethod.POST, path + id + "/release", null));
 
@@ -647,14 +644,34 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
             new JSONObject(response),
             JSONCompareMode.LENIENT);
       }
-      assertThat(ciphertext).isNotBlank().isNotEqualTo(PASSWORD).isNotEqualTo("********");
-      assertThat((String) JsonPath.read(readStoredConfiguration(id), secretPath))
-          .isEqualTo(ciphertext);
+      assertThat(ciphertexts)
+          .allSatisfy(
+              ciphertext ->
+                  assertThat(ciphertext)
+                      .isNotBlank()
+                      .isNotEqualTo(PASSWORD)
+                      .isNotEqualTo("********"));
+      assertThat(storedSecrets(id, secrets)).isEqualTo(ciphertexts);
       assertThat((String) JsonPath.read(responses.getLast(), "$.dataSourceStatus"))
           .isEqualTo("AVAILABLE");
       assertThat(responses).noneMatch(response -> response.contains(PASSWORD));
       exchange(HttpMethod.POST, path + id + "/unrelease", null);
       exchange(HttpMethod.DELETE, path + id, null);
+    }
+
+    private static JSONObject withSecrets(
+        JSONObject authentication, List<String> secrets, String value) throws JSONException {
+      for (String secret : secrets) {
+        authentication.put(secret, value);
+      }
+      return authentication;
+    }
+
+    private List<String> storedSecrets(String id, List<String> secrets) {
+      String stored = readStoredConfiguration(id);
+      return secrets.stream()
+          .map(secret -> (String) JsonPath.read(stored, "$.authentication." + secret))
+          .toList();
     }
 
     private static String withAuthentication(JSONObject authentication) throws JSONException {
@@ -728,8 +745,6 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
               + " | [{'queryParameters':[{'name':'status','value':'a'}]}]"
               + " | connector.authentication.name",
           "{'type':'API_TOKEN','name':'Host','in':'HEADER'} | [] | connector.authentication.name",
-          "{'type':'CLIENT_CERTIFICATE','certificate':'no pem'} | []"
-              + " | connector.authentication.certificate",
           "null | [{'pagination':{'type':'CURSOR','cursorPath':'$..cursor'}}]"
               + " | connector.apiCalls[0].pagination.cursorPath",
           "null | [{'pagination':{'type':'CURSOR','cursorParameter':'c','cursorIn':'HEADER',"

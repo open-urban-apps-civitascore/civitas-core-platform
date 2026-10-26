@@ -4,7 +4,6 @@ import de.civitascore.portal.model.connector.ConnectorConfiguration;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ApiCall;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ApiToken;
-import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ClientCertificate;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Cursor;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.LimitOffset;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.None;
@@ -13,10 +12,6 @@ import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Paginati
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Parameter;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ParameterLocation;
 import de.civitascore.portal.model.embedded.ConnectorType;
-import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -51,15 +46,8 @@ public class HttpConnectorRules implements ConnectorRules {
       violations.add(
           ConnectorViolation.at("baseUrl", "'baseUrl' must use https with authentication"));
     }
-    switch (http.authentication()) {
-      case ApiToken token -> addApiTokenViolations(token, apiCalls, violations);
-      case ClientCertificate client
-          when client.certificate() != null && !holdsCertificates(client.certificate()) ->
-          violations.add(
-              ConnectorViolation.at(
-                  "authentication.certificate",
-                  "'certificate' must hold one or more certificates in PEM"));
-      default -> {}
+    if (http.authentication() instanceof ApiToken token) {
+      addApiTokenViolations(token, apiCalls, violations);
     }
     Set<String> names = new HashSet<>();
     for (int i = 0; i < apiCalls.size(); i++) {
@@ -213,16 +201,6 @@ public class HttpConnectorRules implements ConnectorRules {
               "'name' must differ from the name of each "
                   + sent.locationName()
                   + " of the API calls, pagination included"));
-    }
-  }
-
-  private static boolean holdsCertificates(String pem) {
-    try {
-      return !CertificateFactory.getInstance("X.509")
-          .generateCertificates(new ByteArrayInputStream(pem.getBytes(StandardCharsets.ISO_8859_1)))
-          .isEmpty();
-    } catch (CertificateException e) {
-      return false;
     }
   }
 

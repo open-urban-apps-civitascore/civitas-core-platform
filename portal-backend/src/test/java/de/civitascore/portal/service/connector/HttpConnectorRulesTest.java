@@ -17,7 +17,6 @@ import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Paginati
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Parameter;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ParameterLocation;
 import de.civitascore.portal.model.connector.Secret;
-import de.civitascore.portal.model.connector.TestCertificates;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
@@ -118,26 +117,6 @@ class HttpConnectorRulesTest {
     return rules.validate(
         new HttpConnectorConfiguration(baseUrl, authentication, List.of(named("a"))),
         ConnectorValidator.Stage.DRAFT);
-  }
-
-  @Test
-  void validate_withClientCertificate_requiresCertificatesInPem() {
-    assertThat(validate("https://api.example.org", certificate(TestCertificates.SELF_SIGNED)))
-        .isEmpty();
-    assertThat(
-            validate(
-                "https://api.example.org",
-                certificate(TestCertificates.SELF_SIGNED + TestCertificates.SELF_SIGNED)))
-        .isEmpty();
-    assertThat(validate("https://api.example.org", certificate("-----BEGIN CERTIFICATE-----")))
-        .containsExactly(
-            ConnectorViolation.at(
-                "authentication.certificate",
-                "'certificate' must hold one or more certificates in PEM"));
-  }
-
-  private static ClientCertificate certificate(String pem) {
-    return new ClientCertificate(pem, Secret.of("key"));
   }
 
   private List<ConnectorViolation> validateWithApiToken(

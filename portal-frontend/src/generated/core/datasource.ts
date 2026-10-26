@@ -163,7 +163,7 @@ export const HttpOAuth2AuthenticationSchema = z
 export const HttpClientCertificateAuthenticationSchema = z
   .object({
     type: z.literal('CLIENT_CERTIFICATE'),
-    /** Client certificate in PEM, optionally followed by its chain. */
+    /** Client certificate in PEM, optionally followed by its chain. Stored ENCRYPTED by the host; null/absent when unset. */
     certificate: z.union([z.string(), z.null()]).optional(),
     /** Private key of the certificate in PEM, without a passphrase. Stored ENCRYPTED by the host; null/absent when unset. */
     privateKey: z.union([z.string(), z.null()]).optional(),
