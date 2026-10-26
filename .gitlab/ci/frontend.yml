@@ -191,6 +191,12 @@ deploy-frontend:
 # dev@civitas.local user of the Bruno `ci` environment; playwright/createTestUser.ts and
 # sweep.setup.ts may need a Keycloak admin login), the frontend env below, and whether the specs
 # need seeded data (e2e/scripts/seed-test-users.sh, which runs psql against postgis-dev-env).
+# TODO: first run (pipeline 2989728635), what it showed: the suite starts and logs in, but (1) the
+# specs are stale against the UI (CreateDataset.spec expects the header "Create: New Dataset", the page
+# shows "New Dataset"), (2) the stored session's access token expires after about 5 minutes and the
+# BFF then gets 401 from APISIX ("JWT expired"), so every later spec fails; check the token refresh
+# of the Auth.js session or the access token lifespan of the CI realm, (3) the sweep helper had
+# no Keycloak URL (KC_URL below). Retries are off in CI: with the 401s they only made it run 20 minutes.
 # TODO: it is a nightly job: restrict the rules to the schedule once it is stable. It is
 # allow_failure until then. It overlaps the Robot hero case in the deployment repository and
 # e2e-mf; see TEST-CONSOLIDATION-PLAN.md (D6, D8, C5).
@@ -202,7 +208,7 @@ e2e-test-frontend:
   tags:
     - saas-linux-medium-amd64 # 4 cores, 16 GB memory
   stage: test
-  timeout: 1h
+  timeout: 30m
   allow_failure: true # TODO: remove when the job is stable
   needs:
     - job: build-backend
@@ -255,7 +261,7 @@ e2e-test-frontend:
       pnpm install --frozen-lockfile
       # The mock backend that the specs still use. Not `pnpm json-server`: that script needs bash's `source`.
       npx json-server json-server/db.json -p 3001 > json-server.log 2>&1 &
-      CI=true PLAYWRIGHT_JUNIT_OUTPUT_FILE=results/junit.xml pnpm exec playwright test --project=chromium --reporter=list,junit
+      CI=true PLAYWRIGHT_JUNIT_OUTPUT_FILE=results/junit.xml pnpm exec playwright test --project=chromium --retries=0 --reporter=list,junit
       RUNNER
       E2E_EXIT=$?
       set -e

@@ -263,7 +263,11 @@ deploy-authz:
 # APISIX, OPA, the authz repository and the backend with Keycloak users in three roles. The script
 # was never part of CI. It builds nothing here (--skip-build): the images are built by `docker
 # compose up` from the jars of this pipeline.
-# TODO: this job has never run in CI. Known problems to fix first:
+# TODO: this job has never run in CI. First run (pipeline 2989827415): the port check passed (it
+# needed lsof and ss), then the stack failed to start: the config-adapter of docker-compose.authz-e2e.yml
+# runs with ADAPTERS=keycloak, and the adapter now refuses to start without the saga handlers
+# "frost" and "apisix" ("Required SagaCommandHandlers not registered"). The compose file is stale.
+# Known problems to fix after that:
 #  - the script reaches the stack at localhost, a dind daemon is at `docker` (set below), and a
 #    token issued under that host may not match the issuer the stack is configured with;
 #  - the Flyway step bind-mounts portal-backend/src/main/resources/db/migration with `docker run -v`,
