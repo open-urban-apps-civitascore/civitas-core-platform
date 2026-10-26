@@ -174,8 +174,8 @@ export interface MappingNodeData extends BasePipelineNodeData {
   /** The single saved artifact produced by the mapping editor. */
   mappingConfig: MappingConfig
   /**
-   * Versioned CORE URN of the Mapping artifact created for this node (the POST/PUT `/v1/mappings`
-   * response `versionedUrn`), emitted as the CORE pipeline node's `mappingRef`. Round-trips via
+   * Versioned CORE URN of the Mapping artifact created for this node (the `versionedUrn` of the
+   * mapping create or update response), emitted as the CORE pipeline node's `mappingRef`. Round-trips via
    * `styles`; absent until the mapping has been saved at least once.
    */
   mappingRef?: string

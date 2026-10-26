@@ -1,5 +1,9 @@
 /** `urn:core:<scope>:<owner>:<type>:<domain>:<uuid>` — a pin appends `:<version>`. */
 const LOGICAL_SEGMENTS = 7
+const ID_SEGMENT = 6
+
+/** The UUID segment of a CORE URN, logical or pinned. */
+export const idOfUrn = (urn: string): string => urn.split(':')[ID_SEGMENT]
 
 /** The version segment of a pinned CORE URN, or nothing when it carries none. */
 export const versionOfUrn = (urn: string): string => {

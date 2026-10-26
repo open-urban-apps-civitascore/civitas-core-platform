@@ -936,8 +936,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
             }
           }
 
-          // Create/version mapping artifacts for configured mapping nodes (POST/PUT /v1/mappings). An
-          // already-created mapping (has logicalUrn) whose body is unchanged since the last save is skipped —
+          // Create/version mapping artifacts for configured mapping nodes (POST on the mappings of
+          // the dataset, PUT on the mapping itself). An already-created mapping (has logicalUrn) whose body is unchanged since the last save is skipped —
           // the mapping API creates a new version per request, so sending it on every save (e.g. for an
           // unrelated node edit) would churn versions for nothing. Stash the returned versioned URN
           // (→ CORE model `mappingRef`) and logical URN (→ future PUT-versioning) back onto the node.
