@@ -173,7 +173,7 @@ test_access_catalog_allowed_when_authenticated if {
 		with data.config as mock_http.mock_config
 		with input as {
 			"context": {"identity": {"user": "u1"}},
-			"action": {"operation": "AccessCatalog", "resource": {"catalog": {"name": "civitas"}}},
+			"action": {"operation": "AccessCatalog", "resource": {"catalog": {"name": "geodata"}}},
 		}
 }
 
@@ -207,7 +207,7 @@ test_filter_schemas_allowed_for_information_schema if {
 		with data.config as mock_http.mock_config
 		with input as {
 			"context": {"identity": {"user": "u1"}},
-			"action": {"operation": "FilterSchemas", "resource": {"schema": {"catalogName": "civitas", "schemaName": "information_schema"}}},
+			"action": {"operation": "FilterSchemas", "resource": {"schema": {"catalogName": "geodata", "schemaName": "information_schema"}}},
 		}
 }
 
@@ -222,7 +222,7 @@ test_select_from_columns_granted_via_matching_dataset if {
 		with input as {
 			"context": {"identity": {"user": "u1"}},
 			"action": {"operation": "SelectFromColumns", "resource": {"table": {
-				"catalogName": "civitas",
+				"catalogName": "geodata",
 				"schemaName": _digit_first_schema,
 				"tableName": "baeume",
 			}}},
@@ -236,7 +236,7 @@ test_filter_tables_denied_no_permissions if {
 		with input as {
 			"context": {"identity": {"user": "u1"}},
 			"action": {"operation": "FilterTables", "resource": {"table": {
-				"catalogName": "civitas",
+				"catalogName": "geodata",
 				"schemaName": _digit_first_schema,
 				"tableName": "baeume",
 			}}},
@@ -249,7 +249,7 @@ test_filter_schemas_granted_via_tenant_cascade if {
 		with data.config as mock_http.mock_config
 		with input as {
 			"context": {"identity": {"user": "u1"}},
-			"action": {"operation": "FilterSchemas", "resource": {"schema": {"catalogName": "civitas", "schemaName": _digit_first_schema}}},
+			"action": {"operation": "FilterSchemas", "resource": {"schema": {"catalogName": "geodata", "schemaName": _digit_first_schema}}},
 		}
 }
 
@@ -264,7 +264,7 @@ test_filter_schemas_denied_via_unscoped_system_role if {
 		with data.config as mock_http.mock_config
 		with input as {
 			"context": {"identity": {"user": "u1"}},
-			"action": {"operation": "FilterSchemas", "resource": {"schema": {"catalogName": "civitas", "schemaName": _digit_first_schema}}},
+			"action": {"operation": "FilterSchemas", "resource": {"schema": {"catalogName": "geodata", "schemaName": _digit_first_schema}}},
 		}
 }
 
@@ -275,7 +275,7 @@ test_show_columns_granted_via_datapool_union if {
 		with input as {
 			"context": {"identity": {"user": "u1"}},
 			"action": {"operation": "ShowColumns", "resource": {"table": {
-				"catalogName": "civitas",
+				"catalogName": "geodata",
 				"schemaName": _digit_first_schema,
 				"tableName": "baeume",
 			}}},
@@ -289,7 +289,7 @@ test_show_create_table_denied_different_pool if {
 		with input as {
 			"context": {"identity": {"user": "u1"}},
 			"action": {"operation": "ShowCreateTable", "resource": {"table": {
-				"catalogName": "civitas",
+				"catalogName": "geodata",
 				"schemaName": _digit_first_schema,
 				"tableName": "baeume",
 			}}},
@@ -302,7 +302,7 @@ test_select_from_columns_granted_for_open_data_without_identity if {
 		with data.config as mock_http.mock_config
 		with input as {
 			"action": {"operation": "SelectFromColumns", "resource": {"table": {
-				"catalogName": "civitas",
+				"catalogName": "geodata",
 				"schemaName": _digit_first_schema,
 				"tableName": "baeume",
 			}}},
@@ -315,7 +315,7 @@ test_select_from_columns_denied_for_closed_data_without_identity if {
 		with data.config as mock_http.mock_config
 		with input as {
 			"action": {"operation": "SelectFromColumns", "resource": {"table": {
-				"catalogName": "civitas",
+				"catalogName": "geodata",
 				"schemaName": _digit_first_schema,
 				"tableName": "baeume",
 			}}},
@@ -329,7 +329,7 @@ test_select_from_columns_granted_via_matching_dataset_letter_first if {
 		with input as {
 			"context": {"identity": {"user": "u1"}},
 			"action": {"operation": "SelectFromColumns", "resource": {"table": {
-				"catalogName": "civitas",
+				"catalogName": "geodata",
 				"schemaName": _letter_first_schema,
 				"tableName": "baeume",
 			}}},
@@ -378,7 +378,7 @@ test_schema_scoped_actions_allowed_for_local_admin_identity if {
 		trino.allow with data.backends.trino as _enforced_data
 			with input as {
 				"context": {"identity": {"user": "civitas-config-adapter"}},
-				"action": {"operation": op, "resource": {"schema": {"catalogName": "civitas", "schemaName": _digit_first_schema}}},
+				"action": {"operation": op, "resource": {"schema": {"catalogName": "geodata", "schemaName": _digit_first_schema}}},
 			}
 	}
 }
@@ -389,7 +389,7 @@ test_table_scoped_actions_allowed_for_local_admin_identity if {
 			with input as {
 				"context": {"identity": {"user": "civitas-config-adapter"}},
 				"action": {"operation": op, "resource": {"table": {
-					"catalogName": "civitas",
+					"catalogName": "geodata",
 					"schemaName": _digit_first_schema,
 					"tableName": "baeume",
 				}}},

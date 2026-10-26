@@ -63,13 +63,14 @@ import org.owasp.encoder.Encode;
  * branch; {@code projectId} (the dataset's FROST project id — required only when a {@code FROST}
  * sink is present); a {@code dashboards} binding list and an {@code artifacts} map keyed by each
  * Dashboard's {@code modelUrn} (see {@code de.civitascore.configadapter.model.dataset.Dashboard}).
- * The dashboard model is the source of its title, description and release state. The PostGIS Superset schema is
- * derived from {@code datasetId} via {@link WorkspaceNames#fromDatasetId} — the same rule {@code
- * PostgisSagaHandler}'s {@code PROVISION_SINK} step uses to name the schema, so the two agree on
- * where the table actually lives. FROST datasets have no per-dataset schema — they all live in the
- * shared {@link #FROST_SCHEMA}, isolated per Civitas dataset by baking {@code projectId} into each
- * dataset's {@code sql} (defense in depth only: the real security boundary is OPA's row-filter on
- * the underlying Trino query, see {@code authz/rego/policy/trino_row_filters.rego}).
+ * The dashboard model is the source of its title, description and release state. The PostGIS
+ * Superset schema is derived from {@code datasetId} via {@link WorkspaceNames#fromDatasetId} — the
+ * same rule {@code PostgisSagaHandler}'s {@code PROVISION_SINK} step uses to name the schema, so
+ * the two agree on where the table actually lives. FROST datasets have no per-dataset schema — they
+ * all live in the shared {@link #FROST_SCHEMA}, isolated per Civitas dataset by baking {@code
+ * projectId} into each dataset's {@code sql} (defense in depth only: the real security boundary is
+ * OPA's row-filter on the underlying Trino query, see {@code
+ * authz/rego/policy/trino_row_filters.rego}).
  */
 public class SupersetSagaHandler extends AbstractSagaCommandHandler {
 
@@ -81,14 +82,13 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
   /**
    * FROST lives in its own Postgres database (see {@code
    * dev-environment/frost/docker-compose.yaml}), exposed to Trino as a separate catalog from the
-   * one PostGIS/GeoServer sinks use ({@code civitas} — see {@code
+   * one PostGIS/GeoServer sinks use ({@code geodata} — see {@code
    * dev-environment/trino-superset/trino/start-trino.sh}, which generates both {@code
-   * frost.properties} and {@code civitas.properties}). Superset's only registered Trino connection
-   * ({@code trinoDatabaseId}) defaults to the {@code civitas} catalog, so every FROST SQL reference
-   * below must be catalog-qualified with this constant — an unqualified {@code frost_scoped.*}
-   * would resolve against {@code civitas.frost_scoped}, which doesn't exist.
+   * sensordata.properties} and {@code geodata.properties}). Superset's only registered Trino connection
+   * ({@code trinoDatabaseId}) defaults to the {@code geodata} catalog. FROST datasets set their
+   * catalog explicitly because they live in the separate {@code sensordata} catalog.
    */
-  private static final String FROST_CATALOG = "frost";
+  private static final String SENSORDATA_CATALOG = "sensordata";
 
   /**
    * The shared Postgres schema (see {@code
@@ -220,7 +220,13 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
         int supersetDatasetId =
             existingDatasetId != null
                 ? existingDatasetId
-                : resourceClient.createDataset(schemaName, table, datasetId, editorGroupIds);
+                : resourceClient.createDataset(
+                    "geodata",
+                    schemaName,
+                    table,
+                    null,
+                    Map.of(SupersetResourceClient.CIVITAS_DATASET_ID_KEY, datasetId),
+                    editorGroupIds);
         if (supersetDatasetId <= 0) {
           // Superset created (or already had) a dataset for this table but its id couldn't be
           // resolved — failing loudly here is essential: silently skipping would report this step
@@ -272,18 +278,14 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
           // syncDashboard does for dashboards.
           supersetDatasetId =
               resourceClient.createDataset(
+                  SENSORDATA_CATALOG,
                   FROST_SCHEMA,
                   label,
-                  // Catalog-qualified: this dataset is registered against the "civitas" Trino
-                  // connection (trinoDatabaseId), whose default catalog is "civitas" — frost_scoped
-                  // lives in the separate "frost" catalog, so an unqualified reference would
-                  // resolve to civitas.frost_scoped (doesn't exist). Trino connections aren't
-                  // restricted to their default catalog; cross-catalog references like this are
-                  // fine as long as the connecting user has grants on both (confirmed by the
-                  // existing, though currently disabled, create_frost_dataset.py bootstrap
-                  // script).
+                  // Catalog-qualified because Superset's CORE Trino connection defaults to the
+                  // "sensordata" catalog. Keep the catalog explicit so dataset metadata remains
+                  // correct if the connection default changes.
                   "SELECT * FROM "
-                      + FROST_CATALOG
+                      + SENSORDATA_CATALOG
                       + "."
                       + FROST_SCHEMA
                       + "."
@@ -374,11 +376,7 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
           entry.title(), entry.description(), entry.editorGroupIds(), entry.released());
     }
     if (resourceClient.syncDashboardEditors(
-        existingId,
-        entry.title(),
-        entry.description(),
-        entry.editorGroupIds(),
-        entry.released())) {
+        existingId, entry.title(), entry.description(), entry.editorGroupIds(), entry.released())) {
       return existingId;
     }
     log.warn(

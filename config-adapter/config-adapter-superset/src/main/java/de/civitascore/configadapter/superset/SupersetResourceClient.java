@@ -460,6 +460,7 @@ final class SupersetResourceClient {
   int createDataset(
       String schemaName, String tableName, String civitasDatasetId, List<String> editorGroupIds) {
     return createDataset(
+        null,
         schemaName,
         tableName,
         null,
@@ -500,9 +501,19 @@ final class SupersetResourceClient {
       String sql,
       Map<String, String> extraFields,
       List<String> editorGroupIds) {
+    return createDataset(null, schemaName, tableName, sql, extraFields, editorGroupIds);
+  }
+
+  int createDataset(
+      String catalog,
+      String schemaName,
+      String tableName,
+      String sql,
+      Map<String, String> extraFields,
+      List<String> editorGroupIds) {
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("database", trinoDatabaseId);
-    body.put("catalog", null);
+    body.put("catalog", catalog);
     body.put("schema", schemaName);
     body.put("table_name", tableName);
     if (sql != null) {

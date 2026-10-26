@@ -104,20 +104,7 @@ is_authenticated if {
 	user_context.userId != null
 }
 
-# =============================================================================
-# PERMISSION EVALUATION
-# =============================================================================
-# Mirrors superset.rego's has_permission/has_tenant_permission shape (same
-# civitasDatasetId-keyed model) rather than importing it: the two policies
-# evaluate independent engines with no shared caller today. Extract to a
-# shared lib if a third consumer needs the same shape.
-
-# Deliberately excludes scopeType == null (a SYSTEM role assignment, e.g. Tenant Admin) — unlike
-# permission_eval.rego's REST API scope inheritance, where an unscoped SYSTEM role is meant to
-# cascade to every resource. A SYSTEM role can never hold a DATA permission (RoleService rejects
-# it), so this permission set would never contain one anyway; but not filtering scopeType here
-# would leave open a silent tenant-wide leak the moment that invariant is violated (e.g. by
-# RoleInitializer's seed path, which bypasses that check).
+# CORE payload-read permissions for per-dataset geodata schemas.
 has_tenant_permission(permission) if {
 	some group in user_context.groups
 	some a in group.assignments
@@ -138,7 +125,6 @@ has_permission(permission, dataset_id) if {
 	a.scopeId == dataset_id
 }
 
-# DATAPOOL union inheritance (Epic 1), mirroring superset.rego/permission_eval.rego.
 has_permission(permission, dataset_id) if {
 	dataset_id
 	some group in user_context.groups
@@ -151,19 +137,9 @@ has_permission(permission, dataset_id) if {
 # =============================================================================
 # SCHEMA/TABLE RESOURCE RESOLUTION
 # =============================================================================
-# The schema name Trino sends is the only handle we have on which dataset a
-# request targets. Decoded locally rather than via the AuthZ Repository: this
-# is safe specifically because Civitas dataset ids are always canonical UUIDs
-# — unlike the general case WorkspaceNames.fromDatasetId's javadoc warns about
-# ("distinct ids can collapse... callers must ensure uniqueness"), the
-# transform only ever replaces the 4 fixed hyphen positions with underscores,
-# so it is injective over this restricted domain. "ds_" as a literal prefix
-# is also unambiguous: a UUID's first two hex characters are always
-# [0-9a-f][0-9a-f], and "s" is never a valid hex digit, so a decoded UUID can
-# never itself start with "ds" — there is no case where the prefix could be
-# organic content rather than the added marker.
-
-# FilterSchemas/ShowCreateSchema shape: action.resource.schema.schemaName.
+# The schema and catalog names are both required. A schema name alone is not
+# an access boundary because catalogs may contain the same schema names.
+# FilterSchemas/ShowCreateSchema use action.resource.schema.
 resource_schema_name := input.action.resource.schema.schemaName if {
 	input.action.resource.schema.schemaName
 }
@@ -174,11 +150,20 @@ resource_schema_name := input.action.resource.table.schemaName if {
 	input.action.resource.table.schemaName
 }
 
+resource_catalog_name := input.action.resource.schema.catalogName if {
+	input.action.resource.schema.catalogName
+}
+
+resource_catalog_name := input.action.resource.table.catalogName if {
+	input.action.resource.table.catalogName
+}
+
+resource_catalog_name := input.action.resource.catalog.name if {
+	input.action.resource.catalog.name
+}
+
 _uuid_pattern := `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`
 
-# Digit-first UUIDs get the ds_ prefix (WorkspaceNames.fromDatasetId keeps the
-# name a valid XML NCName) — strip it before undoing the hyphen→underscore
-# substitution.
 civitas_dataset_id(schema) := id if {
 	startswith(schema, "ds_")
 	candidate := regex.replace(substring(schema, 3, -1), "_", "-")
@@ -186,7 +171,6 @@ civitas_dataset_id(schema) := id if {
 	id := candidate
 }
 
-# Letter-first UUIDs (first hex char a-f) are used unprefixed.
 civitas_dataset_id(schema) := id if {
 	not startswith(schema, "ds_")
 	candidate := regex.replace(schema, "_", "-")
@@ -194,11 +178,33 @@ civitas_dataset_id(schema) := id if {
 	id := candidate
 }
 
-# Undefined for a schema that isn't shaped like ours at all (information_schema,
-# etc.) — that's a definite "not ours", handled by the plain-authentication
-# branch below with no permission check needed.
 resolved_dataset_id := civitas_dataset_id(resource_schema_name) if {
 	resource_schema_name
+}
+
+is_geodata_dataset_schema if {
+	resource_catalog_name == "geodata"
+	resolved_dataset_id
+}
+
+is_frost_schema if {
+	resource_catalog_name == "sensordata"
+	resource_schema_name == "frost_scoped"
+}
+
+is_geodata_metadata_table if {
+	input.action.resource.table.catalogName == "geodata"
+	input.action.resource.table.schemaName == "information_schema"
+	input.action.resource.table.tableName in {"schemata", "tables", "columns"}
+}
+
+# Superset discovers schemas by querying Trino's information_schema. The row
+# filter restricts FROST metadata to frost_scoped and geodata metadata to the
+# caller's readable dataset schemas.
+is_frost_schema_metadata_table if {
+	input.action.resource.table.catalogName == "sensordata"
+	input.action.resource.table.schemaName == "information_schema"
+	input.action.resource.table.tableName in {"schemata", "tables", "columns"}
 }
 
 # =============================================================================
@@ -236,8 +242,53 @@ allow if {
 # authentication is the only thing to check; the schema/table actions below
 # are what actually gate dataset visibility.
 allow if {
-	input.action.operation in {"ExecuteQuery", "AccessCatalog", "FilterCatalogs", "ShowSchemas", "ShowCreateSchema"}
+	input.action.operation in {"ExecuteQuery", "ShowSchemas"}
 	is_authenticated
+}
+
+allow if {
+	input.action.operation == "FilterCatalogs"
+	is_authenticated
+}
+
+allow if {
+	input.action.operation == "AccessCatalog"
+	is_authenticated
+	resource_catalog_name in {"sensordata", "geodata"}
+}
+
+# Superset uses one shared CORE database connection. FROST queries use the
+# project-scoped views in sensordata; geodata schemas are checked against CORE's
+# dataset payload-read permission below.
+allow if {
+	input.action.operation in {"FilterSchemas", "ShowCreateSchema"}
+	is_authenticated
+	is_frost_schema
+}
+
+# The geodata catalog contains one schema per CORE dataset. A catalog grant
+# does not grant access to its schemas; each schema still needs payload-read.
+allow if {
+	input.action.operation in {"FilterSchemas", "ShowCreateSchema"}
+	is_authenticated
+	is_geodata_dataset_schema
+	has_permission("DATASET_PAYLOAD_READ", resolved_dataset_id)
+}
+
+allow if {
+	input.action.operation in {"FilterSchemas", "ShowCreateSchema"}
+	resolved_dataset_id
+	is_geodata_dataset_schema
+	dataset_pool_fetcher.is_open_data(resolved_dataset_id)
+}
+
+# Superset reads geodata schema metadata to populate its schema picker. The
+# separate row-filter policy returns only dataset schemas the caller can read.
+allow if {
+	input.action.operation in {"FilterSchemas", "ShowCreateSchema"}
+	is_authenticated
+	resource_catalog_name == "geodata"
+	resource_schema_name == "information_schema"
 }
 
 # A genuinely anonymous Superset session never reaches the ImpersonateUser check above —
@@ -248,8 +299,19 @@ allow if {
 # coarse, non-data-exposing actions on their own (non-impersonated) behalf." Real dataset
 # visibility stays independently gated below regardless of this branch.
 allow if {
-	input.action.operation in {"ExecuteQuery", "AccessCatalog", "FilterCatalogs", "ShowSchemas", "ShowCreateSchema"}
+	input.action.operation in {"ExecuteQuery", "ShowSchemas"}
 	input.context.identity.user in trusted_impersonators
+}
+
+allow if {
+	input.action.operation == "FilterCatalogs"
+	input.context.identity.user in trusted_impersonators
+}
+
+allow if {
+	input.action.operation == "AccessCatalog"
+	input.context.identity.user in trusted_impersonators
+	resource_catalog_name in {"sensordata", "geodata"}
 }
 
 # Once impersonated as the local-admin identity, the same coarse actions must keep working —
@@ -259,34 +321,41 @@ allow if {
 	is_local_admin
 }
 
-# Schema/table-scoped actions against a schema that isn't a Civitas dataset at
-# all (information_schema, etc.) — authentication is sufficient; there is no
-# dataset-level permission to check.
+# FROST table actions are limited to frost_scoped. The separate row-filter
+# policy applies the user's dataset-level FROST project set to each table.
 allow if {
-	input.action.operation in {"FilterColumns", "FilterSchemas", "FilterTables", "SelectFromColumns", "ShowColumns", "ShowCreateTable", "ShowTables"}
+	input.action.operation in {"FilterColumns", "FilterTables", "SelectFromColumns", "ShowColumns", "ShowCreateTable", "ShowTables"}
 	is_authenticated
-	resource_schema_name
-	not resolved_dataset_id
+	is_frost_schema
 }
 
-# Schema/table-scoped actions against a real Civitas dataset schema — gated on
-# DATASET_PAYLOAD_READ, exactly the permission Superset's own schema_access/
-# can_access_datasource checks require (see superset.rego), so a user sees the
-# same datasets through Trino directly as through Superset.
 allow if {
-	input.action.operation in {"FilterColumns", "FilterSchemas", "FilterTables", "SelectFromColumns", "ShowColumns", "ShowCreateTable", "ShowTables"}
+	input.action.operation in {"FilterColumns", "FilterTables", "SelectFromColumns", "ShowColumns", "ShowCreateTable", "ShowTables"}
 	is_authenticated
-	resolved_dataset_id
+	is_geodata_dataset_schema
 	has_permission("DATASET_PAYLOAD_READ", resolved_dataset_id)
 }
 
-# Open-data dataset schemas are readable independent of caller identity. This mirrors the
-# Superset-side open-data branch: authenticated users without an explicit grant and genuinely
-# anonymous Superset chart queries both pass here when the dataset itself is public.
 allow if {
-	input.action.operation in {"FilterColumns", "FilterSchemas", "FilterTables", "SelectFromColumns", "ShowColumns", "ShowCreateTable", "ShowTables"}
+	input.action.operation in {"FilterColumns", "FilterTables", "SelectFromColumns", "ShowColumns", "ShowCreateTable", "ShowTables"}
 	resolved_dataset_id
+	is_geodata_dataset_schema
 	dataset_pool_fetcher.is_open_data(resolved_dataset_id)
+}
+
+allow if {
+	input.action.operation in {"FilterColumns", "FilterTables", "SelectFromColumns", "ShowColumns", "ShowTables"}
+	is_authenticated
+	is_geodata_metadata_table
+}
+
+# Superset's schema picker reads information_schema.schemata. Keep the grant
+# limited to that metadata table; the row-filter endpoint only returns the
+# single allowed FROST schema.
+allow if {
+	input.action.operation == "SelectFromColumns"
+	is_authenticated
+	is_frost_schema_metadata_table
 }
 
 # The local-admin identity bypasses dataset-scoped permission checks entirely, covering both

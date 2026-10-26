@@ -245,7 +245,7 @@ class CivitasSupersetSecurityManager(SupersetSecurityManager):
         else:
             database_name = os.getenv("SUPERSET_TRINO_DATABASE_NAME", "CORE")
             core_schema_permissions = {
-                f"[{database_name}].[civitas].[{self._workspace_name(dataset_id)}]"
+                f"[{database_name}].[geodata].[{self._workspace_name(dataset_id)}]"
                 for dataset_id in result.get("allowed_schemas", [])
             }
 

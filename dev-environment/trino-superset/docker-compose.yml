@@ -53,11 +53,11 @@ services:
       # match FROST_TRINO_READER_PASSWORD there. Not FROST-Server's own app user/password, which
       # has full read-write access to every project's raw tables.
       FROST_TRINO_READER_PASSWORD: ${FROST_TRINO_READER_PASSWORD:-dev-only-frost-trino-reader-password}
-      CIVITAS_DB_HOST: ${CIVITAS_DB_HOST:-postgis-dev-env}
-      CIVITAS_DB_PORT: ${CIVITAS_DB_PORT:-5432}
-      CIVITAS_DB_NAME: ${CIVITAS_DB_NAME:-geoserver}
-      CIVITAS_DB_USER: ${CIVITAS_DB_USER:-geoserver}
-      CIVITAS_DB_PASSWORD: ${CIVITAS_DB_PASSWORD:-geoserver}
+      GEODATA_DB_HOST: ${GEODATA_DB_HOST:-postgis-dev-env}
+      GEODATA_DB_PORT: ${GEODATA_DB_PORT:-5432}
+      GEODATA_DB_NAME: ${GEODATA_DB_NAME:-geoserver}
+      GEODATA_DB_USER: ${GEODATA_DB_USER:-geoserver}
+      GEODATA_DB_PASSWORD: ${GEODATA_DB_PASSWORD:-geoserver}
     ports:
       - "${TRINO_PORT:-8446}:8446"
     volumes:

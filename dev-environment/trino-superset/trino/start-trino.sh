@@ -55,18 +55,18 @@ require_env FROST_DB_HOST
 require_env FROST_DB_PORT
 require_env FROST_DB_NAME
 require_env FROST_TRINO_READER_PASSWORD
-require_env CIVITAS_DB_HOST
-require_env CIVITAS_DB_PORT
-require_env CIVITAS_DB_NAME
-require_env CIVITAS_DB_USER
-require_env CIVITAS_DB_PASSWORD
-require_env CIVITAS_DB_PASSWORD
+require_env GEODATA_DB_HOST
+require_env GEODATA_DB_PORT
+require_env GEODATA_DB_NAME
+require_env GEODATA_DB_USER
+require_env GEODATA_DB_PASSWORD
 
 TRINO_PUBLIC_HOST_PORT="${TRINO_PUBLIC_URL#*://}"
 TRINO_PUBLIC_HOST_PORT="${TRINO_PUBLIC_HOST_PORT%%/*}"
 TRINO_PUBLIC_HOST="${TRINO_PUBLIC_HOST_PORT%%:*}"
 
 mkdir -p /data/trino/tls /etc/trino/catalog
+rm -f /etc/trino/catalog/civitas.properties /etc/trino/catalog/frost.properties
 
 if [ ! -f /data/trino/tls/trino.p12 ]; then
   keytool -genkeypair \
@@ -153,7 +153,7 @@ generate_password_file_entry > /etc/trino/password.db
 # (see dev-environment/frost/migrations/01-create-scoped-views.sql) — not FROST-Server's own app
 # user, which has full read-write access to every project's raw tables. Row-level scoping by
 # project/dataset is enforced by the row-filter policy above, not by this connection's own grants.
-cat > /etc/trino/catalog/frost.properties <<EOF
+cat > /etc/trino/catalog/sensordata.properties <<EOF
 connector.name=postgresql
 connection-url=jdbc:postgresql://${FROST_DB_HOST}:${FROST_DB_PORT}/${FROST_DB_NAME}
 connection-user=frost_trino_reader
@@ -162,11 +162,11 @@ case-insensitive-name-matching=true
 unsupported-type-handling=CONVERT_TO_VARCHAR
 EOF
 
-cat > /etc/trino/catalog/civitas.properties <<EOF
+cat > /etc/trino/catalog/geodata.properties <<EOF
 connector.name=postgresql
-connection-url=jdbc:postgresql://${CIVITAS_DB_HOST}:${CIVITAS_DB_PORT}/${CIVITAS_DB_NAME}
-connection-user=${CIVITAS_DB_USER}
-connection-password=${CIVITAS_DB_PASSWORD}
+connection-url=jdbc:postgresql://${GEODATA_DB_HOST}:${GEODATA_DB_PORT}/${GEODATA_DB_NAME}
+connection-user=${GEODATA_DB_USER}
+connection-password=${GEODATA_DB_PASSWORD}
 case-insensitive-name-matching=true
 unsupported-type-handling=CONVERT_TO_VARCHAR
 EOF

@@ -90,6 +90,25 @@ def ensure_database(db, Database, name: str, sqlalchemy_uri: str, extra: dict):
     return database
 
 
+def migrate_legacy_dataset_catalogs(
+    db, SqlaTable, database, old_catalog: str, new_catalog: str
+) -> int:
+    """Move CORE datasets from a legacy Trino catalog name to its current name."""
+    datasets = (
+        db.session.query(SqlaTable)
+        .filter(
+            SqlaTable.database_id == database.id,
+            SqlaTable.catalog == old_catalog,
+        )
+        .all()
+    )
+    for dataset in datasets:
+        dataset.catalog = new_catalog
+    if datasets:
+        db.session.commit()
+    return len(datasets)
+
+
 def ensure_dashboard_dataset_creator_role(app, db, database):
     """Create the least-privilege role used by CORE dashboard editor groups."""
     sm = app.appbuilder.sm
@@ -124,6 +143,7 @@ def main() -> None:
     app = create_app()
     with app.app_context():
         from superset import db
+        from superset.connectors.sqla.models import SqlaTable
         from superset.models.core import Database
 
         ensure_admin(app, db)
@@ -136,7 +156,7 @@ def main() -> None:
             (
                 "trino://"
                 f"{os.environ['TRINO_SUPERSET_SERVICE_USER']}:{os.environ['TRINO_SUPERSET_SERVICE_PASSWORD']}"
-                "@trino:8446/civitas/public"
+                "@trino:8446/geodata/information_schema"
             ),
             {
                 "metadata_params": {},
@@ -150,6 +170,8 @@ def main() -> None:
                 "schemas_allowed_for_file_upload": [],
             },
         )
+        migrate_legacy_dataset_catalogs(db, SqlaTable, trino_database, "civitas", "geodata")
+        migrate_legacy_dataset_catalogs(db, SqlaTable, trino_database, "frost", "sensordata")
         ensure_dashboard_dataset_creator_role(app, db, trino_database)
 
 

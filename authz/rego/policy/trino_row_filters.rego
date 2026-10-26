@@ -60,12 +60,50 @@ has_tenant_permission(permission) if {
 # =============================================================================
 # TABLE CLASSIFICATION
 # =============================================================================
-# Only frost_scoped.* views carry a row filter at all — every other schema (Civitas per-dataset
-# PostGIS schemas, information_schema, etc.) is already fully gated at the table/schema level by
-# trino.rego's own allow check, so this policy has nothing to add there. Trino treats "no matching
-# result rule" as "no filter" for those, which is correct: they were never meant to be filtered here.
+# FROST data views need row-level filtering because multiple datasets share frost_scoped.*. The
+# geodata PostGIS tables are gated by their own dataset schema in trino.rego; only geodata's
+# information_schema listings need row filters to avoid disclosing other dataset schemas.
 _is_frost_scoped_table if {
 	input.action.resource.table.schemaName == "frost_scoped"
+}
+
+# Superset's schema picker queries information_schema.schemata directly. This
+# metadata table is not covered by the normal FROST project row filter, so
+# expose only the schema that the CORE connection is meant to show.
+_is_frost_schema_listing if {
+	input.action.resource.table.catalogName == "sensordata"
+	input.action.resource.table.schemaName == "information_schema"
+	input.action.resource.table.tableName == "schemata"
+}
+
+_is_frost_table_listing if {
+	input.action.resource.table.catalogName == "sensordata"
+	input.action.resource.table.schemaName == "information_schema"
+	input.action.resource.table.tableName == "tables"
+}
+
+_is_frost_column_listing if {
+	input.action.resource.table.catalogName == "sensordata"
+	input.action.resource.table.schemaName == "information_schema"
+	input.action.resource.table.tableName == "columns"
+}
+
+_is_geodata_schema_listing if {
+	input.action.resource.table.catalogName == "geodata"
+	input.action.resource.table.schemaName == "information_schema"
+	input.action.resource.table.tableName == "schemata"
+}
+
+_is_geodata_table_listing if {
+	input.action.resource.table.catalogName == "geodata"
+	input.action.resource.table.schemaName == "information_schema"
+	input.action.resource.table.tableName == "tables"
+}
+
+_is_geodata_column_listing if {
+	input.action.resource.table.catalogName == "geodata"
+	input.action.resource.table.schemaName == "information_schema"
+	input.action.resource.table.tableName == "columns"
 }
 
 # =============================================================================
@@ -100,6 +138,57 @@ _candidate_dataset_ids contains dataset_id if {
 	some dataset_id in dataset_pool_fetcher.datasets_in_pools(_qualifying_pool_ids)
 }
 
+_dataset_schema_name(dataset_id) := name if {
+	normalized := regex.replace(lower(dataset_id), "-", "_")
+	regex.match(`^[0-9]`, normalized)
+	name := concat("", ["ds_", normalized])
+}
+
+_dataset_schema_name(dataset_id) := name if {
+	normalized := regex.replace(lower(dataset_id), "-", "_")
+	not regex.match(`^[0-9]`, normalized)
+	name := normalized
+}
+
+_readable_geodata_schemas contains schema_name if {
+	some dataset_id in _candidate_dataset_ids
+	schema_name := _dataset_schema_name(dataset_id)
+}
+
+_tenant_geodata_schema_regex := `^(ds_[0-9a-f]{8}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{12}|[a-f][0-9a-f]{7}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{12})$`
+
+_geodata_schema_listing_filter := concat("", ["catalog_name = 'geodata' AND regexp_like(schema_name, '", _tenant_geodata_schema_regex, "')"]) if {
+	has_tenant_permission("DATASET_PAYLOAD_READ")
+}
+
+_geodata_schema_listing_filter := expr if {
+	not has_tenant_permission("DATASET_PAYLOAD_READ")
+	count(_readable_geodata_schemas) > 0
+	quoted := [concat("", ["'", schema_name, "'"]) | some schema_name in _readable_geodata_schemas]
+	expr := concat("", ["catalog_name = 'geodata' AND schema_name IN (", concat(", ", quoted), ")"])
+}
+
+_geodata_schema_listing_filter := "false" if {
+	not has_tenant_permission("DATASET_PAYLOAD_READ")
+	count(_readable_geodata_schemas) == 0
+}
+
+_geodata_table_listing_filter := concat("", ["table_catalog = 'geodata' AND regexp_like(table_schema, '", _tenant_geodata_schema_regex, "')"]) if {
+	has_tenant_permission("DATASET_PAYLOAD_READ")
+}
+
+_geodata_table_listing_filter := expr if {
+	not has_tenant_permission("DATASET_PAYLOAD_READ")
+	count(_readable_geodata_schemas) > 0
+	quoted := [concat("", ["'", schema_name, "'"]) | some schema_name in _readable_geodata_schemas]
+	expr := concat("", ["table_catalog = 'geodata' AND table_schema IN (", concat(", ", quoted), ")"])
+}
+
+_geodata_table_listing_filter := "false" if {
+	not has_tenant_permission("DATASET_PAYLOAD_READ")
+	count(_readable_geodata_schemas) == 0
+}
+
 _readable_frost_project_ids contains project_id if {
 	some dataset_id in _candidate_dataset_ids
 	project_id := dataset_pool_fetcher.frost_project_of(dataset_id)
@@ -120,6 +209,51 @@ default result := []
 result := [{"expression": "true"}] if {
 	_is_frost_scoped_table
 	_allow_all
+}
+
+result := [{"expression": "catalog_name = 'sensordata' AND schema_name = 'frost_scoped'"}] if {
+	_is_frost_schema_listing
+	not _allow_all
+}
+
+result := [{"expression": "table_catalog = 'sensordata' AND table_schema = 'frost_scoped'"}] if {
+	_is_frost_table_listing
+	not _allow_all
+}
+
+result := [{"expression": "table_catalog = 'sensordata' AND table_schema = 'frost_scoped'"}] if {
+	_is_frost_column_listing
+	not _allow_all
+}
+
+result := [{"expression": "true"}] if {
+	_allow_all
+	_is_geodata_schema_listing
+}
+
+result := [{"expression": "true"}] if {
+	_allow_all
+	_is_geodata_table_listing
+}
+
+result := [{"expression": "true"}] if {
+	_allow_all
+	_is_geodata_column_listing
+}
+
+result := [{"expression": _geodata_schema_listing_filter}] if {
+	_is_geodata_schema_listing
+	not _allow_all
+}
+
+result := [{"expression": _geodata_table_listing_filter}] if {
+	_is_geodata_table_listing
+	not _allow_all
+}
+
+result := [{"expression": _geodata_table_listing_filter}] if {
+	_is_geodata_column_listing
+	not _allow_all
 }
 
 result := [{"expression": "true"}] if {

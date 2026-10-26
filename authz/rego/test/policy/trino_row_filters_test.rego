@@ -15,7 +15,7 @@ frost_table_request(user) := {
 	"context": {"identity": {"user": user}},
 	"action": {
 		"operation": "SelectFromColumns",
-		"resource": {"table": {"catalogName": "frost", "schemaName": "frost_scoped", "tableName": "observations_scoped"}},
+		"resource": {"table": {"catalogName": "sensordata", "schemaName": "frost_scoped", "tableName": "observations_scoped"}},
 	},
 }
 
@@ -23,7 +23,7 @@ non_frost_table_request(user) := {
 	"context": {"identity": {"user": user}},
 	"action": {
 		"operation": "SelectFromColumns",
-		"resource": {"table": {"catalogName": "civitas", "schemaName": "ds_5b3f7428-9004-4b76-becc-1538eb3b8388", "tableName": "baeume"}},
+		"resource": {"table": {"catalogName": "geodata", "schemaName": "ds_5b3f7428-9004-4b76-becc-1538eb3b8388", "tableName": "baeume"}},
 	},
 }
 
