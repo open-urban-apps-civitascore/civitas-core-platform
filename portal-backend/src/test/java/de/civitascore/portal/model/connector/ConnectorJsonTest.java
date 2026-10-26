@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -363,6 +364,33 @@ class ConnectorJsonTest {
         .isInstanceOf(StoredSecretRefusedException.class);
     assertThatThrownBy(() -> ConnectorJson.toDocument(http, storedHttpBasic(), ENCRYPT))
         .isInstanceOf(StoredSecretRefusedException.class);
+  }
+
+  private static final String HTTP_OAUTH2 =
+      "{'connectorType':'HTTP','baseUrl':'https://api.example.org',"
+          + "'authentication':{'type':'OAUTH2','tokenUrl':'%s','clientId':'c',"
+          + "'clientSecret':'%s'},'apiCalls':[{'name':'a','path':'/x'}]}";
+
+  @Test
+  void toDocument_withStoredClientSecretForAnotherTokenHost_refusesIt() {
+    Map<String, Object> stored =
+        ConnectorJson.toDocument(
+            ConnectorJson.read(
+                json(HTTP_OAUTH2.formatted("https://auth.example.org/token", "secret"))),
+            null,
+            ENCRYPT);
+    ConnectorConfiguration otherHost =
+        ConnectorJson.read(json(HTTP_OAUTH2.formatted("https://other.example/token", "********")));
+    ConnectorConfiguration otherPath =
+        ConnectorJson.read(
+            json(HTTP_OAUTH2.formatted("https://auth.example.org/oauth2/token", "********")));
+
+    assertThatThrownBy(() -> ConnectorJson.toDocument(otherHost, stored, ENCRYPT))
+        .isInstanceOf(StoredSecretRefusedException.class);
+    assertThat(ConnectorJson.toDocument(otherPath, stored, ENCRYPT))
+        .extractingByKey("authentication")
+        .asInstanceOf(InstanceOfAssertFactories.MAP)
+        .containsEntry("clientSecret", "ENC(secret)");
   }
 
   @Test
