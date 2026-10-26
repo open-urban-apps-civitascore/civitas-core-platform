@@ -66,6 +66,7 @@ public class GroupController {
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(summary = "Create a new group")
   @Problems({
+    ProblemType.NOT_FOUND,
     ProblemType.UNIQUE_CONSTRAINT_VIOLATION,
     ProblemType.EXTERNAL_SYSTEM_ERROR,
     ProblemType.EXTERNAL_SYSTEM_TIMEOUT
