@@ -33,10 +33,9 @@ import org.springframework.http.ResponseEntity;
 /**
  * Integration tests for scope-based collection filtering.
  *
- * <p>Verifies that the X-Allowed-Scope-Ids header correctly filters dataset collection results.
- * Scope IDs correspond to dataset IDs directly (tenant→dataset hierarchy, no intermediate
- * dataspace). Tests the full path: AllowedScopesFilter → AllowedScopes bean → ScopeFilter → JPA
- * Specification.
+ * <p>Verifies that the X-Allowed-Scope-Ids header filters every data-element list (data pools, data
+ * sources, data structures, datasets) by the element's own id. Tests the full path:
+ * AllowedScopesFilter → AllowedScopes bean → ScopeFilter → JPA Specification.
  */
 @DisplayName("Scope Filtering Integration Tests")
 class ScopeFilteringIntegrationTest
