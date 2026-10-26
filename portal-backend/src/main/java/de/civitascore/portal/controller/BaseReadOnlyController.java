@@ -14,7 +14,6 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import jakarta.validation.Validator;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.Map;
@@ -23,7 +22,6 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.experimental.FieldDefaults;
 import org.springdoc.core.annotations.ParameterObject;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -38,7 +36,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.HandlerMapping;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Abstract base controller exposing only GET (read) operations. Subclasses that require write
@@ -58,9 +55,6 @@ public abstract class BaseReadOnlyController<
   abstract BaseService<E, I> getService();
 
   protected abstract BaseAssembler<E, O, UUID> getAssembler();
-
-  @Autowired protected ObjectMapper objectMapper;
-  @Autowired protected Validator validator;
 
   @Operation(
       summary = "List all {entities}",

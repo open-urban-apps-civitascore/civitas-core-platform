@@ -1,7 +1,6 @@
 package de.civitascore.portal.controller;
 
 import de.civitascore.portal.model.connector.ConnectorJson;
-import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSource;
@@ -23,7 +22,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.io.IOException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -38,7 +36,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -243,18 +240,12 @@ public class DataSourceController
    */
   @Override
   protected DataSourceInputDTO patchInput(
-      DataSourceInputDTO currentDto, DataSource entity, JsonNode updates) throws IOException {
+      DataSourceInputDTO currentDto, DataSource entity, JsonNode updates) {
     JsonNode otherMembers =
         updates instanceof ObjectNode object
             ? object.deepCopy().without(ConnectorJson.ROOT)
             : updates;
-    DataSourceInputDTO patchedDto;
-    // Jackson wraps the exception that the any-setter of the input throws for an unknown key.
-    try {
-      patchedDto = super.patchInput(currentDto, entity, otherMembers);
-    } catch (JacksonException e) {
-      throw e.getCause() instanceof MalformedDataSourceRequestException malformed ? malformed : e;
-    }
+    DataSourceInputDTO patchedDto = super.patchInput(currentDto, entity, otherMembers);
     patchedDto.setConnector(getService().patchConnector(entity, updates.path(ConnectorJson.ROOT)));
     return patchedDto;
   }

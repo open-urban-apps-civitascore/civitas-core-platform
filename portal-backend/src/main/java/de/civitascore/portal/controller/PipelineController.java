@@ -15,7 +15,6 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.io.IOException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -117,7 +116,7 @@ public class PipelineController
       description = REMOVAL_CONFLICT_DESCRIPTION,
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<PipelineOutputDTO> patch(
-      @PathVariable UUID id, @RequestBody JsonNode updates) throws IOException {
+      @PathVariable UUID id, @RequestBody JsonNode updates) {
     return super.patch(id, updates);
   }
 

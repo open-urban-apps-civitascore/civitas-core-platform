@@ -74,6 +74,11 @@ class DataSourceControllerIntegrationTest
   }
 
   @Override
+  protected String unknownPatchFieldUrn() {
+    return "urn:civitas:error:MALFORMED_REQUEST";
+  }
+
+  @Override
   protected void performAdditionalCleanup() {
     portalData.cleanAll();
   }

@@ -656,11 +656,12 @@ class DataSinkControllerIntegrationTest
       patchMap.put(
           "configuration", Map.of("tableName", "original_table", "element", dsv.getModelUrn()));
 
-      ResponseEntity<DataSinkOutputDTO> response = performPatch(id, patchMap);
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id, HttpMethod.PATCH, createAuthHeaders(), patchMap);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().isProvisioned()).isTrue();
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getDetail()).isEqualTo("Unknown field: /provisioned");
       assertThat(dataSinkRepository.findById(id).orElseThrow().isProvisioned()).isTrue();
     }
 

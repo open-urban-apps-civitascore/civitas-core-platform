@@ -32,6 +32,11 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
     return true;
   }
 
+  /** The type of the answer to a PATCH that contains a field the input does not have. */
+  protected String unknownPatchFieldUrn() {
+    return "urn:civitas:error:INVALID_INPUT";
+  }
+
   // ── Write helpers ─────────────────────────────────────────────────────────
 
   protected ResponseEntity<O> performCreate(I input) {
@@ -93,6 +98,23 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
     assertThat(response.getStatusCode())
         .as("PATCH producing an invalid entity should return BAD_REQUEST")
         .isEqualTo(HttpStatus.BAD_REQUEST);
+  }
+
+  @Test
+  void patch_withUnknownField_answers400InvalidInput() {
+    if (!supportsUpdateAndPatch()) return;
+    UUID id = createTestEntity();
+
+    ResponseEntity<ProblemDetail> response =
+        exchangeForProblem(
+            getEndpointPath() + "/" + id,
+            HttpMethod.PATCH,
+            createAuthHeaders(),
+            Map.of("noSuchField", "value"));
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().getType()).hasToString(unknownPatchFieldUrn());
   }
 
   @Test

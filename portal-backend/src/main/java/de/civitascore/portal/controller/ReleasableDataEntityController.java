@@ -82,6 +82,6 @@ public abstract class ReleasableDataEntityController<
    */
   protected M patchMeta(UUID id, JsonNode updates) {
     M current = getService().toMetaInput(getService().findByIdOrThrow(id));
-    return mergePatch(id, current, updates);
+    return jsonMergePatch.apply(current, updates, id);
   }
 }

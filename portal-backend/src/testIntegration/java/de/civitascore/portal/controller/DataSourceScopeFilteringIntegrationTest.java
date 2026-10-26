@@ -46,6 +46,11 @@ class DataSourceScopeFilteringIntegrationTest
   }
 
   @Override
+  protected String unknownPatchFieldUrn() {
+    return "urn:civitas:error:MALFORMED_REQUEST";
+  }
+
+  @Override
   protected DataSourceInputDTO createValidInput() {
     DataSourceInputDTO input = new DataSourceInputDTO();
     input.setName("scope_test_datasource_" + System.currentTimeMillis());

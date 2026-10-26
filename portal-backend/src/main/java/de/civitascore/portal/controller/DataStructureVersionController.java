@@ -15,7 +15,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.io.IOException;
 import java.net.URI;
 import java.util.Collections;
 import java.util.Optional;
@@ -121,14 +120,13 @@ public class DataStructureVersionController
    * @param id the UUID of the version to patch
    * @param updates the JSON node containing the fields to update
    * @return the patched version output DTO with HTTP 200 status
-   * @throws IOException if there is an error during JSON processing
    */
   @Override
   @Operation(
       operationId = "patchDataStructureVersion",
       summary = "Partially update a data structure version")
   public ResponseEntity<DataStructureVersionOutputDTO> patch(
-      @PathVariable UUID id, @RequestBody JsonNode updates) throws IOException {
+      @PathVariable UUID id, @RequestBody JsonNode updates) {
     requireOwnedByPathDataStructure(id);
     return super.patch(id, updates);
   }
@@ -245,7 +243,7 @@ public class DataStructureVersionController
             requireOwnedByDataStructure(dataStructureId, versionId));
     DataStructureVersion updated =
         dataStructureVersionService.updateReleasedMeta(
-            versionId, mergePatch(versionId, current, updates));
+            versionId, jsonMergePatch.apply(current, updates, versionId));
     return ResponseEntity.ok(dataStructureVersionAssembler.toOutput(updated));
   }
 

@@ -9,7 +9,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
-import java.io.IOException;
 import java.util.UUID;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -102,8 +101,7 @@ public abstract class DataSetSubEntityController<
       responseCode = "409",
       description = "A saga is in flight on the parent dataset",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  public ResponseEntity<O> patch(@PathVariable UUID id, @RequestBody JsonNode updates)
-      throws IOException {
+  public ResponseEntity<O> patch(@PathVariable UUID id, @RequestBody JsonNode updates) {
     requireOwnedByPathDataSet(id);
     return super.patch(id, updates);
   }

@@ -9,7 +9,6 @@ import de.civitascore.portal.service.LayerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.io.IOException;
 import java.util.Collections;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -90,8 +89,8 @@ public class LayerController
 
   /** PATCH is not supported for Layers. */
   @Override
-  public ResponseEntity<LayerOutputDTO> patch(@PathVariable UUID id, @RequestBody JsonNode updates)
-      throws IOException {
+  public ResponseEntity<LayerOutputDTO> patch(
+      @PathVariable UUID id, @RequestBody JsonNode updates) {
     throw new MethodNotAllowedException(HttpMethod.PATCH, Collections.emptySet());
   }
 }
