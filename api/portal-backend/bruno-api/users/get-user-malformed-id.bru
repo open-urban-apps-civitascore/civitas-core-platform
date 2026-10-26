@@ -1,0 +1,28 @@
+meta {
+  name: Get User with malformed ID
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/users/not-a-uuid
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Status code is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Problem type is INVALID_INPUT", function() {
+    expect(res.body.type).to.equal("urn:civitas:error:INVALID_INPUT");
+  });
+}
+
+docs {
+  **Precondition:** none. USER_READ is a tenant-level permission, so the gateway lets the request through to the backend.
+
+  **Expected Response**
+  - Status: `400 Bad Request`
+  - Body is a problem with type `urn:civitas:error:INVALID_INPUT`; the detail names the path variable, not its value
+}
