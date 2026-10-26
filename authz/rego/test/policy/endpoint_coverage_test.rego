@@ -1,6 +1,6 @@
 # Endpoint scope-coverage tests for portal-backend sub-resources.
 #
-# Covers the nested dataset sub-resources (datasinks, layers, styles, pipelines)
+# Covers the nested dataset sub-resources (datasinks, layers, styles, pipelines, mappings)
 # with the same allow / wrong-scope-deny / unauthenticated-deny checks the top-level
 # resources get, and the AND-permission group-assignments endpoint. These are gated
 # by DATASET_READ / DATASET_UPDATE on the parent dataset (the {id} is the scopeId).
@@ -40,6 +40,8 @@ dataset_read_subresource_paths := {
 	"/v1/datasets/dataset-abc/styles/style-1",
 	"/v1/datasets/dataset-abc/pipelines",
 	"/v1/datasets/dataset-abc/pipelines/pipe-1",
+	"/v1/datasets/dataset-abc/mappings",
+	"/v1/datasets/dataset-abc/mappings/mapping-1",
 }
 
 # The matching DATASET scope grants read and carries the dataset id as the scope header.
@@ -177,4 +179,29 @@ test_ready_meta_denied_with_read_only if {
 test_ready_meta_denied_unauthenticated if {
 	result := authz.decision with input as portal_request_no_auth("PATCH", "/v1/datasets/dataset-abc/ready/meta")
 	result.allow == false
+}
+
+mapping_item_write_requests := {
+	"PUT": "/v1/datasets/dataset-abc/mappings/mapping-1",
+	"DELETE": "/v1/datasets/dataset-abc/mappings/mapping-1",
+}
+
+test_mapping_item_writes_allowed_with_update if {
+	every method, path in mapping_item_write_requests {
+		result := authz.decision with http.send as mock_send_dataset_abc_editor
+			with data.config as mock_http.mock_config
+			with input as portal_request(method, path)
+		result.allow == true
+		result.required_permissions == {"DATASET_UPDATE"}
+	}
+}
+
+test_mapping_item_writes_denied_with_read_only if {
+	every method, path in mapping_item_write_requests {
+		result := authz.decision with http.send as mock_send_dataset_abc_reader
+			with data.config as mock_http.mock_config
+			with input as portal_request(method, path)
+		result.allow == false
+		result.reason == "permission_denied"
+	}
 }

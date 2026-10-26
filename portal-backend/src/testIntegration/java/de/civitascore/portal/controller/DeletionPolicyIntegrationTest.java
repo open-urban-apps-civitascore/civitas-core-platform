@@ -159,7 +159,12 @@ class DeletionPolicyIntegrationTest extends BaseKeycloakIntegrationTest {
         null);
 
     ResponseEntity<String> refused =
-        delete("/datasets/" + dataSet.getId() + "/mappings?urn=" + mappingUrn + "&force=true");
+        delete(
+            "/datasets/"
+                + dataSet.getId()
+                + "/mappings/"
+                + registry.idOf(mappingUrn)
+                + "?force=true");
 
     assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     assertThat(registry.fetchPayload(mappingUrn)).isPresent();

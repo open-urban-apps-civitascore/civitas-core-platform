@@ -442,6 +442,16 @@ public class ModelRegistryGateway {
         : Optional.empty();
   }
 
+  /** The UUID segment of a CORE URN of any artifact type, or null when {@code urn} is none. */
+  public UUID idOf(String urn) {
+    return UrnParser.idFromUrn(urn);
+  }
+
+  /** The pin of a versioned CORE URN, taken apart without reading the registry. */
+  public ModelPin pinOf(String versionedUrn) {
+    return toPin(new ArtifactId(versionedUrn));
+  }
+
   public static UUID deriveId(String key) {
     return UrnParser.deriveId(key);
   }
