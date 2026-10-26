@@ -80,8 +80,7 @@ final class HttpProber implements ConnectionProber {
 
   @Override
   @SuppressWarnings("PMD.CloseResource") // shutdownNow() in finally; close() waits for a hang
-  public ProbeResult probe(
-      Map<String, Object> connector, String apiCall, boolean applyWhere, Cancellation cancellation)
+  public ProbeResult probe(Map<String, Object> connector, String apiCall, Cancellation cancellation)
       throws ConnectionTestFailure {
     Map<String, Object> authentication = objectOrEmpty(connector.get("authentication"));
     Authentication type = Authentication.read(authentication);

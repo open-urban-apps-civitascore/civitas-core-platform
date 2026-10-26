@@ -412,20 +412,24 @@ class DataSourceConnectionTestIntegrationTest extends BaseKeycloakIntegrationTes
     assertThat(request.at("/connector/connectionType").asString()).isEqualTo("sql");
     assertThat(request.path("expiresAt").isString()).isTrue();
     assertThat(readAsConfigAdapter(wire).expiresAt()).isAfter(Instant.now());
-    assertThat(readAsConfigAdapter(wire).applyWhere()).isTrue();
   }
 
   @Test
-  @DisplayName("placeholder with a changed where clause is sent without applying it")
-  void placeholderWithAChangedWhereClause_isSentWithoutApplyingIt() throws Exception {
+  @DisplayName("placeholder with changed values answers 400 and sends nothing")
+  void placeholderWithChangedValues_answers400() {
     UUID id = createSqlDataSource();
-    reply = request -> failure(request, Reason.SOURCE_ERROR);
     Map<String, Object> changed = sqlConnector("********");
-    changed.put("where", "id > 1");
+    changed.put("table", "stations");
 
-    post(DATASOURCES + "/" + id + "/connection-test", body(changed, null));
+    ResponseEntity<JsonNode> response =
+        post(DATASOURCES + "/" + id + "/connection-test", body(changed, null));
 
-    assertThat(readAsConfigAdapter(nextRequest()).applyWhere()).isFalse();
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(response.getBody().path("detail").asString())
+        .isEqualTo(
+            "The stored secret is kept only to test the connector as saved; enter it again to"
+                + " test other values");
+    assertThat(REQUESTS).isEmpty();
   }
 
   @Test
@@ -535,8 +539,7 @@ class DataSourceConnectionTestIntegrationTest extends BaseKeycloakIntegrationTes
             UUID.randomUUID().toString(),
             Instant.now().plusSeconds(10),
             Map.of("connectionType", "sql"),
-            null,
-            false);
+            null);
     List<CompletableFuture<ConnectionTestResult>> answers = new ArrayList<>();
     for (ConnectionTestClient instance : List.of(connectionTestClient, second)) {
       answers.add(CompletableFuture.supplyAsync(() -> instance.test(request)));

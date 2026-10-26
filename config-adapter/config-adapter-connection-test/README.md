@@ -8,7 +8,7 @@ It is neither a `ConfigAdapter` nor a `SagaCommandHandler`. It runs as a workloa
 
 | Topic | Message | Key |
 |---|---|---|
-| `de.civitascore.connectiontest.request` | `ConnectionTestRequest`: `requestId`, `expiresAt`, `connector`, `apiCall`, `applyWhere` | request id |
+| `de.civitascore.connectiontest.request` | `ConnectionTestRequest`: `requestId`, `expiresAt`, `connector`, `apiCall` | request id |
 | `de.civitascore.connectiontest.result` | `ConnectionTestResult`: `requestId`, `outcome` (`SUCCESS`/`FAILURE`), `reason`, `message`, `preview`, `previewTruncated`, `rowCount`, `httpStatus`, `durationMillis` | request id |
 
 - Both records are in `config-adapter-api` (`model.connectiontest`) and travel as plain JSON.
@@ -39,10 +39,10 @@ Delivery:
 | MQTT 5 | HiveMQ client, as NiFi's `ConsumeMQTT` | the broker grants the subscription | — |
 | HTTP | JDK `HttpClient`, request built as the `GetHttpApiCall` processor builds it | a 2xx status with a body the pipeline reads | the body, as text |
 
-- **SQL runs no configured text as SQL, except a `where` clause the request allows.**
+- **SQL runs no configured text as SQL, except the `where` clause.**
   - The table and each column go to the database only as bind parameters of `to_regclass(?)` and `parse_ident(?)`. These resolve them with the parser's quoting, case folding and search path.
   - The query uses the names that the catalog returns, quoted by `quote_ident`, with `LIMIT ?`. It runs in a read-only transaction that is always rolled back.
-  - The `where` clause runs only when the request sets `applyWhere`, wrapped as `WHERE (...)` as NiFi wraps it. The backend sets it for the connector as saved, or for values whose secrets the caller typed. Otherwise the result says the clause is not part of the test.
+  - The `where` clause runs wrapped as `WHERE (...)`, as NiFi wraps it. With a stored password the backend sends only the connector as saved, so only a clause that an editor saved runs with it.
   - A `where` clause with a `;` is refused, here and in the pipeline: the driver runs every statement of a query.
   - The test drops the DSN's own `connectTimeout`, `socketTimeout` and `loginTimeout`, because the driver prefers them to the test's limits.
   - Each value is read as text and cut by the database to one character more than the preview holds. The rows come one per fetch. Thus a table of wide rows (PostGIS polygons) costs no more than its preview.
@@ -85,7 +85,6 @@ BSI TR-03187 W-16 asks for an allowlist of destinations. Data sources are arbitr
 | HTTP status 408, 429 or 5xx | a failure like any non-2xx status | retried as transient |
 | HTTP 2xx with an empty body | success | no record |
 | Broker or API with a private CA | fails: the JVM default CAs are trusted | depends on the NiFi pipeline truststore, a copy of the JDK `cacerts` |
-| SQL `where` clause | run only as saved, or with secrets the caller typed | run |
 | MQTT over WebSocket (`ws://`, `wss://`) | connects to the URL's path, `/` if none | MQTT 3: `/mqtt` if the URL has no path; MQTT 5: the path is dropped |
 | HTTP API that answers slowly | the whole exchange must end within the test's 15 s | 15 s for the headers, then up to 15 s between body reads |
 | MQTT broker that accepts TCP and never answers, with a request that leaves less than 15 s | answered as TIMEOUT when the request runs out; the connection attempt itself ends after 13 s | — |

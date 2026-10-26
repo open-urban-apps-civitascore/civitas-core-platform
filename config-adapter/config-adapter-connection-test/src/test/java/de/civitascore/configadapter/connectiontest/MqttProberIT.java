@@ -125,10 +125,7 @@ class MqttProberIT {
   void subscribesAnonymously(String version) throws Exception {
     ProbeResult result =
         prober.probe(
-            connector("tcp", ANONYMOUS, version, "sensors/+/temp"),
-            null,
-            false,
-            new Cancellation());
+            connector("tcp", ANONYMOUS, version, "sensors/+/temp"), null, new Cancellation());
 
     assertTrue(result.success(), result.message());
     assertTrue(
@@ -144,7 +141,7 @@ class MqttProberIT {
     connector.put("user", "sensor");
     connector.put("password", "sensor-secret");
 
-    ProbeResult result = prober.probe(connector, null, false, new Cancellation());
+    ProbeResult result = prober.probe(connector, null, new Cancellation());
 
     assertTrue(result.success(), result.message());
   }
@@ -158,8 +155,7 @@ class MqttProberIT {
 
     ConnectionTestFailure failure =
         assertThrows(
-            ConnectionTestFailure.class,
-            () -> prober.probe(connector, null, false, new Cancellation()));
+            ConnectionTestFailure.class, () -> prober.probe(connector, null, new Cancellation()));
 
     assertTrue(failure.getMessage().startsWith("The broker did not accept the connection"));
     assertFalse(failure.getMessage().contains("wrong-secret"));
@@ -176,8 +172,7 @@ class MqttProberIT {
 
     ConnectionTestFailure failure =
         assertThrows(
-            ConnectionTestFailure.class,
-            () -> prober.probe(connector, null, false, new Cancellation()));
+            ConnectionTestFailure.class, () -> prober.probe(connector, null, new Cancellation()));
 
     assertTrue(
         failure.getMessage().startsWith("The broker refused the subscription to 'forbidden/x'"),
@@ -189,8 +184,7 @@ class MqttProberIT {
   @ValueSource(strings = {"3", "5"})
   void subscribesOverWebSocket(String version) throws Exception {
     ProbeResult result =
-        prober.probe(
-            connector("ws", WEBSOCKET, version, "sensors/#"), null, false, new Cancellation());
+        prober.probe(connector("ws", WEBSOCKET, version, "sensors/#"), null, new Cancellation());
 
     assertTrue(result.success(), result.message());
   }
@@ -208,8 +202,7 @@ class MqttProberIT {
 
     ConnectionTestFailure failure =
         assertThrows(
-            ConnectionTestFailure.class,
-            () -> prober.probe(connector, null, false, new Cancellation()));
+            ConnectionTestFailure.class, () -> prober.probe(connector, null, new Cancellation()));
 
     assertEquals(
         "The broker did not accept the connection: The connection was refused.",
@@ -235,8 +228,7 @@ class MqttProberIT {
 
       ConnectionTestFailure failure =
           assertThrows(
-              ConnectionTestFailure.class,
-              () -> prober.probe(connector, null, false, new Cancellation()));
+              ConnectionTestFailure.class, () -> prober.probe(connector, null, new Cancellation()));
 
       assertEquals(Reason.TIMEOUT, failure.reason());
       assertEquals("The broker did not answer in time.", failure.getMessage());
@@ -250,10 +242,7 @@ class MqttProberIT {
             ConnectionTestFailure.class,
             () ->
                 prober.probe(
-                    connector("tcp", ANONYMOUS, "3", "sensors/#/temp"),
-                    null,
-                    false,
-                    new Cancellation()));
+                    connector("tcp", ANONYMOUS, "3", "sensors/#/temp"), null, new Cancellation()));
 
     assertTrue(failure.getMessage().contains("sensors/#/temp"), failure.getMessage());
   }
@@ -280,7 +269,7 @@ class MqttProberIT {
       ConnectionTestFailure failure =
           assertThrows(
               ConnectionTestFailure.class,
-              () -> guarded.probe(connector, null, false, new Cancellation()));
+              () -> guarded.probe(connector, null, new Cancellation()));
 
       assertEquals(Reason.INVALID_CONNECTOR, failure.reason(), failure.getMessage());
       assertNull(listener.accept(), "no connection was opened");

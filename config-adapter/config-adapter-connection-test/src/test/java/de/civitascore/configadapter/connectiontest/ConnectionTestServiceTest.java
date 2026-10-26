@@ -69,10 +69,7 @@ class ConnectionTestServiceTest {
 
       @Override
       public ProbeResult probe(
-          Map<String, Object> connector,
-          String apiCall,
-          boolean applyWhere,
-          Cancellation cancellation)
+          Map<String, Object> connector, String apiCall, Cancellation cancellation)
           throws ConnectionTestFailure {
         probes.incrementAndGet();
         probed.set(connector);
@@ -94,7 +91,7 @@ class ConnectionTestServiceTest {
   }
 
   private static ConnectionTestRequest request(Map<String, Object> connector) {
-    return new ConnectionTestRequest("req-1", Instant.EPOCH, connector, "call", false);
+    return new ConnectionTestRequest("req-1", Instant.EPOCH, connector, "call");
   }
 
   private ConnectionTestResult run(ConnectionTestService service, Map<String, Object> connector) {

@@ -39,8 +39,7 @@ final class MqttProber implements ConnectionProber {
   }
 
   @Override
-  public ProbeResult probe(
-      Map<String, Object> connector, String apiCall, boolean applyWhere, Cancellation cancellation)
+  public ProbeResult probe(Map<String, Object> connector, String apiCall, Cancellation cancellation)
       throws ConnectionTestFailure {
     MqttConnectorValues values;
     try {

@@ -81,8 +81,7 @@ class ConnectionTestClientTest {
         UUID.randomUUID().toString(),
         Instant.now().plus(wait),
         Map.of("connectionType", "sql", "password", "ENC(abc)"),
-        null,
-        false);
+        null);
   }
 
   private static ConnectionTestResult success(String requestId) {
@@ -150,8 +149,7 @@ class ConnectionTestClientTest {
             UUID.randomUUID().toString(),
             Instant.now().plusSeconds(10).truncatedTo(ChronoUnit.MILLIS),
             Map.of("connectionType", "http", "baseUrl", "https://api.example.org"),
-            "stations",
-            false);
+            "stations");
 
     Future<ConnectionTestResult> answer = testInBackground(request);
     await().atMost(Duration.ofSeconds(5)).until(() -> client.pendingCount() == 1);

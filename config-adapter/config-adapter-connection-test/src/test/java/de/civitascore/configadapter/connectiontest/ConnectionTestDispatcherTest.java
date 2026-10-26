@@ -74,10 +74,7 @@ class ConnectionTestDispatcherTest {
 
       @Override
       public ProbeResult probe(
-          Map<String, Object> connector,
-          String apiCall,
-          boolean applyWhere,
-          Cancellation cancellation)
+          Map<String, Object> connector, String apiCall, Cancellation cancellation)
           throws ConnectionTestFailure {
         probes.incrementAndGet();
         try {
@@ -116,8 +113,7 @@ class ConnectionTestDispatcherTest {
   }
 
   private static ConnectionTestRequest request(String id, Instant expiresAt, String apiCall) {
-    return new ConnectionTestRequest(
-        id, expiresAt, Map.of("connectionType", "sql"), apiCall, false);
+    return new ConnectionTestRequest(id, expiresAt, Map.of("connectionType", "sql"), apiCall);
   }
 
   @Test

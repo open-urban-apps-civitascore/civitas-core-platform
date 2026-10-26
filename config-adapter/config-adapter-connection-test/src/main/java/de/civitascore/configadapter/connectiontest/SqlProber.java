@@ -35,8 +35,8 @@ import org.slf4j.LoggerFactory;
  * <p>Table and columns reach the database only as bind parameters of {@code to_regclass} and {@code
  * parse_ident}, which apply the parser's quoting, case folding and search path. The query uses the
  * quoted names the catalog returns and runs in a read-only transaction that is always rolled back.
- * The {@code where} clause is the only configured SQL: it runs only when the request allows it,
- * wrapped as the pipeline wraps it, and {@link SqlConnectorValues} keeps it to one statement.
+ * The {@code where} clause is the only configured SQL: it runs wrapped as the pipeline wraps it,
+ * and {@link SqlConnectorValues} keeps it to one statement.
  */
 final class SqlProber implements ConnectionProber {
 
@@ -103,8 +103,7 @@ final class SqlProber implements ConnectionProber {
   }
 
   @Override
-  public ProbeResult probe(
-      Map<String, Object> connector, String apiCall, boolean applyWhere, Cancellation cancellation)
+  public ProbeResult probe(Map<String, Object> connector, String apiCall, Cancellation cancellation)
       throws ConnectionTestFailure {
     SqlConnectorValues values;
     try {
@@ -127,15 +126,9 @@ final class SqlProber implements ConnectionProber {
             values.allColumns()
                 ? allColumns(connection, table)
                 : resolveColumns(connection, table, values.columns());
-        String where = applyWhere ? values.where() : "";
-        Rows rows = readRows(connection, table, columns, where);
+        Rows rows = readRows(connection, table, columns, values.where());
         String message =
             "Connected and read " + rows.count() + " row(s) from " + table.name() + ".";
-        if (where.isEmpty() && !values.where().isEmpty()) {
-          message +=
-              " The where clause is not part of the test; it runs as saved or with a password"
-                  + " entered.";
-        }
         return new ProbeResult(true, message, rows.csv(), rows.cut(), rows.count(), null);
       } finally {
         rollbackQuietly(connection);
@@ -270,9 +263,9 @@ final class SqlProber implements ConnectionProber {
   }
 
   /**
-   * Every name in the statement comes from the catalog, quoted by {@code quote_ident}; a where
-   * clause, when applied, is the configured text. Each value is read as its text form, which every
-   * type has, cut to {@value #VALUE_CHARS} characters.
+   * Every name in the statement comes from the catalog, quoted by {@code quote_ident}; the where
+   * clause is the configured text. Each value is read as its text form, which every type has, cut
+   * to {@value #VALUE_CHARS} characters.
    *
    * @param where the where clause to apply, or {@code ""}
    */

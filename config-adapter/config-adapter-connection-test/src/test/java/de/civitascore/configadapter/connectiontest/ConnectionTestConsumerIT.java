@@ -137,19 +137,14 @@ class ConnectionTestConsumerIT {
   }
 
   @Test
-  void runsTheWhereClauseOnlyWhenTheRequestAllowsIt() throws Exception {
+  void runsTheConfiguredWhereClause() throws Exception {
     Map<String, Object> connector = connector("owner-secret");
     connector.put("where", "datname = 'source'");
 
-    ConnectionTestResult applied = awaitResult(send(connector, UUID.randomUUID().toString(), true));
-    ConnectionTestResult skipped =
-        awaitResult(send(connector, UUID.randomUUID().toString(), false));
+    ConnectionTestResult result = awaitResult(send(connector, UUID.randomUUID().toString()));
 
-    assertEquals("datname\r\nsource\r\n", applied.preview());
-    assertEquals(1, applied.rowCount());
-    assertTrue(skipped.rowCount() > 1, skipped.preview());
-    assertTrue(
-        skipped.message().contains("The where clause is not part of the test"), skipped.message());
+    assertEquals("datname\r\nsource\r\n", result.preview());
+    assertEquals(1, result.rowCount());
   }
 
   @Test
@@ -177,7 +172,7 @@ class ConnectionTestConsumerIT {
     String stale = UUID.randomUUID().toString();
     ConnectionTestRequest request =
         new ConnectionTestRequest(
-            stale, Instant.now().minusSeconds(1), connector("owner-secret"), null, false);
+            stale, Instant.now().minusSeconds(1), connector("owner-secret"), null);
     requests
         .send(
             new ProducerRecord<>(
@@ -190,13 +185,8 @@ class ConnectionTestConsumerIT {
   }
 
   private static String send(Map<String, Object> connector, String id) throws Exception {
-    return send(connector, id, false);
-  }
-
-  private static String send(Map<String, Object> connector, String id, boolean applyWhere)
-      throws Exception {
     ConnectionTestRequest request =
-        new ConnectionTestRequest(id, Instant.now().plusSeconds(20), connector, null, applyWhere);
+        new ConnectionTestRequest(id, Instant.now().plusSeconds(20), connector, null);
     requests
         .send(
             new ProducerRecord<>(

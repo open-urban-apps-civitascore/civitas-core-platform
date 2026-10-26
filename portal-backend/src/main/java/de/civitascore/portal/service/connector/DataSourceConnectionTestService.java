@@ -12,7 +12,6 @@ import de.civitascore.portal.model.connector.MalformedDataSourceRequestException
 import de.civitascore.portal.model.connector.MqttConnectorConfiguration;
 import de.civitascore.portal.model.connector.SqlConnectorConfiguration;
 import de.civitascore.portal.model.connector.StoredSecretRefusedException;
-import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.ConnectionTestInputDTO;
 import de.civitascore.portal.model.output.ConnectionTestResultDTO;
@@ -57,9 +56,9 @@ public class DataSourceConnectionTestService {
   static final String ADAPTER_BUSY = "Too many connection tests are running; try again later";
   private static final String UNSAVED = "unsaved";
   private static final String UNKNOWN = "unknown";
-  static final String STORED_SECRET_FOR_RELEASED_CONNECTOR =
-      "The stored secret of a released data source is kept only to test its connector as released;"
-          + " enter it again to test other values";
+  static final String STORED_SECRET_FOR_SAVED_CONNECTOR =
+      "The stored secret is kept only to test the connector as saved; enter it again to test other"
+          + " values";
   static final String OTHER_DESTINATION_NEEDS_TENANT_READ =
       "Testing values for another destination needs DATASOURCE_READ for the whole tenant";
 
@@ -85,15 +84,13 @@ public class DataSourceConnectionTestService {
    * @throws ExternalSystemTimeoutException if no answer arrives in time
    */
   public ConnectionTestResultDTO test(ConnectionTestInputDTO input) {
-    return bounded(() -> audited(null, Allowance.UNSAVED, input));
+    return bounded(() -> audited(null, SavedSource.NONE, input));
   }
 
   /**
    * Tests connector values for a saved data source in any status. A {@code "********"} placeholder
-   * keeps the stored secret only for the stored destinations of a draft, as every write does, or
-   * for the unchanged connector of a released source, so the secret cannot reach another host. The
-   * where clause runs only as saved, or with secrets the caller typed. Only a tenant-wide reader
-   * may test another destination.
+   * keeps the stored secret only to test the connector as saved, so the secret serves neither
+   * another host nor other data. Only a tenant-wide reader may test another destination.
    *
    * @throws ResourceNotFoundException if no such data source exists
    * @throws MalformedDataSourceRequestException for a placeholder the stored secret may not fill
@@ -107,26 +104,18 @@ public class DataSourceConnectionTestService {
           ConnectorConfiguration requested = input.getConnector();
           ConnectorConfiguration stored = connectorStore.read(dataSource);
           boolean unchanged = unchanged(requested, stored);
-          // A stored secret runs only a where clause that someone who may edit the source saved.
-          boolean applyWhere = unchanged || !ConnectorJson.hasPlaceholder(requested);
           // OPA admits any reader of this data source; another destination needs a tenant-wide
           // grant.
-          String destinationRefusal =
-              allowedScopes.getObject().isWildcard()
-                      || (stored != null && ConnectorUris.staysAtDestinationsOf(requested, stored))
-                  ? null
-                  : OTHER_DESTINATION_NEEDS_TENANT_READ;
-          boolean draft = dataSource.getDataSourceStatus() == DataSourceStatus.DRAFT;
-          Allowance allowance =
-              draft || unchanged
-                  ? new Allowance(
-                      connectorStore.storedDocument(dataSource),
-                      null,
-                      destinationRefusal,
-                      applyWhere)
-                  : new Allowance(
-                      null, STORED_SECRET_FOR_RELEASED_CONNECTOR, destinationRefusal, applyWhere);
-          return audited(dataSourceId, allowance, input);
+          boolean otherDestinationDenied =
+              !allowedScopes.getObject().isWildcard()
+                  && (stored == null || !ConnectorUris.staysAtDestinationsOf(requested, stored));
+          return audited(
+              dataSourceId,
+              new SavedSource(
+                  unchanged ? connectorStore.storedDocument(dataSource) : null,
+                  !unchanged,
+                  otherDestinationDenied),
+              input);
         });
   }
 
@@ -155,30 +144,27 @@ public class DataSourceConnectionTestService {
   }
 
   /**
-   * What a test of a saved data source may use.
+   * What the stored data source allows a test to use.
    *
-   * @param storedDocument the document whose secrets a placeholder may keep, or null
-   * @param placeholderRefusal why a placeholder may not keep the stored secret, or null
-   * @param destinationRefusal why the caller may not test these destinations, or null
-   * @param applyWhere whether an SQL test runs the where clause
+   * @param storedDocument the stored document, whose secrets a placeholder keeps; null if the
+   *     values differ from it
+   * @param changed whether the values differ from the stored connector
+   * @param otherDestinationDenied whether the values reach a destination the caller may not test
    */
-  private record Allowance(
-      Map<String, Object> storedDocument,
-      String placeholderRefusal,
-      String destinationRefusal,
-      boolean applyWhere) {
+  private record SavedSource(
+      Map<String, Object> storedDocument, boolean changed, boolean otherDestinationDenied) {
 
-    /** Unsaved values: no stored secret, any destination, the where clause as sent. */
-    static final Allowance UNSAVED = new Allowance(null, null, null, true);
+    /** Values that no data source holds: no stored secret, any destination. */
+    static final SavedSource NONE = new SavedSource(null, false, false);
   }
 
   /**
    * @param dataSourceId the saved data source, or null for unsaved values
-   * @param allowance what the test may use
+   * @param source what the stored data source allows
    * @param input the values to test
    */
   private ConnectionTestResultDTO audited(
-      UUID dataSourceId, Allowance allowance, ConnectionTestInputDTO input) {
+      UUID dataSourceId, SavedSource source, ConnectionTestInputDTO input) {
     String user = currentUser.getCurrentAuditor().map(UUID::toString).orElse(UNKNOWN);
     String requestId = UUID.randomUUID().toString();
     ConnectorConfiguration connector = input.getConnector();
@@ -189,7 +175,7 @@ public class DataSourceConnectionTestService {
     String outcome = "ERROR";
     String data = "none";
     try {
-      ConnectionTestResultDTO answer = run(user, requestId, allowance, input);
+      ConnectionTestResultDTO answer = run(user, requestId, source, input);
       outcome = answer.success() ? "SUCCESS" : "FAILURE:" + answer.reason();
       data = answer.preview() == null ? "none" : "shown";
       return answer;
@@ -231,20 +217,20 @@ public class DataSourceConnectionTestService {
   }
 
   private ConnectionTestResultDTO run(
-      String user, String requestId, Allowance allowance, ConnectionTestInputDTO input) {
+      String user, String requestId, SavedSource source, ConnectionTestInputDTO input) {
     ConnectorConfiguration connector = input.getConnector();
     String apiCall = blankToNull(input.getApiCall());
     connectorValidator.requireValid(connector, ConnectorValidator.Stage.RELEASE);
     requireFittingApiCall(connector, apiCall);
-    if (allowance.destinationRefusal() != null) {
-      throw new ForbiddenException("DataSource", null, allowance.destinationRefusal());
+    if (source.otherDestinationDenied()) {
+      throw new ForbiddenException("DataSource", null, OTHER_DESTINATION_NEEDS_TENANT_READ);
     }
-    if (allowance.placeholderRefusal() != null && ConnectorJson.hasPlaceholder(connector)) {
-      throw new StoredSecretRefusedException(allowance.placeholderRefusal());
+    if (source.changed() && ConnectorJson.hasPlaceholder(connector)) {
+      throw new StoredSecretRefusedException(STORED_SECRET_FOR_SAVED_CONNECTOR);
     }
-    ConnectorJson.requireStoredSecrets(connector, allowance.storedDocument());
+    ConnectorJson.requireStoredSecrets(connector, source.storedDocument());
     Map<String, Object> document =
-        ConnectorJson.toDocument(connector, allowance.storedDocument(), textEncryptor::encrypt);
+        ConnectorJson.toDocument(connector, source.storedDocument(), textEncryptor::encrypt);
     ConnectionTestClient kafka =
         client.orElseThrow(
             () ->
@@ -256,11 +242,7 @@ public class DataSourceConnectionTestService {
     try {
       ConnectionTestRequest request =
           new ConnectionTestRequest(
-              requestId,
-              Instant.now().plus(properties.waitTime()),
-              document,
-              apiCall,
-              allowance.applyWhere());
+              requestId, Instant.now().plus(properties.waitTime()), document, apiCall);
       return toAnswer(kafka.test(request));
     } finally {
       usersTesting.remove(user);

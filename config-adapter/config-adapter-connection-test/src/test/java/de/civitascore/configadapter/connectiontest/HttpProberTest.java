@@ -378,8 +378,7 @@ class HttpProberTest {
 
     ConnectionTestFailure failure =
         assertThrows(
-            ConnectionTestFailure.class,
-            () -> prober.probe(connector, "root", false, new Cancellation()));
+            ConnectionTestFailure.class, () -> prober.probe(connector, "root", new Cancellation()));
 
     assertEquals(Reason.SOURCE_ERROR, failure.reason(), failure.getMessage());
   }
@@ -427,7 +426,7 @@ class HttpProberTest {
     // The prober trusts the JVM's default context, so the test certificate must be in it.
     SSLContext.setDefault(tls);
     try {
-      return prober.probe(connector, "headers", false, new Cancellation());
+      return prober.probe(connector, "headers", new Cancellation());
     } finally {
       SSLContext.setDefault(jvmDefault);
       echo.stop(0);
@@ -519,10 +518,7 @@ class HttpProberTest {
             ConnectionTestFailure.class,
             () ->
                 guarded.probe(
-                    connector(call("stations", "/stations")),
-                    "stations",
-                    false,
-                    new Cancellation()));
+                    connector(call("stations", "/stations")), "stations", new Cancellation()));
 
     assertEquals(
         "refused " + InetAddress.getLoopbackAddress().getHostAddress(), failure.getMessage());
@@ -589,7 +585,7 @@ class HttpProberTest {
       throws ConnectionTestFailure {
     Map<String, Object> connector =
         callOrConnector.containsKey("apiCalls") ? callOrConnector : connector(callOrConnector);
-    return prober.probe(connector, apiCall, false, new Cancellation());
+    return prober.probe(connector, apiCall, new Cancellation());
   }
 
   private static Map<String, Object> connector(Map<String, Object> call) {

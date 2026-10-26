@@ -61,8 +61,7 @@ final class ConnectionTestService {
       Map<String, Object> decrypted = decrypt(connector);
       text = new ResultText(ResultText.secretsOf(connector, decrypted));
       rejectReferences("", decrypted);
-      ProbeResult probe =
-          prober.probe(decrypted, request.apiCall(), request.applyWhere(), cancellation);
+      ProbeResult probe = prober.probe(decrypted, request.apiCall(), cancellation);
       ResultText.Preview preview = text.preview(probe.preview(), probe.truncated());
       return new ConnectionTestResult(
           requestId,

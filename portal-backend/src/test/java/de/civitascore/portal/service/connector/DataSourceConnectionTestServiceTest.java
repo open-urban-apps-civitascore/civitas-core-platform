@@ -437,6 +437,8 @@ class DataSourceConnectionTestServiceTest {
       return Stream.of(
           arguments(Saved.SQL, "another table", "'readings'", "'stations'"),
           arguments(Saved.SQL, "other columns", "['id','value']", "['id']"),
+          arguments(
+              Saved.SQL, "a where clause", "['id','value']", "['id','value'],'where':'id > 1'"),
           arguments(Saved.SQL, "another database", ":5432/city", ":5432/archive"),
           arguments(Saved.MQTT, "another topic", "sensor/#", "weather/#"),
           arguments(Saved.MQTT, "a removed URL", ",'tcp://broker-b:1883'", ""),
@@ -453,17 +455,30 @@ class DataSourceConnectionTestServiceTest {
       return Stream.concat(otherDestinations(), otherValuesAtTheSameDestination());
     }
 
-    @ParameterizedTest(name = "{0} with {1}")
-    @MethodSource("otherDestinations")
-    @DisplayName("stored secret of a draft is not sent to another destination")
-    void placeholderOfDraftForAnotherDestination_isRejected(
-        Saved saved, String change, String from, String to) {
-      UUID id = savedDataSource(DataSourceStatus.DRAFT, saved.stored());
+    static Stream<Arguments> changedValuesInEveryStatus() {
+      return Stream.of(DataSourceStatus.values())
+          .flatMap(
+              status ->
+                  changedValues()
+                      .map(
+                          values -> {
+                            Object[] each = values.get();
+                            return arguments(status, each[0], each[1], each[2], each[3]);
+                          }));
+    }
+
+    @ParameterizedTest(name = "{0}: {1} with {2}")
+    @MethodSource("changedValuesInEveryStatus")
+    @DisplayName("stored secret serves only the connector as saved")
+    void placeholderWithChangedValues_isRefused(
+        DataSourceStatus status, Saved saved, String change, String from, String to) {
+      UUID id = savedDataSource(status, saved.stored());
 
       assertThatThrownBy(() -> service.test(id, saved.requested(from, to)))
           .isInstanceOf(MalformedDataSourceRequestException.class)
           .hasMessage(
-              "The stored secret is kept only for the stored destination; enter it again for another one");
+              "The stored secret is kept only to test the connector as saved; enter it again to test"
+                  + " other values");
       verify(client, never()).test(any());
       assertThat(singleAuditLine()).endsWith("outcome=REFUSED");
     }
@@ -485,19 +500,6 @@ class DataSourceConnectionTestServiceTest {
       verify(client, never()).test(any());
     }
 
-    @ParameterizedTest(name = "{0} with {1}")
-    @MethodSource("otherValuesAtTheSameDestination")
-    @DisplayName("stored secret of a draft serves other values at the same destination")
-    void placeholderOfDraftForTheSameDestination_takesStoredCiphertext(
-        Saved saved, String change, String from, String to) {
-      UUID id = savedDataSource(DataSourceStatus.DRAFT, saved.stored());
-      answer(DataSourceConnectionTestServiceTest::success);
-
-      service.test(id, saved.requested(from, to));
-
-      assertThat(saved.sentSecret(sentRequest())).isEqualTo(STORED_SECRET);
-    }
-
     @Test
     @DisplayName("a new password may go to another destination")
     void newPasswordForAnotherDestination_isSentEncrypted() {
@@ -514,27 +516,17 @@ class DataSourceConnectionTestServiceTest {
       assertThat(sentRequest().connector()).containsEntry("password", "ENC(terces-wen)");
     }
 
-    @ParameterizedTest(name = "{0} with {1}")
-    @MethodSource("changedValues")
-    @DisplayName("stored secret of a released data source serves only its connector as released")
-    void placeholderOfReleasedDataSourceWithChangedValues_isRejected(
-        Saved saved, String change, String from, String to) {
-      UUID id = savedDataSource(DataSourceStatus.AVAILABLE, saved.stored());
-
-      assertThatThrownBy(() -> service.test(id, saved.requested(from, to)))
-          .isInstanceOf(MalformedDataSourceRequestException.class)
-          .hasMessage(
-              "The stored secret of a released data source is kept only to test its connector as"
-                  + " released; enter it again to test other values");
-      verify(client, never()).test(any());
-      assertThat(singleAuditLine()).endsWith("outcome=REFUSED");
+    static Stream<Arguments> savedConnectorsInEveryStatus() {
+      return Stream.of(DataSourceStatus.values())
+          .flatMap(status -> Stream.of(Saved.values()).map(saved -> arguments(status, saved)));
     }
 
-    @ParameterizedTest
-    @EnumSource(Saved.class)
-    @DisplayName("stored secret of a released data source tests its connector as released")
-    void placeholderOfReleasedDataSourceAsReleased_takesStoredCiphertext(Saved saved) {
-      UUID id = savedDataSource(DataSourceStatus.AVAILABLE, saved.stored());
+    @ParameterizedTest(name = "{0}: {1}")
+    @MethodSource("savedConnectorsInEveryStatus")
+    @DisplayName("stored secret tests the connector as saved")
+    void placeholderWithTheSavedConnector_takesStoredCiphertext(
+        DataSourceStatus status, Saved saved) {
+      UUID id = savedDataSource(status, saved.stored());
       answer(DataSourceConnectionTestServiceTest::success);
 
       service.test(id, saved.requested());
@@ -628,82 +620,6 @@ class DataSourceConnectionTestServiceTest {
 
       assertThat(sentRequest().connector())
           .containsEntry("dsn", "postgres://other.example:5432/city");
-    }
-  }
-
-  @Nested
-  @DisplayName("Where clause")
-  class WhereClause {
-
-    private static ConnectionTestInputDTO sqlWhere(String where, String password) {
-      return input(
-          "{'connectorType':'SQL','driver':'postgres','dsn':'postgres://db.example:5432/city',"
-              + "'table':'readings','columns':['id','value'],'where':'"
-              + where
-              + "','user':'reader','password':'"
-              + password
-              + "'}",
-          null);
-    }
-
-    @Test
-    @DisplayName("unsaved values with a typed password apply their where clause")
-    void unsavedValues_applyTheWhereClause() {
-      answer(DataSourceConnectionTestServiceTest::success);
-
-      service.test(sql(PLAIN_PASSWORD));
-
-      assertThat(sentRequest().applyWhere()).isTrue();
-    }
-
-    @Test
-    @DisplayName("the stored secret applies the saved where clause")
-    void storedSecretWithTheSavedConnector_appliesTheWhereClause() {
-      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
-      answer(DataSourceConnectionTestServiceTest::success);
-
-      service.test(id, sql(Secret.PLACEHOLDER));
-
-      assertThat(sentRequest().applyWhere()).isTrue();
-    }
-
-    @Test
-    @DisplayName("the stored secret does not apply a where clause the caller changed")
-    void storedSecretWithAChangedWhere_doesNotApplyIt() {
-      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
-      answer(DataSourceConnectionTestServiceTest::success);
-
-      service.test(id, sqlWhere("id > 1", Secret.PLACEHOLDER));
-
-      assertThat(sentRequest().applyWhere()).isFalse();
-    }
-
-    @Test
-    @DisplayName("the stored secret does not apply the saved where clause to another table")
-    void storedSecretWithTheSavedWhereOnAnotherTable_doesNotApplyIt() {
-      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
-      answer(DataSourceConnectionTestServiceTest::success);
-
-      service.test(
-          id,
-          input(
-              "{'connectorType':'SQL','driver':'postgres','dsn':'postgres://db.example:5432/city',"
-                  + "'table':'stations','columns':['id','value'],'where':'secret_column > 7',"
-                  + "'user':'reader','password':'********'}",
-              null));
-
-      assertThat(sentRequest().applyWhere()).isFalse();
-    }
-
-    @Test
-    @DisplayName("a typed password applies a changed where clause")
-    void typedPasswordWithAChangedWhere_appliesIt() {
-      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
-      answer(DataSourceConnectionTestServiceTest::success);
-
-      service.test(id, sqlWhere("id > 1", "new-secret"));
-
-      assertThat(sentRequest().applyWhere()).isTrue();
     }
   }
 

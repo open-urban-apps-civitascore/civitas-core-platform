@@ -157,11 +157,11 @@ class SqlProberIT {
   }
 
   @Test
-  void appliesTheWhereClauseWhenTheRequestAllowsIt() throws Exception {
+  void appliesTheConfiguredWhereClause() throws Exception {
     Map<String, Object> connector = connector("readings", List.of("id"), "owner", "owner-secret");
     connector.put("where", "id > 8");
 
-    ProbeResult result = probeWithWhere(connector);
+    ProbeResult result = probe(connector);
 
     assertTrue(result.success(), result.message());
     assertEquals(2, result.rowCount());
@@ -170,31 +170,12 @@ class SqlProberIT {
   }
 
   @Test
-  void ignoresTheWhereClauseWhenTheRequestDoesNotAllowIt() throws Exception {
-    Map<String, Object> connector = connector("readings", List.of("id"), "owner", "owner-secret");
-    connector.put("where", "id > 8 OR write_audit() = 1");
-
-    ProbeResult result = probe(connector);
-
-    assertTrue(result.success(), result.message());
-    assertTrue(
-        result
-            .message()
-            .endsWith(
-                "The where clause is not part of the test; it runs as saved or with a password"
-                    + " entered."),
-        result.message());
-    assertTrue(result.preview().contains("\r\n1\r\n"), "the filter is not applied");
-    assertEquals(0, auditEntries());
-  }
-
-  @Test
   void aWhereClauseThatWritesFailsInTheReadOnlyTransaction() throws Exception {
     Map<String, Object> connector = connector("readings", List.of("id"), "owner", "owner-secret");
     connector.put("where", "write_audit() = 1");
 
     ConnectionTestFailure failure =
-        assertThrows(ConnectionTestFailure.class, () -> probeWithWhere(connector));
+        assertThrows(ConnectionTestFailure.class, () -> probe(connector));
 
     assertTrue(failure.getMessage().contains("read-only transaction"), failure.getMessage());
     assertEquals(0, auditEntries());
@@ -206,7 +187,7 @@ class SqlProberIT {
     connector.put("where", "id = 3 AND CAST(station AS int) > 0");
 
     ConnectionTestFailure failure =
-        assertThrows(ConnectionTestFailure.class, () -> probeWithWhere(connector));
+        assertThrows(ConnectionTestFailure.class, () -> probe(connector));
 
     assertEquals(
         "ERROR: invalid input syntax for type integer: \"station 3\"", failure.getMessage());
@@ -328,10 +309,7 @@ class SqlProberIT {
         ConnectionTestFailure.class,
         () ->
             patient.probe(
-                connector("slow_view", List.of(), "owner", "owner-secret"),
-                null,
-                false,
-                cancellation));
+                connector("slow_view", List.of(), "owner", "owner-secret"), null, cancellation));
 
     long seconds = Duration.ofNanos(System.nanoTime() - begin).toSeconds();
     assertTrue(seconds < 5, "ended after " + seconds + " s");
@@ -382,7 +360,7 @@ class SqlProberIT {
       ConnectionTestFailure failure =
           assertThrows(
               ConnectionTestFailure.class,
-              () -> guarded.probe(connector, null, false, new Cancellation()));
+              () -> guarded.probe(connector, null, new Cancellation()));
 
       assertEquals(Reason.INVALID_CONNECTOR, failure.reason(), failure.getMessage());
       assertNull(listener.accept(), "no connection was opened");
@@ -408,7 +386,7 @@ class SqlProberIT {
       ConnectionTestFailure failure =
           assertThrows(
               ConnectionTestFailure.class,
-              () -> guarded.probe(connector, null, false, new Cancellation()));
+              () -> guarded.probe(connector, null, new Cancellation()));
 
       assertEquals("refused refused.example", failure.getMessage());
       assertEquals(List.of(loopback(), "refused.example"), checked);
@@ -417,11 +395,7 @@ class SqlProberIT {
   }
 
   private ProbeResult probe(Map<String, Object> connector) throws ConnectionTestFailure {
-    return prober.probe(connector, null, false, new Cancellation());
-  }
-
-  private ProbeResult probeWithWhere(Map<String, Object> connector) throws ConnectionTestFailure {
-    return prober.probe(connector, null, true, new Cancellation());
+    return prober.probe(connector, null, new Cancellation());
   }
 
   private static Map<String, Object> connector(

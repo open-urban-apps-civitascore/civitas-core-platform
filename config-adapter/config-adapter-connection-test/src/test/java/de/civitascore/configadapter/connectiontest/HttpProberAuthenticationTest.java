@@ -219,7 +219,6 @@ class HttpProberAuthenticationTest {
                 call,
                 Map.of("type", "API_TOKEN", "name", "api key", "value", "a+b/c", "in", "QUERY")),
             "api",
-            false,
             new Cancellation());
 
     assertTrue(result.success(), result.message());
@@ -326,7 +325,7 @@ class HttpProberAuthenticationTest {
     ConnectionTestFailure failure =
         assertThrows(
             ConnectionTestFailure.class,
-            () -> guarded.probe(connector(call(), oauth2), "api", false, new Cancellation()));
+            () -> guarded.probe(connector(call(), oauth2), "api", new Cancellation()));
 
     assertEquals("refused auth.example.org", failure.getMessage());
     assertTrue(failure.destinationRefused());
@@ -347,7 +346,7 @@ class HttpProberAuthenticationTest {
       ConnectionTestFailure failure =
           assertThrows(
               ConnectionTestFailure.class,
-              () -> prober.probe(connector, "api", false, new Cancellation()));
+              () -> prober.probe(connector, "api", new Cancellation()));
 
       assertEquals("Authentication needs an https base URL.", failure.getMessage());
     }
@@ -447,7 +446,7 @@ class HttpProberAuthenticationTest {
   }
 
   private ProbeResult probe(Map<String, Object> authentication) throws ConnectionTestFailure {
-    return prober.probe(connector(call(), authentication), "api", false, new Cancellation());
+    return prober.probe(connector(call(), authentication), "api", new Cancellation());
   }
 
   private static Request api() {

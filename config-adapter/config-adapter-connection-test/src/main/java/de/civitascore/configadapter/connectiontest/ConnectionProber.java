@@ -22,11 +22,9 @@ interface ConnectionProber {
    *
    * @param connector the connector document, secrets decrypted
    * @param apiCall the name of the API call to run, for an HTTP connector
-   * @param applyWhere whether an SQL connector's where clause is part of the query
    * @param cancellation takes every connection the test opens
    * @throws ConnectionTestFailure if the source does not answer as configured
    */
-  ProbeResult probe(
-      Map<String, Object> connector, String apiCall, boolean applyWhere, Cancellation cancellation)
+  ProbeResult probe(Map<String, Object> connector, String apiCall, Cancellation cancellation)
       throws ConnectionTestFailure;
 }
