@@ -1,12 +1,14 @@
 package de.civitascore.portal.controller.exception;
 
+import de.civitascore.portal.problem.ProblemType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URI;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
-import org.springframework.http.HttpStatus;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
@@ -16,7 +18,6 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -28,10 +29,11 @@ import tools.jackson.databind.json.JsonMapper;
  * Spring Security delegates unauthenticated and forbidden requests here.
  */
 @ControllerAdvice
+// Ahead of GlobalExceptionHandler, whose catch-all would otherwise take the JwtException.
+@Order(Ordered.HIGHEST_PRECEDENCE)
 @Slf4j
 public class SecurityExceptionHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
 
-  private static final String ERROR_URN_PREFIX = "urn:civitas:error:";
   private final ObjectMapper mapper = new JsonMapper();
 
   /**
@@ -48,7 +50,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
       throws IOException {
     log.warn("Authentication failed: {}", Encode.forJava(ex.getMessage()));
     writeProblemDetailResponse(
-        request, response, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required");
+        request, response, ProblemType.UNAUTHORIZED, "Authentication required");
   }
 
   /**
@@ -65,7 +67,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
       throws IOException {
     log.warn("Access denied: {}", Encode.forJava(ex.getMessage()));
     writeProblemDetailResponse(
-        request, response, HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Insufficient privileges");
+        request, response, ProblemType.ACCESS_DENIED, "Insufficient privileges");
   }
 
   /**
@@ -76,31 +78,19 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
    * @return a Problem Detail with HTTP 401 status
    */
   @ExceptionHandler(JwtException.class)
-  @ResponseStatus(HttpStatus.UNAUTHORIZED)
   public ProblemDetail handleJwtException(JwtException ex, HttpServletRequest request) {
     log.warn("JWT validation failed: {}", Encode.forJava(ex.getMessage()));
-    ProblemDetail problemDetail =
-        ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "JWT validation failed");
-    problemDetail.setType(URI.create(ERROR_URN_PREFIX + "INVALID_TOKEN"));
-    problemDetail.setTitle(HttpStatus.UNAUTHORIZED.getReasonPhrase());
-    problemDetail.setInstance(URI.create(request.getRequestURI()));
-    return problemDetail;
+    return ProblemType.INVALID_TOKEN.problemDetail(
+        "JWT validation failed", URI.create(request.getRequestURI()));
   }
 
   private void writeProblemDetailResponse(
-      HttpServletRequest request,
-      HttpServletResponse response,
-      HttpStatus status,
-      String errorCode,
-      String detail)
+      HttpServletRequest request, HttpServletResponse response, ProblemType type, String detail)
       throws IOException {
-    ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, detail);
-    problemDetail.setType(URI.create(ERROR_URN_PREFIX + errorCode));
-    problemDetail.setTitle(status.getReasonPhrase());
-    problemDetail.setInstance(URI.create(request.getRequestURI()));
+    ProblemDetail problemDetail = type.problemDetail(detail, URI.create(request.getRequestURI()));
 
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-    response.setStatus(status.value());
+    response.setStatus(type.status().value());
     response.getWriter().write(mapper.writeValueAsString(problemDetail));
   }
 }

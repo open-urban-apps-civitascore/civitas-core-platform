@@ -1,5 +1,6 @@
 package de.civitascore.portal.configuration;
 
+import de.civitascore.portal.problem.ProblemType;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.ExternalDocumentation;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -476,30 +477,30 @@ public class OpenApiConfig {
             problemExamples(
                 orderedMap(
                     "expired_token",
-                    problemExample(401, "UNAUTHORIZED", "Authentication required", EXAMPLE_PATH),
+                    problemExample(
+                        ProblemType.UNAUTHORIZED, "Authentication required", EXAMPLE_PATH),
                     "invalid_token",
-                    problemExample(401, "INVALID_TOKEN", "JWT validation failed", EXAMPLE_PATH))));
+                    problemExample(
+                        ProblemType.INVALID_TOKEN, "JWT validation failed", EXAMPLE_PATH))));
         addExamplesToResponse(
             openApi.getComponents().getResponses().get("Forbidden"),
             problemExamples(
                 orderedMap(
                     "access_denied",
                     problemExample(
-                        403, "ACCESS_DENIED", "Insufficient privileges", EXAMPLE_PATH))));
+                        ProblemType.ACCESS_DENIED, "Insufficient privileges", EXAMPLE_PATH))));
         addExamplesToResponse(
             openApi.getComponents().getResponses().get("InternalServerError"),
             problemExamples(
                 orderedMap(
                     "data_integrity_error",
                     problemExample(
-                        500,
-                        "DATA_INTEGRITY_ERROR",
+                        ProblemType.DATA_INTEGRITY_ERROR,
                         "A database constraint was violated",
                         EXAMPLE_PATH),
                     "persistence_error",
                     problemExample(
-                        500,
-                        "PERSISTENCE_ERROR",
+                        ProblemType.PERSISTENCE_ERROR,
                         "An unexpected database error occurred",
                         EXAMPLE_PATH))));
       }
@@ -534,29 +535,28 @@ public class OpenApiConfig {
               orderedMap(
                   "invalid_input",
                   problemExample(
-                      400, "INVALID_INPUT", "Validation failed: name must not be blank", path),
+                      ProblemType.INVALID_INPUT, "Validation failed: name must not be blank", path),
                   "validation_failed",
-                  problemExample(400, "VALIDATION_FAILED", "Request body validation failed", path),
+                  problemExample(
+                      ProblemType.VALIDATION_FAILED, "Request body validation failed", path),
                   "malformed_request",
-                  problemExample(400, "MALFORMED_REQUEST", "Failed to read request body", path),
+                  problemExample(
+                      ProblemType.MALFORMED_REQUEST, "Failed to read request body", path),
                   "dataset_not_editable",
                   problemExample(
-                      400,
-                      "DATASET_NOT_EDITABLE",
+                      ProblemType.DATASET_NOT_EDITABLE,
                       "A dataset and its sub-entities can only be changed while the dataset is "
                           + "DRAFT. Unstage or unrelease the dataset first.",
                       path),
                   "model_root_missing",
                   problemExample(
-                      400,
-                      "MODEL_ROOT_MISSING",
+                      ProblemType.MODEL_ROOT_MISSING,
                       "DataStructureVersion model must designate exactly one root Element before"
                           + " releasing",
                       path),
                   "model_member_unreachable",
                   problemExample(
-                      400,
-                      "MODEL_MEMBER_UNREACHABLE",
+                      ProblemType.MODEL_MEMBER_UNREACHABLE,
                       "DataStructureVersion model has members that its root Element does not"
                           + " reach: Orphan",
                       path,
@@ -564,8 +564,7 @@ public class OpenApiConfig {
                       List.of("Orphan")),
                   "model_reference_not_available",
                   problemExample(
-                      400,
-                      "MODEL_REFERENCE_NOT_AVAILABLE",
+                      ProblemType.MODEL_REFERENCE_NOT_AVAILABLE,
                       "A referenced model is not available: it must exist, be readable, and be"
                           + " referenced with a version",
                       path)));
@@ -574,8 +573,7 @@ public class OpenApiConfig {
               orderedMap(
                   "not_found",
                   problemExample(
-                      404,
-                      "NOT_FOUND",
+                      ProblemType.NOT_FOUND,
                       "Resource not found: 550e8400-e29b-41d4-a716-446655440000",
                       path)));
       case "409" ->
@@ -583,33 +581,31 @@ public class OpenApiConfig {
               orderedMap(
                   "unique_constraint",
                   problemExample(
-                      409,
-                      "UNIQUE_CONSTRAINT_VIOLATION",
+                      ProblemType.UNIQUE_CONSTRAINT_VIOLATION,
                       "A resource with this name already exists",
                       path),
                   "resource_in_use",
                   problemExample(
-                      409,
-                      "RESOURCE_IN_USE",
+                      ProblemType.RESOURCE_IN_USE,
                       "Cannot delete: resource is referenced by other entities",
                       path),
                   "saga_in_flight",
                   problemExample(
-                      409,
-                      "SAGA_IN_FLIGHT",
+                      ProblemType.SAGA_IN_FLIGHT,
                       "Cannot write while a saga is in-flight: CREATE",
                       path,
                       "pendingSagaType",
                       "CREATE"),
                   "model_missing",
                   problemExample(
-                      409,
-                      "MODEL_MISSING",
+                      ProblemType.MODEL_MISSING,
                       "DataStructureVersion model is missing from the model registry",
                       path),
                   "foreign_key_violation",
                   problemExample(
-                      409, "FOREIGN_KEY_VIOLATION", "Referenced entity does not exist", path)));
+                      ProblemType.FOREIGN_KEY_VIOLATION,
+                      "Referenced entity does not exist",
+                      path)));
       default -> null;
     };
   }
@@ -627,37 +623,19 @@ public class OpenApiConfig {
     return examples;
   }
 
-  private Map<String, Object> problemExample(
-      int status, String errorCode, String detail, String instance) {
-    String title =
-        switch (status) {
-          case 400 -> "Bad Request";
-          case 401 -> "Unauthorized";
-          case 403 -> "Forbidden";
-          case 404 -> "Not Found";
-          case 409 -> "Conflict";
-          case 500 -> "Internal Server Error";
-          case 502 -> "Bad Gateway";
-          case 504 -> "Gateway Timeout";
-          default -> "Error";
-        };
+  private Map<String, Object> problemExample(ProblemType type, String detail, String instance) {
     Map<String, Object> map = new LinkedHashMap<>();
-    map.put("type", "urn:civitas:error:" + errorCode);
-    map.put("title", title);
-    map.put("status", status);
+    map.put("type", type.type().toString());
+    map.put("title", type.status().getReasonPhrase());
+    map.put("status", type.status().value());
     map.put("detail", detail);
     map.put("instance", instance);
     return map;
   }
 
   private Map<String, Object> problemExample(
-      int status,
-      String errorCode,
-      String detail,
-      String instance,
-      String propertyName,
-      Object propertyValue) {
-    Map<String, Object> map = problemExample(status, errorCode, detail, instance);
+      ProblemType type, String detail, String instance, String propertyName, Object propertyValue) {
+    Map<String, Object> map = problemExample(type, detail, instance);
     map.put(propertyName, propertyValue);
     return map;
   }

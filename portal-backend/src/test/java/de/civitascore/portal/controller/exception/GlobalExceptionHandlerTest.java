@@ -32,17 +32,27 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @DisplayName("GlobalExceptionHandler Unit Tests")
 class GlobalExceptionHandlerTest {
@@ -486,6 +496,99 @@ class GlobalExceptionHandlerTest {
 
       ProblemDetail problemDetail = (ProblemDetail) response.getBody();
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:MALFORMED_REQUEST");
+    }
+  }
+
+  @Nested
+  @DisplayName("Framework and unexpected exception handling")
+  class FrameworkExceptionTests {
+
+    private final ServletWebRequest webRequest =
+        new ServletWebRequest(
+            new MockHttpServletRequest("PATCH", TEST_URI), new MockHttpServletResponse());
+
+    private ProblemDetail problemOf(ResponseEntity<Object> response) {
+      assertThat(response.getBody()).isInstanceOf(ProblemDetail.class);
+      return (ProblemDetail) response.getBody();
+    }
+
+    @Test
+    void handleExceptionInternal_methodNotSupported_keepsAllowAndSetsMethodNotAllowedUrn()
+        throws Exception {
+      ResponseEntity<Object> response =
+          handler.handleException(
+              new HttpRequestMethodNotSupportedException("PATCH", List.of("GET", "DELETE")),
+              webRequest);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+      assertThat(response.getHeaders().getAllow())
+          .contains(HttpMethod.GET, HttpMethod.DELETE)
+          .doesNotContain(HttpMethod.PATCH);
+      ProblemDetail problemDetail = problemOf(response);
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:METHOD_NOT_ALLOWED");
+      assertThat(problemDetail.getTitle()).isEqualTo("Method Not Allowed");
+    }
+
+    @Test
+    void handleExceptionInternal_typeMismatch_namesParameterWithoutEchoingValue() throws Exception {
+      TypeMismatchException ex = new TypeMismatchException("not-a-uuid", UUID.class);
+      ex.initPropertyName("dataSetId");
+
+      ResponseEntity<Object> response = handler.handleException(ex, webRequest);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      ProblemDetail problemDetail = problemOf(response);
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:INVALID_INPUT");
+      assertThat(problemDetail.getDetail()).isEqualTo("Invalid value: dataSetId");
+    }
+
+    @Test
+    void handleExceptionInternal_noResource_setsNotFoundUrn() throws Exception {
+      ResponseEntity<Object> response =
+          handler.handleException(
+              new NoResourceFoundException(HttpMethod.GET, TEST_URI, "datasets"), webRequest);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+      assertThat(problemOf(response).getType()).hasToString("urn:civitas:error:NOT_FOUND");
+    }
+
+    @Test
+    void handleExceptionInternal_mediaTypeNotSupported_setsUnsupportedMediaTypeUrn()
+        throws Exception {
+      ResponseEntity<Object> response =
+          handler.handleException(
+              new HttpMediaTypeNotSupportedException(
+                  MediaType.TEXT_PLAIN, List.of(MediaType.APPLICATION_JSON)),
+              webRequest);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+      assertThat(problemOf(response).getType())
+          .hasToString("urn:civitas:error:UNSUPPORTED_MEDIA_TYPE");
+    }
+
+    @Test
+    void handleUnexpected_anyException_answers500InternalErrorWithFixedDetail() {
+      ProblemDetail problemDetail =
+          handler.handleUnexpected(
+              new IllegalStateException("connection pool of db-internal-7 exhausted"),
+              mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(500);
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:INTERNAL_ERROR");
+      assertThat(problemDetail.getDetail()).isEqualTo("An unexpected error occurred");
+      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+    }
+
+    @Test
+    void handleAccessDenied_fromHandler_answers403AccessDenied() {
+      ProblemDetail problemDetail =
+          handler.handleAccessDenied(
+              new AccessDeniedException("Missing required X-Allowed-Scope-Ids header"),
+              mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(403);
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:ACCESS_DENIED");
+      assertThat(problemDetail.getDetail()).isEqualTo("Insufficient privileges");
     }
   }
 }
