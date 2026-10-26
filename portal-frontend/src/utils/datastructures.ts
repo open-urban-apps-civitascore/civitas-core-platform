@@ -7,8 +7,10 @@ import { DirtyField } from '@/components/uml-modeler/types/session'
 import { SelectOption } from '@/types/common'
 import {
   Datastructure,
+  DATASTRUCTURE_STATUS_TYPES,
   DatastructureFormData,
   DatastructuresListData,
+  DatastructureStatusType,
   DatastructureVersion,
   DatastructureVersionFormAvailableSchema,
   DatastructureVersionFormData,
@@ -33,6 +35,14 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
         if (!highest?.version) return current
         return current.version.localeCompare(highest.version, undefined, { numeric: true }) > 0 ? current : highest
       }, null)
+    const versionCountByStatus = datastructure.dataStructureVersions.reduce<Record<DatastructureStatusType, number>>(
+      (counts, version) => ({
+        ...counts,
+        [version.dataStructureVersionStatus]: counts[version.dataStructureVersionStatus] + 1,
+      }),
+      { [DATASTRUCTURE_STATUS_TYPES.AVAILABLE]: 0, [DATASTRUCTURE_STATUS_TYPES.DRAFT]: 0 },
+    )
+    const inUseByReleasedVersions = datastructure.dataStructureVersions.filter(version => version.inUseByReleased)
     return {
       id: datastructure.id,
       dataStructureId: datastructure.id,
@@ -43,6 +53,8 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
       source: highestVersion?.dataStructureVersionSource || null,
       inUse: datastructure.inUse,
       inUseByReleased: datastructure.inUseByReleased,
+      versionCountByStatus,
+      inUseByReleasedVersionCount: inUseByReleasedVersions.length,
       // add versions field to versions for showing subrows in table
       versions: datastructure.dataStructureVersions.map(version => ({
         id: version.id,

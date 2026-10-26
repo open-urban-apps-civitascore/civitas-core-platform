@@ -1,6 +1,7 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 
+import { CountBadge } from '@/components/count-badge/CountBadge'
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { ContactCell } from '@/components/table/contact-cell/ContactCell'
 import { DataTable } from '@/components/table/DataTable'
@@ -65,9 +66,7 @@ export const DatapoolsTable = (props: DatapoolsTableProps) => {
       cell: info => {
         return (
           <LinkCell href={`/datapools/${info.row.original.id}?subtab=${DatapoolTabValues.datasets}`}>
-            <div className="inline-flex items-center justify-center rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">
-              {info.getValue().length}
-            </div>
+            <CountBadge count={info.getValue().length} />
           </LinkCell>
         )
       },

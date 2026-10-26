@@ -7,11 +7,12 @@ import {
   Row,
   useReactTable,
 } from '@tanstack/react-table'
-import { CircleCheckBig, CircleDashed } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
+import { CountBadge } from '@/components/count-badge/CountBadge'
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { InUseIndicator } from '@/components/in-use-indicator/InUseIndicator'
+import { StatusBadge } from '@/components/status-badge/StatusBadge'
 import { DataTable } from '@/components/table/DataTable'
 import { ExpanderCell } from '@/components/table/expander-cell/ExpanderCell'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
@@ -60,7 +61,12 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
           row.depth === 0 ? `datastructures/${row.original.id}` : `datastructures/${row.parentId}/${row.original.id}`
         return (
           <ExpanderCell row={row} className="font-medium">
-            <LinkCell href={href}>{row.original.name}</LinkCell>
+            <LinkCell
+              href={href}
+              suffix={row.depth === 0 ? <CountBadge count={row.original.versions.length} /> : undefined}
+            >
+              {row.original.name}
+            </LinkCell>
           </ExpanderCell>
         )
       },
@@ -105,7 +111,17 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     }),
     columnHelper.accessor('inUseByReleased', {
       header: tCommon('inUse.columnHeader'),
-      cell: info => <InUseIndicator isInUseByReleased={!!info.getValue()} />,
+      cell: ({ row }: CellContext<DatastructuresListData, unknown>) => {
+        if (row.depth !== 0) return <InUseIndicator isInUseByReleased={!!row.original.inUseByReleased} />
+        const { inUseByReleasedVersionCount, versions } = row.original
+        if (!inUseByReleasedVersionCount) return null
+        return (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <InUseIndicator isInUseByReleased />
+            {`${inUseByReleasedVersionCount}/${versions.length}`}
+          </div>
+        )
+      },
       enableSorting: false,
       meta: {
         style: {
@@ -115,17 +131,18 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     }),
     columnHelper.accessor('status', {
       header: t('tableHeaders.status'),
-      cell: info => {
-        const status = info.getValue()
-        if (!status) return '-'
+      cell: ({ row }: CellContext<DatastructuresListData, unknown>) => {
+        if (row.depth !== 0) {
+          const { status } = row.original
+          return status ? <StatusBadge status={status} /> : '-'
+        }
+        const availableCount = row.original.versionCountByStatus?.[DATASTRUCTURE_STATUS_TYPES.AVAILABLE] ?? 0
+        const draftCount = row.original.versionCountByStatus?.[DATASTRUCTURE_STATUS_TYPES.DRAFT] ?? 0
+        if (!availableCount && !draftCount) return '-'
         return (
           <div className="flex items-center gap-2">
-            {status === DATASTRUCTURE_STATUS_TYPES.DRAFT ? (
-              <CircleDashed className="text-muted-foreground" size={16} />
-            ) : (
-              <CircleCheckBig className="text-muted-foreground" size={16} />
-            )}
-            {tCommon(`status.${status}`)}
+            {availableCount > 0 && <StatusBadge status={DATASTRUCTURE_STATUS_TYPES.AVAILABLE} count={availableCount} />}
+            {draftCount > 0 && <StatusBadge status={DATASTRUCTURE_STATUS_TYPES.DRAFT} count={draftCount} />}
           </div>
         )
       },

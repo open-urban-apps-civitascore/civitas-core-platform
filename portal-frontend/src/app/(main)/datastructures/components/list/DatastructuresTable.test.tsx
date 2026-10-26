@@ -59,7 +59,19 @@ const defaultProps = {
   onDeleteDatastructureClick: vi.fn(),
 }
 
-const renderTable = (props = defaultProps) =>
+const createVersion = (idSuffix: string, overrides?: Partial<DatastructuresListData>): DatastructuresListData => ({
+  ...mockDatastructures[0],
+  id: `00000000-0000-0000-0000-0000000000${idSuffix}`,
+  name: 'Version 1.0.0',
+  status: 'DRAFT',
+  versions: [],
+  ...overrides,
+})
+
+const expandRow = (row: HTMLElement) =>
+  fireEvent.click(within(within(row).getByTestId('expanderCell')).getByRole('button'))
+
+const renderTable = (props: typeof defaultProps = defaultProps) =>
   render(
     <NextIntlClientProvider locale="de" messages={messages}>
       <DatastructuresTable {...props} />
@@ -88,8 +100,8 @@ describe('DatastructuresTable', () => {
     renderTable({
       ...defaultProps,
       datastructures: [
-        { ...first, inUse: true, inUseByReleased: true },
-        { ...second, inUse: true, inUseByReleased: false },
+        { ...first, versions: [createVersion('11')], inUseByReleasedVersionCount: 1 },
+        { ...second, versions: [createVersion('12')], inUseByReleasedVersionCount: 0 },
       ],
     })
     const rows = screen.getAllByRole('row')
@@ -99,7 +111,7 @@ describe('DatastructuresTable', () => {
     expect(within(rows[2]).queryByTestId('inUseIndicator')).toBeNull()
   })
 
-  it('leaves the status empty on a data structure row and shows it on its version sub-rows', () => {
+  it('shows the version count per status on a data structure row and the own status on a version row', () => {
     const [datastructure] = mockDatastructures
     renderTable({
       ...defaultProps,
@@ -107,27 +119,168 @@ describe('DatastructuresTable', () => {
         {
           ...datastructure,
           versions: [
-            {
-              ...datastructure,
-              id: '00000000-0000-0000-0000-000000000011',
-              name: 'Version 1.0.0',
-              status: 'AVAILABLE',
-              versions: [],
-            },
+            createVersion('11', { status: 'AVAILABLE' }),
+            createVersion('12', { status: 'AVAILABLE' }),
+            createVersion('13', { status: 'DRAFT' }),
           ],
+          versionCountByStatus: { AVAILABLE: 2, DRAFT: 1 },
         },
       ],
       rowCount: 1,
     })
 
     const [topLevelRow] = screen.getAllByRole('row').slice(1)
-    expect(within(topLevelRow).queryByText('Verfügbar')).toBeNull()
-    expect(within(topLevelRow).getByText('-')).toBeInTheDocument()
+    expect(within(topLevelRow).getByText('2 Verfügbar')).toBeInTheDocument()
+    expect(within(topLevelRow).getByText('1 Entwurf')).toBeInTheDocument()
 
-    fireEvent.click(within(within(topLevelRow).getByTestId('expanderCell')).getByRole('button'))
+    expandRow(topLevelRow)
 
     const [, , subRow] = screen.getAllByRole('row')
-    expect(within(subRow).getByText('Verfügbar')).toBeInTheDocument()
+    expect(within(subRow).getByTestId('statusBadge')).toHaveTextContent(/^Verfügbar$/)
+  })
+
+  it('shows a dash in the status column of a data structure row without versions', () => {
+    const [datastructure] = mockDatastructures
+    renderTable({
+      ...defaultProps,
+      datastructures: [{ ...datastructure, versionCountByStatus: { AVAILABLE: 0, DRAFT: 0 } }],
+      rowCount: 1,
+    })
+
+    const [topLevelRow] = screen.getAllByRole('row').slice(1)
+    const statusColumnIndex = screen.getAllByRole('columnheader').findIndex(header => header.textContent === 'Status')
+    const statusCell = within(topLevelRow).getAllByRole('cell')[statusColumnIndex]
+    expect(statusCell).toHaveTextContent(/^-$/)
+    expect(within(statusCell).queryByTestId('statusBadge')).toBeNull()
+  })
+
+  it('shows the draft status on a draft version row', () => {
+    const [datastructure] = mockDatastructures
+    renderTable({
+      ...defaultProps,
+      datastructures: [{ ...datastructure, versions: [createVersion('11', { status: 'DRAFT' })] }],
+      rowCount: 1,
+    })
+
+    const [topLevelRow] = screen.getAllByRole('row').slice(1)
+    expandRow(topLevelRow)
+
+    const [, , subRow] = screen.getAllByRole('row')
+    expect(within(subRow).getByTestId('statusBadge')).toHaveTextContent(/^Entwurf$/)
+  })
+
+  it('shows no draft badge on a data structure row without drafts', () => {
+    const [datastructure] = mockDatastructures
+    renderTable({
+      ...defaultProps,
+      datastructures: [{ ...datastructure, versionCountByStatus: { AVAILABLE: 3, DRAFT: 0 } }],
+      rowCount: 1,
+    })
+
+    const [topLevelRow] = screen.getAllByRole('row').slice(1)
+    expect(within(topLevelRow).getAllByTestId('statusBadge')).toHaveLength(1)
+    expect(within(topLevelRow).getByText('3 Verfügbar')).toBeInTheDocument()
+  })
+
+  it('shows the plural for more than one draft on a data structure row', () => {
+    const [datastructure] = mockDatastructures
+    renderTable({
+      ...defaultProps,
+      datastructures: [{ ...datastructure, versionCountByStatus: { AVAILABLE: 0, DRAFT: 2 } }],
+      rowCount: 1,
+    })
+
+    const [topLevelRow] = screen.getAllByRole('row').slice(1)
+    expect(within(topLevelRow).getByText('2 Entwürfe')).toBeInTheDocument()
+  })
+
+  it('shows the in-use icon and the count of used versions on a data structure row', () => {
+    const [datastructure] = mockDatastructures
+    renderTable({
+      ...defaultProps,
+      datastructures: [
+        {
+          ...datastructure,
+          versions: [createVersion('11'), createVersion('12'), createVersion('13')],
+          inUseByReleasedVersionCount: 1,
+        },
+      ],
+      rowCount: 1,
+    })
+
+    const [topLevelRow] = screen.getAllByRole('row').slice(1)
+    expect(within(topLevelRow).getByTestId('inUseIndicator')).toBeInTheDocument()
+    expect(within(topLevelRow).getByText('1/3')).toBeInTheDocument()
+  })
+
+  it('shows no usage on a data structure row without used versions', () => {
+    const [datastructure] = mockDatastructures
+    renderTable({
+      ...defaultProps,
+      datastructures: [{ ...datastructure, versions: [createVersion('11')], inUseByReleasedVersionCount: 0 }],
+      rowCount: 1,
+    })
+
+    const [topLevelRow] = screen.getAllByRole('row').slice(1)
+    expect(within(topLevelRow).queryByTestId('inUseIndicator')).toBeNull()
+    expect(within(topLevelRow).queryByText('0/1')).toBeNull()
+  })
+
+  it('shows the in-use icon without a count on a used version row', () => {
+    const [datastructure] = mockDatastructures
+    renderTable({
+      ...defaultProps,
+      datastructures: [
+        {
+          ...datastructure,
+          versions: [createVersion('11', { inUseByReleased: true })],
+          inUseByReleasedVersionCount: 1,
+        },
+      ],
+      rowCount: 1,
+    })
+
+    const [topLevelRow] = screen.getAllByRole('row').slice(1)
+    expandRow(topLevelRow)
+
+    const [, , subRow] = screen.getAllByRole('row')
+    expect(within(subRow).getByTestId('inUseIndicator')).toBeInTheDocument()
+    expect(within(subRow).queryByText('1/1')).toBeNull()
+  })
+
+  it('shows the number of versions next to the name of a data structure row', () => {
+    const [datastructure] = mockDatastructures
+    renderTable({
+      ...defaultProps,
+      datastructures: [{ ...datastructure, versions: [createVersion('11'), createVersion('12'), createVersion('13')] }],
+      rowCount: 1,
+    })
+
+    const [topLevelRow] = screen.getAllByRole('row').slice(1)
+    expect(within(topLevelRow).getByTestId('countBadge')).toHaveTextContent(/^3$/)
+  })
+
+  it('shows zero versions next to the name of a data structure row without versions', () => {
+    const [datastructure] = mockDatastructures
+    renderTable({ ...defaultProps, datastructures: [datastructure], rowCount: 1 })
+
+    const [topLevelRow] = screen.getAllByRole('row').slice(1)
+    expect(within(topLevelRow).getByTestId('countBadge')).toHaveTextContent(/^0$/)
+  })
+
+  it('shows no version count on a version row', () => {
+    const [datastructure] = mockDatastructures
+    renderTable({
+      ...defaultProps,
+      datastructures: [{ ...datastructure, versions: [createVersion('11')] }],
+      rowCount: 1,
+    })
+
+    const [topLevelRow] = screen.getAllByRole('row').slice(1)
+    expandRow(topLevelRow)
+
+    const [, , subRow] = screen.getAllByRole('row')
+    expect(within(subRow).queryByTestId('countBadge')).toBeNull()
   })
 
   describe('Permission gating', () => {

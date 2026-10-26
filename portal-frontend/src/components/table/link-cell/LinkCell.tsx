@@ -1,6 +1,6 @@
 import { ChevronRight } from 'lucide-react'
 import { LinkProps } from 'next/link'
-import React, { JSX, useRef } from 'react'
+import React, { JSX, ReactNode, useRef } from 'react'
 
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { useIsTruncated } from '@/hooks/use-is-truncated'
@@ -12,17 +12,23 @@ interface LinkCellProps extends LinkProps {
   className?: string
   target?: React.HTMLAttributeAnchorTarget
   isDisabled?: boolean
+  suffix?: ReactNode
 }
 export const LinkCell = (props: LinkCellProps) => {
-  const { children, href, className, target, isDisabled, ...linkProps } = props
+  const { children, href, className, target, isDisabled, suffix, ...linkProps } = props
   const ref = useRef<HTMLDivElement>(null)
   const isTruncated = useIsTruncated(ref)
+  const hasSuffix = suffix !== undefined && suffix !== null && typeof suffix !== 'boolean' && suffix !== ''
+  const suffixElement = hasSuffix ? <span className="shrink-0">{suffix}</span> : null
 
   return (
     <Tooltip open={isTruncated ? undefined : false}>
       <TooltipTrigger asChild>
         {isDisabled ? (
-          <div className={cn('w-full h-full flex items-center', className)}>{children}</div>
+          <div className={cn('w-full h-full flex items-center', hasSuffix && 'gap-2', className)}>
+            {children}
+            {suffixElement}
+          </div>
         ) : (
           <GuardedLink
             className={cn(
@@ -33,9 +39,18 @@ export const LinkCell = (props: LinkCellProps) => {
             target={target}
             {...linkProps}
           >
-            <div ref={ref} className="flex-1 min-w-0 truncate">
-              {children}
-            </div>
+            {hasSuffix ? (
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <div ref={ref} className="min-w-0 truncate">
+                  {children}
+                </div>
+                {suffixElement}
+              </div>
+            ) : (
+              <div ref={ref} className="flex-1 min-w-0 truncate">
+                {children}
+              </div>
+            )}
             <ChevronRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover/link:opacity-100 transition-opacity" />
           </GuardedLink>
         )}

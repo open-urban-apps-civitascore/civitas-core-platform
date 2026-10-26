@@ -129,6 +129,11 @@
       "AVAILABLE": "Verfügbar",
       "READY": "Fertig"
     },
+    "statusCount": {
+      "DRAFT": "{count, plural, one {# Entwurf} other {# Entwürfe}}",
+      "AVAILABLE": "{count, plural, other {# Verfügbar}}",
+      "READY": "{count, plural, other {# Fertig}}"
+    },
     "inUse": {
       "columnHeader": "Verwendung",
       "tooltip": "Wird derzeit verwendet. Die Bearbeitung ist eingeschränkt und das Löschen nicht möglich."
