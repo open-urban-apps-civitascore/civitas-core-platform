@@ -23,6 +23,7 @@ import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Paramete
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ParameterLocation;
 import de.civitascore.portal.model.connector.IdentifiedElement;
 import de.civitascore.portal.model.connector.OnRelease;
+import de.civitascore.portal.model.connector.SqlConnectorConfiguration;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -288,6 +289,28 @@ class ConnectorValidatorTest {
         arguments("headers[0].value", "a\u0000b", false),
         arguments("headers[0].value", "a\u007Fb", false),
         arguments("headers[0].value", "price in €", false));
+  }
+
+  @ParameterizedTest(name = "where \"{0}\" accepted: {1}")
+  @MethodSource("sqlWhereClauses")
+  void validate_sqlConnectorAtDraft_acceptsOnlyAWhereClauseOfOneStatement(
+      String where, boolean accepted) {
+    SqlConnectorConfiguration connector =
+        new SqlConnectorConfiguration(
+            "postgres", "postgres://db.example:5432/city", "t", List.of("id"), where, "u", null);
+
+    assertThat(validator.validate(connector, ConnectorValidator.Stage.DRAFT))
+        .extracting(ConnectorViolation::path)
+        .isEqualTo(accepted ? List.of() : List.of("connector.where"));
+  }
+
+  private static Stream<Arguments> sqlWhereClauses() {
+    return Stream.of(
+        arguments("id > 100", true),
+        arguments("note = 'why?'", true),
+        arguments("x > 1; SELECT 1", false),
+        arguments("x > 1;", false),
+        arguments("note = 'a;b'", false));
   }
 
   private static HttpConnectorConfiguration httpConnectorWith(String key, String value) {

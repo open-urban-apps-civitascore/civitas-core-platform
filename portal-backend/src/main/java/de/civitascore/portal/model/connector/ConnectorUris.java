@@ -3,6 +3,7 @@ package de.civitascore.portal.model.connector;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -42,8 +43,8 @@ public final class ConnectorUris {
    * The DSN without user info and without a {@code jdbc:} prefix, because the config-adapter builds
    * the JDBC URL from a {@code postgres://} DSN. A blank DSN is null.
    *
-   * @throws InvalidConnectorValueException naming {@code key} for a DSN without host or with a
-   *     fragment
+   * @throws InvalidConnectorValueException naming {@code key} for a DSN without host, with a
+   *     fragment or with a repeated parameter
    */
   static String dsnWithoutCredentials(String dsn, String key) {
     if (dsn == null || dsn.isBlank()) {
@@ -55,7 +56,7 @@ public final class ConnectorUris {
             : dsn;
     URI uri = parse(withoutPrefix, key);
     // The connection test and the pipeline read the host after the last '@', also behind a '#'.
-    if (uri.getHost() == null || uri.getRawFragment() != null) {
+    if (uri.getHost() == null || uri.getRawFragment() != null || repeatsAParameter(uri)) {
       throw new InvalidConnectorValueException(key);
     }
     return withoutUserInfo(uri, key).toString();
@@ -147,7 +148,30 @@ public final class ConnectorUris {
     }
   }
 
-  /** The {@code sslmode} parameter of an address, or null if it has none. */
+  /**
+   * Whether a parameter name occurs twice, in any case: the driver takes the last value, the
+   * destination check the {@code sslmode} it finds.
+   */
+  private static boolean repeatsAParameter(URI uri) {
+    String query = uri.getRawQuery();
+    if (query == null) {
+      return false;
+    }
+    Set<String> names = new HashSet<>();
+    for (String parameter : query.split("&")) {
+      int equals = parameter.indexOf('=');
+      String name = equals < 0 ? parameter : parameter.substring(0, equals);
+      if (!name.isEmpty() && !names.add(name.toLowerCase(Locale.ROOT))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * The {@code sslmode} parameter of an address, or null if it has none. The name is matched as the
+   * driver matches it, case-sensitively.
+   */
   private static String sslmode(String dsn) {
     try {
       String query = new URI(dsn).getRawQuery();
@@ -157,7 +181,7 @@ public final class ConnectorUris {
       for (String parameter : query.split("&")) {
         int equals = parameter.indexOf('=');
         String name = equals < 0 ? parameter : parameter.substring(0, equals);
-        if ("sslmode".equalsIgnoreCase(name)) {
+        if ("sslmode".equals(name)) {
           return equals < 0 ? "" : parameter.substring(equals + 1);
         }
       }

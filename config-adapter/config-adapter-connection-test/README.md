@@ -43,6 +43,7 @@ Delivery:
   - The table and each column go to the database only as bind parameters of `to_regclass(?)` and `parse_ident(?)`. These resolve them with the parser's quoting, case folding and search path.
   - The query uses the names that the catalog returns, quoted by `quote_ident`, with `LIMIT ?`. It runs in a read-only transaction that is always rolled back.
   - The `where` clause is free SQL and is **not** part of the test. The result says so.
+  - A `where` clause with a `;` is refused, here and in the pipeline: the driver runs every statement of a query.
   - The test drops the DSN's own `connectTimeout`, `socketTimeout` and `loginTimeout`, because the driver prefers them to the test's limits.
   - Each value is read as text, of which the database sends one character. Thus a table of wide rows (PostGIS polygons) costs little.
 - **MQTT checks the SUBACK code.** A refused subscription is a failure. The test waits for no message. MQTT 5 asks for no retained messages, and messages that arrive before the disconnect are dropped. A broker with a Mosquitto `acl_file` grants a subscription and then delivers nothing to it, so such a test succeeds. The dynamic security plugin refuses the subscription in the SUBACK.

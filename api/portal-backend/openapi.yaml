@@ -13822,8 +13822,10 @@ components:
           example: dbuser
         where:
           type: string
-          description: SQL WHERE clause.
-          example: id > :last_id
+          description: "SQL WHERE clause: one condition of literal SQL, without bind\
+            \ placeholders or ';'."
+          example: id > 100
+          pattern: "[^;]*"
       required:
       - connectorType
     StyleInputDTO:

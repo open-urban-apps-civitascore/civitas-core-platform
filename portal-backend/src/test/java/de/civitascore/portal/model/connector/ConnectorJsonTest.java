@@ -141,6 +141,10 @@ class ConnectorJsonTest {
         "{'connectorType':'SQL','dsn':'postgres://u:pw@ bad'} | Invalid value: connector.dsn",
         "{'connectorType':'SQL','dsn':'postgres://db.example:5432#@attacker.example/city'}"
             + " | Invalid value: connector.dsn",
+        "{'connectorType':'SQL','dsn':'postgres://db.example:5432/city?sslmode=require&sslmode=disable'}"
+            + " | Invalid value: connector.dsn",
+        "{'connectorType':'SQL','dsn':'postgres://db.example:5432/city?SSLMODE=require&sslmode=disable'}"
+            + " | Invalid value: connector.dsn",
         "['SQL'] | Invalid value: connector",
         "{'connectorType':'HTTP','apiCalls':[{'foo':1}]} | Unknown key: connector.apiCalls[0].foo",
         "{'connectorType':'HTTP','authentication':{'type':'DIGEST'}}"
@@ -278,7 +282,8 @@ class ConnectorJsonTest {
       value = {
         "postgres://other.example:5432/city?sslmode=require",
         "postgres://db.example:5433/city?sslmode=require",
-        "postgres://db.example:5432/city?sslmode=disable"
+        "postgres://db.example:5432/city?sslmode=disable",
+        "postgres://db.example:5432/city?SSLMODE=require"
       })
   void toDocument_withStoredSecretForOtherDestination_refusesIt(String dsn) {
     ConnectorConfiguration connector =

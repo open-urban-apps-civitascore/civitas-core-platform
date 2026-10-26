@@ -86,6 +86,23 @@ class SqlConnectorValuesTest {
   }
 
   @ParameterizedTest
+  @ValueSource(strings = {"sslmode=require&sslmode=disable", "SSLMODE=require&sslmode=disable"})
+  void readRejectsARepeatedDsnParameter(String query) {
+    ConnectorValueException e =
+        rejected(connector("dsn", "postgres://db.example:5432/city?" + query));
+
+    assertTrue(e.getMessage().contains("more than once"), e.getMessage());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"x > 1; SELECT 1", "x > 1;", "note = 'a;b'"})
+  void readRejectsWhereWithStatementSeparator(String where) {
+    ConnectorValueException e = rejected(connector("where", where));
+
+    assertTrue(e.getMessage().contains("';'"), e.getMessage());
+  }
+
+  @ParameterizedTest
   @ValueSource(
       strings = {"created_at::date = '2026-01-01'", "note = 'why?'", "t > '12:00:00'", "x = 1"})
   void readAcceptsCastsAndPlaceholderCharactersInsideLiterals(String where)

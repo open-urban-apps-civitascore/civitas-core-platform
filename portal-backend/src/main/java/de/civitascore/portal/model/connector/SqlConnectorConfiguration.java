@@ -4,6 +4,7 @@ import de.civitascore.portal.model.embedded.ConnectorType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Pattern;
 import java.util.List;
 
 /** Connector configuration of an SQL Data source. */
@@ -24,7 +25,11 @@ public record SqlConnectorConfiguration(
             groups = OnRelease.class,
             message = "'columns' is required and must be a non-empty list")
         List<String> columns,
-    @Schema(description = "SQL WHERE clause.", example = "id > :last_id") String where,
+    @Schema(
+            description =
+                "SQL WHERE clause: one condition of literal SQL, without bind placeholders or ';'.",
+            example = "id > 100")
+        @Pattern(regexp = "[^;]*", message = "'where' must be a single condition without ';'") String where,
     @Schema(description = "Database username.", example = "dbuser") String user,
     @Schema(
             description =
