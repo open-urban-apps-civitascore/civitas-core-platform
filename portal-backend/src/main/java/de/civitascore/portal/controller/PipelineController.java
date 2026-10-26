@@ -104,8 +104,9 @@ public class PipelineController
       operationId = "patchPipeline",
       summary = "Partially update a pipeline",
       description =
-          "A DataSink that loses its last Pipeline through this update is removed with its Layers,"
-              + " and with the APIs it is the last backing DataSink of.")
+          JsonMergePatch.OPERATION_DESCRIPTION
+              + " A DataSink that loses its last Pipeline through this update is removed with its"
+              + " Layers, and with the APIs it is the last backing DataSink of.")
   @Parameter(
       name = CONFIRM_DATA_LOSS,
       in = ParameterIn.QUERY,

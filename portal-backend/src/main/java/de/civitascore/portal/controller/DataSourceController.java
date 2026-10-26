@@ -231,6 +231,19 @@ public class DataSourceController
     return ResponseEntity.ok(connectionTestService.test(id, input));
   }
 
+  @Override
+  @Operation(
+      summary = "Partially update a {entity}",
+      description =
+          JsonMergePatch.OPERATION_DESCRIPTION
+              + " The connector is the exception: it merges recursively into the stored"
+              + " connector, so a secret that the patch omits keeps its stored value. A connector"
+              + " with another connectorType replaces the stored one.")
+  public ResponseEntity<DataSourceOutputDTO> patch(
+      @PathVariable UUID id, @RequestBody JsonNode updates) {
+    return super.patch(id, updates);
+  }
+
   /**
    * Applies the {@code connector} member as a JSON merge patch of the stored connector, and the
    * other members as usual. A {@code connector} with another {@code connectorType} replaces the

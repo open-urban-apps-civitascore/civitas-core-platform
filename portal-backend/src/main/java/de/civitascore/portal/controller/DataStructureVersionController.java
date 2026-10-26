@@ -107,7 +107,9 @@ public class DataStructureVersionController {
   }
 
   @PatchMapping("/{versionId}")
-  @Operation(summary = "Partially update a data structure version")
+  @Operation(
+      summary = "Partially update a data structure version",
+      description = JsonMergePatch.OPERATION_DESCRIPTION)
   @ApiResponse(responseCode = "200", description = "Data structure version patched successfully")
   @ApiResponse(
       responseCode = "400",

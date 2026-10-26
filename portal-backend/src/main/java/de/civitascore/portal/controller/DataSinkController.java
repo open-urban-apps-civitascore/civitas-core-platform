@@ -87,7 +87,10 @@ public class DataSinkController
   }
 
   @Override
-  @Operation(operationId = "patchDataSink", summary = "Partially update a DataSink")
+  @Operation(
+      operationId = "patchDataSink",
+      summary = "Partially update a DataSink",
+      description = JsonMergePatch.OPERATION_DESCRIPTION)
   public ResponseEntity<DataSinkOutputDTO> patch(
       @PathVariable UUID id, @RequestBody JsonNode updates) {
     return super.patch(id, updates);

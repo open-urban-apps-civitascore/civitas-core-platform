@@ -102,7 +102,7 @@ public abstract class BaseController<
   }
 
   /**
-   * Applies a partial JSON-merge patch to an existing entity.
+   * Applies a merge patch, as {@link JsonMergePatch} defines it, to an existing entity.
    *
    * @param id the UUID of the entity to patch
    * @param updates the JSON node containing the fields to update
@@ -110,8 +110,7 @@ public abstract class BaseController<
    */
   @Operation(
       summary = "Partially update a {entity}",
-      description =
-          "Applies a partial JSON update to an existing {entity}. Only provided fields are modified.")
+      description = JsonMergePatch.OPERATION_DESCRIPTION)
   @ApiResponse(responseCode = "200", description = "{Entity} patched successfully")
   @ApiResponse(
       responseCode = "400",

@@ -11,6 +11,7 @@ import jakarta.validation.ValidatorFactory;
 import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.Data;
 import org.junit.jupiter.api.AfterAll;
@@ -45,6 +46,8 @@ class JsonMergePatchTest {
     private List<String> tags = List.of("a");
 
     private String code = "ok";
+
+    private Map<String, Object> settings = Map.of("kept", 1, "changed", 2);
 
     public void setCode(String code) {
       if (code.startsWith("!")) {
@@ -110,6 +113,14 @@ class JsonMergePatchTest {
     assertThat(patched.getCount()).isEqualTo(7);
     assertThat(patched.getName()).isEqualTo("current");
     assertThat(patched.getTags()).containsExactly("a");
+  }
+
+  /** Without it, PATCH could silently switch to a recursive merge of nested objects. */
+  @Test
+  void apply_withNestedObject_replacesTheStoredObjectAsAWhole() {
+    TestInput patched = apply("{'settings':{'changed':3}}");
+
+    assertThat(patched.getSettings()).containsExactly(Map.entry("changed", 3));
   }
 
   /** Without it, a DTO's own MALFORMED_REQUEST answer would turn into a generic INVALID_INPUT. */
