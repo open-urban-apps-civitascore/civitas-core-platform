@@ -196,7 +196,8 @@ echo -e "  Docker: ${GREEN}OK${NC}"
 # Check port conflicts
 PORTS_TO_CHECK="5432 8080 8088 8089 8091 8181 9080 9092 9180"
 PORT_CONFLICT=false
-for port in $PORTS_TO_CHECK; do
+# CI forwards the ports of its Docker daemon to localhost before the script starts, so they are in use
+for port in $([ "${SKIP_PORT_CHECK:-false}" = true ] || echo "$PORTS_TO_CHECK"); do
     if ss -tlnp 2>/dev/null | grep -q ":$port " || \
        lsof -i ":$port" > /dev/null 2>&1; then
         echo -e "  Port $port: ${RED}IN USE${NC}"
@@ -313,7 +314,7 @@ wait_for_healthy opa 30 2 || exit 1
 # Step 5: Start portal-backend
 echo "  Starting portal-backend..."
 dc up -d portal-backend
-wait_for_url "Backend health" "http://localhost:8089/v1/actuator/health" 60 2 || exit 1
+wait_for_url "Backend health" "http://localhost:8089/v1/actuator/health" 60 2 || { dc logs --tail 60 portal-backend; exit 1; }
 
 # Step 6: Seed role-permission mappings
 # Must run AFTER backend start because PermissionRoleInitializer creates

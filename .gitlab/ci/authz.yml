@@ -267,8 +267,8 @@ deploy-authz:
 # docker-compose.authz-e2e.yml (ADAPTERS=keycloak) refused to start without the saga handlers
 # "frost" and "apisix"; it now gets their settings as in the API test stack. Open, whatever the
 # next run shows:
-#  - the script reaches the stack at localhost, a dind daemon is at `docker` (set below), and a
-#    token issued under that host may not match the issuer the stack is configured with;
+#  - the stack of the dind daemon is reached at localhost through socat, so that the issuer of the
+#    tokens matches the one the backend is configured with;
 #  - other bind mounts of the stack (Keycloak realm import, APISIX and OPA config) only work if the
 #    dind daemon sees the build directory; the Flyway step copies its files in with `docker cp`;
 #  - the config-adapter, authz and portal-backend images are built from jars that must be in the
@@ -293,11 +293,16 @@ integration-test-authz:
     - job: build-authz
       artifacts: true
   variables:
-    APISIX_URL: http://docker:9080
-    KEYCLOAK_URL: http://docker:8080
+    SKIP_PORT_CHECK: 'true'
   before_script:
-    # lsof and ss for the port check of the script: busybox's lsof is a stub that reports every port as in use
-    - apk add --no-cache bash curl jq postgresql-client lsof iproute2 >/dev/null
+    # socat reaches the stack of the dind daemon at localhost, where the script, the token issuer of
+    # Keycloak and the backend's issuer URI all expect it. The script's port check would find these
+    # forwards in use (and busybox's lsof reports every port as in use), so it is skipped.
+    - apk add --no-cache bash curl jq postgresql-client socat >/dev/null
+    - |
+      for port in 8080 8088 8089 8091 8181 9080 9180; do
+        socat TCP-LISTEN:$port,fork,reuseaddr TCP:docker:$port &
+      done
   script:
     - bash dev-environment/authz/integration-test.sh --skip-build
   after_script:

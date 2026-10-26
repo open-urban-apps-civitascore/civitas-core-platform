@@ -63,7 +63,10 @@ test.describe('Page Layout', async () => {
     const sidebar = page.getByLabel('Main navigation')
     await expect(sidebar).toBeVisible()
 
-    // "Our data" is a group: its links are Data pools, Datasets, Data sources and Data structures
+    // "Our data" is a group (Data pools, Datasets, Data sources, Data structures) that is expanded
+    // only on the pages inside it, so it is opened here when the page is not one of them
+    const ourDataGroup = sidebar.getByRole('button', { name: 'Our data' })
+    if ((await ourDataGroup.getAttribute('aria-expanded')) !== 'true') await ourDataGroup.click()
     const datasetsLink = sidebar.getByRole('link', { name: 'Datasets', exact: true })
     await expect(datasetsLink).toBeVisible()
     await datasetsLink.click()
