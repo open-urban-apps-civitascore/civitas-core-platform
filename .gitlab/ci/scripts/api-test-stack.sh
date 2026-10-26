@@ -63,7 +63,7 @@ api_test_up() {
 }
 
 api_test_collect_logs() {
-  for svc in portal-backend config-adapter connection-tester kafka apisix frost nifi wiremock; do
+  for svc in portal-backend config-adapter connection-tester keycloak kafka apisix frost nifi wiremock; do
     echo "=== $svc logs (last 300 lines) ==="
     api_test_compose logs --tail=300 --no-color "$svc" 2>&1 | tee "${svc}-logs.txt" || true
   done

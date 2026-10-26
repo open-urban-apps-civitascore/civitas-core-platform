@@ -185,12 +185,15 @@ deploy-frontend:
 
 # Playwright end-to-end tests of the portal (portal-frontend/e2e), which were not part of CI before.
 # They run in a Playwright container on the network of the API test stack: the browser, the Next.js
-# dev server the config starts, and a json-server mock share localhost, and Keycloak, APISIX and the
+# production server (`pnpm build`, `pnpm start`), and a json-server mock share localhost, and Keycloak, APISIX and the
 # backend are reached by their service names, so no port is published and no host name is faked.
 # TODO: this job has never run in CI. Expect to fix, in this order: the E2E user (it uses the
 # dev@civitas.local user of the Bruno `ci` environment; playwright/createTestUser.ts and
 # sweep.setup.ts may need a Keycloak admin login), the frontend env below, and whether the specs
 # need seeded data (e2e/scripts/seed-test-users.sh, which runs psql against postgis-dev-env).
+# TODO: runs after the first: the job now tests the production build (the dev server failed on the
+# Google Fonts once), keeps traces of failed tests, and collects the Keycloak log. Read keycloak-logs.txt
+# and the traces to find why the refresh gets "Session not active" (2 below) before touching the specs.
 # TODO: first run (pipeline 2989728635), what it showed: the suite starts and logs in, but (1) the
 # specs are stale against the UI (CreateDataset.spec expects the header "Create: New Dataset", the page
 # shows "New Dataset"), (2) the stored session's access token expires after about 5 minutes and the
@@ -257,11 +260,19 @@ e2e-test-frontend:
       E2E_LASTNAME=User
       E2E_TEST_ENV=dev
       ENV
+      # The production build, not the dev server the Playwright config would start: the dev server
+      # fetched Google Fonts at run time and failed on that in a run (the build fetches them once).
+      # Auth.js needs the host trusted outside of dev.
+      echo "AUTH_TRUST_HOST=true" >> .env.local
       corepack enable
       pnpm install --frozen-lockfile
+      pnpm build
       # The mock backend that the specs still use. Not `pnpm json-server`: that script needs bash's `source`.
       npx json-server json-server/db.json -p 3001 > json-server.log 2>&1 &
-      CI=true PLAYWRIGHT_JUNIT_OUTPUT_FILE=results/junit.xml pnpm exec playwright test --project=chromium --retries=0 --reporter=list,junit
+      pnpm start > next.log 2>&1 &
+      for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3000/login && break; sleep 2; done
+      # CI is not set, so the config reuses the server above instead of starting `pnpm dev`
+      PLAYWRIGHT_JUNIT_OUTPUT_FILE=results/junit.xml pnpm exec playwright test --project=chromium --retries=0 --workers=1 --trace=retain-on-failure --reporter=list,junit
       RUNNER
       E2E_EXIT=$?
       set -e
@@ -269,6 +280,7 @@ e2e-test-frontend:
       docker cp e2e-runner:/app/results/junit.xml e2e-results/junit.xml || true
       docker cp e2e-runner:/app/test-results e2e-results/test-results || true
       docker cp e2e-runner:/app/json-server.log e2e-results/json-server.log || true
+      docker cp e2e-runner:/app/next.log e2e-results/next.log || true
       if [ "$E2E_EXIT" != "0" ]; then
         api_test_collect_logs
       fi

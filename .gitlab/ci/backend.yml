@@ -246,6 +246,7 @@ api-test-backend:
       - portal-backend-logs.txt
       - config-adapter-logs.txt
       - connection-tester-logs.txt
+      - keycloak-logs.txt
       - kafka-logs.txt
       - apisix-logs.txt
       - frost-logs.txt
