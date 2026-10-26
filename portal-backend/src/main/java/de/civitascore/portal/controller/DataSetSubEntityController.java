@@ -10,6 +10,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -57,6 +60,13 @@ public abstract class DataSetSubEntityController<
    * @return the entity class this controller manages
    */
   protected abstract Class<E> getEntityClass();
+
+  /** DataSetOwnedSpec answers a malformed {@code dataSetId} with an empty page, not a 400. */
+  @Override
+  protected ResponseEntity<Page<O>> getAll(Specification<E> spec, Pageable pageable) {
+    extractDataSetId();
+    return super.getAll(spec, pageable);
+  }
 
   @Override
   public ResponseEntity<O> getById(@PathVariable UUID id) {

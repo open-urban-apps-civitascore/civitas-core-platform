@@ -285,7 +285,10 @@ public class OpenApiConfig {
                                             .name(param)
                                             .in("path")
                                             .required(true)
-                                            .schema(new Schema<>().type("string").format("uuid")));
+                                            .schema(
+                                                new Schema<>()
+                                                    .types(Set.of("string"))
+                                                    .format("uuid")));
                               }
                             }
                           });

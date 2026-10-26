@@ -10,6 +10,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +29,10 @@ import tools.jackson.databind.node.ObjectNode;
 
 @DisplayName("OpenAPI Spec Integration Tests")
 class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
+
+  private static final List<String> OPERATION_METHODS =
+      List.of("get", "put", "post", "patch", "delete");
+  private static final Pattern TICKET_NUMBER = Pattern.compile("(?<![\\w&])[#!]\\d+\\b");
 
   private JsonNode spec;
 
@@ -235,6 +241,93 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
     assertThat(discriminator.path("propertyName").asString()).isEqualTo("connectorType");
     assertThat(discriminator.path("mapping").propertyNames())
         .containsExactlyInAnyOrder("MQTT", "SQL", "HTTP");
+  }
+
+  @Test
+  void everyOperation_documentsExactlyOneSuccessResponse() {
+    List<String> offenders = new ArrayList<>();
+    forEachOperation(
+        (name, operation) -> {
+          long successes =
+              operation.path("responses").propertyNames().stream()
+                  .filter(code -> code.startsWith("2"))
+                  .count();
+          if (successes != 1) {
+            offenders.add(name + " documents " + successes + " 2xx responses");
+          }
+        });
+
+    assertThat(offenders).isEmpty();
+  }
+
+  @Test
+  void operationIds_areUniqueWithoutNumericSuffix() {
+    List<String> operationIds = new ArrayList<>();
+    forEachOperation(
+        (name, operation) -> operationIds.add(operation.path("operationId").asString()));
+
+    assertThat(operationIds).doesNotHaveDuplicates().noneMatch(id -> id.matches(".*_\\d+$"));
+  }
+
+  @Test
+  void everyParameter_hasAType() {
+    List<String> untyped = new ArrayList<>();
+    spec.path("paths")
+        .properties()
+        .forEach(
+            path -> {
+              collectUntypedParameters(path.getKey(), path.getValue(), untyped);
+              for (String method : OPERATION_METHODS) {
+                collectUntypedParameters(
+                    method + " " + path.getKey(), path.getValue().path(method), untyped);
+              }
+            });
+
+    assertThat(untyped).isEmpty();
+  }
+
+  @Test
+  void descriptionsAndSummaries_containNoTicketNumbers() {
+    List<String> withTicketNumbers = new ArrayList<>();
+    collectTicketNumbers(spec, withTicketNumbers);
+
+    assertThat(withTicketNumbers).isEmpty();
+  }
+
+  private void forEachOperation(BiConsumer<String, JsonNode> action) {
+    spec.path("paths")
+        .properties()
+        .forEach(
+            path -> {
+              for (String method : OPERATION_METHODS) {
+                JsonNode operation = path.getValue().path(method);
+                if (!operation.isMissingNode()) {
+                  action.accept(method.toUpperCase() + " " + path.getKey(), operation);
+                }
+              }
+            });
+  }
+
+  private static void collectUntypedParameters(
+      String location, JsonNode pathItemOrOperation, List<String> untyped) {
+    for (JsonNode parameter : pathItemOrOperation.path("parameters")) {
+      JsonNode schema = parameter.path("schema");
+      if (!schema.has("type") && !schema.has("$ref")) {
+        untyped.add(location + " " + parameter.path("name").asString());
+      }
+    }
+  }
+
+  private static void collectTicketNumbers(JsonNode node, List<String> withTicketNumbers) {
+    if (node.isObject()) {
+      for (String field : List.of("description", "summary")) {
+        JsonNode text = node.get(field);
+        if (text != null && text.isString() && TICKET_NUMBER.matcher(text.asString()).find()) {
+          withTicketNumbers.add(text.asString());
+        }
+      }
+    }
+    node.values().forEach(child -> collectTicketNumbers(child, withTicketNumbers));
   }
 
   /** Without this test, a JSON Schema validator would recurse without end on such a schema. */

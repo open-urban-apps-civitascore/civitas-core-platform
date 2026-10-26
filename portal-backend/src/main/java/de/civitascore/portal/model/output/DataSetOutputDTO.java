@@ -29,7 +29,7 @@ public class DataSetOutputDTO extends BaseOutputDTO {
 
   @Schema(
       description =
-          "Named API endpoints exposed by this dataset (per concepts #1379 and #1383). Each"
+          "Named API endpoints exposed by this dataset. Each"
               + " entry's previewUrl is server-populated from the configured data-plane domain.")
   private List<NamedApiOutputDTO> namedApis = new ArrayList<>();
 
