@@ -6,11 +6,9 @@ import de.civitascore.portal.model.entity.base.BaseDataEntity;
 import de.civitascore.portal.model.input.BaseDataEntityInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.BaseOutputDTO;
-import de.civitascore.portal.model.output.assembler.AssignmentAssembler;
 import de.civitascore.portal.repository.specification.ScopeFilteringSpecification;
 import de.civitascore.portal.repository.specification.base.BaseSpec;
 import de.civitascore.portal.security.AllowedScopes;
-import de.civitascore.portal.service.AssignmentService;
 import de.civitascore.portal.service.BaseDataEntityService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -46,8 +44,7 @@ public abstract class BaseDataEntityController<
         S extends BaseSpec<E>>
     extends BaseController<I, O, E, S> {
 
-  @Autowired private AssignmentService assignmentService;
-  @Autowired private AssignmentAssembler assignmentAssembler;
+  @Autowired private ScopeAssignments scopeAssignments;
   @Autowired private ScopeFilter scopeFilter;
 
   /**
@@ -101,11 +98,7 @@ public abstract class BaseDataEntityController<
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<List<AssignmentOutputDTO>> getAssignments(@PathVariable UUID id) {
     getService().findByIdOrThrow(id);
-    List<Assignment> assignments =
-        assignmentService.findAllByScopeTypeAndScopeId(getScopeType(), id);
-    List<AssignmentOutputDTO> output =
-        assignments.stream().map(assignmentAssembler::toOutput).toList();
-    return ResponseEntity.ok(output);
+    return ResponseEntity.ok(scopeAssignments.of(getScopeType(), id));
   }
 
   @Override
