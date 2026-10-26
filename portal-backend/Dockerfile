@@ -14,7 +14,7 @@ WORKDIR /app
 # gcompat: snappy-java ships a glibc-linked native library; without the shim the Kafka
 # producer (compression=snappy) cannot load it on Alpine/musl and every publish fails.
 ENV TZ=Europe/Berlin
-RUN apk add --no-cache "curl=8.22.0-r0" "tzdata=2026d-r0" "gcompat=1.1.0-r4"
+RUN apk add --no-cache curl tzdata gcompat
 
 # Copy pre-built JAR from CI artifacts
 COPY target/*.jar ./app.jar
