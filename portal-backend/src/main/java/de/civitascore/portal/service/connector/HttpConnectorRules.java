@@ -143,24 +143,33 @@ public class HttpConnectorRules implements ConnectorRules {
                 "'" + sent.field() + "' must differ from the name of each " + sent.locationName()));
       }
       for (SentName earlier : names.subList(0, i)) {
-        if (earlier.name().equals(sent.name())) {
+        if (earlier.collidesWith(sent)) {
           violations.add(
               ConnectorViolation.at(
                   path, "'" + sent.field() + "' must differ from '" + earlier.field() + "'"));
         }
       }
     }
+    boolean release = stage == ConnectorValidator.Stage.RELEASE;
     switch (apiCall.pagination()) {
-      case PageNumber page when page.endPage() != null && page.endPage() < page.startPage() ->
+      case PageNumber page -> {
+        if (page.endPage() != null && page.endPage() < page.startPage()) {
           violations.add(
               ConnectorViolation.at(
                   paginationPath + ".endPage", "'endPage' must be at least 'startPage'"));
-      case LimitOffset limitOffset when stage == ConnectorValidator.Stage.RELEASE ->
+        }
+      }
+      case LimitOffset limitOffset -> {
+        if (release) {
           addLimitViolations(
               limitOffset.limitParameter(), limitOffset.limit(), paginationPath, violations);
-      case Cursor cursor when stage == ConnectorValidator.Stage.RELEASE ->
+        }
+      }
+      case Cursor cursor -> {
+        if (release) {
           addLimitViolations(cursor.limitParameter(), cursor.limit(), paginationPath, violations);
-      default -> {}
+        }
+      }
     }
   }
 

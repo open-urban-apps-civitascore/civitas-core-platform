@@ -749,7 +749,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
           "{'type':'API_TOKEN','name':'Host','in':'HEADER'} | [] | connector.authentication.name",
           "null | [{'pagination':{'type':'CURSOR','cursorPath':'$..cursor'}}]"
               + " | connector.apiCalls[0].pagination.cursorPath",
-          "null | [{'pagination':{'type':'CURSOR','cursorParameter':'c','cursorIn':'HEADER',"
+          "null | [{'pagination':{'type':'CURSOR','cursorParameter':'c','cursorIn':'QUERY',"
               + "'limitParameter':'c'}}] | connector.apiCalls[0].pagination.limitParameter",
           "null | [{'headers':[{'name':'X-Cursor','value':'1'}],'pagination':{'type':'CURSOR',"
               + "'cursorParameter':'x-cursor','cursorIn':'HEADER'}}]"

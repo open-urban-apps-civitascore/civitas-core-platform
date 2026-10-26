@@ -223,9 +223,10 @@ class HttpConnectorRulesTest {
   }
 
   @Test
-  void validate_withCursorNamedAsLimitParameter_reportsLimitParameter() {
+  void validate_withCursorNamedAsLimitParameter_reportsLimitParameterOnlyAtTheSamePlace() {
     assertThat(
             validate(
+                sending(null, null, new Cursor("$.c", "next", ParameterLocation.QUERY, "next", 1)),
                 sending(
                     null, null, new Cursor("$.c", "next", ParameterLocation.HEADER, "next", 1))))
         .containsExactly(
