@@ -62,8 +62,8 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @ParameterizedTest
   @CsvSource({
-    "/datasets/{id}/released/meta, name",
-    "/datasets/{id}/ready/meta, openDataAccess",
+    "/datasets/{dataSetId}/released/meta, name",
+    "/datasets/{dataSetId}/ready/meta, openDataAccess",
     "/datasources/{dataSourceId}/released/meta, datapoolScope",
     "/datastructures/{dataStructureId}/versions/{versionId}/released/meta, description"
   })
