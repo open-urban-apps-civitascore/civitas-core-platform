@@ -1,6 +1,7 @@
 package de.civitascore.portal.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
 import com.tngtech.archunit.base.DescribedPredicate;
@@ -21,6 +22,9 @@ import org.springframework.web.bind.annotation.RestController;
 @AnalyzeClasses(packages = "de.civitascore.portal", importOptions = DoNotIncludeTests.class)
 class ControllerConventionsTest {
 
+  private static final String DECLARED_RESPONSES =
+      "the 2xx answer comes from the handler signature and the error answers from @Problems";
+
   @ArchTest
   static final ArchRule restControllers_extendNoClass =
       classes()
@@ -39,9 +43,20 @@ class ControllerConventionsTest {
           .beAnnotatedWith(ApiResponse.class)
           .orShould()
           .beAnnotatedWith(ApiResponses.class)
-          .because(
-              "the 2xx answer comes from the handler signature and the error answers from"
-                  + " @Problems");
+          .orShould()
+          .beAnnotatedWith(operationWithResponses())
+          .because(DECLARED_RESPONSES);
+
+  @ArchTest
+  static final ArchRule restControllers_declareNoApiResponse =
+      noClasses()
+          .that()
+          .areAnnotatedWith(RestController.class)
+          .should()
+          .beAnnotatedWith(ApiResponse.class)
+          .orShould()
+          .beAnnotatedWith(ApiResponses.class)
+          .because(DECLARED_RESPONSES);
 
   @ArchTest
   static final ArchRule restControllerMethods_takeTheirOperationIdFromTheMethodName =
@@ -68,6 +83,14 @@ class ControllerConventionsTest {
                             "%s extends %s".formatted(javaClass.getName(), superclass.getName()))));
       }
     };
+  }
+
+  private static DescribedPredicate<JavaAnnotation<?>> operationWithResponses() {
+    return DescribedPredicate.describe(
+        "@Operation with responses",
+        annotation ->
+            annotation.getRawType().isEquivalentTo(Operation.class)
+                && ((Object[]) annotation.get("responses").orElse(new Object[0])).length > 0);
   }
 
   private static DescribedPredicate<JavaAnnotation<?>> operationWithExplicitOperationId() {
