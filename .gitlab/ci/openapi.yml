@@ -1,56 +1,7 @@
 # Keeps api/portal-backend/openapi.yaml in sync with the description the running backend serves.
-
-# Starts the portal-backend with only the services it needs to boot (postgis-dev-env, Kafka,
-# Keycloak) and exports the springdoc description as the artifact openapi.generated.yaml.
-# This job is separate from api-test-backend, so the export does not wait for the Bruno run,
-# a failed Bruno test does not stop the export, and a failed export does not stop the tests.
-export-openapi-spec:
-  rules:
-    - !reference [.only-backend-changes, rules]
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - .gitlab/ci/openapi.yml
-  image: docker:27@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
-  stage: test
-  needs:
-    - job: build-backend
-      artifacts: true
-      optional: true
-  services:
-    - name: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
-  variables:
-    DOCKER_DRIVER: overlay2
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ''
-    # The spec is hosted as documentation, where the CI-internal Keycloak host points nowhere.
-    # example.org is reserved for examples (RFC 2606), so these URLs are obviously not real.
-    OPENAPI_OAUTH_SERVER_URL: https://auth.example.org
-  script:
-    - export COMPOSE_FILES="-f dev-environment/ci/docker-compose.api-test.yml"
-    - |
-      if ls portal-backend/target/*.jar >/dev/null 2>&1; then
-        echo "Portal-backend JAR found — building from source"
-        export COMPOSE_FILES="$COMPOSE_FILES -f dev-environment/ci/docker-compose.api-test.build-portal.yml"
-      else
-        echo "Portal-backend JAR not available — using registry image"
-        echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
-      fi
-    # Naming the service starts it with its depends_on chain only, not the full api-test stack
-    - |
-      docker compose -p openapi-export $COMPOSE_FILES up -d --build --wait --wait-timeout 600 portal-backend || {
-        docker compose -p openapi-export $COMPOSE_FILES ps -a
-        docker compose -p openapi-export $COMPOSE_FILES logs --tail=100 --no-color portal-backend
-        exit 1
-      }
-    # The `local` profile of the stack permits /api-docs.yaml without a token
-    - docker compose -p openapi-export $COMPOSE_FILES exec -T portal-backend curl -sf http://localhost:8089/v1/api-docs.yaml > openapi.generated.yaml
-    # Fail when the override did not reach the backend, instead of committing the internal host
-    - grep -q "$OPENAPI_OAUTH_SERVER_URL/realms/" openapi.generated.yaml
-  artifacts:
-    when: on_success
-    paths:
-      - openapi.generated.yaml
-    expire_in: 30 days
+#
+# The export is made by api-test-backend (artifact openapi.generated.yaml), from the stack that the
+# Bruno tests run against. It was the job export-openapi-spec, which started a second stack.
 
 # Compares the export with the committed file and, on a difference, opens or refreshes a merge
 # request from a bot branch, the way Renovate does. See .gitlab/ci/scripts/update-openapi-spec.mjs.
@@ -62,13 +13,20 @@ export-openapi-spec:
 update-openapi-spec:
   image: node:24.21.0-alpine3.24@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
   stage: report
+  interruptible: false
   # Two develop pipelines must not force-push the bot branch at the same time
   resource_group: openapi-spec-update
   needs:
-    - job: export-openapi-spec
+    - job: api-test-backend
       artifacts: true
   rules:
     - if: $CI_COMMIT_BRANCH == "develop"
+    # TODO: testing: the job is available on merge requests but manual, because it pushes the bot
+    # branch ci/openapi-spec-update and opens or refreshes a merge request against develop from
+    # whatever the checkout holds. Remove this rule to restore the develop-only behaviour.
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+      allow_failure: true
   variables:
     GIT_DEPTH: 1
   before_script:

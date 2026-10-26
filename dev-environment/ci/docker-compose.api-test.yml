@@ -208,7 +208,10 @@ services:
         FROM apache/apisix:3.17.0-debian
         COPY config.yaml /usr/local/apisix/conf/config.yaml
         USER root
-        RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+        # The APISIX apt repo (repos.apiseven.com) does not answer from the CI runners. apt-get update
+        # waits about 130 s for it on every run. curl comes from the Debian repos, so drop that source.
+        RUN rm -f /etc/apt/sources.list.d/apisix.list \
+            && apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
         USER apisix
     depends_on:
       etcd:
@@ -331,7 +334,7 @@ services:
     # ./drivers, but CI runs in Docker-in-Docker where host bind mounts don't work, so it is baked
     # into the image instead.
     build:
-      # Every NAR of the NiFi extensions, which the build-nifi-nars-api-test job builds: the saga
+      # Every NAR of the NiFi extensions, which the build-nifi-nars job builds: the saga
       # collections deploy Pipelines that use PutFrostRecord and GetHttpApiCall. The .dockerignore
       # of the extensions admits only the NARs. Run `mvn -f nifi-extensions/pom.xml package` first
       # when starting this stack by hand.

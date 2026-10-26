@@ -1,0 +1,63 @@
+# Maven jobs of a component share the local repository and its cache. A job extends the template of
+# its component and so declares neither MAVEN_OPTS nor the cache key:
+#
+#   extends: [.only-backend-changes, .maven-backend]
+#
+# The cache is pulled only. The few jobs that install into the repository and so must write it back
+# set `cache: {policy: pull-push, when: always}` themselves. nifi-extensions.yml adds the image.
+
+.maven:
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    paths:
+      - .m2/repository
+    policy: pull
+
+.maven-backend:
+  extends: .maven
+  cache:
+    key:
+      prefix: backend-maven
+      files:
+        - portal-backend/pom.xml
+
+.maven-authz:
+  extends: .maven
+  cache:
+    key:
+      prefix: authz-maven
+      files:
+        - authz/repository/pom.xml
+
+.maven-portal-model:
+  extends: .maven
+  cache:
+    key:
+      prefix: portal-model-maven
+      files:
+        - portal-model/pom.xml
+
+.maven-model-forge:
+  extends: .maven
+  cache:
+    key:
+      prefix: model-forge-maven
+      files:
+        - model-forge/pom.xml
+
+.maven-config-adapter:
+  extends: .maven
+  cache:
+    key:
+      prefix: config-adapter-maven
+      files:
+        - config-adapter/pom.xml
+
+.maven-nifi-extensions:
+  extends: .maven
+  cache:
+    key:
+      prefix: nifi-extensions-maven
+      files:
+        - nifi-extensions/pom.xml
