@@ -215,10 +215,11 @@ export const useDatastructureVersion = ({ version, isCreateMode, onCreateVersion
       throw new ReleasedVersionUpdateError()
     }
 
+    const { id, ...data } = values
     try {
       const response = await updateVersion.mutateAsync({
-        data: values,
-        endpoint: `/datastructures/${datastructureId}/versions/${values.id}`,
+        data,
+        endpoint: `/datastructures/${datastructureId}/versions/${id}`,
       })
       toast.success(t('messages.updateSuccess'))
       // Storing a model assigns the version its number, and the heading is rendered on the server.
