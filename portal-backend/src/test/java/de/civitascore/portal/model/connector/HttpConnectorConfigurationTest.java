@@ -4,9 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ApiCall;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ApiToken;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Basic;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Cursor;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.LimitOffset;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Method;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.None;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.OAuth2;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.PageNumber;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Parameter;
 import java.util.Arrays;
@@ -55,6 +59,36 @@ class HttpConnectorConfigurationTest {
     assertThatThrownBy(() -> withBaseUrl(baseUrl))
         .isInstanceOf(InvalidConnectorValueException.class)
         .hasMessage("baseUrl");
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "https://auth.example.org/oauth2/token/, https://auth.example.org/oauth2/token/",
+    "https://client:secret@auth.example.org/token, https://auth.example.org/token"
+  })
+  void constructor_withTokenUrl_removesUserInfoAndKeepsTheTrailingSlash(
+      String tokenUrl, String kept) {
+    assertThat(new OAuth2(tokenUrl, "c", null, null).tokenUrl()).isEqualTo(kept);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ftp://auth.example.org", "https://auth.example.org/token?grant=x"})
+  void constructor_withTokenUrlThatIsNoHttpUrl_throwsNamingTheKey(String tokenUrl) {
+    assertThatThrownBy(() -> new OAuth2(tokenUrl, "c", null, null))
+        .isInstanceOf(InvalidConnectorValueException.class)
+        .hasMessage("tokenUrl");
+  }
+
+  @Test
+  void constructor_withBlankValuesOfAuthenticationAndPagination_storesNull() {
+    OAuth2 oauth2 = new OAuth2(" ", " ", null, " ");
+    LimitOffset limitOffset = new LimitOffset(" ", "", null, null, " ");
+    Cursor cursor = new Cursor(" ", "", null, " ", null);
+
+    assertThat(new ApiToken(" ", null, null).name()).isNull();
+    assertThat(oauth2).isEqualTo(new OAuth2(null, null, null, null));
+    assertThat(limitOffset).isEqualTo(new LimitOffset(null, null, null, null, null));
+    assertThat(cursor).isEqualTo(new Cursor(null, null, null, null, null));
   }
 
   @Test

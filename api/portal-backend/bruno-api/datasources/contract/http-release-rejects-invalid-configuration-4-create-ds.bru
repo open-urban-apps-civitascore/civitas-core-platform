@@ -18,10 +18,21 @@ body:json {
     "connector": {
       "connectorType": "HTTP",
       "baseUrl": "https://api.example.org",
+      "authentication": { "type": "BEARER_TOKEN" },
       "apiCalls": [
         {
           "name": "stations",
           "pagination": { "type": "PAGE_NUMBER", "pageParameter": "page" }
+        },
+        {
+          "name": "sensors",
+          "path": "/sensors",
+          "pagination": { "type": "LIMIT_OFFSET" }
+        },
+        {
+          "name": "things",
+          "path": "/things",
+          "pagination": { "type": "CURSOR", "cursorPath": "$.next", "cursorIn": "QUERY", "limit": 20 }
         }
       ]
     },
@@ -45,7 +56,8 @@ tests {
 }
 
 docs {
-  Creates an HTTP/REST Data source whose API call has no path and an
-  incomplete pagination. A DRAFT accepts it; step 5 pins the release
-  rejection.
+  Creates an HTTP/REST Data source with a Bearer token authentication
+  without token, an API call without path and three incomplete
+  paginations, one of each type. A DRAFT accepts it; step 5 pins the
+  release rejection.
 }

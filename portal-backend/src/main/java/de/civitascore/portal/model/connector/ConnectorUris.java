@@ -60,12 +60,29 @@ final class ConnectorUris {
   }
 
   /**
-   * The API host URL without user info and without a trailing {@code /}. A blank URL is null.
+   * The API host URL as {@link #httpUrl} cleans it, and without a trailing {@code /}.
+   *
+   * @throws InvalidConnectorValueException as {@link #httpUrl} does
+   */
+  static String httpBaseUrl(String url, String key) {
+    String cleaned = httpUrl(url, key);
+    if (cleaned == null) {
+      return null;
+    }
+    int end = cleaned.length();
+    while (cleaned.charAt(end - 1) == '/') {
+      end--;
+    }
+    return cleaned.substring(0, end);
+  }
+
+  /**
+   * The http or https URL without user info. A blank URL is null.
    *
    * @throws InvalidConnectorValueException naming {@code key} for a URL without host, with a scheme
    *     other than {@code http} or {@code https}, or with a query or fragment
    */
-  static String httpBaseUrl(String url, String key) {
+  static String httpUrl(String url, String key) {
     if (url == null || url.isBlank()) {
       return null;
     }
@@ -76,12 +93,7 @@ final class ConnectorUris {
         || uri.getRawFragment() != null) {
       throw new InvalidConnectorValueException(key);
     }
-    String cleaned = withoutUserInfo(uri, key).toString();
-    int end = cleaned.length();
-    while (cleaned.charAt(end - 1) == '/') {
-      end--;
-    }
-    return cleaned.substring(0, end);
+    return withoutUserInfo(uri, key).toString();
   }
 
   private static URI parse(String value, String key) {

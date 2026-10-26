@@ -9,9 +9,18 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import de.civitascore.portal.model.connector.ConnectorConfiguration;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ApiCall;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ApiToken;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Authentication;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Basic;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.BearerToken;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ClientCertificate;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Cursor;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.LimitOffset;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.OAuth2;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.PageNumber;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Pagination;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Parameter;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ParameterLocation;
 import de.civitascore.portal.model.connector.IdentifiedElement;
 import de.civitascore.portal.model.connector.OnRelease;
 import de.civitascore.portal.model.embedded.ConnectorType;
@@ -130,6 +139,127 @@ class ConnectorValidatorTest {
                 ConnectorValidator.Stage.RELEASE))
         .extracting(ConnectorViolation::path)
         .containsExactly("connector.apiCalls", "connector.baseUrl");
+  }
+
+  private static Stream<Arguments> incompleteAuthentications() {
+    return Stream.of(
+        arguments(new BearerToken(null), List.of("token")),
+        arguments(new ApiToken(null, null, null), List.of("in", "name", "value")),
+        arguments(
+            new OAuth2(null, null, null, null), List.of("clientId", "clientSecret", "tokenUrl")),
+        arguments(new ClientCertificate(null, null), List.of("certificate", "privateKey")));
+  }
+
+  @ParameterizedTest
+  @MethodSource("incompleteAuthentications")
+  void validate_httpAuthenticationAtRelease_reportsEachMissingValueOnlyAtRelease(
+      Authentication authentication, List<String> fields) {
+    HttpConnectorConfiguration connector =
+        new HttpConnectorConfiguration("https://api.example.org", authentication, List.of());
+
+    assertThat(validator.validate(connector, ConnectorValidator.Stage.DRAFT)).isEmpty();
+    assertThat(validator.validate(connector, ConnectorValidator.Stage.RELEASE))
+        .extracting(ConnectorViolation::path)
+        .containsExactlyElementsOf(
+            Stream.concat(
+                    Stream.of("connector.apiCalls"),
+                    fields.stream().map(field -> "connector.authentication." + field))
+                .sorted()
+                .toList());
+  }
+
+  @Test
+  void validate_httpOAuth2WithHttpTokenUrl_reportsTheTokenUrl() {
+    HttpConnectorConfiguration connector =
+        new HttpConnectorConfiguration(
+            "https://api.example.org",
+            new OAuth2("http://auth.example.org/token", "c", null, null),
+            null);
+
+    assertThat(validator.validate(connector, ConnectorValidator.Stage.DRAFT))
+        .containsExactly(
+            new ConnectorViolation(
+                "connector.authentication.tokenUrl", "'tokenUrl' must use https"));
+  }
+
+  @Test
+  void validate_httpPaginationsAtRelease_reportsEachMissingRequiredValue() {
+    HttpConnectorConfiguration connector =
+        new HttpConnectorConfiguration(
+            "https://api.example.org",
+            null,
+            List.of(
+                paged(new Cursor(null, null, null, null, null)),
+                paged(new LimitOffset(null, null, null, null, null))));
+
+    assertThat(validator.validate(connector, ConnectorValidator.Stage.RELEASE))
+        .extracting(ConnectorViolation::path)
+        .containsExactly(
+            "connector.apiCalls[0].pagination.cursorIn",
+            "connector.apiCalls[0].pagination.cursorParameter",
+            "connector.apiCalls[0].pagination.cursorPath",
+            "connector.apiCalls[1].pagination.offsetParameter");
+  }
+
+  @Test
+  void validate_httpPaginationsAtDraft_reportsValuesOutOfRange() {
+    HttpConnectorConfiguration connector =
+        new HttpConnectorConfiguration(
+            "https://api.example.org",
+            null,
+            List.of(
+                paged(new Cursor("$.c", "c", ParameterLocation.QUERY, "l", 0)),
+                paged(new LimitOffset(null, null, 0, -1, null))));
+
+    assertThat(validator.validate(connector, ConnectorValidator.Stage.DRAFT))
+        .extracting(ConnectorViolation::path)
+        .containsExactly(
+            "connector.apiCalls[0].pagination.limit",
+            "connector.apiCalls[1].pagination.limit",
+            "connector.apiCalls[1].pagination.offset");
+  }
+
+  private static ApiCall paged(Pagination pagination) {
+    return new ApiCall("a", null, "/x", null, null, pagination);
+  }
+
+  @ParameterizedTest(name = "{0} accepted: {1}")
+  @MethodSource("jsonPaths")
+  void validate_httpJsonPathAtDraft_acceptsOnlyMemberNamesAndArrayIndexes(
+      String jsonPath, boolean accepted) {
+    HttpConnectorConfiguration connector =
+        new HttpConnectorConfiguration(
+            "https://api.example.org",
+            null,
+            List.of(
+                paged(new Cursor(jsonPath, "c", ParameterLocation.QUERY, "l", 1)),
+                paged(new LimitOffset(null, null, null, null, jsonPath))));
+
+    assertThat(validator.validate(connector, ConnectorValidator.Stage.DRAFT))
+        .extracting(ConnectorViolation::path)
+        .isEqualTo(
+            accepted
+                ? List.of()
+                : List.of(
+                    "connector.apiCalls[0].pagination.cursorPath",
+                    "connector.apiCalls[1].pagination.countPath"));
+  }
+
+  private static Stream<Arguments> jsonPaths() {
+    return Stream.of(
+        arguments("$.next_cursor", true),
+        arguments("$.meta.page-info.count", true),
+        arguments("$.data[0].id", true),
+        arguments("$['next cursor']['a.b']", true),
+        arguments("$", false),
+        arguments("next_cursor", false),
+        arguments("$.data[*]", false),
+        arguments("$..cursor", false),
+        arguments("$.data[?(@.id > 1)]", false),
+        arguments("$.data[-1]", false),
+        arguments("$.data.length()", false),
+        arguments("$['a\\'b']", false),
+        arguments("$.1st", false));
   }
 
   @ParameterizedTest(name = "{0} \"{1}\" accepted: {2}")

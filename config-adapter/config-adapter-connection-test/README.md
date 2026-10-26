@@ -47,7 +47,9 @@ Delivery:
   - Each value is read as text, of which the database sends one character. Thus a table of wide rows (PostGIS polygons) costs little.
 - **MQTT checks the SUBACK code.** A refused subscription is a failure. The test waits for no message. MQTT 5 asks for no retained messages, and messages that arrive before the disconnect are dropped. A broker with a Mosquitto `acl_file` grants a subscription and then delivers nothing to it, so such a test succeeds. The dynamic security plugin refuses the subscription in the SUBACK.
 - **HTTP follows no redirect.** It reads the first 8 KB of the body to tell whether the pipeline reads it.
-  - Basic authentication is sent only over https.
+  - Every authentication other than `NONE` needs an https base URL: Basic, a bearer token (`Authorization: Bearer`), an API token in the named header or query parameter, OAuth 2.0 and a client certificate.
+  - OAuth 2.0 uses the client credentials grant (RFC 6749 §4.4). The test posts to the https token URL with the client ID and secret as HTTP Basic (`client_secret_basic`) and sends the `access_token` of the answer as a bearer token. The token URL passes the same destination check, and the token request and the API call together get the time of one test. A token endpoint that answers with a non-2xx status or without an access token is a `SOURCE_ERROR`; the message keeps the status and an RFC 6749 error code, never the rest of the answer, and the API is not called.
+  - A client certificate is a PEM certificate, optionally followed by its chain, with an unencrypted PKCS#8 PEM key (`BEGIN PRIVATE KEY`) of type RSA or EC. Another key format is `INVALID_CONNECTOR`. The JVM default CAs stay the trusted CAs.
   - A non-2xx status is a failure that keeps the status.
   - A 2xx body is judged as the pipeline reads it. Not JSON, or compressed: failure, because the pipeline's web client does not unpack it. JSON without an object (`[]`, scalars): success, with a note that the pipeline reads no record from it.
 - **A value with `${` or `#{` is refused**, as a release refuses it, because the pipeline engine would evaluate it. The message names the field, never the value.
@@ -57,7 +59,7 @@ Delivery:
 ## Limits and secrets
 
 - A message has at most 500 characters. A result holds no rows and no body of the source.
-- Every decrypted secret is masked in the message.
+- Every decrypted secret is masked in the message. The OAuth 2.0 access token is never put in a message.
 - A message keeps the source's own answer (`password authentication failed`, `NOT_AUTHORIZED`, the HTTP status). A failure of the test's own client is named by its type, never by its text.
 - A connection that fails after its connect timeout is `TIMEOUT`, for every connector type.
 - Logs carry the request id, outcome and duration. At DEBUG they also carry the masked failure message.

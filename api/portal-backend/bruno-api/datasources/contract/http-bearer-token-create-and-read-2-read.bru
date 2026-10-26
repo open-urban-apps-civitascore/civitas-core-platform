@@ -1,0 +1,27 @@
+meta {
+  name: Contract HTTP — Bearer token create + read (2/3 read)
+  type: http
+  seq: 125
+}
+
+get {
+  url: {{baseUrl}}/datasources/{{contractHttpBearerTokenId}}
+  body: none
+  auth: inherit
+}
+
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("The authentication reads back with the Bearer token secret masked", function() {
+    expect(res.body.connector.authentication).to.deep.equal({
+      "type": "BEARER_TOKEN",
+      "token": "********"
+    });
+  });
+  test("No response field holds the secret in clear text", function() {
+    expect(JSON.stringify(res.body)).to.not.include("http-s3cret");
+  });
+}

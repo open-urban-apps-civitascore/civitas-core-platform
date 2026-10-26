@@ -1,0 +1,65 @@
+meta {
+  name: Contract HTTP — API token create + read (1/3 create)
+  type: http
+  seq: 127
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "name": "contract_http_api_token",
+    "description": "contract — HTTP",
+    "connector": {
+      "connectorType": "HTTP",
+      "baseUrl": "https://api.example.org/v1",
+      "authentication": {
+        "type": "API_TOKEN",
+        "name": "X-API-Key",
+        "value": "http-s3cret",
+        "in": "HEADER"
+      },
+      "apiCalls": [
+        {
+          "name": "stations",
+          "path": "/stations"
+        }
+      ]
+    },
+    "dataStructureVersionId": null
+  }
+}
+
+script:post-response {
+  if (!res.body || !res.body.id) {
+    throw new Error("Expected create response to include non-empty 'id'");
+  }
+  bru.setVar('contractHttpApiTokenId', res.body.id);
+}
+
+tests {
+  test("Status is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("The authentication reads back with the API token secret masked", function() {
+    expect(res.body.connector.authentication).to.deep.equal({
+      "type": "API_TOKEN",
+      "name": "X-API-Key",
+      "value": "********",
+      "in": "HEADER"
+    });
+  });
+  test("No response field holds the secret in clear text", function() {
+    expect(JSON.stringify(res.body)).to.not.include("http-s3cret");
+  });
+}
+
+docs {
+  Creates an HTTP/REST Data source with an API token in a header and
+  reads it back.
+}

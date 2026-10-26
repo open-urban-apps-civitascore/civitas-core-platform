@@ -39,7 +39,7 @@ class ConnectorJsonTest {
   private static final JsonMapper MAPPER = new JsonMapper();
   private static final UnaryOperator<String> ENCRYPT = plain -> "ENC(" + plain + ")";
   private static final Pattern SECRET_NAME =
-      Pattern.compile("(?i).*(password|secret|token|apikey|credential|privatekey).*");
+      Pattern.compile("(?i)(?!.*url$).*(password|secret|token|apikey|credential|privatekey).*");
 
   private static final NestedSecretsConnector NESTED =
       new NestedSecretsConnector(
@@ -143,8 +143,12 @@ class ConnectorJsonTest {
             + " | Invalid value: connector.dsn",
         "['SQL'] | Invalid value: connector",
         "{'connectorType':'HTTP','apiCalls':[{'foo':1}]} | Unknown key: connector.apiCalls[0].foo",
-        "{'connectorType':'HTTP','authentication':{'type':'OAUTH2'}}"
-            + " | Unknown connector.authentication.type: OAUTH2",
+        "{'connectorType':'HTTP','authentication':{'type':'DIGEST'}}"
+            + " | Unknown connector.authentication.type: DIGEST",
+        "{'connectorType':'HTTP','authentication':{'type':'OAUTH2','tokenUrl':'ftp://a.example.org'}}"
+            + " | Invalid value: connector.authentication.tokenUrl",
+        "{'connectorType':'HTTP','authentication':{'type':'API_TOKEN','in':'BODY'}}"
+            + " | Invalid value: connector.authentication.in",
         "{'connectorType':'HTTP','apiCalls':[{'pagination':{'pageSize':1}}]}"
             + " | Missing connector.apiCalls[0].pagination.type",
         "{'connectorType':'HTTP','apiCalls':[{'pagination':{'type':'PAGE_NUMBER','pageSize':1.5}}]}"
@@ -157,7 +161,9 @@ class ConnectorJsonTest {
             + " | Invalid value: connector.apiCalls[0].pagination.pageSize",
         "{'connectorType':'HTTP','apiCalls':[{},{'headers':[{'name':'a'},null]}]}"
             + " | Invalid value: connector.apiCalls[1].headers[1]",
-        "{'connectorType':'HTTP','baseUrl':'ftp://api.example.org'} | Invalid value: connector.baseUrl"
+        "{'connectorType':'HTTP','baseUrl':'ftp://api.example.org'} | Invalid value: connector.baseUrl",
+        "{'connectorType':'HTTP','authentication':{'type':'API_TOKEN','in':1}}"
+            + " | Invalid value: connector.authentication.in"
       })
   void read_withInvalidConnector_namesTheKeyButNoValue(String connector, String message) {
     assertThatThrownBy(() -> ConnectorJson.read(json(connector)))
@@ -437,22 +443,38 @@ class ConnectorJsonTest {
         ConnectorJson.read(json(HTTP_BASIC.formatted("secret"))), null, ENCRYPT);
   }
 
-  @Test
-  void httpBasicPassword_isMaskedInResponseEncryptedInDocumentAndKeptForPlaceholder() {
-    Map<String, Object> stored = storedHttpBasic();
-    ConnectorConfiguration placeholder = ConnectorJson.read(json(HTTP_BASIC.formatted("********")));
+  @ParameterizedTest(name = "{0}")
+  @CsvSource(
+      delimiter = '|',
+      quoteCharacter = '"',
+      value = {
+        "'type':'BASIC','username':'reader' | password",
+        "'type':'BEARER_TOKEN' | token",
+        "'type':'API_TOKEN','name':'X-API-Key','in':'HEADER' | value",
+        "'type':'OAUTH2','tokenUrl':'https://auth.example.org/token','clientId':'c' | clientSecret",
+        "'type':'CLIENT_CERTIFICATE','certificate':'pem' | privateKey",
+        "'type':'CLIENT_CERTIFICATE','privateKey':'pem' | certificate"
+      })
+  void httpAuthenticationSecret_isMaskedInResponseEncryptedInDocumentAndKeptForPlaceholder(
+      String fields, String secret) {
+    String connector =
+        "{'connectorType':'HTTP','authentication':{" + fields + ",'" + secret + "':'%s'}}";
+    String pointer = "/authentication/" + secret;
+    Map<String, Object> stored =
+        ConnectorJson.toDocument(
+            ConnectorJson.read(json(connector.formatted("secret"))), null, ENCRYPT);
+    ConnectorConfiguration placeholder = ConnectorJson.read(json(connector.formatted("********")));
 
     assertThat(
             ConnectorJson.toMaskedTree(ConnectorJson.readStored(ConnectorType.HTTP, stored))
-                .at("/authentication/password")
+                .at(pointer)
                 .asString())
         .isEqualTo(Secret.PLACEHOLDER);
-    assertThat(MAPPER.valueToTree(stored).at("/authentication/password").asString())
-        .isEqualTo("ENC(secret)");
+    assertThat(MAPPER.valueToTree(stored).at(pointer).asString()).isEqualTo("ENC(secret)");
     assertThat(
             MAPPER
                 .valueToTree(ConnectorJson.toDocument(placeholder, stored, ENCRYPT))
-                .at("/authentication/password")
+                .at(pointer)
                 .asString())
         .isEqualTo("ENC(secret)");
   }
