@@ -186,6 +186,7 @@ export type BaseDatasetTableData = {
 
 export type DatasetTableData = BaseDatasetTableData & {
   datapool: DatapoolItem | null
+  pipelines: PipelineBasicInfo[]
 }
 
 export type CompletionStepParam = 'access-management' | 'data-flow' | 'apis'
