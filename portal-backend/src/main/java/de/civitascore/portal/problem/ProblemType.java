@@ -5,7 +5,6 @@ import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 /**
  * The catalog of every error answer of portal-backend. Each constant fixes the HTTP status and the
@@ -72,9 +71,6 @@ public enum ProblemType {
   public static Optional<ProblemType> forFrameworkException(Exception ex, HttpStatusCode status) {
     if (ex instanceof HttpMessageNotReadableException) {
       return Optional.of(MALFORMED_REQUEST);
-    }
-    if (ex instanceof HandlerMethodValidationException && status.value() == 400) {
-      return Optional.of(VALIDATION_FAILED);
     }
     return switch (status.value()) {
       case 400 -> Optional.of(INVALID_INPUT);

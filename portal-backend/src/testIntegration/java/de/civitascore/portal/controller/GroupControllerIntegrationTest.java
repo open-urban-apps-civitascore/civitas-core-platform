@@ -908,6 +908,9 @@ class GroupControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getType()).hasToString("urn:civitas:error:VALIDATION_FAILED");
+      assertThat(response.getBody().getProperties())
+          .containsEntry(
+              "fieldErrors", List.of(Map.of("field", "roleId", "message", "Role ID is required")));
     }
   }
 
