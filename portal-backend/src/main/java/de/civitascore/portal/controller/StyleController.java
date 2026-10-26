@@ -9,7 +9,6 @@ import de.civitascore.portal.problem.Problems;
 import de.civitascore.portal.repository.specification.StyleSpec;
 import de.civitascore.portal.service.StyleService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -43,7 +42,6 @@ public class StyleController {
 
   @GetMapping
   @Operation(summary = "List all Styles for a dataset")
-  @ApiResponse(responseCode = "200", description = "Page of styles returned successfully")
   public Page<StyleOutputDTO> listStyles(
       // Typed so that a malformed id answers 400 before StyleSpec reads the path variable.
       @PathVariable UUID dataSetId,
@@ -56,7 +54,6 @@ public class StyleController {
 
   @GetMapping("/{styleId}")
   @Operation(summary = "Get Style by ID")
-  @ApiResponse(responseCode = "200", description = "Style returned successfully")
   @Problems(ProblemType.NOT_FOUND)
   public StyleOutputDTO getStyle(@PathVariable UUID dataSetId, @PathVariable UUID styleId) {
     return styleAssembler.toOutput(requireOwned(dataSetId, styleId));
@@ -65,7 +62,6 @@ public class StyleController {
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(summary = "Create a new Style")
-  @ApiResponse(responseCode = "201", description = "Style created successfully")
   @Problems({
     ProblemType.NOT_FOUND,
     ProblemType.DATASET_NOT_EDITABLE,
@@ -82,7 +78,6 @@ public class StyleController {
 
   @PutMapping("/{styleId}")
   @Operation(summary = "Replace a Style")
-  @ApiResponse(responseCode = "200", description = "Style updated successfully")
   @Problems({
     ProblemType.NOT_FOUND,
     ProblemType.DATASET_NOT_EDITABLE,
@@ -101,7 +96,6 @@ public class StyleController {
   @DeleteMapping("/{styleId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(summary = "Delete a Style")
-  @ApiResponse(responseCode = "204", description = "Style deleted successfully")
   @Problems({
     ProblemType.NOT_FOUND,
     ProblemType.DATASET_NOT_EDITABLE,

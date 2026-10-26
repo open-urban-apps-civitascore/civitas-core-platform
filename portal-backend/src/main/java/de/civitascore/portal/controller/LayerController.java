@@ -9,7 +9,6 @@ import de.civitascore.portal.problem.Problems;
 import de.civitascore.portal.repository.specification.LayerSpec;
 import de.civitascore.portal.service.LayerService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -43,7 +42,6 @@ public class LayerController {
 
   @GetMapping
   @Operation(summary = "List all Layers for a dataset")
-  @ApiResponse(responseCode = "200", description = "Page of layers returned successfully")
   public Page<LayerOutputDTO> listLayers(
       // Typed so that a malformed id answers 400 before LayerSpec reads the path variable.
       @PathVariable UUID dataSetId,
@@ -56,7 +54,6 @@ public class LayerController {
 
   @GetMapping("/{layerId}")
   @Operation(summary = "Get Layer by ID")
-  @ApiResponse(responseCode = "200", description = "Layer returned successfully")
   @Problems(ProblemType.NOT_FOUND)
   public LayerOutputDTO getLayer(@PathVariable UUID dataSetId, @PathVariable UUID layerId) {
     return layerAssembler.toOutput(requireOwned(dataSetId, layerId));
@@ -65,7 +62,6 @@ public class LayerController {
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(summary = "Create a new Layer")
-  @ApiResponse(responseCode = "201", description = "Layer created successfully")
   @Problems({
     ProblemType.NOT_FOUND,
     ProblemType.DATASET_NOT_EDITABLE,
@@ -82,7 +78,6 @@ public class LayerController {
 
   @PutMapping("/{layerId}")
   @Operation(summary = "Replace a Layer")
-  @ApiResponse(responseCode = "200", description = "Layer updated successfully")
   @Problems({
     ProblemType.NOT_FOUND,
     ProblemType.DATASET_NOT_EDITABLE,
@@ -101,7 +96,6 @@ public class LayerController {
   @DeleteMapping("/{layerId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(summary = "Delete a Layer")
-  @ApiResponse(responseCode = "204", description = "Layer deleted successfully")
   @Problems({ProblemType.NOT_FOUND, ProblemType.DATASET_NOT_EDITABLE, ProblemType.SAGA_IN_FLIGHT})
   public void deleteLayer(@PathVariable UUID dataSetId, @PathVariable UUID layerId) {
     requireOwned(dataSetId, layerId);

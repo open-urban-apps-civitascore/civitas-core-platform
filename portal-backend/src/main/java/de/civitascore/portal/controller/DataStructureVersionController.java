@@ -11,7 +11,6 @@ import de.civitascore.portal.service.DataStructureVersionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -42,7 +41,7 @@ import tools.jackson.databind.JsonNode;
 @RestController
 @RequestMapping("/datastructures/{dataStructureId}/versions")
 @RequiredArgsConstructor
-@Tag(name = "Data Structure Versions", description = "Data structure version management endpoints")
+@Tag(name = "Data structure versions", description = "Data structure version management endpoints")
 public class DataStructureVersionController {
 
   private final DataStructureVersionService dataStructureVersionService;
@@ -52,7 +51,6 @@ public class DataStructureVersionController {
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(summary = "Create a new data structure version")
-  @ApiResponse(responseCode = "201", description = "Data structure version created successfully")
   @Problems({
     ProblemType.NOT_FOUND,
     ProblemType.UNIQUE_CONSTRAINT_VIOLATION,
@@ -69,7 +67,6 @@ public class DataStructureVersionController {
 
   @GetMapping("/{versionId}")
   @Operation(summary = "Get data structure version by ID")
-  @ApiResponse(responseCode = "200", description = "Data structure version returned successfully")
   @Problems(ProblemType.NOT_FOUND)
   public DataStructureVersionOutputDTO getDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
@@ -78,7 +75,6 @@ public class DataStructureVersionController {
 
   @PutMapping("/{versionId}")
   @Operation(summary = "Replace a data structure version")
-  @ApiResponse(responseCode = "200", description = "Data structure version updated successfully")
   @Problems({
     ProblemType.NOT_FOUND,
     ProblemType.UNIQUE_CONSTRAINT_VIOLATION,
@@ -99,7 +95,6 @@ public class DataStructureVersionController {
   @Operation(
       summary = "Partially update a data structure version",
       description = JsonMergePatch.OPERATION_DESCRIPTION)
-  @ApiResponse(responseCode = "200", description = "Data structure version patched successfully")
   @Problems({
     ProblemType.NOT_FOUND,
     ProblemType.UNIQUE_CONSTRAINT_VIOLATION,
@@ -141,7 +136,6 @@ public class DataStructureVersionController {
 
   @PatchMapping("/{versionId}/released/meta")
   @Operation(
-      operationId = "updateDataStructureVersionReleasedMeta",
       summary = "Update metadata of a released data structure version",
       description =
           "Applies a JSON merge patch to the description of a released data structure version"
@@ -149,11 +143,10 @@ public class DataStructureVersionController {
               + " field of a released version that can change; a request that contains any other"
               + " field answers 400. For DRAFT versions, use PATCH"
               + " /datastructures/{dataStructureId}/versions/{versionId} instead.")
-  @ApiResponse(responseCode = "200", description = "Released version metadata updated successfully")
   @io.swagger.v3.oas.annotations.parameters.RequestBody(
       content = @Content(schema = @Schema(implementation = DataStructureVersionMetaInputDTO.class)))
   @Problems(ProblemType.NOT_FOUND)
-  public ResponseEntity<DataStructureVersionOutputDTO> updateDataStructureVersionReleasedMeta(
+  public DataStructureVersionOutputDTO updateDataStructureVersionReleasedMeta(
       @PathVariable UUID dataStructureId,
       @PathVariable UUID versionId,
       @RequestBody JsonNode updates) {
@@ -162,17 +155,15 @@ public class DataStructureVersionController {
     DataStructureVersion updated =
         dataStructureVersionService.updateReleasedMeta(
             versionId, jsonMergePatch.apply(current, updates, versionId));
-    return ResponseEntity.ok(dataStructureVersionAssembler.toOutput(updated));
+    return dataStructureVersionAssembler.toOutput(updated);
   }
 
   @PostMapping("/{versionId}/release")
   @Operation(
-      operationId = "releaseDataStructureVersion",
       summary = "Release a data structure version",
       description =
           "Releases a data structure version by setting status to AVAILABLE. Requires a model"
               + " (JSON schema) with exactly one root Element that reaches every other member.")
-  @ApiResponse(responseCode = "200", description = "Data structure version released successfully")
   @Problems({
     ProblemType.NOT_FOUND,
     ProblemType.MODEL_ROOT_MISSING,
@@ -181,25 +172,23 @@ public class DataStructureVersionController {
     ProblemType.MODEL_REFERENCE_NOT_AVAILABLE,
     ProblemType.REGISTRY_UNAVAILABLE
   })
-  public ResponseEntity<DataStructureVersionOutputDTO> releaseDataStructureVersion(
+  public DataStructureVersionOutputDTO releaseDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
     requireOwned(dataStructureId, versionId);
     DataStructureVersion released = dataStructureVersionService.release(versionId);
-    return ResponseEntity.ok(dataStructureVersionAssembler.toOutput(released));
+    return dataStructureVersionAssembler.toOutput(released);
   }
 
   @PostMapping("/{versionId}/unrelease")
   @Operation(
-      operationId = "unreleaseDataStructureVersion",
       summary = "Unrelease a data structure version",
       description = "Unreleases a data structure version by setting status back to DRAFT.")
-  @ApiResponse(responseCode = "200", description = "Data structure version unreleased successfully")
   @Problems({ProblemType.NOT_FOUND, ProblemType.RESOURCE_IN_USE})
-  public ResponseEntity<DataStructureVersionOutputDTO> unreleaseDataStructureVersion(
+  public DataStructureVersionOutputDTO unreleaseDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
     requireOwned(dataStructureId, versionId);
     DataStructureVersion unreleased = dataStructureVersionService.unrelease(versionId);
-    return ResponseEntity.ok(dataStructureVersionAssembler.toOutput(unreleased));
+    return dataStructureVersionAssembler.toOutput(unreleased);
   }
 
   @PostMapping("/{versionId}/duplicate")
