@@ -1,8 +1,9 @@
 # Data source connector contract tests
 
 HTTP characterization tests that pin the connector contract of the
-`POST/GET/PUT/PATCH/DELETE /datasources` endpoints and of
-`POST /datasources/{id}/release`.
+`POST/GET/PUT/PATCH/DELETE /datasources` endpoints, of
+`POST /datasources/{id}/release` and of the connection test,
+`POST /datasources/connection-test` and `POST /datasources/{id}/connection-test`.
 
 ## The connector shape
 
@@ -47,6 +48,11 @@ It holds `connectorType` (`MQTT`, `SQL` or `HTTP`) and the fields of that type:
 | Value out of range, invalid pattern or duplicate name on POST/PUT/PATCH | 400 `VALIDATION_FAILED` | `fieldErrors[].field`: `connector.<path>` |
 | Release with missing required fields | 400 `VALIDATION_FAILED` | `fieldErrors[].field`: `connector.<path>` |
 | Release without a stored connector | 400 `INVALID_INPUT` | `detail`: `Configuration is required for releasing` |
+| Connection test with missing required fields | 400 `VALIDATION_FAILED` | `fieldErrors[].field`: `connector.<path>` |
+| Connection test whose `apiCall` is missing for HTTP, names no API call of the connector, or is set for SQL or MQTT | 400 `VALIDATION_FAILED` | `fieldErrors[].field`: `apiCall` |
+| Connection test with `"********"` and no stored secret at its place | 400 `MALFORMED_REQUEST` | `detail`: `No stored secret for ******** at connector.<path>` |
+| Connection test of a saved data source with `"********"` and another destination (scheme, host or port) | 400 `MALFORMED_REQUEST` | `detail`: `The stored secret is kept only for the stored destination; …` |
+| Connection test of a released data source with `"********"` and changed values | 400 `MALFORMED_REQUEST` | `detail`: `The stored secret of a released data source is kept only to test its connector as released; …` |
 
 A `detail` echoes no value other than a `connectorType` or a nested `type`, because a value
 can carry a credential.
@@ -103,3 +109,6 @@ Range checks such as MQTT `qos` run on every write
 | `sql-unknown-fields-rejected`, `mqtt-unknown-nested-key-rejected`, `http-unknown-nested-key-rejected` | Unknown keys are rejected |
 | `sql-validation-*`, `mqtt-validation-*`, `http-validation-*` | Error responses for an unreadable or invalid connector |
 | `http-release-rejects-invalid-configuration-*` | Release names each missing field of an API call by its path |
+| `sql-connection-test-answers`, `mqtt-connection-test-answers`, `http-connection-test-answers` | A connection test of unsaved values with a `.invalid` host answers `SOURCE_ERROR` |
+| `sql-connection-test-rejects-*`, `http-connection-test-rejects-*` | A connection test rejects incomplete values, a placeholder of unsaved values and a missing `apiCall` before it runs |
+| `sql-connection-test-saved-masked-password-*` | A connection test of a saved data source keeps the stored password for `"********"` |

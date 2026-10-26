@@ -40,7 +40,8 @@ final class ConnectorUris {
    * The DSN without user info and without a {@code jdbc:} prefix, because the config-adapter builds
    * the JDBC URL from a {@code postgres://} DSN. A blank DSN is null.
    *
-   * @throws InvalidConnectorValueException naming {@code key} for a DSN without host
+   * @throws InvalidConnectorValueException naming {@code key} for a DSN without host or with a
+   *     fragment
    */
   static String dsnWithoutCredentials(String dsn, String key) {
     if (dsn == null || dsn.isBlank()) {
@@ -51,7 +52,8 @@ final class ConnectorUris {
             ? dsn.substring(JDBC_PREFIX.length())
             : dsn;
     URI uri = parse(withoutPrefix, key);
-    if (uri.getHost() == null) {
+    // The connection test and the pipeline read the host after the last '@', also behind a '#'.
+    if (uri.getHost() == null || uri.getRawFragment() != null) {
       throw new InvalidConnectorValueException(key);
     }
     return withoutUserInfo(uri, key).toString();

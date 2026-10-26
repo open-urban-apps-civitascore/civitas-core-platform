@@ -1,5 +1,6 @@
 package de.civitascore.portal.model.connector;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.RecordComponent;
@@ -10,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * Replaces each {@value Secret#PLACEHOLDER} of a connector with the stored secret at the same
@@ -25,20 +27,42 @@ final class PlaceholderResolver {
 
   static ConnectorConfiguration resolve(
       ConnectorConfiguration connector, ConnectorConfiguration stored) {
-    return (ConnectorConfiguration) resolveValue(connector, stored);
+    return (ConnectorConfiguration) resolveValue(connector, stored, ConnectorJson.ROOT, path -> {});
   }
 
-  private static Object resolveValue(Object value, Object stored) {
+  /**
+   * The key paths, e.g. {@code connector.password}, of the placeholders that {@link #resolve} turns
+   * into no secret.
+   */
+  static List<String> unresolvedPlaceholders(
+      ConnectorConfiguration connector, ConnectorConfiguration stored) {
+    List<String> unresolved = new ArrayList<>();
+    resolveValue(connector, stored, ConnectorJson.ROOT, unresolved::add);
+    return unresolved;
+  }
+
+  private static Object resolveValue(
+      Object value, Object stored, String path, Consumer<String> onUnresolved) {
     return switch (value) {
       case Secret secret when secret.isPlaceholder() ->
-          stored instanceof Secret storedSecret && storedSecret.isStored() ? storedSecret : null;
-      case Record record -> resolveRecord(record, stored);
-      case List<?> list -> resolveList(list, stored);
+          resolvePlaceholder(stored, path, onUnresolved);
+      case Record record -> resolveRecord(record, stored, path, onUnresolved);
+      case List<?> list -> resolveList(list, stored, path, onUnresolved);
       case null, default -> value;
     };
   }
 
-  private static Record resolveRecord(Record record, Object stored) {
+  private static Secret resolvePlaceholder(
+      Object stored, String path, Consumer<String> onUnresolved) {
+    if (stored instanceof Secret storedSecret && storedSecret.isStored()) {
+      return storedSecret;
+    }
+    onUnresolved.accept(path);
+    return null;
+  }
+
+  private static Record resolveRecord(
+      Record record, Object stored, String path, Consumer<String> onUnresolved) {
     RecordComponent[] components = record.getClass().getRecordComponents();
     Object counterpart = stored != null && stored.getClass() == record.getClass() ? stored : null;
     Object[] values = new Object[components.length];
@@ -47,23 +71,28 @@ final class PlaceholderResolver {
       Object current = componentValue(record, components[i]);
       values[i] =
           resolveValue(
-              current, counterpart == null ? null : componentValue(counterpart, components[i]));
+              current,
+              counterpart == null ? null : componentValue(counterpart, components[i]),
+              path + "." + jsonKey(components[i]),
+              onUnresolved);
       changed |= values[i] != current;
     }
     return changed ? newRecord(record.getClass(), components, values) : record;
   }
 
-  private static List<?> resolveList(List<?> list, Object stored) {
+  private static List<?> resolveList(
+      List<?> list, Object stored, String path, Consumer<String> onUnresolved) {
     Map<Object, Object> storedByIdentity =
         stored instanceof List<?> storedList ? byUniqueIdentity(storedList) : Map.of();
     List<Object> resolved = new ArrayList<>(list.size());
     boolean changed = false;
-    for (Object element : list) {
+    for (int i = 0; i < list.size(); i++) {
+      Object element = list.get(i);
       Object counterpart =
           element instanceof IdentifiedElement identified && identified.identity() != null
               ? storedByIdentity.get(identified.identity())
               : null;
-      Object value = resolveValue(element, counterpart);
+      Object value = resolveValue(element, counterpart, path + "[" + i + "]", onUnresolved);
       resolved.add(value);
       changed |= value != element;
     }
@@ -83,6 +112,11 @@ final class PlaceholderResolver {
     }
     byIdentity.keySet().removeAll(ambiguous);
     return byIdentity;
+  }
+
+  private static String jsonKey(RecordComponent component) {
+    JsonProperty property = component.getAccessor().getAnnotation(JsonProperty.class);
+    return property == null || property.value().isEmpty() ? component.getName() : property.value();
   }
 
   private static Object componentValue(Object record, RecordComponent component) {

@@ -18,9 +18,7 @@ import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
-import de.civitascore.portal.service.connector.ConnectorValidationException;
 import de.civitascore.portal.service.connector.ConnectorValidator;
-import de.civitascore.portal.service.connector.ConnectorViolation;
 import de.civitascore.portal.service.connector.DataSourceConnectorStore;
 import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.InvalidInputException;
@@ -156,14 +154,14 @@ public class DataSourceService
 
   @Override
   protected DataSourceInputDTO preProcessCreateInput(DataSourceInputDTO input) {
-    requireValidConnector(input.getConnector(), ConnectorValidator.Stage.DRAFT);
+    connectorValidator.requireValid(input.getConnector(), ConnectorValidator.Stage.DRAFT);
     return super.preProcessCreateInput(input);
   }
 
   @Override
   protected DataSourceInputDTO preProcessUpdateInput(
       DataSourceInputDTO input, DataSource existingEntity) {
-    requireValidConnector(input.getConnector(), ConnectorValidator.Stage.DRAFT);
+    connectorValidator.requireValid(input.getConnector(), ConnectorValidator.Stage.DRAFT);
     validateConnectorTypeChange(input, existingEntity);
     validateDataStructureVersionChange(input, existingEntity);
     return input;
@@ -386,15 +384,7 @@ public class DataSourceService
           getEntityName(), entity.getId(), "Configuration is required for releasing");
     }
 
-    requireValidConnector(connectorStore.read(entity), ConnectorValidator.Stage.RELEASE);
-  }
-
-  private void requireValidConnector(
-      ConnectorConfiguration connector, ConnectorValidator.Stage stage) {
-    List<ConnectorViolation> violations = connectorValidator.validate(connector, stage);
-    if (!violations.isEmpty()) {
-      throw new ConnectorValidationException(violations);
-    }
+    connectorValidator.requireValid(connectorStore.read(entity), ConnectorValidator.Stage.RELEASE);
   }
 
   /**

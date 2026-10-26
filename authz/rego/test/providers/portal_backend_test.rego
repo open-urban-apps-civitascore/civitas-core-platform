@@ -86,6 +86,17 @@ test_path_pattern_datasource_release if {
 	result == "/v1/datasources/{id}/release"
 }
 
+# The literal segment connection-test is not matched as an {id}.
+test_path_pattern_datasource_connection_test_unsaved if {
+	result := portal_backend.path_pattern with input as portal_request("POST", "/v1/datasources/connection-test")
+	result == "/v1/datasources/connection-test"
+}
+
+test_path_pattern_datasource_connection_test_saved if {
+	result := portal_backend.path_pattern with input as portal_request("POST", "/v1/datasources/ds-123/connection-test")
+	result == "/v1/datasources/{id}/connection-test"
+}
+
 test_path_pattern_datastructure_assignments if {
 	result := portal_backend.path_pattern with input as portal_request("GET", "/v1/datastructures/dstr-123/assignments")
 	result == "/v1/datastructures/{id}/assignments"
@@ -139,6 +150,11 @@ test_endpoints_contains_datasources if {
 
 test_endpoints_contains_datasources_id if {
 	portal_backend.endpoints["/v1/datasources/{id}"]
+}
+
+test_endpoints_contains_datasources_connection_tests if {
+	portal_backend.endpoints["/v1/datasources/connection-test"].POST == "DATASOURCE_CREATE"
+	portal_backend.endpoints["/v1/datasources/{id}/connection-test"].POST == "DATASOURCE_UPDATE"
 }
 
 test_endpoints_contains_datastructures if {
@@ -231,6 +247,20 @@ test_not_collection_endpoint_resource if {
 
 test_not_collection_endpoint_sub_resource if {
 	not portal_backend.is_collection_endpoint with input as portal_request("POST", "/v1/datasets/abc-123/stage")
+}
+
+# The unsaved connection test names no Data source, so it is gated like a collection write.
+test_is_collection_endpoint_datasource_connection_test_unsaved if {
+	portal_backend.is_collection_endpoint with input as portal_request("POST", "/v1/datasources/connection-test")
+}
+
+test_not_collection_endpoint_datasource_connection_test_saved if {
+	not portal_backend.is_collection_endpoint with input as portal_request("POST", "/v1/datasources/ds-123/connection-test")
+}
+
+test_resource_id_datasource_connection_test_saved if {
+	result := portal_backend.resource_id with input as portal_request("POST", "/v1/datasources/ds-123/connection-test")
+	result == "ds-123"
 }
 
 test_not_collection_endpoint_users_me if {

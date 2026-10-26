@@ -164,6 +164,13 @@
     "/v1/datasources/{id}/assignments": {
       "GET": "DATASOURCE_READ"
     },
+    "/v1/datasources/connection-test": {
+      "_collection": true,
+      "POST": "DATASOURCE_CREATE"
+    },
+    "/v1/datasources/{id}/connection-test": {
+      "POST": "DATASOURCE_UPDATE"
+    },
     "/v1/datastructures": {
       "_collection": true,
       "GET": "DATASTRUCTURE_READ",

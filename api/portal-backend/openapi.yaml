@@ -5716,6 +5716,7 @@ paths:
           enum:
           - MQTT
           - SQL
+          - HTTP
       - description: "Filter by DataPool scope. Returns DataSources with scope type\
           \ ALL, or SPECIFIC DataSources that include this DataPool."
         in: query
@@ -5881,6 +5882,119 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
       summary: Create a new datasource
+      tags:
+      - DataSources
+  /datasources/connection-test:
+    post:
+      description: "Tests whether the source answers with the given connector values,\
+        \ before a data source holds them. The values must meet the rules of a release.\
+        \ SQL reads up to 5 rows of the table, MQTT subscribes to the topic, HTTP\
+        \ runs the named API call. The test changes no data source and stores nothing.\
+        \ A placeholder \"********\" has no stored secret to keep here and answers\
+        \ 400. A user runs one test at a time."
+      operationId: testDataSourceConnection
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectionTestInputDTO"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionTestResultDTO"
+          description: "The test ran; success tells whether the source answered as\
+            \ configured, reason why not"
+        "400":
+          content:
+            application/problem+json:
+              examples:
+                dataset_not_editable:
+                  summary: dataset_not_editable
+                  value:
+                    detail: A dataset and its sub-entities can only be changed while
+                      the dataset is DRAFT. Unstage or unrelease the dataset first.
+                    instance: /datasources/connection-test
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:DATASET_NOT_EDITABLE
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    detail: "Validation failed: name must not be blank"
+                    instance: /datasources/connection-test
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:INVALID_INPUT
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    detail: Failed to read request body
+                    instance: /datasources/connection-test
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                model_member_unreachable:
+                  summary: model_member_unreachable
+                  value:
+                    detail: "DataStructureVersion model has members that its root\
+                      \ Element does not reach: Orphan"
+                    instance: /datasources/connection-test
+                    memberNames:
+                    - Orphan
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_root_missing:
+                  summary: model_root_missing
+                  value:
+                    detail: DataStructureVersion model must designate exactly one
+                      root Element before releasing
+                    instance: /datasources/connection-test
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_ROOT_MISSING
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    detail: Request body validation failed
+                    instance: /datasources/connection-test
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:VALIDATION_FAILED
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "The connector cannot be read or does not meet the release\
+            \ rules, apiCall does not fit the connector, or a placeholder has no stored\
+            \ secret"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "The user runs a connection test already, or too many tests\
+            \ are running"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "502":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The test could not be run
+        "504":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The test did not answer in time
+      summary: Test connector values
       tags:
       - DataSources
   /datasources/{id}:
@@ -6363,6 +6477,143 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
       summary: Get assignments
+      tags:
+      - DataSources
+  /datasources/{id}/connection-test:
+    post:
+      description: "Tests whether the source answers with the given connector values,\
+        \ which may differ from the stored ones, for a data source in any status.\
+        \ A placeholder \"********\" keeps the secret stored at its place, but only\
+        \ where it is stored for: at the stored destination of a draft, and for the\
+        \ connector as released of a released data source. Elsewhere, or where no\
+        \ secret is stored, it answers 400. The values must meet the rules of a release.\
+        \ The test changes no data source and stores nothing. A user runs one test\
+        \ at a time."
+      operationId: testSavedDataSourceConnection
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectionTestInputDTO"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionTestResultDTO"
+          description: "The test ran; success tells whether the source answered as\
+            \ configured, reason why not"
+        "400":
+          content:
+            application/problem+json:
+              examples:
+                dataset_not_editable:
+                  summary: dataset_not_editable
+                  value:
+                    detail: A dataset and its sub-entities can only be changed while
+                      the dataset is DRAFT. Unstage or unrelease the dataset first.
+                    instance: "/datasources/{id}/connection-test"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:DATASET_NOT_EDITABLE
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    detail: "Validation failed: name must not be blank"
+                    instance: "/datasources/{id}/connection-test"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:INVALID_INPUT
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    detail: Failed to read request body
+                    instance: "/datasources/{id}/connection-test"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                model_member_unreachable:
+                  summary: model_member_unreachable
+                  value:
+                    detail: "DataStructureVersion model has members that its root\
+                      \ Element does not reach: Orphan"
+                    instance: "/datasources/{id}/connection-test"
+                    memberNames:
+                    - Orphan
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_root_missing:
+                  summary: model_root_missing
+                  value:
+                    detail: DataStructureVersion model must designate exactly one
+                      root Element before releasing
+                    instance: "/datasources/{id}/connection-test"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_ROOT_MISSING
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    detail: Request body validation failed
+                    instance: "/datasources/{id}/connection-test"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:VALIDATION_FAILED
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "The connector cannot be read or does not meet the release\
+            \ rules, apiCall does not fit the connector, or a placeholder has no stored\
+            \ secret"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          content:
+            application/problem+json:
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datasources/{id}/connection-test"
+                    status: 404
+                    title: Not Found
+                    type: urn:civitas:error:NOT_FOUND
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: DataSource not found
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "The user runs a connection test already, or too many tests\
+            \ are running"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "502":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The test could not be run
+        "504":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The test did not answer in time
+      summary: Test connector values of a saved data source
       tags:
       - DataSources
   /datasources/{id}/release:
@@ -10759,17 +11010,68 @@ components:
       required:
       - groupId
       - roleId
+    ConnectionTestInputDTO:
+      type: object
+      description: Connector values to test. The test reads from the source once and
+        changes no Data source; it uses the same rules as the release of a Data source.
+      properties:
+        apiCall:
+          type: string
+          description: "Name of the API call to run. Required for an HTTP connector,\
+            \ where it names one of its apiCalls; absent for any other connector."
+          example: Get all weather stations
+        connector:
+          $ref: "#/components/schemas/Connector"
+      required:
+      - connector
+    ConnectionTestResultDTO:
+      type: object
+      description: "The answer of a connection test. A source that does not answer\
+        \ as configured is a result with success false, not an error response."
+      properties:
+        httpStatus:
+          type: integer
+          format: int32
+          description: "HTTP status code of the call, when the source answered with\
+            \ one."
+          example: 200
+        message:
+          type: string
+          description: "What happened, at most 500 characters."
+          example: "FATAL: password authentication failed for user \"reader\""
+        reason:
+          type: string
+          description: "Why the test failed, null on success: INVALID_CONNECTOR the\
+            \ values do not make a runnable source, SOURCE_ERROR the source answered\
+            \ with an error or could not be reached, TIMEOUT the source did not answer\
+            \ in time."
+          enum:
+          - INVALID_CONNECTOR
+          - SOURCE_ERROR
+          - TIMEOUT
+          example: SOURCE_ERROR
+        rowCount:
+          type: integer
+          format: int32
+          description: "Number of rows read, SQL only."
+          example: 5
+        success:
+          type: boolean
+          description: Whether the source answered as configured.
+          example: true
     Connector:
       description: Connector of the Data source. The connectorType selects the remaining
         fields.
       discriminator:
         mapping:
+          HTTP: "#/components/schemas/HttpConnector"
           MQTT: "#/components/schemas/MqttConnector"
           SQL: "#/components/schemas/SqlConnector"
         propertyName: connectorType
       oneOf:
       - $ref: "#/components/schemas/MqttConnector"
       - $ref: "#/components/schemas/SqlConnector"
+      - $ref: "#/components/schemas/HttpConnector"
     DataEntitySummaryDTO:
       type: object
       properties:
@@ -11575,6 +11877,184 @@ components:
           readOnly: true
         name:
           type: string
+    HttpConnector:
+      type: object
+      description: Connector of an HTTP/REST Data source.
+      properties:
+        apiCalls:
+          type: array
+          description: "The API calls, in the order the client sent them."
+          items:
+            $ref: "#/components/schemas/HttpConnectorApiCall"
+        authentication:
+          description: Authentication of every API call. Absent or null is NONE.
+          oneOf:
+          - $ref: "#/components/schemas/HttpConnectorNoAuthentication"
+          - $ref: "#/components/schemas/HttpConnectorBasicAuthentication"
+        baseUrl:
+          type: string
+          description: "API host: an http or https URL, which every API call path\
+            \ extends. Embedded credentials and a trailing '/' are removed; a query\
+            \ or fragment is rejected. Use authentication for credentials; any authentication\
+            \ other than NONE needs an https URL."
+          example: https://api.example.org/v1
+        connectorType:
+          type: string
+          enum:
+          - HTTP
+      required:
+      - connectorType
+    HttpConnectorApiCall:
+      type: object
+      description: A GET request against the API host.
+      properties:
+        headers:
+          type: array
+          description: "Request headers, sent as given. A name is a header token and\
+            \ not Authorization, Proxy-Authorization, Cookie, Connection, Content-Length,\
+            \ Expect, Host or Upgrade. A value holds only printable ISO-8859-1 characters,\
+            \ spaces and tabs. Values are stored and returned in clear text, so they\
+            \ must not hold secrets; use authentication for credentials."
+          items:
+            $ref: "#/components/schemas/HttpConnectorParameter"
+        method:
+          type: string
+          description: HTTP method. Always GET; ignored in a request.
+          enum:
+          - GET
+          example: GET
+          readOnly: true
+        name:
+          type: string
+          description: "Name of the API call, unique within the connector. A source\
+            \ node of a pipeline refers to the API call by this name, so a rename\
+            \ breaks that reference."
+          example: Get all weather stations
+        pagination:
+          description: Pagination of the API call. Absent or null is no pagination.
+          oneOf:
+          - $ref: "#/components/schemas/HttpConnectorPageNumberPagination"
+        path:
+          type: string
+          description: "Path of the API call below the API host. Starts with '/' and\
+            \ contains only letters, digits and '-', '_', '.', '~', ':', '/'."
+          example: /stations
+          pattern: "^/[A-Za-z0-9._~:/-]*$"
+        queryParameters:
+          type: array
+          description: "Query parameters. Name and value are plain text, sent as given\
+            \ and percent-encoded by the processor. Values are stored and returned\
+            \ in clear text, so they must not hold secrets."
+          items:
+            $ref: "#/components/schemas/HttpConnectorParameter"
+    HttpConnectorAuthentication:
+      type: object
+      discriminator:
+        mapping:
+          BASIC: "#/components/schemas/HttpConnectorBasicAuthentication"
+          NONE: "#/components/schemas/HttpConnectorNoAuthentication"
+        propertyName: type
+      properties:
+        type:
+          type: string
+    HttpConnectorBasicAuthentication:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorAuthentication"
+      - type: object
+        properties:
+          password:
+            type: string
+            format: password
+            description: Basic auth password. Responses show "********" for a stored
+              password.
+            example: secret
+            writeOnly: true
+          type:
+            type: string
+            enum:
+            - BASIC
+          username:
+            type: string
+            description: Basic auth username. Must not contain ':'.
+            example: reader
+            pattern: "^[^:]*$"
+      description: HTTP basic authentication.
+      required:
+      - type
+    HttpConnectorNoAuthentication:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorAuthentication"
+      - type: object
+        properties:
+          type:
+            type: string
+            enum:
+            - NONE
+      description: No authentication.
+      required:
+      - type
+    HttpConnectorPageNumberPagination:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorPagination"
+      - type: object
+        properties:
+          endPage:
+            type: integer
+            format: int32
+            description: "Last page number, at least startPage. Absent or null is\
+              \ no end page."
+            example: 10
+            minimum: 0
+          pageParameter:
+            type: string
+            description: Query parameter that carries the page number.
+            example: page
+          pageSize:
+            type: integer
+            format: int32
+            description: Number of records per page. At least 1.
+            example: 100
+            minimum: 1
+          pageSizeParameter:
+            type: string
+            description: Query parameter that carries the page size.
+            example: size
+          startPage:
+            type: integer
+            format: int32
+            default: 0
+            description: First page number. Absent or null is 0.
+            example: 0
+            minimum: 0
+          type:
+            type: string
+            enum:
+            - PAGE_NUMBER
+      description: "Page-number pagination, with page number and page size as query\
+        \ parameters."
+      required:
+      - type
+    HttpConnectorPagination:
+      type: object
+      discriminator:
+        mapping:
+          PAGE_NUMBER: "#/components/schemas/HttpConnectorPageNumberPagination"
+        propertyName: type
+      properties:
+        type:
+          type: string
+    HttpConnectorParameter:
+      type: object
+      description: A query parameter or a header.
+      properties:
+        name:
+          type: string
+          description: "Name, as plain text."
+          example: status
+        value:
+          type: string
+          description: "Value, as plain text. Can be empty."
+          example: active
     LayerInputDTO:
       type: object
       properties:

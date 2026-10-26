@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.service.connector.StoredConnectorUnreadableException;
+import de.civitascore.portal.util.ConnectionTestBusyException;
 import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
@@ -259,6 +260,22 @@ class GlobalExceptionHandlerTest {
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:FORBIDDEN");
       assertThat(problemDetail.getDetail()).isEqualTo("Cannot delete system role");
+      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+    }
+
+    @Test
+    @DisplayName("Should return 429 for a connection test that cannot start now")
+    void shouldReturn429ForBusyConnectionTest() {
+      ConnectionTestBusyException ex =
+          new ConnectionTestBusyException("A connection test of this user is still running");
+
+      ProblemDetail problemDetail = handler.handleConnectionTestBusy(ex, mockRequest());
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:TOO_MANY_REQUESTS");
+      assertThat(problemDetail.getTitle()).isEqualTo("Too Many Requests");
+      assertThat(problemDetail.getDetail())
+          .isEqualTo("A connection test of this user is still running");
       assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
     }
   }

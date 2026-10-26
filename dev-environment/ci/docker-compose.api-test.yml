@@ -604,6 +604,25 @@ services:
       retries: 10
       start_period: 60s
 
+  # Data source connection test: the config-adapter image with its own main class.
+  connection-tester:
+    image: ${CI_REGISTRY_IMAGE}/config-adapter:${IMAGE_TAG:-develop}
+    command: ["sh", "-c", "exec java $$JAVA_OPTS -cp /civitas/config-adapter.jar de.civitascore.configadapter.application.ConnectionTestApplication"]
+    environment:
+      HEALTHCHECK_PORT: 8087
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      # Must match portal-backend's civitas.master-key.
+      CIVITAS_MASTER_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/health/ready"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
   # ── OWS upstream stub: stands in for GeoServer so an OWS named-API route has a reachable upstream.
   # Echoes any request with 200, which is all the anonymous-OWS open-data e2e (9g4) needs to prove the
   # request traverses APISIX → OIDC → OPA → OWS upstream. Not a real GeoServer (none is provisioned by

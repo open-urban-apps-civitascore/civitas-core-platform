@@ -33,6 +33,7 @@
 		<module>config-adapter-nifi</module>
 		<module>config-adapter-flowable</module>
 		<module>config-adapter-postgis</module>
+		<module>config-adapter-connection-test</module>
 	</modules>
 
 	<properties>
@@ -70,6 +71,8 @@
 		<hikaricp.version>6.2.1</hikaricp.version>
 		<postgresql.version>42.7.13</postgresql.version>
 		<h2.version>2.4.240</h2.version>
+		<!-- MQTT client of the connection test -->
+		<hivemq-mqtt-client.version>1.4.1</hivemq-mqtt-client.version>
 		<cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
 	</properties>
 
@@ -216,6 +219,18 @@
 				<artifactId>postgresql</artifactId>
 				<version>${postgresql.version}</version>
 			</dependency>
+			<!-- MQTT client -->
+			<dependency>
+				<groupId>com.hivemq</groupId>
+				<artifactId>hivemq-mqtt-client</artifactId>
+				<version>${hivemq-mqtt-client.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.hivemq</groupId>
+				<artifactId>hivemq-mqtt-client-websocket</artifactId>
+				<version>${hivemq-mqtt-client.version}</version>
+				<type>pom</type>
+			</dependency>
 			<dependency>
 				<groupId>com.h2database</groupId>
 				<artifactId>h2</artifactId>
@@ -339,6 +354,7 @@
 						<ignoredUnusedDeclaredDependency>commons-beanutils:commons-beanutils</ignoredUnusedDeclaredDependency>
 						<ignoredUnusedDeclaredDependency>org.postgresql:postgresql</ignoredUnusedDeclaredDependency>
 						<ignoredUnusedDeclaredDependency>com.h2database:h2</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>com.hivemq:hivemq-mqtt-client-websocket</ignoredUnusedDeclaredDependency>
 					</ignoredUnusedDeclaredDependencies>
 					<!-- Required at runtime by the adapters' REST clients and JSON mapping;
 					     the analyzer sees direct imports only in test code. -->

@@ -407,7 +407,7 @@ api-test-backend:
       docker cp bruno-runner:/tests/bruno-output.txt bruno-results.txt || true
       # On bruno failure, dump service logs so we can diagnose 500s etc.
       if [ "$BRUNO_EXIT" != "0" ]; then
-        for svc in portal-backend config-adapter kafka apisix frost nifi wiremock; do
+        for svc in portal-backend config-adapter connection-tester kafka apisix frost nifi wiremock; do
           echo "=== $svc logs (last 300 lines) ==="
           docker compose -p api-test $COMPOSE_FILES logs --tail=300 --no-color "$svc" 2>&1 | tee "${svc}-logs.txt" || true
         done
@@ -422,6 +422,7 @@ api-test-backend:
       - bruno-results.txt
       - portal-backend-logs.txt
       - config-adapter-logs.txt
+      - connection-tester-logs.txt
       - kafka-logs.txt
       - apisix-logs.txt
       - frost-logs.txt

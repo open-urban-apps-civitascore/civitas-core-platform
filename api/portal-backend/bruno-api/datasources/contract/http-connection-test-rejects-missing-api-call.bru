@@ -1,0 +1,39 @@
+meta {
+  name: Contract HTTP — connection test rejects a missing apiCall
+  type: http
+  seq: 135
+}
+
+post {
+  url: {{baseUrl}}/datasources/connection-test
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "connector": {
+      "connectorType": "HTTP",
+      "baseUrl": "https://api.invalid/v1",
+      "apiCalls": [{ "name": "Get all weather stations", "path": "/stations" }]
+    }
+  }
+}
+
+tests {
+  test("Status is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Error body names apiCall", function() {
+    expect(res.body.type).to.equal("urn:civitas:error:VALIDATION_FAILED");
+    expect(res.body.fieldErrors).to.deep.equal([
+      { field: "apiCall", message: "'apiCall' is required for an HTTP connector" }
+    ]);
+  });
+}
+
+docs {
+  A test runs one of the connector's API calls, so the request must name
+  it.
+}

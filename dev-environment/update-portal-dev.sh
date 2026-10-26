@@ -15,7 +15,8 @@
 #                       JAR first (containerized Maven, same .m2 volume as the
 #                       start script) — model-forge included, so its artifacts are
 #                       in the cache — then rebuild the image.
-#   - config-adapter  : same as the backend (pre-built fat JAR via -Pdist).
+#   - config-adapter  : same as the backend (pre-built fat JAR via -Pdist); also recreates the
+#                       connection tester.
 #
 # In every case the container is recreated with --force-recreate, because a
 # plain `docker compose up -d` keeps the old container when the image tag is
@@ -71,7 +72,7 @@ all three are rebuilt.
 Components:
   -f, --frontend         portal-frontend
   -b, --backend          portal-backend (rebuilds model-forge too)
-  -c, --config-adapter   config-adapter
+  -c, --config-adapter   config-adapter and the connection tester
   -a, --all              all three (explicit)
 
 Options:
@@ -186,6 +187,8 @@ if [ "$DO_CONFIG" = "true" ]; then
     echo "  Building config-adapter JAR (containerized Maven)..."
     mvn_in_container "$PROJECT_ROOT/config-adapter" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -Pdist -q
     rebuild_image_and_recreate config-adapter civitas-config-adapter
+    # The connection test runs from the same JAR in a container of its own.
+    rebuild_image_and_recreate connection-tester civitas-connection-tester
     echo
 fi
 
