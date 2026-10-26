@@ -275,22 +275,32 @@ class HttpConnectorRulesTest {
   }
 
   @Test
-  void validate_withLimitOffsetWithoutAnyField_reportsThePaginationOnlyAtRelease() {
+  void validate_withLimitWithoutItsParameter_reportsTheMissingOneOnlyAtRelease() {
     HttpConnectorConfiguration connector =
         new HttpConnectorConfiguration(
             "https://api.example.org",
             null,
             List.of(
-                sending(null, null, new LimitOffset(null, null, null, null, null)),
-                sending(null, null, new LimitOffset(null, null, null, 0, null))));
+                sending(null, null, new LimitOffset("limit", "offset", null, null, null)),
+                sending(null, null, new LimitOffset(null, "offset", 20, null, null)),
+                sending(null, null, new Cursor("$.c", "c", ParameterLocation.QUERY, "limit", null)),
+                sending(null, null, new Cursor("$.c", "c", ParameterLocation.QUERY, null, 20)),
+                sending(null, null, new LimitOffset(null, "offset", null, null, null)),
+                sending(null, null, new Cursor("$.c", "c", ParameterLocation.QUERY, null, null))));
 
     assertThat(rules.validate(connector, ConnectorValidator.Stage.DRAFT)).isEmpty();
     assertThat(rules.validate(connector, ConnectorValidator.Stage.RELEASE))
         .containsExactly(
             ConnectorViolation.at(
-                "apiCalls[0].pagination",
-                "A limit/offset pagination needs at least one field; without one, disable the"
-                    + " pagination"));
+                "apiCalls[0].pagination.limit", "'limit' is required with 'limitParameter'"),
+            ConnectorViolation.at(
+                "apiCalls[1].pagination.limitParameter",
+                "'limitParameter' is required with 'limit'"),
+            ConnectorViolation.at(
+                "apiCalls[2].pagination.limit", "'limit' is required with 'limitParameter'"),
+            ConnectorViolation.at(
+                "apiCalls[3].pagination.limitParameter",
+                "'limitParameter' is required with 'limit'"));
   }
 
   @Test

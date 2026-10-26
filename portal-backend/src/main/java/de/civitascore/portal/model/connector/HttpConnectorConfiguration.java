@@ -442,16 +442,27 @@ public record HttpConnectorConfiguration(
   @Schema(
       name = "HttpConnectorLimitOffsetPagination",
       description =
-          "Limit/offset pagination, with limit and offset as query parameters. Every field is"
-              + " optional, but a release needs at least one.")
+          "Limit/offset pagination, with limit and offset as query parameters. Without a limit,"
+              + " the API pages by its default page size, and the offset grows by the number of"
+              + " records of each response.")
   public record LimitOffset(
-      @Schema(description = "Query parameter that carries the limit.", example = "limit")
+      @Schema(
+              description =
+                  "Query parameter that carries the limit. Required with limit; absent or null"
+                      + " sends no limit.",
+              example = "limit")
           String limitParameter,
       @Schema(description = "Query parameter that carries the offset.", example = "offset")
-          String offsetParameter,
-      @Schema(description = "Number of records per request. At least 1.", example = "100")
+          @NotNull(groups = OnRelease.class, message = "'offsetParameter' is required") String offsetParameter,
+      @Schema(
+              description =
+                  "Number of records per request. At least 1. Required with limitParameter.",
+              example = "100")
           @Min(value = 1, message = "'limit' must be at least 1") Integer limit,
-      @Schema(description = "Offset of the first request. At least 0.", example = "0")
+      @Schema(
+              description = "Offset of the first request. At least 0. Absent or null is 0.",
+              defaultValue = "0",
+              example = "0")
           @Min(value = 0, message = "'offset' must be at least 0") Integer offset,
       @Schema(
               description =
@@ -462,10 +473,12 @@ public record HttpConnectorConfiguration(
           @Pattern(regexp = JSON_PATH, message = "'countPath'" + JSON_PATH_MESSAGE) String countPath)
       implements Pagination {
     static final String TYPE = "LIMIT_OFFSET";
+    private static final int DEFAULT_OFFSET = 0;
 
     public LimitOffset {
       limitParameter = ConnectorValues.blankToNull(limitParameter);
       offsetParameter = ConnectorValues.blankToNull(offsetParameter);
+      offset = offset == null ? DEFAULT_OFFSET : offset;
       countPath = ConnectorValues.blankToNull(countPath);
     }
 
@@ -499,10 +512,17 @@ public record HttpConnectorConfiguration(
           @NotNull(groups = OnRelease.class, message = "'cursorParameter' is required") String cursorParameter,
       @Schema(description = "Where each request sends the cursor.", example = "QUERY")
           @NotNull(groups = OnRelease.class, message = "'cursorIn' is required") ParameterLocation cursorIn,
-      @Schema(description = "Query parameter that carries the limit.", example = "limit")
-          @NotNull(groups = OnRelease.class, message = "'limitParameter' is required") String limitParameter,
-      @Schema(description = "Number of records per request. At least 1.", example = "100")
-          @NotNull(groups = OnRelease.class, message = "'limit' is required") @Min(value = 1, message = "'limit' must be at least 1") Integer limit)
+      @Schema(
+              description =
+                  "Query parameter that carries the limit. Required with limit; absent or null"
+                      + " sends no limit.",
+              example = "limit")
+          String limitParameter,
+      @Schema(
+              description =
+                  "Number of records per request. At least 1. Required with limitParameter.",
+              example = "100")
+          @Min(value = 1, message = "'limit' must be at least 1") Integer limit)
       implements Pagination {
     static final String TYPE = "CURSOR";
 

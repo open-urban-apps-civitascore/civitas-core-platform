@@ -183,7 +183,7 @@ class ConnectorValidatorTest {
   }
 
   @Test
-  void validate_httpPaginationsAtRelease_reportsEachMissingCursorValueAndNoLimitOffsetValue() {
+  void validate_httpPaginationsAtRelease_reportsEachMissingRequiredValue() {
     HttpConnectorConfiguration connector =
         new HttpConnectorConfiguration(
             "https://api.example.org",
@@ -198,8 +198,7 @@ class ConnectorValidatorTest {
             "connector.apiCalls[0].pagination.cursorIn",
             "connector.apiCalls[0].pagination.cursorParameter",
             "connector.apiCalls[0].pagination.cursorPath",
-            "connector.apiCalls[0].pagination.limit",
-            "connector.apiCalls[0].pagination.limitParameter");
+            "connector.apiCalls[1].pagination.offsetParameter");
   }
 
   @Test

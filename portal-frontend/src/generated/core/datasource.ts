@@ -196,13 +196,13 @@ export const HttpPageNumberPaginationSchema = z
 export const HttpLimitOffsetPaginationSchema = z
   .object({
     type: z.literal('LIMIT_OFFSET'),
-    /** Query parameter that carries the limit. */
+    /** Query parameter that carries the limit; set together with 'limit'. Null sends no limit, so the offset grows by the number of records of each response. */
     limitParameter: z.union([z.string(), z.null()]).optional(),
     /** Query parameter that carries the offset. */
     offsetParameter: z.union([z.string(), z.null()]).optional(),
-    /** Number of records per request. */
+    /** Number of records per request; set together with 'limitParameter'. */
     limit: z.union([z.number().int(), z.null()]).optional(),
-    /** Offset of the first request. */
+    /** Offset of the first request; null is 0. */
     offset: z.union([z.number().int(), z.null()]).optional(),
     /** JSON path in the response to the number of records, or to an array whose length is that number; null counts the elements of the response, which is then an array. */
     countPath: z.union([z.string(), z.null()]).optional(),
@@ -218,9 +218,9 @@ export const HttpCursorPaginationSchema = z
     cursorParameter: z.union([z.string(), z.null()]).optional(),
     /** Where each request sends the cursor. */
     cursorIn: z.union([z.literal('QUERY'), z.literal('HEADER'), z.null()]).optional(),
-    /** Query parameter that carries the limit. */
+    /** Query parameter that carries the limit; set together with 'limit'. Null sends no limit. */
     limitParameter: z.union([z.string(), z.null()]).optional(),
-    /** Number of records per request. */
+    /** Number of records per request; set together with 'limitParameter'. */
     limit: z.union([z.number().int(), z.null()]).optional(),
   })
   .strict()

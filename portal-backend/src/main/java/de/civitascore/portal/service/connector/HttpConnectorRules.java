@@ -155,23 +155,29 @@ public class HttpConnectorRules implements ConnectorRules {
           violations.add(
               ConnectorViolation.at(
                   paginationPath + ".endPage", "'endPage' must be at least 'startPage'"));
-      case LimitOffset limitOffset
-          when stage == ConnectorValidator.Stage.RELEASE && isEmpty(limitOffset) ->
-          violations.add(
-              ConnectorViolation.at(
-                  paginationPath,
-                  "A limit/offset pagination needs at least one field; without one, disable the"
-                      + " pagination"));
+      case LimitOffset limitOffset when stage == ConnectorValidator.Stage.RELEASE ->
+          addLimitViolations(
+              limitOffset.limitParameter(), limitOffset.limit(), paginationPath, violations);
+      case Cursor cursor when stage == ConnectorValidator.Stage.RELEASE ->
+          addLimitViolations(cursor.limitParameter(), cursor.limit(), paginationPath, violations);
       default -> {}
     }
   }
 
-  private static boolean isEmpty(LimitOffset limitOffset) {
-    return limitOffset.limitParameter() == null
-        && limitOffset.offsetParameter() == null
-        && limitOffset.limit() == null
-        && limitOffset.offset() == null
-        && limitOffset.countPath() == null;
+  private static void addLimitViolations(
+      String limitParameter,
+      Integer limit,
+      String paginationPath,
+      List<ConnectorViolation> violations) {
+    if (limitParameter != null && limit == null) {
+      violations.add(
+          ConnectorViolation.at(
+              paginationPath + ".limit", "'limit' is required with 'limitParameter'"));
+    } else if (limitParameter == null && limit != null) {
+      violations.add(
+          ConnectorViolation.at(
+              paginationPath + ".limitParameter", "'limitParameter' is required with 'limit'"));
+    }
   }
 
   private static void addApiTokenViolations(

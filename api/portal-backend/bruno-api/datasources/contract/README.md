@@ -112,7 +112,7 @@ Range checks such as MQTT `qos` run on every write
 | `sql-sslmode-roundtrip-*` | `sslmode` survives the credential stripping of the DSN |
 | `sql-unknown-fields-rejected`, `mqtt-unknown-nested-key-rejected`, `http-unknown-nested-key-rejected` | Unknown keys are rejected |
 | `sql-validation-*`, `mqtt-validation-*`, `http-validation-*` | Error responses for an unreadable or invalid connector |
-| `http-release-rejects-invalid-configuration-*` | Release names each missing field of the authentication and of an API call by its path, and a limit/offset pagination without any field |
+| `http-release-rejects-invalid-configuration-*` | Release names each missing field of the authentication and of an API call by its path, and a limit without its parameter |
 | `sql-connection-test-answers`, `mqtt-connection-test-answers`, `http-connection-test-answers` | A connection test of unsaved values with a `.invalid` host answers `SOURCE_ERROR` |
 | `sql-connection-test-rejects-*`, `http-connection-test-rejects-*` | A connection test rejects incomplete values, a placeholder of unsaved values and a missing `apiCall` before it runs |
 | `sql-connection-test-saved-masked-password-*` | A connection test of a saved data source keeps the stored password for `"********"` |

@@ -245,10 +245,10 @@
       "required": ["type"],
       "properties": {
         "type":            { "const": "LIMIT_OFFSET" },
-        "limitParameter":  { "type": ["string", "null"], "description": "Query parameter that carries the limit." },
+        "limitParameter":  { "type": ["string", "null"], "description": "Query parameter that carries the limit; set together with 'limit'. Null sends no limit, so the offset grows by the number of records of each response." },
         "offsetParameter": { "type": ["string", "null"], "description": "Query parameter that carries the offset." },
-        "limit":           { "type": ["integer", "null"], "description": "Number of records per request." },
-        "offset":          { "type": ["integer", "null"], "description": "Offset of the first request." },
+        "limit":           { "type": ["integer", "null"], "description": "Number of records per request; set together with 'limitParameter'." },
+        "offset":          { "type": ["integer", "null"], "description": "Offset of the first request; null is 0." },
         "countPath":       { "type": ["string", "null"], "description": "JSON path in the response to the number of records, or to an array whose length is that number; null counts the elements of the response, which is then an array." }
       }
     },
@@ -261,8 +261,8 @@
         "cursorPath":      { "type": ["string", "null"], "description": "JSON path in the response to the cursor of the next request." },
         "cursorParameter": { "type": ["string", "null"], "description": "Name of the query parameter or header that carries the cursor." },
         "cursorIn":        { "enum": ["QUERY", "HEADER", null], "description": "Where each request sends the cursor." },
-        "limitParameter":  { "type": ["string", "null"], "description": "Query parameter that carries the limit." },
-        "limit":           { "type": ["integer", "null"], "description": "Number of records per request." }
+        "limitParameter":  { "type": ["string", "null"], "description": "Query parameter that carries the limit; set together with 'limit'. Null sends no limit." },
+        "limit":           { "type": ["integer", "null"], "description": "Number of records per request; set together with 'limitParameter'." }
       }
     }
   }

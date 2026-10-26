@@ -27,15 +27,14 @@ tests {
       "connector.apiCalls[0].path",
       "connector.apiCalls[0].pagination.pageSizeParameter",
       "connector.apiCalls[0].pagination.pageSize",
-      "connector.apiCalls[1].pagination",
+      "connector.apiCalls[1].pagination.offsetParameter",
       "connector.apiCalls[2].pagination.cursorParameter",
-      "connector.apiCalls[2].pagination.limitParameter",
-      "connector.apiCalls[2].pagination.limit"
+      "connector.apiCalls[2].pagination.limitParameter"
     ]);
   });
-  test("A limit/offset pagination without any field points to disabling the pagination", function() {
-    const error = res.body.fieldErrors.find(function(e) { return e.field === "connector.apiCalls[1].pagination"; });
-    expect(error.message).to.equal("A limit/offset pagination needs at least one field; without one, disable the pagination");
+  test("A limit without its parameter names the missing parameter", function() {
+    const error = res.body.fieldErrors.find(function(e) { return e.field === "connector.apiCalls[2].pagination.limitParameter"; });
+    expect(error.message).to.equal("'limitParameter' is required with 'limit'");
   });
 }
 

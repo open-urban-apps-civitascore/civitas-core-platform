@@ -685,10 +685,12 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
         value = {
           "{'type':'LIMIT_OFFSET','limitParameter':'limit','offsetParameter':'offset',"
               + "'limit':20,'offset':40,'countPath':'$.meta.count'}",
-          "{'type':'LIMIT_OFFSET','limitParameter':null,'offsetParameter':null,"
-              + "'limit':null,'offset':null,'countPath':'$.items'}",
+          "{'type':'LIMIT_OFFSET','limitParameter':null,'offsetParameter':'offset',"
+              + "'limit':null,'offset':0,'countPath':'$.items'}",
           "{'type':'CURSOR','cursorPath':'$.next_cursor','cursorParameter':'X-Cursor',"
-              + "'cursorIn':'HEADER','limitParameter':'limit','limit':20}"
+              + "'cursorIn':'HEADER','limitParameter':'limit','limit':20}",
+          "{'type':'CURSOR','cursorPath':'$.next_cursor','cursorParameter':'cursor',"
+              + "'cursorIn':'QUERY','limitParameter':null,'limit':null}"
         })
     @DisplayName("creates, reads, updates and releases each pagination")
     void eachPaginationIsStoredAndReleased(String pagination) throws Exception {
@@ -828,7 +830,9 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
               + "'cursorParameter':'c','cursorIn':'QUERY','limitParameter':'l'}}]"
               + " | connector.apiCalls[0].pagination.limit",
           "'apiCalls':[{'name':'a','path':'/x','pagination':{'type':'LIMIT_OFFSET'}}]"
-              + " | connector.apiCalls[0].pagination"
+              + " | connector.apiCalls[0].pagination.offsetParameter",
+          "'apiCalls':[{'name':'a','path':'/x','pagination':{'type':'LIMIT_OFFSET',"
+              + "'offsetParameter':'o','limit':20}}] | connector.apiCalls[0].pagination.limitParameter"
         })
     @DisplayName("rejects a release of an incomplete configuration, with the key path of the field")
     void releaseWithIncompleteConfigurationNamesTheField(String member, String field)
