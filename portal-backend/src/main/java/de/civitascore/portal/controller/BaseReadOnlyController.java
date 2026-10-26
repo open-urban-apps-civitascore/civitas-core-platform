@@ -6,16 +6,10 @@ import de.civitascore.portal.model.output.BaseOutputDTO;
 import de.civitascore.portal.model.output.assembler.BaseAssembler;
 import de.civitascore.portal.repository.specification.base.BaseSpec;
 import de.civitascore.portal.service.BaseService;
-import de.civitascore.portal.util.InvalidInputException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.experimental.FieldDefaults;
 import org.springdoc.core.annotations.ParameterObject;
@@ -30,9 +24,6 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
-import org.springframework.web.servlet.HandlerMapping;
 
 /**
  * Abstract base controller exposing only GET (read) operations. Subclasses that require write
@@ -86,45 +77,5 @@ public abstract class BaseReadOnlyController<
     E entity = getService().findByIdOrThrow(id);
     O output = getAssembler().toOutput(entity);
     return ResponseEntity.ok(output);
-  }
-
-  protected Map<String, String> extractPathVariables() {
-    ServletRequestAttributes attributes =
-        (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-
-    if (Objects.isNull(attributes)) {
-      return Map.of();
-    }
-
-    @SuppressWarnings("unchecked")
-    Map<String, String> pathVariables =
-        (Map<String, String>)
-            attributes.getRequest().getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
-    return Objects.nonNull(pathVariables) ? pathVariables : Map.of();
-  }
-
-  protected UUID extractUUIDFromPathVariable(
-      @NotBlank String parameterName, @NotNull Class<E> clazz) {
-    String rawId =
-        Optional.ofNullable(extractPathVariables().get(parameterName))
-            .orElseThrow(
-                () ->
-                    new InvalidInputException(
-                        clazz.getSimpleName(),
-                        parameterName,
-                        String.format("Missing or invalid %s in path variables", parameterName)));
-
-    try {
-      return UUID.fromString(rawId);
-    } catch (IllegalArgumentException ex) {
-      throw new InvalidInputException(
-          clazz.getSimpleName(),
-          parameterName,
-          String.format("Missing or invalid %s in path variables", parameterName));
-    }
-  }
-
-  protected I preProcessInput(I input) {
-    return input;
   }
 }

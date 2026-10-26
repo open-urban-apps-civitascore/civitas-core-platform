@@ -10,18 +10,12 @@ import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
-import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.security.OAuthFlow;
 import io.swagger.v3.oas.models.security.OAuthFlows;
 import io.swagger.v3.oas.models.security.Scopes;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -232,59 +226,6 @@ public class OpenApiConfig {
   public OpenApiCustomizer relativeServerUrlCustomizer() {
     return openApi ->
         openApi.setServers(List.of(new io.swagger.v3.oas.models.servers.Server().url("/v1")));
-  }
-
-  /**
-   * Ensures all path parameters referenced in URL templates are declared as {@code @Parameter} on
-   * the operation. Adds missing path parameters with UUID schema so the generated spec is valid.
-   */
-  @Bean
-  public OpenApiCustomizer missingPathParameterCustomizer() {
-    Pattern pathParamPattern = Pattern.compile("\\{([^}]+)}");
-    return openApi ->
-        openApi
-            .getPaths()
-            .forEach(
-                (path, pathItem) -> {
-                  Matcher matcher = pathParamPattern.matcher(path);
-                  List<String> pathParams = new ArrayList<>();
-                  while (matcher.find()) {
-                    pathParams.add(matcher.group(1));
-                  }
-                  if (pathParams.isEmpty()) {
-                    return;
-                  }
-                  pathItem
-                      .readOperations()
-                      .forEach(
-                          operation -> {
-                            Set<String> declared =
-                                operation.getParameters() == null
-                                    ? Set.of()
-                                    : operation.getParameters().stream()
-                                        .filter(p -> "path".equals(p.getIn()))
-                                        .map(Parameter::getName)
-                                        .collect(Collectors.toSet());
-                            for (String param : pathParams) {
-                              if (!declared.contains(param)) {
-                                if (operation.getParameters() == null) {
-                                  operation.setParameters(new ArrayList<>());
-                                }
-                                operation
-                                    .getParameters()
-                                    .add(
-                                        new Parameter()
-                                            .name(param)
-                                            .in("path")
-                                            .required(true)
-                                            .schema(
-                                                new Schema<>()
-                                                    .types(Set.of("string"))
-                                                    .format("uuid")));
-                              }
-                            }
-                          });
-                });
   }
 
   /**

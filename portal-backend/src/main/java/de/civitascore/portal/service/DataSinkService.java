@@ -484,11 +484,11 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
    * <p>The sink's {@code element} is a versioned CORE {@code :element:} or {@code :datastructure:}
    * URN (the mapping's target structure). Its UUID is the id of the owning portal DataStructure,
    * which must hold at least one version. The DataStructure is DATASTRUCTURE-scoped, which the
-   * DATASET-typed route header cannot cover — so DataSinkService authorizes the reference here
-   * (DataSinkController is a plain BaseController with no scope filtering of its own). A URN that
-   * resolves to no known DataStructure and an unauthorized one must yield the SAME outward failure,
-   * otherwise the difference is an existence oracle over structure URNs; both raise the identical
-   * "not available" 400 and the real denial is logged by {@link ScopeAccessAuthorizer} for audit.
+   * DATASET-typed route header cannot cover — so DataSinkService authorizes the reference here,
+   * because DataSinkController applies no scope filter. A URN that resolves to no known
+   * DataStructure and an unauthorized one must yield the SAME outward failure, otherwise the
+   * difference is an existence oracle over structure URNs; both raise the identical "not available"
+   * 400 and the real denial is logged by {@link ScopeAccessAuthorizer} for audit.
    */
   private void authorizeReferencedStructure(String elementUrn) {
     UUID dataStructureId =

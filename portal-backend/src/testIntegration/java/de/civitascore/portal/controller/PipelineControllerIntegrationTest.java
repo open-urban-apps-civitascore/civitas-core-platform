@@ -929,9 +929,8 @@ class PipelineControllerIntegrationTest
           .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
-    // Without these three, nothing would catch the removal of the path-injection in
-    // DataSetSubEntityController.preProcessInput, the only mechanism keeping a
-    // sub-entity in its path dataset since the per-service guards were consolidated.
+    // Without these three, nothing would catch a handler that stores a pipeline in the dataset
+    // named in the body instead of the one in the path.
     @Test
     @DisplayName("Should ignore a foreign dataSetId in the create body and use the path dataset")
     void shouldIgnoreForeignDataSetIdOnCreate() {

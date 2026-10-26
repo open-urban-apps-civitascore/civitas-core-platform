@@ -180,10 +180,7 @@ class DataSinkControllerIntegrationTest
               createAuthHeaders(),
               null);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDetail())
-          .isEqualTo("Missing or invalid dataSetId in path variables");
+      assertRejected(response, HttpStatus.BAD_REQUEST, "urn:civitas:error:INVALID_INPUT");
     }
 
     @Test
@@ -859,10 +856,7 @@ class DataSinkControllerIntegrationTest
               createAuthHeaders(),
               patchMap);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDetail())
-          .isEqualTo("Missing or invalid dataSetId in path variables");
+      assertRejected(response, HttpStatus.BAD_REQUEST, "urn:civitas:error:INVALID_INPUT");
     }
 
     @Test

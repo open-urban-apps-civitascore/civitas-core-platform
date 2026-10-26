@@ -63,8 +63,7 @@ public abstract class BaseController<
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   public ResponseEntity<O> create(@Valid @RequestBody I input) {
-    I preProcessedInput = preProcessInput(input);
-    E created = getService().create(preProcessedInput);
+    E created = getService().create(input);
     O output = getAssembler().toOutput(created);
     return ResponseEntity.created(Locations.ofCreated(getAssembler().getIdFromOutput(output)))
         .body(output);
@@ -95,8 +94,7 @@ public abstract class BaseController<
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @PutMapping("/{id}")
   public ResponseEntity<O> update(@PathVariable UUID id, @Valid @RequestBody I input) {
-    I preProcessedInput = preProcessInput(input);
-    E updated = getService().update(id, preProcessedInput);
+    E updated = getService().update(id, input);
     O output = getAssembler().toOutput(updated);
     return ResponseEntity.ok(output);
   }
@@ -129,7 +127,6 @@ public abstract class BaseController<
     E current = getService().findByIdOrThrow(id);
     I currentDto = getAssembler().toInput(current);
     I patchedDto = patchInput(currentDto, current, updates);
-    patchedDto = preProcessInput(patchedDto);
     E updated = getService().update(id, patchedDto);
     O output = getAssembler().toOutput(updated);
     return ResponseEntity.ok(output);
