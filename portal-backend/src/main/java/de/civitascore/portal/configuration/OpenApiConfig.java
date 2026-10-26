@@ -467,7 +467,7 @@ public class OpenApiConfig {
   /**
    * Adds realistic ProblemDetail examples (RFC 9457) with actual {@code urn:civitas:error:*} type
    * URNs to all error responses. Shared responses (401, 403, 500) get examples on the component
-   * definition; inline responses (400, 404, 409) get examples per-operation.
+   * definition; inline responses (400, 404, 409, 422, 429) get examples per-operation.
    */
   @Bean
   @Order(3)
@@ -608,6 +608,36 @@ public class OpenApiConfig {
                   problemExample(
                       ProblemType.FOREIGN_KEY_VIOLATION,
                       "Referenced entity does not exist",
+                      path)));
+      case "422" ->
+          problemExamples(
+              orderedMap(
+                  "datasource_scope_violation",
+                  problemExample(
+                      ProblemType.DATASOURCE_SCOPE_VIOLATION,
+                      "One or more DataSources are not permitted for the Dataset's DataPool"
+                          + " scope. Widen the datapool scope of the offending DataSources"
+                          + " [550e8400-e29b-41d4-a716-446655440000] or move the Dataset to a"
+                          + " datapool they are scoped for.",
+                      path,
+                      "offendingDataSourceIds",
+                      List.of("550e8400-e29b-41d4-a716-446655440000")),
+                  "pipeline_closure_invalid",
+                  problemExample(
+                      ProblemType.PIPELINE_CLOSURE_INVALID,
+                      "One or more Pipelines reach an artifact that cannot carry a release. Each"
+                          + " artifact a Pipeline reaches must exist, be readable, and be"
+                          + " released: [550e8400-e29b-41d4-a716-446655440000]",
+                      path,
+                      "offendingPipelineIds",
+                      List.of("550e8400-e29b-41d4-a716-446655440000"))));
+      case "429" ->
+          problemExamples(
+              orderedMap(
+                  "too_many_requests",
+                  problemExample(
+                      ProblemType.TOO_MANY_REQUESTS,
+                      "A connection test of this user is still running",
                       path)));
       default -> null;
     };
