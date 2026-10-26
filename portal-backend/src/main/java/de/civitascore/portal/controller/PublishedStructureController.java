@@ -4,13 +4,15 @@ import de.civitascore.portal.frost.PortStructureCatalog;
 import de.civitascore.portal.frost.PortStructureModel.PortStructure;
 import de.civitascore.portal.frost.PortStructures;
 import de.civitascore.portal.model.entity.PublishedStructure;
+import de.civitascore.portal.problem.ProblemType;
+import de.civitascore.portal.problem.Problems;
 import de.civitascore.portal.repository.PublishedStructureRepository;
+import de.civitascore.portal.util.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -52,25 +54,20 @@ public class PublishedStructureController {
   public record PublishingSinkOutput(String sink, List<PublishedStructureOutput> structures) {}
 
   @GetMapping
-  @Operation(
-      operationId = "listPublishedStructures",
-      summary = "List the sinks that publish data structures, with their structures")
-  public ResponseEntity<List<PublishingSinkOutput>> list() {
+  @Operation(summary = "List the sinks that publish data structures, with their structures")
+  public List<PublishingSinkOutput> listPublishedStructures() {
     List<PublishedStructureOutput> structures =
         PortStructureCatalog.all().stream().map(this::toOutput).toList();
-    return ResponseEntity.ok(
-        List.of(new PublishingSinkOutput(PortStructureCatalog.SINK, structures)));
+    return List.of(new PublishingSinkOutput(PortStructureCatalog.SINK, structures));
   }
 
-  @GetMapping("/{key}")
-  @Operation(
-      operationId = "getPublishedStructure",
-      summary = "Get the model document of a published data structure")
-  public ResponseEntity<Map<String, Object>> structure(@PathVariable String key) {
+  @GetMapping("/{structureKey}")
+  @Operation(summary = "Get the model document of a published data structure")
+  @Problems(ProblemType.NOT_FOUND)
+  public Map<String, Object> getPublishedStructure(@PathVariable String structureKey) {
     return portStructures
-        .model(key)
-        .map(ResponseEntity::ok)
-        .orElseGet(() -> ResponseEntity.notFound().build());
+        .model(structureKey)
+        .orElseThrow(() -> new ResourceNotFoundException("Published structure"));
   }
 
   private PublishedStructureOutput toOutput(PortStructure structure) {
