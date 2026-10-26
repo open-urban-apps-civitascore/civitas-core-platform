@@ -48,6 +48,28 @@ user_context := user_context_fetcher.fetch_context(input.context.identity.user) 
 	user_context_fetcher.fetch_context(input.context.identity.user).userId != null
 }
 
+# The config-adapter must find a newly provisioned PostGIS table before the
+# dataset has end-user DATASET_PAYLOAD_READ assignments. Keep this exception
+# limited to the internal Superset automation identity.
+default local_admin_user := "civitas-config-adapter"
+
+local_admin_user := data.config.trino_local_admin_user if {
+	data.config.trino_local_admin_user
+}
+
+is_local_admin if {
+	local_admin_user != ""
+	input.context.identity.user == local_admin_user
+}
+
+_geodata_metadata_bypass if {
+	_allow_all
+}
+
+_geodata_metadata_bypass if {
+	is_local_admin
+}
+
 # Deliberately excludes scopeType == null (a SYSTEM role assignment, e.g. Tenant Admin) — same
 # reasoning as trino.rego's has_tenant_permission.
 has_tenant_permission(permission) if {
@@ -227,33 +249,33 @@ result := [{"expression": "table_catalog = 'sensordata' AND table_schema = 'fros
 }
 
 result := [{"expression": "true"}] if {
-	_allow_all
+	_geodata_metadata_bypass
 	_is_geodata_schema_listing
 }
 
 result := [{"expression": "true"}] if {
-	_allow_all
+	_geodata_metadata_bypass
 	_is_geodata_table_listing
 }
 
 result := [{"expression": "true"}] if {
-	_allow_all
+	_geodata_metadata_bypass
 	_is_geodata_column_listing
 }
 
 result := [{"expression": _geodata_schema_listing_filter}] if {
 	_is_geodata_schema_listing
-	not _allow_all
+	not _geodata_metadata_bypass
 }
 
 result := [{"expression": _geodata_table_listing_filter}] if {
 	_is_geodata_table_listing
-	not _allow_all
+	not _geodata_metadata_bypass
 }
 
 result := [{"expression": _geodata_table_listing_filter}] if {
 	_is_geodata_column_listing
-	not _allow_all
+	not _geodata_metadata_bypass
 }
 
 result := [{"expression": "true"}] if {

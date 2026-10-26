@@ -1026,7 +1026,7 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ] || [ "$STAR
     # requests while Flowable and its Kafka consumers are still initializing.
     if [ "$config_adapter_option" = "1" ] && [ "$backend_option" = "1" ]; then
         echo "Starting Config Adapter before Portal Backend..."
-        $DOCKER_COMPOSE --env-file "$SCRIPT_DIR/geoserver/.env" up -d $COMPOSE_BUILD config-adapter
+        $DOCKER_COMPOSE --env-file "$SCRIPT_DIR/trino-superset/.env" --env-file "$SCRIPT_DIR/geoserver/.env" up -d $COMPOSE_BUILD config-adapter
 
         CONFIG_ADAPTER_READY=false
         for i in $(seq 1 90); do
@@ -1045,7 +1045,7 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ] || [ "$STAR
         echo "  Config Adapter is ready for Portal Backend initialization"
     fi
 
-    $DOCKER_COMPOSE --env-file "$SCRIPT_DIR/geoserver/.env" up -d $COMPOSE_BUILD $COMPOSE_SERVICES
+    $DOCKER_COMPOSE --env-file "$SCRIPT_DIR/trino-superset/.env" --env-file "$SCRIPT_DIR/geoserver/.env" up -d $COMPOSE_BUILD $COMPOSE_SERVICES
     echo "  Application containers started: $COMPOSE_SERVICES"
     echo
 fi

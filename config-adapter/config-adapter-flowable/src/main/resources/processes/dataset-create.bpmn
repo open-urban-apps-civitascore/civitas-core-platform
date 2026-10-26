@@ -222,16 +222,22 @@
         <flowable:field xsi:type="xs:anyType" name="resultType" stringValue="success"/>
       </extensionElements>
       <incoming>flow-superset-success</incoming>
+      <incoming>flow-dashboard-skip</incoming>
       <outgoing>flow-publish-success-end</outgoing>
     </serviceTask>
+    <exclusiveGateway id="dashboard-gateway" name="Has Dashboard?" default="flow-dashboard-skip">
+      <incoming>flow-prune-skip</incoming>
+      <incoming>flow-prune-success</incoming>
+      <outgoing>flow-dashboard-register</outgoing>
+      <outgoing>flow-dashboard-skip</outgoing>
+    </exclusiveGateway>
     <serviceTask id="register-superset" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Register Superset Dataset">
       <extensionElements>
         <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="superset"/>
         <flowable:field xsi:type="xs:anyType" name="operation" stringValue="REGISTER_DATASET"/>
         <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="register-superset"/>
       </extensionElements>
-      <incoming>flow-prune-skip</incoming>
-      <incoming>flow-prune-success</incoming>
+      <incoming>flow-dashboard-register</incoming>
       <outgoing>flow-superset-success</outgoing>
     </serviceTask>
     <boundaryEvent id="superset-error" name="Step Failed" attachedToRef="register-superset">
@@ -280,8 +286,12 @@
     <sequenceFlow id="flow-prune-featuretypes" name="yes" sourceRef="prune-gateway" targetRef="prune-featuretypes">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_7">${execution.getVariable('hasGeoSink') == true}</conditionExpression>
     </sequenceFlow>
-    <sequenceFlow id="flow-prune-skip" name="no" sourceRef="prune-gateway" targetRef="register-superset"/>
-    <sequenceFlow id="flow-prune-success" sourceRef="prune-featuretypes" targetRef="register-superset"/>
+    <sequenceFlow id="flow-prune-skip" name="no" sourceRef="prune-gateway" targetRef="dashboard-gateway"/>
+    <sequenceFlow id="flow-prune-success" sourceRef="prune-featuretypes" targetRef="dashboard-gateway"/>
+    <sequenceFlow id="flow-dashboard-register" name="yes" sourceRef="dashboard-gateway" targetRef="register-superset">
+      <conditionExpression xsi:type="tFormalExpression">${execution.getVariable('hasDashboards') == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-dashboard-skip" name="no" sourceRef="dashboard-gateway" targetRef="publish-success"/>
     <sequenceFlow id="flow-superset-success" sourceRef="register-superset" targetRef="publish-success"/>
     <sequenceFlow id="flow-superset-error" sourceRef="superset-error" targetRef="compensate-superset"/>
     <sequenceFlow id="flow-superset-comp-pipelines" sourceRef="compensate-superset" targetRef="compensate-pipelines"/>

@@ -89,6 +89,10 @@ services:
       POSTGIS_JDBC_PASSWORD: ${GEOSERVER_DB_PASSWORD:-geoserver}
       # Use Superset's container address. localhost:8088 is the adapter itself in this service.
       SUPERSET_URL: http://civitas-superset:8088
+      # Use the dedicated local Superset service account for saga API calls. Superset forwards
+      # the authenticated username to Trino, where OPA allows this identity for provisioning.
+      SUPERSET_ADMIN_USERNAME: ${SUPERSET_SERVICE_USERNAME:-civitas-config-adapter}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_SERVICE_PASSWORD:-dev-only-civitas-superset-service-password}
       # Dev master key for decrypting ENC(...) credentials at deploy time; must match
       # portal-backend's civitas.master-key.
       CIVITAS_MASTER_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef

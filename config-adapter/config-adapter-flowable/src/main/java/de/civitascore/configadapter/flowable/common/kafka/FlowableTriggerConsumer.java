@@ -225,6 +225,7 @@ public class FlowableTriggerConsumer {
     variables.put("hasGeoSink", hasDataSinkOfType(trigger, DATASINK_TYPE_POSTGIS));
     variables.put("hasFrostSink", hasDataSinkOfType(trigger, DATASINK_TYPE_FROST));
     variables.put("hasLayers", deriveHasLayers(trigger));
+    variables.put("hasDashboards", deriveHasDashboards(trigger));
 
     ProcessInstance instance =
         runtimeService.startProcessInstanceByKey(processKey, businessKey, variables);
@@ -273,5 +274,13 @@ public class FlowableTriggerConsumer {
    */
   private static boolean deriveHasLayers(Map<String, Object> trigger) {
     return trigger.get("layers") instanceof List<?> layers && !layers.isEmpty();
+  }
+
+  /**
+   * Derives the hasDashboards flag from the trigger payload. Superset physical datasets are only
+   * needed when the dataset has at least one Dashboard artifact.
+   */
+  private static boolean deriveHasDashboards(Map<String, Object> trigger) {
+    return trigger.get("dashboards") instanceof List<?> dashboards && !dashboards.isEmpty();
   }
 }

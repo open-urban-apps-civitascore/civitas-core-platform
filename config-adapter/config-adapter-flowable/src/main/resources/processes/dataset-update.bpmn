@@ -34,13 +34,18 @@
       <incoming>flow-frost-skip</incoming>
       <outgoing>flow-apisix-superset</outgoing>
     </serviceTask>
+    <exclusiveGateway id="dashboard-gateway" name="Has Dashboard?" default="flow-dashboard-skip">
+      <incoming>flow-apisix-superset</incoming>
+      <outgoing>flow-dashboard-sync</outgoing>
+      <outgoing>flow-dashboard-skip</outgoing>
+    </exclusiveGateway>
     <serviceTask id="sync-superset" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Sync Superset Dashboard">
       <extensionElements>
         <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="superset"/>
         <flowable:field xsi:type="xs:anyType" name="operation" stringValue="REGISTER_DATASET"/>
         <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="sync-superset"/>
       </extensionElements>
-      <incoming>flow-apisix-superset</incoming>
+      <incoming>flow-dashboard-sync</incoming>
       <outgoing>flow-superset-geo</outgoing>
     </serviceTask>
     <boundaryEvent id="superset-error" name="Step Failed" attachedToRef="sync-superset">
@@ -53,6 +58,7 @@
     </boundaryEvent>
     <exclusiveGateway id="geo-gateway" name="Has Geo Sink?" default="flow-geo-skip">
       <incoming>flow-superset-geo</incoming>
+      <incoming>flow-dashboard-skip</incoming>
       <outgoing>flow-geo-workspace</outgoing>
       <outgoing>flow-geo-skip</outgoing>
     </exclusiveGateway>
@@ -187,7 +193,11 @@
     </sequenceFlow>
     <sequenceFlow id="flow-frost-skip" name="no" sourceRef="frost-gateway" targetRef="update-route"/>
     <sequenceFlow id="flow-frost-apisix" sourceRef="update-project" targetRef="update-route"/>
-    <sequenceFlow id="flow-apisix-superset" sourceRef="update-route" targetRef="sync-superset"/>
+    <sequenceFlow id="flow-apisix-superset" sourceRef="update-route" targetRef="dashboard-gateway"/>
+    <sequenceFlow id="flow-dashboard-sync" name="yes" sourceRef="dashboard-gateway" targetRef="sync-superset">
+      <conditionExpression xsi:type="tFormalExpression">${execution.getVariable('hasDashboards') == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-dashboard-skip" name="no" sourceRef="dashboard-gateway" targetRef="geo-gateway"/>
     <sequenceFlow id="flow-superset-geo" sourceRef="sync-superset" targetRef="geo-gateway"/>
     <sequenceFlow id="flow-superset-error" sourceRef="superset-error" targetRef="compensate-apisix"/>
     <sequenceFlow id="flow-geo-workspace" name="yes" sourceRef="geo-gateway" targetRef="update-workspace">
