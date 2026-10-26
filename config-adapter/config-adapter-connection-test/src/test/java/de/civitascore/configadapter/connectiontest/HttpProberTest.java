@@ -44,6 +44,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPOutputStream;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -137,6 +138,29 @@ class HttpProberTest {
           exchange.sendResponseHeaders(200, compressed.size());
           try (OutputStream body = exchange.getResponseBody()) {
             body.write(compressed.toByteArray());
+          }
+        });
+    server.createContext(
+        "/deflated",
+        exchange -> {
+          ByteArrayOutputStream compressed = new ByteArrayOutputStream();
+          try (DeflaterOutputStream deflate = new DeflaterOutputStream(compressed)) {
+            deflate.write("{\"ok\":true}".getBytes(StandardCharsets.UTF_8));
+          }
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.getResponseHeaders().add("Content-Encoding", "deflate");
+          exchange.sendResponseHeaders(200, compressed.size());
+          try (OutputStream body = exchange.getResponseBody()) {
+            body.write(compressed.toByteArray());
+          }
+        });
+    server.createContext(
+        "/untyped-binary",
+        exchange -> {
+          byte[] bytes = {0x50, 0x4b, 0x00, 0x01};
+          exchange.sendResponseHeaders(200, bytes.length);
+          try (OutputStream body = exchange.getResponseBody()) {
+            body.write(bytes);
           }
         });
     server.createContext(
@@ -318,6 +342,28 @@ class HttpProberTest {
     assertEquals("{\"ok\":true}", result.preview());
     assertFalse(result.success());
     assertTrue(result.message().contains("compressed (gzip)"), result.message());
+  }
+
+  @Test
+  void showsADeflateEncodedBodyButFailsItAsThePipelineDoesNotUnpackIt() throws Exception {
+    ProbeResult result = probe(call("deflated", "/deflated"), "deflated");
+
+    assertEquals("{\"ok\":true}", result.preview());
+    assertFalse(result.success());
+    assertTrue(result.message().contains("compressed (deflate)"), result.message());
+  }
+
+  @Test
+  void describesABodyWithANulByteAndNoContentTypeInsteadOfShowingIt() throws Exception {
+    ProbeResult result = probe(call("untyped-binary", "/untyped-binary"), "untyped-binary");
+
+    assertFalse(result.success());
+    assertTrue(
+        result
+            .message()
+            .endsWith(" It holds 4 bytes of binary data, which the test does not show."),
+        result.message());
+    assertNull(result.preview());
   }
 
   @Test

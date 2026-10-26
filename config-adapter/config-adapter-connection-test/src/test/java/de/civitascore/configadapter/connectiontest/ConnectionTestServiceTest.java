@@ -19,6 +19,9 @@ import de.civitascore.configadapter.model.connectiontest.ConnectionTestRequest;
 import de.civitascore.configadapter.model.connectiontest.ConnectionTestResult;
 import de.civitascore.configadapter.model.connectiontest.ConnectionTestResult.Outcome;
 import de.civitascore.configadapter.model.connectiontest.ConnectionTestResult.Reason;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.util.HashMap;
@@ -322,6 +325,38 @@ class ConnectionTestServiceTest {
     assertEquals("login failed for ********", result.message());
     assertEquals(Reason.SOURCE_ERROR, result.reason());
     assertNull(result.preview());
+  }
+
+  @Test
+  void aFailureThatQuotesTheSourceLogsOnlyItsLogText() {
+    ConnectionTestService service =
+        new ConnectionTestService(
+            List.of(
+                prober(
+                    "sql",
+                    connector -> {
+                      throw ConnectionTestFailure.answeredBySource(
+                          "invalid input syntax for type integer: \"row-value-4711\"",
+                          "The database answered with SQLSTATE 22P02.",
+                          null);
+                    })),
+            IDENTITY);
+    PrintStream console = System.err;
+    ByteArrayOutputStream log = new ByteArrayOutputStream();
+    System.setErr(new PrintStream(log, true, StandardCharsets.UTF_8));
+    ConnectionTestResult result;
+    try {
+      result = run(service, Map.of("connectionType", "sql"));
+    } finally {
+      System.setErr(console);
+    }
+
+    String logged = log.toString(StandardCharsets.UTF_8);
+    assertEquals("invalid input syntax for type integer: \"row-value-4711\"", result.message());
+    assertTrue(
+        logged.contains("Connection test req-1 failed: The database answered with SQLSTATE 22P02."),
+        logged);
+    assertFalse(logged.contains("row-value-4711"), logged);
   }
 
   @Test
