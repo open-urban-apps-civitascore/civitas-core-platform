@@ -849,7 +849,7 @@ class DataSourceConnectionTestServiceTest {
                   + " requestId="
                   + sentRequest().requestId()
                   + " dataSource=unsaved connectorType=SQL destination=\"db.example:5432/city\""
-                  + " target=\"readings\" account=\"reader\" data=shown outcome=SUCCESS");
+                  + " target=\"readings\" data=shown outcome=SUCCESS");
     }
 
     @Test
@@ -899,7 +899,7 @@ class DataSourceConnectionTestServiceTest {
       service.test(http("stations"));
 
       assertThat(singleAuditLine())
-          .contains("destination=\"api.example.org\" target=\"/v1/stations\" account=\"none\" ");
+          .contains("destination=\"api.example.org\" target=\"/v1/stations\" data=");
     }
 
     @Test

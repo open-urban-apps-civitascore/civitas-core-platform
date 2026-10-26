@@ -171,7 +171,6 @@ public class DataSourceConnectionTestService {
     // Read before the test runs, so that an unknown connector type fails before anything is sent.
     String destination = destination(connector);
     String target = target(connector, input.getApiCall());
-    String account = account(connector);
     String outcome = "ERROR";
     String data = "none";
     try {
@@ -198,19 +197,18 @@ public class DataSourceConnectionTestService {
       outcome = "UNAVAILABLE";
       throw e;
     } finally {
-      // TR-03187 L-1/L-6: who tested which destination and data with which account, whether data
-      // of the source was shown and how it ended, without secrets, query or preview. The request
+      // TR-03187 L-1/L-6: who tested which destination and data, whether data of the source was
+      // shown and how it ended, without secrets, source account, query or preview. The request
       // id finds the matching line in the connection test service's log.
       log.info(
           "Connection test: user={} requestId={} dataSource={} connectorType={}"
-              + " destination=\"{}\" target=\"{}\" account=\"{}\" data={} outcome={}",
+              + " destination=\"{}\" target=\"{}\" data={} outcome={}",
           Encode.forJava(user),
           requestId,
           dataSourceId == null ? UNSAVED : dataSourceId,
           connector.connectorType(),
           Encode.forJava(destination),
           Encode.forJava(target),
-          Encode.forJava(account),
           data,
           outcome);
     }
@@ -302,7 +300,6 @@ public class DataSourceConnectionTestService {
         result.httpStatus());
   }
 
-  /** What the test reads: the SQL table, the first MQTT topic, or the HTTP API call. */
   /** What the test reads: the table, the first topic, or the path an HTTP call requests. */
   static String target(ConnectorConfiguration connector, String apiCall) {
     String target =
@@ -335,21 +332,6 @@ public class DataSourceConnectionTestService {
     } catch (URISyntaxException e) {
       return "";
     }
-  }
-
-  /** The account the test signs in with at the source, or {@code none}. */
-  static String account(ConnectorConfiguration connector) {
-    String account =
-        switch (connector) {
-          case SqlConnectorConfiguration sql -> sql.user();
-          case MqttConnectorConfiguration mqtt -> mqtt.user();
-          case HttpConnectorConfiguration http ->
-              http.authentication() instanceof HttpConnectorConfiguration.Basic basic
-                  ? basic.username()
-                  : null;
-          default -> null;
-        };
-    return account == null || account.isBlank() ? "none" : account;
   }
 
   /** Host and port of the first address, for SQL with the database, or {@code unknown}. */
