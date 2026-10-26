@@ -297,9 +297,16 @@ final class HttpProber implements ConnectionProber {
         : new ConnectionTestFailure(message, failed);
   }
 
-  /** An API that echoes the request would return the basic credential, which is a secret. */
+  /**
+   * An API that echoes the request would return the basic credential, which is a secret. JSON may
+   * write its {@code /} as {@code \/}, as PHP's {@code json_encode} does by default.
+   */
   static String maskCredential(String text, String credential) {
-    return credential == null ? text : text.replace(credential, ResultText.MASK);
+    if (credential == null) {
+      return text;
+    }
+    return text.replace(credential, ResultText.MASK)
+        .replace(credential.replace("/", "\\/"), ResultText.MASK);
   }
 
   private static ProbeResult result(HttpResponse<InputStream> response, String credential)

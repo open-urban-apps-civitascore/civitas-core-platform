@@ -263,6 +263,15 @@ class HttpProberTest {
     assertEquals("{\"pad\": \"\", \"Authorization\": \"Basic ********\"}", result.preview());
   }
 
+  @Test
+  void masksAnEchoedCredentialWithJsonEscapedSlashes(@TempDir Path dir) throws Exception {
+    // PHP's json_encode writes "/" as "\/" by default; this credential is dXNlcjpzM2NyZXQ/.
+    ProbeResult result = probeEchoingApi(dir, "", "s3cret?", true);
+
+    assertTrue(result.success(), result.message());
+    assertEquals("{\"pad\": \"\", \"Authorization\": \"Basic ********\"}", result.preview());
+  }
+
   /**
    * The credential starts 10 bytes before the preview limit, so a cut there leaves "Basic dXNl".
    */
@@ -300,6 +309,14 @@ class HttpProberTest {
 
   /** Probes an HTTPS API that answers with the Authorization header it received. */
   private ProbeResult probeEchoingApi(Path dir, String pad) throws Exception {
+    return probeEchoingApi(dir, pad, "s3cret", false);
+  }
+
+  /**
+   * @param escapeSlashes whether the API writes each {@code /} of the header as {@code \/}
+   */
+  private ProbeResult probeEchoingApi(Path dir, String pad, String password, boolean escapeSlashes)
+      throws Exception {
     SSLContext tls = selfSignedTls(dir);
     HttpsServer echo =
         HttpsServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
@@ -314,7 +331,7 @@ class HttpProberTest {
                 "{\"pad\": \""
                     + pad
                     + "\", \"Authorization\": \""
-                    + exchange.getRequestHeaders().getFirst("Authorization")
+                    + echoed(exchange.getRequestHeaders().getFirst("Authorization"), escapeSlashes)
                     + "\"}"));
     echo.start();
     Map<String, Object> connector = connector(call("headers", "/headers"));
@@ -325,7 +342,7 @@ class HttpProberTest {
             + ":"
             + echo.getAddress().getPort());
     connector.put(
-        "authentication", Map.of("type", "BASIC", "username", "user", "password", "s3cret"));
+        "authentication", Map.of("type", "BASIC", "username", "user", "password", password));
     SSLContext jvmDefault = SSLContext.getDefault();
     // The prober trusts the JVM's default context, so the test certificate must be in it.
     SSLContext.setDefault(tls);
@@ -335,6 +352,10 @@ class HttpProberTest {
       SSLContext.setDefault(jvmDefault);
       echo.stop(0);
     }
+  }
+
+  private static String echoed(String header, boolean escapeSlashes) {
+    return escapeSlashes ? header.replace("/", "\\/") : header;
   }
 
   @Test
