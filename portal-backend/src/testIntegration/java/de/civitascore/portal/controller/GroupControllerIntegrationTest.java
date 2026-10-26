@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
 @DisplayName("Group Controller Integration Tests")
@@ -888,6 +889,25 @@ class GroupControllerIntegrationTest
       assertThat(response.getBody().getAssignments())
           .as("Assignments should be preserved when group is updated")
           .hasSize(1);
+    }
+
+    // Fails when an element of the body Set reaches the service unvalidated.
+    @Test
+    void replaceGroupAssignments_withInvalidAssignment_answers400ValidationFailed() {
+      UUID groupId = createTestEntity();
+      AssignmentGroupInputDTO withoutRole = new AssignmentGroupInputDTO();
+      withoutRole.setScopeType(ScopeType.TENANT);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + groupId + "/assignments",
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              List.of(withoutRole));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:VALIDATION_FAILED");
     }
   }
 
