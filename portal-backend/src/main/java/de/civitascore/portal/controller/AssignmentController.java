@@ -9,9 +9,6 @@ import de.civitascore.portal.problem.Problems;
 import de.civitascore.portal.repository.specification.AssignmentSpec;
 import de.civitascore.portal.service.AssignmentService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -50,73 +47,8 @@ public class AssignmentController {
           "Returns a paginated, filterable list of assignments. Supports sorting and"
               + " specification-based filtering.")
   @ApiResponse(responseCode = "200", description = "Page of assignments returned successfully")
-  @Parameter(
-      name = "id",
-      description = "Filter by one or more IDs (comma-separated).",
-      example = "1,2,3",
-      in = ParameterIn.QUERY,
-      schema = @Schema(type = "string", example = "1,2,3"))
-  @Parameter(
-      name = "createdAtFrom",
-      description = "Filter by creation date greater than or equal to this value (ISO 8601).",
-      in = ParameterIn.QUERY,
-      schema = @Schema(type = "string", format = "date-time", example = "2024-01-01T00:00:00Z"))
-  @Parameter(
-      name = "createdAtTo",
-      description = "Filter by creation date less than or equal to this value (ISO 8601).",
-      in = ParameterIn.QUERY,
-      schema = @Schema(type = "string", format = "date-time", example = "2024-12-31T23:59:59Z"))
-  @Parameter(
-      name = "modifiedAtFrom",
-      description = "Filter by modification date greater than or equal to this value (ISO 8601).",
-      in = ParameterIn.QUERY,
-      schema = @Schema(type = "string", format = "date-time", example = "2024-01-01T00:00:00Z"))
-  @Parameter(
-      name = "modifiedAtTo",
-      description = "Filter by modification date less than or equal to this value (ISO 8601).",
-      in = ParameterIn.QUERY,
-      schema = @Schema(type = "string", format = "date-time", example = "2024-12-31T23:59:59Z"))
-  @Parameter(
-      name = "roleId",
-      description = "Filter by role ID (exact match).",
-      in = ParameterIn.QUERY,
-      schema = @Schema(type = "string", example = "role-123"))
-  @Parameter(
-      name = "userId",
-      description = "Filter by user ID (exact match).",
-      in = ParameterIn.QUERY,
-      schema = @Schema(type = "string", example = "user-456"))
-  @Parameter(
-      name = "groupId",
-      description = "Filter by group ID (exact match).",
-      in = ParameterIn.QUERY,
-      schema = @Schema(type = "string", example = "group-789"))
-  @Parameter(
-      name = "scopeId",
-      description = "Filter by scope ID (exact match).",
-      in = ParameterIn.QUERY,
-      schema = @Schema(type = "string", example = "scope-101112"))
-  @Parameter(
-      name = "scopeType",
-      description =
-          "Filter by scope type (exact match). One of: TENANT, DATASET, DATASOURCE,"
-              + " DATASTRUCTURE, DATAPOOL.",
-      in = ParameterIn.QUERY,
-      schema = @Schema(type = "string", example = "DATASET"))
-  @Parameter(
-      name = "roleType",
-      description = "Filter by role type (exact match). One of: SYSTEM, DATA.",
-      in = ParameterIn.QUERY,
-      schema = @Schema(type = "string", example = "DATA"))
-  @Parameter(
-      name = "q",
-      description =
-          "Search in role name, role description, or group name"
-              + " (partial match, case-insensitive).",
-      in = ParameterIn.QUERY,
-      schema = @Schema(type = "string", example = "admin"))
   public Page<AssignmentOutputDTO> listAssignments(
-      @ParameterObject @Parameter(description = "Search/filter spec") AssignmentSpec spec,
+      @ParameterObject AssignmentSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {

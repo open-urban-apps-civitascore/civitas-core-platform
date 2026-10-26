@@ -44,7 +44,7 @@ public class PipelineController
   @Operation(operationId = "listPipelines", summary = "List all pipelines")
   @Override
   public ResponseEntity<Page<PipelineOutputDTO>> getAll(
-      @ParameterObject @Parameter(description = "Search/filter spec") PipelineSpec spec,
+      @ParameterObject PipelineSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {

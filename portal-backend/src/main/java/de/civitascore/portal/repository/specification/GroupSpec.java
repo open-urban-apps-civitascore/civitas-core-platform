@@ -1,14 +1,19 @@
 package de.civitascore.portal.repository.specification;
 
 import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.repository.specification.base.FilterParam;
 import de.civitascore.portal.repository.specification.base.NamedEntitySpec;
 import net.kaczmarzyk.spring.data.jpa.domain.Equal;
 import net.kaczmarzyk.spring.data.jpa.domain.In;
 import net.kaczmarzyk.spring.data.jpa.web.annotation.Spec;
 
+@FilterParam(name = "contactUserId", description = "Filter by contact user ID (exact match).")
 @Spec(path = "contactUser.id", params = "contactUserId", spec = Equal.class)
 interface GroupContactUserIdSpec extends NamedEntitySpec<Group> {}
 
+@FilterParam(
+    name = "memberIds",
+    description = "Filter by member user IDs. Returns groups with any of the listed members.")
 @Spec(path = "members.id", params = "memberIds", paramSeparator = ',', spec = In.class)
 interface GroupMemberIdSpec extends NamedEntitySpec<Group> {}
 

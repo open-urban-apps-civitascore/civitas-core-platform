@@ -12,10 +12,6 @@ import de.civitascore.portal.security.dto.PrincipalUserDetails;
 import de.civitascore.portal.service.AssignmentService;
 import de.civitascore.portal.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
@@ -49,28 +45,6 @@ public class UserController extends BaseController<UserInputDTO, UserOutputDTO, 
   private final AssignmentService assignmentService;
   private final AssignmentAssembler assignmentAssembler;
 
-  @Parameters({
-    @Parameter(
-        name = "firstName",
-        description = "Filter by first name (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "John")),
-    @Parameter(
-        name = "lastName",
-        description = "Filter by last name (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "Doe")),
-    @Parameter(
-        name = "email",
-        description = "Filter by email (exact match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "john.doe@example.com")),
-    @Parameter(
-        name = "q",
-        description = "Search in full name, or email (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "john doe, john@doe.com"))
-  })
   /**
    * Retrieves a paginated list of users with optional filtering by first name, last name, email, or
    * free-text search.
@@ -81,7 +55,7 @@ public class UserController extends BaseController<UserInputDTO, UserOutputDTO, 
    */
   @Override
   public ResponseEntity<Page<UserOutputDTO>> getAll(
-      @ParameterObject @Parameter(description = "Search/filter spec") UserSpec spec,
+      @ParameterObject UserSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {

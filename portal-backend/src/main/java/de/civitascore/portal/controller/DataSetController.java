@@ -14,9 +14,6 @@ import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.service.DataSetService;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -57,38 +54,6 @@ public class DataSetController
   private final DataSetService dataSetService;
   private final DataSetAssembler dataSetAssembler;
 
-  @Parameters({
-    @Parameter(
-        name = "name",
-        description = "Filter by name (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "sensor-data")),
-    @Parameter(
-        name = "description",
-        description = "Filter by description (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "Temperature sensor readings")),
-    @Parameter(
-        name = "q",
-        description = "Search in name or description (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "sensor")),
-    @Parameter(
-        name = "datapoolIds",
-        description =
-            "Filter by datapool IDs (comma-separated UUIDs, IN-clause). Returns datasets assigned to any of the listed datapools.",
-        in = ParameterIn.QUERY,
-        schema =
-            @Schema(
-                type = "string",
-                example =
-                    "550e8400-e29b-41d4-a716-446655440000,3fa85f64-5717-4562-b3fc-2c963f66afa6")),
-    @Parameter(
-        name = "includePendingDelete",
-        description = "Include datasets with pendingSagaType DELETE. Defaults to false.",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "boolean", defaultValue = "false", example = "true"))
-  })
   /**
    * Retrieves a paginated list of datasets with optional filtering by name, description, or
    * free-text search.
@@ -99,7 +64,7 @@ public class DataSetController
    */
   @Override
   public ResponseEntity<Page<DataSetOutputDTO>> getAll(
-      @ParameterObject @Parameter(description = "Search/filter spec") DataSetSpec spec,
+      @ParameterObject DataSetSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {

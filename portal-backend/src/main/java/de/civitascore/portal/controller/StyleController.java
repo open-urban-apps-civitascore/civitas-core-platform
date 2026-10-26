@@ -9,9 +9,6 @@ import de.civitascore.portal.problem.Problems;
 import de.civitascore.portal.repository.specification.StyleSpec;
 import de.civitascore.portal.service.StyleService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -47,32 +44,6 @@ public class StyleController {
   @GetMapping
   @Operation(summary = "List all Styles for a dataset")
   @ApiResponse(responseCode = "200", description = "Page of styles returned successfully")
-  @Parameter(
-      name = "id",
-      description = "Filter by one or more IDs (comma-separated).",
-      example = "1,2,3",
-      in = ParameterIn.QUERY,
-      schema = @Schema(type = "string", example = "1,2,3"))
-  @Parameter(
-      name = "createdAtFrom",
-      description = "Filter by creation date greater than or equal to this value (ISO 8601).",
-      in = ParameterIn.QUERY,
-      schema = @Schema(type = "string", format = "date-time", example = "2024-01-01T00:00:00Z"))
-  @Parameter(
-      name = "createdAtTo",
-      description = "Filter by creation date less than or equal to this value (ISO 8601).",
-      in = ParameterIn.QUERY,
-      schema = @Schema(type = "string", format = "date-time", example = "2024-12-31T23:59:59Z"))
-  @Parameter(
-      name = "modifiedAtFrom",
-      description = "Filter by modification date greater than or equal to this value (ISO 8601).",
-      in = ParameterIn.QUERY,
-      schema = @Schema(type = "string", format = "date-time", example = "2024-01-01T00:00:00Z"))
-  @Parameter(
-      name = "modifiedAtTo",
-      description = "Filter by modification date less than or equal to this value (ISO 8601).",
-      in = ParameterIn.QUERY,
-      schema = @Schema(type = "string", format = "date-time", example = "2024-12-31T23:59:59Z"))
   public Page<StyleOutputDTO> listStyles(
       // Typed so that a malformed id answers 400 before StyleSpec reads the path variable.
       @PathVariable UUID dataSetId,

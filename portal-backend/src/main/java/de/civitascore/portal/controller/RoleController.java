@@ -6,10 +6,6 @@ import de.civitascore.portal.model.output.RoleOutputDTO;
 import de.civitascore.portal.model.output.assembler.RoleAssembler;
 import de.civitascore.portal.repository.specification.RoleSpec;
 import de.civitascore.portal.service.RoleService;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -31,33 +27,6 @@ public class RoleController extends BaseController<RoleInputDTO, RoleOutputDTO, 
   private final RoleService roleService;
   private final RoleAssembler roleAssembler;
 
-  @Parameters({
-    @Parameter(
-        name = "name",
-        description = "Filter by name (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "admin")),
-    @Parameter(
-        name = "description",
-        description = "Filter by description (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "Full access")),
-    @Parameter(
-        name = "roleType",
-        description = "Filter by role type (exact match, comma-separated for multiple).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "SYSTEM")),
-    @Parameter(
-        name = "q",
-        description = "Search in name or description (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "admin")),
-    @Parameter(
-        name = "readonly",
-        description = "Filter by readonly flag (exact match).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "boolean", example = "true"))
-  })
   /**
    * Retrieves a paginated list of roles with optional filtering by name, description, role type, or
    * free-text search.
@@ -68,7 +37,7 @@ public class RoleController extends BaseController<RoleInputDTO, RoleOutputDTO, 
    */
   @Override
   public ResponseEntity<Page<RoleOutputDTO>> getAll(
-      @ParameterObject @Parameter(description = "Search/filter spec") RoleSpec spec,
+      @ParameterObject RoleSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {

@@ -7,10 +7,6 @@ import de.civitascore.portal.model.output.DataStructureOutputDTO;
 import de.civitascore.portal.model.output.assembler.DataStructureAssembler;
 import de.civitascore.portal.repository.specification.DataStructureSpec;
 import de.civitascore.portal.service.DataStructureService;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -34,23 +30,6 @@ public class DataStructureController
   private final DataStructureService dataStructureService;
   private final DataStructureAssembler dataStructureAssembler;
 
-  @Parameters({
-    @Parameter(
-        name = "name",
-        description = "Filter by name (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "My Data Structure")),
-    @Parameter(
-        name = "description",
-        description = "Filter by description (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "Data structure description")),
-    @Parameter(
-        name = "q",
-        description = "Search in name or description (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "structure"))
-  })
   /**
    * Retrieves a paginated list of data structures with optional filtering by name, description, or
    * free-text search.
@@ -61,7 +40,7 @@ public class DataStructureController
    */
   @Override
   public ResponseEntity<Page<DataStructureOutputDTO>> getAll(
-      @ParameterObject @Parameter(description = "Search/filter spec") DataStructureSpec spec,
+      @ParameterObject DataStructureSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {

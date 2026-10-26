@@ -351,6 +351,28 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
             });
   }
 
+  @ParameterizedTest
+  @CsvSource({
+    "/assignments, roleId, string, uuid",
+    "/datasets, datapoolIds, array, uuid",
+    "/datasets/{dataSetId}/layers, createdAtFrom, string, date-time"
+  })
+  void listOperations_documentTheFiltersOfTheirSpec(
+      String path, String name, String type, String format) {
+    JsonNode parameter =
+        spec.path("paths").path(path).path("get").path("parameters").values().stream()
+            .filter(candidate -> candidate.path("name").asString().equals(name))
+            .findFirst()
+            .orElseThrow();
+    JsonNode schema = parameter.path("schema");
+
+    assertThat(parameter.path("in").asString()).isEqualTo("query");
+    assertThat(parameter.path("description").asString()).isNotBlank();
+    assertThat(schema.path("type").asString()).isEqualTo(type);
+    assertThat((type.equals("array") ? schema.path("items") : schema).path("format").asString())
+        .isEqualTo(format);
+  }
+
   @Test
   void operationIds_areUniqueWithoutNumericSuffix() {
     List<String> operationIds = new ArrayList<>();
