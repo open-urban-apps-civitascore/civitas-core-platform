@@ -45,6 +45,7 @@ tests {
 
   test("Returns both URN pins", function() {
     if (res.getStatus() === 201) {
+      expect(res.body.mappingId).to.be.a('string');
       expect(res.body.logicalUrn).to.be.a('string');
       expect(res.body.versionedUrn).to.be.a('string');
     }
@@ -70,7 +71,7 @@ docs {
   `POINT(<lon> <lat>)` literal that the target's `GEOMETRY(POINT,4326)` column parses on insert;
   `$.stationid` is a straight copy.
 
-  **Expected Response:** 201 Created with `logicalUrn`, `versionedUrn` and `version`.
+  **Expected Response:** 201 Created with `mappingId`, `logicalUrn`, `versionedUrn` and `version`.
 
   **Post-condition:** Saves `pgMappingUrn`, referenced by the pipeline's mapping node.
 

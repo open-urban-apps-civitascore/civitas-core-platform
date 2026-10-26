@@ -1,0 +1,63 @@
+meta {
+  name: Create Mapping
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/mappings
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+body:json {
+  {
+    "title": "ApiTestObservation-copy",
+    "source": "{{setupModelUrn}}",
+    "target": "{{setupModelUrn}}",
+    "fields": {
+      "$.station_id": "$.station_id"
+    }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.mappingId) {
+    bru.setVar('mappingId', res.body.mappingId);
+    bru.setVar('mappingLogicalUrn', res.body.logicalUrn);
+    bru.setVar('mappingVersion', res.body.version);
+  }
+}
+
+tests {
+  test("Mapping created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("Location names the new mapping", function() {
+    expect(res.getHeader('location')).to.match(new RegExp('/mappings/' + res.body.mappingId + '$'));
+  });
+
+  test("The id is the UUID of the logical URN", function() {
+    expect(res.body.logicalUrn).to.match(new RegExp(':' + res.body.mappingId + '$'));
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` and `setupModelUrn` (from `00-setup`) are set.
+
+  **Expected Response:** 201 Created with `mappingId`, `logicalUrn`, `versionedUrn`, `version`
+  and the stored content. The `Location` header ends with the `mappingId`.
+
+  **Post-condition:** Saves `mappingId`, `mappingLogicalUrn` and `mappingVersion`.
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | Mapping artifact stored in the registry and linked into the dataset's manifest |
+}
