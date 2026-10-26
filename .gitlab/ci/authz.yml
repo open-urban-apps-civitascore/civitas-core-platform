@@ -293,7 +293,8 @@ integration-test-authz:
     APISIX_URL: http://docker:9080
     KEYCLOAK_URL: http://docker:8080
   before_script:
-    - apk add --no-cache bash curl jq postgresql-client >/dev/null
+    # lsof and ss for the port check of the script: busybox's lsof is a stub that reports every port as in use
+    - apk add --no-cache bash curl jq postgresql-client lsof iproute2 >/dev/null
   script:
     - bash dev-environment/authz/integration-test.sh --skip-build
   after_script:
