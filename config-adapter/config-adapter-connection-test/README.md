@@ -42,7 +42,7 @@ Delivery:
 - **SQL runs no configured text as SQL, except a `where` clause the request allows.**
   - The table and each column go to the database only as bind parameters of `to_regclass(?)` and `parse_ident(?)`. These resolve them with the parser's quoting, case folding and search path.
   - The query uses the names that the catalog returns, quoted by `quote_ident`, with `LIMIT ?`. It runs in a read-only transaction that is always rolled back.
-  - The `where` clause runs only when the request sets `applyWhere`, wrapped as `WHERE (...)` as NiFi wraps it. The backend sets it for a clause as saved, or for values whose secrets the caller typed. Otherwise the result says the clause is not part of the test.
+  - The `where` clause runs only when the request sets `applyWhere`, wrapped as `WHERE (...)` as NiFi wraps it. The backend sets it for the connector as saved, or for values whose secrets the caller typed. Otherwise the result says the clause is not part of the test.
   - A `where` clause with a `;` is refused, here and in the pipeline: the driver runs every statement of a query.
   - The test drops the DSN's own `connectTimeout`, `socketTimeout` and `loginTimeout`, because the driver prefers them to the test's limits.
   - Each value is read as text and cut by the database to one character more than the preview holds. The rows come one per fetch. Thus a table of wide rows (PostGIS polygons) costs no more than its preview.
@@ -64,7 +64,7 @@ Delivery:
 - Every decrypted secret is masked in message and preview. A basic credential that an API echoes back is masked in the preview too. The OAuth 2.0 access token is never put in a message.
 - A message keeps the source's own answer (`password authentication failed`, `NOT_AUTHORIZED`, the HTTP status). A failure of the test's own client is named by its type, never by its text.
 - A connection that fails after its connect timeout is `TIMEOUT`, for every connector type.
-- Logs carry the request id, outcome and duration. At DEBUG they also carry the masked failure message.
+- Logs carry the request id, outcome and duration. At DEBUG they also carry the masked failure message; a database's own answer, which can quote a row value, only as its SQLSTATE.
 
 ## Destinations
 

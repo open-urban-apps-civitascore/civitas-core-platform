@@ -198,7 +198,9 @@ public class DataSourceController
               + " the stored ones, for a data source in any status. A placeholder \"********\""
               + " keeps the secret stored at its place, but only where it is stored for: at the"
               + " stored destination of a draft, and for the connector as released of a released"
-              + " data source. Elsewhere, or where no secret is stored, it answers 400. The values"
+              + " data source. Elsewhere, or where no secret is stored, it answers 400. With a"
+              + " placeholder, a changed where clause is left out. Values for another destination"
+              + " need DATASOURCE_READ for the whole tenant, otherwise it answers 403. The values"
               + " must meet the rules of a release. The test changes no data source and stores"
               + " nothing. A user runs one test at a time.")
   @ApiResponse(

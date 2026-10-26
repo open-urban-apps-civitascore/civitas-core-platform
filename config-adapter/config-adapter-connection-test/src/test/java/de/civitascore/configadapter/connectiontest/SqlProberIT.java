@@ -177,7 +177,13 @@ class SqlProberIT {
     ProbeResult result = probe(connector);
 
     assertTrue(result.success(), result.message());
-    assertTrue(result.message().endsWith("The where clause is not part of the test."));
+    assertTrue(
+        result
+            .message()
+            .endsWith(
+                "The where clause is not part of the test; it runs as saved or with a password"
+                    + " entered."),
+        result.message());
     assertTrue(result.preview().contains("\r\n1\r\n"), "the filter is not applied");
     assertEquals(0, auditEntries());
   }

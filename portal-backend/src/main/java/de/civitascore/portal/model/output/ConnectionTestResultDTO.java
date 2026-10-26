@@ -32,7 +32,9 @@ public record ConnectionTestResultDTO(
         String preview,
     @Schema(description = "Whether the preview was cut at its size limit.", example = "false")
         boolean previewTruncated,
-    @Schema(description = "Number of rows in the preview, SQL only.", example = "2")
+    @Schema(
+            description = "Number of rows read, SQL only; a cut preview shows fewer.",
+            example = "2")
         Integer rowCount,
     @Schema(
             description = "HTTP status code of the call, when the source answered with one.",

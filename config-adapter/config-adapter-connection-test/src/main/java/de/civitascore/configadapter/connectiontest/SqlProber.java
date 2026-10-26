@@ -132,7 +132,9 @@ final class SqlProber implements ConnectionProber {
         String message =
             "Connected and read " + rows.count() + " row(s) from " + table.name() + ".";
         if (where.isEmpty() && !values.where().isEmpty()) {
-          message += " The where clause is not part of the test.";
+          message +=
+              " The where clause is not part of the test; it runs as saved or with a password"
+                  + " entered.";
         }
         return new ProbeResult(true, message, rows.csv(), rows.cut(), rows.count(), null);
       } finally {
@@ -268,8 +270,9 @@ final class SqlProber implements ConnectionProber {
   }
 
   /**
-   * Every name in the statement comes from the catalog, quoted by {@code quote_ident}. Each value
-   * is read as its text form, which every type has, cut to {@value #VALUE_CHARS} characters.
+   * Every name in the statement comes from the catalog, quoted by {@code quote_ident}; a where
+   * clause, when applied, is the configured text. Each value is read as its text form, which every
+   * type has, cut to {@value #VALUE_CHARS} characters.
    *
    * @param where the where clause to apply, or {@code ""}
    */

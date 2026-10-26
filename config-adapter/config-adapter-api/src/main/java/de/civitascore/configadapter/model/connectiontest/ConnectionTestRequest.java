@@ -16,7 +16,7 @@ import java.util.Map;
 
 /**
  * Asks the connection test service to test whether a data source answers with the given connector
- * values. The test moves no data into the platform and changes nothing.
+ * values. The test changes nothing; its result can carry a short preview of the source's data.
  *
  * @param requestId correlates the {@link ConnectionTestResult}
  * @param expiresAt when the requester stops waiting; a request received later is not run
@@ -24,7 +24,7 @@ import java.util.Map;
  *     every secret as {@code ENC(...)}
  * @param apiCall the name of the API call to run for an HTTP connector, otherwise null
  * @param applyWhere whether an SQL test applies the connector's where clause; the requester allows
- *     it only for a clause it stores or for a connector whose secrets the caller typed
+ *     it only for the connector as stored or for a connector whose secrets the caller typed
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ConnectionTestRequest(

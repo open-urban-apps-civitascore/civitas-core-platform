@@ -91,9 +91,9 @@ public class DataSourceConnectionTestService {
   /**
    * Tests connector values for a saved data source in any status. A {@code "********"} placeholder
    * keeps the stored secret only for the stored destinations of a draft, as every write does, or
-   * for the unchanged connector of a released source, so the secret cannot reach another host or
-   * other data. The where clause runs only as saved, or with secrets the caller typed. Only a
-   * tenant-wide reader may test another destination.
+   * for the unchanged connector of a released source, so the secret cannot reach another host. The
+   * where clause runs only as saved, or with secrets the caller typed. Only a tenant-wide reader
+   * may test another destination.
    *
    * @throws ResourceNotFoundException if no such data source exists
    * @throws MalformedDataSourceRequestException for a placeholder the stored secret may not fill

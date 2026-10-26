@@ -22,7 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * @param preview what the source returned: rows as CSV for SQL, the body of an HTTP call for any
  *     status; null otherwise
  * @param previewTruncated whether the preview was cut at its size limit
- * @param rowCount the number of rows in the preview, SQL only
+ * @param rowCount the number of rows read, SQL only; a cut preview shows fewer
  * @param httpStatus the HTTP status code, when the source answered an HTTP call with one
  * @param durationMillis how long the test took in the connection test service
  */
