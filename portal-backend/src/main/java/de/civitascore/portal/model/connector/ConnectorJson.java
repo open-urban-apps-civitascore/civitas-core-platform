@@ -136,7 +136,7 @@ public final class ConnectorJson {
     if (stored != null
         && stored.connectorType() == connector.connectorType()
         && hasPlaceholder(connector)
-        && !ConnectorUris.destinations(connector).equals(ConnectorUris.destinations(stored))) {
+        && !ConnectorUris.staysAtDestinationsOf(connector, stored)) {
       throw new StoredSecretRefusedException(STORED_SECRET_FOR_STORED_DESTINATION);
     }
     return writeDocument(connector, stored, encrypt);

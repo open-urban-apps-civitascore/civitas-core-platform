@@ -124,9 +124,15 @@ public final class ConnectorUris {
   }
 
   /**
-   * Scheme, host, port and {@code sslmode} of every address. A stored secret follows the connector
-   * only to the same destinations.
+   * Whether every destination of {@code requested} is a destination of {@code stored}, in any
+   * order. A stored secret follows the connector only to destinations it was stored for.
    */
+  public static boolean staysAtDestinationsOf(
+      ConnectorConfiguration requested, ConnectorConfiguration stored) {
+    return new HashSet<>(destinations(stored)).containsAll(destinations(requested));
+  }
+
+  /** Scheme, host, port and {@code sslmode} of every address. */
   static List<String> destinations(ConnectorConfiguration connector) {
     return addresses(connector).stream()
         .map(address -> origin(address) + " sslmode=" + sslmode(address))

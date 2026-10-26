@@ -414,7 +414,6 @@ class DataSourceConnectionTestServiceTest {
               "an added URL",
               "'tcp://broker-b:1883'",
               "'tcp://broker-b:1883','tcp://broker-c:1883'"),
-          arguments(Saved.MQTT, "a removed URL", ",'tcp://broker-b:1883'", ""),
           arguments(Saved.HTTP, "another host", "api.example.org", "api.attacker.example"),
           arguments(Saved.HTTP, "another port", "api.example.org/", "api.example.org:8443/"),
           arguments(
@@ -430,6 +429,12 @@ class DataSourceConnectionTestServiceTest {
           arguments(Saved.SQL, "other columns", "['id','value']", "['id']"),
           arguments(Saved.SQL, "another database", ":5432/city", ":5432/archive"),
           arguments(Saved.MQTT, "another topic", "sensor/#", "weather/#"),
+          arguments(Saved.MQTT, "a removed URL", ",'tcp://broker-b:1883'", ""),
+          arguments(
+              Saved.MQTT,
+              "the URLs reordered",
+              "'tcp://broker-a:1883','tcp://broker-b:1883'",
+              "'tcp://broker-b:1883','tcp://broker-a:1883'"),
           arguments(Saved.HTTP, "another API call path", "'/stations'", "'/stations/active'"),
           arguments(Saved.HTTP_OAUTH2, "another token path", "/token", "/oauth2/token"));
     }
