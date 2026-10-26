@@ -60,6 +60,9 @@ final class SqlProber implements ConnectionProber {
    */
   static final int VALUE_CHARS = ResultText.MAX_PREVIEW_BYTES + 1;
 
+  /** The CSV kept: the preview and the margin that masking reads past it. */
+  private static final int KEPT_CHARS = ResultText.MAX_PREVIEW_BYTES + ResultText.MASK_MARGIN;
+
   /**
    * Caps what the driver buffers of one single-row fetch, as a last guard for the heap. With the
    * values cut, only a table of hundreds of columns can reach it.
@@ -307,16 +310,24 @@ final class SqlProber implements ConnectionProber {
     csv.append("\r\n");
     int rows = 0;
     boolean cut = false;
+    boolean full = false;
     while (result.next()) {
-      for (int i = 1; i <= count; i++) {
+      rows++;
+      // Past the preview and its masking margin the rows are only counted, so that wide rows cost
+      // no more memory than the preview.
+      for (int i = 1; i <= count && !full; i++) {
         String value = result.getString(i);
         cut |= value != null && value.length() >= VALUE_CHARS;
         appendField(csv, value, i == 1);
+        full = csv.length() > KEPT_CHARS;
       }
-      csv.append("\r\n");
-      rows++;
+      if (full) {
+        csv.setLength(KEPT_CHARS);
+      } else {
+        csv.append("\r\n");
+      }
     }
-    return new Rows(csv.toString(), rows, cut);
+    return new Rows(csv.toString(), rows, cut || full);
   }
 
   /** NULL is an empty field, an empty string a quoted one, so that the two can be told apart. */
@@ -340,8 +351,13 @@ final class SqlProber implements ConnectionProber {
 
   /** The database's answer, or a timeout when the database did not answer in time. */
   private static ConnectionTestFailure failure(SQLException e) {
-    return ConnectionTestFailure.timedOut(e) || QUERY_CANCELED.equals(e.getSQLState())
-        ? ConnectionTestFailure.timeout(databaseMessage(e), e)
+    if (ConnectionTestFailure.timedOut(e) || QUERY_CANCELED.equals(e.getSQLState())) {
+      return ConnectionTestFailure.timeout(databaseMessage(e), e);
+    }
+    // The server's own text can quote a row value, for example a value that a cast refused.
+    return e.getCause() == null && e.getSQLState() != null
+        ? ConnectionTestFailure.answeredBySource(
+            databaseMessage(e), "The database answered with SQLSTATE " + e.getSQLState() + ".", e)
         : new ConnectionTestFailure(databaseMessage(e), e);
   }
 

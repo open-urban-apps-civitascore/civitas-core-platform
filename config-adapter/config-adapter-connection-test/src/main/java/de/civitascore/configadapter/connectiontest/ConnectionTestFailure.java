@@ -30,6 +30,7 @@ final class ConnectionTestFailure extends Exception {
 
   private final Reason reason;
   private final boolean destinationRefused;
+  private final String logText;
 
   /** The source answered with an error or could not be reached. */
   ConnectionTestFailure(String message) {
@@ -42,14 +43,23 @@ final class ConnectionTestFailure extends Exception {
   }
 
   ConnectionTestFailure(Reason reason, String message, Throwable cause) {
-    this(reason, message, cause, false);
+    this(reason, message, cause, false, null);
   }
 
   private ConnectionTestFailure(
-      Reason reason, String message, Throwable cause, boolean destinationRefused) {
+      Reason reason, String message, Throwable cause, boolean destinationRefused, String logText) {
     super(message, cause);
     this.reason = reason;
     this.destinationRefused = destinationRefused;
+    this.logText = logText;
+  }
+
+  /**
+   * The source answered with its own text, which may quote its data; only {@code logText} goes to
+   * the log.
+   */
+  static ConnectionTestFailure answeredBySource(String message, String logText, Throwable cause) {
+    return new ConnectionTestFailure(Reason.SOURCE_ERROR, message, cause, false, logText);
   }
 
   /** The connector values do not make a source the test can run. */
@@ -64,7 +74,7 @@ final class ConnectionTestFailure extends Exception {
 
   /** The destination check refused the host; a security event, not a typo. */
   static ConnectionTestFailure refused(String message) {
-    return new ConnectionTestFailure(Reason.INVALID_CONNECTOR, message, null, true);
+    return new ConnectionTestFailure(Reason.INVALID_CONNECTOR, message, null, true, null);
   }
 
   /** The source did not answer within the time the test allows. */
@@ -78,6 +88,11 @@ final class ConnectionTestFailure extends Exception {
 
   boolean destinationRefused() {
     return destinationRefused;
+  }
+
+  /** What the log may say about this failure: the message, unless it quotes the source. */
+  String logText() {
+    return logText == null ? getMessage() : logText;
   }
 
   /** The type and stack of {@code e} without its text, which may quote connector values. */

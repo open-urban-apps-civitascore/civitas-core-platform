@@ -84,7 +84,7 @@ final class ConnectionTestService {
         LOG.debug(
             "Connection test {} failed: {}",
             Encode.forJava(requestId),
-            Encode.forJava(text.message(e.getMessage())));
+            Encode.forJava(text.message(e.logText())));
       }
       return ConnectionTestResult.failure(
           requestId, e.reason(), text.message(e.getMessage()), millisSince(begin));

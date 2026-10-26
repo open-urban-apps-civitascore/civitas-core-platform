@@ -29,7 +29,7 @@ public record SqlConnectorConfiguration(
             description =
                 "SQL WHERE clause: one condition of literal SQL, without bind placeholders or ';'.",
             example = "id > 100")
-        @Pattern(regexp = "[^;]*", message = "'where' must be a single condition without ';'") String where,
+        @Pattern(regexp = "^[^;]*$", message = "'where' must be a single condition without ';'") String where,
     @Schema(description = "Database username.", example = "dbuser") String user,
     @Schema(
             description =

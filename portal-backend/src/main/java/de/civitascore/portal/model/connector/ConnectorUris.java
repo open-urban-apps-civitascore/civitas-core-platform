@@ -43,8 +43,7 @@ public final class ConnectorUris {
    * The DSN without user info and without a {@code jdbc:} prefix, because the config-adapter builds
    * the JDBC URL from a {@code postgres://} DSN. A blank DSN is null.
    *
-   * @throws InvalidConnectorValueException naming {@code key} for a DSN without host, with a
-   *     fragment or with a repeated parameter
+   * @throws InvalidConnectorValueException naming {@code key} for a DSN without host
    */
   static String dsnWithoutCredentials(String dsn, String key) {
     if (dsn == null || dsn.isBlank()) {
@@ -55,8 +54,7 @@ public final class ConnectorUris {
             ? dsn.substring(JDBC_PREFIX.length())
             : dsn;
     URI uri = parse(withoutPrefix, key);
-    // The connection test and the pipeline read the host after the last '@', also behind a '#'.
-    if (uri.getHost() == null || uri.getRawFragment() != null || repeatsAParameter(uri)) {
+    if (uri.getHost() == null) {
       throw new InvalidConnectorValueException(key);
     }
     return withoutUserInfo(uri, key).toString();
@@ -155,14 +153,23 @@ public final class ConnectorUris {
   }
 
   /**
-   * Whether a parameter name occurs twice, in any case: the driver takes the last value, the
-   * destination check the {@code sslmode} it finds.
+   * Whether a DSN has a fragment: the connection test and the pipeline read the host after the last
+   * {@code @}, also behind a {@code #}, where the destination check reads the host before it.
    */
-  private static boolean repeatsAParameter(URI uri) {
-    String query = uri.getRawQuery();
-    if (query == null) {
+  public static boolean hasFragment(String dsn) {
+    return dsn.indexOf('#') >= 0;
+  }
+
+  /**
+   * Whether a parameter name of a DSN occurs twice, in any case: the driver takes the last value,
+   * the destination check the {@code sslmode} it finds.
+   */
+  public static boolean repeatsAParameter(String dsn) {
+    int start = dsn.indexOf('?');
+    if (start < 0) {
       return false;
     }
+    String query = dsn.substring(start + 1);
     Set<String> names = new HashSet<>();
     for (String parameter : query.split("&")) {
       int equals = parameter.indexOf('=');

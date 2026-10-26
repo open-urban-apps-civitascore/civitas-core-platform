@@ -30,6 +30,7 @@ import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -139,12 +140,6 @@ class ConnectorJsonTest {
         "{'connectorType':'MQTT','urls':['tcp://u:pw@broker:1883','no url']}"
             + " | Invalid value: connector.urls[1]",
         "{'connectorType':'SQL','dsn':'postgres://u:pw@ bad'} | Invalid value: connector.dsn",
-        "{'connectorType':'SQL','dsn':'postgres://db.example:5432#@attacker.example/city'}"
-            + " | Invalid value: connector.dsn",
-        "{'connectorType':'SQL','dsn':'postgres://db.example:5432/city?sslmode=require&sslmode=disable'}"
-            + " | Invalid value: connector.dsn",
-        "{'connectorType':'SQL','dsn':'postgres://db.example:5432/city?SSLMODE=require&sslmode=disable'}"
-            + " | Invalid value: connector.dsn",
         "['SQL'] | Invalid value: connector",
         "{'connectorType':'HTTP','apiCalls':[{'foo':1}]} | Unknown key: connector.apiCalls[0].foo",
         "{'connectorType':'HTTP','authentication':{'type':'DIGEST'}}"
@@ -268,6 +263,20 @@ class ConnectorJsonTest {
     Map<String, Object> document = ConnectorJson.toDocument(connector, stored, ENCRYPT);
 
     assertThat(document).containsEntry("password", null);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "postgres://db.example:5432/city?sslmode=require&sslmode=require",
+        "postgres://db.example:5432#@attacker.example/city"
+      })
+  void readStored_withADsnThatAWriteRefuses_readsIt(String dsn) {
+    ConnectorConfiguration stored =
+        ConnectorJson.readStored(
+            ConnectorType.SQL, Map.of("connectionType", "sql", "dsn", dsn, "table", "t"));
+
+    assertThat(((SqlConnectorConfiguration) stored).dsn()).isEqualTo(dsn);
   }
 
   private static final Map<String, Object> STORED_SQL =

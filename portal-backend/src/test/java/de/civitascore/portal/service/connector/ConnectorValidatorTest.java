@@ -313,6 +313,27 @@ class ConnectorValidatorTest {
         arguments("note = 'a;b'", false));
   }
 
+  @ParameterizedTest(name = "dsn \"{0}\" accepted: {1}")
+  @MethodSource("sqlDsns")
+  void validate_sqlConnectorAtDraft_acceptsOnlyAnUnambiguousDsn(String dsn, boolean accepted) {
+    SqlConnectorConfiguration connector =
+        new SqlConnectorConfiguration("postgres", dsn, "t", List.of("id"), null, "u", null);
+
+    assertThat(
+            new ConnectorValidator(List.of(new SqlConnectorRules()))
+                .validate(connector, ConnectorValidator.Stage.DRAFT))
+        .extracting(ConnectorViolation::path)
+        .isEqualTo(accepted ? List.of() : List.of("connector.dsn"));
+  }
+
+  private static Stream<Arguments> sqlDsns() {
+    return Stream.of(
+        arguments("postgres://db.example:5432/city?sslmode=require", true),
+        arguments("postgres://db.example:5432/city?sslmode=require&sslmode=disable", false),
+        arguments("postgres://db.example:5432/city?SSLMODE=require&sslmode=disable", false),
+        arguments("postgres://db.example:5432#@attacker.example/city", false));
+  }
+
   private static HttpConnectorConfiguration httpConnectorWith(String key, String value) {
     String path = key.equals("path") ? value : "/stations";
     String headerName = key.equals("headers[0].name") ? value : "Accept";

@@ -110,7 +110,7 @@ class DataSourceConnectionTestServiceTest {
     return new DataSourceConnectionTestService(
         dataSourceService,
         connectorStore,
-        new ConnectorValidator(List.of(new HttpConnectorRules())),
+        new ConnectorValidator(List.of(new HttpConnectorRules(), new SqlConnectorRules())),
         encryptor,
         () -> Optional.of(USER),
         new ConnectionTestProperties("request", "result", 20, maxConcurrent),
@@ -594,6 +594,25 @@ class DataSourceConnectionTestServiceTest {
       service.test(id, sqlAt("db.example", "typed-secret"));
 
       assertThat(sentRequest().connector()).containsEntry("table", "stations");
+    }
+
+    @Test
+    @DisplayName("a DSN that repeats a parameter is refused before anything is sent")
+    void dsnRepeatingAParameter_isRefused() {
+      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
+
+      assertThatThrownBy(
+              () ->
+                  service.test(
+                      id,
+                      input(
+                          "{'connectorType':'SQL','driver':'postgres','dsn':"
+                              + "'postgres://db.example:5432/city?sslmode=require&sslmode=disable',"
+                              + "'table':'readings','columns':['id'],'user':'reader',"
+                              + "'password':'********'}",
+                          null)))
+          .isInstanceOf(ConnectorValidationException.class);
+      verify(client, never()).test(any());
     }
 
     @Test

@@ -73,7 +73,7 @@ class SqlProberIT {
           "INSERT INTO \"Weather\".\"Daily\" VALUES ('2026-10-01', 'dry, \"sunny\"'),"
               + " ('2026-10-02', E'line\\nbreak')");
       sql.execute("CREATE TABLE wide (id int, blob text)");
-      // Five rows of 300,000 characters: more than the driver's result buffer holds at once.
+      // Five rows of 300,000 characters each, far more than a preview holds.
       sql.execute("INSERT INTO wide SELECT i, repeat('x', 300000) FROM generate_series(1, 5) i");
       sql.execute("CREATE TABLE notes (id int, note text)");
       sql.execute("INSERT INTO notes VALUES (1, NULL), (2, '')");
@@ -108,7 +108,9 @@ class SqlProberIT {
     assertTrue(result.success(), result.message());
     assertEquals(5, result.rowCount());
     assertTrue(result.truncated());
-    assertTrue(result.preview().length() < 6 * SqlProber.VALUE_CHARS, "values arrive cut");
+    // 8 KB of preview and a 1 KB margin for masking, however much the rows hold.
+    assertTrue(result.preview().length() <= 9216, "kept " + result.preview().length());
+    assertTrue(result.preview().startsWith("id,blob\r\n1,xxx"), result.preview().substring(0, 20));
   }
 
   @Test
@@ -190,6 +192,19 @@ class SqlProberIT {
 
     assertTrue(failure.getMessage().contains("read-only transaction"), failure.getMessage());
     assertEquals(0, auditEntries());
+  }
+
+  @Test
+  void aRowValueInTheDatabaseAnswerReachesTheUserButNotTheLog() {
+    Map<String, Object> connector = connector("readings", List.of("id"), "owner", "owner-secret");
+    connector.put("where", "id = 3 AND CAST(station AS int) > 0");
+
+    ConnectionTestFailure failure =
+        assertThrows(ConnectionTestFailure.class, () -> probeWithWhere(connector));
+
+    assertEquals(
+        "ERROR: invalid input syntax for type integer: \"station 3\"", failure.getMessage());
+    assertEquals("The database answered with SQLSTATE 22P02.", failure.logText());
   }
 
   @Test

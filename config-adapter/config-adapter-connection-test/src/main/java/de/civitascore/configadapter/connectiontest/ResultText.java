@@ -24,6 +24,10 @@ final class ResultText {
 
   static final int MAX_MESSAGE_CHARS = 500;
   static final int MAX_PREVIEW_BYTES = 8 * 1024;
+
+  /** Read past the preview limit, longer than any secret, so that a cut cannot split one. */
+  static final int MASK_MARGIN = 1024;
+
   static final String TRUNCATED = "\n[truncated]";
 
   static final String MASK = "********";

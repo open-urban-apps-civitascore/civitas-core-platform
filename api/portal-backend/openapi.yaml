@@ -13837,7 +13837,7 @@ components:
           description: "SQL WHERE clause: one condition of literal SQL, without bind\
             \ placeholders or ';'."
           example: id > 100
-          pattern: "[^;]*"
+          pattern: "^[^;]*$"
       required:
       - connectorType
     StyleInputDTO:
