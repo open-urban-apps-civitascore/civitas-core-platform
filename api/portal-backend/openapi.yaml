@@ -241,6 +241,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /assignments
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -608,6 +617,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /datapools
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -877,6 +895,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datapools/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -1032,6 +1059,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datapools/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -1345,6 +1381,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /datasets
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -1574,6 +1619,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/datasinks"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -1709,6 +1763,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -1913,6 +1976,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -2072,6 +2144,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -2316,6 +2397,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/layers"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -2451,6 +2541,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -2657,6 +2756,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -2816,6 +2924,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -3194,6 +3311,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/pipelines"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -3329,6 +3455,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/pipelines/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -3533,6 +3668,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/pipelines/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -3692,6 +3836,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/pipelines/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -3936,6 +4089,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/styles"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -4071,6 +4233,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -4277,6 +4448,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -4436,6 +4616,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -4723,6 +4912,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -4879,6 +5077,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -5131,6 +5338,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{id}/ready/meta"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -5436,6 +5652,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{id}/stage"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -5807,6 +6032,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /datasources
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -5947,6 +6181,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /datasources/connection-test
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -6188,6 +6431,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasources/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -6343,6 +6595,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasources/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -6551,6 +6812,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasources/{id}/connection-test"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -6796,14 +7066,6 @@ paths:
         schema:
           type: string
           example: structure
-      - description: Filter by status (exact match).
-        in: query
-        name: dataStructureStatus
-        schema:
-          type: string
-          enum:
-          - DRAFT
-          - AVAILABLE
       responses:
         "200":
           content:
@@ -6877,6 +7139,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /datastructures
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -7016,6 +7287,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datastructures/{dataStructureId}/versions"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -7206,6 +7486,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datastructures/{dataStructureId}/versions/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -7365,6 +7654,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datastructures/{dataStructureId}/versions/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -7523,6 +7821,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/release"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -7690,6 +7997,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/released/meta"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -7786,8 +8102,6 @@ paths:
   /datastructures/{dataStructureId}/versions/{versionId}/unrelease:
     post:
       description: Unreleases a data structure version by setting status back to DRAFT.
-        Cannot unrelease if this is the only released version of a released DataStructure
-        - unrelease the DataStructure first in that case.
       operationId: unreleaseDataStructureVersion
       parameters:
       - in: path
@@ -7849,6 +8163,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unrelease"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -7868,7 +8191,7 @@ paths:
                     type: urn:civitas:error:VALIDATION_FAILED
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: Invalid input (e.g. already in DRAFT or only released version)
+          description: Invalid input (e.g. already in DRAFT)
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -8132,6 +8455,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datastructures/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -8287,6 +8619,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datastructures/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -8421,96 +8762,6 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
       summary: Get assignments
-      tags:
-      - Data Structures
-  /datastructures/{id}/release:
-    post:
-      description: Transitions the entity from DRAFT to AVAILABLE status.
-      operationId: releaseDataStructure
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DataStructureOutputDTO"
-          description: OK
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
-      summary: Release
-      tags:
-      - Data Structures
-  /datastructures/{id}/released/meta:
-    patch:
-      description: "Applies a JSON merge patch to the metadata of a released entity.\
-        \ An omitted field keeps its value. A field that is not metadata answers 400,\
-        \ and so does null for assignments or datapoolScope. Only works on entities\
-        \ that are not in DRAFT status."
-      operationId: updateReleasedDataStructureMeta
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PatchDataStructureMetaInputDTO"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DataStructureOutputDTO"
-          description: OK
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
-      summary: Update released metadata
-      tags:
-      - Data Structures
-  /datastructures/{id}/unrelease:
-    post:
-      description: Transitions the entity from AVAILABLE back to DRAFT status.
-      operationId: unreleaseDataStructure
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DataStructureOutputDTO"
-          description: OK
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
-      summary: Unrelease
       tags:
       - Data Structures
   /groups:
@@ -8688,6 +8939,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /groups
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -8992,6 +9252,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/groups/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -9147,6 +9416,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/groups/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -9597,6 +9875,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /roles
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -9865,6 +10152,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/roles/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -10020,6 +10316,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/roles/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -10281,6 +10586,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /users
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -10570,6 +10884,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/users/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -10725,6 +11048,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/users/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -11482,23 +11814,6 @@ components:
       required:
       - description
       - name
-    DataStructureMetaInputDTO:
-      type: object
-      properties:
-        assignments:
-          type: array
-          items:
-            $ref: "#/components/schemas/AssignmentScopedInputDTO"
-          uniqueItems: true
-        description:
-          type: string
-          minLength: 1
-        name:
-          type: string
-          minLength: 1
-      required:
-      - description
-      - name
     DataStructureOutputDTO:
       type: object
       properties:
@@ -11508,12 +11823,6 @@ components:
           description: Timestamp when the resource was created
           example: 2025-06-15T10:30:00
           readOnly: true
-        dataStructureStatus:
-          type: string
-          enum:
-          - DRAFT
-          - AVAILABLE
-          example: ACTIVE
         dataStructureVersions:
           type: array
           items:
@@ -11535,7 +11844,7 @@ components:
         inUseByReleased:
           type: boolean
           description: "Whether a released entity references one of this data structure's\
-            \ versions. While true, it cannot be unreleased"
+            \ versions. While true, those versions cannot be unreleased"
           readOnly: true
         modifiedAt:
           type: string
@@ -12012,7 +12321,9 @@ components:
           pageSize:
             type: integer
             format: int32
-            description: Number of records per page. At least 1.
+            description: "Number of records per page. At least 1. It must not be larger\
+              \ than the maximum page size of the API. With a larger page size, the\
+              \ run stops after the first page without an error."
             example: 100
             minimum: 1
           pageSizeParameter:
@@ -12898,20 +13209,6 @@ components:
         name:
           type: string
           minLength: 1
-    PatchDataStructureMetaInputDTO:
-      description: Partial update — only provided fields are modified.
-      properties:
-        assignments:
-          type: array
-          items:
-            $ref: "#/components/schemas/AssignmentScopedInputDTO"
-          uniqueItems: true
-        description:
-          type: string
-          minLength: 1
-        name:
-          type: string
-          minLength: 1
     PatchDataStructureVersionInputDTO:
       description: Partial update — only provided fields are modified.
       properties:
@@ -13233,9 +13530,15 @@ components:
           - RUNTIME
         state:
           type: string
+          description: "OK: the Pipeline runs. ERROR: the deployment failed, or the\
+            \ Pipeline failed while running and tries again at its next run. STOPPED:\
+            \ the platform stopped the Pipeline after a fatal error, and message holds\
+            \ the cause. To run a stopped Pipeline again, unrelease and release the\
+            \ Dataset."
           enum:
           - OK
           - ERROR
+          - STOPPED
     PipelineSummaryDTO:
       type: object
       properties:
