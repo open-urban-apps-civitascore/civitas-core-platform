@@ -80,15 +80,16 @@ allow_cases := [
 		"ctx": mock_http.user_with_scoped_permissions(["DATASET_CREATE"], "DATAPOOL", "pool-1"),
 		"method": "POST", "path": "/v1/datasets", "scope": "", "pool": "pool-1",
 	},
-	# Connection test: unsaved values are gated like a create, a saved Data source like its update.
+	# Connection test: a reader may test. Unsaved values need a tenant-wide grant, a saved Data
+	# source a grant on it.
 	{
 		"name": "datasource connection test, TENANT scope",
-		"ctx": mock_http.user_with_permissions(["DATASOURCE_CREATE"]),
+		"ctx": mock_http.user_with_permissions(["DATASOURCE_READ"]),
 		"method": "POST", "path": "/v1/datasources/connection-test", "scope": "*",
 	},
 	{
 		"name": "saved datasource connection test, matching DATASOURCE scope",
-		"ctx": mock_http.user_with_scoped_permissions(["DATASOURCE_UPDATE"], "DATASOURCE", "ds-1"),
+		"ctx": mock_http.user_with_scoped_permissions(["DATASOURCE_READ"], "DATASOURCE", "ds-1"),
 		"method": "POST", "path": "/v1/datasources/ds-1/connection-test", "scope": "ds-1",
 	},
 ]
@@ -150,28 +151,23 @@ deny_cases := [
 		"method": "POST", "path": "/v1/datasources",
 	},
 	{
-		"name": "datasource connection test, read permission only",
-		"ctx": mock_http.user_with_permissions(["DATASOURCE_READ"]),
-		"method": "POST", "path": "/v1/datasources/connection-test",
-	},
-	{
-		"name": "datasource connection test, TENANT scope without DATASOURCE_CREATE",
-		"ctx": mock_http.user_with_permissions(["DATASOURCE_UPDATE", "DATASOURCE_READ"]),
+		"name": "datasource connection test, TENANT scope without DATASOURCE_READ",
+		"ctx": mock_http.user_with_permissions(["DATASOURCE_CREATE", "DATASOURCE_UPDATE"]),
 		"method": "POST", "path": "/v1/datasources/connection-test",
 	},
 	{
 		"name": "datasource connection test, DATASOURCE scope",
-		"ctx": mock_http.user_with_scoped_permissions(["DATASOURCE_CREATE"], "DATASOURCE", "ds-1"),
+		"ctx": mock_http.user_with_scoped_permissions(["DATASOURCE_READ"], "DATASOURCE", "ds-1"),
 		"method": "POST", "path": "/v1/datasources/connection-test",
 	},
 	{
-		"name": "saved datasource connection test, read permission only",
-		"ctx": mock_http.user_with_scoped_permissions(["DATASOURCE_READ"], "DATASOURCE", "ds-1"),
+		"name": "saved datasource connection test, update permission only",
+		"ctx": mock_http.user_with_scoped_permissions(["DATASOURCE_UPDATE"], "DATASOURCE", "ds-1"),
 		"method": "POST", "path": "/v1/datasources/ds-1/connection-test",
 	},
 	{
 		"name": "saved datasource connection test, wrong DATASOURCE scope",
-		"ctx": mock_http.user_with_scoped_permissions(["DATASOURCE_UPDATE"], "DATASOURCE", "other"),
+		"ctx": mock_http.user_with_scoped_permissions(["DATASOURCE_READ"], "DATASOURCE", "other"),
 		"method": "POST", "path": "/v1/datasources/ds-1/connection-test",
 	},
 	{

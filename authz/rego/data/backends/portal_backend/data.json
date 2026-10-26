@@ -166,10 +166,10 @@
     },
     "/v1/datasources/connection-test": {
       "_collection": true,
-      "POST": "DATASOURCE_CREATE"
+      "POST": "DATASOURCE_READ"
     },
     "/v1/datasources/{id}/connection-test": {
-      "POST": "DATASOURCE_UPDATE"
+      "POST": "DATASOURCE_READ"
     },
     "/v1/datastructures": {
       "_collection": true,
