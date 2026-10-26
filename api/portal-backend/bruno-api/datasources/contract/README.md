@@ -20,7 +20,7 @@ It holds `connectorType` (`MQTT`, `SQL` or `HTTP`) and the fields of that type:
   type. Otherwise it has every field of the type, null when unset. A
   stored secret reads `"********"`, no secret reads `null`. The secrets
   are each `password`, and the HTTP `authentication.token`, `.value`,
-  `.clientSecret` and `.privateKey`. MQTT
+  `.clientSecret`, `.certificate` and `.privateKey`. MQTT
   `protocol_version` reads `"3"` when unset, `tls` reads
   `{ "enabled": false }` when unset. HTTP `authentication` reads
   `{ "type": "NONE" }` when unset, `startPage` reads `0` when unset, and

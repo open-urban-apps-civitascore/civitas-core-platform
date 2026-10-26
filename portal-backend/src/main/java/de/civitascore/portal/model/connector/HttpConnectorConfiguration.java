@@ -169,8 +169,9 @@ public record HttpConnectorConfiguration(
               description =
                   "Name of the header or query parameter that carries the token. It differs from"
                       + " each header or query parameter at the same place of every API call,"
-                      + " pagination included. As a header name, it is a header token and not"
-                      + " Connection, Content-Length, Expect, Host or Upgrade.",
+                      + " pagination included. As a header name, it follows the header name rules"
+                      + " of an API call, but Authorization, Proxy-Authorization and Cookie are"
+                      + " allowed.",
               example = "X-API-Key")
           @NotNull(groups = OnRelease.class, message = "'name' is required") String name,
       @Schema(
@@ -506,8 +507,7 @@ public record HttpConnectorConfiguration(
       @Schema(
               description =
                   "Name of the query parameter or header that carries the cursor. As a header"
-                      + " name, it is a header token and not Authorization, Proxy-Authorization,"
-                      + " Cookie, Connection, Content-Length, Expect, Host or Upgrade.",
+                      + " name, it follows the header name rules of an API call.",
               example = "cursor")
           @NotNull(groups = OnRelease.class, message = "'cursorParameter' is required") String cursorParameter,
       @Schema(description = "Where each request sends the cursor.", example = "QUERY")
