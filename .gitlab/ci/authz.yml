@@ -263,15 +263,14 @@ deploy-authz:
 # APISIX, OPA, the authz repository and the backend with Keycloak users in three roles. The script
 # was never part of CI. It builds nothing here (--skip-build): the images are built by `docker
 # compose up` from the jars of this pipeline.
-# TODO: this job has never run in CI. First run (pipeline 2989827415): the port check passed (it
-# needed lsof and ss), then the stack failed to start: the config-adapter of docker-compose.authz-e2e.yml
-# runs with ADAPTERS=keycloak, and the adapter now refuses to start without the saga handlers
-# "frost" and "apisix" ("Required SagaCommandHandlers not registered"). The compose file is stale.
-# Known problems to fix after that:
+# TODO: first runs: the port check needed lsof and ss; then the config-adapter of
+# docker-compose.authz-e2e.yml (ADAPTERS=keycloak) refused to start without the saga handlers
+# "frost" and "apisix"; it now gets their settings as in the API test stack. Open, whatever the
+# next run shows:
 #  - the script reaches the stack at localhost, a dind daemon is at `docker` (set below), and a
 #    token issued under that host may not match the issuer the stack is configured with;
-#  - the Flyway step bind-mounts portal-backend/src/main/resources/db/migration with `docker run -v`,
-#    which does not work with a daemon in another container (copy the files in instead);
+#  - other bind mounts of the stack (Keycloak realm import, APISIX and OPA config) only work if the
+#    dind daemon sees the build directory; the Flyway step copies its files in with `docker cp`;
 #  - the config-adapter, authz and portal-backend images are built from jars that must be in the
 #    working tree, so build-authz, build-config-adapter and build-backend are needed.
 # TODO: its seven scenarios are also covered by the Rego tests (decision_matrix_test.rego) and the

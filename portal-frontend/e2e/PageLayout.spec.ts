@@ -7,7 +7,7 @@ test.describe('Page Layout', async () => {
 
   test('has title', async ({ page }) => {
     // Expect a title "to contain" a substring.
-    await expect(page).toHaveTitle(/CIVITAS\/Core v2/)
+    await expect(page).toHaveTitle(/CIVITAS\/CORE V2/)
   })
 
   test('renders the basic page layout consistently on different pages', async ({ page }) => {
@@ -45,47 +45,42 @@ test.describe('Page Layout', async () => {
   })
 
   test('toggles the sidebar visibility when clicking the toggle button', async ({ page }) => {
-    const sidebar = page.getByLabel('Main navigation')
-    await expect(sidebar).toBeVisible()
+    const sidebar = page.locator('[data-slot="sidebar"]')
+    await expect(sidebar).toHaveAttribute('data-state', 'expanded')
 
     const toggleSidebarButton = page.getByRole('button', { name: 'Toggle Sidebar' })
     await expect(toggleSidebarButton).toBeVisible()
 
-    // Check if the sidebar is initially expanded
-    const navItem = page.getByText('Our Data')
-
-    // Click the toggle button to hide the sidebar
+    // The labels stay in the DOM when the sidebar collapses to its icons, so the state is checked
     await toggleSidebarButton.click()
-    await expect(navItem).not.toBeVisible()
+    await expect(sidebar).toHaveAttribute('data-state', 'collapsed')
 
-    // Click the toggle button again to show the sidebar
     await toggleSidebarButton.click()
-    await expect(navItem).toBeVisible()
+    await expect(sidebar).toHaveAttribute('data-state', 'expanded')
   })
 
   test('navigates to the correct page when clicking sidebar links', async ({ page }) => {
     const sidebar = page.getByLabel('Main navigation')
     await expect(sidebar).toBeVisible()
 
-    // Click the "Our Data" link and check if URL and main content area are correct
-    const dataLink = sidebar.getByRole('link', { name: 'Our Data' })
-    await expect(dataLink).toBeVisible()
-    await dataLink.click()
+    // "Our data" is a group: its links are Data pools, Datasets, Data sources and Data structures
+    const datasetsLink = sidebar.getByRole('link', { name: 'Datasets', exact: true })
+    await expect(datasetsLink).toBeVisible()
+    await datasetsLink.click()
     await page.waitForLoadState('networkidle')
 
     await expect(page).toHaveURL(/\/datasets/)
-    const heading = page.getByRole('heading', { name: 'Datasets' })
-    await expect(heading).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Datasets', level: 1 })).toBeVisible()
 
-    // Click "User Management" link and check if URL and main content area are correct
-    const userManagementLink = sidebar.getByRole('link', { name: 'User Management' })
-    await expect(userManagementLink).toBeVisible()
-    await userManagementLink.click()
+    // "Tenant management" is a collapsed group with the user management inside
+    await sidebar.getByRole('button', { name: 'Tenant management' }).click()
+    const usersLink = sidebar.getByRole('link', { name: 'User', exact: true })
+    await expect(usersLink).toBeVisible()
+    await usersLink.click()
     await page.waitForLoadState('networkidle')
 
     await expect(page).toHaveURL(/\/users/)
-    const userManagementHeading = page.getByRole('heading', { name: 'Overview: Users' })
-    await expect(userManagementHeading).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Overview: Users' })).toBeVisible()
   })
 
   test('updates breadcrumb correctly', async ({ page }) => {
@@ -93,10 +88,10 @@ test.describe('Page Layout', async () => {
     await page.waitForLoadState('networkidle')
     await expect(page).toHaveURL(/\/datasets/)
 
-    // Check breadcrumb contents on datasets page
+    // Breadcrumb on the datasets page: Home / Datasets
     const breadcrumb = page.getByRole('navigation', { name: 'Breadcrumb' })
     const homePageLink = breadcrumb.getByRole('link', { name: 'Home' })
-    const datasetsPageLink = breadcrumb.getByText('Our Data')
+    const datasetsPageLink = breadcrumb.getByRole('link', { name: 'Datasets' })
 
     await expect(homePageLink).toBeVisible()
     await expect(datasetsPageLink).toBeVisible()
@@ -112,17 +107,15 @@ test.describe('Page Layout', async () => {
     await page.waitForLoadState('networkidle')
     await expect(page).toHaveURL(/\/users/)
 
-    // Check breadcrumb contents on users page
     const breadcrumbUsers = page.getByRole('navigation', { name: 'Breadcrumb' })
     const homePageLinkUsers = breadcrumbUsers.getByRole('link', { name: 'Home' })
-    const usersPageLink = breadcrumbUsers.getByText('User Management')
+    const usersPageLink = breadcrumbUsers.getByRole('link', { name: /users?/i })
 
     await expect(homePageLinkUsers).toBeVisible()
     await expect(usersPageLink).toBeVisible()
     await expect(usersPageLink).toHaveAttribute('aria-current', 'page')
     await expect(homePageLinkUsers).not.toHaveAttribute('aria-current', 'page')
 
-    // Click the "Home" link in the breadcrumb and check if the URL is correct
     await homePageLinkUsers.click()
     await page.waitForLoadState('networkidle')
     await expect(page).toHaveURL(/\/$/)
@@ -155,7 +148,7 @@ test.describe('Language Switcher', () => {
     // Select German and check if language is updated
     await languageMenu.getByRole('option', { name: languageOptionsEnglish['german'] }).click()
     await expect(languageMenu).not.toBeVisible()
-    await expect(page.getByText('Unsere Daten')).toBeVisible()
+    await expect(page.getByText('Unsere Daten', { exact: true })).toBeVisible()
 
     // Open language select again
     await languageSelect.click()
@@ -169,7 +162,7 @@ test.describe('Language Switcher', () => {
     // Select English and check if language is updated
     await languageMenu.getByRole('option', { name: languageOptionsGerman['english'] }).click()
     await expect(languageMenu).not.toBeVisible()
-    await expect(page.getByText('Our Data')).toBeVisible()
+    await expect(page.getByText('Our data', { exact: true })).toBeVisible()
 
     //Check if language menu is closed when clicking outside
     await languageSelect.click()

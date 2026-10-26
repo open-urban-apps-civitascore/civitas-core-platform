@@ -267,15 +267,20 @@ wait_for_healthy postgis-dev-env 30 1 || exit 1
 # Step 2: Flyway migrations
 echo "  Running Flyway migrations..."
 FLYWAY_MIGRATIONS="$PROJECT_ROOT/portal-backend/src/main/resources/db/migration"
-if docker run --rm --network civitas-network \
-    -v "$FLYWAY_MIGRATIONS:/flyway/sql:ro" \
+# The migrations are copied into the container instead of bind-mounted, so this also works when the
+# Docker daemon is not on this host (a dind service in CI)
+FLYWAY_CONTAINER=$(docker create --network civitas-network \
     flyway/flyway:11-alpine \
     -url=jdbc:postgresql://postgis-dev-env:5432/portal_backend \
     -user=admin -password=admin \
     -locations=filesystem:/flyway/sql \
-    migrate; then
+    migrate)
+docker cp "$FLYWAY_MIGRATIONS/." "$FLYWAY_CONTAINER:/flyway/sql"
+if docker start -a "$FLYWAY_CONTAINER"; then
+    docker rm "$FLYWAY_CONTAINER" > /dev/null
     echo -e "  Migrations: ${GREEN}OK${NC}"
 else
+    docker rm "$FLYWAY_CONTAINER" > /dev/null
     echo -e "  Migrations: ${RED}FAILED${NC}"
     exit 1
 fi
