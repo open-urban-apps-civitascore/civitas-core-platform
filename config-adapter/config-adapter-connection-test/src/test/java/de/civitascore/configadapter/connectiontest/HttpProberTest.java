@@ -87,6 +87,31 @@ class HttpProberTest {
             body.write(bytes);
           }
         });
+    server.createContext(
+        "/sheet",
+        exchange -> {
+          exchange
+              .getResponseHeaders()
+              .add(
+                  "Content-Type",
+                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+          byte[] bytes = new byte[] {0x50, 0x4b, 0x03, 0x04, 0x14, 0, 0, 0};
+          exchange.sendResponseHeaders(200, bytes.length);
+          try (OutputStream body = exchange.getResponseBody()) {
+            body.write(bytes);
+          }
+        });
+    server.createContext(
+        "/not-gzip",
+        exchange -> {
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.getResponseHeaders().add("Content-Encoding", "gzip");
+          byte[] bytes = "{\"ok\":true}".getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(200, bytes.length);
+          try (OutputStream body = exchange.getResponseBody()) {
+            body.write(bytes);
+          }
+        });
     server.createContext("/empty", exchange -> respond(exchange, 204, "", null));
     server.createContext(
         "/scalars", exchange -> respond(exchange, 200, "application/json", "[1, 2, 3]"));
@@ -215,8 +240,40 @@ class HttpProberTest {
 
     assertFalse(result.success());
     assertEquals(200, result.httpStatus());
-    assertTrue(result.message().contains("not JSON"), result.message());
-    assertEquals("(7 bytes of application/zip, not shown)", result.preview());
+    assertEquals(
+        "The API answered with HTTP 200. The body is not JSON; the pipeline reads JSON only."
+            + " It holds 7 bytes of application/zip, which the test does not show.",
+        result.message());
+    assertNull(result.preview());
+  }
+
+  @Test
+  void describesAnOfficeDocumentInsteadOfShowingIt() throws Exception {
+    ProbeResult result = probe(call("sheet", "/sheet"), "sheet");
+
+    assertFalse(result.success());
+    assertTrue(
+        result
+            .message()
+            .endsWith(
+                " It holds 8 bytes of"
+                    + " application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,"
+                    + " which the test does not show."),
+        result.message());
+    assertNull(result.preview());
+  }
+
+  @Test
+  void keepsTheStatusOfABodyThatIsNotTheEncodingItNames() throws Exception {
+    ProbeResult result = probe(call("not-gzip", "/not-gzip"), "not-gzip");
+
+    assertFalse(result.success());
+    assertEquals(200, result.httpStatus());
+    assertEquals(
+        "The API answered with HTTP 200. The body is compressed (gzip), which the pipeline does"
+            + " not unpack. It is not valid gzip, so the test does not show it.",
+        result.message());
+    assertNull(result.preview());
   }
 
   @Test
@@ -249,7 +306,10 @@ class HttpProberTest {
   void describesABodyInAnEncodingItCannotDecode() throws Exception {
     ProbeResult result = probe(call("brotli", "/brotli"), "brotli");
 
-    assertEquals("(4 bytes encoded as br, not shown)", result.preview());
+    assertTrue(
+        result.message().endsWith(" It holds 4 bytes encoded as br, which the test does not show."),
+        result.message());
+    assertNull(result.preview());
     assertFalse(result.success());
   }
 

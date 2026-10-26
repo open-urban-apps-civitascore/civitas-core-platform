@@ -13,6 +13,7 @@ import static de.civitascore.configadapter.connector.ConnectorValues.objectOrEmp
 import static de.civitascore.configadapter.connector.ConnectorValues.trimmedString;
 
 import de.civitascore.configadapter.connector.ConnectorValues;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -36,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
+import java.util.zip.ZipException;
 
 /**
  * Runs the named API call of an HTTP connector once and returns its status code and body. A
@@ -46,10 +48,18 @@ final class HttpProber implements ConnectionProber {
   /** The connect timeout of the pipeline's web client. */
   private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
 
-  /** Read past the preview limit, longer than any credential, so the cut cannot split one. */
-  private static final int MASK_MARGIN_BYTES = 1024;
-
   private static final char[] HEX = "0123456789ABCDEF".toCharArray();
+
+  /** Media types of text that are not {@code text/*}, {@code +json} or {@code +xml}. */
+  private static final Set<String> TEXT_TYPES =
+      Set.of(
+          "application/json",
+          "application/xml",
+          "application/javascript",
+          "application/yaml",
+          "application/x-yaml",
+          "application/csv",
+          "application/x-ndjson");
 
   /** Content encodings whose body the preview can show. */
   private static final Set<String> DECODABLE_ENCODINGS =
@@ -318,7 +328,7 @@ final class HttpProber implements ConnectionProber {
       message += " The pipeline does not follow redirects.";
     }
     Body body = read(response);
-    if (success && body.head().length > 0) {
+    if (success && (body.head().length > 0 || !"identity".equals(body.encoding()))) {
       String unreadable = unreadableByPipeline(body);
       if (unreadable != null) {
         success = false;
@@ -337,16 +347,10 @@ final class HttpProber implements ConnectionProber {
           null,
           status);
     }
-    String preview =
-        body.head().length == 0
-            ? null
-            : "("
-                + (body.truncated() ? "more than " : "")
-                + body.head().length
-                + " bytes "
-                + body.kind()
-                + ", not shown)";
-    return new ProbeResult(success, message, preview, false, null, status);
+    if (body.notShown() != null) {
+      message += " " + body.notShown();
+    }
+    return new ProbeResult(success, message, null, false, null, status);
   }
 
   /** Why the pipeline cannot read a body, or null if it can. */
@@ -378,9 +382,19 @@ final class HttpProber implements ConnectionProber {
     boolean decodable = DECODABLE_ENCODINGS.contains(encoding);
     byte[] bytes;
     try (InputStream body = response.body()) {
-      bytes =
-          (decodable ? decoded(body, encoding) : body)
-              .readNBytes(ResultText.MAX_PREVIEW_BYTES + MASK_MARGIN_BYTES);
+      try {
+        bytes =
+            (decodable ? decoded(body, encoding) : body)
+                .readNBytes(ResultText.MAX_PREVIEW_BYTES + ResultText.MASK_MARGIN);
+      } catch (ZipException | EOFException e) {
+        // A body labelled gzip or deflate that is something else, or empty.
+        return new Body(
+            null,
+            new byte[0],
+            false,
+            "It is not valid " + encoding + ", so the test does not show it.",
+            encoding);
+      }
     } catch (IOException e) {
       throw new ConnectionTestFailure(
           "The API answered with HTTP "
@@ -391,19 +405,23 @@ final class HttpProber implements ConnectionProber {
     }
     boolean truncated = bytes.length > ResultText.MAX_PREVIEW_BYTES;
     byte[] head = Arrays.copyOf(bytes, Math.min(bytes.length, ResultText.MAX_PREVIEW_BYTES));
+    String size = (truncated ? "more than " : "") + head.length + " bytes";
     if (!decodable) {
-      return new Body(null, head, truncated, "encoded as " + encoding, encoding);
+      return new Body(null, head, truncated, notShown(size + " encoded as " + encoding), encoding);
     }
-    if (head.length == 0 || !isText(contentType, head)) {
-      return new Body(
-          null,
-          head,
-          truncated,
-          "of " + (contentType.isEmpty() ? "binary data" : contentType),
-          encoding);
+    if (head.length == 0) {
+      return new Body(null, head, false, null, encoding);
     }
-    return new Body(
-        new String(bytes, charset(contentType)), head, truncated, "of " + contentType, encoding);
+    String mediaType = contentType.split(";")[0].trim();
+    if (!isText(mediaType, head)) {
+      String kind = mediaType.isEmpty() ? "binary data" : mediaType;
+      return new Body(null, head, truncated, notShown(size + " of " + kind), encoding);
+    }
+    return new Body(new String(bytes, charset(contentType)), head, truncated, null, encoding);
+  }
+
+  private static String notShown(String what) {
+    return "It holds " + what + ", which the test does not show.";
   }
 
   private static InputStream decoded(InputStream body, String encoding) throws IOException {
@@ -414,21 +432,21 @@ final class HttpProber implements ConnectionProber {
     };
   }
 
-  private static boolean isText(String contentType, byte[] bytes) {
-    if (contentType.isEmpty()) {
-      for (byte b : bytes) {
-        if (b == 0) {
-          return false;
-        }
+  /**
+   * Text media types by name, so that an Office document, whose type names "xml", counts as binary.
+   * A NUL byte makes any body binary.
+   */
+  private static boolean isText(String mediaType, byte[] bytes) {
+    for (byte b : bytes) {
+      if (b == 0) {
+        return false;
       }
-      return true;
     }
-    return contentType.startsWith("text/")
-        || contentType.contains("json")
-        || contentType.contains("xml")
-        || contentType.contains("csv")
-        || contentType.contains("javascript")
-        || contentType.contains("yaml");
+    return mediaType.isEmpty()
+        || mediaType.startsWith("text/")
+        || mediaType.endsWith("+json")
+        || mediaType.endsWith("+xml")
+        || TEXT_TYPES.contains(mediaType);
   }
 
   private static Charset charset(String contentType) {
@@ -500,10 +518,11 @@ final class HttpProber implements ConnectionProber {
    * @param text the body as text, or null if it is not text
    * @param head the first bytes of the body, unpacked if it is compressed
    * @param truncated whether the body is longer than {@code head}
-   * @param kind what the bytes are, e.g. "of application/zip" or "encoded as br"
+   * @param notShown why a body that is not text is not shown, or null
    * @param encoding the content encoding the server sent, {@code identity} if none
    */
-  private record Body(String text, byte[] head, boolean truncated, String kind, String encoding) {}
+  private record Body(
+      String text, byte[] head, boolean truncated, String notShown, String encoding) {}
 
   /** The {@code type} of a connector's authentication. */
   private enum Authentication {
