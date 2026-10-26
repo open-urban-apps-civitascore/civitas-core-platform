@@ -7,6 +7,7 @@ import de.civitascore.portal.messaging.kafka.ConnectionTestClient;
 import de.civitascore.portal.model.connector.ConnectorConfiguration;
 import de.civitascore.portal.model.connector.ConnectorJson;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.OAuth2;
 import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
 import de.civitascore.portal.model.connector.MqttConnectorConfiguration;
 import de.civitascore.portal.model.connector.SqlConnectorConfiguration;
@@ -25,12 +26,14 @@ import java.net.URISyntaxException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
@@ -292,7 +295,11 @@ public class DataSourceConnectionTestService {
           case SqlConnectorConfiguration sql -> sql.dsn() == null ? null : List.of(sql.dsn());
           case MqttConnectorConfiguration mqtt -> mqtt.urls();
           case HttpConnectorConfiguration http ->
-              http.baseUrl() == null ? null : List.of(http.baseUrl());
+              Stream.of(
+                      http.baseUrl(),
+                      http.authentication() instanceof OAuth2 oauth2 ? oauth2.tokenUrl() : null)
+                  .filter(Objects::nonNull)
+                  .toList();
           default ->
               throw new IllegalArgumentException(
                   "No addresses of " + connector.getClass().getSimpleName());

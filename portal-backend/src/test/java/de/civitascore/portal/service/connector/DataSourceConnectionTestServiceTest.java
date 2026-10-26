@@ -181,7 +181,14 @@ class DataSourceConnectionTestServiceTest {
             + "'authentication':{'type':'BASIC','username':'reader','password':'********'},"
             + "'apiCalls':[{'name':'stations','path':'/stations'}]}",
         "stations",
-        "/authentication/password");
+        "/authentication/password"),
+    HTTP_OAUTH2(
+        "{'connectorType':'HTTP','baseUrl':'https://api.example.org/v1',"
+            + "'authentication':{'type':'OAUTH2','tokenUrl':'https://auth.example.org/token',"
+            + "'clientId':'reader','clientSecret':'********'},"
+            + "'apiCalls':[{'name':'stations','path':'/stations'}]}",
+        "stations",
+        "/authentication/clientSecret");
 
     private final String json;
     private final String apiCall;
@@ -400,7 +407,12 @@ class DataSourceConnectionTestServiceTest {
               "'tcp://broker-b:1883','tcp://broker-c:1883'"),
           arguments(Saved.MQTT, "a removed URL", ",'tcp://broker-b:1883'", ""),
           arguments(Saved.HTTP, "another host", "api.example.org", "api.attacker.example"),
-          arguments(Saved.HTTP, "another port", "api.example.org/", "api.example.org:8443/"));
+          arguments(Saved.HTTP, "another port", "api.example.org/", "api.example.org:8443/"),
+          arguments(
+              Saved.HTTP_OAUTH2,
+              "another token host",
+              "auth.example.org",
+              "auth.attacker.example"));
     }
 
     static Stream<Arguments> otherValuesAtTheSameDestination() {
@@ -409,7 +421,8 @@ class DataSourceConnectionTestServiceTest {
           arguments(Saved.SQL, "other columns", "['id','value']", "['id']"),
           arguments(Saved.SQL, "another database", ":5432/city", ":5432/archive"),
           arguments(Saved.MQTT, "another topic", "sensor/#", "weather/#"),
-          arguments(Saved.HTTP, "another API call path", "'/stations'", "'/stations/active'"));
+          arguments(Saved.HTTP, "another API call path", "'/stations'", "'/stations/active'"),
+          arguments(Saved.HTTP_OAUTH2, "another token path", "/token", "/oauth2/token"));
     }
 
     static Stream<Arguments> changedValues() {
