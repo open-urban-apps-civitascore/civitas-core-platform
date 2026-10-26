@@ -4,12 +4,13 @@ import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.input.assignment.AssignmentInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.assembler.AssignmentAssembler;
+import de.civitascore.portal.problem.ProblemType;
+import de.civitascore.portal.problem.Problems;
 import de.civitascore.portal.repository.specification.AssignmentSpec;
 import de.civitascore.portal.service.AssignmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,7 +23,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -128,10 +128,7 @@ public class AssignmentController {
       summary = "Get assignment by ID",
       description = "Returns a single assignment identified by its UUID.")
   @ApiResponse(responseCode = "200", description = "Assignment returned successfully")
-  @ApiResponse(
-      responseCode = "404",
-      description = "Assignment not found",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @Problems(ProblemType.NOT_FOUND)
   public AssignmentOutputDTO getAssignment(@PathVariable UUID assignmentId) {
     return assignmentAssembler.toOutput(assignmentService.findByIdOrThrow(assignmentId));
   }
@@ -144,14 +141,11 @@ public class AssignmentController {
           "Creates a new assignment and returns it with a Location header pointing to the new"
               + " assignment URI.")
   @ApiResponse(responseCode = "201", description = "Assignment created successfully")
-  @ApiResponse(
-      responseCode = "400",
-      description = "Invalid input",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "409",
-      description = "Conflict (e.g. unique constraint violation)",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @Problems({
+    ProblemType.INVALID_INPUT,
+    ProblemType.NOT_FOUND,
+    ProblemType.UNIQUE_CONSTRAINT_VIOLATION
+  })
   public ResponseEntity<AssignmentOutputDTO> createAssignment(
       @Valid @RequestBody AssignmentInputDTO input) {
     Assignment created = assignmentService.create(input);
@@ -165,14 +159,7 @@ public class AssignmentController {
       summary = "Delete an assignment",
       description = "Permanently deletes an assignment by its UUID.")
   @ApiResponse(responseCode = "204", description = "Assignment deleted successfully")
-  @ApiResponse(
-      responseCode = "404",
-      description = "Assignment not found",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "409",
-      description = "Conflict (assignment still in use)",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @Problems(ProblemType.NOT_FOUND)
   public void deleteAssignment(@PathVariable UUID assignmentId) {
     assignmentService.deleteById(assignmentId);
   }

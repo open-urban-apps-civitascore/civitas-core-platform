@@ -4,12 +4,13 @@ import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.input.LayerInputDTO;
 import de.civitascore.portal.model.output.LayerOutputDTO;
 import de.civitascore.portal.model.output.assembler.LayerAssembler;
+import de.civitascore.portal.problem.ProblemType;
+import de.civitascore.portal.problem.Problems;
 import de.civitascore.portal.repository.specification.LayerSpec;
 import de.civitascore.portal.service.LayerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,7 +23,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -86,10 +86,7 @@ public class LayerController {
   @GetMapping("/{layerId}")
   @Operation(summary = "Get Layer by ID")
   @ApiResponse(responseCode = "200", description = "Layer returned successfully")
-  @ApiResponse(
-      responseCode = "404",
-      description = "Layer not found",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @Problems(ProblemType.NOT_FOUND)
   public LayerOutputDTO getLayer(@PathVariable UUID dataSetId, @PathVariable UUID layerId) {
     return layerAssembler.toOutput(requireOwned(dataSetId, layerId));
   }
@@ -98,14 +95,12 @@ public class LayerController {
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(summary = "Create a new Layer")
   @ApiResponse(responseCode = "201", description = "Layer created successfully")
-  @ApiResponse(
-      responseCode = "400",
-      description = "Parent dataset is not in DRAFT",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "409",
-      description = "A saga is in flight on the parent dataset",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @Problems({
+    ProblemType.NOT_FOUND,
+    ProblemType.DATASET_NOT_EDITABLE,
+    ProblemType.SAGA_IN_FLIGHT,
+    ProblemType.UNIQUE_CONSTRAINT_VIOLATION
+  })
   public ResponseEntity<LayerOutputDTO> createLayer(
       @PathVariable UUID dataSetId, @Valid @RequestBody LayerInputDTO input) {
     input.setDataSetId(dataSetId);
@@ -117,18 +112,12 @@ public class LayerController {
   @PutMapping("/{layerId}")
   @Operation(summary = "Replace a Layer")
   @ApiResponse(responseCode = "200", description = "Layer updated successfully")
-  @ApiResponse(
-      responseCode = "400",
-      description = "Parent dataset is not in DRAFT",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "404",
-      description = "Layer not found",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "409",
-      description = "A saga is in flight on the parent dataset",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @Problems({
+    ProblemType.NOT_FOUND,
+    ProblemType.DATASET_NOT_EDITABLE,
+    ProblemType.SAGA_IN_FLIGHT,
+    ProblemType.UNIQUE_CONSTRAINT_VIOLATION
+  })
   public LayerOutputDTO updateLayer(
       @PathVariable UUID dataSetId,
       @PathVariable UUID layerId,
@@ -142,18 +131,7 @@ public class LayerController {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(summary = "Delete a Layer")
   @ApiResponse(responseCode = "204", description = "Layer deleted successfully")
-  @ApiResponse(
-      responseCode = "400",
-      description = "Parent dataset is not in DRAFT",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "404",
-      description = "Layer not found",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "409",
-      description = "A saga is in flight on the parent dataset",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @Problems({ProblemType.NOT_FOUND, ProblemType.DATASET_NOT_EDITABLE, ProblemType.SAGA_IN_FLIGHT})
   public void deleteLayer(@PathVariable UUID dataSetId, @PathVariable UUID layerId) {
     requireOwned(dataSetId, layerId);
     layerService.deleteById(layerId);

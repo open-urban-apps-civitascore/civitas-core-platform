@@ -5,6 +5,8 @@ import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionMetaInputDTO;
 import de.civitascore.portal.model.output.DataStructureVersionOutputDTO;
 import de.civitascore.portal.model.output.assembler.DataStructureVersionAssembler;
+import de.civitascore.portal.problem.ProblemType;
+import de.civitascore.portal.problem.Problems;
 import de.civitascore.portal.service.DataStructureVersionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -16,7 +18,6 @@ import java.net.URI;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -53,14 +54,12 @@ public class DataStructureVersionController {
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(summary = "Create a new data structure version")
   @ApiResponse(responseCode = "201", description = "Data structure version created successfully")
-  @ApiResponse(
-      responseCode = "400",
-      description = "Invalid input",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "409",
-      description = "Conflict (e.g. unique constraint violation)",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @Problems({
+    ProblemType.NOT_FOUND,
+    ProblemType.UNIQUE_CONSTRAINT_VIOLATION,
+    ProblemType.MODEL_REFERENCE_NOT_AVAILABLE,
+    ProblemType.REGISTRY_UNAVAILABLE
+  })
   public ResponseEntity<DataStructureVersionOutputDTO> createDataStructureVersion(
       @PathVariable UUID dataStructureId, @Valid @RequestBody DataStructureVersionInputDTO input) {
     input.setDataStructureId(dataStructureId);
@@ -72,10 +71,7 @@ public class DataStructureVersionController {
   @GetMapping("/{versionId}")
   @Operation(summary = "Get data structure version by ID")
   @ApiResponse(responseCode = "200", description = "Data structure version returned successfully")
-  @ApiResponse(
-      responseCode = "404",
-      description = "Data structure version not found",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @Problems(ProblemType.NOT_FOUND)
   public DataStructureVersionOutputDTO getDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
     return dataStructureVersionAssembler.toOutput(requireOwned(dataStructureId, versionId));
@@ -84,18 +80,12 @@ public class DataStructureVersionController {
   @PutMapping("/{versionId}")
   @Operation(summary = "Replace a data structure version")
   @ApiResponse(responseCode = "200", description = "Data structure version updated successfully")
-  @ApiResponse(
-      responseCode = "400",
-      description = "Invalid input",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "404",
-      description = "Data structure version not found",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "409",
-      description = "Conflict (e.g. unique constraint violation)",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @Problems({
+    ProblemType.NOT_FOUND,
+    ProblemType.UNIQUE_CONSTRAINT_VIOLATION,
+    ProblemType.MODEL_REFERENCE_NOT_AVAILABLE,
+    ProblemType.REGISTRY_UNAVAILABLE
+  })
   public DataStructureVersionOutputDTO updateDataStructureVersion(
       @PathVariable UUID dataStructureId,
       @PathVariable UUID versionId,
@@ -111,18 +101,12 @@ public class DataStructureVersionController {
       summary = "Partially update a data structure version",
       description = JsonMergePatch.OPERATION_DESCRIPTION)
   @ApiResponse(responseCode = "200", description = "Data structure version patched successfully")
-  @ApiResponse(
-      responseCode = "400",
-      description = "Invalid input",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "404",
-      description = "Data structure version not found",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "409",
-      description = "Conflict (e.g. unique constraint violation)",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @Problems({
+    ProblemType.NOT_FOUND,
+    ProblemType.UNIQUE_CONSTRAINT_VIOLATION,
+    ProblemType.MODEL_REFERENCE_NOT_AVAILABLE,
+    ProblemType.REGISTRY_UNAVAILABLE
+  })
   public DataStructureVersionOutputDTO patchDataStructureVersion(
       @PathVariable UUID dataStructureId,
       @PathVariable UUID versionId,
@@ -170,22 +154,9 @@ public class DataStructureVersionController {
               + " field answers 400. For DRAFT versions, use PATCH"
               + " /datastructures/{dataStructureId}/versions/{versionId} instead.")
   @ApiResponse(responseCode = "200", description = "Released version metadata updated successfully")
-  @ApiResponse(
-      responseCode = "400",
-      description =
-          "Invalid input (e.g. version is DRAFT, or the request contains a field other than"
-              + " description)",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "404",
-      description = "Data structure version not found",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "409",
-      description = "Conflict (e.g. unique constraint violation)",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @io.swagger.v3.oas.annotations.parameters.RequestBody(
       content = @Content(schema = @Schema(implementation = DataStructureVersionMetaInputDTO.class)))
+  @Problems(ProblemType.NOT_FOUND)
   public ResponseEntity<DataStructureVersionOutputDTO> updateDataStructureVersionReleasedMeta(
       @PathVariable UUID dataStructureId,
       @PathVariable UUID versionId,
@@ -206,20 +177,14 @@ public class DataStructureVersionController {
           "Releases a data structure version by setting status to AVAILABLE. Requires a model"
               + " (JSON schema) with exactly one root Element that reaches every other member.")
   @ApiResponse(responseCode = "200", description = "Data structure version released successfully")
-  @ApiResponse(
-      responseCode = "400",
-      description =
-          "Invalid input (e.g. already released, missing model, no root Element, or members the"
-              + " root Element does not reach)",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "404",
-      description = "Data structure version not found",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "409",
-      description = "The version's model is missing from the model registry",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @Problems({
+    ProblemType.NOT_FOUND,
+    ProblemType.MODEL_ROOT_MISSING,
+    ProblemType.MODEL_MEMBER_UNREACHABLE,
+    ProblemType.MODEL_MISSING,
+    ProblemType.MODEL_REFERENCE_NOT_AVAILABLE,
+    ProblemType.REGISTRY_UNAVAILABLE
+  })
   public ResponseEntity<DataStructureVersionOutputDTO> releaseDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
     requireOwned(dataStructureId, versionId);
@@ -233,18 +198,7 @@ public class DataStructureVersionController {
       summary = "Unrelease a data structure version",
       description = "Unreleases a data structure version by setting status back to DRAFT.")
   @ApiResponse(responseCode = "200", description = "Data structure version unreleased successfully")
-  @ApiResponse(
-      responseCode = "400",
-      description = "Invalid input (e.g. already in DRAFT)",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "404",
-      description = "Data structure version not found",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "409",
-      description = "Conflict (version is in use by a DataSource)",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @Problems({ProblemType.NOT_FOUND, ProblemType.RESOURCE_IN_USE})
   public ResponseEntity<DataStructureVersionOutputDTO> unreleaseDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
     requireOwned(dataStructureId, versionId);
