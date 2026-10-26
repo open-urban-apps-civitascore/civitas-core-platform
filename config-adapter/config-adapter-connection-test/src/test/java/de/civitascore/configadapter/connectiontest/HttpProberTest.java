@@ -286,14 +286,14 @@ class HttpProberTest {
   }
 
   @Test
-  void refusesBasicAuthenticationOverHttp() {
+  void refusesAuthenticationOverHttp() {
     Map<String, Object> connector = connector(call("stations", "/stations"));
     connector.put("authentication", Map.of("type", "BASIC", "username", "u", "password", "secret"));
 
     ConnectionTestFailure failure =
         assertThrows(ConnectionTestFailure.class, () -> probe(connector, "stations"));
 
-    assertEquals("Basic authentication needs an https base URL.", failure.getMessage());
+    assertEquals("Authentication needs an https base URL.", failure.getMessage());
     assertEquals(Reason.INVALID_CONNECTOR, failure.reason());
     assertTrue(REQUESTS.isEmpty());
   }
@@ -376,7 +376,7 @@ class HttpProberTest {
     HttpConnectTimeoutException timeout = new HttpConnectTimeoutException("HTTP connect timed out");
     timeout.initCause(new ConnectException("HTTP connect timed out"));
 
-    ConnectionTestFailure failure = HttpProber.failure(new ExecutionException(timeout));
+    ConnectionTestFailure failure = HttpProber.failure("The API", new ExecutionException(timeout));
 
     assertEquals(Reason.TIMEOUT, failure.reason());
     assertEquals("The API did not answer: The connection timed out.", failure.getMessage());

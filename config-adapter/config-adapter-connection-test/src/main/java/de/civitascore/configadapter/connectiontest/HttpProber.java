@@ -21,13 +21,14 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -63,41 +64,113 @@ final class HttpProber implements ConnectionProber {
   @SuppressWarnings("PMD.CloseResource") // shutdownNow() in finally; close() waits for a hang
   public ProbeResult probe(Map<String, Object> connector, String apiCall, Cancellation cancellation)
       throws ConnectionTestFailure {
-    Map<String, Object> call = apiCall(connector, apiCall);
-    String baseUrl = trimmedString(connector.get("baseUrl"));
-    URI uri = uri(baseUrl, call);
-    guard.check(uri.getHost());
     Map<String, Object> authentication = objectOrEmpty(connector.get("authentication"));
-    boolean basic = "BASIC".equals(authentication.get("type"));
-    if (basic && !"https".equalsIgnoreCase(uri.getScheme())) {
-      throw ConnectionTestFailure.invalid("Basic authentication needs an https base URL.");
+    Authentication type = Authentication.read(authentication);
+    Map<String, Object> call = apiCall(connector, apiCall);
+    ParameterLocation apiTokenIn =
+        type == Authentication.API_TOKEN ? apiTokenIn(authentication) : null;
+    if (apiTokenIn == ParameterLocation.QUERY) {
+      call = withQueryParameter(call, apiToken(authentication));
     }
-    String credential = basic ? credential(authentication) : null;
-    HttpRequest request = request(uri, call, credential);
+    URI uri = uri(trimmedString(connector.get("baseUrl")), call);
+    guard.check(uri.getHost());
+    if (type != Authentication.NONE && !"https".equalsIgnoreCase(uri.getScheme())) {
+      throw ConnectionTestFailure.invalid("Authentication needs an https base URL.");
+    }
+    URI tokenUri = type == Authentication.OAUTH2 ? tokenUri(authentication) : null;
 
-    HttpClient client =
-        HttpClient.newBuilder()
-            .connectTimeout(CONNECT_TIMEOUT)
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .proxy(HttpClient.Builder.NO_PROXY)
-            .build();
+    HttpClient client = client(type, authentication);
     cancellation.register(client::shutdownNow);
+    long deadline = System.nanoTime() + timeout.toNanos();
     try {
-      CompletableFuture<HttpResponse<InputStream>> exchange =
-          client.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream());
-      HttpResponse<InputStream> response = exchange.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+      Map.Entry<String, String> header =
+          switch (type) {
+            case NONE, CLIENT_CERTIFICATE -> null;
+            case BASIC -> Map.entry("Authorization", "Basic " + credential(authentication));
+            case BEARER_TOKEN ->
+                Map.entry("Authorization", "Bearer " + required(authentication, "token"));
+            case API_TOKEN ->
+                apiTokenIn == ParameterLocation.HEADER ? apiToken(authentication) : null;
+            case OAUTH2 ->
+                Map.entry(
+                    "Authorization",
+                    "Bearer " + accessToken(client, tokenUri, authentication, deadline));
+          };
+      HttpResponse<InputStream> response =
+          send(client, request(uri, call, header), "The API", deadline);
       return result(response);
-    } catch (ExecutionException e) {
-      throw failure(e);
-    } catch (TimeoutException e) {
-      throw ConnectionTestFailure.timeout("The API did not answer in time.", e);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw ConnectionTestFailure.timeout("The test was stopped.", e);
     } finally {
       // close() would wait for an exchange that hangs; the answer is read by now.
       client.shutdownNow();
     }
+  }
+
+  private URI tokenUri(Map<String, Object> oauth2) throws ConnectionTestFailure {
+    URI tokenUri = ClientCredentialsGrant.tokenUri(required(oauth2, "tokenUrl"));
+    guard.check(tokenUri.getHost());
+    return tokenUri;
+  }
+
+  private static HttpClient client(Authentication type, Map<String, Object> authentication)
+      throws ConnectionTestFailure {
+    HttpClient.Builder builder =
+        HttpClient.newBuilder()
+            .connectTimeout(CONNECT_TIMEOUT)
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .proxy(HttpClient.Builder.NO_PROXY);
+    if (type == Authentication.CLIENT_CERTIFICATE) {
+      builder.sslContext(
+          ClientCertificate.tls(
+              required(authentication, "certificate"), required(authentication, "privateKey")));
+    }
+    return builder.build();
+  }
+
+  /**
+   * Sends a request and waits for its answer until {@code deadline}.
+   *
+   * @param peer who answers, as the subject of a failure message
+   */
+  private static HttpResponse<InputStream> send(
+      HttpClient client, HttpRequest request, String peer, long deadline)
+      throws ConnectionTestFailure {
+    try {
+      return client
+          .sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
+          .get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+    } catch (ExecutionException e) {
+      throw failure(peer, e);
+    } catch (TimeoutException e) {
+      throw ConnectionTestFailure.timeout(peer + " did not answer in time.", e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw ConnectionTestFailure.timeout("The test was stopped.", e);
+    }
+  }
+
+  private String accessToken(
+      HttpClient client, URI tokenUri, Map<String, Object> oauth2, long deadline)
+      throws ConnectionTestFailure {
+    HttpRequest request =
+        ClientCredentialsGrant.request(
+            tokenUri,
+            required(oauth2, "clientId"),
+            required(oauth2, "clientSecret"),
+            trimmedString(oauth2.get("scope")),
+            timeout);
+    HttpResponse<InputStream> response = send(client, request, "The token endpoint", deadline);
+    byte[] body;
+    try (InputStream in = response.body()) {
+      body = in.readNBytes(ClientCredentialsGrant.MAX_RESPONSE_BYTES);
+    } catch (IOException e) {
+      throw new ConnectionTestFailure(
+          "The token endpoint answered with HTTP "
+              + response.statusCode()
+              + ", but the body could not be read: "
+              + ConnectionTestFailure.describe(e),
+          e);
+    }
+    return ClientCredentialsGrant.accessToken(response.statusCode(), body);
   }
 
   private static Map<String, Object> apiCall(Map<String, Object> connector, String name)
@@ -140,32 +213,75 @@ final class HttpProber implements ConnectionProber {
     return uri;
   }
 
+  /**
+   * A value of the authentication.
+   *
+   * @throws ConnectionTestFailure if it is missing or blank
+   */
+  private static String required(Map<String, Object> authentication, String key)
+      throws ConnectionTestFailure {
+    Object value = authentication.get(key);
+    if (trimmedString(value).isEmpty()) {
+      throw ConnectionTestFailure.invalid("The authentication has no '" + key + "'.");
+    }
+    return String.valueOf(value);
+  }
+
+  private static ParameterLocation apiTokenIn(Map<String, Object> apiToken)
+      throws ConnectionTestFailure {
+    try {
+      return ParameterLocation.valueOf(trimmedString(apiToken.get("in")));
+    } catch (IllegalArgumentException e) {
+      throw ConnectionTestFailure.invalid(
+          "The API token must be sent in a QUERY parameter or a HEADER.", e);
+    }
+  }
+
+  private static Map.Entry<String, String> apiToken(Map<String, Object> apiToken)
+      throws ConnectionTestFailure {
+    return Map.entry(required(apiToken, "name"), required(apiToken, "value"));
+  }
+
+  private static Map<String, Object> withQueryParameter(
+      Map<String, Object> call, Map.Entry<String, String> parameter) {
+    List<Map<String, Object>> parameters = new ArrayList<>(parameters(call.get("queryParameters")));
+    parameters.add(
+        Map.<String, Object>of("name", parameter.getKey(), "value", parameter.getValue()));
+    Map<String, Object> extended = new HashMap<>(call);
+    extended.put("queryParameters", parameters);
+    return extended;
+  }
+
   /** The base64 {@code user:password} of a basic authentication. */
   private static String credential(Map<String, Object> basic) {
     String credential = basic.get("username") + ":" + basic.get("password");
     return Base64.getEncoder().encodeToString(credential.getBytes(StandardCharsets.UTF_8));
   }
 
-  private HttpRequest request(URI uri, Map<String, Object> call, String credential)
+  private HttpRequest request(URI uri, Map<String, Object> call, Map.Entry<String, String> header)
       throws ConnectionTestFailure {
     HttpRequest.Builder request = HttpRequest.newBuilder(uri).GET().timeout(timeout);
     try {
-      for (Map<String, Object> header : parameters(call.get("headers"))) {
-        request.header(String.valueOf(header.get("name")), valueOf(header));
+      for (Map<String, Object> parameter : parameters(call.get("headers"))) {
+        request.header(String.valueOf(parameter.get("name")), valueOf(parameter));
       }
-      if (credential != null) {
-        request.header("Authorization", "Basic " + credential);
-      }
-      return request.build();
     } catch (IllegalArgumentException e) {
       // The JDK HTTP client puts the header value into this message, so it is not passed on.
       throw ConnectionTestFailure.invalid("The API call has a header that cannot be sent.", e);
     }
+    if (header != null) {
+      try {
+        request.header(header.getKey(), header.getValue());
+      } catch (IllegalArgumentException e) {
+        throw ConnectionTestFailure.invalid("The authentication cannot be sent as a header.", e);
+      }
+    }
+    return request.build();
   }
 
   /** The client's failure, with the reason TIMEOUT when the client timed out. */
-  static ConnectionTestFailure failure(ExecutionException failed) {
-    String message = "The API did not answer: " + ConnectionTestFailure.describe(failed.getCause());
+  static ConnectionTestFailure failure(String peer, ExecutionException failed) {
+    String message = peer + " did not answer: " + ConnectionTestFailure.describe(failed.getCause());
     return ConnectionTestFailure.timedOut(failed)
         ? ConnectionTestFailure.timeout(message, failed)
         : new ConnectionTestFailure(message, failed);
@@ -258,7 +374,7 @@ final class HttpProber implements ConnectionProber {
   }
 
   /** Percent-encodes all but the unreserved characters of RFC 3986, so a space is {@code %20}. */
-  private static void encode(String text, StringBuilder out) {
+  static void encode(String text, StringBuilder out) {
     for (byte b : text.getBytes(StandardCharsets.UTF_8)) {
       int c = b & 0xFF;
       if (unreserved(c)) {
@@ -287,4 +403,30 @@ final class HttpProber implements ConnectionProber {
    * @param encoding the content encoding the server sent, {@code identity} if none
    */
   private record Body(byte[] bytes, boolean truncated, String encoding) {}
+
+  /** The {@code type} of a connector's authentication. */
+  private enum Authentication {
+    NONE,
+    BASIC,
+    BEARER_TOKEN,
+    API_TOKEN,
+    OAUTH2,
+    CLIENT_CERTIFICATE;
+
+    /** Absent is NONE. */
+    static Authentication read(Map<String, Object> authentication) throws ConnectionTestFailure {
+      String type = trimmedString(authentication.get("type"));
+      try {
+        return type.isEmpty() ? NONE : valueOf(type);
+      } catch (IllegalArgumentException e) {
+        throw ConnectionTestFailure.invalid(
+            "Authentication type '" + type + "' cannot be tested.", e);
+      }
+    }
+  }
+
+  private enum ParameterLocation {
+    QUERY,
+    HEADER
+  }
 }
