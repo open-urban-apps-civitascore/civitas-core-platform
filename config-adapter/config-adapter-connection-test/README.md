@@ -74,7 +74,7 @@ Delivery:
 
 The client resolves the name again when it connects. `GuardedResolver` is installed as the JVM's resolver through `java.net.spi.InetAddressResolverProvider`. For two minutes it checks every resolution of a name that a test let through, for every client, thread and spelling of the name. Thus the name cannot give the check a public address and the connection an internal one (DNS rebinding). All other names resolve unchanged through the built-in resolver.
 
-BSI TR-03187 W-16 asks for an allowlist of destinations. Data sources are arbitrary hosts, so the test relies on the network position of its own workload. The same control applies to the pipeline in NiFi.
+BSI TR-03187 W-16 asks for an allowlist of destinations. Data sources are arbitrary hosts, so the test relies on the network position of its own workload. The same control applies to the pipeline in NiFi. The test shows what a destination answers, and every tenant-wide reader of data sources may test values that no data source holds. Thus the network position, not the permission, decides which destinations a test reaches.
 
 ## Known differences from the pipeline
 
