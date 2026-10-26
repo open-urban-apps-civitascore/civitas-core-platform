@@ -239,10 +239,10 @@ public class DataSetService
               .findById(input.getDatapoolId())
               .orElseThrow(() -> new ResourceNotFoundException("DataPool", input.getDatapoolId()));
       // Authorize only when the dataset is actually being placed into a DIFFERENT pool. A PATCH
-      // re-sends the dataset's existing datapoolId (BaseController#patchInput merges the current
-      // state), so an update that leaves the pool unchanged must NOT require pool authorization —
-      // otherwise a caller holding a direct dataset grant (scope id) but no pool scope could no
-      // longer edit a dataset that happens to sit in a pool.
+      // re-sends the dataset's existing datapoolId (JsonMergePatch merges the patch into the
+      // current state), so an update that leaves the pool unchanged must NOT require pool
+      // authorization — otherwise a caller holding a direct dataset grant (scope id) but no pool
+      // scope could no longer edit a dataset that happens to sit in a pool.
       if (!input.getDatapoolId().equals(currentPoolId)) {
         authorizeTargetPool(input.getDatapoolId());
       }

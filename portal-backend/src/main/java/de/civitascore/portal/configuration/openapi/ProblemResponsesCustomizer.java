@@ -32,10 +32,6 @@ import org.springframework.web.method.HandlerMethod;
  * Documents the error responses of an operation from the problem types its handler can answer: the
  * ones every operation answers, the ones its parameters imply, and the ones it declares with {@link
  * Problems}. Each error response refers to the catalog example of each of its types.
- *
- * <p>A handler without {@link Problems} keeps its hand-written error responses. Each lists the
- * implicit types of its status, or else only the first catalog type of that status, because listing
- * every type of the status would document problems the handler never answers.
  */
 @Component
 public class ProblemResponsesCustomizer implements OperationCustomizer {
@@ -66,30 +62,16 @@ public class ProblemResponsesCustomizer implements OperationCustomizer {
   public Operation customize(Operation operation, HandlerMethod handlerMethod) {
     Problems declared =
         AnnotatedElementUtils.findMergedAnnotation(handlerMethod.getMethod(), Problems.class);
-    ApiResponses responses = operation.getResponses();
-    Map<String, ApiResponse> handWritten = errorResponses(responses);
-
     Set<ProblemType> problems = implicitProblems(handlerMethod);
     if (declared != null) {
-      if (!handWritten.isEmpty()) {
-        throw new IllegalStateException(
-            "%s declares @Problems and the error @ApiResponse %s; declare problem types only"
-                .formatted(handlerMethod.getShortLogMessage(), handWritten.keySet()));
-      }
       problems.addAll(Arrays.asList(declared.value()));
-    } else {
-      handWritten.keySet().stream()
-          .map(Integer::parseInt)
-          .filter(status -> problems.stream().noneMatch(type -> type.status().value() == status))
-          .forEach(status -> problems.add(firstCatalogTypeOf(status)));
     }
 
+    ApiResponses responses = operation.getResponses();
     byStatus(problems)
         .forEach(
             (status, types) ->
-                responses.addApiResponse(
-                    String.valueOf(status.value()),
-                    response(status, types, handWritten.get(String.valueOf(status.value())))));
+                responses.addApiResponse(String.valueOf(status.value()), response(status, types)));
     return operation;
   }
 
@@ -105,17 +87,12 @@ public class ProblemResponsesCustomizer implements OperationCustomizer {
         .content(new Content().addMediaType(PROBLEM_JSON, problemJson));
   }
 
-  private static ApiResponse response(
-      HttpStatus status, Set<ProblemType> types, ApiResponse handWritten) {
+  private static ApiResponse response(HttpStatus status, Set<ProblemType> types) {
     SharedResponse shared = SHARED_RESPONSES.get(status);
     if (shared != null && shared.types().equals(types)) {
       return new ApiResponse().$ref(shared.name());
     }
-    String description =
-        handWritten != null && handWritten.getDescription() != null
-            ? handWritten.getDescription()
-            : status.getReasonPhrase();
-    return problemResponse(description, types);
+    return problemResponse(status.getReasonPhrase(), types);
   }
 
   private static Set<ProblemType> implicitProblems(HandlerMethod handlerMethod) {
@@ -135,20 +112,6 @@ public class ProblemResponsesCustomizer implements OperationCustomizer {
       }
     }
     return problems;
-  }
-
-  private static Map<String, ApiResponse> errorResponses(ApiResponses responses) {
-    return responses.entrySet().stream()
-        .filter(response -> response.getKey().startsWith("4") || response.getKey().startsWith("5"))
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-  }
-
-  private static ProblemType firstCatalogTypeOf(int status) {
-    return Arrays.stream(ProblemType.values())
-        .filter(type -> type.status().value() == status)
-        .findFirst()
-        .orElseThrow(
-            () -> new IllegalStateException("No problem type in the catalog for " + status));
   }
 
   private static SortedMap<HttpStatus, Set<ProblemType>> byStatus(Set<ProblemType> problems) {
