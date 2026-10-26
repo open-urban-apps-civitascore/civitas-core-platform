@@ -61,7 +61,7 @@ Delivery:
 ## Limits and secrets
 
 - A message has at most 500 characters. A preview has at most 8 KB of UTF-8, with a `[truncated]` marker. A body that is not text is described, not shown.
-- Every decrypted secret is masked in message and preview. A basic credential that an API echoes back is masked in the preview too. The OAuth 2.0 access token is never put in a message.
+- Every decrypted secret is masked in message and preview. A credential that the test sends and an API echoes back is masked in the preview too, the OAuth 2.0 access token included. The OAuth 2.0 access token is never put in a message.
 - A message keeps the source's own answer (`password authentication failed`, `NOT_AUTHORIZED`, the HTTP status). A failure of the test's own client is named by its type, never by its text.
 - A connection that fails after its connect timeout is `TIMEOUT`, for every connector type.
 - Logs carry the request id, outcome and duration. At DEBUG they also carry the masked failure message; a database's own answer, which can quote a row value, only as its SQLSTATE.

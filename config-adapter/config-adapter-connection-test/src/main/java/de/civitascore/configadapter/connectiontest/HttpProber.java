@@ -101,11 +101,10 @@ final class HttpProber implements ConnectionProber {
     cancellation.register(client::shutdownNow);
     long deadline = System.nanoTime() + timeout.toNanos();
     try {
-      String credential = type == Authentication.BASIC ? credential(authentication) : null;
       Map.Entry<String, String> header =
           switch (type) {
             case NONE, CLIENT_CERTIFICATE -> null;
-            case BASIC -> Map.entry("Authorization", "Basic " + credential);
+            case BASIC -> Map.entry("Authorization", "Basic " + credential(authentication));
             case BEARER_TOKEN ->
                 Map.entry("Authorization", "Bearer " + required(authentication, "token"));
             case API_TOKEN ->
@@ -117,7 +116,7 @@ final class HttpProber implements ConnectionProber {
           };
       HttpResponse<InputStream> response =
           send(client, request(uri, call, header), "The API", deadline);
-      return result(response, credential);
+      return result(response, credentialOf(header));
     } finally {
       // close() would wait for an exchange that hangs; the answer is read by now.
       client.shutdownNow();
@@ -306,9 +305,22 @@ final class HttpProber implements ConnectionProber {
         : new ConnectionTestFailure(message, failed);
   }
 
+  /** The credential an authentication header carries: an Authorization value without scheme. */
+  private static String credentialOf(Map.Entry<String, String> header) {
+    if (header == null) {
+      return null;
+    }
+    String value = header.getValue();
+    int space = value.indexOf(' ');
+    return "Authorization".equals(header.getKey()) && space > 0
+        ? value.substring(space + 1)
+        : value;
+  }
+
   /**
-   * An API that echoes the request would return the basic credential, which is a secret. JSON may
-   * write its {@code /} as {@code \/}, as PHP's {@code json_encode} does by default.
+   * An API that echoes the request would return the credential it sent, which is a secret, or for
+   * OAuth 2.0 an access token. JSON may write its {@code /} as {@code \/}, as PHP's {@code
+   * json_encode} does by default.
    */
   static String maskCredential(String text, String credential) {
     if (credential == null) {
