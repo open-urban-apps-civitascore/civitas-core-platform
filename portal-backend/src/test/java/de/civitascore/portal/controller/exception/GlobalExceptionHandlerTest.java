@@ -567,19 +567,6 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void handleUnexpected_anyException_answers500InternalErrorWithFixedDetail() {
-      ProblemDetail problemDetail =
-          handler.handleUnexpected(
-              new IllegalStateException("connection pool of db-internal-7 exhausted"),
-              mockRequest());
-
-      assertThat(problemDetail.getStatus()).isEqualTo(500);
-      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:INTERNAL_ERROR");
-      assertThat(problemDetail.getDetail()).isEqualTo("An unexpected error occurred");
-      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
-    }
-
-    @Test
     void handleAccessDenied_fromHandler_answers403AccessDenied() {
       ProblemDetail problemDetail =
           handler.handleAccessDenied(

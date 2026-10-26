@@ -34,6 +34,8 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.jspecify.annotations.Nullable;
 import org.owasp.encoder.Encode;
 import org.springframework.beans.TypeMismatchException;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -54,6 +56,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  * Problem Detail responses.
  */
 @RestControllerAdvice
+@Order(Ordered.LOWEST_PRECEDENCE - 1)
 @Slf4j
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
@@ -505,13 +508,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       AuthenticationException ex, HttpServletRequest request) {
     log.warn("Authentication failed: {}", Encode.forJava(ex.getMessage()));
     return ProblemType.UNAUTHORIZED.problemDetail("Authentication required", instance(request));
-  }
-
-  @ExceptionHandler(Exception.class)
-  public ProblemDetail handleUnexpected(Exception ex, HttpServletRequest request) {
-    log.error("Unexpected error on {}", Encode.forJava(request.getRequestURI()), ex);
-    return ProblemType.INTERNAL_ERROR.problemDetail(
-        "An unexpected error occurred", instance(request));
   }
 
   /** Spring MVC leaves the type null, which RFC 9457 reads as {@code about:blank}. */

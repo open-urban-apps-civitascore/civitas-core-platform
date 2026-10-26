@@ -29,7 +29,7 @@ import tools.jackson.databind.json.JsonMapper;
  * Spring Security delegates unauthenticated and forbidden requests here.
  */
 @ControllerAdvice
-// Ahead of GlobalExceptionHandler, whose catch-all would otherwise take the JwtException.
+// Ahead of FallbackExceptionHandler, whose catch-all would otherwise take the JwtException.
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @Slf4j
 public class SecurityExceptionHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
