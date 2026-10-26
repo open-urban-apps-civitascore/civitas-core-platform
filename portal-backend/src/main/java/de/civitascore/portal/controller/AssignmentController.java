@@ -9,9 +9,11 @@ import de.civitascore.portal.service.AssignmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -19,37 +21,61 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import tools.jackson.databind.JsonNode;
 
 /** REST controller for managing role-to-user/group assignment resources. */
 @RestController
 @RequestMapping("/assignments")
 @RequiredArgsConstructor
 @Tag(name = "Assignments", description = "Role assignment management endpoints")
-public class AssignmentController
-    extends BaseController<AssignmentInputDTO, AssignmentOutputDTO, Assignment, AssignmentSpec> {
+public class AssignmentController {
 
   private final AssignmentService assignmentService;
   private final AssignmentAssembler assignmentAssembler;
 
-  /** {@inheritDoc} */
-  @Override
-  AssignmentService getService() {
-    return assignmentService;
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  protected AssignmentAssembler getAssembler() {
-    return assignmentAssembler;
-  }
-
+  @GetMapping
+  @Operation(
+      summary = "List all assignments",
+      description =
+          "Returns a paginated, filterable list of assignments. Supports sorting and"
+              + " specification-based filtering.")
+  @ApiResponse(responseCode = "200", description = "Page of assignments returned successfully")
+  @Parameter(
+      name = "id",
+      description = "Filter by one or more IDs (comma-separated).",
+      example = "1,2,3",
+      in = ParameterIn.QUERY,
+      schema = @Schema(type = "string", example = "1,2,3"))
+  @Parameter(
+      name = "createdAtFrom",
+      description = "Filter by creation date greater than or equal to this value (ISO 8601).",
+      in = ParameterIn.QUERY,
+      schema = @Schema(type = "string", format = "date-time", example = "2024-01-01T00:00:00Z"))
+  @Parameter(
+      name = "createdAtTo",
+      description = "Filter by creation date less than or equal to this value (ISO 8601).",
+      in = ParameterIn.QUERY,
+      schema = @Schema(type = "string", format = "date-time", example = "2024-12-31T23:59:59Z"))
+  @Parameter(
+      name = "modifiedAtFrom",
+      description = "Filter by modification date greater than or equal to this value (ISO 8601).",
+      in = ParameterIn.QUERY,
+      schema = @Schema(type = "string", format = "date-time", example = "2024-01-01T00:00:00Z"))
+  @Parameter(
+      name = "modifiedAtTo",
+      description = "Filter by modification date less than or equal to this value (ISO 8601).",
+      in = ParameterIn.QUERY,
+      schema = @Schema(type = "string", format = "date-time", example = "2024-12-31T23:59:59Z"))
   @Parameter(
       name = "roleId",
       description = "Filter by role ID (exact match).",
@@ -89,52 +115,65 @@ public class AssignmentController
               + " (partial match, case-insensitive).",
       in = ParameterIn.QUERY,
       schema = @Schema(type = "string", example = "admin"))
-  /**
-   * Retrieves a paginated list of assignments with optional filtering by role, user, group, scope,
-   * and role type.
-   *
-   * @param spec the assignment search/filter specification
-   * @param pageable pagination and sorting parameters
-   * @return a page of assignment output DTOs with HTTP 200 status
-   */
-  @Override
-  public ResponseEntity<Page<AssignmentOutputDTO>> getAll(
+  public Page<AssignmentOutputDTO> listAssignments(
       @ParameterObject @Parameter(description = "Search/filter spec") AssignmentSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
-    return super.getAll(spec, pageable);
+    return assignmentAssembler.toOutput(assignmentService.findAll(spec, pageable));
   }
 
-  /**
-   * Update operation is not supported for assignments.
-   *
-   * @param id the assignment UUID (unused)
-   * @param input the assignment input (unused)
-   * @return never returns normally
-   * @throws UnsupportedOperationException always
-   */
-  @PutMapping("/{id}")
-  @Override
-  @Operation(hidden = true)
-  public ResponseEntity<AssignmentOutputDTO> update(
-      @PathVariable UUID id, @RequestBody AssignmentInputDTO input) {
-    throw new UnsupportedOperationException("Assignment updates are not supported.");
+  @GetMapping("/{assignmentId}")
+  @Operation(
+      summary = "Get assignment by ID",
+      description = "Returns a single assignment identified by its UUID.")
+  @ApiResponse(responseCode = "200", description = "Assignment returned successfully")
+  @ApiResponse(
+      responseCode = "404",
+      description = "Assignment not found",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  public AssignmentOutputDTO getAssignment(@PathVariable UUID assignmentId) {
+    return assignmentAssembler.toOutput(assignmentService.findByIdOrThrow(assignmentId));
   }
 
-  /**
-   * Patch operation is not supported for assignments.
-   *
-   * @param id the assignment UUID (unused)
-   * @param updates the JSON patch data (unused)
-   * @return never returns normally
-   * @throws UnsupportedOperationException always
-   */
-  @PatchMapping("/{id}")
-  @Override
-  @Operation(hidden = true)
-  public ResponseEntity<AssignmentOutputDTO> patch(
-      @PathVariable UUID id, @RequestBody JsonNode updates) {
-    throw new UnsupportedOperationException("Assignment patches are not supported.");
+  @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
+  @Operation(
+      summary = "Create a new assignment",
+      description =
+          "Creates a new assignment and returns it with a Location header pointing to the new"
+              + " assignment URI.")
+  @ApiResponse(responseCode = "201", description = "Assignment created successfully")
+  @ApiResponse(
+      responseCode = "400",
+      description = "Invalid input",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (e.g. unique constraint violation)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  public ResponseEntity<AssignmentOutputDTO> createAssignment(
+      @Valid @RequestBody AssignmentInputDTO input) {
+    Assignment created = assignmentService.create(input);
+    return ResponseEntity.created(Locations.ofCreated(created.getId()))
+        .body(assignmentAssembler.toOutput(created));
+  }
+
+  @DeleteMapping("/{assignmentId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Operation(
+      summary = "Delete an assignment",
+      description = "Permanently deletes an assignment by its UUID.")
+  @ApiResponse(responseCode = "204", description = "Assignment deleted successfully")
+  @ApiResponse(
+      responseCode = "404",
+      description = "Assignment not found",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (assignment still in use)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  public void deleteAssignment(@PathVariable UUID assignmentId) {
+    assignmentService.deleteById(assignmentId);
   }
 }

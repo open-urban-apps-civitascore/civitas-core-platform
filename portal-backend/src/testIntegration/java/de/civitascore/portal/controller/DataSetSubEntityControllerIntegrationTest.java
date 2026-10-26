@@ -39,9 +39,8 @@ public abstract class DataSetSubEntityControllerIntegrationTest<
    */
   protected abstract String getSubEntityPathSegment();
 
-  /** Whether the controller serves PATCH. Layers and Styles answer 405 instead. */
-  protected boolean supportsPatch() {
-    return true;
+  private boolean supportsPatch() {
+    return !unservedItemMethods().contains(HttpMethod.PATCH);
   }
 
   protected void assertRejected(
@@ -157,9 +156,6 @@ public abstract class DataSetSubEntityControllerIntegrationTest<
   }
 
   private void assertMalformedDataSetIdProblem(ResponseEntity<ProblemDetail> response) {
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    assertThat(response.getBody()).isNotNull();
-    assertThat(response.getBody().getDetail())
-        .isEqualTo("Missing or invalid dataSetId in path variables");
+    assertRejected(response, HttpStatus.BAD_REQUEST, "urn:civitas:error:INVALID_INPUT");
   }
 }

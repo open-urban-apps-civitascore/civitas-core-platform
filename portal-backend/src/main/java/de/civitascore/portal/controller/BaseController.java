@@ -9,7 +9,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
-import java.net.URI;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -22,7 +21,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -68,13 +66,8 @@ public abstract class BaseController<
     I preProcessedInput = preProcessInput(input);
     E created = getService().create(preProcessedInput);
     O output = getAssembler().toOutput(created);
-    UUID createdId = getAssembler().getIdFromOutput(output);
-    URI location =
-        ServletUriComponentsBuilder.fromCurrentRequest()
-            .path("/{id}")
-            .buildAndExpand(createdId)
-            .toUri();
-    return ResponseEntity.created(location).body(output);
+    return ResponseEntity.created(Locations.ofCreated(getAssembler().getIdFromOutput(output)))
+        .body(output);
   }
 
   /**

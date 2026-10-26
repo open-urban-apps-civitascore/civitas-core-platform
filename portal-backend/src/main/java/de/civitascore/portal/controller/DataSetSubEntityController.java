@@ -23,8 +23,7 @@ import tools.jackson.databind.JsonNode;
  * /datasets/{dataSetId}/...}.
  *
  * <p>Every id-addressed operation answers {@link ResourceNotFoundException} when the addressed
- * entity belongs to a different dataset than the path names, so a foreign id is indistinguishable
- * from an unknown one and cannot reveal the other dataset's state.
+ * entity belongs to a different dataset than the path names.
  *
  * @param <I> the input DTO type
  * @param <O> the output DTO type
@@ -135,9 +134,7 @@ public abstract class DataSetSubEntityController<
   protected E requireOwnedByPathDataSet(UUID id) {
     UUID dataSetId = extractDataSetId();
     E entity = getService().findByIdOrThrow(id);
-    if (!dataSetId.equals(entity.getDataSet().getId())) {
-      throw new ResourceNotFoundException(getEntityClass().getSimpleName(), id);
-    }
+    ParentOwnership.requireSameParent(dataSetId, entity.getDataSet().getId(), getEntityClass(), id);
     return entity;
   }
 

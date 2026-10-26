@@ -1,13 +1,18 @@
 package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.model.output.BaseOutputDTO;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -27,9 +32,20 @@ import tools.jackson.core.type.TypeReference;
 public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O extends BaseOutputDTO>
     extends BaseReadOnlyControllerIntegrationTest<I, O> {
 
-  /** Whether the controller supports PUT/PATCH. Return false to replace 404 tests with 500. */
-  protected boolean supportsUpdateAndPatch() {
-    return true;
+  /** The methods that the controller does not map on {@code /{id}}. */
+  protected Set<HttpMethod> unservedItemMethods() {
+    return Set.of();
+  }
+
+  private boolean serves(HttpMethod itemMethod) {
+    return !unservedItemMethods().contains(itemMethod);
+  }
+
+  static void assertMethodNotAllowed(ResponseEntity<ProblemDetail> response, HttpMethod rejected) {
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+    assertThat(response.getHeaders().getAllow()).isNotEmpty().doesNotContain(rejected);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().getType()).hasToString("urn:civitas:error:METHOD_NOT_ALLOWED");
   }
 
   /** The type of the answer to a PATCH that contains a field the input does not have. */
@@ -88,7 +104,7 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
   @Test
   @DisplayName("Should return BAD_REQUEST when PATCH produces an invalid entity")
   void shouldRejectPatchThatResultsInInvalidEntity() {
-    if (!supportsUpdateAndPatch()) return;
+    assumeTrue(serves(HttpMethod.PATCH));
     UUID id = createTestEntity();
     Map<String, Object> patchBody =
         objectMapper.convertValue(createInvalidInput(), new TypeReference<>() {});
@@ -102,7 +118,7 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
 
   @Test
   void patch_withUnknownField_answers400InvalidInput() {
-    if (!supportsUpdateAndPatch()) return;
+    assumeTrue(serves(HttpMethod.PATCH));
     UUID id = createTestEntity();
 
     ResponseEntity<ProblemDetail> response =
@@ -120,7 +136,7 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
   @Test
   @DisplayName("Should return 404 when updating non-existent entity")
   void shouldReturn404WhenUpdatingNonExistentEntity() {
-    if (!supportsUpdateAndPatch()) return;
+    assumeTrue(serves(HttpMethod.PUT));
     ResponseEntity<ProblemDetail> response =
         exchangeForProblem(
             getEndpointPath() + "/" + UUID.randomUUID(),
@@ -134,7 +150,7 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
   @Test
   @DisplayName("Should return 404 when patching non-existent entity")
   void shouldReturn404WhenPatchingNonExistentEntity() {
-    if (!supportsUpdateAndPatch()) return;
+    assumeTrue(serves(HttpMethod.PATCH));
     ResponseEntity<ProblemDetail> response =
         exchangeForProblem(
             getEndpointPath() + "/" + UUID.randomUUID(),
@@ -145,33 +161,24 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
   }
 
-  @Test
-  @DisplayName("Should reject PUT when operation is not supported")
-  void shouldRejectUnsupportedPut() {
-    if (supportsUpdateAndPatch()) return;
-    UUID id = createTestEntity();
+  @TestFactory
+  Stream<DynamicTest> itemMethod_whenNotServed_answers405WithAllowAndProblem() {
+    return unservedItemMethods().stream()
+        .map(
+            method ->
+                DynamicTest.dynamicTest(
+                    method.name(),
+                    () -> {
+                      ResponseEntity<ProblemDetail> response =
+                          exchangeForProblem(
+                              getEndpointPath() + "/" + createTestEntity(),
+                              method,
+                              createAuthHeaders(),
+                              createUpdateInput());
 
-    ResponseEntity<ProblemDetail> response =
-        exchangeForProblem(
-            getEndpointPath() + "/" + id, HttpMethod.PUT, createAuthHeaders(), createValidInput());
-
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-  }
-
-  @Test
-  @DisplayName("Should reject PATCH when operation is not supported")
-  void shouldRejectUnsupportedPatch() {
-    if (supportsUpdateAndPatch()) return;
-    UUID id = createTestEntity();
-
-    ResponseEntity<ProblemDetail> response =
-        exchangeForProblem(
-            getEndpointPath() + "/" + id,
-            HttpMethod.PATCH,
-            createAuthHeaders(),
-            Map.of("name", "patched"));
-
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+                      assertMethodNotAllowed(response, method);
+                      assertThat(response.getHeaders().getAllow()).contains(HttpMethod.GET);
+                    }));
   }
 
   @Test

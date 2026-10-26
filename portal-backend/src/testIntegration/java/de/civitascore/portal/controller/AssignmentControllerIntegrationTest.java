@@ -19,9 +19,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import tools.jackson.core.type.TypeReference;
 
 @DisplayName("Assignment Controller Integration Tests")
 class AssignmentControllerIntegrationTest
@@ -42,8 +42,8 @@ class AssignmentControllerIntegrationTest
   }
 
   @Override
-  protected boolean supportsUpdateAndPatch() {
-    return false;
+  protected Set<HttpMethod> unservedItemMethods() {
+    return Set.of(HttpMethod.PUT, HttpMethod.PATCH);
   }
 
   @Override
@@ -591,20 +591,5 @@ class AssignmentControllerIntegrationTest
               assignment ->
                   assertThat(assignment.getRole().getName()).containsIgnoringCase(uniqueToken));
     }
-  }
-
-  @Override
-  @Test
-  @DisplayName("Should return INTERNAL_SERVER_ERROR when PATCH due to unsupported operation")
-  void shouldRejectPatchThatResultsInInvalidEntity() {
-    UUID id = createTestEntity();
-    Map<String, Object> patchBody =
-        objectMapper.convertValue(createInvalidInput(), new TypeReference<>() {});
-
-    ResponseEntity<AssignmentOutputDTO> response = performPatch(id, patchBody);
-
-    assertThat(response.getStatusCode())
-        .as("PATCH producing an invalid entity should return INTERNAL_SERVER_ERROR")
-        .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
   }
 }

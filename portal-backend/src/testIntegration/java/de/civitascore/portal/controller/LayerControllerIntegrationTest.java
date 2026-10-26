@@ -17,6 +17,7 @@ import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
@@ -32,7 +33,6 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import tools.jackson.core.type.TypeReference;
 
 @DisplayName("Layer Controller Integration Tests")
 class LayerControllerIntegrationTest
@@ -44,8 +44,8 @@ class LayerControllerIntegrationTest
   }
 
   @Override
-  protected boolean supportsPatch() {
-    return false;
+  protected Set<HttpMethod> unservedItemMethods() {
+    return Set.of(HttpMethod.PATCH);
   }
 
   @Autowired private LayerRepository layerRepository;
@@ -116,31 +116,6 @@ class LayerControllerIntegrationTest
   @Override
   protected UUID getIdFromOutput(LayerOutputDTO output) {
     return output.getId();
-  }
-
-  @Override
-  @Test
-  @DisplayName("PATCH is not supported — always returns 405")
-  void shouldRejectPatchThatResultsInInvalidEntity() {
-    UUID id = createTestEntity();
-    Map<String, Object> patchBody =
-        objectMapper.convertValue(createInvalidInput(), new TypeReference<>() {});
-    ResponseEntity<LayerOutputDTO> response = performPatch(id, patchBody);
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
-  }
-
-  @Override
-  @Test
-  @DisplayName("PATCH is not supported — always returns 405")
-  void shouldReturn404WhenPatchingNonExistentEntity() {
-    UUID randomId = UUID.randomUUID();
-    ResponseEntity<ProblemDetail> response =
-        exchangeForProblem(
-            getEndpointPath() + "/" + randomId,
-            HttpMethod.PATCH,
-            createAuthHeaders(),
-            Map.of("layerName", "x"));
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
   }
 
   @Nested

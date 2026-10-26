@@ -178,6 +178,22 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
+    void create_withMalformedDataStructureId_answers400InvalidInput() {
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDescription("version under a malformed parent id");
+
+      ResponseEntity<ProblemDetail> response =
+          restTemplate.exchange(
+              "/datastructures/not-a-uuid/versions",
+              HttpMethod.POST,
+              new HttpEntity<>(input, createAuthHeaders()),
+              ProblemDetail.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:INVALID_INPUT");
+    }
+
+    @Test
     @DisplayName("A UML model is stored under the data structure's id")
     void umlModelIsStoredUnderTheDataStructureId() {
       DataStructure structure = portalData.dataStructure(b -> b.name("OriginalName"));
@@ -435,13 +451,14 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @Test
     @DisplayName("Should return 405 for getAll (endpoint disabled)")
     void shouldRejectGetAll() {
-      ResponseEntity<String> response =
+      ResponseEntity<ProblemDetail> response =
           restTemplate.exchange(
-              getEndpoint(), HttpMethod.GET, new HttpEntity<>(createAuthHeaders()), String.class);
+              getEndpoint(),
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              ProblemDetail.class);
 
-      assertThat(response.getStatusCode())
-          .as("Should return METHOD_NOT_ALLOWED status")
-          .isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+      BaseControllerIntegrationTest.assertMethodNotAllowed(response, HttpMethod.GET);
     }
   }
 
