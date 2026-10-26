@@ -144,6 +144,7 @@ integration-test-backend:
       - portal-backend/target/failsafe-reports/
       - portal-backend/target/site/jacoco-it/
       - portal-backend/target/jacoco-it.exec
+      - portal-backend/target/undocumented-answers.txt
     reports:
       junit: portal-backend/target/failsafe-reports/TEST-*.xml
 

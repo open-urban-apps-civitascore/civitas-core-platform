@@ -33,7 +33,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @Import({
   PortalTestDataFactory.class,
   InfraTestDataFactory.class,
-  OmitNullRequestFieldsConfiguration.class
+  OmitNullRequestFieldsConfiguration.class,
+  AnswerRecordingConfiguration.class
 })
 @Slf4j(access = AccessLevel.PROTECTED)
 public abstract class BaseKeycloakIntegrationTest {
