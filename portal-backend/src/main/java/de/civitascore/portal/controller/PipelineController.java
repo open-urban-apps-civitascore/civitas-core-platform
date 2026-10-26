@@ -153,7 +153,6 @@ public class PipelineController {
     ProblemType.NOT_FOUND,
     ProblemType.DATASET_NOT_EDITABLE,
     ProblemType.SAGA_IN_FLIGHT,
-    ProblemType.RESOURCE_IN_USE,
     ProblemType.REMOVAL_NOT_CONFIRMED,
     ProblemType.REGISTRY_UNAVAILABLE
   })
