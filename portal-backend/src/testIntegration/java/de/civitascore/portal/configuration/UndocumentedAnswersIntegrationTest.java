@@ -21,7 +21,7 @@ import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Reports the answers of the integration tests that the OpenAPI description does not document. It
+ * Fails on the answers of the integration tests that the OpenAPI description does not document. It
  * runs after every other integration test class of the JVM, see {@code junit-platform.properties}.
  */
 @Order(Integer.MAX_VALUE)
@@ -30,7 +30,7 @@ class UndocumentedAnswersIntegrationTest extends BaseKeycloakIntegrationTest {
   private static final Path REPORT = Path.of("target", "undocumented-answers.txt");
 
   @Test
-  void writesUndocumentedAnswersReport() throws IOException {
+  void everyRecordedAnswer_isDocumentedInTheSpec() throws IOException {
     HttpHeaders headers = new HttpHeaders();
     headers.setBearerAuth(getValidAccessToken());
     ResponseEntity<JsonNode> spec =
@@ -48,5 +48,6 @@ class UndocumentedAnswersIntegrationTest extends BaseKeycloakIntegrationTest {
         undocumented.size(),
         answers.size(),
         REPORT.toAbsolutePath());
+    assertThat(undocumented).as("undocumented answers, see %s", REPORT.toAbsolutePath()).isEmpty();
   }
 }
