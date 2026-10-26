@@ -5,7 +5,6 @@ import static org.assertj.core.api.InstanceOfAssertFactories.type;
 
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -189,7 +188,7 @@ class DataSinkControllerIntegrationTest
     @DisplayName("Should read back a POSTGIS DataSink with correct dataSetId")
     void shouldReadPostgisDataSinkWithCorrectDataSetId() {
       ensureTestData();
-      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      var ds = portalData.dataStructure();
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
@@ -290,7 +289,7 @@ class DataSinkControllerIntegrationTest
     @DisplayName("POST creates a POSTGIS DataSink with a resolved DSV summary")
     void postCreatesPostgisDataSink() {
       ensureTestData();
-      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      var ds = portalData.dataStructure();
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
@@ -324,7 +323,7 @@ class DataSinkControllerIntegrationTest
     @DisplayName("POST returns 409 when a sibling POSTGIS sink already uses the tableName")
     void postRejectsDuplicatePostgisTableName() {
       ensureTestData();
-      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      var ds = portalData.dataStructure();
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
@@ -355,7 +354,7 @@ class DataSinkControllerIntegrationTest
     @DisplayName("POST returns 409 when the tableName differs from a sibling only in case")
     void postRejectsCaseOnlyDuplicatePostgisTableName() {
       ensureTestData();
-      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      var ds = portalData.dataStructure();
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
@@ -386,7 +385,7 @@ class DataSinkControllerIntegrationTest
     @DisplayName("POST returns 400 when the POSTGIS tableName is not a plain identifier")
     void postRejectsNonIdentifierPostgisTableName() {
       ensureTestData();
-      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      var ds = portalData.dataStructure();
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
@@ -422,7 +421,7 @@ class DataSinkControllerIntegrationTest
     @DisplayName("POST accepts a FROST DataSink referencing its mapping's target structure")
     void postAcceptsFrostWithElement() {
       ensureTestData();
-      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      var ds = portalData.dataStructure();
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
@@ -506,7 +505,7 @@ class DataSinkControllerIntegrationTest
     @DisplayName("PUT replaces the configuration of an existing same-type DataSink")
     void putReplacesDataSinkConfiguration() {
       ensureTestData();
-      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      var ds = portalData.dataStructure();
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
@@ -544,7 +543,7 @@ class DataSinkControllerIntegrationTest
     @DisplayName("PUT returns 400 when changing the immutable dataSinkType")
     void putRejectsTypeChange() {
       UUID id = createTestEntity();
-      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      var ds = portalData.dataStructure();
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
@@ -592,7 +591,7 @@ class DataSinkControllerIntegrationTest
     @DisplayName("PATCH updates configuration on a POSTGIS DataSink in place")
     void patchUpdatesPostgisConfiguration() {
       ensureTestData();
-      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      var ds = portalData.dataStructure();
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
@@ -632,7 +631,7 @@ class DataSinkControllerIntegrationTest
     @DisplayName("PATCH cannot reset the provisioned flag of a DataSink")
     void patchKeepsProvisionedFlag() {
       ensureTestData();
-      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      var ds = portalData.dataStructure();
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
@@ -667,7 +666,7 @@ class DataSinkControllerIntegrationTest
     @DisplayName("PATCH leaves omitted fields unchanged")
     void patchLeavesOmittedFieldsUnchanged() {
       ensureTestData();
-      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      var ds = portalData.dataStructure();
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
@@ -708,7 +707,7 @@ class DataSinkControllerIntegrationTest
     @DisplayName("PATCH returns 409 when renaming a sink onto a sibling POSTGIS tableName")
     void patchRejectsDuplicatePostgisTableName() {
       ensureTestData();
-      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      var ds = portalData.dataStructure();
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
@@ -754,7 +753,7 @@ class DataSinkControllerIntegrationTest
         "PUT returns 409 when renaming a provisioned POSTGIS sink, even with confirmDataLoss")
     void putRejectsRenameOfProvisionedPostgisSink() {
       ensureTestData();
-      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      var ds = portalData.dataStructure();
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
@@ -786,7 +785,7 @@ class DataSinkControllerIntegrationTest
     @DisplayName("PATCH returns 400 when changing the immutable dataSinkType")
     void patchRejectsTypeChange() {
       ensureTestData();
-      var ds = portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      var ds = portalData.dataStructure();
       DataStructureVersion dsv =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));

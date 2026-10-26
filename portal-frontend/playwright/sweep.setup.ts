@@ -87,7 +87,6 @@ setup('sweep stale e2e data', async () => {
   )
   for (const d of datastructures) {
     try {
-      await api.unreleaseDatastructure(d.id).catch(() => {})
       await api.deleteDatastructure(d.id)
     } catch {
       warn(`datastructure ${d.id}`)

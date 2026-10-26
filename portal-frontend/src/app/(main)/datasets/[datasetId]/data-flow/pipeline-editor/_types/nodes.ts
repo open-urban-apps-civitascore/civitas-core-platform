@@ -86,6 +86,8 @@ export interface DataSourceNodeData extends BasePipelineNodeData {
    * is the CORE pipeline node's `sourceRef`. Round-trips via `styles`; absent until a source is selected.
    */
   configurationUrn?: string
+  /** Name of the selected API call. HTTP sources only. */
+  apiCallName?: string
   entityMetadata?: {
     connector?: string
     connection?: string
@@ -113,10 +115,6 @@ export interface FrostNodeData extends BasePipelineNodeData {
    * must not decide what a Pipeline writes.
    */
   port?: FrostSinkPort
-  /** Fixed FROST server display name */
-  serverName: string
-  /** Fixed FROST server URL */
-  serverUrl: string
   /** SensorThings API version */
   version: string
 }

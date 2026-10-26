@@ -31,7 +31,7 @@ const mockDatastructures: DatastructuresListData[] = [
     id: '00000000-0000-0000-0000-000000000001',
     name: 'Customer Schema',
     description: 'Schema for customer data',
-    status: 'DRAFT',
+    status: null,
     source: 'OWN',
     versionNumber: '1.0.0',
     versions: [],
@@ -40,7 +40,7 @@ const mockDatastructures: DatastructuresListData[] = [
     id: '00000000-0000-0000-0000-000000000002',
     name: 'Order Schema',
     description: 'Schema for order data',
-    status: 'AVAILABLE',
+    status: null,
     source: null,
     versionNumber: null,
     versions: [],
@@ -97,6 +97,37 @@ describe('DatastructuresTable', () => {
     expect(screen.getByRole('columnheader', { name: 'Verwendung' })).toBeDefined()
     expect(within(rows[1]).getByTestId('inUseIndicator')).toBeInTheDocument()
     expect(within(rows[2]).queryByTestId('inUseIndicator')).toBeNull()
+  })
+
+  it('leaves the status empty on a data structure row and shows it on its version sub-rows', () => {
+    const [datastructure] = mockDatastructures
+    renderTable({
+      ...defaultProps,
+      datastructures: [
+        {
+          ...datastructure,
+          versions: [
+            {
+              ...datastructure,
+              id: '00000000-0000-0000-0000-000000000011',
+              name: 'Version 1.0.0',
+              status: 'AVAILABLE',
+              versions: [],
+            },
+          ],
+        },
+      ],
+      rowCount: 1,
+    })
+
+    const [topLevelRow] = screen.getAllByRole('row').slice(1)
+    expect(within(topLevelRow).queryByText('Verfügbar')).toBeNull()
+    expect(within(topLevelRow).getByText('-')).toBeInTheDocument()
+
+    fireEvent.click(within(within(topLevelRow).getByTestId('expanderCell')).getByRole('button'))
+
+    const [, , subRow] = screen.getAllByRole('row')
+    expect(within(subRow).getByText('Verfügbar')).toBeInTheDocument()
   })
 
   describe('Permission gating', () => {

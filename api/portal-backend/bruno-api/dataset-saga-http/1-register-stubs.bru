@@ -1,0 +1,163 @@
+meta {
+  name: 1. Register the WireMock stubs
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{wiremockUrl}}/__admin/mappings/import
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "mappings": [
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000001",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": { "method": "GET", "urlPath": "/dataset-saga-http/things" },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": [
+            {
+              "name": "HTTP saga station 1",
+              "description": "Delivered by the things API call",
+              "properties": { "reference": "http-saga-things-1" },
+              "Locations": [
+                {
+                  "name": "HTTP saga station 1",
+                  "description": "Location of station 1",
+                  "encodingType": "application/geo+json",
+                  "location": { "type": "Point", "coordinates": [8.40, 49.01] }
+                }
+              ]
+            },
+            {
+              "name": "HTTP saga station 2",
+              "description": "Delivered by the things API call",
+              "properties": { "reference": "http-saga-things-2" }
+            }
+          ]
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000002",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": { "method": "GET", "urlPath": "/dataset-saga-http/missing" },
+        "response": { "status": 404 }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000003",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": { "method": "GET", "urlPath": "/dataset-saga-http/invalid" },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": [
+            {
+              "name": "HTTP saga valid record of an invalid response",
+              "description": "Agrees with the Data structure",
+              "properties": { "reference": "http-saga-invalid-0" }
+            },
+            {
+              "name": 4711,
+              "description": "Violates the Data structure",
+              "properties": { "reference": "http-saga-invalid-1" }
+            }
+          ]
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000010",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/pages",
+          "queryParameters": { "page": { "equalTo": "0" }, "size": { "equalTo": "2" } }
+        },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": [
+            {
+              "name": "HTTP saga page station 1",
+              "description": "Delivered by the pages API call",
+              "properties": { "reference": "http-saga-pages-1" }
+            },
+            {
+              "name": "HTTP saga page station 2",
+              "description": "Delivered by the pages API call",
+              "properties": { "reference": "http-saga-pages-2" }
+            }
+          ]
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000011",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/pages",
+          "queryParameters": { "page": { "equalTo": "1" }, "size": { "equalTo": "2" } }
+        },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": [
+            {
+              "name": "HTTP saga page station 3",
+              "description": "Delivered by the pages API call",
+              "properties": { "reference": "http-saga-pages-3" }
+            },
+            {
+              "name": "HTTP saga page station 4",
+              "description": "Delivered by the pages API call",
+              "properties": { "reference": "http-saga-pages-4" }
+            }
+          ]
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000012",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/pages",
+          "queryParameters": { "page": { "equalTo": "2" }, "size": { "equalTo": "2" } }
+        },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": [
+            {
+              "name": "HTTP saga page station 5",
+              "description": "Delivered by the pages API call",
+              "properties": { "reference": "http-saga-pages-5" }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
+
+tests {
+  test("Stubs registered", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  Registers the four API calls of the HTTP/REST Data source in the WireMock of the API test
+  stack, under the path prefix `/dataset-saga-http/`. The stubs carry fixed ids, so a second run
+  replaces them, and the metadata `suite`, by which step 15 removes them.
+
+  | Path | Response |
+  |---|---|
+  | `things` | 200, two Things in the form the FROST port `ThingTree` writes |
+  | `missing` | 404 |
+  | `invalid` | 200, a valid record and a record whose `name` is a number |
+  | `pages` | 200 for `page` 0, 1 and 2 with `size` 2: two, two and one Thing. Any other page is a 404. |
+}

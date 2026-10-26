@@ -11,6 +11,8 @@ import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
+import de.civitascore.modelforge.contract.ForeignReference;
+import de.civitascore.modelforge.contract.ForeignReferencesQuery;
 import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.ImportSmartDataModelCommand;
@@ -140,6 +142,20 @@ public interface ModelForge {
      *     Element nor a DataStructure
      */
     RootCheck checkRoot(ArtifactId artifactId);
+
+    /**
+     * The artifacts a DataStructure model references that are not its own, each with the
+     * DataStructure that minted it. A reference is a CORE-URN {@code $ref} at any depth or a
+     * concrete {@code x-core-ref}; own is what the DataStructure minted.
+     *
+     * <p>Asked of a document before either store path, or of a stored version with the own
+     * Elements it reaches. Answered from the stored references, not the in-memory graph; whether a
+     * reference is allowed is the caller's decision.
+     *
+     * @throws IllegalArgumentException when only a stored version is asked about and the registry
+     *     does not hold it
+     */
+    List<ForeignReference> foreignReferences(ForeignReferencesQuery query);
 
     // ── Dependency graph ─────────────────────────────────────────────────────
 

@@ -151,7 +151,7 @@ class NifiFrostFindOrCreateIT extends AbstractNifiIT {
     // NiFi loads the NAR at startup. Without it the processor does not exist and the deployment
     // fails — hence the explicit skip above rather than a failure that reads like an adapter
     // defect.
-    startNifi(HOST_PORT, network, container -> installFrostNar(container, nar.get()));
+    startNifi(HOST_PORT, network, container -> installExtensionNars(container));
   }
 
   /** Creates the FROST project the flows are scoped to and returns its {@code @iot.id}. */

@@ -1,0 +1,44 @@
+meta {
+  name: Contract HTTP — validation: duplicate API call names
+  type: http
+  seq: 113
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "name": "contract_http_duplicate_names",
+    "description": "contract — HTTP",
+    "connector": {
+      "connectorType": "HTTP",
+      "apiCalls": [
+        { "name": "stations", "path": "/stations" },
+        { "name": "stations", "path": "/stations/1" }
+      ]
+    },
+    "dataStructureVersionId": null
+  }
+}
+
+tests {
+  test("Status is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Error body matches the VALIDATION_FAILED contract", function() {
+    expect(res.body.type).to.equal("urn:civitas:error:VALIDATION_FAILED");
+    expect(res.body.fieldErrors).to.deep.equal([
+      { field: "connector.apiCalls[1].name", message: "'name' must be unique among the API calls" }
+    ]);
+  });
+}
+
+docs {
+  A source node names the API call it reads, so names must be unique.
+  The rule runs on every write, not only at release.
+}

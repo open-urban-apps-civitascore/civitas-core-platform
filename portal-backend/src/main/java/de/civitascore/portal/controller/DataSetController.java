@@ -51,7 +51,7 @@ import tools.jackson.databind.JsonNode;
 @RequiredArgsConstructor
 @Tag(name = "DataSets", description = "Dataset management endpoints")
 public class DataSetController
-    extends BaseDataEntityController<
+    extends ReleasableDataEntityController<
         DataSetInputDTO, DataSetMetaInputDTO, DataSetOutputDTO, DataSet, DataSetSpec> {
 
   private final DataSetService dataSetService;

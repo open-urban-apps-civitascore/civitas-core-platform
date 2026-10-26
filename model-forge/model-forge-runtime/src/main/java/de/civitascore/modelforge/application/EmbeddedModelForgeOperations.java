@@ -14,6 +14,8 @@ import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
+import de.civitascore.modelforge.contract.ForeignReference;
+import de.civitascore.modelforge.contract.ForeignReferencesQuery;
 import de.civitascore.modelforge.contract.Diagnostic;
 import de.civitascore.modelforge.contract.DiagnosticSeverity;
 import de.civitascore.modelforge.contract.ImportResult;
@@ -74,6 +76,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
     private final SmartDataModelsService smartDataModelsService;
     private final XRepositoryService xRepositoryService;
     private final UrnService urns;
+    private final ForeignReferenceResolver foreignReferenceResolver;
 
     public EmbeddedModelForgeOperations(
         SchemaImportService schemaImportService,
@@ -101,6 +104,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         this.smartDataModelsService = smartDataModelsService;
         this.xRepositoryService = xRepositoryService;
         this.urns = urns;
+        this.foreignReferenceResolver = new ForeignReferenceResolver(registry, urns);
     }
 
     @Override
@@ -301,6 +305,11 @@ public class EmbeddedModelForgeOperations implements ModelForge {
     }
 
     private record Member(String name, String urn) {}
+
+    @Override
+    public List<ForeignReference> foreignReferences(ForeignReferencesQuery query) {
+        return foreignReferenceResolver.resolve(query);
+    }
 
     @Override
     public DependencyGraphView dependencies(DependencyQuery query) {

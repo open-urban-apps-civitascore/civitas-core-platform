@@ -54,7 +54,7 @@ export interface BasePipelineNodeProps {
   children?: ReactNode
   /** Additional CSS class */
   className?: string
-  /** Validation severity for visual indicator (Phase 5) */
+  /** Validation severity, shown as the border color */
   validationSeverity?: ValidationSeverity
 }
 
@@ -158,7 +158,7 @@ export const BasePipelineNode: React.FC<BasePipelineNodeProps> = ({
   const validationBorderColor = VALIDATION_COLORS[validationSeverity]
   const finalContainerStyle: CSSProperties = {
     ...containerStyle,
-    position: 'relative', // Required for validation badge positioning
+    position: 'relative',
     ...(validationSeverity !== 'none' && {
       border: `2px solid ${validationBorderColor}`,
       boxShadow: `0 0 0 2px ${validationBorderColor}30`,
@@ -167,29 +167,6 @@ export const BasePipelineNode: React.FC<BasePipelineNodeProps> = ({
 
   return (
     <div className={`pipeline-node ${className}`} style={finalContainerStyle}>
-      {/* Validation Indicator Badge */}
-      {validationSeverity !== 'none' && (
-        <div
-          style={{
-            position: 'absolute',
-            top: -6,
-            right: -6,
-            width: 14,
-            height: 14,
-            borderRadius: '50%',
-            backgroundColor: validationBorderColor,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '10px',
-            color: 'white',
-            fontWeight: 'bold',
-            zIndex: 10,
-          }}
-        >
-          {validationSeverity === 'error' ? '!' : '⚠'}
-        </div>
-      )}
       {/* Left Handle (Input) */}
       {hasLeftHandle && <Handle type="target" position={Position.Left} id="input" style={handleStyle} />}
 

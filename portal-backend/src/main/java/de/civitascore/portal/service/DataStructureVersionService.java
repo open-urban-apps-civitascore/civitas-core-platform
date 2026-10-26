@@ -2,7 +2,6 @@ package de.civitascore.portal.service;
 
 import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
@@ -12,9 +11,11 @@ import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.VersionBump;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.security.ModelReferenceAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ModelMemberUnreachableException;
 import de.civitascore.portal.util.ModelMissingException;
+import de.civitascore.portal.util.ModelReferenceNotAvailableException;
 import de.civitascore.portal.util.ModelRootMissingException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
@@ -51,6 +52,8 @@ public class DataStructureVersionService
   private final ModelRegistryGateway modelRegistryGateway;
 
   private final ArtifactUsageLookup artifactUsageLookup;
+
+  private final ModelReferenceAuthorizer modelReferenceAuthorizer;
 
   @Override
   protected DataStructureVersionRepository getRepository() {
@@ -135,6 +138,9 @@ public class DataStructureVersionService
       return;
     }
     DataStructure parent = entity.getDataStructure();
+    // Before anything is written: a refused write must leave no trace in the registry.
+    modelReferenceAuthorizer.authorizeWrite(
+        parent.getId(), input.getModel(), input.getStyles(), entity.getModelUrn());
     ModelRegistryGateway.ModelPin pin =
         modelRegistryGateway.storeModel(
             Optional.ofNullable(parent.getModelLogicalUrn()),
@@ -246,6 +252,8 @@ public class DataStructureVersionService
    * @throws ModelMemberUnreachableException if members of the version's model are not reachable
    *     from its root Element
    * @throws ModelMissingException if the model registry no longer holds the version's model
+   * @throws ModelReferenceNotAvailableException if the version's model references a model the
+   *     caller may not use
    */
   @Transactional
   public DataStructureVersion release(UUID id) {
@@ -265,19 +273,19 @@ public class DataStructureVersionService
     }
 
     modelRegistryGateway.requireSingleRoot(version.getModelUrn());
+    modelReferenceAuthorizer.authorizeStored(
+        version.getDataStructure().getId(), version.getModelUrn());
 
     version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
     return dataStructureVersionRepository.save(version);
   }
 
   /**
-   * Unreleases a data structure version by setting status back to DRAFT. Validates that unreleasing
-   * won't leave a released DataStructure without any released versions.
+   * Unreleases a data structure version by setting status back to DRAFT.
    *
    * @param id the version ID
    * @return the unreleased version
-   * @throws InvalidInputException if version is already DRAFT or if unreleasing would leave a
-   *     released DataStructure without released versions
+   * @throws InvalidInputException if version is already DRAFT
    * @throws ResourceInUseException if a released entity references the version
    */
   @Transactional
@@ -291,32 +299,22 @@ public class DataStructureVersionService
     }
 
     artifactUsageLookup.of(version).requireNoReleasedReferrer(getEntityName(), id);
-    validateExistenceOfOtherReleasedVersion(
-        version,
-        "Cannot unrelease this DataStructureVersion because it is the only released version of a released DataStructure. Please unrelease the DataStructure first.");
 
     version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
     return dataStructureVersionRepository.save(version);
   }
 
   /**
-   * Validates that the version is not in use by any data source or data sink and that deleting it
-   * would not leave a released data structure without any released versions.
+   * Validates that the version is not in use by any data source or data sink.
    *
    * @param id the version ID to delete
    * @return the version entity to be deleted
    * @throws ResourceInUseException if the version is still referenced
-   * @throws InvalidInputException if the version is the only released version of a released data
-   *     structure
    */
   @Override
   protected DataStructureVersion preProcessDelete(UUID id) {
     DataStructureVersion version = findByIdOrThrow(id);
     validateNotInUse(id);
-    validateExistenceOfOtherReleasedVersion(
-        version,
-        "Cannot delete this DataStructureVersion because it is the only released version of a released DataStructure. Please unrelease the DataStructure first.");
-
     return version;
   }
 
@@ -342,22 +340,5 @@ public class DataStructureVersionService
         .findById(versionId)
         .map(DataStructureVersion::getModelUrn)
         .orElse(null);
-  }
-
-  private void validateExistenceOfOtherReleasedVersion(
-      DataStructureVersion version, String errorMessage) {
-    DataStructure dataStructure = version.getDataStructure();
-    if (dataStructure.getDataStructureStatus() == DataStructureStatus.DRAFT) {
-      return;
-    }
-
-    boolean hasOtherReleasedVersions =
-        dataStructure.getDataStructureVersions().stream()
-            .filter(v -> !v.getId().equals(version.getId()))
-            .anyMatch(v -> v.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT);
-
-    if (!hasOtherReleasedVersions) {
-      throw new InvalidInputException("dataStructureVersionStatus", version.getId(), errorMessage);
-    }
   }
 }

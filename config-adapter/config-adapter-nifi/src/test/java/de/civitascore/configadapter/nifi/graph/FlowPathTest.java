@@ -26,11 +26,11 @@ import org.junit.jupiter.api.Test;
 class FlowPathTest {
 
   private static GraphNode node(String id, String kind) {
-    return new GraphNode(id, kind, null, null, null, null);
+    return new GraphNode(id, kind, null, null, null, null, null);
   }
 
   private static GraphNode cron(String id, String expression) {
-    return new GraphNode(id, "cron", null, null, null, expression);
+    return new GraphNode(id, "cron", null, null, null, null, expression);
   }
 
   private static GraphEdge edge(String from, String to) {

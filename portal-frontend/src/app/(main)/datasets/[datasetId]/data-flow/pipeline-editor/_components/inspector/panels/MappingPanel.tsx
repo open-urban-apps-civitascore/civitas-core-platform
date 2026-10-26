@@ -34,11 +34,23 @@ interface DatastructureFieldProps {
   placeholder: string
   selectedKey: string | null
   name?: string
+  versionNumber?: string
+  status?: string
   onSelect: (selection: SchemaSelection) => void
+  isDisabled: boolean
 }
 
 /** Datastructure-version picker reusing DataModelImportModal. */
-const DatastructureField = ({ label, placeholder, selectedKey, name, onSelect }: DatastructureFieldProps) => {
+const DatastructureField = ({
+  label,
+  placeholder,
+  selectedKey,
+  name,
+  versionNumber,
+  status,
+  onSelect,
+  isDisabled,
+}: DatastructureFieldProps) => {
   const { datasetId } = useParams<{ datasetId: string }>()
   const { canReadDatastructures } = useDatasetPermissionsById(datasetId)
   const [isOpen, setIsOpen] = useState(false)
@@ -53,8 +65,19 @@ const DatastructureField = ({ label, placeholder, selectedKey, name, onSelect }:
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setIsOpen(true)}>
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full justify-start"
+        disabled={isDisabled}
+        onClick={() => setIsOpen(true)}
+      >
         <span className="truncate">{name || placeholder}</span>
+        {(versionNumber || status) && (
+          <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+            {[versionNumber, status].filter(Boolean).join(' · ')}
+          </span>
+        )}
       </Button>
       {canReadDatastructures && (
         <DataModelImportModal
@@ -73,9 +96,10 @@ const DatastructureField = ({ label, placeholder, selectedKey, name, onSelect }:
 interface MappingPanelProps {
   data: MappingNodeData
   onUpdate: (data: Partial<MappingNodeData>) => void
+  isLocked: boolean
 }
 
-export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
+export const MappingPanel = ({ data, onUpdate, isLocked }: MappingPanelProps) => {
   const t = useTranslations('pipelineEditor.mappingPanel')
   const tStatus = useTranslations('common.status')
   const [isEditorOpen, setIsEditorOpen] = useState(false)
@@ -88,8 +112,18 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
 
   // Names and statuses are not stored on the node — resolve them from the version references at
   // render time.
-  const { name: sourceName, status: sourceStatus } = useDatastructureVersionInfo(sourceKey ?? undefined)
-  const { name: targetName, status: targetStatus } = useDatastructureVersionInfo(targetKey ?? undefined)
+  const {
+    name: sourceName,
+    versionNumber: sourceVersionNumber,
+    status: sourceStatus,
+  } = useDatastructureVersionInfo(sourceKey ?? undefined)
+  const {
+    name: targetName,
+    versionNumber: targetVersionNumber,
+    status: targetStatus,
+  } = useDatastructureVersionInfo(targetKey ?? undefined)
+  const sourceStatusLabel = sourceStatus ? tStatus(sourceStatus) : undefined
+  const targetStatusLabel = targetStatus ? tStatus(targetStatus) : undefined
 
   // The node is "configured" (deployable) ONLY after the field mapping has been saved (handleSave).
   // The name and the source/target selection alone never mark it configured — otherwise a node with
@@ -127,7 +161,13 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
     <div className="space-y-4 p-4">
       <div className="space-y-2">
         <Label htmlFor="mappingName">{t('name')}</Label>
-        <Input id="mappingName" value={data.label} onChange={handleName} placeholder={t('namePlaceholder')} />
+        <Input
+          id="mappingName"
+          value={data.label}
+          onChange={handleName}
+          placeholder={t('namePlaceholder')}
+          disabled={isLocked}
+        />
       </div>
 
       <DatastructureField
@@ -135,25 +175,33 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
         placeholder={t('selectDatastructure')}
         selectedKey={sourceKey}
         name={sourceName}
+        versionNumber={sourceVersionNumber}
+        status={sourceStatusLabel}
         onSelect={handleSource}
+        isDisabled={isLocked}
       />
       <DatastructureField
         label={t('outputDatastructure')}
         placeholder={t('selectDatastructure')}
         selectedKey={targetKey}
         name={targetName}
+        versionNumber={targetVersionNumber}
+        status={targetStatusLabel}
         onSelect={handleTarget}
+        isDisabled={isLocked}
       />
 
       <EntityMetadata
         title={t('details')}
         items={[
-          { label: t('inputStatus'), value: sourceStatus ? tStatus(sourceStatus) : undefined },
-          { label: t('outputStatus'), value: targetStatus ? tStatus(targetStatus) : undefined },
+          { label: t('inputVersion'), value: sourceVersionNumber },
+          { label: t('inputStatus'), value: sourceStatusLabel },
+          { label: t('outputVersion'), value: targetVersionNumber },
+          { label: t('outputStatus'), value: targetStatusLabel },
         ]}
       />
 
-      <Button className="w-full" disabled={!canOpen} onClick={() => setIsEditorOpen(true)}>
+      <Button disabled={!canOpen} onClick={() => setIsEditorOpen(true)}>
         {t('openMappingEditor')}
       </Button>
 
@@ -174,6 +222,7 @@ export const MappingPanel = ({ data, onUpdate }: MappingPanelProps) => {
           }}
           config={data.mappingConfig}
           onSave={handleSave}
+          isReadOnly={isLocked}
         />
       )}
     </div>

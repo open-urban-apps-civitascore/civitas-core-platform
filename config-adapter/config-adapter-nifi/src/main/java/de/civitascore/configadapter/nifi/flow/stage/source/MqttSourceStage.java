@@ -25,6 +25,7 @@ import de.civitascore.configadapter.nifi.flow.stage.PlanContext;
 import de.civitascore.configadapter.nifi.flow.stage.Processor;
 import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageResult;
+import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -125,7 +126,12 @@ public final class MqttSourceStage implements SourceStage {
    * silently consume from the wrong source, so a missing value fails the deploy.
    */
   @Override
-  public void bind(Datasource source, String sourceNodeKey, PlanContext out)
+  public void bind(
+      Datasource source,
+      Map<String, Map<String, Object>> artifacts,
+      GraphNode node,
+      String sourceNodeKey,
+      PlanContext out)
       throws FatalAdapterException {
     Map<String, Object> original = source.getAdditionalProperties();
     Map<String, Object> decrypted = credentials.decrypt(original);

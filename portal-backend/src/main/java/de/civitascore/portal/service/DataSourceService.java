@@ -3,7 +3,6 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.mapper.DataSourceMapper;
 import de.civitascore.portal.model.connector.ConnectorConfiguration;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
@@ -46,7 +45,7 @@ import tools.jackson.databind.JsonNode;
 @Service
 @RequiredArgsConstructor
 public class DataSourceService
-    extends BaseDataEntityService<DataSource, DataSourceInputDTO, DataSourceMetaInputDTO> {
+    extends ReleasableDataEntityService<DataSource, DataSourceInputDTO, DataSourceMetaInputDTO> {
 
   private final DataSourceRepository dataSourceRepository;
   private final DataSourceMapper dataSourceMapper;
@@ -425,12 +424,6 @@ public class DataSourceService
           getEntityName(),
           dsv.getId(),
           "DataStructureVersion must be in AVAILABLE status for an AVAILABLE DataSource");
-    }
-    if (dsv.getDataStructure().getDataStructureStatus() != DataStructureStatus.AVAILABLE) {
-      throw new InvalidInputException(
-          getEntityName(),
-          dsv.getId(),
-          "The parent DataStructure must be in AVAILABLE status for an AVAILABLE DataSource");
     }
   }
 

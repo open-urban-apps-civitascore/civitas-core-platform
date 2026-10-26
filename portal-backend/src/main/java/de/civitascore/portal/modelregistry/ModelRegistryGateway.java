@@ -7,6 +7,8 @@ import de.civitascore.modelforge.contract.ArtifactWriteResult;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyQuery;
+import de.civitascore.modelforge.contract.ForeignReference;
+import de.civitascore.modelforge.contract.ForeignReferencesQuery;
 import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.RootCheck;
@@ -83,6 +85,20 @@ public class ModelRegistryGateway {
    * the walk short of the whole flow.
    */
   public record ArtifactClosure(Set<String> artifacts, Set<String> unresolved, boolean truncated) {}
+
+  /**
+   * An artifact a Data structure model references that is not the Data structure's own, as {@link
+   * ModelForge#foreignReferences} reports it.
+   */
+  public record ModelReference(String target, Kind kind, String mintedBy) {
+
+    /** How the model refers to the target. */
+    public enum Kind {
+      LINKED,
+      EMBEDDED_PINNED,
+      EMBEDDED_FLOATING
+    }
+  }
 
   /**
    * Stores a model (with its styles merged in as {@value #X_UI_STYLES}) in the registry and returns
@@ -250,6 +266,50 @@ public class ModelRegistryGateway {
       case RootCheck.UnreachableMembers unreachable ->
           throw new ModelMemberUnreachableException(unreachable.memberNames());
     }
+  }
+
+  /**
+   * The foreign references a model about to be stored adds to the version's stored model, as {@link
+   * ModelForge#foreignReferences} defines them.
+   *
+   * @param dataStructureId the id of the Data structure the model belongs to
+   * @param model the submitted model
+   * @param styles the submitted styles, read like {@link #storeModel} stores them
+   * @param storedModelUrn the version's stored model, or null when it has none yet
+   */
+  public List<ModelReference> addedForeignReferences(
+      UUID dataStructureId,
+      Map<String, Object> model,
+      Map<String, Object> styles,
+      String storedModelUrn) {
+    ArtifactId stored =
+        storedModelUrn == null || storedModelUrn.isBlank() ? null : new ArtifactId(storedModelUrn);
+    return toModelReferences(
+        modelForge.foreignReferences(
+            new ForeignReferencesQuery(dataStructureId, mergeStyles(model, styles), stored)));
+  }
+
+  /**
+   * Every foreign reference of a stored model, including those of the own Elements it reaches.
+   *
+   * @param dataStructureId the id of the Data structure the model belongs to
+   * @param modelUrn CORE URN of the stored model
+   */
+  public List<ModelReference> foreignReferencesOf(UUID dataStructureId, String modelUrn) {
+    return toModelReferences(
+        modelForge.foreignReferences(
+            new ForeignReferencesQuery(dataStructureId, null, new ArtifactId(modelUrn))));
+  }
+
+  private static List<ModelReference> toModelReferences(List<ForeignReference> references) {
+    return references.stream()
+        .map(
+            reference ->
+                new ModelReference(
+                    reference.target(),
+                    ModelReference.Kind.valueOf(reference.kind().name()),
+                    reference.mintedBy()))
+        .toList();
   }
 
   /**

@@ -31,9 +31,10 @@ import { PortStructureTree } from '../components/PortStructureTree'
 interface FrostPanelProps {
   data: FrostNodeData
   onUpdate: (updates: Partial<FrostNodeData>) => void
+  isLocked: boolean
 }
 
-export const FrostPanel: React.FC<FrostPanelProps> = ({ data, onUpdate }) => {
+export const FrostPanel: React.FC<FrostPanelProps> = ({ data, onUpdate, isLocked }) => {
   const t = useTranslations('pipelineEditor')
 
   const handlePortChange = useCallback(
@@ -51,9 +52,12 @@ export const FrostPanel: React.FC<FrostPanelProps> = ({ data, onUpdate }) => {
   return (
     <div className="space-y-4 p-4">
       <div className="space-y-2">
-        <Label htmlFor="frost-port">{t('frostPanel.port')}</Label>
-        <Select value={data.port ?? ''} onValueChange={handlePortChange}>
-          <SelectTrigger id="frost-port" aria-invalid={!data.port}>
+        <Label htmlFor="frost-port">
+          {t('frostPanel.port')}
+          <span className="text-red-500 ml-1">*</span>
+        </Label>
+        <Select value={data.port ?? ''} onValueChange={handlePortChange} disabled={isLocked} required>
+          <SelectTrigger id="frost-port" aria-invalid={!data.port} aria-required>
             <SelectValue placeholder={t('frostPanel.portPlaceholder')} />
           </SelectTrigger>
           <SelectContent>
@@ -81,7 +85,6 @@ export const FrostPanel: React.FC<FrostPanelProps> = ({ data, onUpdate }) => {
       <EntityMetadata
         title={t('frostPanel.details')}
         items={[
-          { label: t('frostPanel.serverName'), value: data.serverName },
           { label: t('frostPanel.serverUrl'), value: t('frostPanel.internalServer') },
           { label: t('frostPanel.version'), value: data.version },
         ]}

@@ -1,0 +1,37 @@
+meta {
+  name: Contract HTTP — PATCH changes auth type (3/4 patch BASIC with mask)
+  type: http
+  seq: 105
+}
+
+patch {
+  url: {{baseUrl}}/datasources/{{contractHttpPatchAuthId}}
+  body: json
+  auth: inherit
+}
+
+
+body:json {
+  {
+    "connector": {
+      "authentication": { "type": "BASIC", "username": "reader", "password": "********" }
+    }
+  }
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("The mask does not bring back the dropped password", function() {
+    expect(res.body.connector.authentication).to.deep.equal({
+      type: "BASIC", username: "reader", password: null
+    });
+  });
+}
+
+docs {
+  After step 2 no password is stored, so `"********"` resolves to no
+  password. A mask must never restore a password of an earlier
+  authentication.
+}

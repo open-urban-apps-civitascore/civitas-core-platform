@@ -23,7 +23,7 @@
 
 lint-frontend:
   extends: .only-frontend-changes
-  image: node:22
+  image: node:22.23.4
   stage: lint
   needs: []
   variables:
@@ -60,7 +60,7 @@ lint-frontend:
 
 dependency-prune-frontend:
   extends: .only-frontend-changes
-  image: node:22
+  image: node:22.23.4
   stage: lint
   needs: []
   variables:
@@ -88,7 +88,7 @@ dependency-prune-frontend:
 
 test-frontend:
   extends: .only-frontend-changes
-  image: node:22
+  image: node:22.23.4
   stage: test
   needs: []
   variables:
@@ -122,7 +122,7 @@ test-frontend:
 
 build-frontend:
   extends: .only-frontend-changes
-  image: node:22
+  image: node:22.23.4
   stage: build
   needs: ['lint-frontend', 'dependency-prune-frontend']
   variables:

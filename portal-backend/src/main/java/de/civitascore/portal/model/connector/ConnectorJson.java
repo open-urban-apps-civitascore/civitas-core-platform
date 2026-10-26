@@ -13,12 +13,15 @@ import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ValueDeserializer;
+import tools.jackson.databind.cfg.CoercionAction;
+import tools.jackson.databind.cfg.CoercionInputShape;
 import tools.jackson.databind.exc.InvalidTypeIdException;
 import tools.jackson.databind.exc.UnrecognizedPropertyException;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.jsontype.TypeDeserializer;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.type.LogicalType;
 
 /**
  * Converts a {@link ConnectorConfiguration} between its three JSON forms:
@@ -49,7 +52,16 @@ public final class ConnectorJson {
       Set.of("$schema", "$id", "id", "title", "description", ELEMENT, DOCUMENT_TYPE_PROPERTY);
 
   private static final JsonMapper STRICT =
-      JsonMapper.builder().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
+      JsonMapper.builder()
+          .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+          .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
+          .withCoercionConfig(
+              LogicalType.Integer,
+              config -> {
+                config.setCoercion(CoercionInputShape.String, CoercionAction.Fail);
+                config.setCoercion(CoercionInputShape.EmptyString, CoercionAction.Fail);
+              })
+          .build();
   private static final JsonMapper LENIENT =
       JsonMapper.builder().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
 
@@ -58,8 +70,8 @@ public final class ConnectorJson {
   /**
    * Reads the connector of a request.
    *
-   * @throws MalformedDataSourceRequestException for an unknown key at any level, an unknown or
-   *     missing {@code connectorType}, or a value of the wrong form
+   * @throws MalformedDataSourceRequestException for an unknown key, an unknown or missing type at
+   *     any level, or a value of the wrong form
    */
   public static ConnectorConfiguration read(JsonNode connector) {
     if (!connector.isObject()) {
@@ -190,10 +202,7 @@ public final class ConnectorJson {
       return new MalformedDataSourceRequestException("Unknown key: " + keyPath(e));
     }
     if (e instanceof InvalidTypeIdException typeId) {
-      return new MalformedDataSourceRequestException(
-          typeId.getTypeId() == null
-              ? "Missing " + ROOT + "." + TYPE_PROPERTY
-              : "Unknown " + TYPE_PROPERTY + ": " + typeId.getTypeId());
+      return new MalformedDataSourceRequestException(typeIdMessage(typeId));
     }
     for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
       if (cause instanceof InvalidConnectorValueException value) {
@@ -202,6 +211,18 @@ public final class ConnectorJson {
       }
     }
     return new MalformedDataSourceRequestException("Invalid value: " + keyPath(e));
+  }
+
+  private static String typeIdMessage(InvalidTypeIdException e) {
+    if (e.getPath().isEmpty()) {
+      return e.getTypeId() == null
+          ? "Missing " + ROOT + "." + TYPE_PROPERTY
+          : "Unknown " + TYPE_PROPERTY + ": " + e.getTypeId();
+    }
+    String typeKey = keyPath(e) + "." + JsonMergePatch.NESTED_TYPE_PROPERTY;
+    return e.getTypeId() == null
+        ? "Missing " + typeKey
+        : "Unknown " + typeKey + ": " + e.getTypeId();
   }
 
   private static String keyPath(JacksonException e) {

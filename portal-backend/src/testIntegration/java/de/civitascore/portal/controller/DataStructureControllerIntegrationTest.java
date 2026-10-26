@@ -5,7 +5,6 @@ import static org.assertj.core.groups.Tuple.tuple;
 
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
@@ -121,9 +120,6 @@ class DataStructureControllerIntegrationTest
       assertThat(output.getDescription())
           .as("Description should match input")
           .isEqualTo("A new test data structure");
-      assertThat(output.getDataStructureStatus())
-          .as("Status should be set to DRAFT by preCreate hook")
-          .isEqualTo(DataStructureStatus.DRAFT);
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
 
       assertThat(response.getHeaders().getLocation())
@@ -136,7 +132,6 @@ class DataStructureControllerIntegrationTest
     void shouldFailToCreateDataStructureWithMissingName() {
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setDescription("Missing name");
-      input.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       ResponseEntity<DataStructureOutputDTO> response = performCreate(input);
 
@@ -178,7 +173,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Shared Data Structure Name");
       input.setDescription("First one");
-      input.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       ResponseEntity<DataStructureOutputDTO> firstResponse = performCreate(input);
       assertThat(firstResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -202,10 +196,7 @@ class DataStructureControllerIntegrationTest
       // Create data structure with relationships
       DataStructure dataStructure =
           portalData.dataStructure(
-              b ->
-                  b.name("Test Data Structure 1")
-                      .description("First test data structure")
-                      .dataStructureStatus(DataStructureStatus.DRAFT));
+              b -> b.name("Test Data Structure 1").description("First test data structure"));
 
       DataStructureVersion modelledVersion =
           portalData.attachModel(
@@ -235,8 +226,6 @@ class DataStructureControllerIntegrationTest
       assertThat(output.getId()).isEqualTo(dataStructure.getId());
       assertThat(output.getName()).isEqualTo("Test Data Structure 1");
       assertThat(output.getDescription()).isEqualTo("First test data structure");
-      assertThat(output.getDataStructureStatus()).isEqualTo(DataStructureStatus.DRAFT);
-
       assertThat(output.getDataStructureVersions())
           .as("Should have dataStructureVersions field")
           .isNotNull();
@@ -329,7 +318,6 @@ class DataStructureControllerIntegrationTest
       assertThat(output.getId()).isEqualTo(dataStructureId);
       assertThat(output.getName()).isEqualTo("Updated Data Structure");
       assertThat(output.getDescription()).isEqualTo("Updated description");
-      assertThat(output.getDataStructureStatus()).isEqualTo(DataStructureStatus.DRAFT);
     }
 
     @Test
@@ -338,7 +326,6 @@ class DataStructureControllerIntegrationTest
       DataStructureInputDTO input = new DataStructureInputDTO();
       input.setName("Non-existent");
       input.setDescription("a description");
-      input.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       ResponseEntity<DataStructureOutputDTO> response = performUpdate(UUID.randomUUID(), input);
 
@@ -380,34 +367,32 @@ class DataStructureControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should fail to update released data structure with regular PUT endpoint")
-    void shouldFailToUpdateReleasedDataStructureWithRegularPut() {
-      DataStructure dataStructure =
-          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.DRAFT));
-
-      portalData.dataStructureVersion(
-          dataStructure,
-          b ->
-              b.version("1.0.0")
-                  .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
-                  .modelName("Released Model"));
-
-      // Release via API
-      restTemplate.exchange(
-          ENDPOINT + "/" + dataStructure.getId() + "/release",
-          HttpMethod.POST,
-          new HttpEntity<>(createAuthHeaders()),
-          getOutputTypeReference());
+    @DisplayName("Should update a data structure whose version is released via PUT")
+    void shouldUpdateDataStructureWithReleasedVersionViaPut() {
+      DataStructure dataStructure = dataStructureWithReleasedVersion();
 
       DataStructureInputDTO input = new DataStructureInputDTO();
-      input.setName("Trying to update released with regular PUT");
-      input.setDescription("This should fail");
+      input.setName("Renamed with a released version");
+      input.setDescription("Changed description");
 
       ResponseEntity<DataStructureOutputDTO> response = performUpdate(dataStructure.getId(), input);
 
-      assertThat(response.getStatusCode())
-          .as("Should return BAD_REQUEST status")
-          .isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getName()).isEqualTo("Renamed with a released version");
+      assertThat(response.getBody().getDescription()).isEqualTo("Changed description");
+    }
+
+    @Test
+    @DisplayName("Should patch the name of a data structure whose version is released")
+    void shouldPatchNameOfDataStructureWithReleasedVersion() {
+      DataStructure dataStructure = dataStructureWithReleasedVersion();
+
+      ResponseEntity<DataStructureOutputDTO> response =
+          performPatch(dataStructure.getId(), Map.of("name", "Patched with a released version"));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getName()).isEqualTo("Patched with a released version");
+      assertThat(response.getBody().getDescription()).isEqualTo(dataStructure.getDescription());
     }
   }
 
@@ -440,394 +425,6 @@ class DataStructureControllerIntegrationTest
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
           .isEqualTo(HttpStatus.NOT_FOUND);
-    }
-  }
-
-  @Nested
-  @DisplayName("Release DataStructure Tests")
-  class ReleaseDataStructureTests {
-
-    private UUID dataStructureWithReleasedVersionId;
-
-    @BeforeEach
-    void setupReleasableDataStructure() {
-      performAdditionalCleanup();
-
-      DataStructure dataStructure =
-          portalData.dataStructure(
-              b ->
-                  b.name("Releasable Data Structure")
-                      .description("Data structure with released version")
-                      .dataStructureStatus(DataStructureStatus.DRAFT));
-      dataStructureWithReleasedVersionId = dataStructure.getId();
-
-      portalData.dataStructureVersion(
-          dataStructure,
-          b ->
-              b.version("1.0.0")
-                  .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
-                  .modelName("Released Model"));
-    }
-
-    @Test
-    @DisplayName("Should release data structure with released version successfully")
-    void shouldReleaseDataStructureWithReleasedVersion() {
-      DataStructure dataStructure =
-          dataStructureRepository.findById(dataStructureWithReleasedVersionId).orElseThrow();
-      assertThat(dataStructure.getDataStructureStatus()).isEqualTo(DataStructureStatus.DRAFT);
-
-      ResponseEntity<DataStructureOutputDTO> response =
-          exchange(
-              ENDPOINT + "/" + dataStructureWithReleasedVersionId + "/release",
-              HttpMethod.POST,
-              createAuthHeaders(),
-              null,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).as("Response body should not be null").isNotNull();
-
-      DataStructureOutputDTO output = response.getBody();
-      assertThat(output.getId()).isEqualTo(dataStructureWithReleasedVersionId);
-      assertThat(output.getDataStructureStatus())
-          .as("Status should be AVAILABLE after releasing")
-          .isEqualTo(DataStructureStatus.AVAILABLE);
-    }
-
-    @Test
-    @DisplayName("Should fail to release data structure without released versions")
-    void shouldFailToReleaseDataStructureWithoutReleasedVersions() {
-      DataStructure dataStructure =
-          portalData.dataStructure(
-              b ->
-                  b.name("No Released Versions")
-                      .description("Data structure without released versions")
-                      .dataStructureStatus(DataStructureStatus.DRAFT));
-
-      portalData.dataStructureVersion(
-          dataStructure,
-          b ->
-              b.version("1.0.0")
-                  .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
-                  .modelName("Draft Model"));
-
-      ResponseEntity<DataStructureOutputDTO> response =
-          exchange(
-              ENDPOINT + "/" + dataStructure.getId() + "/release",
-              HttpMethod.POST,
-              createAuthHeaders(),
-              null,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode())
-          .as("Should return BAD_REQUEST status")
-          .isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName("Should fail to release already released data structure")
-    void shouldFailToReleaseAlreadyReleasedDataStructure() {
-      // First release
-      exchange(
-          ENDPOINT + "/" + dataStructureWithReleasedVersionId + "/release",
-          HttpMethod.POST,
-          createAuthHeaders(),
-          null,
-          getOutputTypeReference());
-
-      // Try to release again
-      ResponseEntity<DataStructureOutputDTO> response =
-          exchange(
-              ENDPOINT + "/" + dataStructureWithReleasedVersionId + "/release",
-              HttpMethod.POST,
-              createAuthHeaders(),
-              null,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode())
-          .as("Should return BAD_REQUEST status")
-          .isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName("Should return 404 when releasing non-existent data structure")
-    void shouldReturn404WhenReleasingNonExistentDataStructure() {
-      ResponseEntity<DataStructureOutputDTO> response =
-          exchange(
-              ENDPOINT + "/" + UUID.randomUUID() + "/release",
-              HttpMethod.POST,
-              createAuthHeaders(),
-              null,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode())
-          .as("Should return NOT_FOUND status")
-          .isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("Should fail to release without authentication")
-    void shouldFailToReleaseWithoutAuth() {
-      ResponseEntity<String> response =
-          performRequestWithoutAuth(
-              "/" + dataStructureWithReleasedVersionId + "/release", HttpMethod.POST);
-
-      assertThat(response.getStatusCode())
-          .as("Should return UNAUTHORIZED status")
-          .isEqualTo(HttpStatus.UNAUTHORIZED);
-    }
-  }
-
-  @Nested
-  @DisplayName("Unrelease DataStructure Tests")
-  class UnreleaseDataStructureTests {
-
-    private UUID releasedDataStructureId;
-
-    @BeforeEach
-    void setupReleasedDataStructure() {
-      performAdditionalCleanup();
-
-      DataStructure dataStructure =
-          portalData.dataStructure(
-              b ->
-                  b.name("Released Data Structure")
-                      .description("Data structure for unrelease testing")
-                      .dataStructureStatus(DataStructureStatus.AVAILABLE));
-      releasedDataStructureId = dataStructure.getId();
-
-      portalData.dataStructureVersion(
-          dataStructure,
-          b ->
-              b.version("1.0.0")
-                  .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
-                  .modelName("Released Model"));
-    }
-
-    @Test
-    @DisplayName("Should unrelease released data structure successfully")
-    void shouldUnreleaseReleasedDataStructureSuccessfully() {
-      ResponseEntity<DataStructureOutputDTO> response =
-          exchange(
-              ENDPOINT + "/" + releasedDataStructureId + "/unrelease",
-              HttpMethod.POST,
-              createAuthHeaders(),
-              null,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).as("Response body should not be null").isNotNull();
-
-      DataStructureOutputDTO output = response.getBody();
-      assertThat(output.getId()).isEqualTo(releasedDataStructureId);
-      assertThat(output.getDataStructureStatus())
-          .as("Status should be DRAFT after unreleasing")
-          .isEqualTo(DataStructureStatus.DRAFT);
-    }
-
-    @Test
-    @DisplayName("Should fail to unrelease already unreleased data structure")
-    void shouldFailToUnreleaseDraftDataStructure() {
-      DataStructure draftDataStructure =
-          portalData.dataStructure(
-              b ->
-                  b.name("Draft Data Structure")
-                      .description("Already in draft status")
-                      .dataStructureStatus(DataStructureStatus.DRAFT));
-
-      ResponseEntity<DataStructureOutputDTO> response =
-          exchange(
-              ENDPOINT + "/" + draftDataStructure.getId() + "/unrelease",
-              HttpMethod.POST,
-              createAuthHeaders(),
-              null,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode())
-          .as("Should return BAD_REQUEST status")
-          .isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName("Should return 404 when unreleasing non-existent data structure")
-    void shouldReturn404WhenUnreleasingNonExistentDataStructure() {
-      ResponseEntity<DataStructureOutputDTO> response =
-          exchange(
-              ENDPOINT + "/" + UUID.randomUUID() + "/unrelease",
-              HttpMethod.POST,
-              createAuthHeaders(),
-              null,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode())
-          .as("Should return NOT_FOUND status")
-          .isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("Should fail to unrelease without authentication")
-    void shouldFailToUnreleaseWithoutAuth() {
-      ResponseEntity<String> response =
-          performRequestWithoutAuth("/" + releasedDataStructureId + "/unrelease", HttpMethod.POST);
-
-      assertThat(response.getStatusCode())
-          .as("Should return UNAUTHORIZED status")
-          .isEqualTo(HttpStatus.UNAUTHORIZED);
-    }
-  }
-
-  @Nested
-  @DisplayName("Update Released Meta Tests")
-  class UpdateReleasedMetaTests {
-
-    private UUID releasedDataStructureId;
-
-    @BeforeEach
-    void setupReleasedDataStructure() {
-      performAdditionalCleanup();
-
-      DataStructure dataStructure =
-          portalData.dataStructure(
-              b ->
-                  b.name("Released Data Structure")
-                      .description("Data structure for meta update testing")
-                      .dataStructureStatus(DataStructureStatus.AVAILABLE));
-      releasedDataStructureId = dataStructure.getId();
-
-      portalData.dataStructureVersion(
-          dataStructure,
-          b ->
-              b.version("1.0.0")
-                  .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
-                  .modelName("Released Model"));
-    }
-
-    @Test
-    @DisplayName("Should update metadata of released data structure successfully")
-    void shouldUpdateReleasedMetaSuccessfully() {
-      DataStructureInputDTO input = new DataStructureInputDTO();
-      input.setName("Updated Released Data Structure");
-      input.setDescription("Updated description for released data structure");
-
-      ResponseEntity<DataStructureOutputDTO> response =
-          exchange(
-              ENDPOINT + "/" + releasedDataStructureId + "/released/meta",
-              HttpMethod.PATCH,
-              createAuthHeaders(),
-              input,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).as("Response body should not be null").isNotNull();
-
-      DataStructureOutputDTO output = response.getBody();
-      assertThat(output.getId()).isEqualTo(releasedDataStructureId);
-      assertThat(output.getName())
-          .as("Name should be updated")
-          .isEqualTo("Updated Released Data Structure");
-      assertThat(output.getDescription())
-          .as("Description should be updated")
-          .isEqualTo("Updated description for released data structure");
-      assertThat(output.getDataStructureStatus())
-          .as("Status should remain AVAILABLE")
-          .isEqualTo(DataStructureStatus.AVAILABLE);
-    }
-
-    @Test
-    @DisplayName("Should keep the description when the released meta patch omits it")
-    void shouldKeepDescriptionWhenReleasedMetaPatchOmitsIt() {
-      ResponseEntity<DataStructureOutputDTO> response =
-          exchange(
-              ENDPOINT + "/" + releasedDataStructureId + "/released/meta",
-              HttpMethod.PATCH,
-              createAuthHeaders(),
-              Map.of("name", "Renamed Released Data Structure"),
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getName()).isEqualTo("Renamed Released Data Structure");
-      assertThat(response.getBody().getDescription())
-          .isEqualTo("Data structure for meta update testing");
-    }
-
-    @Test
-    @DisplayName("Should fail to update released meta for DRAFT data structure")
-    void shouldFailToUpdateReleasedMetaForDraftDataStructure() {
-      DataStructure draftDataStructure =
-          portalData.dataStructure(
-              b ->
-                  b.name("Draft Data Structure")
-                      .description("Draft data structure")
-                      .dataStructureStatus(DataStructureStatus.DRAFT));
-
-      DataStructureInputDTO input = new DataStructureInputDTO();
-      input.setName("Trying to update draft");
-      input.setDescription("This should fail");
-
-      ResponseEntity<DataStructureOutputDTO> response =
-          exchange(
-              ENDPOINT + "/" + draftDataStructure.getId() + "/released/meta",
-              HttpMethod.PATCH,
-              createAuthHeaders(),
-              input,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode())
-          .as("Should return BAD_REQUEST status")
-          .isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName("Should return 404 when updating released meta for non-existent data structure")
-    void shouldReturn404WhenUpdatingReleasedMetaForNonExistentDataStructure() {
-      DataStructureInputDTO input = new DataStructureInputDTO();
-      input.setName("Non-existent");
-      input.setDescription("Does not exist");
-
-      ResponseEntity<DataStructureOutputDTO> response =
-          exchange(
-              ENDPOINT + "/" + UUID.randomUUID() + "/released/meta",
-              HttpMethod.PATCH,
-              createAuthHeaders(),
-              input,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode())
-          .as("Should return NOT_FOUND status")
-          .isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("Should fail to update released meta without authentication")
-    void shouldFailToUpdateReleasedMetaWithoutAuth() {
-      ResponseEntity<String> response =
-          performRequestWithoutAuth(
-              "/" + releasedDataStructureId + "/released/meta", HttpMethod.PATCH);
-
-      assertThat(response.getStatusCode())
-          .as("Should return UNAUTHORIZED status")
-          .isEqualTo(HttpStatus.UNAUTHORIZED);
-    }
-
-    @Test
-    @DisplayName("Should fail to update released meta with blank name")
-    void shouldFailToUpdateReleasedMetaWithBlankName() {
-      DataStructureInputDTO input = new DataStructureInputDTO();
-      input.setName("");
-      input.setDescription("Blank name should fail");
-
-      ResponseEntity<DataStructureOutputDTO> response =
-          exchange(
-              ENDPOINT + "/" + releasedDataStructureId + "/released/meta",
-              HttpMethod.PATCH,
-              createAuthHeaders(),
-              input,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode())
-          .as("Should return BAD_REQUEST status")
-          .isEqualTo(HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -962,8 +559,9 @@ class DataStructureControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should replace assignments of released data structure via released meta patch")
-    void shouldReplaceAssignmentsViaReleasedMeta() {
+    @DisplayName(
+        "Should replace assignments of a data structure whose version is released via PATCH")
+    void shouldReplaceAssignmentsOfDataStructureWithReleasedVersionViaPatch() {
       UUID groupId1 = createTestGroup();
       UUID groupId2 = createTestGroup();
       UUID roleId = createTestRole();
@@ -976,21 +574,16 @@ class DataStructureControllerIntegrationTest
       createInput.setAssignments(Set.of(assignment1));
       UUID id = performCreate(createInput).getBody().getId();
 
-      DataStructure dataStructure = dataStructureRepository.findById(id).orElseThrow();
-      dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
-      dataStructureRepository.save(dataStructure);
+      portalData.dataStructureVersion(
+          dataStructureRepository.findById(id).orElseThrow(),
+          b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
 
       AssignmentScopedInputDTO assignment2 = new AssignmentScopedInputDTO();
       assignment2.setGroupId(groupId2);
       assignment2.setRoleId(roleId);
 
       ResponseEntity<DataStructureOutputDTO> response =
-          exchange(
-              ENDPOINT + "/" + id + "/released/meta",
-              HttpMethod.PATCH,
-              createAuthHeaders(),
-              Map.of("assignments", Set.of(assignment2)),
-              getOutputTypeReference());
+          performPatch(id, Map.of("assignments", Set.of(assignment2)));
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
@@ -1020,8 +613,7 @@ class DataStructureControllerIntegrationTest
           portalData.dataStructure(
               b ->
                   b.name("InUse Data Structure")
-                      .description("Data structure with a version referenced by a DataSource")
-                      .dataStructureStatus(DataStructureStatus.AVAILABLE));
+                      .description("Data structure with a version referenced by a DataSource"));
       inUseDataStructureId = ds.getId();
 
       DataStructureVersion version =
@@ -1034,46 +626,6 @@ class DataStructureControllerIntegrationTest
 
       portalData.dataSource(
           b -> b.dataSourceStatus(DataSourceStatus.AVAILABLE).dataStructureVersion(version));
-    }
-
-    @Test
-    @DisplayName("Should unrelease a data structure whose versions only drafts reference")
-    void shouldUnreleaseWhenOnlyDraftsReference() {
-      DataStructure ds =
-          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
-      DataStructureVersion version =
-          portalData.dataStructureVersion(
-              ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
-      portalData.dataSource(
-          b -> b.dataSourceStatus(DataSourceStatus.DRAFT).dataStructureVersion(version));
-
-      ResponseEntity<DataStructureOutputDTO> response =
-          exchange(
-              ENDPOINT + "/" + ds.getId() + "/unrelease",
-              HttpMethod.POST,
-              createAuthHeaders(),
-              null,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody().isInUse()).isTrue();
-      assertThat(response.getBody().isInUseByReleased()).isFalse();
-    }
-
-    @Test
-    @DisplayName("Should return 409 when unreleasing in-use data structure")
-    void shouldReturn409WhenUnreleasingInUseDataStructure() {
-      ResponseEntity<DataStructureOutputDTO> response =
-          exchange(
-              ENDPOINT + "/" + inUseDataStructureId + "/unrelease",
-              HttpMethod.POST,
-              createAuthHeaders(),
-              null,
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode())
-          .as("Should return CONFLICT status")
-          .isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test
@@ -1104,8 +656,7 @@ class DataStructureControllerIntegrationTest
     @Test
     @DisplayName("Should report inUse and inUseByReleased on each version row")
     void shouldReportUsageOnEachVersionRow() {
-      DataStructure ds =
-          portalData.dataStructure(b -> b.dataStructureStatus(DataStructureStatus.AVAILABLE));
+      DataStructure ds = portalData.dataStructure();
       DataStructureVersion releasedUse =
           portalData.dataStructureVersion(
               ds, b -> b.dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE));
@@ -1140,10 +691,7 @@ class DataStructureControllerIntegrationTest
     void shouldReturnInUseFalseWhenNoDataSourceReferences() {
       DataStructure ds =
           portalData.dataStructure(
-              b ->
-                  b.name("Not InUse Data Structure")
-                      .description("No DataSources reference this")
-                      .dataStructureStatus(DataStructureStatus.DRAFT));
+              b -> b.name("Not InUse Data Structure").description("No DataSources reference this"));
 
       ResponseEntity<DataStructureOutputDTO> response = performGetById(ds.getId());
 
@@ -1153,5 +701,16 @@ class DataStructureControllerIntegrationTest
           .as("inUse should be false when no DataSource references any version")
           .isFalse();
     }
+  }
+
+  private DataStructure dataStructureWithReleasedVersion() {
+    DataStructure dataStructure = portalData.dataStructure();
+    portalData.dataStructureVersion(
+        dataStructure,
+        b ->
+            b.version("1.0.0")
+                .dataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE)
+                .modelName("Released Model"));
+    return dataStructure;
   }
 }

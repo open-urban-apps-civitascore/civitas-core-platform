@@ -1,0 +1,21 @@
+meta {
+  name: Contract HTTP — release rejects invalid config (2/6 release DSV)
+  type: http
+  seq: 115
+}
+
+post {
+  url: {{baseUrl}}/datastructures/{{setupDataStructureId}}/versions/{{contractHttpReleaseInvalidDsvId}}/release
+  body: none
+  auth: inherit
+}
+
+
+tests {
+  test("DSV released (200)", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("DSV status is AVAILABLE", function() {
+    expect(res.body.dataStructureVersionStatus).to.equal("AVAILABLE");
+  });
+}

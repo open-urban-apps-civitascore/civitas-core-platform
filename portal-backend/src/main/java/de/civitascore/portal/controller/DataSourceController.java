@@ -40,7 +40,7 @@ import tools.jackson.databind.node.ObjectNode;
 @RequiredArgsConstructor
 @Tag(name = "DataSources", description = "Data source management endpoints")
 public class DataSourceController
-    extends BaseDataEntityController<
+    extends ReleasableDataEntityController<
         DataSourceInputDTO,
         DataSourceMetaInputDTO,
         DataSourceOutputDTO,

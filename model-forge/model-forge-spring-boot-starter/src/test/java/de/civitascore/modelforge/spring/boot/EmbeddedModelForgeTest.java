@@ -9,6 +9,8 @@ import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
+import de.civitascore.modelforge.contract.ForeignReference;
+import de.civitascore.modelforge.contract.ForeignReferencesQuery;
 import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.ImportSmartDataModelCommand;
@@ -87,6 +89,11 @@ class EmbeddedModelForgeTest {
                 @Override
                 public RootCheck checkRoot(ArtifactId artifactId) {
                     return new RootCheck.Rooted();
+                }
+
+                @Override
+                public List<ForeignReference> foreignReferences(ForeignReferencesQuery query) {
+                    return List.of();
                 }
 
                 @Override

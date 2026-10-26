@@ -2,6 +2,7 @@ package de.civitascore.portal.messaging.saga;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
@@ -15,12 +16,14 @@ import de.civitascore.portal.configuration.SagaProperties;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSinkType;
+import de.civitascore.portal.model.embedded.PipelineRuntimeState;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.entity.PipelineRuntimeStatus;
 import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DashboardRepository;
@@ -109,6 +112,14 @@ class DataSetSagaPublisherTest {
     p.setVersion(3L);
     p.setDataSources(Set.of(sources));
     return p;
+  }
+
+  private static Pipeline withRuntimeState(Pipeline pipeline, PipelineRuntimeState state) {
+    PipelineRuntimeStatus status = new PipelineRuntimeStatus();
+    status.setPipeline(pipeline);
+    status.setState(state);
+    pipeline.setRuntimeStatus(status);
+    return pipeline;
   }
 
   /**
@@ -544,6 +555,23 @@ class DataSetSagaPublisherTest {
       var jsonCaptor = stubKafkaSend();
 
       publisher.publishUpdateRequested(dataSet(current), Set.of(current, removed));
+
+      JsonNode artifacts = new JsonMapper().readTree(jsonCaptor.getValue()).get("artifacts");
+      assertThat(List.copyOf(artifacts.propertyNames())).containsExactly(SOURCE_URN);
+      verify(modelRegistryGateway, never()).dependencyUrns(OTHER_PIPELINE_URN);
+    }
+
+    @Test
+    @DisplayName("an UPDATE trigger carries no artifacts of a STOPPED Pipeline")
+    void updateTriggerOmitsArtifactsOfStoppedPipelines() {
+      storedPipeline(PIPELINE_URN, SOURCE_URN);
+      stored(SOURCE_URN, Map.of("connectionType", "sql"));
+      Pipeline running = withRuntimeState(modelledPipeline(PIPELINE_URN), PipelineRuntimeState.OK);
+      Pipeline stopped =
+          withRuntimeState(modelledPipeline(OTHER_PIPELINE_URN), PipelineRuntimeState.STOPPED);
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishUpdateRequested(dataSet(running, stopped), Set.of(running, stopped));
 
       JsonNode artifacts = new JsonMapper().readTree(jsonCaptor.getValue()).get("artifacts");
       assertThat(List.copyOf(artifacts.propertyNames())).containsExactly(SOURCE_URN);
@@ -1102,6 +1130,60 @@ class DataSetSagaPublisherTest {
       assertThat(hasAdd).as("new pipeline should be ADD").isTrue();
       assertThat(hasUpdate).as("existing pipeline should be UPDATE").isTrue();
       assertThat(hasDelete).as("removed pipeline should be DELETE").isTrue();
+    }
+
+    private DataSet releasedDataSet(Set<Pipeline> pipelines) {
+      DataSet dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setOpenDataAccess(false);
+      dataSet.setPipelineIds(
+          pipelines.stream().map(pipeline -> pipeline.getId().toString()).toList());
+      dataSet.setPipelines(pipelines);
+      return dataSet;
+    }
+
+    @Test
+    @DisplayName("a STOPPED pipeline is left out of the update, a running and a failed one stay")
+    void stoppedPipelineIsLeftOutOfTheUpdate() {
+      Pipeline running = withRuntimeState(pipeline(UUID.randomUUID()), PipelineRuntimeState.OK);
+      Pipeline failed = withRuntimeState(pipeline(UUID.randomUUID()), PipelineRuntimeState.ERROR);
+      Pipeline stopped =
+          withRuntimeState(pipeline(UUID.randomUUID()), PipelineRuntimeState.STOPPED);
+      Pipeline neverReported = pipeline(UUID.randomUUID());
+      Set<Pipeline> pipelines = Set.of(running, failed, stopped, neverReported);
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishUpdateRequested(releasedDataSet(pipelines), pipelines);
+
+      JsonNode dataPipelines =
+          new JsonMapper().readTree(jsonCaptor.getValue()).get("dataPipelines");
+      assertThat(dataPipelines)
+          .extracting(entry -> entry.get("id").asString(), entry -> entry.get("action").asString())
+          .containsExactlyInAnyOrder(
+              tuple(running.getId().toString(), "UPDATE"),
+              tuple(failed.getId().toString(), "UPDATE"),
+              tuple(neverReported.getId().toString(), "UPDATE"));
+    }
+
+    @Test
+    @DisplayName("a dataset whose pipelines are all STOPPED still publishes an update trigger")
+    void allPipelinesStoppedStillPublishesTheUpdate() {
+      Pipeline stopped =
+          withRuntimeState(pipeline(UUID.randomUUID()), PipelineRuntimeState.STOPPED);
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishUpdateRequested(releasedDataSet(Set.of(stopped)), Set.of(stopped));
+
+      JsonNode payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      assertThat(payload.get("sagaType").asString()).isEqualTo("DATASET_UPDATE");
+      assertThat(payload.get("dataPipelines").isArray()).isTrue();
+      assertThat(payload.get("dataPipelines").isEmpty()).isTrue();
+      assertThat(payload.get("artifacts").isObject()).isTrue();
+      assertThat(payload.get("artifacts").isEmpty()).isTrue();
+      assertThat(payload.get("pipelineIds"))
+          .extracting(JsonNode::asString)
+          .containsExactly(stopped.getId().toString());
     }
 
     @Test

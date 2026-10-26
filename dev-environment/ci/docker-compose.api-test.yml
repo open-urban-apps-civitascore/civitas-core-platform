@@ -393,17 +393,16 @@ services:
     # ./drivers, but CI runs in Docker-in-Docker where host bind mounts don't work, so it is baked
     # into the image instead.
     build:
-      context: ../nifi
-      # The FROST NAR the build-frost-nar-api-test job builds. The saga collections deploy FROST
-      # Pipelines, which write through PutFrostRecord. Run `mvn -f nifi-extensions/pom.xml package`
-      # first when starting this stack by hand.
-      additional_contexts:
-        frostnar: ../../nifi-extensions/nifi-frost-nar/target
+      # Every NAR of the NiFi extensions, which the build-nifi-nars-api-test job builds: the saga
+      # collections deploy Pipelines that use PutFrostRecord and GetHttpApiCall. The .dockerignore
+      # of the extensions admits only the NARs. Run `mvn -f nifi-extensions/pom.xml package` first
+      # when starting this stack by hand.
+      context: ../../nifi-extensions
       dockerfile_inline: |
         FROM apache/nifi:2.9.0
         # lib/, not the auto-load directory: NiFi loads lib/ before it answers a request, so the
-        # first deployment already finds PutFrostRecord.
-        COPY --from=frostnar --chown=nifi:nifi *.nar /opt/nifi/nifi-current/lib/
+        # first deployment already finds the processors of the extensions.
+        COPY --chown=nifi:nifi nifi-*-nar/target/*.nar /opt/nifi/nifi-current/lib/
         USER root
         RUN mkdir -p /opt/nifi/drivers \
           && curl -fsSL -o /opt/nifi/drivers/postgresql.jar \
@@ -734,6 +733,13 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
+
+  # ── HTTP/REST API for the HTTP/REST Data sources of the saga collections. It starts without
+  # stubs: each Bruno folder registers its own through the admin API and removes them again. The
+  # service name is the host name of the Data source, and NiFi's HTTP client takes no host with a '_'.
+  wiremock:
+    image: wiremock/wiremock:3.9.2@sha256:d13997cd7b52583528a766019cfe7d4e91c4d224a67bdaa6f60efbb532f32176
+    command: ["--verbose"]
 
   # ── APISIX Route Seeding (one-shot, run via: docker compose run --rm apisix-seed)
   apisix-seed:

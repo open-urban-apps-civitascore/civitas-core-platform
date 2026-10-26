@@ -688,7 +688,14 @@ public class OpenApiConfig {
                           + " reach: Orphan",
                       path,
                       "memberNames",
-                      List.of("Orphan"))));
+                      List.of("Orphan")),
+                  "model_reference_not_available",
+                  problemExample(
+                      400,
+                      "MODEL_REFERENCE_NOT_AVAILABLE",
+                      "A referenced model is not available: it must exist, be readable, and be"
+                          + " referenced with a version",
+                      path)));
       case "404" ->
           problemExamples(
               orderedMap(

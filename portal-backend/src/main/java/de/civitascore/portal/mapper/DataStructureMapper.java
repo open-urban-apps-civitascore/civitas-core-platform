@@ -2,7 +2,6 @@ package de.civitascore.portal.mapper;
 
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
-import de.civitascore.portal.model.input.DataStructureMetaInputDTO;
 import de.civitascore.portal.model.output.DataStructureOutputDTO;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
@@ -36,16 +35,9 @@ public interface DataStructureMapper
   @Override
   DataStructureInputDTO toInput(DataStructure entity);
 
-  @Mapping(target = "assignments", ignore = true)
-  DataStructureMetaInputDTO toMetaInput(DataStructure entity);
-
-  @Mapping(target = "dataStructureStatus", ignore = true)
-  DataStructureInputDTO toUpdateInput(DataStructureMetaInputDTO meta);
-
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Mapping(target = "assignments", ignore = true)
   @Mapping(target = "dataStructureVersions", ignore = true)
-  @Mapping(target = "dataStructureStatus", ignore = true)
   @Override
   void updateEntity(@MappingTarget DataStructure entity, DataStructureInputDTO input);
 }

@@ -21,6 +21,8 @@
         - nifi-extensions/**/*
         - .gitlab-ci.yml
         - .gitlab/ci/nifi-extensions.yml
+        - model-forge/model-forge-runtime/src/main/java/de/civitascore/modelforge/validation/CoreJsonSchemaFactory.java
+        - model-forge/model-forge-runtime/src/main/resources/geojson/**/*
 
 .nifi-extensions-maven:
   image: maven:3.9-eclipse-temurin-25-alpine

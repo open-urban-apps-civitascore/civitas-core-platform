@@ -3,10 +3,17 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { useGetDatasources } from '@/app/services/api/datasources/clientRequests'
 import { DATASOURCE_FILTER_PARAMS, QUERY_PARAMS } from '@/const/searchParams'
+import { cronNode, dataSourceNode, pipeline } from '@/test-support/pipelineFixtures'
 import type { Datasource } from '@/types/datasources'
 import { DATAPOOL_SCOPE_TYPES, DATASOURCE_STATUS_TYPES } from '@/types/datasources'
 
-import { datasourceToSelectable, useDataSourceEntities } from './entityService'
+import {
+  apiCallNamesOf,
+  apiCallsOf,
+  datasourceToSelectable,
+  useDataSourceEntities,
+  withCurrentConnectorTypes,
+} from './entityService'
 
 vi.mock('@/app/services/api/datasources/clientRequests', () => ({
   useGetDatasources: vi.fn(),
@@ -179,5 +186,64 @@ describe('datasourceToSelectable', () => {
     const ds = mockDatasource({ description: null })
     const result = datasourceToSelectable(ds)
     expect(result.metadata?.description).toBeNull()
+  })
+})
+
+describe('apiCallsOf', () => {
+  const httpDatasource = (apiCalls: unknown) =>
+    mockDatasource({ connector: { connectorType: 'HTTP', apiCalls } as Datasource['connector'] })
+
+  it('returns name and method of each API call', () => {
+    const datasource = httpDatasource([{ name: 'Test Call 1', method: 'GET', path: '/items' }])
+
+    expect(apiCallsOf(datasource)).toEqual([{ name: 'Test Call 1', method: 'GET' }])
+  })
+
+  it('leaves out API calls without a name', () => {
+    const datasource = httpDatasource([
+      { name: '', path: '/a' },
+      { name: 'Test Call 1', path: '/b' },
+    ])
+
+    expect(apiCallsOf(datasource)).toEqual([{ name: 'Test Call 1', method: undefined }])
+  })
+
+  it('returns only the names for apiCallNamesOf', () => {
+    const datasource = httpDatasource([{ name: 'Test Call 1', method: 'GET', path: '/items' }])
+
+    expect(apiCallNamesOf(datasource)).toEqual(['Test Call 1'])
+  })
+
+  it('returns no API calls for a non-HTTP data source', () => {
+    expect(apiCallsOf(mockDatasource())).toEqual([])
+  })
+
+  it('returns no API calls when the HTTP configuration cannot be read', () => {
+    expect(apiCallsOf(httpDatasource('not a list'))).toEqual([])
+  })
+})
+
+describe('withCurrentConnectorTypes', () => {
+  const sqlSource = dataSourceNode({ data: { entityMetadata: { connector: 'SQL' } } })
+
+  it('sets the current connector type of the data source', () => {
+    const result = withCurrentConnectorTypes(pipeline([sqlSource], []), new Map([['ds-guid-1', 'HTTP']]))
+
+    expect(result.nodes[0].data).toMatchObject({ entityMetadata: { connector: 'HTTP' } })
+  })
+
+  it('keeps the stored connector type when the data source is not in the list', () => {
+    const result = withCurrentConnectorTypes(pipeline([sqlSource], []), new Map([['ds-guid-2', 'HTTP']]))
+
+    expect(result.nodes[0].data).toMatchObject({ entityMetadata: { connector: 'SQL' } })
+  })
+
+  it('does not change other nodes or the given pipeline', () => {
+    const original = pipeline([sqlSource, cronNode()], [])
+
+    const result = withCurrentConnectorTypes(original, new Map([['ds-guid-1', 'HTTP']]))
+
+    expect(result.nodes[1]).toBe(original.nodes[1])
+    expect(original.nodes[0].data).toMatchObject({ entityMetadata: { connector: 'SQL' } })
   })
 })

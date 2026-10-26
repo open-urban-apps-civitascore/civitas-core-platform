@@ -3522,7 +3522,6 @@
       "description": "Description 1",
       "inUse": false,
       "assignments": [],
-      "dataStructureStatus": "DRAFT",
       "dataStructureVersions": [
         {
           "id": "v1",
@@ -3551,7 +3550,6 @@
       "description": "Description 2",
       "inUse": false,
       "assignments": [],
-      "dataStructureStatus": "DRAFT",
       "dataStructureVersions": [
         {
           "id": "v2",
@@ -3597,7 +3595,6 @@
       "description": "Description 3",
       "inUse": false,
       "assignments": [],
-      "dataStructureStatus": "DRAFT",
       "dataStructureVersions": [
         {
           "id": "v4",
@@ -3660,7 +3657,6 @@
       "description": "Description 4",
       "inUse": false,
       "assignments": [],
-      "dataStructureStatus": "DRAFT",
       "dataStructureVersions": [],
       "createdAt": "",
       "modifiedAt": ""

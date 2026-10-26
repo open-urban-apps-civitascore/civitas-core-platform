@@ -29,6 +29,7 @@ import {
   useUpdatePipeline,
 } from '@/app/services/api/pipelines/clientRequests'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
+import { CONNECTOR_TYPES } from '@/const/connectors'
 import { useDatasetPermissions } from '@/hooks/use-dataset-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import {
@@ -43,8 +44,12 @@ import {
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
 import { useDataSinkLocks } from '../../_hooks/use-datasink-locks'
+import { useNodeName } from '../../_hooks/use-node-name'
+import { NodeValidationContext } from '../../_hooks/use-node-validation-severity'
+import { usePipelineDatasources } from '../../_hooks/use-pipeline-datasources'
 import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
 import { tableNameOwnerOutsideNode, tableNameOwnersOutsideSession } from '../../_services/dataSinkNameService'
+import { apiCallNamesOf, withCurrentConnectorTypes } from '../../_services/entityService'
 import {
   buildDataSinkPayloads,
   buildMappingArtifacts,
@@ -83,6 +88,13 @@ import type { ActivePipelineContextValue, PipelineStats } from '../../_types/con
 import type { PipelineNodeData } from '../../_types/nodes'
 import type { NodeCreationContext, Pipeline, PipelineEdge, PipelineNode, PipelineNodeType } from '../../_types/pipeline'
 import type { UsePipelineSessionReturn } from '../../_types/session'
+import type { ValidationSeverity } from '../nodes/base/BasePipelineNode'
+
+const withoutSelection = (pipeline: Pipeline): Pipeline => ({
+  ...pipeline,
+  nodes: pipeline.nodes.map(node => ({ ...node, selected: false })),
+  edges: pipeline.edges.map(edge => ({ ...edge, selected: false })),
+})
 
 // ============================================================================
 // Props
@@ -112,12 +124,14 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const searchParams = useSearchParams()
   const requestedPipelineId = searchParams.get('pipeline')
   const t = useTranslations('pipelineEditor')
+  const nodeName = useNodeName()
   const datasetId = params.datasetId
   const activeSession = sessionManager.getActiveSession()
   const pipeline = activeSession?.pipeline || createEmptyPipeline()
 
   // ===== Track whether initial load has been done =====
   const hasLoadedRef = useRef(false)
+  const loadedPipelineIdsRef = useRef<string[] | null>(null)
 
   // ===== Backend API Hooks =====
   const pipelinesQuery = useGetPipelines(datasetId)
@@ -133,6 +147,23 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const deleteMappingMutation = useDeleteMapping(datasetId)
 
   const { isReadOnly } = useReadOnly()
+
+  const { entities: datasources, isLoading: isLoadingDatasources } = usePipelineDatasources()
+
+  const connectorTypeByDatasourceId = useMemo(
+    () =>
+      new Map(
+        datasources.flatMap(datasource =>
+          datasource.connector ? [[datasource.id, datasource.connector.connectorType] as const] : [],
+        ),
+      ),
+    [datasources],
+  )
+
+  const currentPipelineOf = useCallback(
+    (sessionPipeline: Pipeline) => withCurrentConnectorTypes(sessionPipeline, connectorTypeByDatasourceId),
+    [connectorTypeByDatasourceId],
+  )
 
   const { canDeletePipeline: canDelete } = useDatasetPermissions(datasetQuery.data?.data)
 
@@ -184,6 +215,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
     hasLoadedRef.current = true
     const pipelineDTOs = pipelinesQuery.data.data
+    loadedPipelineIdsRef.current = pipelineDTOs.map(dto => dto.id)
 
     if (pipelineDTOs.length === 0) {
       // No pipelines in backend — keep the default empty session
@@ -221,7 +253,25 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   }, [pipelinesQuery.data, sessionManager, requestedPipelineId])
 
   // ===== Validation State =====
-  const [validationResult, setValidationResult] = useState<ValidationResultWithNodeStatus | null>(null)
+  const [validationResults, setValidationResults] = useState<Record<string, ValidationResultWithNodeStatus>>({})
+  const validationResult = activeSession ? (validationResults[activeSession.id] ?? null) : null
+
+  const setValidationResultFor = useCallback((sessionId: string, result: ValidationResultWithNodeStatus | null) => {
+    setValidationResults(previous => {
+      const next = { ...previous }
+      if (result) {
+        next[sessionId] = result
+      } else {
+        delete next[sessionId]
+      }
+      return next
+    })
+  }, [])
+
+  const sessionIdsWithErrors = useMemo(() => {
+    const sessionIds = Object.keys(validationResults)
+    return new Set(sessionIds.filter(sessionId => validationResults[sessionId].errors.length > 0))
+  }, [validationResults])
   /** True when pipeline changed since last validation - requires validation before save */
   const [isValidationRequired, setIsValidationRequired] = useState(true)
   /** True when validation panel should be shown in inspector */
@@ -236,15 +286,18 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   }, [activeSession?.isDirty, validationResult?.errors?.length, isValidationRequired])
 
   // ===== Track pipeline changes to invalidate validation =====
+  const previousActiveSessionIdRef = useRef(activeSession?.id)
   useEffect(() => {
+    const isSameSession = previousActiveSessionIdRef.current === activeSession?.id
+    previousActiveSessionIdRef.current = activeSession?.id
     // When pipeline changes (and is dirty), mark validation as required
     if (activeSession?.isDirty) {
       setIsValidationRequired(true)
-      // Also clear validation result when pipeline changes
-      setValidationResult(null)
+      // A tab switch keeps the result of the new active pipeline.
+      if (isSameSession) setValidationResultFor(activeSession.id, null)
       setShouldShowValidationPanel(false)
     }
-  }, [activeSession?.isDirty, pipeline.nodes.length, pipeline.edges.length])
+  }, [activeSession?.isDirty, activeSession?.id, pipeline.nodes.length, pipeline.edges.length, setValidationResultFor])
 
   // ===== Memoized Values =====
   const selectedNode = useMemo(() => pipeline.nodes.find(n => n.selected) || null, [pipeline.nodes])
@@ -408,10 +461,19 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   // ===== Geo persistence table names =====
   // The dataset's POSTGIS sinks share one schema, so a table name may be used only once per dataset.
   const validationContextFor = useCallback(
-    (sessionId: string): PipelineValidationContext => ({
-      tableNameOwners: tableNameOwnersOutsideSession(sessionManager.sessions, sessionId),
-    }),
-    [sessionManager.sessions],
+    (sessionId: string): PipelineValidationContext => {
+      const httpDatasources = datasources.filter(
+        datasource => datasource.connector?.connectorType === CONNECTOR_TYPES.HTTP,
+      )
+      return {
+        tableNameOwners: tableNameOwnersOutsideSession(sessionManager.sessions, sessionId),
+        apiCallNamesByDatasourceId: new Map(
+          httpDatasources.map(datasource => [datasource.id, apiCallNamesOf(datasource)]),
+        ),
+        nodeName,
+      }
+    },
+    [sessionManager.sessions, datasources, nodeName],
   )
 
   const pipelineUsingTableName = useCallback(
@@ -421,27 +483,25 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Validation Operations =====
   const runValidation = useCallback(() => {
-    const result = validatePipelineWithNodeStatus(pipeline, activeSession ? validationContextFor(activeSession.id) : {})
-    setValidationResult(result)
+    const result = validatePipelineWithNodeStatus(
+      currentPipelineOf(pipeline),
+      activeSession ? validationContextFor(activeSession.id) : {},
+    )
+    if (activeSession) setValidationResultFor(activeSession.id, result)
     // Mark validation as no longer required (it was just run)
     setIsValidationRequired(false)
     // Show validation panel in inspector
     setShouldShowValidationPanel(true)
-    // Deselect all so the next click fires a selection change and hides the validation panel
-    updatePipeline(p => ({
-      ...p,
-      nodes: p.nodes.map(node => ({ ...node, selected: false })),
-      edges: p.edges.map(edge => ({ ...edge, selected: false })),
-    }))
+    updatePipeline(withoutSelection)
     return result
-  }, [pipeline, activeSession, validationContextFor, updatePipeline])
+  }, [pipeline, activeSession, validationContextFor, updatePipeline, currentPipelineOf, setValidationResultFor])
 
   const clearValidation = useCallback(() => {
-    setValidationResult(null)
-  }, [])
+    if (activeSession) setValidationResultFor(activeSession.id, null)
+  }, [activeSession, setValidationResultFor])
 
   const getNodeValidationSeverity = useCallback(
-    (nodeId: string): 'error' | 'warning' | 'none' => {
+    (nodeId: string): ValidationSeverity => {
       return getNodeValidationSeverityFn(nodeId, validationResult)
     },
     [validationResult],
@@ -450,6 +510,41 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const hideValidationPanel = useCallback(() => {
     setShouldShowValidationPanel(false)
   }, [])
+
+  // ===== Validate all saved pipelines once after load =====
+  const hasValidatedOnLoadRef = useRef(false)
+  useEffect(() => {
+    const loadedPipelineIds = loadedPipelineIdsRef.current
+    if (hasValidatedOnLoadRef.current || !loadedPipelineIds || isLoadingDatasources || isReadOnly) return
+    const savedSessions = sessionManager.sessions.filter(session => session.pipeline.id)
+    const sessionPipelineIds = new Set(savedSessions.map(session => session.pipeline.id))
+    if (!loadedPipelineIds.every(pipelineId => sessionPipelineIds.has(pipelineId))) return
+    hasValidatedOnLoadRef.current = true
+
+    const results = savedSessions.map(
+      session =>
+        [
+          session.id,
+          validatePipelineWithNodeStatus(currentPipelineOf(session.pipeline), validationContextFor(session.id)),
+        ] as const,
+    )
+    setValidationResults(previous => ({ ...previous, ...Object.fromEntries(results) }))
+
+    const activeResult = results.find(([sessionId]) => sessionId === activeSession?.id)?.[1]
+    if (activeSession && activeResult && activeResult.errors.length > 0) {
+      setIsValidationRequired(false)
+      setShouldShowValidationPanel(true)
+      sessionManager.updateSessionPipeline(activeSession.id, withoutSelection)
+    }
+  }, [
+    isLoadingDatasources,
+    isReadOnly,
+    sessionManager,
+    sessionManager.sessions,
+    activeSession,
+    currentPipelineOf,
+    validationContextFor,
+  ])
 
   // ===== Pipeline Operations: Rename =====
   const renamePipeline = useCallback(
@@ -530,18 +625,31 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       return false
     }
 
-    // Validate all dirty pipelines before saving
+    // Errors in unchanged pipelines do not block the save.
+    const unchangedSavedSessions = sessionManager.sessions.filter(s => !s.isDirty && s.pipeline.id)
     const failedNames: string[] = []
-    for (const session of dirtySessions) {
-      const result = validatePipelineWithNodeStatus(session.pipeline, validationContextFor(session.id))
-      if (!result.isValid) {
+    const unchangedInvalidNames: string[] = []
+    for (const session of [...dirtySessions, ...unchangedSavedSessions]) {
+      const result = validatePipelineWithNodeStatus(
+        currentPipelineOf(session.pipeline),
+        validationContextFor(session.id),
+      )
+      setValidationResultFor(session.id, result)
+      if (result.isValid) continue
+      if (session.isDirty) {
         failedNames.push(session.name)
+      } else {
+        unchangedInvalidNames.push(session.name)
       }
     }
 
     if (failedNames.length > 0) {
       toast.error(t('header.validationFailed', { names: failedNames.join(', ') }))
       return false
+    }
+
+    if (unchangedInvalidNames.length > 0) {
+      toast.error(t('header.unchangedPipelinesInvalid', { names: unchangedInvalidNames.join(', ') }))
     }
 
     // A destructive sink change only risks data once the dataset's table physically exists.
@@ -589,7 +697,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       for (const session of dirtySessions) {
         // Declared outside the try below so the catch can still see whatever refs were stashed
         // onto it before the failing step.
-        let currentPipeline = session.pipeline
+        let currentPipeline = currentPipelineOf(session.pipeline)
         try {
           const snapshot = dataSinkSnapshotsRef.current[session.id] ?? {}
 
@@ -790,6 +898,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     datasetQuery.data,
     confirmDataLoss,
     validationContextFor,
+    currentPipelineOf,
+    setValidationResultFor,
     t,
     isReadOnly,
   ])
@@ -833,12 +943,12 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       validationResult,
       runValidation,
       clearValidation,
-      getNodeValidationSeverity,
       pipelineUsingTableName,
       isValidationRequired,
       canSave,
       shouldShowValidationPanel,
       hideValidationPanel,
+      sessionIdsWithErrors,
 
       // Pipeline operations
       renamePipeline,
@@ -883,12 +993,12 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       validationResult,
       runValidation,
       clearValidation,
-      getNodeValidationSeverity,
       pipelineUsingTableName,
       isValidationRequired,
       canSave,
       shouldShowValidationPanel,
       hideValidationPanel,
+      sessionIdsWithErrors,
       renamePipeline,
       deletePipeline,
       isDeleting,
@@ -906,7 +1016,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   return (
     <ActivePipelineProvider value={contextValue}>
-      {children}
+      <NodeValidationContext.Provider value={getNodeValidationSeverity}>{children}</NodeValidationContext.Provider>
       <WarningModal
         open={isDataLossDialogOpen}
         onOpenChange={open => {

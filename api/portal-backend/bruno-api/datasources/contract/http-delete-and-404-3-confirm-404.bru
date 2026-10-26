@@ -1,0 +1,18 @@
+meta {
+  name: Contract HTTP — delete + 404 (3/3 confirm 404)
+  type: http
+  seq: 122
+}
+
+get {
+  url: {{baseUrl}}/datasources/{{contractHttpDeleteId}}
+  body: none
+  auth: inherit
+}
+
+
+tests {
+  test("Status is 404 after delete", function() {
+    expect(res.getStatus()).to.equal(404);
+  });
+}

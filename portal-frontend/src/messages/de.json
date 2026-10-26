@@ -1084,10 +1084,22 @@
       "brokerTlsMismatch": "Broker-URL und TLS-Einstellung passen nicht zusammen.",
       "topicInvalidChars": "Das Topic darf keine Kommas, Semikolons oder Leerzeichen enthalten.",
       "topicSingle": "Es ist nur ein Topic erlaubt.",
+      "invalidBaseUrl": "Geben Sie eine gültige http- oder https-URL ohne Query und Fragment ein (z. B. https://api.example.org/v1).",
+      "baseUrlCredentials": "Geben Sie keine Zugangsdaten im API-Host ein. Tragen Sie sie in der Authentifizierung ein.",
+      "usernameColon": "Der Benutzername darf keinen Doppelpunkt (:) enthalten.",
+      "invalidPath": "Der Pfad muss mit / beginnen und darf nur erlaubte Zeichen enthalten.",
+      "apiCallsMax": "Es ist nur ein API-Aufruf möglich.",
+      "invalidHeaderName": "Erlaubte Zeichen im Header-Namen: a–z, A–Z, 0–9 und ! # $ % & ' * + - . ^ _ ` | ~. Keine Leerzeichen.",
+      "credentialHeader": "Zugangsdaten gehören in die Authentifizierung.",
+      "headerValueLineBreak": "Der Header-Wert darf keinen Zeilenumbruch enthalten.",
+      "pageNumberInteger": "Geben Sie eine ganze Zahl ab 0 ein.",
+      "pageNumberMax": "Geben Sie eine Zahl bis 2147483647 ein.",
+      "pageSizeMin": "Die Seitengröße muss mindestens 1 sein.",
+      "endPageBeforeStartPage": "Die Endseite darf nicht kleiner als die Startseite sein.",
       "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten",
       "inUseError": "Diese Datenquelle wird noch von einer Pipeline verwendet.",
-      "datastructureNotAvailableError": "Die Datenquelle konnte nicht auf \"Verfügbar\" gesetzt werden. Bitte setzen Sie zuerst die Datenstruktur und ihre Version auf \"Verfügbar\".",
+      "datastructureNotAvailableError": "Die Datenquelle konnte nicht auf \"Verfügbar\" gesetzt werden. Bitte setzen Sie zuerst die Version der Datenstruktur auf \"Verfügbar\".",
       "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
     },
     "connection": {
@@ -1117,8 +1129,73 @@
       "basicInfo": "Basisinformationen",
       "connector": "Konnektor",
       "dataStructure": "Datenstruktur",
+      "apiCalls": "API-Aufrufe",
       "accessManagement": "Zugriff",
       "datapools": "Datenpools"
+    },
+    "apiCallsTab": {
+      "title": "API-Aufrufe",
+      "availableInfo": "Diese Datenquelle hat den Status \"Verfügbar\". Um die API-Aufrufe zu ändern, setzen Sie den Status zuerst auf \"Entwurf\".",
+      "copyUrl": "URL kopieren",
+      "copySuccess": "URL wurde in die Zwischenablage kopiert.",
+      "add": "API-Aufruf erstellen",
+      "empty": {
+        "title": "Noch kein API-Aufruf"
+      },
+      "unnamed": "Unbenannter API-Aufruf",
+      "collapseAll": "Alle zuklappen",
+      "expandAll": "Alle aufklappen",
+      "request": {
+        "title": "Request",
+        "question": "Welcher Endpunkt soll aufgerufen werden?"
+      },
+      "method": {
+        "label": "Methode"
+      },
+      "path": {
+        "label": "Pfad",
+        "hint": "Erlaubte Zeichen: a–z, A–Z, 0–9, -, _, ., ~, :, /. Beginnt mit /."
+      },
+      "name": {
+        "label": "Name",
+        "placeholder": "Name des API-Aufrufs"
+      },
+      "parameters": {
+        "query": "Query",
+        "header": "Header",
+        "addQuery": "+ Query-Parameter",
+        "addHeader": "+ Header",
+        "name": "Name",
+        "value": "Wert",
+        "remove": "Entfernen"
+      },
+      "delete": {
+        "title": "API-Aufruf löschen?",
+        "description": "Pipelines, die „{name}“ verwenden, funktionieren nicht mehr."
+      },
+      "pagination": {
+        "title": "Paginierung",
+        "enable": "Paginierung verwenden",
+        "type": {
+          "label": "Art der Paginierung",
+          "pageNumber": "Seitennummer"
+        },
+        "pageParameter": {
+          "label": "Seitenparameter"
+        },
+        "pageSizeParameter": {
+          "label": "Seitengrößenparameter"
+        },
+        "pageSize": {
+          "label": "Seitengröße"
+        },
+        "startPage": {
+          "label": "Startseite"
+        },
+        "endPage": {
+          "label": "Endseite"
+        }
+      }
     },
     "connectorTab": {
       "title1": "Konnektor",
@@ -1128,6 +1205,11 @@
       "connection": "Verbindung",
       "establishConnection": "Verbindung herstellen",
       "availableInfo": "Diese Datenquelle hat den Status \"Verfügbar\". Um den Konnektor zu ändern, setzen Sie den Status zuerst auf \"Entwurf\".",
+      "types": {
+        "MQTT": "MQTT",
+        "SQL": "SQL",
+        "HTTP": "HTTP/REST"
+      },
       "mqtt": {
         "urls": {
           "label": "Broker",
@@ -1184,6 +1266,22 @@
         },
         "where": {
           "label": "WHERE"
+        }
+      },
+      "http": {
+        "baseUrl": {
+          "label": "API-Host"
+        },
+        "authentication": {
+          "label": "Authentifizierung",
+          "none": "Keine",
+          "basic": "Basic"
+        },
+        "username": {
+          "label": "Benutzername"
+        },
+        "password": {
+          "label": "Passwort"
         }
       }
     },
@@ -1288,8 +1386,7 @@
     },
     "messages": {
       "createSuccess": "Datenstruktur wurde erfolgreich angelegt.",
-      "updateSuccess": "Datenstruktur wurde erfolgreich aktualisiert.",
-      "isInUseStatusHint": "Kann nicht auf Entwurf gesetzt werden, da diese Datenstruktur bereits verwendet wird."
+      "updateSuccess": "Datenstruktur wurde erfolgreich aktualisiert."
     },
     "errors": {
       "deletionError": "Beim Löschen der Datenstruktur ist ein Fehler aufgetreten.",
@@ -1331,8 +1428,7 @@
     "messages": {
       "createSuccess": "Die Version der Datenstruktur wurde erfolgreich angelegt.",
       "updateSuccess": "Die Version der Datenstruktur wurde erfolgreich aktualisiert.",
-      "isAvailableModelHint": "Die Versionsinformationen und die Strukturdefinition können nicht bearbeitet werden, da diese Version bereits den Status 'Verfügbar' hat.",
-      "isLastAvailableVersion": "Kann nicht auf Entwurf gesetzt werden, da dies die letzte verfügbare Version einer verfügbaren Datenstruktur ist. Setzen Sie zuerst die Datenstruktur auf Entwurf."
+      "isAvailableModelHint": "Die Versionsinformationen und die Strukturdefinition können nicht bearbeitet werden, da diese Version bereits den Status 'Verfügbar' hat."
     },
     "errors": {
       "creationError": "Beim Anlegen der Version der Datenstruktur ist ein Fehler aufgetreten.",
@@ -1344,7 +1440,6 @@
   },
   "pipelineEditor": {
     "title": "Pipeline Editor",
-    "subtitle": "Definiert, wie Daten aufgenommen, transformiert und gespeichert werden",
     "canvas": {
       "noPipeline": "Keine Pipeline verfügbar"
     },
@@ -1413,15 +1508,28 @@
     "dataSourcePanel": {
       "label": "Datenquelle",
       "placeholder": "Datenquelle auswählen...",
-      "details": "Datenquellen-Details",
+      "details": "Details",
       "connector": "Konnektor",
       "connection": "Verbindung",
       "status": "Status",
       "description": "Beschreibung",
+      "dataStructure": "Datenstruktur",
+      "dataStructureVersion": "Datenstruktur-Version",
+      "dataStructureVersionStatus": "Status der Datenstruktur-Version",
       "tags": "Tags",
+      "showDataSource": "Datenquelle anzeigen",
       "showDataStructure": "Datenstruktur anzeigen",
       "noPermission": "Keine Berechtigung zum Lesen von Datenquellen",
-      "anonymousName": "Anonyme Datenquelle"
+      "anonymousName": "Anonyme Datenquelle",
+      "apiCall": "API-Aufruf",
+      "apiCallPlaceholder": "API-Aufruf auswählen...",
+      "noApiCalls": "Keine API-Aufrufe",
+      "apiCallNotFound": "Dieser API-Aufruf existiert nicht in der Datenquelle. Bitte einen anderen API-Aufruf wählen.",
+      "selectDialog": {
+        "title": "Datenquelle auswählen",
+        "description": "Wählen Sie die Datenquelle, aus der diese Pipeline liest.",
+        "confirm": "Auswählen"
+      }
     },
     "sink": {
       "locked": {
@@ -1450,14 +1558,13 @@
       }
     },
     "frostPanel": {
-      "details": "Sensordaten-Speicher Details",
-      "serverName": "Servername",
+      "details": "Details",
       "serverUrl": "Server-URL",
       "internalServer": "Interner Server",
       "version": "Version",
       "port": "Port",
-      "portPlaceholder": "Wählen Sie, was diese Senke schreibt",
-      "portHelp": "Der Port entscheidet, was die Senke schreibt. Es gibt keine Vorgabe: ohne ihn veröffentlicht das Dataset nicht.",
+      "portPlaceholder": "Wählen Sie einen Port",
+      "portHelp": "Der Port bestimmt, ob die eingehenden Daten als Things, Observations oder ThingTrees gespeichert werden.",
       "expects": "Erwartet:",
       "logic": {
         "ownKey": "Upsert mit eigenem Schlüssel",
@@ -1494,7 +1601,7 @@
       "dataStructureVersion": "Datenstruktur-Version",
       "importDataStructure": "Datenstruktur importieren",
       "changeDataStructure": "Datenstruktur ändern",
-      "details": "Datenstruktur-Details",
+      "details": "Details",
       "dataStructureName": "Datenstruktur",
       "versionNumber": "Version",
       "anonymousDataStructure": "Anonyme Datenstruktur",
@@ -1514,13 +1621,13 @@
       "outputDatastructure": "Ausgangs-Datenstruktur",
       "openMappingEditor": "Mapping-Editor öffnen",
       "details": "Referenzierte Datenstrukturen",
+      "inputVersion": "Version Eingangs-Datenstruktur",
       "inputStatus": "Status Eingangs-Datenstruktur",
+      "outputVersion": "Version Ausgangs-Datenstruktur",
       "outputStatus": "Status Ausgangs-Datenstruktur"
     },
     "entitySelector": {
-      "selectEntity": "Entität auswählen...",
-      "errorLoading": "Fehler beim Laden der Entitäten",
-      "clearSelection": "Auswahl aufheben"
+      "errorLoading": "Fehler beim Laden der Entitäten"
     },
     "validation": {
       "results": "Validierungsergebnisse",
@@ -1539,8 +1646,11 @@
         "orphanNode": "{label} ist mit keinem anderen Knoten verbunden",
         "minimumFunctionalNodes": "Pipeline muss mindestens einen funktionalen Knoten zwischen Start und Ende haben",
         "duplicateTableName": "Der Tabellenname \"{tableName}\" wird bereits in der Pipeline \"{pipeline}\" verwendet",
-        "cronMqttIncompatible": "Ein CRON-Trigger kann nicht mit einer MQTT-Datenquelle verwendet werden. Bitte eine SQL-Quelle (Pull) verwenden.",
-        "cronSourceConnectorUnknown": "Der Quell-Konnektor konnte nicht ermittelt werden; ein CRON-Trigger funktioniert nur mit einer SQL-Quelle (Pull), nicht mit MQTT.",
+        "cronMqttIncompatible": "Ein CRON-Trigger kann nicht mit einer MQTT-Datenquelle verwendet werden. Bitte eine Pull-Quelle (SQL oder HTTP) verwenden.",
+        "cronSourceConnectorUnknown": "Der Quell-Konnektor konnte nicht ermittelt werden; ein CRON-Trigger funktioniert nur mit einer Pull-Quelle (SQL oder HTTP), nicht mit MQTT.",
+        "sourceRequiresCron": "{label} braucht einen CRON-Trigger. Bitte einen CRON-Knoten mit dieser Datenquelle verbinden.",
+        "apiCallMissing": "{label} hat keinen API-Aufruf. Bitte einen API-Aufruf auswählen.",
+        "apiCallNotFound": "Der API-Aufruf \"{apiCallName}\" von {label} existiert nicht in der Datenquelle. Bitte einen API-Aufruf auswählen.",
         "sqlSourceNoScheduleDefaultPoll": "Diese SQL-Quelle hat keinen CRON-Knoten und pollt im Standardintervall (alle 5 Minuten). Für einen expliziten Zeitplan bitte einen CRON-Knoten hinzufügen.",
         "frostMappingUnknownStaTarget": "{label} bildet {path} ab — kein gültiger SensorThings-Zielpfad; erlaubt sind die Katalogpfade des Thing-förmigen Zielmodells (z. B. $.name, $.Datastreams[].name, $.Datastreams[].Observations[].result) sowie dessen Match-Schlüssel",
         "frostMappingMissingMatchKeys": "{label} muss die Match-Schlüssel ({entity}) abbilden: {fields} — sie identifizieren die Entität beim Find-or-Create",
@@ -1565,7 +1675,7 @@
         "multipleSinkNodes": "{label} ist ein zusätzlicher Datenspeicher-Knoten; eine Pipeline unterstützt genau einen",
         "nodeUnsupportedPosition": "{label} ist an einer nicht unterstützten Position verdrahtet",
         "unknownNodeInFlow": "{label} hat einen nicht unterstützten Knotentyp und kann nicht in den Datenfluss verdrahtet werden",
-        "flowBranches": "Der Datenfluss verzweigt bei {label}; ein linearer Fluss von Quelle zu Senke ist erforderlich",
+        "flowBranches": "Der Datenfluss verzweigt bei {label}; ein linearer Fluss von Datenquelle zu Datenspeicher ist erforderlich",
         "flowCycle": "Der Datenfluss enthält einen Zyklus bei {label}",
         "noDataPath": "Es gibt keinen Datenfluss-Pfad von der Datenquelle zum Datenspeicher",
         "mappingNotOnPath": "{label} liegt nicht auf dem Datenfluss-Pfad zwischen Datenquelle und Datenspeicher",
@@ -1602,6 +1712,7 @@
       "savingAll": "Speichert...",
       "exit": "Beenden",
       "validationFailed": "Validierung fehlgeschlagen für: {names}",
+      "unchangedPipelinesInvalid": "Diese Pipelines sind nicht gültig: {names}. Bitte die Fehler beheben.",
       "duplicateNames": "Doppelte Pipeline-Namen: {names}",
       "saveFailed": "Speichern fehlgeschlagen: {names}",
       "saveSuccess": "Pipeline \"{name}\" erfolgreich gespeichert",
@@ -1620,7 +1731,8 @@
     "tabs": {
       "closeTab": "Tab schließen",
       "newPipeline": "Neue Pipeline",
-      "untitledPipeline": "Pipeline ohne Namen"
+      "untitledPipeline": "Pipeline ohne Namen",
+      "hasErrors": "Diese Pipeline hat Fehler"
     },
     "nodeLabels": {
       "notConfigured": "Nicht konfiguriert"

@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
@@ -57,7 +56,6 @@ class GoverningVersionLookupTest {
   private static DataStructureVersion record(String version, DataStructureVersionStatus status) {
     DataStructure parent = new DataStructure();
     parent.setId(STRUCTURE_ID);
-    parent.setDataStructureStatus(DataStructureStatus.AVAILABLE);
     parent.setModelLogicalUrn(LOGICAL);
     DataStructureVersion record = new DataStructureVersion();
     record.setId(UUID.randomUUID());

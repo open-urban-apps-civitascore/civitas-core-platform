@@ -89,19 +89,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const isInUseByReleased = version?.inUseByReleased ?? false
 
-  const otherVersions = !version
-    ? datastructure.dataStructureVersions
-    : datastructure.dataStructureVersions?.flatMap(datastructureVersion =>
-        datastructureVersion.id !== version.id ? datastructureVersion : [],
-      )
-
-  const isDatastructureAvailable = datastructure.dataStructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
-  const isLastAvailableVersionInAvailableDatastructure =
-    isDatastructureAvailable &&
-    !otherVersions.some(
-      otherVersion => otherVersion.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
-    )
-
   const redirectAfterVersionCreation = (createResponse: DatastructureVersion) =>
     router.push(
       `/datastructures/${datastructureId}/${createResponse.id}?mode=edit&${QUERY_PARAMS.subTabValue}=${subTabValue}`,
@@ -138,8 +125,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     return completed
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formValues])
-
-  const canSetDraft = !isLastAvailableVersionInAvailableDatastructure
 
   const canStage = useMemo(() => DatastructureVersionFormAvailableSchema.safeParse(formValues).success, [formValues])
 
@@ -211,8 +196,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     [pathname, params, router],
   )
 
-  const statusHint = isLastAvailableVersionInAvailableDatastructure ? t('messages.isLastAvailableVersion') : undefined
-
   const handleStatusSelect = (newStatus: DatastructureStatusType) => {
     if (newStatus === DATASTRUCTURE_STATUS_TYPES.DRAFT && isInUseByReleased) {
       setIsDraftBlockedModalOpen(true)
@@ -260,8 +243,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         statusOptions: Object.values(DATASTRUCTURE_STATUS_TYPES),
         canStage,
         canRelease,
-        canSetDraft,
-        statusHint,
         availableHint: !canRelease ? tCommon('messages.releasePermissionRequiredHint') : undefined,
       }}
       confirmButtonType="button"

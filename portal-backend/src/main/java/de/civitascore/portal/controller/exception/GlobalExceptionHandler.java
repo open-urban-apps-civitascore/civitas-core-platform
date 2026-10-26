@@ -11,6 +11,7 @@ import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ModelMemberUnreachableException;
 import de.civitascore.portal.util.ModelMissingException;
+import de.civitascore.portal.util.ModelReferenceNotAvailableException;
 import de.civitascore.portal.util.ModelRootMissingException;
 import de.civitascore.portal.util.PipelineClosureValidationException;
 import de.civitascore.portal.util.ResourceInUseException;
@@ -134,6 +135,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     // TR-03187 W-18/W-19: the detail is a fixed constant with no runtime data interpolated.
     return createProblemDetail(
         HttpStatus.BAD_REQUEST, "MODEL_ROOT_MISSING", ex.getMessage(), request);
+  }
+
+  @ExceptionHandler(ModelReferenceNotAvailableException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public ProblemDetail handleModelReferenceNotAvailable(
+      ModelReferenceNotAvailableException ex, HttpServletRequest request) {
+    log.warn("Model reference not available");
+    // TR-03187 W-18/W-19: one fixed detail for every cause; it does not reveal if the model exists.
+    return createProblemDetail(
+        HttpStatus.BAD_REQUEST, "MODEL_REFERENCE_NOT_AVAILABLE", ex.getMessage(), request);
   }
 
   @ExceptionHandler(ModelMemberUnreachableException.class)

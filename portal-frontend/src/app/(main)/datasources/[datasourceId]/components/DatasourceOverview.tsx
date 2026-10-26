@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useGetDatapools } from '@/app/services/api/datapools/clientRequests'
+import { useGetDatastructures } from '@/app/services/api/datastructures/clientRequests'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -16,10 +17,12 @@ import PageEditControls from '@/components/page-edit-controls/PageEditControls'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Form } from '@/components/ui/form'
+import { CONNECTOR_TYPES } from '@/const/connectors'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
+import { ApiCallSnapshots, CollapsedApiCallSections, HttpApiCallForm } from '@/types/connectors'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Datapool } from '@/types/datapools'
 import {
@@ -33,6 +36,7 @@ import { getSelectedDatastructureVersion } from '@/utils/datasources'
 
 import { useDatasourceForm } from '../hooks/useDatasourceForm'
 import { AccessManagementTab } from './access-management/AccessManagementTab'
+import { ApiCallsTab } from './api-calls-tab/ApiCallsTab'
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { ConnectorTab } from './connector-tab/ConnectorTab'
 import { AddDatapoolModal } from './datapools-tab/AddDatapoolModal'
@@ -48,6 +52,7 @@ const allTabs: Tab<DatasourceTab>[] = [
   { value: 'basicInfo', label: 'datasources.tabs.basicInfo' },
   { value: 'connector', label: 'datasources.tabs.connector' },
   { value: 'dataStructure', label: 'datasources.tabs.dataStructure' },
+  { value: 'apiCalls', label: 'datasources.tabs.apiCalls' },
   { value: 'datapools', label: 'datasources.tabs.datapools' },
   { value: 'accessManagement', label: 'datasources.tabs.accessManagement' },
 ]
@@ -134,6 +139,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const {
     areAssignmentsDirty,
     areDatapoolsDirty,
+    isFormDirty,
     form: datasourceForm,
     dataSourceStatus,
     selectedConnectorType,
@@ -148,6 +154,11 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   } = useDatasourceForm(datasource, assignedGroups, initialAssignments, assignedDatapools, initialDatapools)
 
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
+  // Field ids change on every form reset, indexes do not.
+  const [editingApiCalls, setEditingApiCalls] = useState<ApiCallSnapshots>(new Map())
+  const [collapsedApiCallSections, setCollapsedApiCallSections] = useState<CollapsedApiCallSections>(new Map())
+  // Index of each API call at the last save, null for a new API call. Undefined: no change since then.
+  const [initialApiCallIndexes, setInitialApiCallIndexes] = useState<ReadonlyArray<number | null>>()
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isDraftBlockedModalOpen, setIsDraftBlockedModalOpen] = useState(false)
 
@@ -159,32 +170,96 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     handleStatusChange(newStatus)
   }
 
-  const hasUnsavedChanges =
-    datasourceForm.formState.isDirty || areAssignmentsDirty || areDatapoolsDirty || hasStatusChanged
+  const hasUnsavedChanges = isFormDirty || areAssignmentsDirty || areDatapoolsDirty || hasStatusChanged
+
+  const isHttpConnector = selectedConnectorType === CONNECTOR_TYPES.HTTP
 
   const hasAssignedDatastructure = initialDatastructureId !== null
   const tabs = useMemo(
-    () => allTabs.filter(tab => tab.value !== 'dataStructure' || canReadDatastructures || hasAssignedDatastructure),
-    [canReadDatastructures, hasAssignedDatastructure],
+    () =>
+      allTabs.filter(tab => {
+        if (tab.value === 'dataStructure') return canReadDatastructures || hasAssignedDatastructure
+        if (tab.value === 'apiCalls') return isHttpConnector
+        return true
+      }),
+    [canReadDatastructures, hasAssignedDatastructure, isHttpConnector],
   )
 
+  useEffect(() => {
+    if (selectedTab === 'apiCalls' && !isHttpConnector) setSelectedTab('connector')
+  }, [selectedTab, isHttpConnector])
+
+  useEffect(() => {
+    setEditingApiCalls(new Map())
+    setCollapsedApiCallSections(new Map())
+    setInitialApiCallIndexes(undefined)
+  }, [selectedConnectorType])
+
+  const datastructureIdParam = useMemo(
+    () => (selectedDatastructureId ? new URLSearchParams({ id: selectedDatastructureId }) : undefined),
+    [selectedDatastructureId],
+  )
+
+  const { data: selectedDatastructureResponse } = useGetDatastructures({
+    params: datastructureIdParam,
+    isEnabled: isHttpConnector && canReadDatastructures && !!selectedDatastructureId,
+  })
+
+  // The query keeps the previous data until the response for the new id arrives.
+  const loadedDatastructure = selectedDatastructureResponse?.data?.[0]
+  const selectedDatastructureName =
+    loadedDatastructure?.id === selectedDatastructureId ? loadedDatastructure?.name : undefined
+
+  const getInitialApiCallIndexes = () => {
+    const initialApiCalls = (datasourceForm.formState.defaultValues?.configuration?.apiCalls ?? []) as HttpApiCallForm[]
+    return initialApiCallIndexes ?? initialApiCalls.map((_, index) => index)
+  }
+
+  const handleApiCallAdd = () => setInitialApiCallIndexes([...getInitialApiCallIndexes(), null])
+
+  const handleApiCallRemove = (removedIndex: number) =>
+    setInitialApiCallIndexes(getInitialApiCallIndexes().filter((_, index) => index !== removedIndex))
+
+  // Call after the form holds the saved values.
+  const syncApiCallViews = (toInitialIndex: (index: number) => number | null) => {
+    const initialApiCalls = (datasourceForm.getValues('configuration.apiCalls') ?? []) as HttpApiCallForm[]
+    const editingEntries = [...editingApiCalls.keys()].flatMap(index => {
+      const initialIndex = toInitialIndex(index)
+      return initialIndex === null
+        ? []
+        : [[initialIndex, structuredClone(initialApiCalls[initialIndex] ?? null)] as const]
+    })
+    const collapsedEntries = [...collapsedApiCallSections].flatMap(([index, sections]) => {
+      const initialIndex = toInitialIndex(index)
+      return initialIndex === null ? [] : [[initialIndex, sections] as const]
+    })
+    setEditingApiCalls(new Map(editingEntries))
+    setCollapsedApiCallSections(new Map(collapsedEntries))
+    setInitialApiCallIndexes(undefined)
+  }
+
   const resetToInitialState = () => {
+    const initialIndexes = getInitialApiCallIndexes()
     resetDatasourceToInitialState()
     datasourceForm.reset()
+    syncApiCallViews(index => initialIndexes[index] ?? null)
     setAssignedGroups(initialAssignments)
     setAssignedDatapools(initialDatapools)
     setSelectedDatastructureId(initialDatastructureId)
     setSelectedDatastructureVersionId(initialVersionId)
   }
+
   const handleSave = () =>
     submitDatasource(() => {
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
+      syncApiCallViews(index => index)
       router.refresh()
     })
 
   const handleSaveForUnsavedChanges = () =>
     submitDatasource(() => {
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
+      syncApiCallViews(index => index)
     })
 
   useRegisterUnsavedChanges(hasUnsavedChanges, handleSaveForUnsavedChanges)
@@ -208,6 +283,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const handleSaveAndExit = async () => {
     await submitDatasource(() => {
       setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
+      syncApiCallViews(index => index)
       setIsExitModalOpen(false)
       updateMode(false)
     })
@@ -259,6 +335,21 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             isReadOnly={isReadOnly}
             isDatasourceInUseByReleased={datasource.inUseByReleased}
             isDatasourceReleased={isReleased}
+          />
+        )
+      case 'apiCalls':
+        return (
+          <ApiCallsTab
+            form={datasourceForm}
+            isReadOnly={isReadOnly}
+            isDatasourceReleased={isReleased}
+            dataStructureName={selectedDatastructureName}
+            editingApiCalls={editingApiCalls}
+            collapsedSections={collapsedApiCallSections}
+            onEditingApiCallsChange={setEditingApiCalls}
+            onApiCallAdd={handleApiCallAdd}
+            onApiCallRemove={handleApiCallRemove}
+            onCollapsedSectionsChange={setCollapsedApiCallSections}
           />
         )
       case 'datapools':

@@ -1036,6 +1036,21 @@ describe('validateCronAndMappingWired', () => {
     )
     expect(validatePipeline(pipeline).errors.some(error => error.messageKey === NOT_WIRED_KEY)).toBe(false)
   })
+
+  it('names the node with the name from the context', () => {
+    const pipeline = wire(
+      [
+        { id: 's', type: 'start', data: {} },
+        { id: 'c', type: 'cron', data: { label: 'Scheduled Trigger' } },
+      ],
+      [{ id: 'e1', source: 's', target: 'c' }],
+    )
+    const context: PipelineValidationContext = { nodeName: node => `name of ${node.id}` }
+
+    const error = validatePipeline(pipeline, context).errors.find(issue => issue.messageKey === NOT_WIRED_KEY)
+
+    expect(error?.messageParams).toEqual({ label: 'name of c' })
+  })
 })
 
 describe('validateUniqueGeoPersistenceTableNames', () => {
@@ -1093,5 +1108,113 @@ describe('validateUniqueGeoPersistenceTableNames', () => {
   it('accepts a pipeline whose names are not used elsewhere', () => {
     const pipeline = pipelineWith([geoWithTable('geo-1', 'roads')])
     expect(duplicateErrors(pipeline, { tableNameOwners: { rivers: 'Water' } })).toEqual([])
+  })
+})
+
+describe('validateSourceHasRequiredSchedule', () => {
+  it('flags an HTTP source without a CRON edge', () => {
+    const pipeline = graph(
+      [startNode, sourceAt('src-1', 'HTTP'), geoAt('geo-1')],
+      [
+        { source: 'start-1', target: 'src-1' },
+        { source: 'src-1', target: 'geo-1' },
+      ],
+    )
+    const errors = errorsFor(pipeline, 'sourceRequiresCron')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('src-1')
+  })
+
+  it('accepts an HTTP source with a CRON edge', () => {
+    const pipeline = graph(
+      [startNode, sourceAt('src-1', 'HTTP'), geoAt('geo-1'), cronAt('cron-1')],
+      [
+        { source: 'start-1', target: 'cron-1' },
+        { source: 'cron-1', target: 'src-1' },
+        { source: 'src-1', target: 'geo-1' },
+      ],
+    )
+    expect(errorsFor(pipeline, 'sourceRequiresCron')).toEqual([])
+  })
+
+  it('flags an HTTP source when the CRON node is not connected to it', () => {
+    const pipeline = graph(
+      [startNode, sourceAt('src-1', 'HTTP'), geoAt('geo-1'), cronAt('cron-1')],
+      [
+        { source: 'start-1', target: 'src-1' },
+        { source: 'src-1', target: 'geo-1' },
+      ],
+    )
+    expect(errorsFor(pipeline, 'sourceRequiresCron')).toHaveLength(1)
+  })
+
+  it('does not flag a SQL source without a CRON node', () => {
+    const pipeline = graph(
+      [startNode, sourceAt('src-1', 'SQL'), geoAt('geo-1')],
+      [
+        { source: 'start-1', target: 'src-1' },
+        { source: 'src-1', target: 'geo-1' },
+      ],
+    )
+    expect(errorsFor(pipeline, 'sourceRequiresCron')).toEqual([])
+  })
+
+  it('does not warn about an unknown connector for a CRON on an HTTP source', () => {
+    const pipeline = graph(
+      [startNode, sourceAt('src-1', 'HTTP'), geoAt('geo-1'), cronAt('cron-1')],
+      [
+        { source: 'start-1', target: 'cron-1' },
+        { source: 'cron-1', target: 'src-1' },
+        { source: 'src-1', target: 'geo-1' },
+      ],
+    )
+    const { warnings } = validatePipeline(pipeline)
+    expect(warnings.some(warning => warning.messageKey === 'validation.messages.cronSourceConnectorUnknown')).toBe(
+      false,
+    )
+  })
+})
+
+describe('validateHttpSourceApiCall', () => {
+  const DATASOURCE_ID = 'datasource-1'
+
+  const sourceWithApiCall = (connector: string, apiCallName?: string): TestNode => {
+    const source = sourceAt('src-1', connector)
+    return { ...source, data: { ...source.data, entityId: DATASOURCE_ID, apiCallName } }
+  }
+
+  const apiCallErrors = (node: TestNode, key: string, context?: PipelineValidationContext) =>
+    validatePipeline(pipelineWith([node]), context).errors.filter(
+      error => error.messageKey === `validation.messages.${key}`,
+    )
+
+  const contextWith = (names: string[]): PipelineValidationContext => ({
+    apiCallNamesByDatasourceId: new Map([[DATASOURCE_ID, names]]),
+  })
+
+  it('flags an HTTP source without an API call', () => {
+    const errors = apiCallErrors(sourceWithApiCall('HTTP'), 'apiCallMissing')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].elementId).toBe('src-1')
+  })
+
+  it('flags an API call name that the data source does not have', () => {
+    const errors = apiCallErrors(sourceWithApiCall('HTTP', 'Old call'), 'apiCallNotFound', contextWith(['New call']))
+    expect(errors).toHaveLength(1)
+    expect(errors[0].messageParams).toEqual({ label: 'src-1', apiCallName: 'Old call' })
+  })
+
+  it('accepts an API call name that the data source has', () => {
+    const node = sourceWithApiCall('HTTP', 'Weather')
+    expect(apiCallErrors(node, 'apiCallNotFound', contextWith(['Weather']))).toEqual([])
+    expect(apiCallErrors(node, 'apiCallMissing', contextWith(['Weather']))).toEqual([])
+  })
+
+  it('does not check the name when the context has no entry for the data source', () => {
+    expect(apiCallErrors(sourceWithApiCall('HTTP', 'Weather'), 'apiCallNotFound')).toEqual([])
+  })
+
+  it('does not flag a SQL source without an API call', () => {
+    expect(apiCallErrors(sourceWithApiCall('SQL'), 'apiCallMissing')).toEqual([])
   })
 })

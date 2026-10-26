@@ -1,16 +1,12 @@
 package de.civitascore.portal.service;
 
-import de.civitascore.portal.model.embedded.ReleasableStatus;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.base.BaseDataEntity;
 import de.civitascore.portal.model.input.BaseDataEntityInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentScopedInputDTO;
 import de.civitascore.portal.security.AssignmentChangeAuthorizer;
-import de.civitascore.portal.util.InvalidInputException;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Base service for entities that carry scoped {@link Assignment} collections. Extends {@link
@@ -18,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
  * during the post-conversion lifecycle hook, authorized by the {@link AssignmentChangeAuthorizer}.
  */
 public abstract class BaseDataEntityService<
-        E extends BaseDataEntity, I extends M, M extends BaseDataEntityInputDTO>
+        E extends BaseDataEntity, I extends BaseDataEntityInputDTO>
     extends BaseService<E, I> {
 
   /**
@@ -65,66 +61,4 @@ public abstract class BaseDataEntityService<
     getAssignmentChangeAuthorizer().authorizeReplacement(entity, assignments);
     entity.setAssignments(assignments);
   }
-
-  // --- Status accessors (abstract — each concrete service implements) ---
-
-  protected abstract ReleasableStatus getEntityStatus(E entity);
-
-  protected abstract void setEntityStatus(E entity, ReleasableStatus status);
-
-  protected abstract ReleasableStatus getDraftStatus();
-
-  protected abstract ReleasableStatus getAvailableStatus();
-
-  // --- Release lifecycle template methods ---
-
-  @Transactional
-  public E release(UUID id) {
-    E entity = findByIdOrThrow(id);
-    if (!getEntityStatus(entity).isDraft()) {
-      throw new InvalidInputException(
-          getEntityName(), id, "Only entities in DRAFT status can be released");
-    }
-    validateRelease(entity);
-    setEntityStatus(entity, getAvailableStatus());
-    return save(entity);
-  }
-
-  @Transactional
-  public E unrelease(UUID id) {
-    E entity = findByIdOrThrow(id);
-    if (!getEntityStatus(entity).isAvailable()) {
-      throw new InvalidInputException(
-          getEntityName(), id, "Only entities in AVAILABLE status can be unreleased");
-    }
-    validateUnrelease(entity);
-    setEntityStatus(entity, getDraftStatus());
-    return save(entity);
-  }
-
-  /**
-   * Applies metadata to a released entity. A field that {@link #toMetaInput} leaves {@code null},
-   * such as {@code assignments}, keeps its value while it is still {@code null} here.
-   *
-   * @param id the entity ID
-   * @param meta the metadata, typically {@link #toMetaInput} with a patch applied
-   * @return the updated entity
-   * @throws InvalidInputException if the entity is in DRAFT status
-   */
-  public abstract E updateReleasedMeta(UUID id, M meta);
-
-  /**
-   * Returns the current metadata of the entity, which a metadata patch starts from.
-   *
-   * @param entity the entity
-   * @return the metadata, with {@code assignments} and any other field whose {@code null} means
-   *     keep left {@code null}
-   */
-  public abstract M toMetaInput(E entity);
-
-  // --- Validation hooks (default no-op, subclasses override) ---
-
-  protected void validateRelease(E entity) {}
-
-  protected void validateUnrelease(E entity) {}
 }

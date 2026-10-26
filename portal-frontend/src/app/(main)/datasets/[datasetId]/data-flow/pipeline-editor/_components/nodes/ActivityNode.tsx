@@ -11,6 +11,8 @@
 import type { NodeProps } from '@xyflow/react'
 
 import { getNodeDef } from '../../_config/nodeRegistry'
+import { useNodeName } from '../../_hooks/use-node-name'
+import { useNodeValidationSeverity } from '../../_hooks/use-node-validation-severity'
 import type { PipelineNodeData } from '../../_types/nodes'
 import type { PipelineNodeType } from '../../_types/pipeline'
 import { BasePipelineNode } from './base/BasePipelineNode'
@@ -21,9 +23,12 @@ import { ControlNode } from './base/ControlNode'
 export const createActivityNode = (type: PipelineNodeType) => {
   const def = getNodeDef(type)
 
-  const ActivityNode: React.FC<NodeProps> = ({ data, selected: isSelected = false }) => {
+  const ActivityNode: React.FC<NodeProps> = ({ id, data, selected: isSelected = false }) => {
+    const validationSeverity = useNodeValidationSeverity(id)
+    const nodeName = useNodeName()
     const nodeData = data as PipelineNodeData
     const isConfigured = Boolean(nodeData.configured)
+    const label = nodeName({ type, data: nodeData })
 
     // UML-style circular control nodes (start / end) render their own shape.
     if (def?.shape === 'controlStart' || def?.shape === 'controlEnd') {
@@ -45,11 +50,12 @@ export const createActivityNode = (type: PipelineNodeType) => {
         category={def?.category ?? 'general'}
         isConfigured={isConfigured}
         isSelected={isSelected}
-        label={nodeData.label || (def?.type ?? '')}
+        label={label}
         sublabel={sublabel}
         icon={def?.icon}
         hasLeftHandle={def?.handles.left ?? true}
         hasRightHandle={def?.handles.right ?? true}
+        validationSeverity={validationSeverity}
       />
     )
   }

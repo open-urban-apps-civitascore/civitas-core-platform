@@ -20,6 +20,7 @@ package de.civitascore.configadapter.nifi.flow.stage;
 public enum Fragment {
   CONSUME_MQTT("consume_mqtt"),
   QUERY_DATABASE_TABLE_RECORD("query_database_table_record"),
+  GET_HTTP_API_CALL("get_http_api_call"),
   CONVERT_RECORD("convert_record"),
   UPDATE_RECORD("update_record"),
   FORK_RECORD("fork_record"),
@@ -27,6 +28,8 @@ public enum Fragment {
   INVOKE_HTTP("invoke_http"),
   PUT_FROST_RECORD("put_frost_record"),
   LOG_MESSAGE("log_message"),
+  STOP_STAMP("stop_stamp"),
+  PIPELINE_STOP("pipeline_stop"),
   SPLIT_JSON("split_json"),
   EVALUATE_JSON_PATH("evaluate_json_path"),
   REPLACE_TEXT("replace_text"),
@@ -35,6 +38,7 @@ public enum Fragment {
   JSON_RECORD_SET_WRITER("json_record_set_writer"),
   MQTT_SSL_CONTEXT_SERVICE("mqtt_ssl_context_service"),
   WEB_CLIENT_SERVICE("web_client_service"),
+  HTTP_SOURCE_WEB_CLIENT("http_source_web_client"),
   DBCP_CONNECTION_POOL("dbcp_connection_pool");
 
   private final String resource;

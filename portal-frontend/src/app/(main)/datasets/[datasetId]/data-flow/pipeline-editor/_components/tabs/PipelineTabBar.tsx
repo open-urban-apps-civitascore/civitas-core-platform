@@ -20,10 +20,13 @@ import type { PipelineSession } from '../../_types/session'
 interface TabProps {
   session: PipelineSession
   isActive: boolean
+  hasErrors: boolean
   onSelect: (sessionId: string) => void
 }
 
-const Tab: React.FC<TabProps> = ({ session, isActive, onSelect }) => {
+const Tab: React.FC<TabProps> = ({ session, isActive, hasErrors, onSelect }) => {
+  const t = useTranslations('pipelineEditor')
+
   return (
     <div
       className={`
@@ -42,6 +45,16 @@ const Tab: React.FC<TabProps> = ({ session, isActive, onSelect }) => {
         <span className="flex items-center truncate text-sm">
           {session.name}
           {session.isDirty && <span className="ml-1 text-primary">•</span>}
+          {hasErrors && (
+            <span
+              className="ml-1 text-destructive"
+              role="img"
+              title={t('tabs.hasErrors')}
+              aria-label={t('tabs.hasErrors')}
+            >
+              •
+            </span>
+          )}
         </span>
       </div>
     </div>
@@ -55,6 +68,7 @@ const Tab: React.FC<TabProps> = ({ session, isActive, onSelect }) => {
 interface PipelineTabBarProps {
   sessions: PipelineSession[]
   activeSessionId: string | null
+  sessionIdsWithErrors: ReadonlySet<string>
   onSelectSession: (sessionId: string) => void
   onCreateSession: () => void
   /** When false, a new tab cannot be created (user lacks edit permission). */
@@ -68,6 +82,7 @@ interface PipelineTabBarProps {
 export const PipelineTabBar: React.FC<PipelineTabBarProps> = ({
   sessions,
   activeSessionId,
+  sessionIdsWithErrors,
   onSelectSession,
   onCreateSession,
   canCreate = true,
@@ -83,6 +98,7 @@ export const PipelineTabBar: React.FC<PipelineTabBarProps> = ({
             key={session.id}
             session={session}
             isActive={session.id === activeSessionId}
+            hasErrors={sessionIdsWithErrors.has(session.id)}
             onSelect={onSelectSession}
           />
         ))}

@@ -1,10 +1,16 @@
 package de.civitascore.portal.service.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import de.civitascore.portal.model.connector.ConnectorConfiguration;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ApiCall;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Basic;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.PageNumber;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Parameter;
 import de.civitascore.portal.model.connector.IdentifiedElement;
 import de.civitascore.portal.model.connector.OnRelease;
 import de.civitascore.portal.model.embedded.ConnectorType;
@@ -21,8 +27,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import tools.jackson.databind.DeserializationConfig;
 import tools.jackson.databind.JavaType;
@@ -54,6 +64,116 @@ class ConnectorValidatorTest {
         .containsExactly(
             new ConnectorViolation("connector.api_calls[0].auth.token", "token required"),
             new ConnectorViolation("connector.name", "name required"));
+  }
+
+  @Test
+  void validate_httpConnectorAtDraft_reportsPathsIntoSealedVariantsAndListElements() {
+    List<Parameter> parameters = List.of(new Parameter("a b", "x\ny"));
+    HttpConnectorConfiguration connector =
+        new HttpConnectorConfiguration(
+            "https://api.example.org",
+            new Basic("a:b", null),
+            List.of(
+                new ApiCall(
+                    "a",
+                    null,
+                    "stations",
+                    parameters,
+                    parameters,
+                    new PageNumber("page", null, 0, -1, -1))));
+
+    assertThat(validator.validate(connector, ConnectorValidator.Stage.DRAFT))
+        .extracting(ConnectorViolation::path)
+        .containsExactly(
+            "connector.apiCalls[0].headers[0].name",
+            "connector.apiCalls[0].headers[0].value",
+            "connector.apiCalls[0].pagination.endPage",
+            "connector.apiCalls[0].pagination.pageSize",
+            "connector.apiCalls[0].pagination.startPage",
+            "connector.apiCalls[0].path",
+            "connector.authentication.username");
+  }
+
+  @Test
+  void validate_httpConnectorAtRelease_reportsEachMissingValue() {
+    List<Parameter> parameters = List.of(new Parameter(null, ""));
+    HttpConnectorConfiguration connector =
+        new HttpConnectorConfiguration(
+            null,
+            new Basic(null, null),
+            List.of(
+                new ApiCall(
+                    null,
+                    null,
+                    null,
+                    parameters,
+                    parameters,
+                    new PageNumber(null, null, null, null, null))));
+
+    assertThat(validator.validate(connector, ConnectorValidator.Stage.RELEASE))
+        .extracting(ConnectorViolation::path)
+        .containsExactly(
+            "connector.apiCalls[0].headers[0].name",
+            "connector.apiCalls[0].name",
+            "connector.apiCalls[0].pagination.pageParameter",
+            "connector.apiCalls[0].pagination.pageSize",
+            "connector.apiCalls[0].pagination.pageSizeParameter",
+            "connector.apiCalls[0].path",
+            "connector.apiCalls[0].queryParameters[0].name",
+            "connector.authentication.password",
+            "connector.authentication.username",
+            "connector.baseUrl");
+    assertThat(
+            validator.validate(
+                new HttpConnectorConfiguration(null, null, List.of()),
+                ConnectorValidator.Stage.RELEASE))
+        .extracting(ConnectorViolation::path)
+        .containsExactly("connector.apiCalls", "connector.baseUrl");
+  }
+
+  @ParameterizedTest(name = "{0} \"{1}\" accepted: {2}")
+  @MethodSource("httpCharacterSets")
+  void validate_httpConnectorAtDraft_acceptsExactlyTheAllowedCharacters(
+      String key, String value, boolean accepted) {
+    assertThat(validator.validate(httpConnectorWith(key, value), ConnectorValidator.Stage.DRAFT))
+        .extracting(ConnectorViolation::path)
+        .isEqualTo(accepted ? List.of() : List.of("connector.apiCalls[0]." + key));
+  }
+
+  private static Stream<Arguments> httpCharacterSets() {
+    return Stream.of(
+        arguments("path", "/v1/stations.json~a:b_c-D9/", true),
+        arguments("path", "/", true),
+        arguments("path", "/x?token=abc", false),
+        arguments("path", "/a b", false),
+        arguments("path", "/a%2Fb", false),
+        arguments("path", "/a#b", false),
+        arguments("headers[0].name", "!#$%&'*+.^_`|~09AZaz-", true),
+        arguments("headers[0].name", "X:Y", false),
+        arguments("headers[0].name", "X(Y)", false),
+        arguments("headers[0].value", "text/plain; q=0.5\tMünster ~", true),
+        arguments("headers[0].value", "", true),
+        arguments("headers[0].value", "a\r\nX-Injected: y", false),
+        arguments("headers[0].value", "a\u0000b", false),
+        arguments("headers[0].value", "a\u007Fb", false),
+        arguments("headers[0].value", "price in €", false));
+  }
+
+  private static HttpConnectorConfiguration httpConnectorWith(String key, String value) {
+    String path = key.equals("path") ? value : "/stations";
+    String headerName = key.equals("headers[0].name") ? value : "Accept";
+    String headerValue = key.equals("headers[0].value") ? value : "v";
+    return new HttpConnectorConfiguration(
+        "https://api.example.org",
+        null,
+        List.of(
+            new ApiCall(
+                "a",
+                null,
+                path,
+                List.of(),
+                List.of(new Parameter(headerName, headerValue)),
+                new PageNumber("page", "size", 1, 0, null))));
   }
 
   @Test

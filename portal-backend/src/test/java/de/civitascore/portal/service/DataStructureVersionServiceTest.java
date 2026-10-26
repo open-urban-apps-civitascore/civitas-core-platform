@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -14,7 +15,6 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
@@ -24,7 +24,9 @@ import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.VersionBump;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.security.ModelReferenceAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ModelReferenceNotAvailableException;
 import de.civitascore.portal.util.ModelRootMissingException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
@@ -41,6 +43,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -60,6 +63,7 @@ class DataStructureVersionServiceTest {
   @Mock private DataSourceRepository dataSourceRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private ArtifactUsageLookup artifactUsageLookup;
+  @Mock private ModelReferenceAuthorizer modelReferenceAuthorizer;
 
   private static final ArtifactUsageLookup.ArtifactUsage IN_USE_BY_RELEASED =
       new ArtifactUsageLookup.ArtifactUsage(
@@ -98,7 +102,6 @@ class DataStructureVersionServiceTest {
     void shouldBlockUnreleaseWhenInUseByReleased() {
       UUID versionId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
-      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
 
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
@@ -118,7 +121,6 @@ class DataStructureVersionServiceTest {
     void shouldAllowUnreleaseWhenInUseByDraftsOnly() {
       UUID versionId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
-      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
 
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
@@ -141,25 +143,18 @@ class DataStructureVersionServiceTest {
     }
 
     @Test
-    @DisplayName("Should allow unrelease when version is not in use")
-    void shouldAllowUnreleaseWhenNotInUse() {
+    @DisplayName("Should unrelease the only released version when it is not in use")
+    void shouldUnreleaseOnlyReleasedVersionWhenNotInUse() {
       UUID versionId = UUID.randomUUID();
-      UUID otherVersionId = UUID.randomUUID();
 
       DataStructure ds = new DataStructure();
-      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
 
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
       version.setDataStructure(ds);
 
-      DataStructureVersion otherVersion = new DataStructureVersion();
-      otherVersion.setId(otherVersionId);
-      otherVersion.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
-      otherVersion.setDataStructure(ds);
-
-      ds.setDataStructureVersions(Set.of(version, otherVersion));
+      ds.setDataStructureVersions(Set.of(version));
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.save(version)).thenReturn(version);
@@ -179,7 +174,6 @@ class DataStructureVersionServiceTest {
     void shouldBlockDeleteWhenInUse() {
       UUID versionId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
-      ds.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
@@ -199,7 +193,6 @@ class DataStructureVersionServiceTest {
     void shouldBlockDeleteWhenStillReferenced() {
       UUID versionId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
-      ds.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
@@ -220,7 +213,6 @@ class DataStructureVersionServiceTest {
     void shouldAllowDeleteWhenNotInUse() {
       UUID versionId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
-      ds.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersion version = new DataStructureVersion();
       version.setId(versionId);
@@ -318,6 +310,9 @@ class DataStructureVersionServiceTest {
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
       version.setModelUrn(
           "urn:core:platform:civitas:element:common:5cf6e9e7-fa0d-877a-bda7-df0cc339e439:1.0.0");
+      DataStructure dataStructure = new DataStructure();
+      dataStructure.setId(UUID.randomUUID());
+      version.setDataStructure(dataStructure);
 
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.save(version)).thenReturn(version);
@@ -332,6 +327,33 @@ class DataStructureVersionServiceTest {
       // registry write here fails the test instead of silently changing what a release does.
       verify(modelRegistryGateway).requireSingleRoot(version.getModelUrn());
       verifyNoMoreInteractions(modelRegistryGateway);
+      verify(modelReferenceAuthorizer)
+          .authorizeStored(dataStructure.getId(), version.getModelUrn());
+    }
+
+    @Test
+    @DisplayName("Should block release when the model references a model the caller may not use")
+    void shouldBlockReleaseWhenAReferenceIsNotAvailable() {
+      UUID versionId = UUID.randomUUID();
+      DataStructure dataStructure = new DataStructure();
+      dataStructure.setId(UUID.randomUUID());
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      version.setModelUrn(
+          "urn:core:platform:civitas:datastructure:common:6f1c2a3e-8d4b-4c5a-9e7f-1a2b3c4d5e6f:1.0.0");
+      version.setDataStructure(dataStructure);
+
+      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
+      doThrow(new ModelReferenceNotAvailableException())
+          .when(modelReferenceAuthorizer)
+          .authorizeStored(dataStructure.getId(), version.getModelUrn());
+
+      assertThatThrownBy(() -> dataStructureVersionService.release(versionId))
+          .isInstanceOf(ModelReferenceNotAvailableException.class);
+      assertThat(version.getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.DRAFT);
+      verify(dataStructureVersionRepository, never()).save(any());
     }
 
     @Test
@@ -383,7 +405,6 @@ class DataStructureVersionServiceTest {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
-      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureId(dataStructureId);
@@ -425,7 +446,6 @@ class DataStructureVersionServiceTest {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
-      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
       dataStructure.setModelLogicalUrn(
           "urn:core:platform:civitas:element:common:00000000-0000-4000-8000-000000000016");
 
@@ -462,7 +482,6 @@ class DataStructureVersionServiceTest {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
-      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
       dataStructure.setModelLogicalUrn(
           "urn:core:platform:civitas:element:common:00000000-0000-4000-8000-000000000016");
 
@@ -493,7 +512,6 @@ class DataStructureVersionServiceTest {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
-      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
       dataStructure.setModelLogicalUrn(
           "urn:core:platform:civitas:element:common:00000000-0000-4000-8000-000000000016");
 
@@ -525,7 +543,6 @@ class DataStructureVersionServiceTest {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
-      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureId(dataStructureId);
@@ -572,7 +589,6 @@ class DataStructureVersionServiceTest {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
-      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureId(dataStructureId);
@@ -595,7 +611,6 @@ class DataStructureVersionServiceTest {
       UUID dataStructureId = UUID.randomUUID();
       DataStructure dataStructure = new DataStructure();
       dataStructure.setId(dataStructureId);
-      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureId(dataStructureId);
@@ -612,6 +627,90 @@ class DataStructureVersionServiceTest {
           .isInstanceOf(UniqueConstraintViolationException.class)
           .hasMessageContaining("unchanged from version 1.0.0");
       verify(dataStructureVersionRepository, never()).save(any());
+    }
+
+    private DataStructureVersion draftWithStoredModel(UUID versionId, DataStructure dataStructure) {
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setVersion("2.4.0");
+      version.setModelUrn(STORED_PIN);
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      version.setDataStructure(dataStructure);
+      return version;
+    }
+
+    private static final String STORED_PIN =
+        "urn:core:platform:civitas:element:common:7c96ac2d-1fad-817a-a9b0-c7374bba1952:2.4.0";
+
+    @Test
+    @DisplayName("References are checked against the stored model before anything is stored")
+    void referencesAreCheckedBeforeTheModelIsStored() {
+      UUID versionId = UUID.randomUUID();
+      DataStructure dataStructure = new DataStructure();
+      dataStructure.setId(UUID.randomUUID());
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureId(dataStructure.getId());
+      input.setModel(new HashMap<>(Map.of("title", "Replaced")));
+
+      when(dataStructureVersionRepository.findById(versionId))
+          .thenReturn(Optional.of(draftWithStoredModel(versionId, dataStructure)));
+      when(dataStructureVersionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataStructureService.findByIdOrThrow(dataStructure.getId())).thenReturn(dataStructure);
+
+      dataStructureVersionService.update(versionId, input);
+
+      InOrder order = inOrder(modelReferenceAuthorizer, modelRegistryGateway);
+      order
+          .verify(modelReferenceAuthorizer)
+          .authorizeWrite(dataStructure.getId(), input.getModel(), null, STORED_PIN);
+      order
+          .verify(modelRegistryGateway)
+          .storeModel(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("A refused reference leaves nothing stored")
+    void aRefusedReferenceLeavesNothingStored() {
+      DataStructure dataStructure = new DataStructure();
+      dataStructure.setId(UUID.randomUUID());
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureId(dataStructure.getId());
+      input.setModel(new HashMap<>(Map.of("title", "Observation")));
+
+      when(dataStructureVersionMapper.toEntity(any())).thenReturn(new DataStructureVersion());
+      when(dataStructureService.findByIdOrThrow(dataStructure.getId())).thenReturn(dataStructure);
+      doThrow(new ModelReferenceNotAvailableException())
+          .when(modelReferenceAuthorizer)
+          .authorizeWrite(eq(dataStructure.getId()), any(), any(), isNull());
+
+      assertThatThrownBy(() -> dataStructureVersionService.create(input))
+          .isInstanceOf(ModelReferenceNotAvailableException.class);
+      verify(modelRegistryGateway, never())
+          .storeModel(any(), any(), any(), any(), any(), any(), any());
+      verify(dataStructureVersionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("An unchanged model stores nothing and keeps its pin")
+    void anUnchangedModelStoresNothing() {
+      UUID versionId = UUID.randomUUID();
+      DataStructure dataStructure = new DataStructure();
+      dataStructure.setId(UUID.randomUUID());
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureId(dataStructure.getId());
+      input.setModel(new HashMap<>(Map.of("title", "Kept")));
+
+      when(dataStructureVersionRepository.findById(versionId))
+          .thenReturn(Optional.of(draftWithStoredModel(versionId, dataStructure)));
+      when(dataStructureVersionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(dataStructureService.findByIdOrThrow(dataStructure.getId())).thenReturn(dataStructure);
+      when(modelRegistryGateway.isUnchanged(eq(STORED_PIN), any(), any())).thenReturn(true);
+
+      DataStructureVersion result = dataStructureVersionService.update(versionId, input);
+
+      verify(modelRegistryGateway, never())
+          .storeModel(any(), any(), any(), any(), any(), any(), any());
+      assertThat(result.getModelUrn()).isEqualTo(STORED_PIN);
     }
   }
 }

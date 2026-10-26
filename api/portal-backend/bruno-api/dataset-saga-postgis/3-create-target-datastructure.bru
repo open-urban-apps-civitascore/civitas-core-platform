@@ -40,7 +40,7 @@ tests {
 }
 
 docs {
-  **PostGIS saga step 3** — Prerequisites: source structure released (step 2c).
+  **PostGIS saga step 3** — Prerequisites: source structure version released (step 2b).
 
   Creates the target DataStructure ("PostGIS Saga Target Structure"). Its version (step 3a) holds a JSON Schema with a `geo` property that `$ref`s the GeoJSON Point schema. The PostGIS adapter turns that ref into a `GEOMETRY(POINT,4326)` column when the saga provisions the sink table. The POSTGIS DataSink (step 6) references this version.
 
@@ -52,7 +52,7 @@ docs {
 
   | Layer | Effect |
   |---|---|
-  | Backend | DataStructure record created in `portal_backend` DB with status `DRAFT` |
+  | Backend | DataStructure record created in `portal_backend` DB |
   | Config Adapter | — |
   | External System | — |
 }

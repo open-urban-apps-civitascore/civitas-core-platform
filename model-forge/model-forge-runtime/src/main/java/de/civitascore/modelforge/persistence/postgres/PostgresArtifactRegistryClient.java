@@ -326,6 +326,28 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         }
     }
 
+    @Override
+    public List<String> dataStructuresListing(String elementUrn) {
+        UrnParser.requireNoControlChars(elementUrn);
+        String logical = UrnParser.logicalUrn(elementUrn);
+        try {
+            return references.dataStructuresListing(logical);
+        } catch (DataAccessException e) {
+            throw translate(e, "Could not read the Data Structures listing " + logical);
+        }
+    }
+
+    @Override
+    public Set<String> dataStructureMemberKeys(String dataStructureUrn) {
+        UrnParser.requireNoControlChars(dataStructureUrn);
+        String logical = UrnParser.logicalUrn(dataStructureUrn);
+        try {
+            return new LinkedHashSet<>(representations.dataStructureMemberKeys(logical));
+        } catch (DataAccessException e) {
+            throw translate(e, "Could not read the member keys of " + logical);
+        }
+    }
+
     // ── Read ──────────────────────────────────────────────────────────────────
 
     @Override

@@ -1,0 +1,96 @@
+meta {
+  name: 9a. Verify the runtime states of the Pipelines
+  type: http
+  seq: 20
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{httpSagaDataSetId}}
+}
+
+script:pre-request {
+  // The cron of each Pipeline fires every 10 s, and the runtime monitor of the NiFi config-adapter
+  // polls every 5 s, so both stops arrive well within the 120 s of this poll.
+  const axios = require('axios');
+  const baseUrl = bru.getEnvVar('baseUrl');
+  const datasetId = bru.getVar('httpSagaDataSetId');
+  const stopped = [bru.getVar('httpSagaMissingPipelineId'), bru.getVar('httpSagaInvalidPipelineId')];
+
+  const form = [
+    ['grant_type', 'password'],
+    ['client_id', bru.getEnvVar('clientId')],
+    ['client_secret', bru.getEnvVar('clientSecret')],
+    ['username', bru.getEnvVar('username')],
+    ['password', bru.getEnvVar('password')],
+  ].map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+  const tokenResp = await axios.post(
+    `${bru.getEnvVar('keycloakUrl')}/realms/${bru.getEnvVar('realm')}/protocol/openid-connect/token`,
+    form,
+    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+  );
+  const token = tokenResp.data.access_token;
+
+  for (let i = 0; i < 60; i++) {
+    let resp;
+    try {
+      resp = await axios.get(`${baseUrl}/datasets/${datasetId}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+    } catch (e) { /* transient; retry */ }
+    const pipelines = (resp && resp.data && resp.data.pipelines) || [];
+    const done = stopped.every(id => {
+      const pipeline = pipelines.find(p => p.id === id);
+      return pipeline && pipeline.runtimeStatus && pipeline.runtimeStatus.state === 'STOPPED';
+    });
+    if (done) break;
+    await new Promise(r => setTimeout(r, 2000));
+  }
+}
+
+tests {
+  const statusOf = id => {
+    const pipeline = (res.body.pipelines || []).find(p => p.id === id);
+    return (pipeline && pipeline.runtimeStatus) || {};
+  };
+
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("The things Pipeline is OK", function() {
+    expect(statusOf(bru.getVar('httpSagaThingsPipelineId')).state).to.equal('OK');
+  });
+
+  test("The pages Pipeline is OK", function() {
+    expect(statusOf(bru.getVar('httpSagaPagesPipelineId')).state).to.equal('OK');
+  });
+
+  test("The missing Pipeline is STOPPED on the 404 of its API call", function() {
+    const status = statusOf(bru.getVar('httpSagaMissingPipelineId'));
+    expect(status.state).to.equal('STOPPED');
+    expect(status.message).to.equal('API call "missing": GET /missing failed with status 404');
+  });
+
+  test("The invalid Pipeline is STOPPED on the record that violates the Data structure", function() {
+    const status = statusOf(bru.getVar('httpSagaInvalidPipelineId'));
+    expect(status.state).to.equal('STOPPED');
+    expect(status.message).to.equal(
+      'API call "invalid": 1 of 2 records violate the Data structure: record 1: /name type');
+  });
+
+  test("No cause holds a value of the response", function() {
+    expect(statusOf(bru.getVar('httpSagaInvalidPipelineId')).message).to.not.include('4711');
+  });
+}
+
+docs {
+  Polls the Dataset until the runtime monitor has stopped the `missing` and the `invalid`
+  Pipeline. A stop leaves the Dataset released and the other Pipelines running, so the `things`
+  and the `pages` Pipeline stay `OK`.
+}

@@ -169,8 +169,10 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("Should not set required actions for existing user when email is unchanged")
-    void shouldNotSetRequiredActionsForExistingUserWithSameEmail() {
+    @DisplayName(
+        "Should leave requiredActions and emailVerified unset for existing user when email is"
+            + " unchanged")
+    void shouldLeaveKeycloakStateUnsetForExistingUserWithSameEmail() {
       UserService service = createService();
       User user = userWithId(UUID.randomUUID());
       user.setExternalId("keycloak-uuid-123");
@@ -180,13 +182,14 @@ class UserServiceTest {
 
       UserConfig config = (UserConfig) service.toConfigValuePreSave(user, input);
 
-      assertThat(config.getRequiredActions()).isEmpty();
-      assertThat(config.getEmailVerified()).isTrue();
+      assertThat(config.getRequiredActions()).isNull();
+      assertThat(config.getEmailVerified()).isNull();
     }
 
     @Test
     @DisplayName(
-        "Should add VERIFY_EMAIL and set emailVerified=false when email changes for existing user")
+        "Should set emailVerified=false and leave requiredActions unset when email changes for"
+            + " existing user")
     void shouldResetEmailVerifiedWhenEmailChanges() {
       UserService service = createService();
       User user = userWithId(UUID.randomUUID());
@@ -197,7 +200,7 @@ class UserServiceTest {
 
       UserConfig config = (UserConfig) service.toConfigValuePreSave(user, input);
 
-      assertThat(config.getRequiredActions()).containsExactly("VERIFY_EMAIL");
+      assertThat(config.getRequiredActions()).isNull();
       assertThat(config.getEmailVerified()).isFalse();
     }
 

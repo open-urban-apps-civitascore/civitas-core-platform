@@ -19,9 +19,10 @@ import type { CronNodeData } from '../../../_types/nodes'
 interface CronPanelProps {
   data: CronNodeData
   onUpdate: (data: Partial<CronNodeData>) => void
+  isLocked: boolean
 }
 
-export const CronPanel: React.FC<CronPanelProps> = ({ data, onUpdate }) => {
+export const CronPanel: React.FC<CronPanelProps> = ({ data, onUpdate, isLocked }) => {
   const t = useTranslations('pipelineEditor')
 
   const handleExpressionChange = (expression: string) => {
@@ -43,6 +44,7 @@ export const CronPanel: React.FC<CronPanelProps> = ({ data, onUpdate }) => {
           onChange={e => handleExpressionChange(e.target.value)}
           placeholder="0,30 */2 * * * *"
           className="font-mono"
+          disabled={isLocked}
         />
         {hasValidationError && <p className="text-xs text-destructive">{t('cronPanel.invalidCron')}</p>}
       </div>

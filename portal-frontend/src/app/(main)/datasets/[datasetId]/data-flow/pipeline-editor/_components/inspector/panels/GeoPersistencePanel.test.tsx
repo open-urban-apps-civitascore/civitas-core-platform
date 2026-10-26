@@ -59,6 +59,7 @@ const renderPanel = (
   overrides: Partial<GeoPersistenceNodeData> = {},
   onUpdate: (data: Partial<GeoPersistenceNodeData>) => void = vi.fn(),
   locks: DataSinkLocks = { provisioned: false, inUseByLayer: false },
+  isLocked = false,
 ) => {
   const contextValue = {
     selectedNode,
@@ -69,7 +70,7 @@ const renderPanel = (
   render(
     <QueryClientProvider client={new QueryClient()}>
       <ActivePipelineContext.Provider value={contextValue}>
-        <GeoPersistencePanel data={{ ...nodeData, ...overrides }} onUpdate={onUpdate} />
+        <GeoPersistencePanel data={{ ...nodeData, ...overrides }} onUpdate={onUpdate} isLocked={isLocked} />
       </ActivePipelineContext.Provider>
     </QueryClientProvider>,
   )
@@ -159,7 +160,6 @@ describe('GeoPersistencePanel data structure selection', () => {
     id: DATASTRUCTURE_ID,
     name: 'Test Structure',
     description: 'Test description',
-    dataStructureStatus: 'AVAILABLE' as const,
     dataStructureVersions: [
       {
         id: FIRST_VERSION_ID,
@@ -255,5 +255,29 @@ describe('GeoPersistencePanel data structure selection', () => {
       dataStructureUrn: `${DATASTRUCTURE_URN}:1.0.0`,
       configured: false,
     })
+  })
+
+  it('opens the selected Data structure version', async () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    renderPanel(() => null, { dataStructureVersionId: `${DATASTRUCTURE_ID}/${FIRST_VERSION_ID}` })
+
+    await userEvent.click(screen.getByRole('button', { name: 'dataSourcePanel.showDataStructure' }))
+
+    expect(open).toHaveBeenCalledWith(`/datastructures/${DATASTRUCTURE_ID}/${FIRST_VERSION_ID}`, '_blank')
+    open.mockRestore()
+  })
+
+  it('disables editing but keeps Show Data structure in a locked panel', () => {
+    renderPanel(
+      () => null,
+      { dataStructureVersionId: `${DATASTRUCTURE_ID}/${FIRST_VERSION_ID}` },
+      vi.fn(),
+      { provisioned: false, inUseByLayer: false },
+      true,
+    )
+
+    expect(screen.getByLabelText('geoPersistencePanel.tableName')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'geoPersistencePanel.changeDataStructure' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'dataSourcePanel.showDataStructure' })).toBeEnabled()
   })
 })

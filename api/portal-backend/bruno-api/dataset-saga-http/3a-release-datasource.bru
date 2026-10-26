@@ -1,0 +1,33 @@
+meta {
+  name: 3a. Release DataSource
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/datasources/:id/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{httpSagaDataSourceId}}
+}
+
+script:post-response {
+  if (res.body && res.body.configurationUrn) {
+    bru.setVar('httpSagaDataSourceLatestUrn',
+      res.body.configurationUrn.split(':').slice(0, 7).join(':') + ':latest');
+  }
+}
+
+tests {
+  test("DataSource released", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  The source nodes of the Pipelines refer to the Data source by `:latest`, as the Pipeline editor
+  does: the configuration URN without its version segment, followed by `:latest`.
+}

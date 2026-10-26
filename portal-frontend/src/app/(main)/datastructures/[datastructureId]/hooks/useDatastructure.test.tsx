@@ -8,13 +8,9 @@ import { Datastructure } from '@/types/datastructures'
 import { useDatastructure } from './useDatastructure'
 
 const mockUpdateDatastructure = vi.fn()
-const mockUpdateDatastructureReleased = vi.fn()
 
 vi.mock('@/app/services/api/datastructures/clientRequests', () => ({
   useUpdateDatastructure: () => ({ mutateAsync: mockUpdateDatastructure, isPending: false }),
-  useUpdateDatastructureReleased: () => ({ mutateAsync: mockUpdateDatastructureReleased, isPending: false }),
-  useReleaseDatastructure: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useUnreleaseDatastructure: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -29,11 +25,10 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
 }))
 
-const availableDatastructure: Datastructure = {
+const datastructureWithAvailableVersion: Datastructure = {
   id: 'structure-1',
   name: 'Test Datastructure',
   description: 'A test datastructure',
-  dataStructureStatus: 'AVAILABLE',
   createdAt: '2024-01-01',
   modifiedAt: '2024-01-01',
   dataStructureVersions: [
@@ -54,23 +49,26 @@ const wrapper = ({ children }: PropsWithChildren) => (
   <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
 )
 
+const setup = () =>
+  renderHook(
+    () =>
+      useDatastructure({
+        datastructure: datastructureWithAvailableVersion,
+        assignedGroups: [],
+        initialAssignments: [],
+      }),
+    { wrapper },
+  )
+
 describe('useDatastructure', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('sends only id, name and description to the released endpoint for an AVAILABLE data structure', async () => {
-    mockUpdateDatastructureReleased.mockResolvedValue({ data: availableDatastructure })
-    const { result } = renderHook(
-      () =>
-        useDatastructure({
-          datastructure: availableDatastructure,
-          assignedGroups: [],
-          initialAssignments: [],
-          canRelease: true,
-        }),
-      { wrapper },
-    )
+  it('updates a data structure that has an available version through the update endpoint', async () => {
+    mockUpdateDatastructure.mockResolvedValue({ data: datastructureWithAvailableVersion })
+    const { result } = setup()
+
     act(() => {
       result.current.form.setValue('description', 'Changed description', { shouldDirty: true })
     })
@@ -79,11 +77,16 @@ describe('useDatastructure', () => {
       await result.current.saveDatastructure()
     })
 
-    expect(mockUpdateDatastructure).not.toHaveBeenCalled()
-    expect(mockUpdateDatastructureReleased).toHaveBeenCalledWith({
+    expect(mockUpdateDatastructure).toHaveBeenCalledWith({
       id: 'structure-1',
       name: 'Test Datastructure',
       description: 'Changed description',
     })
+  })
+
+  it('marks the versions tab complete when a version is available', () => {
+    const { result } = setup()
+
+    expect(result.current.completedTabs).toContain('versions')
   })
 })

@@ -19,8 +19,8 @@ _Avoid_: type, class, model, definition
 
 **Data Structure**:
 An artifact that groups Elements as its members. A different concept from the Portal Backend's
-**Data Structure**, despite the shared name: that one is a tenant-curated asset with a release
-lifecycle, this one is the grouping in the registry it is translated into.
+**Data Structure**, despite the shared name: that one is a tenant-curated asset whose versions
+carry a release lifecycle, this one is the grouping in the registry it is translated into.
 _Avoid_: schema set, model group, bundle
 
 **Root**:
@@ -69,6 +69,13 @@ _Avoid_: link, dependency, edge
 A reference whose target the registry no longer holds. Kept deliberately: the link still states what
 the document said, and it resolves again if the target returns.
 _Avoid_: dangling reference, broken link, orphan
+
+**Foreign reference**:
+A reference from a Data Structure's model to an artifact that is not the Data Structure's own. An
+Element is a Data Structure's own when that Data Structure minted it — its UUID derives from the
+Data Structure's UUID and a member key — or when that Data Structure lists it and none minted it.
+Listing an Element another Data Structure minted does not make it one's own.
+_Avoid_: external reference, cross-structure reference
 
 **Data Set membership**:
 The one kind of reference that does not by itself prevent its target from being deleted. It is

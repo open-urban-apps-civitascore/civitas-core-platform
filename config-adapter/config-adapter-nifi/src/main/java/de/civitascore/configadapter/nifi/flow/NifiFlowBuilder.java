@@ -23,6 +23,7 @@ import de.civitascore.configadapter.nifi.flow.stage.SinkStage;
 import de.civitascore.configadapter.nifi.flow.stage.SourceStage;
 import de.civitascore.configadapter.nifi.flow.stage.StageRegistry;
 import de.civitascore.configadapter.nifi.flow.stage.StageResult;
+import de.civitascore.configadapter.nifi.flow.stage.StopSource;
 import de.civitascore.configadapter.nifi.flow.stage.TransformStage;
 import de.civitascore.configadapter.nifi.flow.stage.transform.ConvertRecordStage;
 import de.civitascore.configadapter.nifi.flow.stage.transform.RecordMappingStage;
@@ -165,12 +166,15 @@ public class NifiFlowBuilder {
     // on 'success', so it is wired straight into the transform/sink with no convert. The sink stage
     // differs: PostGIS is a single terminal processor (PutDatabaseRecord), FROST is a multi-stage
     // find-or-create sub-flow.
-    List<Processor> prefix = new ArrayList<>(sourceStage.build(ctx).chain());
-    List<Processor> failureSources = new ArrayList<>();
+    StageResult sourceResult = sourceStage.build(ctx);
+    List<Processor> prefix = new ArrayList<>(sourceResult.chain());
+    List<Processor> failureSources = new ArrayList<>(sourceResult.failureSources());
+    List<StopSource> stopSources = new ArrayList<>(sourceResult.stopSources());
     for (TransformStage transform : transformsFor(sourceStage, sinkStage, spec)) {
       StageResult result = transform.build(ctx);
       prefix.addAll(result.chain());
       failureSources.addAll(result.failureSources());
+      stopSources.addAll(result.stopSources());
     }
     for (int i = 0; i < prefix.size(); i++) {
       ctx.addProcessor(prefix.get(i));
@@ -180,6 +184,7 @@ public class NifiFlowBuilder {
     }
     Processor tail = prefix.get(prefix.size() - 1);
     sinkStage.build(ctx, tail, failureSources);
+    addStopPath(ctx, stopSources);
 
     ObjectNode root = mapper.createObjectNode();
     root.set("flowContents", flow);
@@ -237,6 +242,24 @@ public class NifiFlowBuilder {
     if (!accepted.contains(offered) && !convertible) {
       throw new FatalAdapterException(
           AdapterErrorCode.NIFI_TEMPLATE_ERROR, sink.inputRejectionMessage(mappingPresent));
+    }
+  }
+
+  // ─── Stop path ──────────────────────────────────────────────────────────────
+
+  /**
+   * Adds the stop sink and routes every stop source to it. A flow without a stop source gets
+   * neither, so its snapshot keeps its bytes.
+   */
+  private static void addStopPath(BuildContext ctx, List<StopSource> stopSources)
+      throws FatalAdapterException {
+    if (stopSources.isEmpty()) {
+      return;
+    }
+    Processor stopSink = ctx.loadProcessor(Fragment.PIPELINE_STOP, null);
+    ctx.addProcessor(stopSink);
+    for (StopSource stopSource : stopSources) {
+      ctx.routeStop(stopSource, stopSink);
     }
   }
 

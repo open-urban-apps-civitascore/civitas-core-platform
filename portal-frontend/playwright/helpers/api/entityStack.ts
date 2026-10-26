@@ -65,7 +65,6 @@ export const createAvailableEntityStack = async (
     model: buildUmlModel(modelName, modelUri),
   })
   await adminApi.releaseDatastructureVersion(datastructure.id, version.id)
-  await adminApi.releaseDatastructure(datastructure.id)
 
   // 2. Datasource linked to the available version → release
   const datasource = await adminApi.createDatasource({
@@ -105,7 +104,7 @@ export const createAvailableEntityStack = async (
   await adminApi.stageDataset(dataset.id)
 
   // 4. Unstage dataset and datasource back to DRAFT so tests can enter edit mode.
-  //    The datastructure + version stay AVAILABLE (can't unrelease while version is referenced).
+  //    The version stays AVAILABLE (can't unrelease while it is referenced).
   //    Order: dataset first (depends on datasource), then datasource.
   await adminApi.unstageDataset(dataset.id)
   await adminApi.unreleaseDatasource(datasource.id)
@@ -114,9 +113,8 @@ export const createAvailableEntityStack = async (
 }
 
 /**
- * Creates a standalone datastructure with an available version, suitable for
- * testing the datastructure status dropdown. Not linked to any datasource,
- * so the datastructure itself stays in DRAFT and can be edited.
+ * Creates a standalone datastructure with an available version. Not linked to any
+ * datasource, so its version can still be set back to draft.
  */
 export const createDraftDatastructureWithAvailableVersion = async (
   adminApi: ApiClient,

@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<ruleset name="NiFi HTTP Processors"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0
+           https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+  <description>PMD rules for the nifi-http-processors module.
+    Excludes only the rules this module triggers.</description>
+
+  <!-- Best Practices -->
+  <rule ref="category/java/bestpractices.xml">
+    <exclude name="GuardLogStatement"/>          <!-- ComponentLog formats its arguments lazily -->
+  </rule>
+
+  <!-- Design -->
+  <rule ref="category/java/design.xml">
+    <!-- The processor declares its annotations, properties, validators and session handling in one
+         class, as NiFi expects of a processor. -->
+    <exclude name="ExcessiveImports"/>
+  </rule>
+
+  <!-- Error Prone -->
+  <rule ref="category/java/errorprone.xml">
+    <!-- An accessor takes the name of its field, as the accessor of a record does. -->
+    <exclude name="AvoidFieldNameMatchingMethodName"/>
+  </rule>
+
+  <!-- Code Style -->
+  <rule ref="category/java/codestyle.xml">
+    <exclude name="LocalVariableCouldBeFinal"/>
+    <exclude name="MethodArgumentCouldBeFinal"/>
+    <exclude name="CommentDefaultAccessModifier"/>
+    <exclude name="OnlyOneReturn"/>
+    <exclude name="AtLeastOneConstructor"/>
+    <exclude name="LongVariable"/>
+    <exclude name="ShortVariable"/>
+  </rule>
+</ruleset>

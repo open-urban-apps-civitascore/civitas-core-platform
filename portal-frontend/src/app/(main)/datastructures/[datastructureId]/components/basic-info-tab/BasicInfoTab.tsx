@@ -10,10 +10,10 @@ import { TextField } from '@/components/form/fields/TextField'
 import { FooterElement } from '@/components/form/FooterElement'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { cn } from '@/lib/utils'
-import { DatastructureFormDraft } from '@/types/datastructures'
+import { DatastructureFormData } from '@/types/datastructures'
 
 interface BasicInfoTabProps {
-  form: UseFormReturn<DatastructureFormDraft>
+  form: UseFormReturn<DatastructureFormData>
   isReadOnly?: boolean
 }
 

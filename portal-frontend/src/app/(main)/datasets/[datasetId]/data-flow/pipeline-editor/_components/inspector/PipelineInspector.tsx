@@ -19,6 +19,7 @@ import { InspectorShell } from '@/components/node-editor/inspector/InspectorShel
 import { getNodeDefForData } from '../../_config/nodeRegistry'
 import { LAYOUT_DIMENSIONS } from '../../_constants/pipelineStyles'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
+import { useNodeName } from '../../_hooks/use-node-name'
 import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
 import type { PipelineNodeData } from '../../_types/nodes'
 import { InspectorHeader } from './components/InspectorHeader'
@@ -39,8 +40,16 @@ interface PipelineInspectorProps {
 
 export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className = '' }) => {
   const t = useTranslations('pipelineEditor')
-  const { selectedNode, selectedEdge, updateNode, shouldShowValidationPanel, validationResult, getSinkLockReason } =
-    useActivePipeline()
+  const nodeNameOf = useNodeName()
+  const {
+    pipeline,
+    selectedNode,
+    selectedEdge,
+    updateNode,
+    shouldShowValidationPanel,
+    validationResult,
+    getSinkLockReason,
+  } = useActivePipeline()
   const { isReadOnly } = useReadOnly()
 
   const lockReason = selectedNode ? getSinkLockReason(selectedNode) : null
@@ -57,6 +66,12 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
     [isReadOnly, isProvisioned, selectedNode, updateNode],
   )
 
+  const nodeName = (nodeId: string): string => {
+    const node = pipeline?.nodes.find(candidate => candidate.id === nodeId)
+    if (!node) return nodeId
+    return nodeNameOf(node)
+  }
+
   // Render the appropriate panel by looking up the node's registry definition.
   // Adding a new node type requires no change here — only a new registry entry.
   const renderNodePanel = () => {
@@ -66,9 +81,6 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
     if (!def) return null
 
     const { InspectorPanel, isPanelReadonly } = def
-    const panel = <InspectorPanel data={selectedNode.data} onUpdate={handleNodeUpdate} />
-
-    // Editable panels are dimmed and non-interactive in read-only mode and for a provisioned sink.
     const isLocked = !isPanelReadonly && (isReadOnly || isProvisioned)
 
     return (
@@ -88,13 +100,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
             tooltip={t(`sink.locked.${lockReason}.tooltip`)}
           />
         )}
-        {isLocked ? (
-          <div className="pointer-events-none opacity-60" aria-disabled>
-            {panel}
-          </div>
-        ) : (
-          panel
-        )}
+        <InspectorPanel data={selectedNode.data} onUpdate={handleNodeUpdate} isLocked={isLocked} />
       </>
     )
   }
@@ -122,7 +128,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
         header={
           <InspectorHeader
             nodeType={selectedNode.type}
-            label={selectedNode.data.label as string}
+            label={nodeNameOf(selectedNode)}
             isConfigured={selectedNode.data.configured as boolean}
           />
         }
@@ -141,11 +147,11 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
             <dl className="space-y-2">
               <div className="flex justify-between">
                 <dt className="text-sm text-muted-foreground">{t('inspector.source')}</dt>
-                <dd className="text-sm font-medium">{selectedEdge.source}</dd>
+                <dd className="text-sm font-medium">{nodeName(selectedEdge.source)}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-sm text-muted-foreground">{t('inspector.target')}</dt>
-                <dd className="text-sm font-medium">{selectedEdge.target}</dd>
+                <dd className="text-sm font-medium">{nodeName(selectedEdge.target)}</dd>
               </div>
             </dl>
           </div>

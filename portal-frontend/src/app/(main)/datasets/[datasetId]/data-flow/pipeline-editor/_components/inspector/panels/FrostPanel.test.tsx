@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import type { FrostNodeData } from '../../../_types/nodes'
@@ -59,13 +59,11 @@ const nodeData: FrostNodeData = {
   label: 'Sensor Data Storage',
   configured: false,
   entityType: 'frost',
-  serverName: 'Sensor Data Storage',
-  serverUrl: '',
   version: '1.1',
 }
 
 const renderPanel = (overrides: Partial<FrostNodeData> = {}, onUpdate = vi.fn()) => {
-  render(<FrostPanel data={{ ...nodeData, ...overrides }} onUpdate={onUpdate} />)
+  render(<FrostPanel data={{ ...nodeData, ...overrides }} onUpdate={onUpdate} isLocked={false} />)
   return onUpdate
 }
 
@@ -76,6 +74,13 @@ describe('FrostPanel', () => {
     // An empty port is an error state, not an empty field: the platform must not pick the logic.
     expect(screen.getByRole('combobox')).toHaveAttribute('aria-invalid', 'true')
     expect(screen.getByText('frostPanel.portPlaceholder')).toBeInTheDocument()
+  })
+
+  it('marks the port as required', () => {
+    renderPanel()
+
+    expect(screen.getByRole('combobox')).toHaveAttribute('aria-required', 'true')
+    expect(screen.getByText('*')).toBeInTheDocument()
   })
 
   it('lists the ports grouped by logic class', async () => {
@@ -121,7 +126,8 @@ describe('FrostPanel', () => {
     // translator the marker renders as the same word as the field's own name, so it appears twice.
     expect(screen.getAllByText('reference')).toHaveLength(2)
     // Three mandatory fields: result, parameters and thingReference.
-    expect(screen.getAllByText('*')).toHaveLength(3)
+    const structureTree = screen.getAllByRole('list')[0]
+    expect(within(structureTree).getAllByText('*')).toHaveLength(3)
   })
 
   it('names the references while the structure is not there', () => {
@@ -139,11 +145,11 @@ describe('FrostPanel', () => {
     expect(screen.queryByText('frostPanel.expects')).not.toBeInTheDocument()
   })
 
-  it('shows the fixed server name, the internal server and the version', () => {
+  it('shows the internal server and the version', () => {
     renderPanel()
 
     const valueOf = (label: string) => screen.getByText(label).nextElementSibling
-    expect(valueOf('frostPanel.serverName')).toHaveTextContent('Sensor Data Storage')
+    expect(screen.queryByText('frostPanel.serverName')).not.toBeInTheDocument()
     expect(valueOf('frostPanel.serverUrl')).toHaveTextContent('frostPanel.internalServer')
     expect(valueOf('frostPanel.version')).toHaveTextContent('1.1')
   })

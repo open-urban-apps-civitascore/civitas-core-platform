@@ -1,0 +1,26 @@
+meta {
+  name: 15. Remove the WireMock stubs
+  type: http
+  seq: 29
+}
+
+post {
+  url: {{wiremockUrl}}/__admin/mappings/remove-by-metadata
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "matchesJsonPath": {
+      "expression": "$.suite",
+      "equalTo": "dataset-saga-http"
+    }
+  }
+}
+
+tests {
+  test("Stubs removed", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
