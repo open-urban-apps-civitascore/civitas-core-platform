@@ -462,7 +462,8 @@ class DataSourceConnectionTestServiceTest {
 
       assertThatThrownBy(() -> service.test(id, saved.requested(from, to)))
           .isInstanceOf(MalformedDataSourceRequestException.class)
-          .hasMessage(ConnectorJson.STORED_SECRET_FOR_STORED_DESTINATION);
+          .hasMessage(
+              "The stored secret is kept only for the stored destination; enter it again for another one");
       verify(client, never()).test(any());
       assertThat(singleAuditLine()).endsWith("outcome=REFUSED");
     }
@@ -522,7 +523,9 @@ class DataSourceConnectionTestServiceTest {
 
       assertThatThrownBy(() -> service.test(id, saved.requested(from, to)))
           .isInstanceOf(MalformedDataSourceRequestException.class)
-          .hasMessage(DataSourceConnectionTestService.STORED_SECRET_FOR_RELEASED_CONNECTOR);
+          .hasMessage(
+              "The stored secret of a released data source is kept only to test its connector as"
+                  + " released; enter it again to test other values");
       verify(client, never()).test(any());
       assertThat(singleAuditLine()).endsWith("outcome=REFUSED");
     }
@@ -676,6 +679,23 @@ class DataSourceConnectionTestServiceTest {
     }
 
     @Test
+    @DisplayName("the stored secret does not apply the saved where clause to another table")
+    void storedSecretWithTheSavedWhereOnAnotherTable_doesNotApplyIt() {
+      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
+      answer(DataSourceConnectionTestServiceTest::success);
+
+      service.test(
+          id,
+          input(
+              "{'connectorType':'SQL','driver':'postgres','dsn':'postgres://db.example:5432/city',"
+                  + "'table':'stations','columns':['id','value'],'where':'secret_column > 7',"
+                  + "'user':'reader','password':'********'}",
+              null));
+
+      assertThat(sentRequest().applyWhere()).isFalse();
+    }
+
+    @Test
     @DisplayName("a typed password applies a changed where clause")
     void typedPasswordWithAChangedWhere_appliesIt() {
       UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
@@ -728,7 +748,7 @@ class DataSourceConnectionTestServiceTest {
 
       assertThatThrownBy(() -> service.test(sql(PLAIN_PASSWORD)))
           .isInstanceOf(ConnectionTestBusyException.class)
-          .hasMessage(DataSourceConnectionTestService.ADAPTER_BUSY);
+          .hasMessage("Too many connection tests are running; try again later");
       assertThat(singleAuditLine()).endsWith("outcome=BUSY");
     }
 
@@ -813,7 +833,7 @@ class DataSourceConnectionTestServiceTest {
 
       assertThatThrownBy(() -> limited.test(id, sql(PLAIN_PASSWORD)))
           .isInstanceOf(ConnectionTestBusyException.class)
-          .hasMessage(DataSourceConnectionTestService.ADAPTER_BUSY);
+          .hasMessage("Too many connection tests are running; try again later");
       verify(dataSourceService, never()).findByIdOrThrow(id);
       release.countDown();
 
@@ -869,7 +889,7 @@ class DataSourceConnectionTestServiceTest {
 
       assertThatThrownBy(() -> service.test(sql(PLAIN_PASSWORD)))
           .isInstanceOf(ConnectionTestBusyException.class)
-          .hasMessage(DataSourceConnectionTestService.USER_BUSY);
+          .hasMessage("A connection test of this user is still running");
       release.countDown();
 
       assertThat(first.get(5, TimeUnit.SECONDS).success()).isTrue();

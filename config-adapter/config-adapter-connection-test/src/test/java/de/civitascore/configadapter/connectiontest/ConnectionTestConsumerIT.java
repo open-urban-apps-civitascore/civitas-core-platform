@@ -133,7 +133,23 @@ class ConnectionTestConsumerIT {
 
     assertEquals(Outcome.SUCCESS, result.outcome(), result.message());
     assertTrue(result.preview().startsWith("datname\r\n"), result.preview());
-    assertEquals(result.preview().split("\r\n").length - 1, result.rowCount());
+    assertTrue(result.preview().contains("\r\nsource\r\n"), result.preview());
+  }
+
+  @Test
+  void runsTheWhereClauseOnlyWhenTheRequestAllowsIt() throws Exception {
+    Map<String, Object> connector = connector("owner-secret");
+    connector.put("where", "datname = 'source'");
+
+    ConnectionTestResult applied = awaitResult(send(connector, UUID.randomUUID().toString(), true));
+    ConnectionTestResult skipped =
+        awaitResult(send(connector, UUID.randomUUID().toString(), false));
+
+    assertEquals("datname\r\nsource\r\n", applied.preview());
+    assertEquals(1, applied.rowCount());
+    assertTrue(skipped.rowCount() > 1, skipped.preview());
+    assertTrue(
+        skipped.message().contains("The where clause is not part of the test"), skipped.message());
   }
 
   @Test
@@ -174,8 +190,13 @@ class ConnectionTestConsumerIT {
   }
 
   private static String send(Map<String, Object> connector, String id) throws Exception {
+    return send(connector, id, false);
+  }
+
+  private static String send(Map<String, Object> connector, String id, boolean applyWhere)
+      throws Exception {
     ConnectionTestRequest request =
-        new ConnectionTestRequest(id, Instant.now().plusSeconds(20), connector, null, false);
+        new ConnectionTestRequest(id, Instant.now().plusSeconds(20), connector, null, applyWhere);
     requests
         .send(
             new ProducerRecord<>(

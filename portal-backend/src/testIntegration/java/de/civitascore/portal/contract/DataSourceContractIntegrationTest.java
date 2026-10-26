@@ -373,6 +373,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat((String) JsonPath.read(stored, "$.dsn"))
           .isEqualTo("postgres://other.example:5432/db");
       assertThat((String) JsonPath.read(stored, "$.password"))
+          .startsWith("ENC(")
           .isNotEqualTo(originalCiphertext)
           .isNotEqualTo("n3w");
     }

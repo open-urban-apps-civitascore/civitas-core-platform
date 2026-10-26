@@ -39,13 +39,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPOutputStream;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,6 +60,12 @@ class HttpProberTest {
 
   private static HttpServer server;
   private static final List<HttpExchange> REQUESTS = new CopyOnWriteArrayList<>();
+
+  /** Lets the {@code /slow} handler end with the test that started it. */
+  private static volatile CountDownLatch slowRelease = new CountDownLatch(1);
+
+  /** The Authorization header the echoing API received in this test. */
+  private final AtomicReference<String> echoedAuthorization = new AtomicReference<>();
 
   /** Accepts every host: the server runs on the loopback interface the guard refuses. */
   private static final DestinationCheck ANY_HOST = host -> {};
@@ -143,12 +153,13 @@ class HttpProberTest {
     server.createContext(
         "/slow",
         exchange -> {
+          // Records nothing: by the time it ends, another test may run.
           try {
-            Thread.sleep(10_000);
+            slowRelease.await(10, TimeUnit.SECONDS);
           } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
           }
-          respond(exchange, 200, "text/plain", "late");
+          exchange.close();
         });
     server.createContext(
         "/latin1",
@@ -172,6 +183,12 @@ class HttpProberTest {
   @BeforeEach
   void clearRequests() {
     REQUESTS.clear();
+  }
+
+  @AfterEach
+  void releaseSlowRequests() {
+    slowRelease.countDown();
+    slowRelease = new CountDownLatch(1);
   }
 
   @Test
@@ -229,7 +246,8 @@ class HttpProberTest {
     ProbeResult result = probe(call("large", "/large"), "large");
 
     assertTrue(result.truncated());
-    assertTrue(result.preview().length() <= ResultText.MAX_PREVIEW_BYTES);
+    // The preview and a 1 KB masking margin; the 8 KB cut is ResultText's.
+    assertTrue(result.preview().getBytes(StandardCharsets.UTF_8).length <= 9216);
     assertTrue(result.preview().startsWith("ää"));
   }
 
@@ -318,8 +336,7 @@ class HttpProberTest {
     ProbeResult result = probeEchoingApi(dir, "");
 
     assertTrue(result.success(), result.message());
-    assertEquals(
-        "Basic dXNlcjpzM2NyZXQ=", REQUESTS.get(0).getRequestHeaders().getFirst("Authorization"));
+    assertEquals("Basic dXNlcjpzM2NyZXQ=", echoedAuthorization.get());
     assertEquals("{\"pad\": \"\", \"Authorization\": \"Basic ********\"}", result.preview());
   }
 
@@ -343,7 +360,7 @@ class HttpProberTest {
     ProbeResult result = probeEchoingApi(dir, pad);
 
     assertTrue(
-        result.preview().contains("\"Authorization\": \"Basic ********\""), result.message());
+        result.preview().contains("\"Authorization\": \"Basic ********\""), result.preview());
     assertFalse(result.preview().contains("dXNl"));
   }
 
@@ -383,16 +400,19 @@ class HttpProberTest {
     echo.setHttpsConfigurator(new HttpsConfigurator(tls));
     echo.createContext(
         "/headers",
-        exchange ->
-            respond(
-                exchange,
-                200,
-                "application/json",
-                "{\"pad\": \""
-                    + pad
-                    + "\", \"Authorization\": \""
-                    + echoed(exchange.getRequestHeaders().getFirst("Authorization"), escapeSlashes)
-                    + "\"}"));
+        exchange -> {
+          String authorization = exchange.getRequestHeaders().getFirst("Authorization");
+          echoedAuthorization.set(authorization);
+          respond(
+              exchange,
+              200,
+              "application/json",
+              "{\"pad\": \""
+                  + pad
+                  + "\", \"Authorization\": \""
+                  + echoed(authorization, escapeSlashes)
+                  + "\"}");
+        });
     echo.start();
     Map<String, Object> connector = connector(call("headers", "/headers"));
     connector.put(

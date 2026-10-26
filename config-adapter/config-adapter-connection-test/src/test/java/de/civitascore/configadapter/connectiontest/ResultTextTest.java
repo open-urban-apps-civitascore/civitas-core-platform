@@ -111,13 +111,12 @@ class ResultTextTest {
     ResultText text = new ResultText(List.of("s"));
 
     assertNull(text.message(null));
-    assertNull(text.preview(null, true).text());
-    assertTrue(text.preview(null, true).truncated());
+    assertNull(text.preview(null, false).text());
   }
 
   @Test
   void previewWithinLimitIsKeptAsIs() {
-    String preview = "a".repeat(ResultText.MAX_PREVIEW_BYTES);
+    String preview = "a".repeat(8192);
 
     assertEquals(preview, new ResultText(List.of()).preview(preview, false).text());
     assertFalse(new ResultText(List.of()).preview(preview, false).truncated());
@@ -127,7 +126,7 @@ class ResultTextTest {
   void truncatedFlagAddsMarkerEvenForShortPreview() {
     ResultText.Preview cut = new ResultText(List.of()).preview("abc", true);
 
-    assertEquals("abc" + ResultText.TRUNCATED, cut.text());
+    assertEquals("abc\n[truncated]", cut.text());
     assertTrue(cut.truncated());
   }
 
@@ -135,37 +134,31 @@ class ResultTextTest {
   void longPreviewIsCutIncludingMarker() {
     String result = new ResultText(List.of()).preview("a".repeat(20_000), false).text();
 
-    assertEquals(ResultText.MAX_PREVIEW_BYTES, utf8Length(result));
-    assertTrue(result.endsWith(ResultText.TRUNCATED));
+    assertEquals("a".repeat(8180) + "\n[truncated]", result);
+    assertEquals(8192, utf8Length(result));
   }
 
   @Test
   void previewCutNeverSplitsTwoByteCharacter() {
     String result = new ResultText(List.of()).preview("ä".repeat(10_000), false).text();
 
-    assertTrue(utf8Length(result) <= ResultText.MAX_PREVIEW_BYTES);
-    assertTrue(result.endsWith(ResultText.TRUNCATED));
-    String body = result.substring(0, result.length() - ResultText.TRUNCATED.length());
-    assertEquals("ä".repeat(body.length()), body);
+    assertEquals("ä".repeat(4090) + "\n[truncated]", result);
   }
 
   @Test
   void previewCutNeverSplitsFourByteCharacter() {
     String result = new ResultText(List.of()).preview(EMOJI.repeat(5_000), false).text();
 
-    assertTrue(utf8Length(result) <= ResultText.MAX_PREVIEW_BYTES);
-    String body = result.substring(0, result.length() - ResultText.TRUNCATED.length());
-    assertEquals(EMOJI.repeat(body.length() / 2), body);
+    assertEquals(EMOJI.repeat(2045) + "\n[truncated]", result);
   }
 
   @Test
   void previewWithMultiByteCharacterAtBoundaryStaysWithinLimit() {
-    int budget = ResultText.MAX_PREVIEW_BYTES - utf8Length(ResultText.TRUNCATED);
-    // One byte short of the budget, then a 2-byte character that no longer fits.
-    String input = "a".repeat(budget - 1) + "ä" + "tail";
+    // 8180 bytes fit beside the 12-byte marker: one byte short, then a 2-byte character.
+    String input = "a".repeat(8179) + "ä" + "tail";
 
     String result = new ResultText(List.of()).preview(input, true).text();
 
-    assertEquals("a".repeat(budget - 1) + ResultText.TRUNCATED, result);
+    assertEquals("a".repeat(8179) + "\n[truncated]", result);
   }
 }

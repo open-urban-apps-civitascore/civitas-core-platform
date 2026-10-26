@@ -255,7 +255,7 @@ class DataSourceConnectionTestIntegrationTest extends BaseKeycloakIntegrationTes
                 null,
                 "2 rows",
                 "id,value\n1,20.5\n2,21.0\n",
-                false,
+                true,
                 2,
                 null,
                 480);
@@ -266,6 +266,7 @@ class DataSourceConnectionTestIntegrationTest extends BaseKeycloakIntegrationTes
     assertThat(response.getBody().path("success").asBoolean()).isTrue();
     assertThat(response.getBody().path("preview").asString())
         .isEqualTo("id,value\n1,20.5\n2,21.0\n");
+    assertThat(response.getBody().path("previewTruncated").asBoolean()).isTrue();
     assertThat(response.getBody().path("rowCount").asInt()).isEqualTo(2);
     assertThat(response.getBody().hasNonNull("reason")).isFalse();
   }
@@ -411,6 +412,20 @@ class DataSourceConnectionTestIntegrationTest extends BaseKeycloakIntegrationTes
     assertThat(request.at("/connector/connectionType").asString()).isEqualTo("sql");
     assertThat(request.path("expiresAt").isString()).isTrue();
     assertThat(readAsConfigAdapter(wire).expiresAt()).isAfter(Instant.now());
+    assertThat(readAsConfigAdapter(wire).applyWhere()).isTrue();
+  }
+
+  @Test
+  @DisplayName("placeholder with a changed where clause is sent without applying it")
+  void placeholderWithAChangedWhereClause_isSentWithoutApplyingIt() throws Exception {
+    UUID id = createSqlDataSource();
+    reply = request -> failure(request, Reason.SOURCE_ERROR);
+    Map<String, Object> changed = sqlConnector("********");
+    changed.put("where", "id > 1");
+
+    post(DATASOURCES + "/" + id + "/connection-test", body(changed, null));
+
+    assertThat(readAsConfigAdapter(nextRequest()).applyWhere()).isFalse();
   }
 
   @Test

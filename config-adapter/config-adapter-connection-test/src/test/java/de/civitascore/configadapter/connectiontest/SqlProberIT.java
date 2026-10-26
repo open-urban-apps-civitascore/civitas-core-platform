@@ -165,8 +165,8 @@ class SqlProberIT {
 
     assertTrue(result.success(), result.message());
     assertEquals(2, result.rowCount());
-    assertFalse(result.preview().contains("\r\n1\r\n"), result.preview());
-    assertFalse(result.message().contains("where clause"), result.message());
+    assertEquals("id\r\n9\r\n10\r\n", result.preview());
+    assertEquals("Connected and read 2 row(s) from public.readings.", result.message());
   }
 
   @Test

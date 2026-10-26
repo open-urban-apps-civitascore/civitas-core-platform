@@ -301,7 +301,8 @@ class ConnectorJsonTest {
 
     assertThatThrownBy(() -> ConnectorJson.toDocument(connector, STORED_SQL, ENCRYPT))
         .isInstanceOf(StoredSecretRefusedException.class)
-        .hasMessage(ConnectorJson.STORED_SECRET_FOR_STORED_DESTINATION);
+        .hasMessage(
+            "The stored secret is kept only for the stored destination; enter it again for another one");
   }
 
   /** A merge patch that omits the password keeps it as a placeholder. */

@@ -27,8 +27,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 class ConnectionTestServiceTest {
 
@@ -37,7 +35,6 @@ class ConnectionTestServiceTest {
   private final AtomicInteger probes = new AtomicInteger();
   private final AtomicReference<Map<String, Object>> probed = new AtomicReference<>();
   private final AtomicReference<String> probedApiCall = new AtomicReference<>();
-  private final AtomicReference<Boolean> probedApplyWhere = new AtomicReference<>();
 
   private static final Decryptor IDENTITY = connector -> connector;
 
@@ -80,7 +77,6 @@ class ConnectionTestServiceTest {
         probes.incrementAndGet();
         probed.set(connector);
         probedApiCall.set(apiCall);
-        probedApplyWhere.set(applyWhere);
         return behaviour.probe(connector);
       }
     };
@@ -249,17 +245,21 @@ class ConnectionTestServiceTest {
     assertEquals("call", probedApiCall.get());
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void theRequestDecidesWhetherTheWhereClauseApplies(boolean applyWhere) {
-    ConnectionTestService service = service(IDENTITY);
+  @Test
+  void aPreviewLongerThanTheLimitIsCutAndMarkedAsCut() {
+    ConnectionTestService service =
+        new ConnectionTestService(
+            List.of(
+                prober(
+                    "http",
+                    connector ->
+                        new ProbeResult(true, "ok", "a".repeat(10_000), false, null, 200))),
+            IDENTITY);
 
-    service.test(
-        new ConnectionTestRequest(
-            "req-1", Instant.EPOCH, Map.of("connectionType", "sql"), null, applyWhere),
-        new Cancellation());
+    ConnectionTestResult result = run(service, Map.of("connectionType", "http"));
 
-    assertEquals(applyWhere, probedApplyWhere.get());
+    assertTrue(result.previewTruncated());
+    assertEquals("a".repeat(8180) + "\n[truncated]", result.preview());
   }
 
   @Test
@@ -302,9 +302,8 @@ class ConnectionTestServiceTest {
     ConnectionTestResult result =
         run(service, Map.of("connectionType", "http", "password", "ENC(abc)"));
 
-    assertFalse(result.message().contains(PASSWORD));
-    assertFalse(result.preview().contains(PASSWORD));
-    assertTrue(result.message().contains("********"));
+    assertEquals("echo ********", result.message());
+    assertEquals("{\"seen\":\"********\"}", result.preview());
   }
 
   @Test
