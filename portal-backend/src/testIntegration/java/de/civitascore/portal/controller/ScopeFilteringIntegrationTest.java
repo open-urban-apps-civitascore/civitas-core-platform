@@ -2,9 +2,14 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
+import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSourceRepository;
+import de.civitascore.portal.repository.DataStructureRepository;
+import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.AllowedScopesFilter;
 import de.civitascore.portal.util.RestPage;
 import java.net.URI;
@@ -14,12 +19,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.FieldSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
 /**
@@ -27,8 +35,8 @@ import org.springframework.http.ResponseEntity;
  *
  * <p>Verifies that the X-Allowed-Scope-Ids header correctly filters dataset collection results.
  * Scope IDs correspond to dataset IDs directly (tenant→dataset hierarchy, no intermediate
- * dataspace). Tests the full path: AllowedScopesFilter → AllowedScopes bean →
- * BaseController.applyScopeFilter() → JPA Specification.
+ * dataspace). Tests the full path: AllowedScopesFilter → AllowedScopes bean → ScopeFilter → JPA
+ * Specification.
  */
 @DisplayName("Scope Filtering Integration Tests")
 class ScopeFilteringIntegrationTest
@@ -37,7 +45,15 @@ class ScopeFilteringIntegrationTest
   private static final String SCOPE_HEADER = "X-Allowed-Scope-Ids";
   private static final String DATASETS_ENDPOINT = "/datasets";
 
+  private static final String[] DATA_ELEMENT_LISTS = {
+    "/datapools", "/datasources", "/datastructures", DATASETS_ENDPOINT
+  };
+
   @Autowired private DataSetRepository dataSetRepository;
+  @Autowired private DataSourceRepository dataSourceRepository;
+  @Autowired private DataStructureRepository dataStructureRepository;
+  @Autowired private DataPoolRepository dataPoolRepository;
+  @Autowired private PortalTestDataFactory portalData;
 
   @Override
   protected String getEndpointPath() {
@@ -85,11 +101,58 @@ class ScopeFilteringIntegrationTest
   @Override
   protected void performAdditionalCleanup() {
     dataSetRepository.deleteAll();
+    dataSourceRepository.deleteAll();
+    dataStructureRepository.deleteAll();
+    dataPoolRepository.deleteAll();
   }
 
   @AfterEach
   void cleanup() {
     performAdditionalCleanup();
+  }
+
+  // --- Every data-element list ---
+
+  // Each controller calls the scope filter itself; these fail when one of its lists does not.
+  @ParameterizedTest
+  @FieldSource("DATA_ELEMENT_LISTS")
+  void list_withoutScopeHeader_answers403(String path) {
+    HttpHeaders headers = createAuthHeaders();
+    headers.remove(AllowedScopesFilter.HEADER_NAME);
+
+    ResponseEntity<ProblemDetail> response =
+        exchangeForProblem(path, HttpMethod.GET, headers, null);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().getType()).hasToString("urn:civitas:error:ACCESS_DENIED");
+  }
+
+  @ParameterizedTest
+  @FieldSource("DATA_ELEMENT_LISTS")
+  void list_withNonMatchingScope_returnsEmptyPage(String path) {
+    portalData.dataPool();
+    portalData.dataSource();
+    portalData.dataStructure();
+    portalData.dataSet();
+    assertThat(list(path, AllowedScopes.WILDCARD).getContent()).isNotEmpty();
+
+    RestPage<Map<String, Object>> page = list(path, UUID.randomUUID().toString());
+
+    assertThat(page.getContent()).isEmpty();
+    assertThat(page.getTotalElements()).isZero();
+  }
+
+  private RestPage<Map<String, Object>> list(String path, String scopeHeaderValue) {
+    ResponseEntity<RestPage<Map<String, Object>>> response =
+        restTemplate.exchange(
+            path,
+            HttpMethod.GET,
+            new HttpEntity<>(freshAuthHeadersWithScope(scopeHeaderValue)),
+            new ParameterizedTypeReference<>() {});
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getBody()).isNotNull();
+    return response.getBody();
   }
 
   // --- Dataset scope filtering ---

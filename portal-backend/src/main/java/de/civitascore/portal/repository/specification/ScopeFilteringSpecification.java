@@ -15,8 +15,8 @@ import org.springframework.data.jpa.domain.Specification;
  * <p>These specifications filter collection queries based on user's authorized scope IDs from OPA.
  * Used by controllers to implement collection-level access control.
  *
- * <p>Usage: Controllers call {@code BaseController.applyScopeFilter()} with these specifications to
- * decorate the query spec before passing it to the service layer.
+ * <p>Usage: Controllers pass these specifications to {@code ScopeFilter} to decorate the query spec
+ * before passing it to the service layer.
  */
 public final class ScopeFilteringSpecification {
 
