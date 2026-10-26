@@ -51,7 +51,8 @@ public record HttpConnectorConfiguration(
    * A JSON path of member names and array indexes only, so that the processor evaluates no filter
    * or script expression.
    */
-  static final String JSON_PATH = "\\$(\\.[A-Za-z_][A-Za-z0-9_-]*|\\['[^'\\\\]+'\\]|\\[[0-9]+\\])+";
+  static final String JSON_PATH =
+      "^\\$(\\.[A-Za-z_][A-Za-z0-9_-]*|\\['[^'\\\\]+'\\]|\\[[0-9]+\\])+$";
 
   private static final String JSON_PATH_MESSAGE =
       " must start with '$' and hold only member names and array indexes, as in $.data[0].id or"
@@ -213,8 +214,7 @@ public record HttpConnectorConfiguration(
                   "Token endpoint of the authorization server: an https URL. Embedded credentials"
                       + " are removed; a query or fragment is rejected.",
               example = "https://auth.example.org/oauth2/token")
-          @NotNull(groups = OnRelease.class, message = "'tokenUrl' is required") @Pattern(regexp = "(?i)https:.*", message = "'tokenUrl' must use https")
-          String tokenUrl,
+          @NotNull(groups = OnRelease.class, message = "'tokenUrl' is required") @Pattern(regexp = "^[hH][tT][tT][pP][sS]:.*$", message = "'tokenUrl' must use https") String tokenUrl,
       @Schema(description = "Client ID at the authorization server.", example = "civitas-core")
           @NotNull(groups = OnRelease.class, message = "'clientId' is required") String clientId,
       @Schema(

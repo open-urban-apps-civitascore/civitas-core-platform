@@ -109,6 +109,21 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
   }
 
   @Test
+  @DisplayName("Should export each HTTP/REST connector pattern as a portable, anchored expression")
+  void shouldExportHttpConnectorPatternsAnchoredWithoutInlineFlags() {
+    List<String> patterns = new ArrayList<>();
+    spec.path("components").path("schemas").properties().stream()
+        .filter(schema -> schema.getKey().startsWith("HttpConnector"))
+        .forEach(schema -> collectPatterns(schema.getValue(), patterns));
+
+    // A JSON Schema pattern matches anywhere in the value, and JavaScript knows no (?i).
+    assertThat(patterns)
+        .isNotEmpty()
+        .allSatisfy(
+            pattern -> assertThat(pattern).startsWith("^").endsWith("$").doesNotContain("(?"));
+  }
+
+  @Test
   @DisplayName("Should describe the method of an HTTP/REST API call as read-only")
   void shouldDescribeHttpMethodAsReadOnly() {
     assertThat(
@@ -295,6 +310,16 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
       node = node.path(segment);
     }
     return node;
+  }
+
+  private static void collectPatterns(JsonNode node, List<String> patterns) {
+    if (node.isObject()) {
+      JsonNode pattern = node.get("pattern");
+      if (pattern != null && pattern.isString()) {
+        patterns.add(pattern.asString());
+      }
+    }
+    node.values().forEach(child -> collectPatterns(child, patterns));
   }
 
   private void collectDanglingReferences(JsonNode node, List<String> dangling) {
