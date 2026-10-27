@@ -99,20 +99,20 @@ bundle-authz-rego:
     # opa build archives paths relative to this directory, matching the Dockerfile COPY paths.
     # Note: backends go at /bundle/backends/ (not data/backends/) because
     # OPA bundles treat data/ as a special prefix that conflicts with manifest roots
-    - mkdir -p /tmp/opa-bundle/backends
-    - cp -r policy lib providers /tmp/opa-bundle/
-    - cp -r data/backends/* /tmp/opa-bundle/backends/
+    - mkdir -p /bundle/backends
+    - cp -r policy lib providers /bundle/
+    - cp -r data/backends/* /bundle/backends/
     # Create manifest with revision
     - |
-      cat > /tmp/opa-bundle/.manifest << EOF
+      cat > /bundle/.manifest << EOF
       {
         "revision": "${REVISION:-$CI_COMMIT_SHORT_SHA}",
         "roots": ["civitas", "backends", "system"]
       }
       EOF
     # Build bundle
-    - chmod -R 0755 /tmp/opa-bundle
-    - opa build -b /tmp/opa-bundle -o bundle.tar.gz
+    - chmod -R 0755 /bundle
+    - opa build -b /bundle -o bundle.tar.gz
     - echo "Bundle built successfully"
     - tar -tzf bundle.tar.gz | head -20
   artifacts:
