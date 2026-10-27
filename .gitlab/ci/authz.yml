@@ -25,7 +25,7 @@
 # Common OPA configuration for CI jobs (lint, test, qa, bundle)
 # which GitLab CI requires to execute script commands.
 .opa-common:
-  image: registry.gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-deployment/opa:2153c0f
+  image: registry.gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-deployment/opa:2153c0f@sha256:809c192602f9bb19a9ae754e0258bdec801104b3858b6006f33c3c04d3f7e0ca
 
 # =============================================================================
 # Lint Stage
@@ -120,7 +120,7 @@ bundle-authz-rego:
 # This must always run (needs: []) to ensure dependency scanning has the graph
 # even when the build job is skipped due to no changes
 generate-graph-authz:
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: lint
   rules:
     # Always run on the nightly scheduled pipeline
@@ -155,7 +155,7 @@ generate-graph-authz:
 
 lint-authz:
   extends: .api-test-stack-changes
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: lint
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
@@ -173,7 +173,7 @@ lint-authz:
 
 dependency-prune-authz:
   extends: .api-test-stack-changes
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: test
   needs:
     - job: setup-version-portal-model
@@ -195,7 +195,7 @@ dependency-prune-authz:
 
 test-authz:
   extends: .only-authz-changes
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: test
   needs:
     - job: build-authz
@@ -236,7 +236,7 @@ test-authz:
 
 build-authz:
   extends: .api-test-stack-changes
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: build
   needs:
     - job: setup-version
@@ -268,7 +268,7 @@ build-authz:
 
 build-opa-image:
   extends: .only-authz-changes
-  image: docker:27-dind
+  image: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   stage: publish
   needs:
     - job: setup-version
@@ -280,7 +280,7 @@ build-opa-image:
     - job: api-test-backend
       optional: true
   services:
-    - docker:27-dind
+    - docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
@@ -312,7 +312,7 @@ build-opa-image:
 
 build-authz-image:
   extends: .only-authz-changes
-  image: docker:27-dind
+  image: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   stage: publish
   needs:
     - job: setup-version
@@ -323,7 +323,7 @@ build-authz-image:
     - job: api-test-backend
       optional: true
   services:
-    - docker:27-dind
+    - docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
@@ -363,7 +363,7 @@ build-authz-image:
 container-scan-opa:
   extends: .only-authz-changes
   image:
-    name: aquasec/trivy:0.55.1
+    name: aquasec/trivy:0.55.2@sha256:addfb8fd6b9e520c25b22c61d8aa5d58ecd7879177aa959f952bf4734f4e3f60
     entrypoint: ['']
   stage: container-qa
   needs:
@@ -387,7 +387,7 @@ container-scan-opa:
 container-scan-authz:
   extends: .only-authz-changes
   image:
-    name: aquasec/trivy:0.55.1
+    name: aquasec/trivy:0.55.2@sha256:addfb8fd6b9e520c25b22c61d8aa5d58ecd7879177aa959f952bf4734f4e3f60
     entrypoint: ['']
   stage: container-qa
   needs:
@@ -410,14 +410,14 @@ container-scan-authz:
 
 deploy-opa:
   extends: .only-authz-changes
-  image: docker:27-dind
+  image: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   stage: deploy
   needs:
     - job: setup-version
       artifacts: true
     - job: container-scan-opa
   services:
-    - docker:27-dind
+    - docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
@@ -441,14 +441,14 @@ deploy-opa:
 
 deploy-authz:
   extends: .only-authz-changes
-  image: docker:27-dind
+  image: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   stage: deploy
   needs:
     - job: setup-version
       artifacts: true
     - job: container-scan-authz
   services:
-    - docker:27-dind
+    - docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
@@ -472,14 +472,14 @@ deploy-authz:
 
 sbom-opa-image:
   extends: .only-authz-changes
-  image: docker:27-dind
+  image: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   stage: report
   needs:
     - job: setup-version
       artifacts: true
     - job: deploy-opa
   services:
-    - docker:27-dind
+    - docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
@@ -504,14 +504,14 @@ sbom-opa-image:
 
 sbom-authz-image:
   extends: .only-authz-changes
-  image: docker:27-dind
+  image: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   stage: report
   needs:
     - job: setup-version
       artifacts: true
     - job: deploy-authz
   services:
-    - docker:27-dind
+    - docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
