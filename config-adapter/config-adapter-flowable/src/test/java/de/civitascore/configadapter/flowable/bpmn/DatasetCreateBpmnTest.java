@@ -295,7 +295,7 @@ class DatasetCreateBpmnTest {
     stubFrostSuccess();
     stubApisixSuccess();
 
-    ProcessInstance instance = startProcessWithGeo(false, true, true);
+    ProcessInstance instance = startProcessWithGeo(false, true, true, true, true);
     executeAllJobs();
 
     assertProcessCompleted(instance.getId());
@@ -509,6 +509,15 @@ class DatasetCreateBpmnTest {
 
   private ProcessInstance startProcessWithGeo(
       boolean hasPipelines, boolean hasGeoSink, boolean hasLayers, boolean hasFrostSink) {
+    return startProcessWithGeo(hasPipelines, hasGeoSink, hasLayers, hasFrostSink, false);
+  }
+
+  private ProcessInstance startProcessWithGeo(
+      boolean hasPipelines,
+      boolean hasGeoSink,
+      boolean hasLayers,
+      boolean hasFrostSink,
+      boolean hasDashboards) {
     Map<String, Object> variables = new HashMap<>();
     variables.put("sagaId", "saga-test-123");
     variables.put("datasetId", "ds-456");
@@ -518,6 +527,7 @@ class DatasetCreateBpmnTest {
     variables.put("hasGeoSink", hasGeoSink);
     variables.put("hasFrostSink", hasFrostSink);
     variables.put("hasLayers", hasLayers);
+    variables.put("hasDashboards", hasDashboards);
     if (hasPipelines) {
       variables.put("dataPipelines", List.of(Map.of("id", "p-1", "data", "{}")));
       variables.put("artifacts", Map.of());

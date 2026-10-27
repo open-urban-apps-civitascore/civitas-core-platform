@@ -263,6 +263,12 @@
           <dc:Bounds height="28.0" width="110.0" x="466.0" y="71.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_DashboardGateway" bpmnElement="dashboard-gateway" isMarkerVisible="true">
+        <dc:Bounds height="50.0" width="50.0" x="410.0" y="115.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_DashboardGateway" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="28.0" width="72.0" x="399.0" y="165.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_SupersetError" bpmnElement="superset-error">
         <dc:Bounds height="36.0" width="36.0" x="558.0" y="92.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_SupersetError" labelStyle="BPMNLabelStyle_1">
@@ -436,12 +442,21 @@
         <di:waypoint xsi:type="dc:Point" x="200.0" y="280.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_17"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_ApisixSuperset" bpmnElement="flow-apisix-superset" sourceElement="BPMNShape_ServiceTask_2" targetElement="BPMNShape_SyncSuperset">
+      <bpmndi:BPMNEdge id="BPMNEdge_ApisixSuperset" bpmnElement="flow-apisix-superset" sourceElement="BPMNShape_ServiceTask_2" targetElement="BPMNShape_DashboardGateway">
         <di:waypoint xsi:type="dc:Point" x="416.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="440.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="440.0" y="85.0"/>
-        <di:waypoint xsi:type="dc:Point" x="466.0" y="85.0"/>
+        <di:waypoint xsi:type="dc:Point" x="410.0" y="140.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_ApisixSuperset"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_DashboardSync" bpmnElement="flow-dashboard-sync" sourceElement="BPMNShape_DashboardGateway" targetElement="BPMNShape_SyncSuperset">
+        <di:waypoint xsi:type="dc:Point" x="435.0" y="115.0"/>
+        <di:waypoint xsi:type="dc:Point" x="435.0" y="85.0"/>
+        <di:waypoint xsi:type="dc:Point" x="466.0" y="85.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_DashboardSync"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_DashboardSkip" bpmnElement="flow-dashboard-skip" sourceElement="BPMNShape_DashboardGateway" targetElement="BPMNShape_ExclusiveGateway_1">
+        <di:waypoint xsi:type="dc:Point" x="460.0" y="140.0"/>
+        <di:waypoint xsi:type="dc:Point" x="466.0" y="175.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_DashboardSkip"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SupersetGeo" bpmnElement="flow-superset-geo" sourceElement="BPMNShape_SyncSuperset" targetElement="BPMNShape_ExclusiveGateway_1">
         <di:waypoint xsi:type="dc:Point" x="576.0" y="85.0"/>
