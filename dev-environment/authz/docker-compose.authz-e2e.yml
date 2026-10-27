@@ -140,6 +140,10 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgis-dev-env:5432/portal_backend?sslmode=disable
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: admin
+      # integration-test.sh migrates the SQL files with the Flyway CLI before the backend starts, so
+      # that the roles can be seeded first. The CLI cannot run the Java migrations (V1_2_26 to
+      # V1_2_28, in src/main/java/db/migration), so the backend applies them itself, out of order.
+      SPRING_FLYWAY_OUT_OF_ORDER: "true"
       # Kafka
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS: kafka:29092
