@@ -25,7 +25,7 @@
 # Common OPA configuration for CI jobs (lint, test, qa, bundle)
 # which GitLab CI requires to execute script commands.
 .opa-common:
-  image: registry.gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-deployment/opa:2153c0f
+  image: openpolicyagent/opa:1.21.0-static@sha256:9eb36ac3ceb3b855e776e60926a8a5142f96109a219a5fcd490fa1744c755bec
 
 # =============================================================================
 # Lint Stage
