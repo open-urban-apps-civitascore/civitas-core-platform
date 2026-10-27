@@ -25,7 +25,7 @@
         - model-forge/model-forge-runtime/src/main/resources/geojson/**/*
 
 .nifi-extensions-maven:
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -100,7 +100,7 @@ build-nifi-extensions:
   extends:
     - .only-nifi-extensions-changes
     - .nifi-extensions-maven
-  image: maven:3.9-eclipse-temurin-25
+  image: maven:3.9-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: build-package
   needs:
     - job: setup-version-nifi-extensions
@@ -138,13 +138,13 @@ integration-test-nifi-extensions:
   extends:
     - .only-nifi-extensions-changes
     - .nifi-extensions-maven
-  image: maven:3.9-eclipse-temurin-25
+  image: maven:3.9-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: test
   needs:
     - job: setup-version-nifi-extensions
     - job: build-nifi-extensions
   services:
-    - name: docker:27-dind
+    - name: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
       alias: docker
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
@@ -191,7 +191,7 @@ publish-nifi-extensions:
 build-nifi-extensions-image:
   extends:
     - .only-nifi-extensions-changes
-  image: docker:27-dind
+  image: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   stage: publish
   needs:
     - job: setup-version-nifi-extensions
@@ -199,7 +199,7 @@ build-nifi-extensions-image:
       artifacts: true
     - job: integration-test-nifi-extensions
   services:
-    - docker:27-dind
+    - docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
@@ -231,7 +231,7 @@ build-nifi-extensions-image:
 container-scan-nifi-extensions:
   extends: .only-nifi-extensions-changes
   image:
-    name: aquasec/trivy:0.55.1
+    name: aquasec/trivy:0.55.2@sha256:addfb8fd6b9e520c25b22c61d8aa5d58ecd7879177aa959f952bf4734f4e3f60
     entrypoint: ['']
   stage: container-qa
   needs:
@@ -252,14 +252,14 @@ container-scan-nifi-extensions:
 
 deploy-nifi-extensions-image:
   extends: .only-nifi-extensions-changes
-  image: docker:27-dind
+  image: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   stage: deploy
   needs:
     - job: setup-version
       artifacts: true
     - job: container-scan-nifi-extensions
   services:
-    - docker:27-dind
+    - docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
@@ -282,14 +282,14 @@ deploy-nifi-extensions-image:
 
 sbom-nifi-extensions-image:
   extends: .only-nifi-extensions-changes
-  image: docker:27-dind
+  image: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   stage: report
   needs:
     - job: setup-version
       artifacts: true
     - job: deploy-nifi-extensions-image
   services:
-    - docker:27-dind
+    - docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'

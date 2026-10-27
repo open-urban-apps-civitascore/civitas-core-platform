@@ -26,7 +26,7 @@
 # This must always run (needs: []) to ensure dependency scanning has the graph
 # even when the build job is skipped due to no changes
 generate-graph-backend:
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: lint
   needs: []
   rules:
@@ -62,7 +62,7 @@ generate-graph-backend:
 
 lint-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: lint
   needs: []
   variables:
@@ -100,7 +100,7 @@ check-migrations-backend:
 
 dependency-prune-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: test
   needs:
     - job: setup-version-portal-model
@@ -128,7 +128,7 @@ dependency-prune-backend:
 
 test-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: test
   needs:
     - job: build-backend
@@ -174,7 +174,7 @@ test-backend:
 
 integration-test-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-25
+  image: maven:3.9-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: test
   needs:
     - job: build-backend
@@ -190,7 +190,7 @@ integration-test-backend:
     - job: publish-portal-model
     - job: publish-model-forge
   services:
-    - name: docker:27-dind
+    - name: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
     DOCKER_DRIVER: overlay2
@@ -227,7 +227,7 @@ integration-test-backend:
 #  pipeline-engine migration to NiFi still pending, see WI 1622).
 # Auto-runs on main/develop, manual trigger on MRs (heavy: ~2 min, 6+ containers).
 saga-e2e-test-backend:
-  image: maven:3.9-eclipse-temurin-25
+  image: maven:3.9-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: test
   needs:
     - job: build-backend
@@ -256,7 +256,7 @@ saga-e2e-test-backend:
         - .gitlab-ci.yml
         - .gitlab/ci/backend.yml
   services:
-    - name: docker:27-dind
+    - name: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
     DOCKER_DRIVER: overlay2
@@ -293,7 +293,7 @@ saga-e2e-test-backend:
 # Pipelines in every other MR.
 build-nifi-nars-api-test:
   extends: .api-test-stack-changes
-  image: maven:3.9-eclipse-temurin-25
+  image: maven:3.9-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: build-package
   needs: []
   variables:
@@ -322,7 +322,7 @@ api-test-backend:
   tags:
     - saas-linux-medium-amd64 # 4 cores, 16 GB memory
   extends: .api-test-stack-changes
-  image: docker:27
+  image: docker:27@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   stage: test # runs after build jobs provide JAR artifacts
   needs:
     - job: build-backend
@@ -338,7 +338,7 @@ api-test-backend:
       artifacts: true
 
   services:
-    - name: docker:27-dind
+    - name: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_HOST: tcp://docker:2375
@@ -432,7 +432,7 @@ api-test-backend:
 
 report-test-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-25
+  image: maven:3.9-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: test
   dependencies:
     - build-backend
@@ -457,7 +457,7 @@ report-test-backend:
 
 build-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: build
   needs:
     - job: setup-version
@@ -498,7 +498,7 @@ build-backend:
 
 build-backend-image:
   extends: .only-backend-changes
-  image: docker:27
+  image: docker:27@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   stage: publish
   needs:
     - job: setup-version
@@ -510,7 +510,7 @@ build-backend-image:
     - job: api-test-backend
       optional: true
   services:
-    - name: docker:27-dind
+    - name: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
@@ -548,7 +548,7 @@ build-backend-image:
 container-scan-backend:
   extends: .only-backend-changes
   image:
-    name: aquasec/trivy:0.55.1
+    name: aquasec/trivy:0.55.2@sha256:addfb8fd6b9e520c25b22c61d8aa5d58ecd7879177aa959f952bf4734f4e3f60
     entrypoint: ['']
   stage: container-qa
   needs:
@@ -571,14 +571,14 @@ container-scan-backend:
 
 deploy-backend:
   extends: .only-backend-changes
-  image: docker:27
+  image: docker:27@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   stage: deploy
   needs:
     - job: setup-version
       artifacts: true
     - job: container-scan-backend
   services:
-    - docker:27-dind
+    - docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
@@ -602,14 +602,14 @@ deploy-backend:
 
 sbom-backend-image:
   extends: .only-backend-changes
-  image: docker:27
+  image: docker:27@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   stage: report
   needs:
     - job: setup-version
       artifacts: true
     - job: deploy-backend
   services:
-    - docker:27-dind
+    - docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'

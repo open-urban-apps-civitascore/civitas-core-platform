@@ -50,7 +50,7 @@
 # - develop: snapshot version (e.g., 0.1.0-SNAPSHOT)
 # - MR: merge request version (e.g., 0.1.0-MR-123-SNAPSHOT)
 setup-version-model-forge:
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: .pre
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
@@ -85,7 +85,7 @@ setup-version-model-forge:
 # Always runs (own rules, no `changes`) so the scanner has the graph even when the
 # build job is skipped because nothing changed.
 generate-graph-model-forge:
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: lint
   needs:
     - job: setup-version-model-forge
@@ -125,7 +125,7 @@ generate-graph-model-forge:
 #  in the documentation repo.)
 validate-schemas-model-forge:
   extends: .only-model-forge-changes
-  image: python:3.12-slim
+  image: python:3.12-slim@sha256:e70237b264442328526ff29d6b3c43bd8abcf6cbab78a949322fb69b7d91d6b6
   stage: lint
   needs: []
   script:
@@ -215,13 +215,13 @@ validate-schemas-model-forge:
 # the Testcontainers-based tests (admin-ui boot test against a real PostgreSQL).
 test-model-forge:
   extends: .only-model-forge-changes
-  image: maven:3.9-eclipse-temurin-25
+  image: maven:3.9-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: build-package
   needs:
     - job: setup-version-model-forge
       artifacts: true
   services:
-    - name: docker:27-dind
+    - name: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
       alias: docker
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
@@ -255,7 +255,7 @@ test-model-forge:
 # The admin UI sets maven.deploy.skip, so the console is not published.
 publish-model-forge:
   extends: .only-model-forge-changes
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: deploy-package
   needs:
     - job: setup-version-model-forge

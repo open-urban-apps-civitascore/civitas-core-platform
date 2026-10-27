@@ -31,7 +31,7 @@
 # - develop: snapshot version (e.g., 1.0.0-SNAPSHOT)
 # - MR: merge request version (e.g., 1.0.0-MR-123)
 setup-version-portal-model:
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: .pre
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
@@ -68,7 +68,7 @@ setup-version-portal-model:
 # This must always run (needs: []) to ensure dependency scanning has the graph
 # even when the build job is skipped due to no changes
 generate-graph-portal-model:
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: lint
   needs:
     - job: setup-version-portal-model
@@ -105,7 +105,7 @@ generate-graph-portal-model:
 
 lint-portal-model:
   extends: .only-portal-model-changes
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: lint
   needs:
     - job: setup-version-portal-model
@@ -124,7 +124,7 @@ lint-portal-model:
 
 dependency-prune-portal-model:
   extends: .only-portal-model-changes
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: lint
   needs:
     - job: setup-version-portal-model
@@ -146,7 +146,7 @@ dependency-prune-portal-model:
 
 build-portal-model:
   extends: .only-portal-model-changes
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: build-package
   needs:
     - job: setup-version-portal-model
@@ -173,7 +173,7 @@ build-portal-model:
 # Run portal-model unit tests
 test-portal-model:
   extends: .only-portal-model-changes
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: build-package
   needs:
     - job: setup-version-portal-model
@@ -201,7 +201,7 @@ test-portal-model:
 # Runs in deploy-package stage so backend tests can use the published artifacts
 publish-portal-model:
   extends: .only-portal-model-changes
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: deploy-package
   needs:
     - job: setup-version-portal-model
