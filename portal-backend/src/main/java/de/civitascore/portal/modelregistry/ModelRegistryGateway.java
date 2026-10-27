@@ -72,7 +72,13 @@ public class ModelRegistryGateway {
    * @param versionedUrn the concrete versioned CORE URN of this stored version
    * @param version the SemVer version segment of {@code versionedUrn}
    */
-  public record ModelPin(String logicalUrn, String versionedUrn, String version) {}
+  public record ModelPin(String logicalUrn, String versionedUrn, String version) {
+
+    /** The UUID segment of the pinned CORE URN, or null when the URN carries none. */
+    public UUID id() {
+      return UrnParser.idFromUrn(logicalUrn);
+    }
+  }
 
   /**
    * A document read back from the registry, split into the host's separate views: {@code content}
@@ -442,16 +448,6 @@ public class ModelRegistryGateway {
         : Optional.empty();
   }
 
-  /** The UUID segment of a CORE URN of any artifact type, or null when {@code urn} is none. */
-  public UUID idOf(String urn) {
-    return UrnParser.idFromUrn(urn);
-  }
-
-  /** The pin of a versioned CORE URN, taken apart without reading the registry. */
-  public ModelPin pinOf(String versionedUrn) {
-    return toPin(new ArtifactId(versionedUrn));
-  }
-
   public static UUID deriveId(String key) {
     return UrnParser.deriveId(key);
   }
@@ -488,16 +484,16 @@ public class ModelRegistryGateway {
   }
 
   /**
-   * The versioned CORE URNs of a given artifact type that {@code urn} depends on, read from Model
-   * Forge's dependency graph. This is the envelope-level way for host orchestration to learn, e.g.,
-   * which Mappings a pipeline references — <b>without ever parsing the pipeline's content</b> (the
+   * The pins of the artifacts of a given type that {@code urn} depends on, read from Model Forge's
+   * dependency graph. This is the envelope-level way for host orchestration to learn, e.g., which
+   * Mappings a pipeline references — <b>without ever parsing the pipeline's content</b> (the
    * dependency graph is part of the envelope; see the portal-backend integration contract). Empty
    * when {@code urn} is null/blank.
    *
    * @param urn the depending artifact's logical or versioned CORE URN
    * @param artifactType the CORE artifact-type segment to keep (e.g. {@code "mapping"})
    */
-  public List<String> dependencyUrnsOfType(String urn, String artifactType) {
+  public List<ModelPin> dependencyPinsOfType(String urn, String artifactType) {
     if (urn == null || urn.isBlank()) {
       return List.of();
     }
@@ -505,6 +501,7 @@ public class ModelRegistryGateway {
         .map(node -> node.artifactId().value())
         .filter(u -> artifactType.equals(UrnParser.artifactTypeFromUrn(u)))
         .distinct()
+        .map(u -> toPin(new ArtifactId(u)))
         .toList();
   }
 
@@ -531,7 +528,7 @@ public class ModelRegistryGateway {
    * A flow's participating closure: every artifact reachable from {@code urn} within {@code
    * maxDepth} reference hops, and which of them the registry no longer holds.
    *
-   * <p>Unlike {@link #dependencyUrnsOfType}, which reports direct edges of one type, this walks the
+   * <p>Unlike {@link #dependencyPinsOfType}, which reports direct edges of one type, this walks the
    * graph transitively. The walk is level-bounded and guards a cyclic graph with a visited set, so
    * a mutually referencing pair terminates rather than recursing. The entry artifact is not a
    * member of its own closure.

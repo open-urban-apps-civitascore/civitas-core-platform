@@ -3,6 +3,7 @@ package de.civitascore.portal.service;
 import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway.ModelPin;
 import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -51,8 +52,7 @@ public class MappingService {
    *
    * @param document the authored content with the editor's node {@code positions}
    */
-  public record StoredMapping(
-      UUID mappingId, ModelRegistryGateway.ModelPin pin, Map<String, Object> document) {}
+  public record StoredMapping(UUID mappingId, ModelPin pin, Map<String, Object> document) {}
 
   /**
    * The Mappings of this DataSet, in manifest order.
@@ -62,11 +62,8 @@ public class MappingService {
   public List<MappingSummary> list(UUID dataSetId) {
     Set<String> seen = new HashSet<>();
     return members(manifestUrnOrThrow(dataSetId)).stream()
-        .filter(member -> seen.add(registry.logicalUrn(member)))
-        .map(
-            member ->
-                new MappingSummary(
-                    registry.idOf(member), registry.logicalUrn(member), titleOf(member)))
+        .filter(member -> seen.add(member.logicalUrn()))
+        .map(member -> new MappingSummary(member.id(), member.logicalUrn(), titleOf(member)))
         .toList();
   }
 
@@ -77,17 +74,17 @@ public class MappingService {
    * @throws ResourceNotFoundException when the Mapping is no member of this DataSet
    */
   public StoredMapping get(UUID dataSetId, UUID mappingId) {
-    String member = currentMemberOrThrow(manifestUrnOrThrow(dataSetId), mappingId);
+    ModelPin member = currentMemberOrThrow(manifestUrnOrThrow(dataSetId), mappingId);
     Map<String, Object> document =
         registry
-            .fetchPayload(member)
+            .fetchPayload(member.versionedUrn())
             .map(
                 stored ->
                     withPositions(
                         stored.content(),
                         stored.styles() == null ? null : stored.styles().get(POSITIONS)))
             .orElseThrow(() -> new ResourceNotFoundException(ENTITY_NAME, mappingId));
-    return new StoredMapping(mappingId, registry.pinOf(member), document);
+    return new StoredMapping(mappingId, member, document);
   }
 
   /**
@@ -105,7 +102,7 @@ public class MappingService {
    */
   public StoredMapping update(UUID dataSetId, UUID mappingId, Map<String, Object> doc) {
     String manifestUrn = manifestUrnOrThrow(dataSetId);
-    String logicalUrn = registry.logicalUrn(currentMemberOrThrow(manifestUrn, mappingId));
+    String logicalUrn = currentMemberOrThrow(manifestUrn, mappingId).logicalUrn();
     return store(manifestUrn, Optional.of(logicalUrn), doc);
   }
 
@@ -118,8 +115,8 @@ public class MappingService {
    * @throws ResourceNotFoundException when the Mapping is no member of this DataSet
    */
   public void delete(UUID dataSetId, UUID mappingId) {
-    String member = currentMemberOrThrow(manifestUrnOrThrow(dataSetId), mappingId);
-    registry.deletePayload(registry.logicalUrn(member));
+    ModelPin member = currentMemberOrThrow(manifestUrnOrThrow(dataSetId), mappingId);
+    registry.deletePayload(member.logicalUrn());
   }
 
   /**
@@ -133,7 +130,7 @@ public class MappingService {
     Map<String, Object> styles = positions == null ? null : Map.of(POSITIONS, positions);
     requireResolvableEndpoint(content, "source");
     requireResolvableEndpoint(content, "target");
-    ModelRegistryGateway.ModelPin pin =
+    ModelPin pin =
         registry.storePayload(
             PayloadKind.MAPPING,
             logicalUrn,
@@ -143,8 +140,7 @@ public class MappingService {
             content,
             styles,
             manifestUrn);
-    return new StoredMapping(
-        registry.idOf(pin.logicalUrn()), pin, withPositions(content, positions));
+    return new StoredMapping(pin.id(), pin, withPositions(content, positions));
   }
 
   private static Map<String, Object> withPositions(Map<String, Object> content, Object positions) {
@@ -183,9 +179,9 @@ public class MappingService {
     return title instanceof String s && !s.isBlank() ? s : "mapping";
   }
 
-  private String titleOf(String member) {
+  private String titleOf(ModelPin member) {
     return registry
-        .fetchPayload(member)
+        .fetchPayload(member.versionedUrn())
         .map(stored -> stored.content().get("title"))
         .filter(String.class::isInstance)
         .map(String.class::cast)
@@ -203,14 +199,14 @@ public class MappingService {
     return manifestUrn;
   }
 
-  private List<String> members(String manifestUrn) {
-    return registry.dependencyUrnsOfType(manifestUrn, MAPPING_ARTIFACT_TYPE);
+  private List<ModelPin> members(String manifestUrn) {
+    return registry.dependencyPinsOfType(manifestUrn, MAPPING_ARTIFACT_TYPE);
   }
 
-  /** The manifest's versioned URN of the Mapping, which is its current version. */
-  private String currentMemberOrThrow(String manifestUrn, UUID mappingId) {
+  /** The manifest's pin of the Mapping, which is its current version. */
+  private ModelPin currentMemberOrThrow(String manifestUrn, UUID mappingId) {
     return members(manifestUrn).stream()
-        .filter(member -> mappingId.equals(registry.idOf(member)))
+        .filter(member -> mappingId.equals(member.id()))
         .findFirst()
         .orElseThrow(() -> new ResourceNotFoundException(ENTITY_NAME, mappingId));
   }

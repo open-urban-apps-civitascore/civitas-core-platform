@@ -163,6 +163,32 @@ class ModelRegistryGatewayTest {
       assertThat(gateway.dependencyUrns("  ")).isEmpty();
       verify(modelForge, never()).dependencies(any());
     }
+
+    @Test
+    @DisplayName("of one type are the pins of those nodes, once each, with the id of their URN")
+    void pinsOfOneType() {
+      when(modelForge.dependencies(any()))
+          .thenReturn(
+              new DependencyGraphView(
+                  List.of(
+                      new DependencyGraphView.Node(new ArtifactId(PIPELINE_URN), "pipeline"),
+                      new DependencyGraphView.Node(new ArtifactId(SOURCE_URN), "source"),
+                      new DependencyGraphView.Node(new ArtifactId(MAPPING_URN), "mapping"),
+                      new DependencyGraphView.Node(new ArtifactId(MAPPING_URN), "mapping")),
+                  List.of(edge(SOURCE_URN), edge(MAPPING_URN))));
+
+      List<ModelRegistryGateway.ModelPin> pins =
+          gateway.dependencyPinsOfType(PIPELINE_URN, "mapping");
+
+      assertThat(pins)
+          .containsExactly(
+              new ModelRegistryGateway.ModelPin(
+                  "urn:core:platform:civitas:mapping:common:158a41e4-f47b-8e87-bc6f-d6573a02ab99",
+                  MAPPING_URN,
+                  "1.0.0"));
+      assertThat(pins.getFirst().id())
+          .isEqualTo(UUID.fromString("158a41e4-f47b-8e87-bc6f-d6573a02ab99"));
+    }
   }
 
   @Nested

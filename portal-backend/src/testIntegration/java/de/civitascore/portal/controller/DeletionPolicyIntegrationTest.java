@@ -9,6 +9,7 @@ import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.output.MappingOutputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
@@ -146,28 +147,23 @@ class DeletionPolicyIntegrationTest extends BaseKeycloakIntegrationTest {
     DataSet dataSet = dataSetWithManifest();
     Pipeline pipeline = portalData.pipeline(dataSet);
 
-    String mappingUrn = createMapping(dataSet, source, target);
+    MappingOutputDTO mapping = createMapping(dataSet, source, target);
     portalData.attachPipelineDefinition(
         pipeline,
         Map.of(
             "title",
             "Ingest",
             "nodes",
-            List.of(Map.of("id", "map", "kind", "mapping", "mappingRef", mappingUrn)),
+            List.of(Map.of("id", "map", "kind", "mapping", "mappingRef", mapping.logicalUrn())),
             "edges",
             List.of()),
         null);
 
     ResponseEntity<String> refused =
-        delete(
-            "/datasets/"
-                + dataSet.getId()
-                + "/mappings/"
-                + registry.idOf(mappingUrn)
-                + "?force=true");
+        delete("/datasets/" + dataSet.getId() + "/mappings/" + mapping.mappingId() + "?force=true");
 
     assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-    assertThat(registry.fetchPayload(mappingUrn)).isPresent();
+    assertThat(registry.fetchPayload(mapping.logicalUrn())).isPresent();
   }
 
   @Test
@@ -178,7 +174,7 @@ class DeletionPolicyIntegrationTest extends BaseKeycloakIntegrationTest {
     DataSet dataSet = dataSetWithManifest();
     Pipeline pipeline = portalData.pipeline(dataSet);
 
-    String mappingUrn = createMapping(dataSet, source, target);
+    String mappingUrn = createMapping(dataSet, source, target).logicalUrn();
     pipeline =
         portalData.attachPipelineDefinition(
             pipeline,
@@ -350,7 +346,7 @@ class DeletionPolicyIntegrationTest extends BaseKeycloakIntegrationTest {
     return new ObjectMapper().readTree(body).get(name).asText();
   }
 
-  private String createMapping(
+  private MappingOutputDTO createMapping(
       DataSet dataSet, DataStructureVersion source, DataStructureVersion target) {
     ResponseEntity<String> created =
         post(
@@ -365,6 +361,6 @@ class DeletionPolicyIntegrationTest extends BaseKeycloakIntegrationTest {
                 "fields",
                 Map.of()));
     assertThat(created.getStatusCode()).as("%s", created.getBody()).isEqualTo(HttpStatus.CREATED);
-    return field(created.getBody(), "logicalUrn");
+    return new ObjectMapper().readValue(created.getBody(), MappingOutputDTO.class);
   }
 }
