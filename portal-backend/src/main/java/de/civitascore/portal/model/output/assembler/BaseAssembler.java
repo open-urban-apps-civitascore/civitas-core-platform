@@ -81,13 +81,4 @@ public interface BaseAssembler<
   default O postProcessOutput(O dto, E entity) {
     return dto;
   }
-
-  /** Extract ID from output DTO. */
-  default ID getIdFromOutput(O output) {
-    try {
-      return (ID) output.getId();
-    } catch (ClassCastException e) {
-      throw new IllegalStateException("Cannot extract ID from output DTO", e);
-    }
-  }
 }
