@@ -23,7 +23,8 @@ public class DashboardAssembler implements BaseAssembler<Dashboard, DashboardOut
       return output;
     }
     Map<String, Object> model =
-        modelRegistryGateway.fetchPayload(entity.getModelUrn())
+        modelRegistryGateway
+            .fetchPayload(entity.getModelUrn())
             .map(ModelRegistryGateway.RegistryDocument::content)
             .orElse(null);
     if (model == null) {

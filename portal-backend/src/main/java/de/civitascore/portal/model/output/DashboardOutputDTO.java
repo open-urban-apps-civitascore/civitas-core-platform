@@ -1,8 +1,8 @@
 package de.civitascore.portal.model.output;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import de.civitascore.portal.model.embedded.VisualizationType;
 import de.civitascore.portal.model.embedded.DashboardFilterExpansion;
+import de.civitascore.portal.model.embedded.VisualizationType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
 import lombok.Data;

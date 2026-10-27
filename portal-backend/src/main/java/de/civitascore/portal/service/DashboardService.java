@@ -138,8 +138,10 @@ public class DashboardService extends BaseService<Dashboard, DashboardInputDTO> 
     super.postDelete(entity);
   }
 
-  /** Stores the dashboard's user-controlled configuration in Model Forge and keeps only its URN
-   * on the relational row. The row remains the engine-id and authorization binding. */
+  /**
+   * Stores the dashboard's user-controlled configuration in Model Forge and keeps only its URN on
+   * the relational row. The row remains the engine-id and authorization binding.
+   */
   private void storeModel(Dashboard entity) {
     DataSet dataSet = entity.getDataSet();
     String manifestUrn = dataSet == null ? null : dataSet.getManifestLogicalUrn();

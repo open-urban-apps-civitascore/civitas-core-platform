@@ -2,8 +2,8 @@ package de.civitascore.portal.model.input;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import de.civitascore.portal.model.embedded.VisualizationType;
 import de.civitascore.portal.model.embedded.DashboardFilterExpansion;
+import de.civitascore.portal.model.embedded.VisualizationType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -22,9 +22,7 @@ public final class DashboardInputDTO extends VisualizationInputDTO {
   @Schema(description = "Whether the dashboard is published in the dashboard engine")
   private Boolean released;
 
-  @Min(0)
-  @Max(3)
-  @Schema(description = "Superset standalone display mode from 0 to 3")
+  @Min(0) @Max(3) @Schema(description = "Superset standalone display mode from 0 to 3")
   private Integer standaloneMode;
 
   @Schema(description = "Whether Superset shows the dashboard filter bar")

@@ -52,8 +52,9 @@ class DashboardServiceTest {
     dataSet.setId(dataSetId);
     dataSet.setManifestLogicalUrn("urn:core:platform:civitas:dataset:common:test");
     lenient()
-        .when(modelRegistryGateway.storePayload(
-            eq(PayloadKind.DASHBOARD), any(), any(), any(), any(), any(), any()))
+        .when(
+            modelRegistryGateway.storePayload(
+                eq(PayloadKind.DASHBOARD), any(), any(), any(), any(), any(), any()))
         .thenReturn(
             new ModelPin(
                 "urn:core:platform:civitas:dashboard:common:test",
