@@ -21,12 +21,6 @@ update-openapi-spec:
       artifacts: true
   rules:
     - if: $CI_COMMIT_BRANCH == "develop"
-    # TODO: testing: the job is available on merge requests but manual, because it pushes the bot
-    # branch ci/openapi-spec-update and opens or refreshes a merge request against develop from
-    # whatever the checkout holds. Remove this rule to restore the develop-only behaviour.
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: manual
-      allow_failure: true
   variables:
     GIT_DEPTH: 1
   before_script:

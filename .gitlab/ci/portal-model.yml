@@ -10,7 +10,6 @@
     - !reference [.only-backend-changes, rules]
     - !reference [.only-authz-changes, rules]
     - !reference [.only-model-forge-changes, rules]
-    - !reference [.rules-mr-always, rules] # TODO: testing, every job runs on every merge request. Remove this line to bring the changes: filter below back
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - portal-model/**/*
@@ -79,7 +78,7 @@ build-portal-model:
 # build-portal-model.
 publish-portal-model:
   extends:
-    - .rules-publish # TODO: testing, merge requests publish too. Back to .rules-protected
+    - .rules-protected
     - .maven-portal-model
   image: maven:3.9.16-eclipse-temurin-25-alpine
   stage: deploy-package

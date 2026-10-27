@@ -8,7 +8,6 @@
 .only-nifi-extensions-changes:
   rules:
     - !reference [.rules-protected, rules]
-    - !reference [.rules-mr-always, rules] # TODO: testing, every job runs on every merge request. Remove this line to bring the changes: filter below back
     # Run on MR only when the extensions change
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:

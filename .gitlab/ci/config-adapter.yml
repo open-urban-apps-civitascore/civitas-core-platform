@@ -3,7 +3,6 @@
 .only-config-adapter-changes:
   rules:
     - !reference [.rules-protected, rules]
-    - !reference [.rules-mr-always, rules] # TODO: testing, every job runs on every merge request. Remove this line to bring the changes: filter below back
     # Run on MR only when config-adapter files change
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
@@ -226,7 +225,7 @@ static-analysis-config-adapter:
 # do not publish; portal-backend uses the artifact of build-config-adapter there, in every pipeline.
 publish-config-adapter:
   extends:
-    - .rules-publish # TODO: testing, merge requests publish too. Back to .rules-protected
+    - .rules-protected
     - .maven-config-adapter
   image: maven:3.9.16-eclipse-temurin-25-alpine
   stage: deploy-package

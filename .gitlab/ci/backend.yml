@@ -3,7 +3,6 @@
 .only-backend-changes:
   rules:
     - !reference [.rules-protected, rules]
-    - !reference [.rules-mr-always, rules] # TODO: testing, every job runs on every merge request. Remove this line to bring the changes: filter below back
     # Run on MR only when backend files change
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
@@ -147,7 +146,6 @@ saga-e2e-test-backend:
   needs: !reference [.backend-dependencies, needs]
   rules:
     - !reference [.rules-protected, rules]
-    - !reference [.rules-mr-always, rules] # TODO: testing, every job runs on every merge request. Remove this line to bring the changes: filter below back
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - portal-backend/**/*

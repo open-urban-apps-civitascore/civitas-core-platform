@@ -15,17 +15,8 @@
     - !reference [.rules-protected, rules]
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
-# TEST MODE: every job runs on every merge request pipeline, whatever the merge request changes.
-# TODO: remove this block and every `!reference [.rules-mr-always, rules]` line (grep for it) to
-# bring the `changes:` filters back; merge requests then run only the components they touch.
-.rules-mr-always:
+# The nightly schedule only (the scheduled pipeline has IS_NIGHTLY=true). For the end-to-end suites that
+# are too slow for a merge request.
+.rules-nightly:
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-
-# The release gate of the Maven registry: protected branches only.
-# TODO: testing only: merge requests publish their -MR-<iid>-SNAPSHOT versions too, so that
-# publish-* runs. Switch the publish-* jobs back to .rules-protected (grep for .rules-publish).
-.rules-publish:
-  rules:
-    - !reference [.rules-protected, rules]
-    - !reference [.rules-mr-always, rules]
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"

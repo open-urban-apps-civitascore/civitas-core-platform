@@ -26,7 +26,6 @@
 .only-model-forge-changes:
   rules:
     - !reference [.rules-protected, rules]
-    - !reference [.rules-mr-always, rules] # TODO: testing, every job runs on every merge request. Remove this line to bring the changes: filter below back
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - model-forge/**/*
@@ -230,7 +229,7 @@ test-model-forge:
 # The admin UI sets maven.deploy.skip, so the console is not published.
 publish-model-forge:
   extends:
-    - .rules-publish # TODO: testing, merge requests publish too. Back to .rules-protected
+    - .rules-protected
     - .maven-model-forge
   image: maven:3.9.16-eclipse-temurin-25-alpine
   stage: deploy-package

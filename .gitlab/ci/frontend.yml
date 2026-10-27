@@ -3,7 +3,6 @@
 .only-frontend-changes:
   rules:
     - !reference [.rules-protected, rules]
-    - !reference [.rules-mr-always, rules] # TODO: testing, every job runs on every merge request. Remove this line to bring the changes: filter below back
     # Run on MR only when frontend files change
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
@@ -183,36 +182,30 @@ deploy-frontend:
   variables:
     IMAGE_NAME: frontend-portal
 
-# Playwright end-to-end tests of the portal (portal-frontend/e2e), which were not part of CI before.
-# They run in a Playwright container on the network of the API test stack: the browser, the Next.js
-# production server (`pnpm build`, `pnpm start`), and a json-server mock share localhost, and Keycloak, APISIX and the
-# backend are reached by their service names, so no port is published and no host name is faked.
-# TODO: this job has never run in CI. Expect to fix, in this order: the E2E user (it uses the
-# dev@civitas.local user of the Bruno `ci` environment; playwright/createTestUser.ts and
-# sweep.setup.ts may need a Keycloak admin login), the frontend env below, and whether the specs
-# need seeded data (e2e/scripts/seed-test-users.sh, which runs psql against postgis-dev-env).
-# TODO: runs after the first: the job now tests the production build (the dev server failed on the
-# Google Fonts once), keeps traces of failed tests, and collects the Keycloak log. Read keycloak-logs.txt
-# and the traces to find why the refresh gets "Session not active" (2 below) before touching the specs.
-# TODO: first run (pipeline 2989728635), what it showed: the suite starts and logs in, but (1) the
-# specs are stale against the UI (CreateDataset.spec expects the header "Create: New Dataset", the page
-# shows "New Dataset"), (2) the stored session's access token expires after about 5 minutes and the
-# BFF then gets 401 from APISIX ("JWT expired"), so every later spec fails; check the token refresh
-# of the Auth.js session or the access token lifespan of the CI realm, (3) the sweep helper had
-# no Keycloak URL (KC_URL below). Retries are off in CI: with the 401s they only made it run 20 minutes.
-# TODO: it is a nightly job: restrict the rules to the schedule once it is stable. It is
-# allow_failure until then. It overlaps the Robot hero case in the deployment repository and
-# e2e-mf; see TEST-CONSOLIDATION-PLAN.md (D6, D8, C5).
+# Playwright end-to-end tests of the portal (portal-frontend/e2e). They run in a Playwright container
+# on the network of the API test stack: the browser, the production server (`pnpm build`, `pnpm start`;
+# the dev server fetched Google Fonts at run time and failed on that) and a json-server mock share
+# localhost, and Keycloak, APISIX and the backend are reached by their service names. The E2E user is
+# the dev@civitas.local user of the Bruno `ci` environment. Traces of failed tests, the Next.js log
+# and the service logs are kept as artifacts.
+#
+# Nightly only: it takes about 7 minutes with the stack, and it overlaps the Robot hero case in the
+# deployment repository and e2e-mf (TEST-CONSOLIDATION-PLAN.md, D6, D8, C5).
+# TODO: the 14 specs of e2e/users are skipped (describe.skip): they use json-server for create and
+# edit, which the app no longer reads. Port them to the API helpers (playwright/helpers/api) like the
+# dataset specs.
+# TODO: the stored session's access token lives 5 minutes. The suite takes under one, but a longer
+# run showed 401s from APISIX ("JWT expired") when the refresh failed with "Session not active". If
+# it comes back, read keycloak-logs.txt.
 e2e-test-frontend:
   extends:
-    - .only-frontend-changes
+    - .rules-nightly
     - .docker-cli
     - .dind
   tags:
     - saas-linux-medium-amd64 # 4 cores, 16 GB memory
   stage: test
   timeout: 30m
-  allow_failure: true # TODO: remove when the job is stable
   needs:
     - job: build-backend
       artifacts: true
