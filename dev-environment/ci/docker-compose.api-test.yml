@@ -321,9 +321,9 @@ services:
         COPY providers /staging/providers
         COPY data/backends /staging/data/backends
         RUN mkdir -p /staging/data/config && \
-            printf '{"authz_repository_url":"http://authz-repository:8091/api/v1/user-context","dataset_pool_membership_url":"http://authz-repository:8091/api/v1/dataset-pool","authz_cache_duration_seconds":0}\n'\
+            printf '{"authz_repository_url":"http://authz-repository:8091/api/v1/user-context","dataset_pool_membership_url":"http://authz-repository:8091/api/v1/dataset-pool","dashboard_dataset_url":"http://authz-repository:8091/api/v1/dashboard-dataset","authz_cache_duration_seconds":0}\n'\
             > /staging/data/config/config.json
-        FROM openpolicyagent/opa:1.19.1-static
+        FROM openpolicyagent/opa:1.21.0-static@sha256:9eb36ac3ceb3b855e776e60926a8a5142f96109a219a5fcd490fa1744c755bec
         COPY --from=prep /staging/policies /policies
         COPY --from=prep /staging/helpers /helpers
         COPY --from=prep /staging/providers /providers
