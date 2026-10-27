@@ -13,6 +13,7 @@ public class StoredConnectorUnreadableException extends ProblemException {
   public StoredConnectorUnreadableException(UUID dataSourceId, String urn) {
     super(
         ProblemType.PERSISTENCE_ERROR,
-        "Stored connector of DataSource " + dataSourceId + " cannot be read: " + urn);
+        "Stored connector of DataSource " + dataSourceId + " cannot be read: " + urn,
+        null);
   }
 }

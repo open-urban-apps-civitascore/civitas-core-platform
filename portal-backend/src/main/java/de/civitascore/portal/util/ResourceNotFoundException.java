@@ -41,7 +41,7 @@ public class ResourceNotFoundException extends ProblemException {
 
   private ResourceNotFoundException(
       String message, String resourceType, UUID resourceId, Collection<UUID> resourceIds) {
-    super(ProblemType.NOT_FOUND, message, message);
+    super(ProblemType.NOT_FOUND, message);
     this.resourceType = resourceType;
     this.resourceId = resourceId;
     this.resourceIds = resourceIds;

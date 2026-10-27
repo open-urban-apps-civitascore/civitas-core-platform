@@ -18,14 +18,14 @@ public class InvalidInputException extends ProblemException {
   private final String resourceInfo;
 
   public InvalidInputException(String resourceType, UUID resourceId, String message) {
-    super(ProblemType.INVALID_INPUT, message, message);
+    super(ProblemType.INVALID_INPUT, message);
     this.resourceType = resourceType;
     this.resourceId = resourceId;
     this.resourceInfo = null;
   }
 
   public InvalidInputException(String resourceType, String resourceInfo, String message) {
-    super(ProblemType.INVALID_INPUT, message, message);
+    super(ProblemType.INVALID_INPUT, message);
     this.resourceType = resourceType;
     this.resourceId = null;
     this.resourceInfo = resourceInfo;

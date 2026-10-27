@@ -2,7 +2,6 @@ package de.civitascore.portal.problem;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.net.URI;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -56,16 +55,14 @@ class ProblemTypeTest {
   }
 
   @Test
-  void problemDetail_carriesTypeTitleStatusDetailAndInstance() {
+  void problemDetail_carriesTypeTitleStatusAndDetail() {
     ProblemDetail problemDetail =
-        TestProblemDetails.create()
-            .of(ProblemType.RESOURCE_IN_USE, URI.create("/v1/datasets"), "in use");
+        TestProblemDetails.create().of(ProblemType.RESOURCE_IN_USE, "in use");
 
     assertThat(problemDetail.getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
     assertThat(problemDetail.getTitle()).isEqualTo("Resource in use");
     assertThat(problemDetail.getStatus()).isEqualTo(409);
     assertThat(problemDetail.getDetail()).isEqualTo("in use");
-    assertThat(problemDetail.getInstance()).hasToString("/v1/datasets");
   }
 
   @ParameterizedTest

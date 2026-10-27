@@ -22,7 +22,7 @@ public class ResourceInUseException extends ProblemException {
 
   public ResourceInUseException(
       String resourceType, UUID resourceId, String message, List<String> blockedBy) {
-    super(ProblemType.RESOURCE_IN_USE, message, message);
+    super(ProblemType.RESOURCE_IN_USE, message);
     this.resourceType = resourceType;
     this.resourceId = resourceId;
     this.blockedBy = blockedBy == null ? List.of() : List.copyOf(blockedBy);

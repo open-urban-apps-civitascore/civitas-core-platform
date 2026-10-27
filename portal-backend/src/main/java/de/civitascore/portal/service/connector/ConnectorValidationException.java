@@ -1,5 +1,6 @@
 package de.civitascore.portal.service.connector;
 
+import de.civitascore.portal.problem.FieldError;
 import de.civitascore.portal.problem.ProblemException;
 import de.civitascore.portal.problem.ProblemType;
 import java.util.List;
@@ -11,7 +12,7 @@ public class ConnectorValidationException extends ProblemException {
   private final transient List<ConnectorViolation> violations;
 
   public ConnectorValidationException(List<ConnectorViolation> violations) {
-    super(ProblemType.VALIDATION_FAILED, "Invalid connector");
+    super(ProblemType.VALIDATION_FAILED, "Invalid connector", null);
     this.violations = List.copyOf(violations);
   }
 
@@ -24,7 +25,7 @@ public class ConnectorValidationException extends ProblemException {
     return Map.of(
         "fieldErrors",
         violations.stream()
-            .map(violation -> Map.of("field", violation.path(), "message", violation.message()))
+            .map(violation -> new FieldError(violation.path(), violation.message()))
             .toList());
   }
 }

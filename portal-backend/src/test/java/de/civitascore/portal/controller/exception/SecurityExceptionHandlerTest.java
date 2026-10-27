@@ -11,7 +11,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.net.URI;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -108,7 +107,7 @@ class SecurityExceptionHandlerTest {
     JwtException jwtException = new JwtException("Token expired");
 
     // when
-    ProblemDetail problemDetail = SUT.handleJwtException(jwtException, request);
+    ProblemDetail problemDetail = SUT.handleJwtException(jwtException);
 
     // then
     assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED.value());
@@ -124,12 +123,22 @@ class SecurityExceptionHandlerTest {
     JwtException jwtException = new JwtException(null);
 
     // when
-    ProblemDetail problemDetail = SUT.handleJwtException(jwtException, request);
+    ProblemDetail problemDetail = SUT.handleJwtException(jwtException);
 
     // then
     assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED.value());
     assertThat(problemDetail.getType()).hasToString("urn:civitas:error:INVALID_TOKEN");
     assertThat(problemDetail.getDetail()).isEqualTo("JWT validation failed");
-    assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+  }
+
+  @Test
+  void handleAccessDenied_fromHandler_answers403AccessDenied() {
+    ProblemDetail problemDetail =
+        SUT.handleAccessDenied(
+            new AccessDeniedException("Missing required X-Allowed-Scope-Ids header"));
+
+    assertThat(problemDetail.getStatus()).isEqualTo(403);
+    assertThat(problemDetail.getType()).hasToString("urn:civitas:error:ACCESS_DENIED");
+    assertThat(problemDetail.getDetail()).isEqualTo("Insufficient privileges");
   }
 }

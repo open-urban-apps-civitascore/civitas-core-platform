@@ -11,7 +11,7 @@ public class ForbiddenException extends ProblemException {
   private final UUID resourceId;
 
   public ForbiddenException(String resourceType, UUID resourceId, String message) {
-    super(ProblemType.FORBIDDEN, message, message);
+    super(ProblemType.FORBIDDEN, message);
     this.resourceType = resourceType;
     this.resourceId = resourceId;
   }

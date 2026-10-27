@@ -7,6 +7,6 @@ import de.civitascore.portal.problem.ProblemType;
 public class DataSetNotEditableException extends ProblemException {
 
   public DataSetNotEditableException(String message) {
-    super(ProblemType.DATASET_NOT_EDITABLE, message, message);
+    super(ProblemType.DATASET_NOT_EDITABLE, message);
   }
 }

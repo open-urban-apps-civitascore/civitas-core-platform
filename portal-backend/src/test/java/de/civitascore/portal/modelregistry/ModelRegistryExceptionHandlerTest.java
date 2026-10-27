@@ -17,19 +17,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
-import org.springframework.mock.web.MockHttpServletRequest;
 
 @DisplayName("Registry failures are given an HTTP meaning instead of surfacing unmapped")
 class ModelRegistryExceptionHandlerTest {
 
   private final ModelRegistryExceptionHandler handler =
       new ModelRegistryExceptionHandler(TestProblemDetails.create());
-
-  private static MockHttpServletRequest request() {
-    MockHttpServletRequest request = new MockHttpServletRequest();
-    request.setRequestURI("/v1/mappings");
-    return request;
-  }
 
   @Test
   @DisplayName("a rejected document is a client error naming the path that was objected to")
@@ -44,12 +37,11 @@ class ModelRegistryExceptionHandlerTest {
                     "type",
                     "$.fields")));
 
-    ProblemDetail problem = handler.handleValidationFailed(ex, request());
+    ProblemDetail problem = handler.handleValidationFailed(ex);
 
     assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
     assertThat(problem.getType()).hasToString("urn:civitas:error:INVALID_INPUT");
     assertThat(problem.getDetail()).contains("$.fields").contains("integer found, object expected");
-    assertThat(problem.getInstance()).hasToString("/v1/mappings");
   }
 
   @Test
@@ -57,8 +49,7 @@ class ModelRegistryExceptionHandlerTest {
   void rejectedDocumentWithoutDiagnostics() {
     ProblemDetail problem =
         handler.handleValidationFailed(
-            new ValidationFailedException("Artifact does not satisfy its CORE schema", List.of()),
-            request());
+            new ValidationFailedException("Artifact does not satisfy its CORE schema", List.of()));
 
     assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
     assertThat(problem.getDetail()).isEqualTo("Artifact does not satisfy its CORE schema");
@@ -72,8 +63,7 @@ class ModelRegistryExceptionHandlerTest {
             new ArtifactInUseException(
                 "urn:core:platform:civitas:mapping:common:3bb4d91a-a4c3-8696-bbb3-ee3c4ef17c6d",
                 List.of(
-                    "urn:core:platform:civitas:pipeline:common:c71d3077-985f-85f7-b699-88738d3e0dd6")),
-            request());
+                    "urn:core:platform:civitas:pipeline:common:c71d3077-985f-85f7-b699-88738d3e0dd6")));
 
     assertThat(problem.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
     assertThat(problem.getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
@@ -99,8 +89,7 @@ class ModelRegistryExceptionHandlerTest {
   @DisplayName("an unreachable registry is a temporary fault, not a client error")
   void unreachableRegistryIsServiceUnavailable() {
     ProblemDetail problem =
-        handler.handleRegistryUnavailable(
-            new RegistryUnavailableException("connection refused"), request());
+        handler.handleRegistryUnavailable(new RegistryUnavailableException("connection refused"));
 
     assertThat(problem.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
     assertThat(problem.getType()).hasToString("urn:civitas:error:REGISTRY_UNAVAILABLE");
@@ -119,7 +108,7 @@ class ModelRegistryExceptionHandlerTest {
                     "validation",
                     "$.fields")));
 
-    ProblemDetail problem = handler.handleValidationFailed(failure, request());
+    ProblemDetail problem = handler.handleValidationFailed(failure);
 
     assertThat(problem.getDetail()).contains("$.fields: array found, object expected");
     assertThat(problem.getDetail()).doesNotContain("$.fields: $.fields");

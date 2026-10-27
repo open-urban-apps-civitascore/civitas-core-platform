@@ -1,15 +1,14 @@
 package de.civitascore.portal.controller.exception;
 
 import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
+import de.civitascore.portal.problem.FieldError;
 import de.civitascore.portal.problem.ProblemDetails;
 import de.civitascore.portal.problem.ProblemException;
 import de.civitascore.portal.problem.ProblemType;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import jakarta.persistence.PersistenceException;
-import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -25,8 +24,6 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -60,17 +57,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
    * Answers a typed problem with its catalog type, title, detail and extension members.
    *
    * @param ex the problem
-   * @param request the current HTTP request
    * @return the Problem Detail with the status of the problem type
    */
   @ExceptionHandler(ProblemException.class)
-  public ProblemDetail handleProblem(ProblemException ex, HttpServletRequest request) {
+  public ProblemDetail handleProblem(ProblemException ex) {
     if (ex.type().status().is5xxServerError()) {
       log.error("Answering {}: {}", ex.type(), Encode.forJava(ex.toString()));
     } else {
       log.warn("Answering {}: {}", ex.type(), Encode.forJava(ex.toString()));
     }
-    return problemDetails.of(ex, instance(request));
+    return problemDetails.of(ex);
   }
 
   /**
@@ -78,12 +74,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
    * appropriate Problem Detail response.
    *
    * @param ex the data integrity violation exception
-   * @param request the current HTTP request
-   * @return a Problem Detail response with a status code matching the constraint type
+   * @return a Problem Detail with a status code matching the constraint type
    */
   @ExceptionHandler(DataIntegrityViolationException.class)
-  public ResponseEntity<ProblemDetail> handleDataIntegrityViolation(
-      DataIntegrityViolationException ex, HttpServletRequest request) {
+  public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException ex) {
     if (ex.getCause() instanceof ConstraintViolationException cve) {
       String sqlState = cve.getSQLState();
 
@@ -93,7 +87,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.warn("Unique constraint violation: {}", Encode.forJava(mapped.getMessage()));
         // TR-03187 W-18/W-19: column name and submitted value are needed by clients; extracted
         // via regex from the DB error, not the raw DB message.
-        return toResponse(problemDetails.of(mapped, instance(request)));
+        return problemDetails.of(mapped);
       }
 
       if (FOREIGN_KEY_VIOLATION_STATE.equals(sqlState)) {
@@ -101,7 +95,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "Foreign key violation on constraint '{}': {}",
             Encode.forJava(cve.getConstraintName()),
             Encode.forJava(cve.getMessage()));
-        return toProblemDetailResponse(ProblemType.FOREIGN_KEY_VIOLATION, request);
+        return problemDetails.of(ProblemType.FOREIGN_KEY_VIOLATION);
       }
 
       if (NOT_NULL_VIOLATION_STATE.equals(sqlState)) {
@@ -109,13 +103,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "Not-null violation on constraint '{}': {}",
             Encode.forJava(cve.getConstraintName()),
             Encode.forJava(cve.getMessage()));
-        return toProblemDetailResponse(ProblemType.NOT_NULL_VIOLATION, request);
+        return problemDetails.of(ProblemType.NOT_NULL_VIOLATION);
       }
     }
 
     log.error(
         "Data integrity violation: {}", Encode.forJava(ex.getMostSpecificCause().getMessage()));
-    return toProblemDetailResponse(ProblemType.DATA_INTEGRITY_ERROR, request);
+    return problemDetails.of(ProblemType.DATA_INTEGRITY_ERROR);
   }
 
   /**
@@ -123,18 +117,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
    * persistence errors.
    *
    * @param ex the persistence exception
-   * @param request the current HTTP request
-   * @return a Problem Detail response with HTTP 400 for validation failures or 500 for other errors
+   * @return a Problem Detail with HTTP 400 for validation failures or 500 for other errors
    */
   @ExceptionHandler(PersistenceException.class)
-  public ResponseEntity<ProblemDetail> handlePersistenceException(
-      PersistenceException ex, HttpServletRequest request) {
+  public ProblemDetail handlePersistenceException(PersistenceException ex) {
     if (ex.getCause() instanceof IllegalStateException ise) {
       log.warn("Entity validation failed: {}", Encode.forJava(ise.getMessage()));
-      return toProblemDetailResponse(ProblemType.ENTITY_VALIDATION_FAILED, request);
+      return problemDetails.of(ProblemType.ENTITY_VALIDATION_FAILED);
     }
     log.error("Persistence error: {}", Encode.forJava(ex.getMessage()), ex);
-    return toProblemDetailResponse(ProblemType.PERSISTENCE_ERROR, request);
+    return problemDetails.of(ProblemType.PERSISTENCE_ERROR);
   }
 
   /**
@@ -153,18 +145,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       HttpHeaders headers,
       HttpStatusCode status,
       WebRequest request) {
-    List<Map<String, String>> fieldErrors =
+    List<FieldError> fieldErrors =
         ex.getBindingResult().getFieldErrors().stream()
             .map(
                 fe ->
-                    Map.of(
-                        "field",
+                    new FieldError(
                         fe.getField(),
-                        "message",
                         fe.getDefaultMessage() != null ? fe.getDefaultMessage() : ""))
             .toList();
 
-    ProblemDetail problemDetail = problemDetails.of(ProblemType.VALIDATION_FAILED, null);
+    ProblemDetail problemDetail = problemDetails.of(ProblemType.VALIDATION_FAILED);
     problemDetail.setProperty("fieldErrors", fieldErrors);
 
     log.warn("Validation failed: {} field error(s)", fieldErrors.size());
@@ -190,7 +180,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     Optional<MalformedDataSourceRequestException> malformedRequest =
         malformedDataSourceRequestIn(ex);
     if (malformedRequest.isPresent()) {
-      return ResponseEntity.badRequest().body(problemDetails.of(malformedRequest.get(), null));
+      return ResponseEntity.badRequest().body(problemDetails.of(malformedRequest.get()));
     }
     return super.handleHttpMessageNotReadable(ex, headers, status, request);
   }
@@ -228,35 +218,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return response;
   }
 
-  @ExceptionHandler(AccessDeniedException.class)
-  public ProblemDetail handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
-    log.warn("Access denied: {}", Encode.forJava(ex.getMessage()));
-    return problemDetails.of(ProblemType.ACCESS_DENIED, instance(request));
-  }
-
-  @ExceptionHandler(AuthenticationException.class)
-  public ProblemDetail handleAuthentication(
-      AuthenticationException ex, HttpServletRequest request) {
-    log.warn("Authentication failed: {}", Encode.forJava(ex.getMessage()));
-    return problemDetails.of(ProblemType.UNAUTHORIZED, instance(request));
-  }
-
   /** Spring MVC leaves the type null, which RFC 9457 reads as {@code about:blank}. */
   private static boolean isBlank(@Nullable URI type) {
     return type == null || BLANK_TYPE.equals(type);
-  }
-
-  private static URI instance(HttpServletRequest request) {
-    return URI.create(request.getRequestURI());
-  }
-
-  private ResponseEntity<ProblemDetail> toProblemDetailResponse(
-      ProblemType type, HttpServletRequest request) {
-    return toResponse(problemDetails.of(type, instance(request)));
-  }
-
-  private static ResponseEntity<ProblemDetail> toResponse(ProblemDetail problemDetail) {
-    return ResponseEntity.status(problemDetail.getStatus()).body(problemDetail);
   }
 
   private UniqueConstraintViolationException extractUniqueViolationException(String dbMessage) {

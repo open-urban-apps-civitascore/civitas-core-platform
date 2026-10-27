@@ -15,7 +15,7 @@ public class SagaInFlightException extends ProblemException {
   private final PendingSagaType pendingSagaType;
 
   public SagaInFlightException(UUID dataSetId, PendingSagaType pendingSagaType, String message) {
-    super(ProblemType.SAGA_IN_FLIGHT, message, message);
+    super(ProblemType.SAGA_IN_FLIGHT, message);
     this.dataSetId = dataSetId;
     this.pendingSagaType = pendingSagaType;
   }

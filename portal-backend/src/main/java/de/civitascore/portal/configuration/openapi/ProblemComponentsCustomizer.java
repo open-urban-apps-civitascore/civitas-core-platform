@@ -1,6 +1,5 @@
 package de.civitascore.portal.configuration.openapi;
 
-import de.civitascore.portal.problem.ProblemDetails;
 import de.civitascore.portal.problem.ProblemType;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -16,10 +15,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class ProblemComponentsCustomizer implements OpenApiCustomizer {
 
-  private final ProblemDetails problemDetails;
+  private final ProblemExamples problemExamples;
 
-  public ProblemComponentsCustomizer(ProblemDetails problemDetails) {
-    this.problemDetails = problemDetails;
+  ProblemComponentsCustomizer(ProblemExamples problemExamples) {
+    this.problemExamples = problemExamples;
   }
 
   @Override
@@ -28,7 +27,7 @@ public class ProblemComponentsCustomizer implements OpenApiCustomizer {
     for (ProblemType type : ProblemType.values()) {
       components.addExamples(
           type.name(),
-          new Example().summary(type.type().toString()).value(problemDetails.example(type)));
+          new Example().summary(type.type().toString()).value(problemExamples.example(type)));
     }
     ProblemResponsesCustomizer.SHARED_RESPONSES.forEach(
         (status, shared) ->

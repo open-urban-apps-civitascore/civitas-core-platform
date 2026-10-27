@@ -7,6 +7,6 @@ import de.civitascore.portal.problem.ProblemType;
 public class ConnectionTestBusyException extends ProblemException {
 
   public ConnectionTestBusyException(String message) {
-    super(ProblemType.TOO_MANY_REQUESTS, message, message);
+    super(ProblemType.TOO_MANY_REQUESTS, message);
   }
 }

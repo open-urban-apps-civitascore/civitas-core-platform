@@ -7,6 +7,6 @@ import de.civitascore.portal.problem.ProblemType;
 public class ModelRootMissingException extends ProblemException {
 
   public ModelRootMissingException() {
-    super(ProblemType.MODEL_ROOT_MISSING, ProblemType.MODEL_ROOT_MISSING.name());
+    super(ProblemType.MODEL_ROOT_MISSING, ProblemType.MODEL_ROOT_MISSING.name(), null);
   }
 }

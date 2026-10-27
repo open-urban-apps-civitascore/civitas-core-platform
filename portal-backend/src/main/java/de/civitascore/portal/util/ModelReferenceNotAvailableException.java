@@ -12,6 +12,7 @@ public class ModelReferenceNotAvailableException extends ProblemException {
   public ModelReferenceNotAvailableException() {
     super(
         ProblemType.MODEL_REFERENCE_NOT_AVAILABLE,
-        ProblemType.MODEL_REFERENCE_NOT_AVAILABLE.name());
+        ProblemType.MODEL_REFERENCE_NOT_AVAILABLE.name(),
+        null);
   }
 }

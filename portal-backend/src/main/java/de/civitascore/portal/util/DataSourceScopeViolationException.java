@@ -24,7 +24,7 @@ public class DataSourceScopeViolationException extends ProblemException {
   }
 
   private DataSourceScopeViolationException(List<UUID> offendingDataSourceIds, String message) {
-    super(ProblemType.DATASOURCE_SCOPE_VIOLATION, message, message);
+    super(ProblemType.DATASOURCE_SCOPE_VIOLATION, message);
     this.offendingDataSourceIds = List.copyOf(offendingDataSourceIds);
   }
 

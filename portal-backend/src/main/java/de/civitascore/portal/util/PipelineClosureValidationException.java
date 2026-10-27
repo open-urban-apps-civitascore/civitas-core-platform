@@ -27,7 +27,7 @@ public class PipelineClosureValidationException extends ProblemException {
   }
 
   private PipelineClosureValidationException(String message, List<UUID> offendingPipelineIds) {
-    super(ProblemType.PIPELINE_CLOSURE_INVALID, message, message);
+    super(ProblemType.PIPELINE_CLOSURE_INVALID, message);
     this.offendingPipelineIds = List.copyOf(offendingPipelineIds);
   }
 

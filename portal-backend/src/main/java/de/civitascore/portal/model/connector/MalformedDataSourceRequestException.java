@@ -12,6 +12,6 @@ import de.civitascore.portal.problem.ProblemType;
 public class MalformedDataSourceRequestException extends ProblemException {
 
   public MalformedDataSourceRequestException(String message) {
-    super(ProblemType.MALFORMED_REQUEST, message, message);
+    super(ProblemType.MALFORMED_REQUEST, message);
   }
 }

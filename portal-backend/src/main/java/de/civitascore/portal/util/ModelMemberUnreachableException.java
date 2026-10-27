@@ -19,7 +19,7 @@ public class ModelMemberUnreachableException extends ProblemException {
   }
 
   private ModelMemberUnreachableException(String message, List<String> memberNames) {
-    super(ProblemType.MODEL_MEMBER_UNREACHABLE, message, message);
+    super(ProblemType.MODEL_MEMBER_UNREACHABLE, message);
     this.memberNames = List.copyOf(memberNames);
   }
 

@@ -6,20 +6,24 @@ import org.jspecify.annotations.Nullable;
 /**
  * An error that portal-backend answers with the problem of one catalog type. The title and detail
  * come from the message bundle: {@code problem.<CODE>.detail} formatted with {@link
- * #detailArguments()}. The exception message goes to the log; a type with a free-form detail passes
- * it as the detail argument as well.
+ * #detailArguments()}. The exception message goes to the log.
  */
 public abstract class ProblemException extends RuntimeException {
 
   private final ProblemType type;
   private final Object[] detailArguments;
 
-  protected ProblemException(ProblemType type, String message, Object... detailArguments) {
+  /**
+   * For a type whose detail is free-form ({@code {0}}): the message is the detail of the answer as
+   * well, so it must not reveal internal state.
+   */
+  protected ProblemException(ProblemType type, String message) {
     super(message);
     this.type = type;
-    this.detailArguments = detailArguments.clone();
+    this.detailArguments = new Object[] {message};
   }
 
+  /** For a type whose detail is fixed: the message goes to the log only. */
   protected ProblemException(ProblemType type, String message, @Nullable Throwable cause) {
     super(message, cause);
     this.type = type;

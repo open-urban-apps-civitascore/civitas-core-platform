@@ -27,10 +27,11 @@ import tools.jackson.databind.json.JsonMapper;
  * authorization failures.
  *
  * <p>Implements both {@link AuthenticationEntryPoint} and {@link AccessDeniedHandler} so that
- * Spring Security delegates unauthenticated and forbidden requests here.
+ * Spring Security delegates unauthenticated and forbidden requests here, and answers the same
+ * failures when a handler throws them.
  */
 @ControllerAdvice
-// Ahead of FallbackExceptionHandler, whose catch-all would otherwise take the JwtException.
+// Ahead of FallbackExceptionHandler, whose catch-all would otherwise take the security exceptions.
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @Slf4j
 public class SecurityExceptionHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
@@ -54,8 +55,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
   public void commence(
       HttpServletRequest request, HttpServletResponse response, AuthenticationException ex)
       throws IOException {
-    log.warn("Authentication failed: {}", Encode.forJava(ex.getMessage()));
-    writeProblemDetailResponse(request, response, ProblemType.UNAUTHORIZED);
+    writeProblemDetailResponse(request, response, handleAuthentication(ex));
   }
 
   /**
@@ -70,30 +70,43 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
   public void handle(
       HttpServletRequest request, HttpServletResponse response, AccessDeniedException ex)
       throws IOException {
-    log.warn("Access denied: {}", Encode.forJava(ex.getMessage()));
-    writeProblemDetailResponse(request, response, ProblemType.ACCESS_DENIED);
+    writeProblemDetailResponse(request, response, handleAccessDenied(ex));
+  }
+
+  /** Answers an authentication failure that a handler throws. */
+  @ExceptionHandler(AuthenticationException.class)
+  public ProblemDetail handleAuthentication(AuthenticationException ex) {
+    return answer(ProblemType.UNAUTHORIZED, "Authentication failed", ex);
+  }
+
+  /** Answers an access denial that a handler throws, for example from method security. */
+  @ExceptionHandler(AccessDeniedException.class)
+  public ProblemDetail handleAccessDenied(AccessDeniedException ex) {
+    return answer(ProblemType.ACCESS_DENIED, "Access denied", ex);
   }
 
   /**
    * Handles JWT validation failures and returns a 401 Problem Detail response.
    *
    * @param ex the JWT exception
-   * @param request the current HTTP request
    * @return a Problem Detail with HTTP 401 status
    */
   @ExceptionHandler(JwtException.class)
-  public ProblemDetail handleJwtException(JwtException ex, HttpServletRequest request) {
-    log.warn("JWT validation failed: {}", Encode.forJava(ex.getMessage()));
-    return problemDetails.of(ProblemType.INVALID_TOKEN, URI.create(request.getRequestURI()));
+  public ProblemDetail handleJwtException(JwtException ex) {
+    return answer(ProblemType.INVALID_TOKEN, "JWT validation failed", ex);
+  }
+
+  private ProblemDetail answer(ProblemType type, String logPrefix, RuntimeException ex) {
+    log.warn("{}: {}", logPrefix, Encode.forJava(ex.getMessage()));
+    return problemDetails.of(type);
   }
 
   private void writeProblemDetailResponse(
-      HttpServletRequest request, HttpServletResponse response, ProblemType type)
+      HttpServletRequest request, HttpServletResponse response, ProblemDetail problemDetail)
       throws IOException {
-    ProblemDetail problemDetail = problemDetails.of(type, URI.create(request.getRequestURI()));
-
+    problemDetail.setInstance(URI.create(request.getRequestURI()));
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-    response.setStatus(type.status().value());
+    response.setStatus(problemDetail.getStatus());
     response.getWriter().write(mapper.writeValueAsString(problemDetail));
   }
 }

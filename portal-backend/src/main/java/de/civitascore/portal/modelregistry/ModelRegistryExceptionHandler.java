@@ -10,8 +10,6 @@ import de.civitascore.modelforge.contract.RegistryUnavailableException;
 import de.civitascore.modelforge.contract.ValidationFailedException;
 import de.civitascore.portal.problem.ProblemDetails;
 import de.civitascore.portal.problem.ProblemType;
-import jakarta.servlet.http.HttpServletRequest;
-import java.net.URI;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
@@ -45,11 +43,10 @@ public class ModelRegistryExceptionHandler {
 
   /** A document the registry refuses to store, reported with the paths it objected to. */
   @ExceptionHandler(ValidationFailedException.class)
-  public ProblemDetail handleValidationFailed(
-      ValidationFailedException ex, HttpServletRequest request) {
+  public ProblemDetail handleValidationFailed(ValidationFailedException ex) {
     String detail = withDiagnostics(ex);
     log.warn("Registry rejected a document: {}", Encode.forJava(detail));
-    return problemDetails.of(ProblemType.INVALID_INPUT, instance(request), detail);
+    return problemDetails.of(ProblemType.INVALID_INPUT, detail);
   }
 
   /**
@@ -57,12 +54,10 @@ public class ModelRegistryExceptionHandler {
    * goes to the log only.
    */
   @ExceptionHandler(ArtifactInUseException.class)
-  public ProblemDetail handleArtifactInUse(ArtifactInUseException ex, HttpServletRequest request) {
+  public ProblemDetail handleArtifactInUse(ArtifactInUseException ex) {
     log.warn("Registry refused a delete: {}", Encode.forJava(ex.getMessage()));
     return problemDetails.of(
-        ProblemType.RESOURCE_IN_USE,
-        instance(request),
-        "The artifact is still referenced by another artifact");
+        ProblemType.RESOURCE_IN_USE, "The artifact is still referenced by another artifact");
   }
 
   /** A write that collides with data the registry already holds, such as a taken version. */
@@ -75,10 +70,9 @@ public class ModelRegistryExceptionHandler {
 
   /** The registry cannot be reached; the caller may retry. */
   @ExceptionHandler(RegistryUnavailableException.class)
-  public ProblemDetail handleRegistryUnavailable(
-      RegistryUnavailableException ex, HttpServletRequest request) {
+  public ProblemDetail handleRegistryUnavailable(RegistryUnavailableException ex) {
     log.error("Model registry unavailable", ex);
-    return problemDetails.of(ProblemType.REGISTRY_UNAVAILABLE, instance(request));
+    return problemDetails.of(ProblemType.REGISTRY_UNAVAILABLE);
   }
 
   /**
@@ -105,9 +99,5 @@ public class ModelRegistryExceptionHandler {
       return message;
     }
     return message.startsWith(path) ? message : path + ": " + message;
-  }
-
-  private static URI instance(HttpServletRequest request) {
-    return URI.create(request.getRequestURI());
   }
 }

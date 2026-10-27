@@ -3,7 +3,6 @@ package de.civitascore.portal.controller.exception;
 import de.civitascore.portal.problem.ProblemDetails;
 import de.civitascore.portal.problem.ProblemType;
 import jakarta.servlet.http.HttpServletRequest;
-import java.net.URI;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
 import org.springframework.core.Ordered;
@@ -34,6 +33,6 @@ public class FallbackExceptionHandler {
   @ExceptionHandler(Exception.class)
   public ProblemDetail handleUnexpected(Exception ex, HttpServletRequest request) {
     log.error("Unexpected error on {}", Encode.forJava(request.getRequestURI()), ex);
-    return problemDetails.of(ProblemType.INTERNAL_ERROR, URI.create(request.getRequestURI()));
+    return problemDetails.of(ProblemType.INTERNAL_ERROR);
   }
 }

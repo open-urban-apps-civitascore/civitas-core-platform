@@ -30,6 +30,6 @@ public class UniqueConstraintViolationException extends ProblemException {
   }
 
   public UniqueConstraintViolationException(String message) {
-    super(ProblemType.UNIQUE_CONSTRAINT_VIOLATION, message, message);
+    super(ProblemType.UNIQUE_CONSTRAINT_VIOLATION, message);
   }
 }
