@@ -16,6 +16,79 @@ _allow_all_data := {"data_permissions": null}
 
 _enforced_data := {"data_permissions": ["DATASET_PAYLOAD_READ"]}
 
+mock_public_dashboard(req) := {"status_code": 200, "body": {"civitasDatasetId": "ds-1"}} if {
+	contains(req.url, "dashboard-dataset")
+}
+
+mock_public_dashboard(req) := {"status_code": 200, "body": {"openDataAccess": true, "available": true}} if {
+	contains(req.url, "dataset-pool")
+}
+
+mock_private_dashboard(req) := {"status_code": 200, "body": {"civitasDatasetId": "ds-1"}} if {
+	contains(req.url, "dashboard-dataset")
+}
+
+mock_private_dashboard(req) := {"status_code": 200, "body": {"openDataAccess": false}} if {
+	contains(req.url, "dataset-pool")
+}
+
+mock_unreleased_dashboard(req) := {"status_code": 200, "body": {"civitasDatasetId": "ds-1"}} if {
+	contains(req.url, "dashboard-dataset")
+}
+
+mock_unreleased_dashboard(req) := {"status_code": 200, "body": {"openDataAccess": true, "available": false}} if {
+	contains(req.url, "dataset-pool")
+}
+
+mock_core_dashboard_editor(req) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_UPDATE"], "DATASET", "ds-1")} if {
+	contains(req.url, "user-context")
+}
+
+mock_core_dashboard_editor(req) := {"status_code": 200, "body": {"civitasDatasetId": "ds-1"}} if {
+	contains(req.url, "dashboard-dataset")
+}
+
+mock_core_dashboard_reader(req) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_READ"], "DATASET", "ds-1")} if {
+	contains(req.url, "user-context")
+}
+
+mock_core_dashboard_reader(req) := {"status_code": 200, "body": {"civitasDatasetId": "ds-1"}} if {
+	contains(req.url, "dashboard-dataset")
+}
+
+test_core_dashboard_editor_can_edit_and_read_draft if {
+	superset.can_edit_core_dashboard with http.send as mock_core_dashboard_editor
+		with data.config as mock_http.mock_config
+		with input as {"user": "u1", "externalDashboardId": "7", "published": false}
+	superset.can_read_core_dashboard with http.send as mock_core_dashboard_editor
+		with data.config as mock_http.mock_config
+		with input as {"user": "u1", "externalDashboardId": "7", "published": false}
+}
+
+test_core_dashboard_reader_cannot_edit_or_read_draft if {
+	not superset.can_edit_core_dashboard with http.send as mock_core_dashboard_reader
+		with data.config as mock_http.mock_config
+		with input as {"user": "u1", "externalDashboardId": "7", "published": false}
+	not superset.can_read_core_dashboard with http.send as mock_core_dashboard_reader
+		with data.config as mock_http.mock_config
+		with input as {"user": "u1", "externalDashboardId": "7", "published": false}
+	superset.can_read_core_dashboard with http.send as mock_core_dashboard_reader
+		with data.config as mock_http.mock_config
+		with input as {"user": "u1", "externalDashboardId": "7", "published": true}
+}
+
+test_public_dashboard_requires_core_open_data if {
+	superset.can_view_public_dashboard with http.send as mock_public_dashboard
+		with data.config as mock_http.mock_config
+		with input as {"externalDashboardId": "7"}
+	not superset.can_view_public_dashboard with http.send as mock_private_dashboard
+		with data.config as mock_http.mock_config
+		with input as {"externalDashboardId": "7"}
+	not superset.can_view_public_dashboard with http.send as mock_unreleased_dashboard
+		with data.config as mock_http.mock_config
+		with input as {"externalDashboardId": "7"}
+}
+
 # =============================================================================
 # ALLOW-ALL GATE
 # =============================================================================
@@ -99,6 +172,35 @@ test_can_access_database_always_true if {
 mock_send_dataset_read(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_PAYLOAD_READ"], "DATASET", "ds-1")}
 
 mock_send_tenant_read(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_PAYLOAD_READ"], "TENANT", "tenant-1")}
+
+mock_send_dashboard_dataset_read(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_READ"], "DATASET", "ds-1")}
+
+mock_send_dashboard_pool_update(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_UPDATE"], "DATAPOOL", "pool-1")}
+
+test_dashboard_users_with_dataset_read if {
+	superset.dashboard_users
+		with data.config as mock_http.mock_config
+		with input as {"user": "u1"}
+		with http.send as mock_send_dashboard_dataset_read
+}
+
+test_dashboard_users_with_pool_update if {
+	superset.dashboard_users
+		with data.config as mock_http.mock_config
+		with input as {"user": "u1"}
+		with http.send as mock_send_dashboard_pool_update
+}
+
+test_dashboard_users_denied_without_dataset_right if {
+	not superset.dashboard_users
+		with data.config as mock_http.mock_config
+		with input as {"user": "u1"}
+		with http.send as mock_send_dataset_read
+}
+
+test_dashboard_users_denied_without_identity if {
+	not superset.dashboard_users with input as {}
+}
 
 mock_send_dashboard_write(req) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_DASHBOARD_UPDATE"], "DATASET", "ds-1")} if {
 	contains(req.url, "user-context")

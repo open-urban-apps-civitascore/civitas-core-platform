@@ -3,29 +3,22 @@
 # Trino is configured with a SEPARATE endpoint from the base allow/deny policy:
 #   opa.policy.row-filters-uri=http://civitas-opa:8181/v1/data/civitas/trino/row_filters/result
 #
-# Verified against the actual Trino 481 OPA plugin jar (io.trino.plugin.opa.OpaConfig's @Config
-# annotations), not assumed from docs: the property is opa.policy.row-filters-uri, and the plugin's
-# OpaRowFiltersQueryResult/OpaViewExpression records confirm the response shape below
-# ({"result": [{"expression": "..."}]}) and the request shape consumed here
-# (input.action.resource.table.{catalogName,schemaName,tableName}, input.context.identity.user) —
-# both match what trino.rego's own base allow policy already assumes for the same fields.
+# Trino's OPA plugin uses `opa.policy.row-filters-uri` and returns the
+# {"result": [{"expression": "..."}]} response shape. The resource fields consumed here match
+# the OPA request contract used by trino.rego's base allow policy.
 #
-# Why this policy exists at all, separate from trino.rego's table/schema-level allow check:
-# PostGIS datasets each get their own Postgres schema (one dataset = one schema), so trino.rego's
-# existing schema-level DATASET_PAYLOAD_READ check already IS dataset-level access control. FROST's
-# "Projects" plugin stores every dataset's sensor data in one shared schema (frost_scoped, backed by
-# public.THINGS/OBSERVATIONS/etc. — see dev-environment/frost/migrations/01-create-scoped-views.sql)
-# — there is no schema/table boundary between datasets there, so row-level filtering is the only way
-# to scope access. trino.rego's base allow check still applies to frost_scoped.* (same as
-# information_schema: any authenticated user may query the schema at all), but the actual dataset
-# boundary is enforced here, per row, via the flattened frost_project_id column every
-# frost_scoped.* view carries.
+# Why this policy exists, separate from trino.rego's table/schema-level allow check:
+# PostGIS datasets each get their own schema. FROST uses dataset-specific schemas that contain
+# PostgreSQL views filtered to one FROST project. Trino still needs row filters for information_schema
+# so it lists only the CORE dataset schemas the caller can read. The shared frost_scoped source
+# views are denied to the Trino reader role.
 package civitas.trino.row_filters
 
 import rego.v1
 
 import data.civitas.authz.dataset_pool_fetcher
 import data.civitas.authz.user_context_fetcher
+import data.civitas.trino
 
 # =============================================================================
 # BACKEND ENABLEMENT SWITCH
@@ -82,9 +75,8 @@ has_tenant_permission(permission) if {
 # =============================================================================
 # TABLE CLASSIFICATION
 # =============================================================================
-# FROST data views need row-level filtering because multiple datasets share frost_scoped.*. The
-# geodata PostGIS tables are gated by their own dataset schema in trino.rego; only geodata's
-# information_schema listings need row filters to avoid disclosing other dataset schemas.
+# Dataset tables are gated by their dataset schemas in trino.rego. The information_schema listings
+# need row filters to avoid disclosing other dataset schemas.
 _is_frost_scoped_table if {
 	input.action.resource.table.schemaName == "frost_scoped"
 }
@@ -128,16 +120,15 @@ _is_geodata_column_listing if {
 	input.action.resource.table.tableName == "columns"
 }
 
+_is_table_comments_metadata if {
+	input.action.resource.table.catalogName == "system"
+	input.action.resource.table.schemaName == "metadata"
+	input.action.resource.table.tableName == "table_comments"
+}
+
 # =============================================================================
-# READABLE FROST PROJECT IDS
+# DATASET SCHEMAS VISIBLE TO AN AUTHENTICATED USER
 # =============================================================================
-# Enumerates the FROST project ids backing every dataset the caller holds DATASET_PAYLOAD_READ on —
-# mirrors superset.rego's allowed_schemas / permission_eval.rego's qualifying_datapool_ids "enumerate
-# what I can see" pattern (direct DATASET grants + DATAPOOL union via the batch
-# dataset_pool_fetcher.datasets_in_pools() reverse-lookup), then maps each dataset id to its FROST
-# project id via the dataset's own projectId field (dataset_pool_fetcher.frost_project_of, backed by
-# the same /api/v1/dataset-pool/{id} lookup already used for pool_of()/is_open_data() — no extra
-# round-trip class of its own).
 
 _candidate_dataset_ids contains dataset_id if {
 	some group in user_context.groups
@@ -174,13 +165,48 @@ _dataset_schema_name(dataset_id) := name if {
 
 _readable_geodata_schemas contains schema_name if {
 	some dataset_id in _candidate_dataset_ids
+	schema_name := dataset_pool_fetcher.attributes(dataset_id).schemaName
+}
+
+_readable_geodata_schemas contains schema_name if {
+	some dataset_id in _candidate_dataset_ids
+	not dataset_pool_fetcher.attributes(dataset_id).schemaName
 	schema_name := _dataset_schema_name(dataset_id)
 }
 
-_tenant_geodata_schema_regex := `^(ds_[0-9a-f]{8}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{12}|[a-f][0-9a-f]{7}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{12})$`
+_readable_frost_schemas contains schema_name if {
+	some dataset_id in _candidate_dataset_ids
+	schema_name := dataset_pool_fetcher.attributes(dataset_id).schemaName
+}
 
-_geodata_schema_listing_filter := concat("", ["catalog_name = 'geodata' AND regexp_like(schema_name, '", _tenant_geodata_schema_regex, "')"]) if {
+_readable_frost_schemas contains schema_name if {
+	some dataset_id in _candidate_dataset_ids
+	not dataset_pool_fetcher.attributes(dataset_id).schemaName
+	schema_name := _dataset_schema_name(dataset_id)
+}
+
+_all_frost_schemas contains schema_name if {
+	some dataset in dataset_pool_fetcher.schemas()
+	schema_name := dataset.schemaName
+}
+
+_all_geodata_schemas contains schema_name if {
+	some dataset in dataset_pool_fetcher.schemas()
+	schema_name := dataset.schemaName
+}
+
+_tenant_dataset_schema_regex := `^(ds_[0-9a-f]{8}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{12}|[a-f][0-9a-f]{7}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{12})$`
+
+_geodata_schema_listing_filter := expr if {
 	has_tenant_permission("DATASET_PAYLOAD_READ")
+	count(_all_geodata_schemas) > 0
+	quoted := [concat("", ["'", schema_name, "'"]) | some schema_name in _all_geodata_schemas]
+	expr := concat("", ["catalog_name = 'geodata' AND schema_name IN (", concat(", ", quoted), ")"])
+}
+
+_geodata_schema_listing_filter := "false" if {
+	has_tenant_permission("DATASET_PAYLOAD_READ")
+	count(_all_geodata_schemas) == 0
 }
 
 _geodata_schema_listing_filter := expr if {
@@ -195,8 +221,16 @@ _geodata_schema_listing_filter := "false" if {
 	count(_readable_geodata_schemas) == 0
 }
 
-_geodata_table_listing_filter := concat("", ["table_catalog = 'geodata' AND regexp_like(table_schema, '", _tenant_geodata_schema_regex, "')"]) if {
+_geodata_table_listing_filter := expr if {
 	has_tenant_permission("DATASET_PAYLOAD_READ")
+	count(_all_geodata_schemas) > 0
+	quoted := [concat("", ["'", schema_name, "'"]) | some schema_name in _all_geodata_schemas]
+	expr := concat("", ["table_catalog = 'geodata' AND table_schema IN (", concat(", ", quoted), ")"])
+}
+
+_geodata_table_listing_filter := "false" if {
+	has_tenant_permission("DATASET_PAYLOAD_READ")
+	count(_all_geodata_schemas) == 0
 }
 
 _geodata_table_listing_filter := expr if {
@@ -211,21 +245,92 @@ _geodata_table_listing_filter := "false" if {
 	count(_readable_geodata_schemas) == 0
 }
 
-_readable_frost_project_ids contains project_id if {
-	some dataset_id in _candidate_dataset_ids
-	project_id := dataset_pool_fetcher.frost_project_of(dataset_id)
+_frost_schema_listing_filter := expr if {
+	has_tenant_permission("DATASET_PAYLOAD_READ")
+	count(_all_frost_schemas) > 0
+	quoted := [concat("", ["'", schema_name, "'"]) | some schema_name in _all_frost_schemas]
+	expr := concat("", ["catalog_name = 'sensordata' AND schema_name IN (", concat(", ", quoted), ")"])
+}
+
+_frost_schema_listing_filter := concat("", ["catalog_name = 'sensordata' AND regexp_like(schema_name, '", _tenant_dataset_schema_regex, "')"]) if {
+	has_tenant_permission("DATASET_PAYLOAD_READ")
+	count(_all_frost_schemas) == 0
+}
+
+_frost_schema_listing_filter := expr if {
+	not has_tenant_permission("DATASET_PAYLOAD_READ")
+	count(_readable_frost_schemas) > 0
+	quoted := [concat("", ["'", schema_name, "'"]) | some schema_name in _readable_frost_schemas]
+	expr := concat("", ["catalog_name = 'sensordata' AND schema_name IN (", concat(", ", quoted), ")"])
+}
+
+_frost_schema_listing_filter := "false" if {
+	not has_tenant_permission("DATASET_PAYLOAD_READ")
+	count(_readable_frost_schemas) == 0
+}
+
+_frost_table_listing_filter := expr if {
+	has_tenant_permission("DATASET_PAYLOAD_READ")
+	count(_all_frost_schemas) > 0
+	quoted := [concat("", ["'", schema_name, "'"]) | some schema_name in _all_frost_schemas]
+	expr := concat("", ["table_catalog = 'sensordata' AND table_schema IN (", concat(", ", quoted), ")"])
+}
+
+_frost_table_listing_filter := concat("", ["table_catalog = 'sensordata' AND regexp_like(table_schema, '", _tenant_dataset_schema_regex, "')"]) if {
+	has_tenant_permission("DATASET_PAYLOAD_READ")
+	count(_all_frost_schemas) == 0
+}
+
+_frost_table_listing_filter := expr if {
+	not has_tenant_permission("DATASET_PAYLOAD_READ")
+	count(_readable_frost_schemas) > 0
+	quoted := [concat("", ["'", schema_name, "'"]) | some schema_name in _readable_frost_schemas]
+	expr := concat("", ["table_catalog = 'sensordata' AND table_schema IN (", concat(", ", quoted), ")"])
+}
+
+_frost_table_listing_filter := "false" if {
+	not has_tenant_permission("DATASET_PAYLOAD_READ")
+	count(_readable_frost_schemas) == 0
+}
+
+_is_frost_dataset_table if {
+	input.action.resource.table.catalogName == "sensordata"
+	dataset_pool_fetcher.dataset_id_for_schema(input.action.resource.table.schemaName)
+}
+
+_is_frost_dataset_table if {
+	input.action.resource.table.catalogName == "sensordata"
+	trino.civitas_dataset_id(input.action.resource.table.schemaName)
+}
+
+_frost_dataset_id := dataset_pool_fetcher.dataset_id_for_schema(input.action.resource.table.schemaName) if {
+	_is_frost_dataset_table
+	dataset_pool_fetcher.dataset_id_for_schema(input.action.resource.table.schemaName)
+}
+
+_frost_dataset_id := trino.civitas_dataset_id(input.action.resource.table.schemaName) if {
+	_is_frost_dataset_table
+	trino.civitas_dataset_id(input.action.resource.table.schemaName)
+}
+
+_can_read_frost_dataset if {
+	is_local_admin
+}
+
+_can_read_frost_dataset if {
+	trino.is_authenticated
+	trino.has_permission("DATASET_PAYLOAD_READ", _frost_dataset_id)
+}
+
+_can_read_frost_dataset if {
+	dataset_pool_fetcher.is_open_and_available(_frost_dataset_id)
 }
 
 # =============================================================================
 # ROW-FILTER RESULT
 # =============================================================================
-# One of three expressions, identical in shape across every frost_scoped.* view — the join
-# complexity lives entirely in the views themselves (see the migration file), not here:
-#   - "true"                              — allow-all mode, or a TENANT-scoped reader: no restriction
-#   - "frost_project_id IN ('1', '2')"    — the caller's actual readable set
-#   - "false"                             — nothing readable: deny every row, not "no filter" (Trino
-#                                            treats an omitted result as unrestricted, the opposite
-#                                            of fail-secure)
+# Per-dataset FROST views are already filtered in PostgreSQL. OPA checks their CORE dataset schema
+# directly; the shared source views are denied to Trino's reader identity.
 default result := []
 
 result := [{"expression": "true"}] if {
@@ -233,17 +338,17 @@ result := [{"expression": "true"}] if {
 	_allow_all
 }
 
-result := [{"expression": "catalog_name = 'sensordata' AND schema_name = 'frost_scoped'"}] if {
+result := [{"expression": _frost_schema_listing_filter}] if {
 	_is_frost_schema_listing
 	not _allow_all
 }
 
-result := [{"expression": "table_catalog = 'sensordata' AND table_schema = 'frost_scoped'"}] if {
+result := [{"expression": _frost_table_listing_filter}] if {
 	_is_frost_table_listing
 	not _allow_all
 }
 
-result := [{"expression": "table_catalog = 'sensordata' AND table_schema = 'frost_scoped'"}] if {
+result := [{"expression": _frost_table_listing_filter}] if {
 	_is_frost_column_listing
 	not _allow_all
 }
@@ -278,24 +383,42 @@ result := [{"expression": _geodata_table_listing_filter}] if {
 	not _geodata_metadata_bypass
 }
 
-result := [{"expression": "true"}] if {
-	_is_frost_scoped_table
-	not _allow_all
-	has_tenant_permission("DATASET_PAYLOAD_READ")
-}
-
-result := [{"expression": expr}] if {
-	_is_frost_scoped_table
-	not _allow_all
-	not has_tenant_permission("DATASET_PAYLOAD_READ")
-	count(_readable_frost_project_ids) > 0
-	quoted := [concat("", ["'", id, "'"]) | some id in _readable_frost_project_ids]
-	expr := concat("", ["frost_project_id IN (", concat(", ", quoted), ")"])
-}
-
 result := [{"expression": "false"}] if {
 	_is_frost_scoped_table
 	not _allow_all
-	not has_tenant_permission("DATASET_PAYLOAD_READ")
-	count(_readable_frost_project_ids) == 0
+}
+
+result := [{"expression": "true"}] if {
+	_is_frost_dataset_table
+	_can_read_frost_dataset
+}
+
+result := [{"expression": "false"}] if {
+	_is_frost_dataset_table
+	not _can_read_frost_dataset
+}
+
+# Trino's SQLAlchemy dialect reads system.metadata.table_comments during table
+# reflection. Limit returned rows to the user's readable dataset schemas in
+# the two CORE catalogs. Translate the information_schema column names used by
+# the existing filters to the names in table_comments.
+_table_comments_metadata_filter := "true" if {
+	_geodata_metadata_bypass
+}
+
+_table_comments_metadata_filter := concat("", [
+	"(", replace(replace(_geodata_table_listing_filter, "table_catalog", "catalog_name"), "table_schema", "schema_name"), ") OR (",
+	replace(replace(_frost_table_listing_filter, "table_catalog", "catalog_name"), "table_schema", "schema_name"), ")",
+]) if {
+	not _geodata_metadata_bypass
+}
+
+result := [{"expression": _table_comments_metadata_filter}] if {
+	_is_table_comments_metadata
+	not _allow_all
+}
+
+result := [{"expression": "true"}] if {
+	_is_table_comments_metadata
+	_allow_all
 }

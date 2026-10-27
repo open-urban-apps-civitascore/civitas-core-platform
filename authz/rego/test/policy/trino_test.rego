@@ -79,9 +79,31 @@ test_decode_undefined_for_malformed_ds_prefix if {
 # (for DATAPOOL union) dataset-pool endpoints.
 # =============================================================================
 
-mock_send_dataset_read(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_PAYLOAD_READ"], "DATASET", _digit_first_dataset_id)}
+mock_dataset_routes(req, dataset_id, pool_id, open_data, available) := {"status_code": 404, "body": {}} if {
+	contains(req.url, "/schema/")
+}
 
-mock_send_tenant_read(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_PAYLOAD_READ"], "TENANT", "tenant-1")}
+mock_dataset_routes(req, dataset_id, pool_id, open_data, available) := {"status_code": 200, "body": {
+	"datasetId": dataset_id,
+	"schemaName": "temperature_readings_1538eb3b",
+	"poolId": pool_id,
+	"openDataAccess": open_data,
+	"available": available,
+}} if {
+	contains(req.url, dataset_id)
+}
+
+mock_send_dataset_read(req) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_PAYLOAD_READ"], "DATASET", _digit_first_dataset_id)} if {
+	contains(req.url, "user-context")
+}
+
+mock_send_dataset_read(req) := mock_dataset_routes(req, _digit_first_dataset_id, null, false, false)
+
+mock_send_tenant_read(req) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_PAYLOAD_READ"], "TENANT", "tenant-1")} if {
+	contains(req.url, "user-context")
+}
+
+mock_send_tenant_read(req) := mock_dataset_routes(req, _digit_first_dataset_id, null, false, false)
 
 mock_send_no_permissions(_) := {"status_code": 200, "body": mock_http.user_no_permissions}
 
@@ -89,25 +111,21 @@ mock_send_datapool_in_pool(req) := {"status_code": 200, "body": mock_http.user_w
 	contains(req.url, "user-context")
 }
 
-mock_send_datapool_in_pool(req) := {"status_code": 200, "body": {"poolId": "pool-1"}} if {
-	contains(req.url, "dataset-pool")
-}
+mock_send_datapool_in_pool(req) := mock_dataset_routes(req, _digit_first_dataset_id, "pool-1", false, false)
 
 mock_send_datapool_other_pool(req) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_PAYLOAD_READ"], "DATAPOOL", "pool-1")} if {
 	contains(req.url, "user-context")
 }
 
-mock_send_datapool_other_pool(req) := {"status_code": 200, "body": {"poolId": "pool-2"}} if {
-	contains(req.url, "dataset-pool")
-}
+mock_send_datapool_other_pool(req) := mock_dataset_routes(req, _digit_first_dataset_id, "pool-2", false, false)
 
 mock_send_valid_target(_) := {"status_code": 200, "body": {"userId": "u2", "externalId": "u2", "groups": []}}
 
 mock_send_unresolvable_target(_) := {"status_code": 404, "body": {}}
 
-mock_send_open_dataset_attrs(_) := {"status_code": 200, "body": {"poolId": null, "openDataAccess": true}}
+mock_send_open_dataset_attrs(req) := mock_dataset_routes(req, _digit_first_dataset_id, null, true, true)
 
-mock_send_closed_dataset_attrs(_) := {"status_code": 200, "body": {"poolId": null, "openDataAccess": false}}
+mock_send_closed_dataset_attrs(_) := {"status_code": 200, "body": {"poolId": null, "openDataAccess": false, "available": false}}
 
 # =============================================================================
 # IMPERSONATE_USER
@@ -188,13 +206,26 @@ test_execute_query_denied_when_unresolvable_identity if {
 }
 
 test_catalog_actions_allowed_for_trusted_raw_superset_identity if {
-	every op in {"ExecuteQuery", "AccessCatalog", "FilterCatalogs", "ShowSchemas", "ShowCreateSchema"} {
+	every op in {"ExecuteQuery", "FilterCatalogs", "ShowSchemas"} {
 		trino.allow with data.backends.trino as _enforced_data
 			with input as {
 				"context": {"identity": {"user": "superset_trino"}},
 				"action": {"operation": op},
 			}
 	}
+	trino.allow with data.backends.trino as _enforced_data
+		with input as {
+			"context": {"identity": {"user": "superset_trino"}},
+			"action": {"operation": "AccessCatalog", "resource": {"catalog": {"name": "geodata"}}},
+		}
+}
+
+test_show_create_schema_without_schema_resource_denied_for_raw_superset_identity if {
+	not trino.allow with data.backends.trino as _enforced_data
+		with input as {
+			"context": {"identity": {"user": "superset_trino"}},
+			"action": {"operation": "ShowCreateSchema"},
+		}
 }
 
 # =============================================================================
@@ -309,6 +340,34 @@ test_select_from_columns_granted_for_open_data_without_identity if {
 		}
 }
 
+test_frost_schema_select_granted_for_matching_dataset if {
+	trino.allow with data.backends.trino as _enforced_data
+		with http.send as mock_send_dataset_read
+		with data.config as mock_http.mock_config
+		with input as {
+			"context": {"identity": {"user": "u1"}},
+			"action": {"operation": "SelectFromColumns", "resource": {"table": {
+				"catalogName": "sensordata",
+				"schemaName": _digit_first_schema,
+				"tableName": "observations_scoped",
+			}}},
+		}
+}
+
+test_frost_shared_schema_denied_to_regular_user if {
+	not trino.allow with data.backends.trino as _enforced_data
+		with http.send as mock_send_no_permissions
+		with data.config as mock_http.mock_config
+		with input as {
+			"context": {"identity": {"user": "u1"}},
+			"action": {"operation": "SelectFromColumns", "resource": {"table": {
+				"catalogName": "sensordata",
+				"schemaName": "frost_scoped",
+				"tableName": "observations_scoped",
+			}}},
+		}
+}
+
 test_select_from_columns_denied_for_closed_data_without_identity if {
 	not trino.allow with data.backends.trino as _enforced_data
 		with http.send as mock_send_closed_dataset_attrs
@@ -336,7 +395,11 @@ test_select_from_columns_granted_via_matching_dataset_letter_first if {
 		}
 }
 
-mock_send_letter_first_dataset_read(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_PAYLOAD_READ"], "DATASET", _letter_first_dataset_id)}
+mock_send_letter_first_dataset_read(req) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_PAYLOAD_READ"], "DATASET", _letter_first_dataset_id)} if {
+	contains(req.url, "user-context")
+}
+
+mock_send_letter_first_dataset_read(req) := mock_dataset_routes(req, _letter_first_dataset_id, null, false, false)
 
 # =============================================================================
 # LOCAL ADMIN BYPASS (config-adapter's own Superset identity)

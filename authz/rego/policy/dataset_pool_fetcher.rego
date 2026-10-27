@@ -3,10 +3,10 @@
 # To decide a single dataset request OPA needs two concrete facts about that
 # dataset that only the AuthZ Repository knows:
 #   1. Which datapool it belongs to (Epic 1 union inheritance), and
-#   2. Whether it is flagged for open data access (anonymous payload read, ABAC).
+#   2. Whether it is flagged for open data access and available (anonymous payload read, ABAC).
 #
 # Both come from ONE endpoint — "tell me about dataset X" — returning a small
-# object { "poolId": "<uuid>"|null, "openDataAccess": true|false }. OPA memoizes
+# object { "poolId": "<uuid>"|null, "openDataAccess": true|false, "available": true|false }. OPA memoizes
 # http.send within an evaluation, so pool_of() and is_open_data() share a single
 # network round-trip even though they are separate questions.
 #
@@ -36,7 +36,7 @@ import rego.v1
 # Base URL of the dataset attributes endpoint, e.g.
 #   http://authz-repository:8091/api/v1/dataset-pool
 # The dataset id is appended: {url}/{datasetId}
-#   → { "poolId": "<uuid>"|null, "openDataAccess": true|false }
+#   → { "poolId": "<uuid>"|null, "openDataAccess": true|false, "available": true|false }
 dataset_pool_url := data.config.dataset_pool_membership_url if {
 	data.config.dataset_pool_membership_url
 }
@@ -108,13 +108,10 @@ is_open_data(dataset_id) if {
 	attributes(dataset_id).openDataAccess == true
 }
 
-# frost_project_of(dataset_id) → the FROST-Server project id backing this dataset's sensor data.
-# Undefined when the lookup failed or the dataset has no FROST sink (frostProjectId null).
-# Consumed by the Trino row-filter policy to map a readable dataset id to the project id it needs
-# to filter frost_scoped.* views by.
-frost_project_of(dataset_id) := project_id if {
-	project_id := attributes(dataset_id).frostProjectId
-	project_id != null
+# is_open_and_available(dataset_id) → true only for a released dataset explicitly marked public.
+is_open_and_available(dataset_id) if {
+	attributes(dataset_id).openDataAccess == true
+	attributes(dataset_id).available == true
 }
 
 # datasets_in_pools(pool_ids) → the deduplicated union of dataset ids across every given pool.
@@ -138,4 +135,34 @@ datasets_in_pools(pool_ids) := ids if {
 	})
 	response.status_code == 200
 	ids := response.body.datasetIds
+}
+
+# dataset_id_for_schema(schema) resolves readable FROST schemas through CORE. The friendly schema
+# does not expose the dataset UUID, so OPA must resolve it before checking permissions.
+dataset_id_for_schema(schema) := dataset_id if {
+	dataset_pool_url
+	response := http.send({
+		"method": "GET",
+		"url": concat("", [dataset_pool_url, "/schema/", schema]),
+		"timeout": request_timeout,
+		"headers": {"Accept": "application/json"},
+		"raise_error": false,
+	})
+	response.status_code == 200
+	dataset_id := response.body.datasetId
+}
+
+# schemas() is used only for a tenant-wide DATASET_PAYLOAD_READ listing. Individual assignments
+# continue to resolve only their candidate dataset IDs.
+schemas() := result if {
+	dataset_pool_url
+	response := http.send({
+		"method": "GET",
+		"url": concat("", [dataset_pool_url, "/schemas"]),
+		"timeout": request_timeout,
+		"headers": {"Accept": "application/json"},
+		"raise_error": false,
+	})
+	response.status_code == 200
+	result := response.body
 }

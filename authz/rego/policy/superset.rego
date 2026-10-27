@@ -136,16 +136,70 @@ schema_access := {
 	"is_tenant_reader": is_tenant_reader,
 }
 
+# Superset's FAB permissions need the actual Trino schema name, not the CORE dataset UUID.
+# Dataset IDs remain the authorization keys above; CORE supplies the current readable schema.
+allowed_geodata_schemas contains schema_name if {
+	is_tenant_reader
+	some dataset in dataset_pool_fetcher.schemas()
+	schema_name := dataset.schemaName
+}
+
+allowed_geodata_schemas contains schema_name if {
+	some dataset_id in allowed_schemas
+	schema_name := dataset_pool_fetcher.attributes(dataset_id).schemaName
+}
+
 # Group IDs and names are returned to Superset so it can mirror CORE membership into
 # FAB Groups. Superset uses those Groups as native Subjects for editors/viewers; group
 # membership itself remains owned by CORE and is reconciled at OAuth login.
-user_groups := {"groups": [
-{"id": group.id, "name": group.name} |
-	some group in user_context.groups
-	group.id != null
-	group.name != null
-]} if {
+user_groups := {"groups": groups} if {
 	user_context.userId != null
+	groups := [result |
+		some i
+		core_group := user_context.groups[i]
+		core_group.id != null
+		core_group.name != null
+		result := {"id": core_group.id, "name": core_group.name}
+	]
+}
+
+# Dashboard access is a CORE-derived entitlement, independent of whether a dashboard
+# already exists. Superset maps it to its interactive role at OAuth login.
+default dashboard_users := false
+
+dashboard_users if {
+	some group in user_context.groups
+	some a in group.assignments
+	a.scopeType in {"TENANT", "DATAPOOL", "DATASET"}
+	some permission in {"DATASET_READ", "DATASET_UPDATE"}
+	permission in a.permissions
+}
+
+# A Superset Subject alone must never turn a private CORE dashboard public.
+default can_view_public_dashboard := false
+
+can_view_public_dashboard if {
+	dashboard_id := sprintf("%v", [input.externalDashboardId])
+	dataset_id := dashboard_dataset_fetcher.civitas_dataset_id_of(dashboard_id)
+	dataset_pool_fetcher.is_open_data(dataset_id)
+	dataset_pool_fetcher.attributes(dataset_id).available == true
+}
+
+default can_edit_core_dashboard := false
+
+can_edit_core_dashboard if {
+	has_permission_for("DATASET_UPDATE", resolved_dashboard_dataset_id)
+}
+
+default can_read_core_dashboard := false
+
+can_read_core_dashboard if {
+	can_edit_core_dashboard
+}
+
+can_read_core_dashboard if {
+	input.published == true
+	has_permission_for("DATASET_READ", resolved_dashboard_dataset_id)
 }
 
 # =============================================================================

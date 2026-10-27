@@ -22,4 +22,7 @@ public interface DataSetRepository extends JpaRepository<DataSet, UUID> {
 
   @Query("select d.id from DataSet d where d.dataPool.id in :poolIds")
   List<UUID> findIdsByDataPoolIdIn(@Param("poolIds") Collection<UUID> poolIds);
+
+  @Query(value = "select id from datasets where right(replace(id::text, '-', ''), 8) = :suffix", nativeQuery = true)
+  List<UUID> findIdsByUuidSuffix(@Param("suffix") String suffix);
 }

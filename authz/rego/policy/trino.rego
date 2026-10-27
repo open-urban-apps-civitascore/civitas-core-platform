@@ -23,7 +23,7 @@
 # EMPIRICAL VALIDATION NEEDED: the resource shapes below (e.g.
 # action.resource.table.schemaName) reflect the standard Trino OPA
 # access-control plugin contract, but have not been confirmed against a live
-# Trino 481 instance. start-trino.sh already sets opa.log-requests=true —
+# Trino instance. start-trino.sh already sets opa.log-requests=true —
 # check civitas-opa's own logs for the raw request body on a real query and
 # adjust the resource.* paths below if they don't match.
 #
@@ -178,18 +178,70 @@ civitas_dataset_id(schema) := id if {
 	id := candidate
 }
 
-resolved_dataset_id := civitas_dataset_id(resource_schema_name) if {
+resolved_dataset_id := dataset_pool_fetcher.dataset_id_for_schema(resource_schema_name) if {
+	resource_catalog_name in {"sensordata", "geodata"}
 	resource_schema_name
+}
+
+# Keep access stable while an existing FROST project is being migrated from the legacy UUID schema.
+resolved_dataset_id := civitas_dataset_id(resource_schema_name) if {
+	resource_catalog_name == "sensordata"
+	resource_schema_name
+	not dataset_pool_fetcher.dataset_id_for_schema(resource_schema_name)
+}
+
+resolved_dataset_id := civitas_dataset_id(resource_schema_name) if {
+	resource_catalog_name == "geodata"
+	resource_schema_name
+	not dataset_pool_fetcher.dataset_id_for_schema(resource_schema_name)
 }
 
 is_geodata_dataset_schema if {
 	resource_catalog_name == "geodata"
 	resolved_dataset_id
+	resource_schema_name == dataset_pool_fetcher.attributes(resolved_dataset_id).schemaName
 }
 
-is_frost_schema if {
+# Retain permission-checked access for already registered Superset datasets that still point to
+# the physical PostGIS UUID schema. Schema discovery exposes only the readable alias schema.
+is_geodata_legacy_dataset_schema if {
+	resource_catalog_name == "geodata"
+	resource_schema_name
+	dataset_id := civitas_dataset_id(resource_schema_name)
+	dataset_pool_fetcher.attributes(dataset_id).datasetId == dataset_id
+	resource_schema_name != dataset_pool_fetcher.attributes(dataset_id).schemaName
+}
+
+is_geodata_readable_dataset_schema if {
+	is_geodata_dataset_schema
+}
+
+is_geodata_readable_dataset_schema if {
+	is_geodata_legacy_dataset_schema
+}
+
+is_frost_dataset_schema if {
 	resource_catalog_name == "sensordata"
-	resource_schema_name == "frost_scoped"
+	resolved_dataset_id
+	resource_schema_name == dataset_pool_fetcher.attributes(resolved_dataset_id).schemaName
+}
+
+# Existing saved Superset datasets may still query the UUID schema during migration. Keep that
+# access path permission-checked, but never expose it through schema discovery.
+is_frost_legacy_dataset_schema if {
+	resource_catalog_name == "sensordata"
+	resource_schema_name
+	dataset_id := civitas_dataset_id(resource_schema_name)
+	dataset_pool_fetcher.attributes(dataset_id).datasetId == dataset_id
+	resource_schema_name != dataset_pool_fetcher.attributes(dataset_id).schemaName
+}
+
+is_frost_readable_dataset_schema if {
+	is_frost_dataset_schema
+}
+
+is_frost_readable_dataset_schema if {
+	is_frost_legacy_dataset_schema
 }
 
 is_geodata_metadata_table if {
@@ -198,9 +250,17 @@ is_geodata_metadata_table if {
 	input.action.resource.table.tableName in {"schemata", "tables", "columns"}
 }
 
+# The Trino SQLAlchemy dialect reads comments from system.metadata.table_comments
+# while reflecting a dataset. Keep access to that system table separate from
+# ordinary system-catalog data and row-filter its results below.
+is_table_comments_metadata_table if {
+	input.action.resource.table.catalogName == "system"
+	input.action.resource.table.schemaName == "metadata"
+	input.action.resource.table.tableName == "table_comments"
+}
+
 # Superset discovers schemas by querying Trino's information_schema. The row
-# filter restricts FROST metadata to frost_scoped and geodata metadata to the
-# caller's readable dataset schemas.
+# filter restricts FROST and geodata metadata to the caller's readable dataset schemas.
 is_frost_schema_metadata_table if {
 	input.action.resource.table.catalogName == "sensordata"
 	input.action.resource.table.schemaName == "information_schema"
@@ -257,29 +317,41 @@ allow if {
 	resource_catalog_name in {"sensordata", "geodata"}
 }
 
-# Superset uses one shared CORE database connection. FROST queries use the
-# project-scoped views in sensordata; geodata schemas are checked against CORE's
-# dataset payload-read permission below.
+# Superset's Trino dialect needs the system catalog only to read filtered
+# table comments during dataset reflection. Other system tables remain denied.
 allow if {
-	input.action.operation in {"FilterSchemas", "ShowCreateSchema"}
+	input.action.operation == "AccessCatalog"
 	is_authenticated
-	is_frost_schema
+	resource_catalog_name == "system"
 }
 
-# The geodata catalog contains one schema per CORE dataset. A catalog grant
-# does not grant access to its schemas; each schema still needs payload-read.
+# Both Trino catalogs use a schema per CORE dataset. Access to a catalog does not
+# grant access to its dataset schemas; each schema needs its CORE payload-read right.
 allow if {
 	input.action.operation in {"FilterSchemas", "ShowCreateSchema"}
 	is_authenticated
-	is_geodata_dataset_schema
+	is_geodata_readable_dataset_schema
 	has_permission("DATASET_PAYLOAD_READ", resolved_dataset_id)
 }
 
 allow if {
 	input.action.operation in {"FilterSchemas", "ShowCreateSchema"}
 	resolved_dataset_id
-	is_geodata_dataset_schema
-	dataset_pool_fetcher.is_open_data(resolved_dataset_id)
+	is_geodata_readable_dataset_schema
+	dataset_pool_fetcher.is_open_and_available(resolved_dataset_id)
+}
+
+allow if {
+	input.action.operation in {"FilterSchemas", "ShowCreateSchema"}
+	is_authenticated
+	is_frost_dataset_schema
+	has_permission("DATASET_PAYLOAD_READ", resolved_dataset_id)
+}
+
+allow if {
+	input.action.operation in {"FilterSchemas", "ShowCreateSchema"}
+	is_frost_dataset_schema
+	dataset_pool_fetcher.is_open_and_available(resolved_dataset_id)
 }
 
 # Superset reads geodata schema metadata to populate its schema picker. The
@@ -321,26 +393,32 @@ allow if {
 	is_local_admin
 }
 
-# FROST table actions are limited to frost_scoped. The separate row-filter
-# policy applies the user's dataset-level FROST project set to each table.
+# FROST table actions resolve the dataset through CORE; PostGIS keeps UUID-derived schemas.
 allow if {
 	input.action.operation in {"FilterColumns", "FilterTables", "SelectFromColumns", "ShowColumns", "ShowCreateTable", "ShowTables"}
 	is_authenticated
-	is_frost_schema
+	is_frost_readable_dataset_schema
+	has_permission("DATASET_PAYLOAD_READ", resolved_dataset_id)
+}
+
+allow if {
+	input.action.operation in {"FilterColumns", "FilterTables", "SelectFromColumns", "ShowColumns", "ShowCreateTable", "ShowTables"}
+	is_frost_readable_dataset_schema
+	dataset_pool_fetcher.is_open_and_available(resolved_dataset_id)
 }
 
 allow if {
 	input.action.operation in {"FilterColumns", "FilterTables", "SelectFromColumns", "ShowColumns", "ShowCreateTable", "ShowTables"}
 	is_authenticated
-	is_geodata_dataset_schema
+	is_geodata_readable_dataset_schema
 	has_permission("DATASET_PAYLOAD_READ", resolved_dataset_id)
 }
 
 allow if {
 	input.action.operation in {"FilterColumns", "FilterTables", "SelectFromColumns", "ShowColumns", "ShowCreateTable", "ShowTables"}
 	resolved_dataset_id
-	is_geodata_dataset_schema
-	dataset_pool_fetcher.is_open_data(resolved_dataset_id)
+	is_geodata_readable_dataset_schema
+	dataset_pool_fetcher.is_open_and_available(resolved_dataset_id)
 }
 
 allow if {
@@ -349,9 +427,14 @@ allow if {
 	is_geodata_metadata_table
 }
 
+allow if {
+	input.action.operation in {"FilterColumns", "FilterTables", "SelectFromColumns", "ShowColumns", "ShowTables"}
+	is_authenticated
+	is_table_comments_metadata_table
+}
+
 # Superset's schema picker reads information_schema.schemata. Keep the grant
-# limited to that metadata table; the row-filter endpoint only returns the
-# single allowed FROST schema.
+# limited to that metadata table; the row-filter endpoint only returns readable dataset schemas.
 allow if {
 	input.action.operation == "SelectFromColumns"
 	is_authenticated

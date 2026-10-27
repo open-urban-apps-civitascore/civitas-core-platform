@@ -1,8 +1,11 @@
 package de.civitascore.authz.repository.service;
 
 import de.civitascore.authz.repository.data.DataSetRepository;
+import de.civitascore.authz.repository.model.dto.DatapoolDatasetSchema;
 import de.civitascore.authz.repository.model.dto.DatapoolDatasetsResponse;
 import de.civitascore.authz.repository.model.dto.DatasetPoolResponse;
+import de.civitascore.portal.model.dataset.DatasetSchemaNames;
+import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.entity.DataPool;
 import java.util.List;
 import java.util.Optional;
@@ -29,15 +32,11 @@ public class DatasetPoolService {
   private final DataSetRepository dataSetRepository;
 
   /**
-   * Returns the authorization attributes of a dataset: its datapool membership (Epic 1 union
-   * inheritance), its open-data flag (ABAC), and its FROST project id (row-level scoping for
-   * FROST-backed sensor data, see the Trino row-filter policy). All resolved from the single
-   * {@code DataSet} row, so the lookup stays one query.
+   * Returns the authorization attributes of a dataset: its datapool membership, open-data flag,
+   * and availability state. All values come from the CORE dataset record.
    *
    * @param datasetId the dataset id
-   * @return present with the pool id (possibly {@code null} when the dataset has no pool), the
-   *     open-data flag, and the FROST project id (possibly {@code null} when the dataset has no
-   *     FROST sink) if the dataset exists; empty if the dataset does not exist
+   * @return present with the dataset's authorization attributes if it exists; empty otherwise
    */
   @Transactional(readOnly = true)
   public Optional<DatasetPoolResponse> getDatasetPool(UUID datasetId) {
@@ -47,10 +46,35 @@ public class DatasetPoolService {
             dataSet -> {
               DataPool pool = dataSet.getDataPool();
               return new DatasetPoolResponse(
+                  dataSet.getId(),
                   pool != null ? pool.getId() : null,
+                  DatasetSchemaNames.fromDataset(dataSet.getName(), dataSet.getId()),
                   Boolean.TRUE.equals(dataSet.getOpenDataAccess()),
-                  dataSet.getProjectId());
+                  dataSet.getDataSetStatus() == DataSetStatus.AVAILABLE);
             });
+  }
+
+  /**
+   * Resolves a FROST schema name to its CORE dataset. The UUID suffix narrows the lookup; the
+   * complete canonical name is then checked to reject collisions and forged schema names.
+   */
+  @Transactional(readOnly = true)
+  public Optional<DatasetPoolResponse> getDatasetBySchema(String schemaName) {
+    if (schemaName == null || !schemaName.matches("[a-z0-9_]{1,63}")) {
+      return Optional.empty();
+    }
+    String suffix = schemaName.substring(Math.max(0, schemaName.length() - 8));
+    if (!suffix.matches("[0-9a-f]{8}")) {
+      return Optional.empty();
+    }
+    List<UUID> matches = dataSetRepository.findIdsByUuidSuffix(suffix);
+    List<DatasetPoolResponse> exactMatches =
+        matches.stream()
+            .map(this::getDatasetPool)
+            .flatMap(Optional::stream)
+            .filter(dataset -> schemaName.equals(dataset.getSchemaName()))
+            .toList();
+    return exactMatches.size() == 1 ? Optional.of(exactMatches.getFirst()) : Optional.empty();
   }
 
   /**
@@ -65,5 +89,16 @@ public class DatasetPoolService {
   @Transactional(readOnly = true)
   public DatapoolDatasetsResponse getDatasetsInPools(List<UUID> poolIds) {
     return new DatapoolDatasetsResponse(dataSetRepository.findIdsByDataPoolIdIn(poolIds));
+  }
+
+  @Transactional(readOnly = true)
+  public List<DatapoolDatasetSchema> getDatasetSchemas() {
+    return dataSetRepository.findAll().stream()
+        .map(
+            dataset ->
+                new DatapoolDatasetSchema(
+                    dataset.getId(),
+                    DatasetSchemaNames.fromDataset(dataset.getName(), dataset.getId())))
+        .toList();
   }
 }

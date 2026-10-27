@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 import de.civitascore.authz.repository.data.DataSetRepository;
 import de.civitascore.authz.repository.model.dto.DatapoolDatasetsResponse;
 import de.civitascore.authz.repository.model.dto.DatasetPoolResponse;
+import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import java.util.List;
@@ -48,7 +49,7 @@ class DatasetPoolServiceTest {
     void datasetWithPool_returnsPoolId() {
       DataPool pool = new DataPool();
       pool.setId(POOL_ID);
-      DataSet dataSet = new DataSet();
+      DataSet dataSet = dataset();
       dataSet.setDataPool(pool);
       when(dataSetRepository.findById(DATASET_ID)).thenReturn(Optional.of(dataSet));
 
@@ -61,7 +62,7 @@ class DatasetPoolServiceTest {
     @Test
     @DisplayName("returns null pool id when the dataset has no pool")
     void datasetWithoutPool_returnsNullPoolId() {
-      DataSet dataSet = new DataSet();
+      DataSet dataSet = dataset();
       dataSet.setDataPool(null);
       when(dataSetRepository.findById(DATASET_ID)).thenReturn(Optional.of(dataSet));
 
@@ -74,20 +75,36 @@ class DatasetPoolServiceTest {
     @Test
     @DisplayName("returns openDataAccess=true when the dataset is flagged for open data")
     void datasetFlaggedOpen_returnsOpenDataAccessTrue() {
-      DataSet dataSet = new DataSet();
+      DataSet dataSet = dataset();
       dataSet.setOpenDataAccess(true);
+      dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
       when(dataSetRepository.findById(DATASET_ID)).thenReturn(Optional.of(dataSet));
 
       Optional<DatasetPoolResponse> result = datasetPoolService.getDatasetPool(DATASET_ID);
 
       assertThat(result).isPresent();
       assertThat(result.get().isOpenDataAccess()).isTrue();
+      assertThat(result.get().isAvailable()).isTrue();
+    }
+
+    @Test
+    @DisplayName("marks a draft dataset unavailable even when its open-data flag is set")
+    void draftDatasetIsUnavailable() {
+      DataSet dataSet = dataset();
+      dataSet.setOpenDataAccess(true);
+      dataSet.setDataSetStatus(DataSetStatus.DRAFT);
+      when(dataSetRepository.findById(DATASET_ID)).thenReturn(Optional.of(dataSet));
+
+      DatasetPoolResponse result = datasetPoolService.getDatasetPool(DATASET_ID).orElseThrow();
+
+      assertThat(result.isOpenDataAccess()).isTrue();
+      assertThat(result.isAvailable()).isFalse();
     }
 
     @Test
     @DisplayName("returns openDataAccess=false when the dataset is not flagged open")
     void datasetNotFlaggedOpen_returnsOpenDataAccessFalse() {
-      DataSet dataSet = new DataSet();
+      DataSet dataSet = dataset();
       dataSet.setOpenDataAccess(false);
       when(dataSetRepository.findById(DATASET_ID)).thenReturn(Optional.of(dataSet));
 
@@ -100,7 +117,7 @@ class DatasetPoolServiceTest {
     @Test
     @DisplayName("defaults openDataAccess to false when the flag is unset (secure default)")
     void datasetUnsetFlag_defaultsToFalse() {
-      DataSet dataSet = new DataSet();
+      DataSet dataSet = dataset();
       when(dataSetRepository.findById(DATASET_ID)).thenReturn(Optional.of(dataSet));
 
       Optional<DatasetPoolResponse> result = datasetPoolService.getDatasetPool(DATASET_ID);
@@ -109,30 +126,13 @@ class DatasetPoolServiceTest {
       assertThat(result.get().isOpenDataAccess()).isFalse();
     }
 
-    @Test
-    @DisplayName("returns the FROST project id when the dataset has a FROST sink")
-    void datasetWithFrostProject_returnsFrostProjectId() {
-      DataSet dataSet = new DataSet();
-      dataSet.setProjectId("42");
-      when(dataSetRepository.findById(DATASET_ID)).thenReturn(Optional.of(dataSet));
+  }
 
-      Optional<DatasetPoolResponse> result = datasetPoolService.getDatasetPool(DATASET_ID);
-
-      assertThat(result).isPresent();
-      assertThat(result.get().getFrostProjectId()).isEqualTo("42");
-    }
-
-    @Test
-    @DisplayName("returns null FROST project id when the dataset has no FROST sink")
-    void datasetWithoutFrostProject_returnsNullFrostProjectId() {
-      DataSet dataSet = new DataSet();
-      when(dataSetRepository.findById(DATASET_ID)).thenReturn(Optional.of(dataSet));
-
-      Optional<DatasetPoolResponse> result = datasetPoolService.getDatasetPool(DATASET_ID);
-
-      assertThat(result).isPresent();
-      assertThat(result.get().getFrostProjectId()).isNull();
-    }
+  private static DataSet dataset() {
+    DataSet dataSet = new DataSet();
+    dataSet.setId(DATASET_ID);
+    dataSet.setName("Example dataset");
+    return dataSet;
   }
 
   @Nested
