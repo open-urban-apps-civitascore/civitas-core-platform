@@ -560,3 +560,24 @@ describe('useDatastructureVersion — a stored model reaches the surfaces outsid
     expect(mockRefresh).toHaveBeenCalled()
   })
 })
+
+describe('useDatastructureVersion — the update request', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  // The backend PATCH rejects unknown fields, so an id in the body would fail every save.
+  it('addresses the version by its id in the path and leaves the id out of the body', async () => {
+    const { hook, updateVersion } = setup(version({ styles: validDiagram() }))
+
+    act(() => hook.result.current.form.setValue('description', 'changed', { shouldDirty: true }))
+    await act(async () => {
+      await hook.result.current.saveDatastructureVersion(DS_ID)
+    })
+
+    const payload = updateVersion.mutateAsync.mock.calls[0][0] as { data: Record<string, unknown>; endpoint: string }
+    expect(payload.endpoint).toBe(`/datastructures/${DS_ID}/versions/v1`)
+    expect(payload.data).not.toHaveProperty('id')
+    expect(payload.data).toHaveProperty('description', 'changed')
+  })
+})
