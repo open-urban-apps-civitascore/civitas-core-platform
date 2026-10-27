@@ -152,9 +152,9 @@ dataset_id_for_schema(schema) := dataset_id if {
 	dataset_id := response.body.datasetId
 }
 
-# schemas() is used only for a tenant-wide DATASET_PAYLOAD_READ listing. Individual assignments
+# schemas is used only for a tenant-wide DATASET_PAYLOAD_READ listing. Individual assignments
 # continue to resolve only their candidate dataset IDs.
-schemas() := result if {
+schemas := result if {
 	dataset_pool_url
 	response := http.send({
 		"method": "GET",

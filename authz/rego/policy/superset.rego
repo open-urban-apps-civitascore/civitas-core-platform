@@ -140,7 +140,7 @@ schema_access := {
 # Dataset IDs remain the authorization keys above; CORE supplies the current readable schema.
 allowed_geodata_schemas contains schema_name if {
 	is_tenant_reader
-	some dataset in dataset_pool_fetcher.schemas()
+	some dataset in dataset_pool_fetcher.schemas
 	schema_name := dataset.schemaName
 }
 

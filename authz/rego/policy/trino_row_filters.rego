@@ -186,12 +186,12 @@ _readable_frost_schemas contains schema_name if {
 }
 
 _all_frost_schemas contains schema_name if {
-	some dataset in dataset_pool_fetcher.schemas()
+	some dataset in dataset_pool_fetcher.schemas
 	schema_name := dataset.schemaName
 }
 
 _all_geodata_schemas contains schema_name if {
-	some dataset in dataset_pool_fetcher.schemas()
+	some dataset in dataset_pool_fetcher.schemas
 	schema_name := dataset.schemaName
 }
 

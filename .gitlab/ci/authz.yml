@@ -28,6 +28,7 @@
   image:
     name: openpolicyagent/opa:1.21.0-static-debug@sha256:392ba3778b7e0b4c74f1b1c3ddf299d60982605f73be03f2dc18cdf2cb2e7357
     entrypoint: [""]
+    user: "0:0"
 
 # =============================================================================
 # Lint Stage
@@ -93,24 +94,24 @@ bundle-authz-rego:
   script:
     - cd authz/rego
     - echo "Building OPA bundle (revision ${REVISION:-$CI_COMMIT_SHORT_SHA})..."
-    # Create bundle directory structure at /bundle (not /tmp/bundle) so that
-    # opa build embeds "bundle/" as prefix — matching the Dockerfile COPY paths.
+    # Use /tmp because the shell-enabled OPA CI image runs as non-root.
+    # opa build archives paths relative to this directory, matching the Dockerfile COPY paths.
     # Note: backends go at /bundle/backends/ (not data/backends/) because
     # OPA bundles treat data/ as a special prefix that conflicts with manifest roots
-    - mkdir -p /bundle/backends
-    - cp -r policy lib providers /bundle/
-    - cp -r data/backends/* /bundle/backends/
+    - mkdir -p /tmp/opa-bundle/backends
+    - cp -r policy lib providers /tmp/opa-bundle/
+    - cp -r data/backends/* /tmp/opa-bundle/backends/
     # Create manifest with revision
     - |
-      cat > /bundle/.manifest << EOF
+      cat > /tmp/opa-bundle/.manifest << EOF
       {
         "revision": "${REVISION:-$CI_COMMIT_SHORT_SHA}",
         "roots": ["civitas", "backends", "system"]
       }
       EOF
     # Build bundle
-    - chmod -R 0755 /bundle
-    - opa build -b /bundle -o bundle.tar.gz
+    - chmod -R 0755 /tmp/opa-bundle
+    - opa build -b /tmp/opa-bundle -o bundle.tar.gz
     - echo "Bundle built successfully"
     - tar -tzf bundle.tar.gz | head -20
   artifacts:
