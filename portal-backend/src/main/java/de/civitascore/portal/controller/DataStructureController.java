@@ -110,7 +110,7 @@ public class DataStructureController {
       description = "Returns all role assignments scoped to this data structure.")
   @Problems(ProblemType.NOT_FOUND)
   public List<AssignmentOutputDTO> getDataStructureAssignments(@PathVariable UUID dataStructureId) {
-    dataStructureService.findByIdOrThrow(dataStructureId);
-    return scopeAssignments.of(ScopeType.DATASTRUCTURE, dataStructureId);
+    return scopeAssignments.of(
+        ScopeType.DATASTRUCTURE, dataStructureService.findByIdOrThrow(dataStructureId));
   }
 }

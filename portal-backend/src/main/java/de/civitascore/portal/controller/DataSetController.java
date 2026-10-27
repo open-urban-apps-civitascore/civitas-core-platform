@@ -163,8 +163,7 @@ public class DataSetController {
       description = "Returns all role assignments scoped to this dataset.")
   @Problems(ProblemType.NOT_FOUND)
   public List<AssignmentOutputDTO> getDataSetAssignments(@PathVariable UUID dataSetId) {
-    dataSetService.findByIdOrThrow(dataSetId);
-    return scopeAssignments.of(ScopeType.DATASET, dataSetId);
+    return scopeAssignments.of(ScopeType.DATASET, dataSetService.findByIdOrThrow(dataSetId));
   }
 
   @PostMapping("/{dataSetId}/stage")

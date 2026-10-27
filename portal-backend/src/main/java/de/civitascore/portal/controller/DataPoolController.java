@@ -114,7 +114,6 @@ public class DataPoolController {
       description = "Returns all role assignments scoped to this data pool.")
   @Problems(ProblemType.NOT_FOUND)
   public List<AssignmentOutputDTO> getDataPoolAssignments(@PathVariable UUID dataPoolId) {
-    dataPoolService.findByIdOrThrow(dataPoolId);
-    return scopeAssignments.of(ScopeType.DATAPOOL, dataPoolId);
+    return scopeAssignments.of(ScopeType.DATAPOOL, dataPoolService.findByIdOrThrow(dataPoolId));
   }
 }

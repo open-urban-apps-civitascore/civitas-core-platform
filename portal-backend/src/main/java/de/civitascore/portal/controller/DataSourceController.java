@@ -143,8 +143,8 @@ public class DataSourceController {
       description = "Returns all role assignments scoped to this data source.")
   @Problems(ProblemType.NOT_FOUND)
   public List<AssignmentOutputDTO> getDataSourceAssignments(@PathVariable UUID dataSourceId) {
-    dataSourceService.findByIdOrThrow(dataSourceId);
-    return scopeAssignments.of(ScopeType.DATASOURCE, dataSourceId);
+    return scopeAssignments.of(
+        ScopeType.DATASOURCE, dataSourceService.findByIdOrThrow(dataSourceId));
   }
 
   @PostMapping("/{dataSourceId}/release")
