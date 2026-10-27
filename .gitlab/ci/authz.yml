@@ -281,8 +281,6 @@ build-opa-image:
       artifacts: true
     - job: test-authz
     - job: test-authz-rego
-    - job: api-test-backend
-      optional: true
   services:
     - docker:27-dind
   variables:
