@@ -10,15 +10,20 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway.ModelPin;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway.RegistryDocument;
 import de.civitascore.portal.modelregistry.PayloadKind;
+import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.service.MappingService.MappingSummary;
 import de.civitascore.portal.service.MappingService.StoredMapping;
+import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.SagaInFlightException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +34,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -65,15 +71,19 @@ class MappingServiceTest {
 
   @Mock private ModelRegistryGateway registry;
   @Mock private DataSetService dataSetService;
+  @Mock private DataSetRepository dataSetRepository;
 
   private MappingService mappingService;
+  private DataSet dataSet;
 
   @BeforeEach
   void createService() {
-    mappingService = new MappingService(registry, dataSetService);
+    mappingService =
+        new MappingService(registry, dataSetService, new DataSetMutationGuard(dataSetRepository));
 
-    DataSet dataSet = new DataSet();
+    dataSet = new DataSet();
     dataSet.setManifestLogicalUrn(MANIFEST_URN);
+    dataSet.setDataSetStatus(DataSetStatus.DRAFT);
     lenient().when(dataSetService.findByIdOrThrow(DATA_SET_ID)).thenReturn(dataSet);
   }
 
@@ -288,6 +298,62 @@ class MappingServiceTest {
         .hasMessageContaining("no manifest");
 
     verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = DataSetStatus.class, names = "DRAFT", mode = EnumSource.Mode.EXCLUDE)
+  void create_whenTheDataSetIsNotDraft_throwsDataSetNotEditable(DataSetStatus status) {
+    dataSet.setDataSetStatus(status);
+
+    assertThatThrownBy(() -> mappingService.create(DATA_SET_ID, Map.of("fields", Map.of())))
+        .isInstanceOf(DataSetNotEditableException.class);
+
+    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void update_whenTheDataSetIsNotDraft_throwsDataSetNotEditable() {
+    stubMembers(pin());
+    dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+
+    assertThatThrownBy(
+            () -> mappingService.update(DATA_SET_ID, MAPPING_ID, Map.of("fields", Map.of())))
+        .isInstanceOf(DataSetNotEditableException.class);
+
+    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void delete_whenTheDataSetIsNotDraft_throwsDataSetNotEditable() {
+    stubMembers(pin());
+    dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+
+    assertThatThrownBy(() -> mappingService.delete(DATA_SET_ID, MAPPING_ID))
+        .isInstanceOf(DataSetNotEditableException.class);
+
+    verify(registry, never()).deletePayload(any());
+  }
+
+  @Test
+  void update_whileASagaIsInFlight_throwsSagaInFlight() {
+    stubMembers(pin());
+    dataSet.setPendingSagaType(PendingSagaType.UPDATE);
+
+    assertThatThrownBy(
+            () -> mappingService.update(DATA_SET_ID, MAPPING_ID, Map.of("fields", Map.of())))
+        .isInstanceOf(SagaInFlightException.class);
+
+    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void update_whenTheMappingIsForeignAndTheDataSetIsNotDraft_throwsNotFound() {
+    stubMembers(pin());
+    dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+
+    assertThatThrownBy(
+            () -> mappingService.update(DATA_SET_ID, FOREIGN_ID, Map.of("fields", Map.of())))
+        .isInstanceOf(ResourceNotFoundException.class);
   }
 
   private static final String SOURCE_URN =

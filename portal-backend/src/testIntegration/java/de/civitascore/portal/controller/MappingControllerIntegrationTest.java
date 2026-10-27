@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
+import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.output.MappingOutputDTO;
 import de.civitascore.portal.model.output.MappingSummaryDTO;
@@ -28,6 +29,7 @@ import org.springframework.http.ResponseEntity;
 class MappingControllerIntegrationTest extends BaseKeycloakIntegrationTest {
 
   private static final String NOT_FOUND = "urn:civitas:error:NOT_FOUND";
+  private static final String NOT_EDITABLE = "urn:civitas:error:DATASET_NOT_EDITABLE";
 
   @Autowired private PortalTestDataFactory portalData;
 
@@ -132,6 +134,27 @@ class MappingControllerIntegrationTest extends BaseKeycloakIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     assertThat(response.getBody().getType()).hasToString(NOT_FOUND);
     MappingOutputDTO unchanged = get(owner.getId(), created.mappingId()).getBody();
+    assertThat(unchanged.version()).isEqualTo(created.version());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"POST", "PUT", "DELETE"})
+  void writeRoutes_whenTheDataSetIsNotDraft_answer400DatasetNotEditable(String method) {
+    DataSet dataSet = portalData.dataSetWithManifest();
+    MappingOutputDTO created = create(dataSet, "Sensors").getBody();
+    dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+    portalData.saveDataSet(dataSet);
+    String path =
+        "POST".equals(method)
+            ? collection(dataSet.getId())
+            : item(dataSet.getId(), created.mappingId());
+
+    ResponseEntity<ProblemDetail> response =
+        exchange(HttpMethod.valueOf(method), path, body("Changed"), ProblemDetail.class);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(response.getBody().getType()).hasToString(NOT_EDITABLE);
+    MappingOutputDTO unchanged = get(dataSet.getId(), created.mappingId()).getBody();
     assertThat(unchanged.version()).isEqualTo(created.version());
   }
 

@@ -29,6 +29,8 @@ import org.springframework.stereotype.Service;
  * the members of the DataSet's manifest only. The DataSet-typed route grant covers exactly those
  * members, so a caller cannot reach a mapping of another DataSet, and a foreign mapping answers
  * like an unknown one.
+ *
+ * <p>Writes need an editable DataSet, like every other part of a DataSet.
  */
 @Service
 @RequiredArgsConstructor
@@ -43,6 +45,7 @@ public class MappingService {
 
   private final ModelRegistryGateway registry;
   private final DataSetService dataSetService;
+  private final DataSetMutationGuard dataSetMutationGuard;
 
   /** A Mapping as the list names it. */
   public record MappingSummary(UUID mappingId, String logicalUrn, String title) {}
@@ -61,7 +64,7 @@ public class MappingService {
    */
   public List<MappingSummary> list(UUID dataSetId) {
     Set<String> seen = new HashSet<>();
-    return members(manifestUrnOrThrow(dataSetId)).stream()
+    return members(dataSetWithManifestOrThrow(dataSetId).getManifestLogicalUrn()).stream()
         .filter(member -> seen.add(member.logicalUrn()))
         .map(member -> new MappingSummary(member.id(), member.logicalUrn(), titleOf(member)))
         .toList();
@@ -74,7 +77,9 @@ public class MappingService {
    * @throws ResourceNotFoundException when the Mapping is no member of this DataSet
    */
   public StoredMapping get(UUID dataSetId, UUID mappingId) {
-    ModelPin member = currentMemberOrThrow(manifestUrnOrThrow(dataSetId), mappingId);
+    ModelPin member =
+        currentMemberOrThrow(
+            dataSetWithManifestOrThrow(dataSetId).getManifestLogicalUrn(), mappingId);
     Map<String, Object> document =
         registry
             .fetchPayload(member.versionedUrn())
@@ -92,7 +97,9 @@ public class MappingService {
    * through this DataSet afterwards.
    */
   public StoredMapping create(UUID dataSetId, Map<String, Object> doc) {
-    return store(manifestUrnOrThrow(dataSetId), Optional.empty(), doc);
+    DataSet dataSet = dataSetWithManifestOrThrow(dataSetId);
+    dataSetMutationGuard.requireMutable(dataSet, "create " + ENTITY_NAME);
+    return store(dataSet.getManifestLogicalUrn(), Optional.empty(), doc);
   }
 
   /**
@@ -101,8 +108,10 @@ public class MappingService {
    * @throws ResourceNotFoundException when the Mapping is no member of this DataSet
    */
   public StoredMapping update(UUID dataSetId, UUID mappingId, Map<String, Object> doc) {
-    String manifestUrn = manifestUrnOrThrow(dataSetId);
+    DataSet dataSet = dataSetWithManifestOrThrow(dataSetId);
+    String manifestUrn = dataSet.getManifestLogicalUrn();
     String logicalUrn = currentMemberOrThrow(manifestUrn, mappingId).logicalUrn();
+    dataSetMutationGuard.requireMutable(dataSet, "update " + ENTITY_NAME);
     return store(manifestUrn, Optional.of(logicalUrn), doc);
   }
 
@@ -115,7 +124,9 @@ public class MappingService {
    * @throws ResourceNotFoundException when the Mapping is no member of this DataSet
    */
   public void delete(UUID dataSetId, UUID mappingId) {
-    ModelPin member = currentMemberOrThrow(manifestUrnOrThrow(dataSetId), mappingId);
+    DataSet dataSet = dataSetWithManifestOrThrow(dataSetId);
+    ModelPin member = currentMemberOrThrow(dataSet.getManifestLogicalUrn(), mappingId);
+    dataSetMutationGuard.requireMutable(dataSet, "delete " + ENTITY_NAME);
     registry.deletePayload(member.logicalUrn());
   }
 
@@ -188,15 +199,13 @@ public class MappingService {
         .orElse(null);
   }
 
-  /** The DataSet's manifest URN, which every mapping of that DataSet is a member of. */
-  private String manifestUrnOrThrow(UUID dataSetId) {
+  private DataSet dataSetWithManifestOrThrow(UUID dataSetId) {
     DataSet dataSet = dataSetService.findByIdOrThrow(dataSetId);
-    String manifestUrn = dataSet.getManifestLogicalUrn();
-    if (manifestUrn == null) {
+    if (dataSet.getManifestLogicalUrn() == null) {
       throw new InvalidInputException(
           "DataSet", dataSetId, "DataSet has no manifest to hold mappings");
     }
-    return manifestUrn;
+    return dataSet;
   }
 
   private List<ModelPin> members(String manifestUrn) {

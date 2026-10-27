@@ -55,7 +55,13 @@ public class MappingController {
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(summary = "Create a Mapping")
-  @Problems({ProblemType.NOT_FOUND, ProblemType.INVALID_INPUT, ProblemType.REGISTRY_UNAVAILABLE})
+  @Problems({
+    ProblemType.NOT_FOUND,
+    ProblemType.INVALID_INPUT,
+    ProblemType.DATASET_NOT_EDITABLE,
+    ProblemType.SAGA_IN_FLIGHT,
+    ProblemType.REGISTRY_UNAVAILABLE
+  })
   public ResponseEntity<MappingOutputDTO> createMapping(
       @PathVariable UUID dataSetId, @Valid @RequestBody MappingInputDTO input) {
     StoredMapping stored = mappingService.create(dataSetId, mappingAssembler.toDocument(input));
@@ -67,7 +73,13 @@ public class MappingController {
   @Operation(
       summary = "Store a new version of a Mapping",
       description = "Every request stores a new version, also when the content did not change.")
-  @Problems({ProblemType.NOT_FOUND, ProblemType.INVALID_INPUT, ProblemType.REGISTRY_UNAVAILABLE})
+  @Problems({
+    ProblemType.NOT_FOUND,
+    ProblemType.INVALID_INPUT,
+    ProblemType.DATASET_NOT_EDITABLE,
+    ProblemType.SAGA_IN_FLIGHT,
+    ProblemType.REGISTRY_UNAVAILABLE
+  })
   public MappingOutputDTO updateMapping(
       @PathVariable UUID dataSetId,
       @PathVariable UUID mappingId,
@@ -84,7 +96,13 @@ public class MappingController {
           "Rejected while another artifact still references the mapping — a pipeline's mappingRef,"
               + " for instance. Remove that reference at the artifact holding it first; deleting a"
               + " mapping a pipeline still uses would leave the pipeline pointing at nothing.")
-  @Problems({ProblemType.NOT_FOUND, ProblemType.RESOURCE_IN_USE, ProblemType.REGISTRY_UNAVAILABLE})
+  @Problems({
+    ProblemType.NOT_FOUND,
+    ProblemType.RESOURCE_IN_USE,
+    ProblemType.DATASET_NOT_EDITABLE,
+    ProblemType.SAGA_IN_FLIGHT,
+    ProblemType.REGISTRY_UNAVAILABLE
+  })
   public void deleteMapping(@PathVariable UUID dataSetId, @PathVariable UUID mappingId) {
     mappingService.delete(dataSetId, mappingId);
   }
