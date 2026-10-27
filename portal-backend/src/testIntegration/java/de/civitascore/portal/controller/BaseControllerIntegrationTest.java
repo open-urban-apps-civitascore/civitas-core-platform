@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.model.output.BaseOutputDTO;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -117,20 +119,23 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
   }
 
   @Test
-  void patch_withUnknownField_answers400InvalidInput() {
+  void patch_withUnknownField_answers400AndAppliesNoField() {
     assumeTrue(serves(HttpMethod.PATCH));
     UUID id = createTestEntity();
+    O before = performGetById(id).getBody();
+    Map<String, Object> patchBody =
+        new HashMap<>(objectMapper.convertValue(createUpdateInput(), new TypeReference<>() {}));
+    patchBody.values().removeIf(Objects::isNull);
+    patchBody.put("noSuchField", "value");
 
     ResponseEntity<ProblemDetail> response =
         exchangeForProblem(
-            getEndpointPath() + "/" + id,
-            HttpMethod.PATCH,
-            createAuthHeaders(),
-            Map.of("noSuchField", "value"));
+            getEndpointPath() + "/" + id, HttpMethod.PATCH, createAuthHeaders(), patchBody);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(response.getBody()).isNotNull();
     assertThat(response.getBody().getType()).hasToString(unknownPatchFieldUrn());
+    assertThat(performGetById(id).getBody()).usingRecursiveComparison().isEqualTo(before);
   }
 
   @Test
