@@ -13,6 +13,8 @@ import static org.mockito.Mockito.when;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.input.MappingInputDTO;
+import de.civitascore.portal.model.input.MappingNodePosition;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway.ModelPin;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway.RegistryDocument;
@@ -24,7 +26,6 @@ import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.SagaInFlightException;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,6 +41,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Unit tests for {@link MappingService}: a thin pass-through that stores/versions a CORE Mapping
@@ -79,7 +81,11 @@ class MappingServiceTest {
   @BeforeEach
   void createService() {
     mappingService =
-        new MappingService(registry, dataSetService, new DataSetMutationGuard(dataSetRepository));
+        new MappingService(
+            registry,
+            dataSetService,
+            new DataSetMutationGuard(dataSetRepository),
+            new JsonMapper());
 
     dataSet = new DataSet();
     dataSet.setManifestLogicalUrn(MANIFEST_URN);
@@ -110,6 +116,29 @@ class MappingServiceTest {
         .thenReturn(pin());
   }
 
+  private static MappingInputDTO mapping(Map<String, Object> fields) {
+    MappingInputDTO mapping = new MappingInputDTO();
+    mapping.setFields(fields);
+    return mapping;
+  }
+
+  private static MappingInputDTO mapping() {
+    return mapping(Map.of());
+  }
+
+  private static MappingInputDTO titled(String title) {
+    MappingInputDTO mapping = mapping();
+    mapping.setTitle(title);
+    return mapping;
+  }
+
+  private static MappingInputDTO between(String source, String target) {
+    MappingInputDTO mapping = mapping();
+    mapping.setSource(source);
+    mapping.setTarget(target);
+    return mapping;
+  }
+
   /** The manifest holds {@code members} as its mapping members. */
   private void stubMembers(ModelPin... members) {
     when(registry.dependencyPinsOfType(MANIFEST_URN, "mapping")).thenReturn(List.of(members));
@@ -121,8 +150,7 @@ class MappingServiceTest {
 
     StoredMapping result =
         mappingService.create(
-            DATA_SET_ID,
-            Map.of("fields", Map.of("$.id", Map.of("op", "copy", "sourcePath", "$.id"))));
+            DATA_SET_ID, mapping(Map.of("$.id", Map.of("op", "copy", "sourcePath", "$.id"))));
 
     assertThat(result.pin()).isEqualTo(pin());
     verify(registry)
@@ -135,9 +163,9 @@ class MappingServiceTest {
   void create_returnsTheIdOfTheMintedUrn() {
     stubStore();
 
-    StoredMapping result = mappingService.create(DATA_SET_ID, Map.of("fields", Map.of()));
+    StoredMapping result = mappingService.create(DATA_SET_ID, mapping());
 
-    assertThat(result.mappingId()).isEqualTo(MAPPING_ID);
+    assertThat(result.pin().id()).isEqualTo(MAPPING_ID);
   }
 
   @Test
@@ -145,7 +173,7 @@ class MappingServiceTest {
   void create_linksIntoTheDataSetManifest() {
     stubStore();
 
-    mappingService.create(DATA_SET_ID, Map.of("fields", Map.of()));
+    mappingService.create(DATA_SET_ID, mapping());
 
     verify(registry)
         .storePayload(
@@ -158,7 +186,7 @@ class MappingServiceTest {
     stubMembers(pin());
     stubStore();
 
-    mappingService.update(DATA_SET_ID, MAPPING_ID, Map.of("fields", Map.of()));
+    mappingService.update(DATA_SET_ID, MAPPING_ID, mapping());
 
     verify(registry)
         .storePayload(
@@ -170,12 +198,13 @@ class MappingServiceTest {
   void update_splitsPositionsIntoStylesAndReturnsThemWithTheContent() {
     stubMembers(pin());
     stubStore();
-    Map<String, Object> positions = Map.of("$.geom", Map.of("x", 1, "y", 2));
-    Map<String, Object> doc = new LinkedHashMap<>();
-    doc.put("fields", Map.of("$.geom", Map.of("op", "geoPoint", "lat", "$.lat", "lon", "$.lon")));
-    doc.put("positions", positions);
+    Map<String, MappingNodePosition> positions =
+        Map.of("$.geom", new MappingNodePosition(1.5, 2.0));
+    MappingInputDTO mapping =
+        mapping(Map.of("$.geom", Map.of("op", "geoPoint", "lat", "$.lat", "lon", "$.lon")));
+    mapping.setPositions(positions);
 
-    StoredMapping result = mappingService.update(DATA_SET_ID, MAPPING_ID, doc);
+    StoredMapping result = mappingService.update(DATA_SET_ID, MAPPING_ID, mapping);
 
     verify(registry)
         .storePayload(
@@ -187,15 +216,17 @@ class MappingServiceTest {
             stylesCaptor.capture(),
             any());
     assertThat(contentCaptor.getValue()).doesNotContainKey("positions").containsKey("fields");
-    assertThat(stylesCaptor.getValue()).containsEntry("positions", positions);
-    assertThat(result.document()).containsEntry("positions", positions).containsKey("fields");
+    assertThat(stylesCaptor.getValue())
+        .containsEntry("positions", Map.of("$.geom", Map.of("x", 1.5, "y", 2.0)));
+    assertThat(result.mapping().getPositions()).isEqualTo(positions);
+    assertThat(result.mapping().getFields()).containsKey("$.geom");
   }
 
   @Test
   void create_whenTitlePresent_usesItAsArtifactName() {
     stubStore();
 
-    mappingService.create(DATA_SET_ID, Map.of("title", "My Mapping", "fields", Map.of()));
+    mappingService.create(DATA_SET_ID, titled("My Mapping"));
 
     verify(registry)
         .storePayload(
@@ -207,7 +238,7 @@ class MappingServiceTest {
   void create_whenTitleMissing_defaultsNameToMapping() {
     stubStore();
 
-    mappingService.create(DATA_SET_ID, Map.of("fields", Map.of()));
+    mappingService.create(DATA_SET_ID, mapping());
 
     verify(registry)
         .storePayload(
@@ -228,11 +259,10 @@ class MappingServiceTest {
 
     StoredMapping result = mappingService.get(DATA_SET_ID, MAPPING_ID);
 
-    assertThat(result.mappingId()).isEqualTo(MAPPING_ID);
     assertThat(result.pin()).isEqualTo(currentVersion);
-    assertThat(result.document())
-        .containsEntry("fields", fields)
-        .containsEntry("positions", positions);
+    assertThat(result.mapping().getFields()).isEqualTo(fields);
+    assertThat(result.mapping().getPositions())
+        .isEqualTo(Map.of("$.id", new MappingNodePosition(1.0, 2.0)));
   }
 
   @Test
@@ -281,8 +311,7 @@ class MappingServiceTest {
   void update_whenMappingIdIsNoMemberOfThisDataSet_throwsNotFoundAndStoresNothing() {
     stubMembers(pin());
 
-    assertThatThrownBy(
-            () -> mappingService.update(DATA_SET_ID, FOREIGN_ID, Map.of("fields", Map.of())))
+    assertThatThrownBy(() -> mappingService.update(DATA_SET_ID, FOREIGN_ID, mapping()))
         .isInstanceOf(ResourceNotFoundException.class);
 
     verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
@@ -293,7 +322,7 @@ class MappingServiceTest {
   void create_whenDataSetHasNoManifest_isRejected() {
     when(dataSetService.findByIdOrThrow(DATA_SET_ID)).thenReturn(new DataSet());
 
-    assertThatThrownBy(() -> mappingService.create(DATA_SET_ID, Map.of()))
+    assertThatThrownBy(() -> mappingService.create(DATA_SET_ID, new MappingInputDTO()))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("no manifest");
 
@@ -305,7 +334,7 @@ class MappingServiceTest {
   void create_whenTheDataSetIsNotDraft_throwsDataSetNotEditable(DataSetStatus status) {
     dataSet.setDataSetStatus(status);
 
-    assertThatThrownBy(() -> mappingService.create(DATA_SET_ID, Map.of("fields", Map.of())))
+    assertThatThrownBy(() -> mappingService.create(DATA_SET_ID, mapping()))
         .isInstanceOf(DataSetNotEditableException.class);
 
     verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
@@ -316,8 +345,7 @@ class MappingServiceTest {
     stubMembers(pin());
     dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
 
-    assertThatThrownBy(
-            () -> mappingService.update(DATA_SET_ID, MAPPING_ID, Map.of("fields", Map.of())))
+    assertThatThrownBy(() -> mappingService.update(DATA_SET_ID, MAPPING_ID, mapping()))
         .isInstanceOf(DataSetNotEditableException.class);
 
     verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
@@ -339,8 +367,7 @@ class MappingServiceTest {
     stubMembers(pin());
     dataSet.setPendingSagaType(PendingSagaType.UPDATE);
 
-    assertThatThrownBy(
-            () -> mappingService.update(DATA_SET_ID, MAPPING_ID, Map.of("fields", Map.of())))
+    assertThatThrownBy(() -> mappingService.update(DATA_SET_ID, MAPPING_ID, mapping()))
         .isInstanceOf(SagaInFlightException.class);
 
     verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
@@ -351,8 +378,7 @@ class MappingServiceTest {
     stubMembers(pin());
     dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
 
-    assertThatThrownBy(
-            () -> mappingService.update(DATA_SET_ID, FOREIGN_ID, Map.of("fields", Map.of())))
+    assertThatThrownBy(() -> mappingService.update(DATA_SET_ID, FOREIGN_ID, mapping()))
         .isInstanceOf(ResourceNotFoundException.class);
   }
 
@@ -375,8 +401,7 @@ class MappingServiceTest {
     stubResolvable(SOURCE_URN, TARGET_URN);
     stubStore();
 
-    mappingService.create(
-        DATA_SET_ID, Map.of("source", SOURCE_URN, "target", TARGET_URN, "fields", Map.of()));
+    mappingService.create(DATA_SET_ID, between(SOURCE_URN, TARGET_URN));
 
     verify(registry)
         .storePayload(eq(PayloadKind.MAPPING), any(), any(), any(), any(), any(), any());
@@ -389,8 +414,7 @@ class MappingServiceTest {
         "urn:core:platform:civitas:element:common:99d9ab54-d6f3-8c7e-a746-f62a4a18fae6:1.0.0";
     when(registry.fetchModel(missing)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(
-            () -> mappingService.create(DATA_SET_ID, Map.of("source", missing, "fields", Map.of())))
+    assertThatThrownBy(() -> mappingService.create(DATA_SET_ID, between(missing, null)))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("not available");
 
@@ -406,10 +430,7 @@ class MappingServiceTest {
     when(registry.fetchModel(missingVersion)).thenReturn(Optional.empty());
 
     assertThatThrownBy(
-            () ->
-                mappingService.create(
-                    DATA_SET_ID,
-                    Map.of("source", SOURCE_URN, "target", missingVersion, "fields", Map.of())))
+            () -> mappingService.create(DATA_SET_ID, between(SOURCE_URN, missingVersion)))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("not available");
 
@@ -426,9 +447,7 @@ class MappingServiceTest {
       })
   @DisplayName("an endpoint not pinned to a SemVer version is refused before anything is stored")
   void create_whenEndpointNotPinned_isRefused(String unpinned) {
-    assertThatThrownBy(
-            () ->
-                mappingService.create(DATA_SET_ID, Map.of("source", unpinned, "fields", Map.of())))
+    assertThatThrownBy(() -> mappingService.create(DATA_SET_ID, between(unpinned, null)))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("pinned to a version");
 
@@ -441,7 +460,7 @@ class MappingServiceTest {
   void create_whenEndpointsAbsent_isAccepted() {
     stubStore();
 
-    mappingService.create(DATA_SET_ID, Map.of("fields", Map.of()));
+    mappingService.create(DATA_SET_ID, mapping());
 
     verify(registry)
         .storePayload(eq(PayloadKind.MAPPING), any(), any(), any(), any(), any(), any());
@@ -450,7 +469,7 @@ class MappingServiceTest {
 
   @Test
   void list_returnsIdLogicalUrnAndTitleOfEachMember() {
-    stubMembers(pin(), pin(LOGICAL_URN, "1.1.0"), otherPin());
+    stubMembers(pin(), otherPin());
     when(registry.fetchPayload(VERSIONED_URN))
         .thenReturn(
             Optional.of(

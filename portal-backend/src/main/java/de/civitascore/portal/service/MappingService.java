@@ -2,20 +2,22 @@ package de.civitascore.portal.service;
 
 import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.input.MappingInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway.ModelPin;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway.RegistryDocument;
 import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * First-class Mapping artifacts, nested under the DataSet they belong to. A Mapping is a CORE
@@ -29,8 +31,6 @@ import org.springframework.stereotype.Service;
  * the members of the DataSet's manifest only. The DataSet-typed route grant covers exactly those
  * members, so a caller cannot reach a mapping of another DataSet, and a foreign mapping answers
  * like an unknown one.
- *
- * <p>Writes need an editable DataSet, like every other part of a DataSet.
  */
 @Service
 @RequiredArgsConstructor
@@ -43,9 +43,12 @@ public class MappingService {
 
   private static final String POSITIONS = "positions";
 
+  private static final TypeReference<Map<String, Object>> CONTENT = new TypeReference<>() {};
+
   private final ModelRegistryGateway registry;
   private final DataSetService dataSetService;
   private final DataSetMutationGuard dataSetMutationGuard;
+  private final ObjectMapper objectMapper;
 
   /** A Mapping as the list names it. */
   public record MappingSummary(UUID mappingId, String logicalUrn, String title) {}
@@ -53,9 +56,9 @@ public class MappingService {
   /**
    * A stored version of a Mapping.
    *
-   * @param document the authored content with the editor's node {@code positions}
+   * @param mapping the authored content with the editor's node {@code positions}
    */
-  public record StoredMapping(UUID mappingId, ModelPin pin, Map<String, Object> document) {}
+  public record StoredMapping(ModelPin pin, MappingInputDTO mapping) {}
 
   /**
    * The Mappings of this DataSet, in manifest order.
@@ -63,9 +66,7 @@ public class MappingService {
    * @throws InvalidInputException when the DataSet has no manifest
    */
   public List<MappingSummary> list(UUID dataSetId) {
-    Set<String> seen = new HashSet<>();
     return members(dataSetWithManifestOrThrow(dataSetId).getManifestLogicalUrn()).stream()
-        .filter(member -> seen.add(member.logicalUrn()))
         .map(member -> new MappingSummary(member.id(), member.logicalUrn(), titleOf(member)))
         .toList();
   }
@@ -80,26 +81,22 @@ public class MappingService {
     ModelPin member =
         currentMemberOrThrow(
             dataSetWithManifestOrThrow(dataSetId).getManifestLogicalUrn(), mappingId);
-    Map<String, Object> document =
+    MappingInputDTO mapping =
         registry
             .fetchPayload(member.versionedUrn())
-            .map(
-                stored ->
-                    withPositions(
-                        stored.content(),
-                        stored.styles() == null ? null : stored.styles().get(POSITIONS)))
+            .map(this::toMapping)
             .orElseThrow(() -> new ResourceNotFoundException(ENTITY_NAME, mappingId));
-    return new StoredMapping(mappingId, member, document);
+    return new StoredMapping(member, mapping);
   }
 
   /**
    * Stores a new Mapping and links it into the DataSet's manifest, which is what makes it reachable
    * through this DataSet afterwards.
    */
-  public StoredMapping create(UUID dataSetId, Map<String, Object> doc) {
+  public StoredMapping create(UUID dataSetId, MappingInputDTO mapping) {
     DataSet dataSet = dataSetWithManifestOrThrow(dataSetId);
     dataSetMutationGuard.requireMutable(dataSet, "create " + ENTITY_NAME);
-    return store(dataSet.getManifestLogicalUrn(), Optional.empty(), doc);
+    return store(dataSet.getManifestLogicalUrn(), Optional.empty(), mapping);
   }
 
   /**
@@ -107,12 +104,12 @@ public class MappingService {
    *
    * @throws ResourceNotFoundException when the Mapping is no member of this DataSet
    */
-  public StoredMapping update(UUID dataSetId, UUID mappingId, Map<String, Object> doc) {
+  public StoredMapping update(UUID dataSetId, UUID mappingId, MappingInputDTO mapping) {
     DataSet dataSet = dataSetWithManifestOrThrow(dataSetId);
     String manifestUrn = dataSet.getManifestLogicalUrn();
     String logicalUrn = currentMemberOrThrow(manifestUrn, mappingId).logicalUrn();
     dataSetMutationGuard.requireMutable(dataSet, "update " + ENTITY_NAME);
-    return store(manifestUrn, Optional.of(logicalUrn), doc);
+    return store(manifestUrn, Optional.of(logicalUrn), mapping);
   }
 
   /**
@@ -135,31 +132,31 @@ public class MappingService {
    * x-ui-styles}; everything else is passed through opaquely to Model Forge.
    */
   private StoredMapping store(
-      String manifestUrn, Optional<String> logicalUrn, Map<String, Object> doc) {
-    Map<String, Object> content = new LinkedHashMap<>(doc);
+      String manifestUrn, Optional<String> logicalUrn, MappingInputDTO mapping) {
+    requireResolvableEndpoint(mapping.getSource(), "source");
+    requireResolvableEndpoint(mapping.getTarget(), "target");
+    Map<String, Object> content = objectMapper.convertValue(mapping, CONTENT);
     Object positions = content.remove(POSITIONS);
     Map<String, Object> styles = positions == null ? null : Map.of(POSITIONS, positions);
-    requireResolvableEndpoint(content, "source");
-    requireResolvableEndpoint(content, "target");
     ModelPin pin =
         registry.storePayload(
             PayloadKind.MAPPING,
             logicalUrn,
             // A Mapping has no portal row, so Model Forge mints its UUID.
             null,
-            deriveName(content),
+            deriveName(mapping),
             content,
             styles,
             manifestUrn);
-    return new StoredMapping(pin.id(), pin, withPositions(content, positions));
+    return new StoredMapping(pin, mapping);
   }
 
-  private static Map<String, Object> withPositions(Map<String, Object> content, Object positions) {
-    Map<String, Object> document = new LinkedHashMap<>(content);
-    if (positions != null) {
-      document.put(POSITIONS, positions);
+  private MappingInputDTO toMapping(RegistryDocument stored) {
+    Map<String, Object> document = new LinkedHashMap<>(stored.content());
+    if (stored.styles() != null && stored.styles().get(POSITIONS) != null) {
+      document.put(POSITIONS, stored.styles().get(POSITIONS));
     }
-    return document;
+    return objectMapper.convertValue(document, MappingInputDTO.class);
   }
 
   /**
@@ -171,12 +168,11 @@ public class MappingService {
    * read the schema. A URN that does not resolve and one the caller may not see are reported
    * identically, so the difference is not an existence oracle over structure URNs.
    */
-  private void requireResolvableEndpoint(Map<String, Object> content, String field) {
-    Object raw = content.get(field);
-    if (raw == null) {
+  private void requireResolvableEndpoint(String urn, String field) {
+    if (urn == null) {
       return;
     }
-    if (!(raw instanceof String urn) || !CoreUrn.isValid(urn)) {
+    if (!CoreUrn.isValid(urn)) {
       throw new InvalidInputException(
           ENTITY_NAME, field, field + " must be a CORE URN pinned to a version");
     }
@@ -185,17 +181,15 @@ public class MappingService {
     }
   }
 
-  private static String deriveName(Map<String, Object> doc) {
-    Object title = doc.get("title");
-    return title instanceof String s && !s.isBlank() ? s : "mapping";
+  private static String deriveName(MappingInputDTO mapping) {
+    String title = mapping.getTitle();
+    return title != null && !title.isBlank() ? title : "mapping";
   }
 
   private String titleOf(ModelPin member) {
     return registry
         .fetchPayload(member.versionedUrn())
-        .map(stored -> stored.content().get("title"))
-        .filter(String.class::isInstance)
-        .map(String.class::cast)
+        .map(stored -> toMapping(stored).getTitle())
         .orElse(null);
   }
 

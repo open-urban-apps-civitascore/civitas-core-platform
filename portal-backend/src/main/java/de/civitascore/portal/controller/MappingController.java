@@ -64,8 +64,8 @@ public class MappingController {
   })
   public ResponseEntity<MappingOutputDTO> createMapping(
       @PathVariable UUID dataSetId, @Valid @RequestBody MappingInputDTO input) {
-    StoredMapping stored = mappingService.create(dataSetId, mappingAssembler.toDocument(input));
-    return ResponseEntity.created(Locations.ofCreated(stored.mappingId()))
+    StoredMapping stored = mappingService.create(dataSetId, input);
+    return ResponseEntity.created(Locations.ofCreated(stored.pin().id()))
         .body(mappingAssembler.toOutput(stored));
   }
 
@@ -84,8 +84,7 @@ public class MappingController {
       @PathVariable UUID dataSetId,
       @PathVariable UUID mappingId,
       @Valid @RequestBody MappingInputDTO input) {
-    return mappingAssembler.toOutput(
-        mappingService.update(dataSetId, mappingId, mappingAssembler.toDocument(input)));
+    return mappingAssembler.toOutput(mappingService.update(dataSetId, mappingId, input));
   }
 
   @DeleteMapping("/{mappingId}")
