@@ -26,7 +26,7 @@
 # which GitLab CI requires to execute script commands.
 .opa-common:
   image:
-    name: openpolicyagent/opa:1.21.0-static@sha256:9eb36ac3ceb3b855e776e60926a8a5142f96109a219a5fcd490fa1744c755bec
+    name: openpolicyagent/opa:1.21.0-static-debug@sha256:392ba3778b7e0b4c74f1b1c3ddf299d60982605f73be03f2dc18cdf2cb2e7357
     entrypoint: [""]
 
 # =============================================================================
