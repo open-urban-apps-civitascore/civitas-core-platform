@@ -1,5 +1,9 @@
 'use client'
 
+import { isValidElement, type ReactElement } from 'react'
+
+import { cn } from '@/lib/utils'
+
 /**
  * EntityMetadata Component
  *
@@ -13,7 +17,7 @@
 
 interface MetadataItem {
   label: string
-  value: string | string[] | undefined
+  value: string | string[] | ReactElement | undefined
 }
 
 interface EntityMetadataProps {
@@ -40,7 +44,7 @@ export const EntityMetadata: React.FC<EntityMetadataProps> = ({ items, title = '
           {filteredItems.map(item => (
             <div key={item.label} className="flex flex-col gap-0.5">
               <dt className="text-xs text-muted-foreground">{item.label}</dt>
-              <dd className="text-sm text-foreground">
+              <dd className={cn('text-sm text-foreground', isValidElement(item.value) && 'pt-1')}>
                 {Array.isArray(item.value) ? (
                   item.value.length > 0 ? (
                     <div className="flex flex-wrap gap-1">

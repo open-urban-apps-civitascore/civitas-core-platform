@@ -1,8 +1,8 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
-import { CheckIcon, CircleDashed, UserCheck } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
+import { StatusBadge } from '@/components/status-badge/StatusBadge'
 import { ContactCell } from '@/components/table/contact-cell/ContactCell'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
@@ -42,20 +42,6 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
   const locale = useLocale()
 
   const columnHelper = createColumnHelper<DatasetTableData>()
-
-  const statusCell = ({ value }: { value: string }) => {
-    const statusIconMap = {
-      DRAFT: <CircleDashed className="w-4 h-4 text-muted-foreground" />,
-      AVAILABLE: <UserCheck className="w-4 h-4 text-muted-foreground" />,
-      READY: <CheckIcon className="w-4 h-4 text-muted-foreground" />,
-    } as const
-
-    return (
-      <div className="flex items-center gap-2">
-        {statusIconMap[value as keyof typeof statusIconMap]} {t(`tableValues.${value.toLowerCase()}`)}
-      </div>
-    )
-  }
 
   const columns = [
     columnHelper.accessor('id', {
@@ -125,7 +111,7 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
     }),
     columnHelper.accessor('dataSetStatus', {
       header: t('tableHeaders.status'),
-      cell: info => (info.getValue() ? statusCell({ value: info.getValue() }) : '-'),
+      cell: info => (info.getValue() ? <StatusBadge status={info.getValue()} /> : '-'),
       meta: {
         style: {
           width: '20%',

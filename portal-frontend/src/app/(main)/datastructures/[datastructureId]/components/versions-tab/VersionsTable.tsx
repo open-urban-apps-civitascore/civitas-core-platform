@@ -1,12 +1,12 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
-import { CircleCheckBig, CircleDashed } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
 import { InUseIndicator } from '@/components/in-use-indicator/InUseIndicator'
+import { StatusBadge } from '@/components/status-badge/StatusBadge'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { DATASTRUCTURE_STATUS_TYPES, DatastructureVersionsListData } from '@/types/datastructures'
+import { DatastructureVersionsListData } from '@/types/datastructures'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
@@ -90,19 +90,7 @@ export const VersionsTable = (props: VersionsTableProps) => {
     }),
     columnHelper.accessor('status', {
       header: t('tableHeaders.status'),
-      cell: info => {
-        const status = info.getValue()
-        return (
-          <div className="flex items-center gap-2">
-            {status === DATASTRUCTURE_STATUS_TYPES.DRAFT ? (
-              <CircleDashed className="text-muted-foreground" size={16} />
-            ) : (
-              <CircleCheckBig className="text-muted-foreground" size={16} />
-            )}
-            {tCommon(`status.${info.getValue()}`)}
-          </div>
-        )
-      },
+      cell: info => <StatusBadge status={info.getValue()} />,
       meta: {
         style: {
           width: '5%',

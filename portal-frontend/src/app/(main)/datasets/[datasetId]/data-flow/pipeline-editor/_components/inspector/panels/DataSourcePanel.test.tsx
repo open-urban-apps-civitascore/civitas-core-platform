@@ -61,6 +61,9 @@ const datasource = (
     dataStructureVersion,
   }) as unknown as Datasource
 
+const detailsValue = (label: string) =>
+  within(screen.getByText(label).parentElement as HTMLElement).getByTestId('statusBadge')
+
 const apiCall = (name: string, method: string | null = 'GET') => ({ name, method, path: '/items' })
 
 const HTTP_ONE_CALL = datasource('http-1', 'Test HTTP Source 1', {
@@ -233,7 +236,8 @@ describe('DataSourcePanel', () => {
 
     expect(screen.getByText('Air Quality')).toBeInTheDocument()
     expect(screen.getByText('1.2.0')).toBeInTheDocument()
-    expect(screen.getByText('DRAFT')).toBeInTheDocument()
+    expect(detailsValue('dataSourcePanel.status')).toHaveTextContent('status.AVAILABLE')
+    expect(detailsValue('dataSourcePanel.dataStructureVersionStatus')).toHaveTextContent('status.DRAFT')
   })
 
   it('opens the Data structure version used by the Data source', async () => {

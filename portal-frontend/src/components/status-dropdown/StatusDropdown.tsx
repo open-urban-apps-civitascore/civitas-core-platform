@@ -3,6 +3,7 @@
 import { ChevronDown, CircleCheckBig, CircleCheckIcon, CircleDashed, Info } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
+import { StatusBadge } from '@/components/status-badge/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
@@ -62,62 +63,66 @@ export const StatusDropdown = <T extends StatusTypes>(props: StatusDropdownProps
           <TooltipContent>{statusHint}</TooltipContent>
         </Tooltip>
       )}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            data-testid="statusDropdown"
-            className="flex items-center gap-2 min-w-[140px] justify-between"
-            disabled={isReadOnly}
-          >
-            <div className="flex items-center gap-2">
-              {getStatusIcon(status)}
-              <span>{getStatusLabel(status)}</span>
-            </div>
-            <ChevronDown className="w-4 h-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {statusOptions.map(option => {
-            // canStage means the content passes validation to leave DRAFT (stage to READY).
-            // AVAILABLE additionally needs *_RELEASE permission (canRelease); READY only needs *_UPDATE (implied by edit mode).
-            const isAvailableDisabled = option === STATUS_TYPES.AVAILABLE && (!canStage || !canRelease)
-            const isReadyDisabled = option === STATUS_TYPES.READY && !canStage
-            const isDisabled = isAvailableDisabled || isReadyDisabled || (option === STATUS_TYPES.DRAFT && !canSetDraft)
+      {isReadOnly ? (
+        <StatusBadge status={status} className="h-9" />
+      ) : (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              data-testid="statusDropdown"
+              className="flex items-center gap-2 min-w-[140px] justify-between"
+            >
+              <div className="flex items-center gap-2">
+                {getStatusIcon(status)}
+                <span>{getStatusLabel(status)}</span>
+              </div>
+              <ChevronDown className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {statusOptions.map(option => {
+              // canStage means the content passes validation to leave DRAFT (stage to READY).
+              // AVAILABLE additionally needs *_RELEASE permission (canRelease); READY only needs *_UPDATE (implied by edit mode).
+              const isAvailableDisabled = option === STATUS_TYPES.AVAILABLE && (!canStage || !canRelease)
+              const isReadyDisabled = option === STATUS_TYPES.READY && !canStage
+              const isDisabled =
+                isAvailableDisabled || isReadyDisabled || (option === STATUS_TYPES.DRAFT && !canSetDraft)
 
-            const item = (
-              <DropdownMenuItem
-                key={option}
-                data-testid={`statusOption-${option.toLowerCase()}`}
-                onClick={() => onStatusChange(option)}
-                disabled={isDisabled}
-                className={cn(
-                  status === option && 'bg-accent',
-                  (isAvailableDisabled || isReadyDisabled) && 'opacity-50 cursor-not-allowed',
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  {getStatusIcon(option)}
-                  <span>{getStatusLabel(option)}</span>
-                </div>
-              </DropdownMenuItem>
-            )
-
-            if (isAvailableDisabled && availableHint) {
-              return (
-                <Tooltip key={option}>
-                  <TooltipTrigger asChild>
-                    <div>{item}</div>
-                  </TooltipTrigger>
-                  <TooltipContent>{availableHint}</TooltipContent>
-                </Tooltip>
+              const item = (
+                <DropdownMenuItem
+                  key={option}
+                  data-testid={`statusOption-${option.toLowerCase()}`}
+                  onClick={() => onStatusChange(option)}
+                  disabled={isDisabled}
+                  className={cn(
+                    status === option && 'bg-accent',
+                    (isAvailableDisabled || isReadyDisabled) && 'opacity-50 cursor-not-allowed',
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    {getStatusIcon(option)}
+                    <span>{getStatusLabel(option)}</span>
+                  </div>
+                </DropdownMenuItem>
               )
-            }
 
-            return item
-          })}
-        </DropdownMenuContent>
-      </DropdownMenu>
+              if (isAvailableDisabled && availableHint) {
+                return (
+                  <Tooltip key={option}>
+                    <TooltipTrigger asChild>
+                      <div>{item}</div>
+                    </TooltipTrigger>
+                    <TooltipContent>{availableHint}</TooltipContent>
+                  </Tooltip>
+                )
+              }
+
+              return item
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </div>
   )
 }

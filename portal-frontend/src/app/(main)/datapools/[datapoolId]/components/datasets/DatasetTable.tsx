@@ -1,6 +1,7 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
 import { useLocale, useTranslations } from 'next-intl'
 
+import { StatusBadge } from '@/components/status-badge/StatusBadge'
 import { ContactCell } from '@/components/table/contact-cell/ContactCell'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
@@ -82,9 +83,8 @@ export const DatasetTable = (props: DatasetTableProps) => {
     }),
     columnHelper.accessor('dataSetStatus', {
       header: t('tableHeaders.status'),
-      cell: info => info.getValue(),
+      cell: info => <StatusBadge status={info.getValue()} />,
       meta: {
-        truncate: true,
         style: {
           width: '15%',
           minWidth: '200px',

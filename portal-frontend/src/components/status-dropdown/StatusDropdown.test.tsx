@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import { STATUS_TYPES } from '@/types/common'
@@ -54,10 +55,25 @@ describe('StatusDropdown', () => {
     expect(availableOption).toHaveAttribute('data-disabled')
   })
 
-  it('disables the dropdown trigger when isReadOnly is true', () => {
+  it('shows the status badge and no dropdown trigger when isReadOnly is true', () => {
     render(<StatusDropdown {...defaultProps} isReadOnly={true} />)
 
-    const trigger = screen.getByTestId('statusDropdown')
-    expect(trigger).toBeDisabled()
+    expect(screen.getByTestId('statusBadge')).toHaveTextContent('status.DRAFT')
+    expect(screen.queryByTestId('statusDropdown')).toBeNull()
+  })
+
+  it('gives the status badge the height of the dropdown trigger when isReadOnly is true', () => {
+    render(<StatusDropdown {...defaultProps} isReadOnly={true} />)
+
+    expect(screen.getByTestId('statusBadge')).toHaveClass('h-9')
+    expect(screen.getByTestId('statusBadge')).not.toHaveClass('h-7')
+  })
+
+  it('keeps the status hint next to the status badge when isReadOnly is true', async () => {
+    const { container } = render(<StatusDropdown {...defaultProps} isReadOnly={true} statusHint="Test hint" />)
+
+    expect(screen.getByTestId('statusBadge')).toBeInTheDocument()
+    await userEvent.hover(container.querySelector('.lucide-info') as Element)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Test hint')
   })
 })

@@ -16,6 +16,7 @@ import {
   DataModelImportModal,
   type SelectedDatastructureVersion,
 } from '@/app/(main)/datasources/[datasourceId]/components/datastructure-tab/DataModelImportModal'
+import { StatusBadge } from '@/components/status-badge/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -35,7 +36,6 @@ interface GeoPersistencePanelProps {
 
 export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, onUpdate, isLocked }) => {
   const t = useTranslations('pipelineEditor')
-  const tStatus = useTranslations('common.status')
   const { datasetId } = useParams<{ datasetId: string }>()
   const { canReadDatastructures } = useDatasetPermissionsById(datasetId)
   const { selectedNode, pipelineUsingTableName, getSinkLocks } = useActivePipeline()
@@ -130,7 +130,7 @@ export const GeoPersistencePanel: React.FC<GeoPersistencePanelProps> = ({ data, 
               { label: t('geoPersistencePanel.versionNumber'), value: versionNumber },
               {
                 label: t('geoPersistencePanel.status'),
-                value: dataStructureVersionStatus ? tStatus(dataStructureVersionStatus) : undefined,
+                value: dataStructureVersionStatus ? <StatusBadge status={dataStructureVersionStatus} /> : undefined,
               },
             ]}
           />

@@ -367,7 +367,7 @@ describe('DatasetOverview', () => {
             roleCount: 1,
           })
 
-          expect(screen.getByTestId('statusDropdown')).toHaveTextContent(dataSetStatus)
+          expect(screen.getByTestId('statusBadge')).toHaveTextContent(dataSetStatus)
 
           await act(async () => {
             rerender(
@@ -383,7 +383,7 @@ describe('DatasetOverview', () => {
             )
           })
 
-          expect(screen.getByTestId('statusDropdown')).toHaveTextContent(dataSetStatus)
+          expect(screen.getByTestId('statusBadge')).toHaveTextContent(dataSetStatus)
           expect(toast.info).not.toHaveBeenCalled()
         },
       )
@@ -399,7 +399,7 @@ describe('DatasetOverview', () => {
           roleCount: 1,
         })
 
-        expect(screen.getByTestId('statusDropdown')).toHaveTextContent('READY')
+        expect(screen.getByTestId('statusBadge')).toHaveTextContent('READY')
 
         rerender(
           <DatasetOverview
@@ -414,7 +414,7 @@ describe('DatasetOverview', () => {
           />,
         )
 
-        expect(screen.getByTestId('statusDropdown')).toHaveTextContent('DRAFT')
+        expect(screen.getByTestId('statusBadge')).toHaveTextContent('DRAFT')
         expect(toast.info).toHaveBeenCalledWith('info.switchMode')
       })
     })
@@ -669,7 +669,7 @@ describe('DatasetOverview', () => {
       fireEvent.click(screen.getByTestId('cancelButton'))
       fireEvent.click(screen.getByTestId('discardButton'))
 
-      expect(screen.getByTestId('statusDropdown')).toHaveTextContent('DRAFT')
+      expect(screen.getByTestId('statusBadge')).toHaveTextContent('DRAFT')
       expect(screen.getByTestId('editButton')).toBeInTheDocument()
       expect(screen.queryByTestId('exitWarningModal')).not.toBeInTheDocument()
     })

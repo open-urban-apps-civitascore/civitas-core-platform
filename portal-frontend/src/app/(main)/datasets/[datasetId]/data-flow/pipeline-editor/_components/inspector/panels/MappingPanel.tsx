@@ -12,6 +12,7 @@ import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
 import { DataModelImportModal } from '@/app/(main)/datasources/[datasourceId]/components/datastructure-tab/DataModelImportModal'
+import { StatusBadge } from '@/components/status-badge/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -195,9 +196,9 @@ export const MappingPanel = ({ data, onUpdate, isLocked }: MappingPanelProps) =>
         title={t('details')}
         items={[
           { label: t('inputVersion'), value: sourceVersionNumber },
-          { label: t('inputStatus'), value: sourceStatusLabel },
+          { label: t('inputStatus'), value: sourceStatus && <StatusBadge status={sourceStatus} /> },
           { label: t('outputVersion'), value: targetVersionNumber },
-          { label: t('outputStatus'), value: targetStatusLabel },
+          { label: t('outputStatus'), value: targetStatus && <StatusBadge status={targetStatus} /> },
         ]}
       />
 
