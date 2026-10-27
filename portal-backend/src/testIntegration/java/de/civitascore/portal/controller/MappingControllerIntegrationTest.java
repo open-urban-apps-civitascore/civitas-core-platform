@@ -1,20 +1,25 @@
 package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.input.MappingNodePosition;
 import de.civitascore.portal.model.output.MappingOutputDTO;
 import de.civitascore.portal.model.output.MappingSummaryDTO;
 import de.civitascore.portal.security.AllowedScopesFilter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
@@ -30,6 +35,7 @@ class MappingControllerIntegrationTest extends BaseKeycloakIntegrationTest {
 
   private static final String NOT_FOUND = "urn:civitas:error:NOT_FOUND";
   private static final String NOT_EDITABLE = "urn:civitas:error:DATASET_NOT_EDITABLE";
+  private static final String VALIDATION_FAILED = "urn:civitas:error:VALIDATION_FAILED";
 
   @Autowired private PortalTestDataFactory portalData;
 
@@ -59,12 +65,13 @@ class MappingControllerIntegrationTest extends BaseKeycloakIntegrationTest {
     DataSet dataSet = portalData.dataSetWithManifest();
     MappingOutputDTO created = create(dataSet, "Sensors").getBody();
     Map<String, Object> fields = Map.of("$.id", Map.of("op", "copy", "sourcePath", "$.id"));
+    Map<String, Object> positions = Map.of("$.id", Map.of("x", 12.5, "y", -3.25));
 
     ResponseEntity<MappingOutputDTO> updated =
         exchange(
             HttpMethod.PUT,
             item(dataSet.getId(), created.mappingId()),
-            Map.of("title", "Sensors", "fields", fields),
+            Map.of("title", "Sensors", "fields", fields, "positions", positions),
             MappingOutputDTO.class);
 
     assertThat(updated.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -77,6 +84,7 @@ class MappingControllerIntegrationTest extends BaseKeycloakIntegrationTest {
     assertThat(read.version()).isEqualTo(version.version());
     assertThat(read.versionedUrn()).isEqualTo(version.versionedUrn());
     assertThat(read.fields()).isEqualTo(fields);
+    assertThat(read.positions()).isEqualTo(Map.of("$.id", new MappingNodePosition(12.5, -3.25)));
   }
 
   @Test
@@ -86,12 +94,7 @@ class MappingControllerIntegrationTest extends BaseKeycloakIntegrationTest {
     MappingOutputDTO second = create(dataSet, "Second").getBody();
     create(portalData.dataSetWithManifest(), "Elsewhere");
 
-    ResponseEntity<List<MappingSummaryDTO>> listed =
-        restTemplate.exchange(
-            collection(dataSet.getId()),
-            HttpMethod.GET,
-            new HttpEntity<>(headers()),
-            new ParameterizedTypeReference<>() {});
+    ResponseEntity<List<MappingSummaryDTO>> listed = list(dataSet.getId());
 
     assertThat(listed.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(listed.getBody())
@@ -158,6 +161,40 @@ class MappingControllerIntegrationTest extends BaseKeycloakIntegrationTest {
     assertThat(unchanged.version()).isEqualTo(created.version());
   }
 
+  @ParameterizedTest
+  @MethodSource("invalidBodies")
+  void writeRoutes_whenTheBodyIsInvalid_answer400ValidationFailedAndStoreNothing(
+      String method, Map<String, Object> invalid) {
+    DataSet dataSet = portalData.dataSetWithManifest();
+    MappingOutputDTO created = create(dataSet, "Sensors").getBody();
+    String path =
+        "POST".equals(method)
+            ? collection(dataSet.getId())
+            : item(dataSet.getId(), created.mappingId());
+
+    ResponseEntity<ProblemDetail> response =
+        exchange(HttpMethod.valueOf(method), path, invalid, ProblemDetail.class);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(response.getBody().getType()).hasToString(VALIDATION_FAILED);
+    assertThat(list(dataSet.getId()).getBody())
+        .containsExactly(
+            new MappingSummaryDTO(created.mappingId(), created.logicalUrn(), "Sensors"));
+    MappingOutputDTO unchanged = get(dataSet.getId(), created.mappingId()).getBody();
+    assertThat(unchanged.version()).isEqualTo(created.version());
+  }
+
+  static Stream<Arguments> invalidBodies() {
+    Map<String, Object> withoutFields = Map.of("title", "Changed");
+    Map<String, Object> positionWithoutY =
+        Map.of(
+            "title", "Changed", "fields", Map.of(), "positions", Map.of("$.id", Map.of("x", 1.5)));
+    return Stream.of("POST", "PUT")
+        .flatMap(
+            method ->
+                Stream.of(arguments(method, withoutFields), arguments(method, positionWithoutY)));
+  }
+
   @Test
   void itemRoutes_whenTheMappingIdIsUnknown_answerLikeAForeignMapping() {
     DataSet owner = portalData.dataSetWithManifest();
@@ -177,6 +214,14 @@ class MappingControllerIntegrationTest extends BaseKeycloakIntegrationTest {
         exchange(HttpMethod.POST, collection(dataSet.getId()), body(title), MappingOutputDTO.class);
     assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     return created;
+  }
+
+  private ResponseEntity<List<MappingSummaryDTO>> list(UUID dataSetId) {
+    return restTemplate.exchange(
+        collection(dataSetId),
+        HttpMethod.GET,
+        new HttpEntity<>(headers()),
+        new ParameterizedTypeReference<>() {});
   }
 
   private ResponseEntity<MappingOutputDTO> get(UUID dataSetId, UUID mappingId) {
