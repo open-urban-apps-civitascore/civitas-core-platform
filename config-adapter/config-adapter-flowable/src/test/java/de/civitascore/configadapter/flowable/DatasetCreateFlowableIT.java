@@ -195,6 +195,7 @@ class DatasetCreateFlowableIT {
     variables.put("description", "Integration test via Flowable");
     variables.put("hasPipelines", false);
     variables.put("hasFrostSink", true);
+    variables.put("hasDashboards", true);
     variables.put("artifacts", Map.of());
     variables.put("dataPipelines", List.of());
     // Per-NamedApi route model (#1311/#1379): CREATE_ROUTE provisions one route per named-API
