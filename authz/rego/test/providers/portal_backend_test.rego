@@ -153,8 +153,8 @@ test_endpoints_contains_datasources_id if {
 }
 
 test_endpoints_contains_datasources_connection_tests if {
-	portal_backend.endpoints["/v1/datasources/connection-test"].POST == "DATASOURCE_CREATE"
-	portal_backend.endpoints["/v1/datasources/{id}/connection-test"].POST == "DATASOURCE_UPDATE"
+	portal_backend.endpoints["/v1/datasources/connection-test"].POST == "DATASOURCE_READ"
+	portal_backend.endpoints["/v1/datasources/{id}/connection-test"].POST == "DATASOURCE_READ"
 }
 
 test_endpoints_contains_datastructures if {
@@ -249,7 +249,7 @@ test_not_collection_endpoint_sub_resource if {
 	not portal_backend.is_collection_endpoint with input as portal_request("POST", "/v1/datasets/abc-123/stage")
 }
 
-# The unsaved connection test names no Data source, so it is gated like a collection write.
+# The unsaved connection test names no Data source, so it is a collection endpoint.
 test_is_collection_endpoint_datasource_connection_test_unsaved if {
 	portal_backend.is_collection_endpoint with input as portal_request("POST", "/v1/datasources/connection-test")
 }

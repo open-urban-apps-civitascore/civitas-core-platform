@@ -132,7 +132,19 @@ class ConnectionTestConsumerIT {
     ConnectionTestResult result = awaitResult(id);
 
     assertEquals(Outcome.SUCCESS, result.outcome(), result.message());
-    assertTrue(result.rowCount() > 0, result.message());
+    assertTrue(result.preview().startsWith("datname\r\n"), result.preview());
+    assertTrue(result.preview().contains("\r\nsource\r\n"), result.preview());
+  }
+
+  @Test
+  void runsTheConfiguredWhereClause() throws Exception {
+    Map<String, Object> connector = connector("owner-secret");
+    connector.put("where", "datname = 'source'");
+
+    ConnectionTestResult result = awaitResult(send(connector, UUID.randomUUID().toString()));
+
+    assertEquals("datname\r\nsource\r\n", result.preview());
+    assertEquals(1, result.rowCount());
   }
 
   @Test

@@ -338,6 +338,47 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
     }
 
     @Test
+    @DisplayName("SQL: PATCH of the host alone answers 400 and keeps the stored connector")
+    void sqlPatchOfTheHostAloneIsRefused() throws Exception {
+      String id =
+          createSqlDataSource("contract_sql_patch_host", createAvailableDataStructureVersionId());
+      String stored = readStoredConfiguration(id);
+
+      ResponseEntity<String> response =
+          send(
+              HttpMethod.PATCH,
+              DATASOURCES_ENDPOINT + "/" + id,
+              "{\"connector\": {\"dsn\": \"postgres://other.example:5432/db\"}}");
+
+      assertThat(response.getStatusCode().value()).isEqualTo(400);
+      assertThat((String) JsonPath.read(response.getBody(), "$.detail"))
+          .startsWith("The stored secret is kept only for the stored destination");
+      assertThat(readStoredConfiguration(id)).isEqualTo(stored);
+    }
+
+    @Test
+    @DisplayName("SQL: PATCH of the host with a new password stores the new password")
+    void sqlPatchOfTheHostWithANewPasswordStoresIt() throws Exception {
+      String id =
+          createSqlDataSource(
+              "contract_sql_patch_host_pw", createAvailableDataStructureVersionId());
+      String originalCiphertext = JsonPath.read(readStoredConfiguration(id), "$.password");
+
+      exchange(
+          HttpMethod.PATCH,
+          DATASOURCES_ENDPOINT + "/" + id,
+          "{\"connector\": {\"dsn\": \"postgres://other.example:5432/db\", \"password\": \"n3w\"}}");
+
+      String stored = readStoredConfiguration(id);
+      assertThat((String) JsonPath.read(stored, "$.dsn"))
+          .isEqualTo("postgres://other.example:5432/db");
+      assertThat((String) JsonPath.read(stored, "$.password"))
+          .startsWith("ENC(")
+          .isNotEqualTo(originalCiphertext)
+          .isNotEqualTo("n3w");
+    }
+
+    @Test
     @DisplayName("MQTT: configuration column matches expected JSONB shape after PUT")
     void mqttConfigurationIsPersistedInExpectedShapeAfterPut() throws Exception {
       UUID dsvId = createAvailableDataStructureVersionId();
@@ -568,10 +609,10 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
               HttpMethod.PATCH,
               path + id,
               """
-              { "connector": { "baseUrl": "https://other.example.org" } }
+              { "connector": { "baseUrl": "https://api.example.org/v2" } }
               """));
       assertThat((String) JsonPath.read(readStoredConfiguration(id), "$.baseUrl"))
-          .isEqualTo("https://other.example.org");
+          .isEqualTo("https://api.example.org/v2");
       assertThat(storedPassword(id)).isEqualTo(ciphertext);
 
       responses.add(exchange(HttpMethod.POST, path + id + "/release", null));

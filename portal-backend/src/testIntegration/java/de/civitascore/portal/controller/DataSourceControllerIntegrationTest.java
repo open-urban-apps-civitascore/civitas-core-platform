@@ -42,6 +42,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
@@ -419,6 +420,50 @@ class DataSourceControllerIntegrationTest
       assertThat(response.getBody().getProperties().get("fieldErrors"))
           .isEqualTo(
               List.of(Map.of("field", "connector.qos", "message", "'qos' must be 0, 1, or 2")));
+    }
+
+    @ParameterizedTest(name = "{0} = {1}")
+    @CsvSource(
+        delimiter = '|',
+        quoteCharacter = '"',
+        value = {
+          "dsn | postgres://localhost:5432/db#x | 'dsn' must not contain a fragment ('#')",
+          "dsn | postgres://localhost:5432/db?sslmode=require&sslmode=disable"
+              + " | 'dsn' must not repeat a parameter",
+          "where | id > 1; SELECT 1 | 'where' must be a single condition without ';'"
+        })
+    void create_withSqlValueTheRulesRefuse_returnsFieldError(
+        String key, String value, String message) {
+      Map<String, Object> connector = sqlConnector();
+      connector.put(key, value);
+
+      ResponseEntity<ProblemDetail> response =
+          writeExpectingProblem(HttpMethod.POST, "", body(connector, null));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getProperties().get("fieldErrors"))
+          .isEqualTo(List.of(Map.of("field", "connector." + key, "message", message)));
+    }
+
+    @Test
+    void patch_withDsnFragment_returnsFieldError() {
+      UUID id = createWithConnector(sqlConnector());
+
+      ResponseEntity<ProblemDetail> response =
+          writeExpectingProblem(
+              HttpMethod.PATCH,
+              "/" + id,
+              Map.of("connector", Map.of("dsn", "postgres://localhost:5432/db#x")));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getProperties().get("fieldErrors"))
+          .isEqualTo(
+              List.of(
+                  Map.of(
+                      "field",
+                      "connector.dsn",
+                      "message",
+                      "'dsn' must not contain a fragment ('#')")));
     }
 
     @Test

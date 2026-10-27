@@ -95,6 +95,22 @@ class FlowDeploymentPlannerTest {
   }
 
   @Test
+  void whereWithStatementSeparatorIsRejected() throws Exception {
+    // NiFi appends the clause verbatim and the driver runs every statement of the query
+    Datasource source = sqlSourceBasic();
+    source.handleUnknownProperty("where", "x > 1; SELECT 1");
+    try (CredentialResolver resolver = new CredentialResolver(stretchedKey())) {
+      FatalAdapterException ex =
+          assertThrows(
+              FatalAdapterException.class,
+              () ->
+                  planner(resolver)
+                      .plan(req("p-sql-semi", graphWithMapping(), source, postgisSinkWithPk())));
+      assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
+    }
+  }
+
+  @Test
   void whereWithExpressionLanguageReferenceIsRejected() throws Exception {
     // a NiFi Expression Language reference in 'where' is evaluated in the environment scope and
     // would

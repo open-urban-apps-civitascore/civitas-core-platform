@@ -25,7 +25,7 @@
 
   <!-- Error Prone -->
   <rule ref="category/java/errorprone.xml">
-    <exclude name="NullAssignment"/>             <!-- Optional values (reason, rowCount, httpStatus) are null by design -->
+    <exclude name="NullAssignment"/>             <!-- Optional values (reason, preview, rowCount, httpStatus) are null by design -->
     <exclude name="AvoidLiteralsInIfCondition"/> <!-- HTTP status codes and SQLSTATEs read clearer as literals -->
     <exclude name="AvoidDuplicateLiterals"/>     <!-- Repeated message fragments are clearer inline -->
     <exclude name="AvoidFieldNameMatchingMethodName"/> <!-- Record-style accessors -->

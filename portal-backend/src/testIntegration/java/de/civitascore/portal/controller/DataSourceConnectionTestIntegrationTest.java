@@ -192,18 +192,25 @@ class DataSourceConnectionTestIntegrationTest extends BaseKeycloakIntegrationTes
     return request;
   }
 
-  private HttpHeaders headers() {
+  /**
+   * @param scopes the scope ids OPA allows, {@code *} for a tenant-wide grant
+   */
+  private HttpHeaders headers(String scopes) {
     HttpHeaders headers = new HttpHeaders();
     headers.setBearerAuth(getValidAccessToken());
     headers.setContentType(MediaType.APPLICATION_JSON);
-    headers.set(AllowedScopesFilter.HEADER_NAME, "*");
+    headers.set(AllowedScopesFilter.HEADER_NAME, scopes);
     return headers;
   }
 
   private ResponseEntity<JsonNode> post(String path, Object body) {
+    return post(path, body, "*");
+  }
+
+  private ResponseEntity<JsonNode> post(String path, Object body, String scopes) {
     ResponseEntity<String> raw =
         restTemplate.exchange(
-            path, HttpMethod.POST, new HttpEntity<>(body, headers()), String.class);
+            path, HttpMethod.POST, new HttpEntity<>(body, headers(scopes)), String.class);
     JsonNode json = raw.getBody() == null ? null : objectMapper.readTree(raw.getBody());
     return ResponseEntity.status(raw.getStatusCode()).body(json);
   }
@@ -238,17 +245,28 @@ class DataSourceConnectionTestIntegrationTest extends BaseKeycloakIntegrationTes
   }
 
   @Test
-  @DisplayName("success answers 200 with the row count")
-  void success_answersWithTheRowCount() throws Exception {
+  @DisplayName("success answers 200 with the CSV preview")
+  void success_answersWithThePreview() throws Exception {
     reply =
         request ->
             new ConnectionTestResult(
-                request.requestId(), Outcome.SUCCESS, null, "2 rows", 2, null, 480);
+                request.requestId(),
+                Outcome.SUCCESS,
+                null,
+                "2 rows",
+                "id,value\n1,20.5\n2,21.0\n",
+                true,
+                2,
+                null,
+                480);
 
     ResponseEntity<JsonNode> response = testUnsaved(body(sqlConnector(PLAIN_PASSWORD), null));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody().path("success").asBoolean()).isTrue();
+    assertThat(response.getBody().path("preview").asString())
+        .isEqualTo("id,value\n1,20.5\n2,21.0\n");
+    assertThat(response.getBody().path("previewTruncated").asBoolean()).isTrue();
     assertThat(response.getBody().path("rowCount").asInt()).isEqualTo(2);
     assertThat(response.getBody().hasNonNull("reason")).isFalse();
   }
@@ -397,6 +415,24 @@ class DataSourceConnectionTestIntegrationTest extends BaseKeycloakIntegrationTes
   }
 
   @Test
+  @DisplayName("placeholder with changed values answers 400 and sends nothing")
+  void placeholderWithChangedValues_answers400() {
+    UUID id = createSqlDataSource();
+    Map<String, Object> changed = sqlConnector("********");
+    changed.put("table", "stations");
+
+    ResponseEntity<JsonNode> response =
+        post(DATASOURCES + "/" + id + "/connection-test", body(changed, null));
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(response.getBody().path("detail").asString())
+        .isEqualTo(
+            "The stored secret is kept only to test the connector as saved; enter it again to"
+                + " test other values");
+    assertThat(REQUESTS).isEmpty();
+  }
+
+  @Test
   @DisplayName("placeholder of a saved data source sends its stored ciphertext")
   void placeholderOfSavedDataSource_sendsStoredCiphertext() throws Exception {
     UUID id = createSqlDataSource();
@@ -426,6 +462,36 @@ class DataSourceConnectionTestIntegrationTest extends BaseKeycloakIntegrationTes
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(REQUESTS).isEmpty();
+  }
+
+  @Test
+  @DisplayName("a reader of the saved data source only may not test another destination")
+  void readerOfTheDataSourceOnly_withAnotherDestination_answers403() {
+    UUID id = createSqlDataSource();
+    Map<String, Object> elsewhere = sqlConnector("typed-s3cret");
+    elsewhere.put("dsn", "postgres://capture.example:5432/city");
+
+    ResponseEntity<JsonNode> response =
+        post(DATASOURCES + "/" + id + "/connection-test", body(elsewhere, null), id.toString());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    assertThat(REQUESTS).isEmpty();
+  }
+
+  @Test
+  @DisplayName("a reader of the saved data source only tests other values at its destination")
+  void readerOfTheDataSourceOnly_atItsDestination_answers200() throws Exception {
+    UUID id = createSqlDataSource();
+    reply = request -> failure(request, Reason.SOURCE_ERROR);
+    Map<String, Object> otherTable = sqlConnector("typed-s3cret");
+    otherTable.put("table", "stations");
+
+    ResponseEntity<JsonNode> response =
+        post(DATASOURCES + "/" + id + "/connection-test", body(otherTable, null), id.toString());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(objectMapper.readTree(nextRequest()).at("/connector/table").asString())
+        .isEqualTo("stations");
   }
 
   @Test
@@ -481,7 +547,8 @@ class DataSourceConnectionTestIntegrationTest extends BaseKeycloakIntegrationTes
     nextRequest();
     nextRequest();
     ConnectionTestResult result =
-        new ConnectionTestResult(request.requestId(), Outcome.SUCCESS, null, "ok", null, null, 1);
+        new ConnectionTestResult(
+            request.requestId(), Outcome.SUCCESS, null, "ok", null, false, null, null, 1);
 
     kafkaTemplate
         .send(ConnectionTestTopics.RESULT, request.requestId(), writeAsConfigAdapter(result))

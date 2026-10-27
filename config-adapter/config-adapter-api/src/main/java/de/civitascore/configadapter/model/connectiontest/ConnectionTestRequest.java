@@ -16,7 +16,7 @@ import java.util.Map;
 
 /**
  * Asks the connection test service to test whether a data source answers with the given connector
- * values. The test moves no data into the platform and changes nothing.
+ * values. The test changes nothing; its result can carry a short preview of the source's data.
  *
  * @param requestId correlates the {@link ConnectionTestResult}
  * @param expiresAt when the requester stops waiting; a request received later is not run

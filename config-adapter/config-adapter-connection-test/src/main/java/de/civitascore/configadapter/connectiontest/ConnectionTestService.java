@@ -62,11 +62,14 @@ final class ConnectionTestService {
       text = new ResultText(ResultText.secretsOf(connector, decrypted));
       rejectReferences("", decrypted);
       ProbeResult probe = prober.probe(decrypted, request.apiCall(), cancellation);
+      ResultText.Preview preview = text.preview(probe.preview(), probe.truncated());
       return new ConnectionTestResult(
           requestId,
           probe.success() ? Outcome.SUCCESS : Outcome.FAILURE,
           probe.success() ? null : Reason.SOURCE_ERROR,
           text.message(probe.message()),
+          preview.text(),
+          preview.truncated(),
           probe.rowCount(),
           probe.httpStatus(),
           millisSince(begin));
@@ -80,7 +83,7 @@ final class ConnectionTestService {
         LOG.debug(
             "Connection test {} failed: {}",
             Encode.forJava(requestId),
-            Encode.forJava(text.message(e.getMessage())));
+            Encode.forJava(text.message(e.logText())));
       }
       return ConnectionTestResult.failure(
           requestId, e.reason(), text.message(e.getMessage()), millisSince(begin));

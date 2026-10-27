@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -22,11 +23,16 @@ class ResultTextTest {
 
   private static final String EMOJI = "😀";
 
+  private static int utf8Length(String text) {
+    return text.getBytes(StandardCharsets.UTF_8).length;
+  }
+
   @Test
-  void messageMasksEverySecret() {
+  void messageAndPreviewMaskEverySecret() {
     ResultText text = new ResultText(List.of("hunter2", "token"));
 
     assertEquals("a ******** b ********", text.message("a hunter2 b token"));
+    assertEquals("a ******** b ********", text.preview("a hunter2 b token", false).text());
   }
 
   @Test
@@ -105,5 +111,54 @@ class ResultTextTest {
     ResultText text = new ResultText(List.of("s"));
 
     assertNull(text.message(null));
+    assertNull(text.preview(null, false).text());
+  }
+
+  @Test
+  void previewWithinLimitIsKeptAsIs() {
+    String preview = "a".repeat(8192);
+
+    assertEquals(preview, new ResultText(List.of()).preview(preview, false).text());
+    assertFalse(new ResultText(List.of()).preview(preview, false).truncated());
+  }
+
+  @Test
+  void truncatedFlagAddsMarkerEvenForShortPreview() {
+    ResultText.Preview cut = new ResultText(List.of()).preview("abc", true);
+
+    assertEquals("abc\n[truncated]", cut.text());
+    assertTrue(cut.truncated());
+  }
+
+  @Test
+  void longPreviewIsCutIncludingMarker() {
+    String result = new ResultText(List.of()).preview("a".repeat(20_000), false).text();
+
+    assertEquals("a".repeat(8180) + "\n[truncated]", result);
+    assertEquals(8192, utf8Length(result));
+  }
+
+  @Test
+  void previewCutNeverSplitsTwoByteCharacter() {
+    String result = new ResultText(List.of()).preview("ä".repeat(10_000), false).text();
+
+    assertEquals("ä".repeat(4090) + "\n[truncated]", result);
+  }
+
+  @Test
+  void previewCutNeverSplitsFourByteCharacter() {
+    String result = new ResultText(List.of()).preview(EMOJI.repeat(5_000), false).text();
+
+    assertEquals(EMOJI.repeat(2045) + "\n[truncated]", result);
+  }
+
+  @Test
+  void previewWithMultiByteCharacterAtBoundaryStaysWithinLimit() {
+    // 8180 bytes fit beside the 12-byte marker: one byte short, then a 2-byte character.
+    String input = "a".repeat(8179) + "ä" + "tail";
+
+    String result = new ResultText(List.of()).preview(input, true).text();
+
+    assertEquals("a".repeat(8179) + "\n[truncated]", result);
   }
 }

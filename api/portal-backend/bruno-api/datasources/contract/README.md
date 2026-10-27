@@ -34,8 +34,11 @@ It holds `connectorType` (`MQTT`, `SQL` or `HTTP`) and the fields of that type:
   differs from the stored one is replaced, not merged.
   `"connector": null` removes it; an omitted `connector` keeps it.
 - **Secret placeholder:** `"********"` for a secret in a write keeps the
-  stored secret at the same place. With no stored secret there, for
-  example after a change of `authentication.type`, none is stored.
+  stored secret at the same place, and so does a PATCH that omits it.
+  This holds only while every destination stays: scheme, host and port of
+  each address, the OAuth2 token URL included, and `sslmode`. With no
+  stored secret there, for example after a change of `authentication.type`,
+  none is stored.
 
 ## Errors
 
@@ -53,7 +56,7 @@ It holds `connectorType` (`MQTT`, `SQL` or `HTTP`) and the fields of that type:
 | Connection test with missing required fields | 400 `VALIDATION_FAILED` | `fieldErrors[].field`: `connector.<path>` |
 | Connection test whose `apiCall` is missing for HTTP, names no API call of the connector, or is set for SQL or MQTT | 400 `VALIDATION_FAILED` | `fieldErrors[].field`: `apiCall` |
 | Connection test with `"********"` and no stored secret at its place | 400 `MALFORMED_REQUEST` | `detail`: `No stored secret for ******** at connector.<path>` |
-| Connection test of a saved data source with `"********"` and another destination (scheme, host or port) | 400 `MALFORMED_REQUEST` | `detail`: `The stored secret is kept only for the stored destination; …` |
+| Write or connection test of a saved data source that keeps the stored password for another destination (scheme, host, port or `sslmode`) | 400 `MALFORMED_REQUEST` | `detail`: `The stored secret is kept only for the stored destination; …` |
 | Connection test of a released data source with `"********"` and changed values | 400 `MALFORMED_REQUEST` | `detail`: `The stored secret of a released data source is kept only to test its connector as released; …` |
 
 A `detail` echoes no value other than a `connectorType` or a nested `type`, because a value
@@ -102,6 +105,7 @@ Range checks such as MQTT `qos` run on every write
 | `http-pagination-create-and-read-*` | Limit/offset and cursor pagination read back as sent |
 | `sql-update-masked-secret-*`, `http-update-masked-secret-*` | PUT with `"********"` keeps the stored password |
 | `sql-masked-password-without-stored-secret-*` | PUT with `"********"` and no stored password stores none |
+| `sql-patch-other-host-*` | PATCH of another host keeps no stored password and is refused |
 | `sql-patch-partial-*`, `mqtt-patch-partial-*` | PATCH without `connector` keeps it |
 | `sql-patch-clears-field-*` | PATCH with `null` or `""` clears a key, omitted keys stay |
 | `mqtt-patch-changes-connector-type-*` | PATCH with another `connectorType` replaces the connector |

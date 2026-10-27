@@ -164,7 +164,7 @@ public class DataSourceController
       responseCode = "200",
       description =
           "The test ran; success tells whether the source answered as configured, reason why"
-              + " not",
+              + " not, preview what it returned",
       content = @Content(schema = @Schema(implementation = ConnectionTestResultDTO.class)))
   @ApiResponse(
       responseCode = "400",
@@ -196,16 +196,16 @@ public class DataSourceController
       description =
           "Tests whether the source answers with the given connector values, which may differ from"
               + " the stored ones, for a data source in any status. A placeholder \"********\""
-              + " keeps the secret stored at its place, but only where it is stored for: at the"
-              + " stored destination of a draft, and for the connector as released of a released"
-              + " data source. Elsewhere, or where no secret is stored, it answers 400. The values"
+              + " keeps the stored secret only to test the connector as saved; with changed values,"
+              + " or where no secret is stored, it answers 400. Values for another destination"
+              + " need DATASOURCE_READ for the whole tenant, otherwise it answers 403. The values"
               + " must meet the rules of a release. The test changes no data source and stores"
               + " nothing. A user runs one test at a time.")
   @ApiResponse(
       responseCode = "200",
       description =
           "The test ran; success tells whether the source answered as configured, reason why"
-              + " not",
+              + " not, preview what it returned",
       content = @Content(schema = @Schema(implementation = ConnectionTestResultDTO.class)))
   @ApiResponse(
       responseCode = "400",

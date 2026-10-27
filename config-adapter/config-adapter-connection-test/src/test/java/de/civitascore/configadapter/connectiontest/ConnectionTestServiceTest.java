@@ -19,6 +19,9 @@ import de.civitascore.configadapter.model.connectiontest.ConnectionTestRequest;
 import de.civitascore.configadapter.model.connectiontest.ConnectionTestResult;
 import de.civitascore.configadapter.model.connectiontest.ConnectionTestResult.Outcome;
 import de.civitascore.configadapter.model.connectiontest.ConnectionTestResult.Reason;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.util.HashMap;
@@ -86,7 +89,8 @@ class ConnectionTestServiceTest {
 
   private ConnectionTestService service(Decryptor decryptor) {
     return new ConnectionTestService(
-        List.of(prober("sql", connector -> ProbeResult.success("Connected."))), decryptor);
+        List.of(prober("sql", connector -> ProbeResult.success("Connected.", "a,b\n1,2"))),
+        decryptor);
   }
 
   private static ConnectionTestRequest request(Map<String, Object> connector) {
@@ -136,7 +140,7 @@ class ConnectionTestServiceTest {
   void connectionTypeIsMatchedCaseInsensitively() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("sql", connector -> ProbeResult.success("ok"))), IDENTITY);
+            List.of(prober("sql", connector -> ProbeResult.success("ok", null))), IDENTITY);
 
     ConnectionTestResult result = run(service, Map.of("connectionType", " SQL "));
 
@@ -148,7 +152,7 @@ class ConnectionTestServiceTest {
   void plaintextPasswordAtTopLevelFailsWithoutProbing() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("sql", connector -> ProbeResult.success("ok"))), IDENTITY);
+            List.of(prober("sql", connector -> ProbeResult.success("ok", null))), IDENTITY);
 
     ConnectionTestResult result =
         run(service, Map.of("connectionType", "sql", "password", PASSWORD));
@@ -164,7 +168,7 @@ class ConnectionTestServiceTest {
   void plaintextPasswordNestedFailsWithoutProbing() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("sql", connector -> ProbeResult.success("ok"))), IDENTITY);
+            List.of(prober("sql", connector -> ProbeResult.success("ok", null))), IDENTITY);
 
     ConnectionTestResult result =
         run(
@@ -180,7 +184,7 @@ class ConnectionTestServiceTest {
   void encryptedPasswordPassesAndProberGetsDecryptedConnector() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("sql", connector -> ProbeResult.success("ok"))), decrypting());
+            List.of(prober("sql", connector -> ProbeResult.success("ok", null))), decrypting());
 
     ConnectionTestResult result =
         run(
@@ -207,7 +211,7 @@ class ConnectionTestServiceTest {
         };
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("sql", connector -> ProbeResult.success("ok"))), failing);
+            List.of(prober("sql", connector -> ProbeResult.success("ok", null))), failing);
 
     ConnectionTestResult result =
         run(service, Map.of("connectionType", "sql", "password", "ENC(abc)"));
@@ -220,11 +224,14 @@ class ConnectionTestServiceTest {
   }
 
   @Test
-  void probeSuccessMapsOutcomeMessageStatusAndRequestId() {
+  void probeSuccessMapsOutcomeMessagePreviewAndRequestId() {
     ConnectionTestService service =
         new ConnectionTestService(
             List.of(
-                prober("http", connector -> new ProbeResult(true, "Got a response.", null, 200))),
+                prober(
+                    "http",
+                    connector ->
+                        new ProbeResult(true, "Got a response.", "{\"a\":1}", false, null, 200))),
             IDENTITY);
 
     ConnectionTestResult result = run(service, Map.of("connectionType", "http"));
@@ -233,16 +240,37 @@ class ConnectionTestServiceTest {
     assertEquals(Outcome.SUCCESS, result.outcome());
     assertNull(result.reason());
     assertEquals("Got a response.", result.message());
+    assertEquals("{\"a\":1}", result.preview());
     assertEquals(200, result.httpStatus());
     assertEquals("call", probedApiCall.get());
   }
 
   @Test
-  void unsuccessfulProbeResultIsFailureWithStatusKept() {
+  void aPreviewLongerThanTheLimitIsCutAndMarkedAsCut() {
     ConnectionTestService service =
         new ConnectionTestService(
             List.of(
-                prober("http", connector -> new ProbeResult(false, "Unauthorized.", null, 401))),
+                prober(
+                    "http",
+                    connector ->
+                        new ProbeResult(true, "ok", "a".repeat(10_000), false, null, 200))),
+            IDENTITY);
+
+    ConnectionTestResult result = run(service, Map.of("connectionType", "http"));
+
+    assertTrue(result.previewTruncated());
+    assertEquals("a".repeat(8180) + "\n[truncated]", result.preview());
+  }
+
+  @Test
+  void unsuccessfulProbeResultIsFailureWithPreviewAndStatusKept() {
+    ConnectionTestService service =
+        new ConnectionTestService(
+            List.of(
+                prober(
+                    "http",
+                    connector ->
+                        new ProbeResult(false, "Unauthorized.", "denied", false, null, 401))),
             IDENTITY);
 
     ConnectionTestResult result = run(service, Map.of("connectionType", "http"));
@@ -250,22 +278,32 @@ class ConnectionTestServiceTest {
     assertEquals(Outcome.FAILURE, result.outcome());
     assertEquals(Reason.SOURCE_ERROR, result.reason());
     assertEquals("Unauthorized.", result.message());
+    assertEquals("denied", result.preview());
     assertEquals(401, result.httpStatus());
   }
 
   @Test
-  void secretsAreMaskedInTheProbeMessage() {
+  void secretsAreMaskedInProbeMessageAndPreview() {
     ConnectionTestService service =
         new ConnectionTestService(
             List.of(
-                prober("http", connector -> new ProbeResult(true, "echo " + PASSWORD, null, 200))),
+                prober(
+                    "http",
+                    connector ->
+                        new ProbeResult(
+                            true,
+                            "echo " + PASSWORD,
+                            "{\"seen\":\"" + PASSWORD + "\"}",
+                            false,
+                            null,
+                            200))),
             decrypting());
 
     ConnectionTestResult result =
         run(service, Map.of("connectionType", "http", "password", "ENC(abc)"));
 
-    assertFalse(result.message().contains(PASSWORD));
-    assertTrue(result.message().contains("********"));
+    assertEquals("echo ********", result.message());
+    assertEquals("{\"seen\":\"********\"}", result.preview());
   }
 
   @Test
@@ -286,13 +324,46 @@ class ConnectionTestServiceTest {
     assertEquals(Outcome.FAILURE, result.outcome());
     assertEquals("login failed for ********", result.message());
     assertEquals(Reason.SOURCE_ERROR, result.reason());
+    assertNull(result.preview());
+  }
+
+  @Test
+  void aFailureThatQuotesTheSourceLogsOnlyItsLogText() {
+    ConnectionTestService service =
+        new ConnectionTestService(
+            List.of(
+                prober(
+                    "sql",
+                    connector -> {
+                      throw ConnectionTestFailure.answeredBySource(
+                          "invalid input syntax for type integer: \"row-value-4711\"",
+                          "The database answered with SQLSTATE 22P02.",
+                          null);
+                    })),
+            IDENTITY);
+    PrintStream console = System.err;
+    ByteArrayOutputStream log = new ByteArrayOutputStream();
+    System.setErr(new PrintStream(log, true, StandardCharsets.UTF_8));
+    ConnectionTestResult result;
+    try {
+      result = run(service, Map.of("connectionType", "sql"));
+    } finally {
+      System.setErr(console);
+    }
+
+    String logged = log.toString(StandardCharsets.UTF_8);
+    assertEquals("invalid input syntax for type integer: \"row-value-4711\"", result.message());
+    assertTrue(
+        logged.contains("Connection test req-1 failed: The database answered with SQLSTATE 22P02."),
+        logged);
+    assertFalse(logged.contains("row-value-4711"), logged);
   }
 
   @Test
   void aReferenceInADecryptedPasswordIsRefusedLikeTheReleaseWithoutQuotingIt() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("mqtt", connector -> ProbeResult.success("ok"))),
+            List.of(prober("mqtt", connector -> ProbeResult.success("ok", null))),
             connector -> {
               Map<String, Object> plain = new HashMap<>(connector);
               plain.put("password", "pw-#{x}-tail");
@@ -312,7 +383,7 @@ class ConnectionTestServiceTest {
   void aReferenceInAListValueIsRefusedNamingItsPlace() {
     ConnectionTestService service =
         new ConnectionTestService(
-            List.of(prober("mqtt", connector -> ProbeResult.success("ok"))), IDENTITY);
+            List.of(prober("mqtt", connector -> ProbeResult.success("ok", null))), IDENTITY);
 
     ConnectionTestResult result =
         run(service, Map.of("connectionType", "mqtt", "topics", List.of("sensors/${x}")));

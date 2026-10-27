@@ -140,6 +140,15 @@ class HttpProberAuthenticationTest {
         });
     server.createContext("/api", exchange -> respond(exchange, 200, "{}"));
     server.createContext(
+        "/echo",
+        exchange ->
+            respond(
+                exchange,
+                200,
+                "{\"Authorization\": \""
+                    + exchange.getRequestHeaders().getFirst("Authorization")
+                    + "\"}"));
+    server.createContext(
         "/token",
         exchange ->
             respond(
@@ -248,6 +257,18 @@ class HttpProberAuthenticationTest {
     assertEquals("application/x-www-form-urlencoded", token.headers().get("Content-type"));
     assertEquals("grant_type=client_credentials&scope=read%20write", token.body());
     assertEquals("Bearer " + ACCESS_TOKEN, api().authorization());
+  }
+
+  @Test
+  void masksTheAccessTokenThatAnApiEchoes() throws Exception {
+    Map<String, Object> call = call();
+    call.put("path", "/echo");
+
+    ProbeResult result =
+        prober.probe(connector(call, oauth2("/token", null)), "api", new Cancellation());
+
+    assertTrue(result.success(), result.message());
+    assertEquals("{\"Authorization\": \"Bearer ********\"}", result.preview());
   }
 
   @Test

@@ -98,7 +98,7 @@ class ConnectionTestDispatcherTest {
           Thread.currentThread().interrupt();
           throw new ConnectionTestFailure("interrupted");
         }
-        return ProbeResult.success("ok");
+        return ProbeResult.success("ok", null);
       }
     };
   }

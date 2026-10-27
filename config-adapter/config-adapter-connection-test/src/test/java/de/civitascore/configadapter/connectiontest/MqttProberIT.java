@@ -131,6 +131,7 @@ class MqttProberIT {
     assertTrue(
         result.message().contains("with MQTT " + version + " and subscribed to 'sensors/+/temp'"),
         result.message());
+    assertNull(result.preview());
   }
 
   @ParameterizedTest

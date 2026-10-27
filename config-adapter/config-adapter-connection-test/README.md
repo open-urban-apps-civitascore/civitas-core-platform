@@ -9,7 +9,7 @@ It is neither a `ConfigAdapter` nor a `SagaCommandHandler`. It runs as a workloa
 | Topic | Message | Key |
 |---|---|---|
 | `de.civitascore.connectiontest.request` | `ConnectionTestRequest`: `requestId`, `expiresAt`, `connector`, `apiCall` | request id |
-| `de.civitascore.connectiontest.result` | `ConnectionTestResult`: `requestId`, `outcome` (`SUCCESS`/`FAILURE`), `reason`, `message`, `rowCount`, `httpStatus`, `durationMillis` | request id |
+| `de.civitascore.connectiontest.result` | `ConnectionTestResult`: `requestId`, `outcome` (`SUCCESS`/`FAILURE`), `reason`, `message`, `preview`, `previewTruncated`, `rowCount`, `httpStatus`, `durationMillis` | request id |
 
 - Both records are in `config-adapter-api` (`model.connectiontest`) and travel as plain JSON.
 - The topic names are the defaults of `connectiontest.kafka.request-topic` / `result-topic`.
@@ -32,25 +32,27 @@ Delivery:
 
 ## What each type tests
 
-| Type | Client | Success |
-|---|---|---|
-| SQL | PostgreSQL JDBC driver, as NiFi's `QueryDatabaseTableRecord` | up to 5 rows read |
-| MQTT 3 | HiveMQ client, MQTT 3.1.1 | the broker grants the subscription |
-| MQTT 5 | HiveMQ client, as NiFi's `ConsumeMQTT` | the broker grants the subscription |
-| HTTP | JDK `HttpClient`, request built as the `GetHttpApiCall` processor builds it | a 2xx status with a body the pipeline reads |
+| Type | Client | Success | Preview |
+|---|---|---|---|
+| SQL | PostgreSQL JDBC driver, as NiFi's `QueryDatabaseTableRecord` | up to 5 rows read | rows as RFC 4180 CSV with a header; each value is sent cut to the preview size |
+| MQTT 3 | HiveMQ client, MQTT 3.1.1 | the broker grants the subscription | — |
+| MQTT 5 | HiveMQ client, as NiFi's `ConsumeMQTT` | the broker grants the subscription | — |
+| HTTP | JDK `HttpClient`, request built as the `GetHttpApiCall` processor builds it | a 2xx status with a body the pipeline reads | the body, as text |
 
-- **SQL runs no configured text as SQL.**
+- **SQL runs no configured text as SQL, except the `where` clause.**
   - The table and each column go to the database only as bind parameters of `to_regclass(?)` and `parse_ident(?)`. These resolve them with the parser's quoting, case folding and search path.
   - The query uses the names that the catalog returns, quoted by `quote_ident`, with `LIMIT ?`. It runs in a read-only transaction that is always rolled back.
-  - The `where` clause is free SQL and is **not** part of the test. The result says so.
+  - The `where` clause runs wrapped as `WHERE (...)`, as NiFi wraps it. With a stored password the backend sends only the connector as saved, so only a clause that an editor saved runs with it.
+  - A `where` clause with a `;` is refused, here and in the pipeline: the driver runs every statement of a query.
   - The test drops the DSN's own `connectTimeout`, `socketTimeout` and `loginTimeout`, because the driver prefers them to the test's limits.
-  - Each value is read as text, of which the database sends one character. Thus a table of wide rows (PostGIS polygons) costs little.
+  - Each value is read as text and cut by the database to one character more than the preview holds. The rows come one per fetch. Thus a table of wide rows (PostGIS polygons) costs no more than its preview.
 - **MQTT checks the SUBACK code.** A refused subscription is a failure. The test waits for no message. MQTT 5 asks for no retained messages, and messages that arrive before the disconnect are dropped. A broker with a Mosquitto `acl_file` grants a subscription and then delivers nothing to it, so such a test succeeds. The dynamic security plugin refuses the subscription in the SUBACK.
-- **HTTP follows no redirect.** It reads the first 8 KB of the body to tell whether the pipeline reads it.
+- **HTTP follows no redirect.** It reads the body up to the preview limit.
+  - A `gzip` or `deflate` body is decompressed for the preview. Another content encoding is described, not shown.
   - Every authentication other than `NONE` needs an https base URL: Basic, a bearer token (`Authorization: Bearer`), an API token in the named header or query parameter, OAuth 2.0 and a client certificate.
   - OAuth 2.0 uses the client credentials grant (RFC 6749 §4.4). The test posts to the https token URL with the client ID and secret as HTTP Basic (`client_secret_basic`) and sends the `access_token` of the answer as a bearer token. The token URL passes the same destination check, and the token request and the API call together get the time of one test. A token endpoint that answers with a non-2xx status or without an access token is a `SOURCE_ERROR`; the message keeps the status and an RFC 6749 error code, never the rest of the answer, and the API is not called.
   - A client certificate is a PEM certificate, optionally followed by its chain, with an unencrypted PKCS#8 PEM key (`BEGIN PRIVATE KEY`) of type RSA or EC. Another key format is `INVALID_CONNECTOR`. The JVM default CAs stay the trusted CAs.
-  - A non-2xx status is a failure that keeps the status.
+  - A non-2xx status is a failure that keeps status and body.
   - A 2xx body is judged as the pipeline reads it. Not JSON, or compressed: failure, because the pipeline's web client does not unpack it. JSON without an object (`[]`, scalars): success, with a note that the pipeline reads no record from it.
 - **A value with `${` or `#{` is refused**, as a release refuses it, because the pipeline engine would evaluate it. The message names the field, never the value.
 
@@ -58,11 +60,11 @@ Delivery:
 
 ## Limits and secrets
 
-- A message has at most 500 characters. A result holds no rows and no body of the source.
-- Every decrypted secret is masked in the message. The OAuth 2.0 access token is never put in a message.
+- A message has at most 500 characters. A preview has at most 8 KB of UTF-8, with a `[truncated]` marker. A body that is not text is described, not shown.
+- Every decrypted secret is masked in message and preview. A credential that the test sends and an API echoes back is masked in the preview too, the OAuth 2.0 access token included. The OAuth 2.0 access token is never put in a message.
 - A message keeps the source's own answer (`password authentication failed`, `NOT_AUTHORIZED`, the HTTP status). A failure of the test's own client is named by its type, never by its text.
 - A connection that fails after its connect timeout is `TIMEOUT`, for every connector type.
-- Logs carry the request id, outcome and duration. At DEBUG they also carry the masked failure message.
+- Logs carry the request id, outcome and duration. At DEBUG they also carry the masked failure message; a database's own answer, which can quote a row value, only as its SQLSTATE.
 
 ## Destinations
 
@@ -72,7 +74,7 @@ Delivery:
 
 The client resolves the name again when it connects. `GuardedResolver` is installed as the JVM's resolver through `java.net.spi.InetAddressResolverProvider`. For two minutes it checks every resolution of a name that a test let through, for every client, thread and spelling of the name. Thus the name cannot give the check a public address and the connection an internal one (DNS rebinding). All other names resolve unchanged through the built-in resolver.
 
-BSI TR-03187 W-16 asks for an allowlist of destinations. Data sources are arbitrary hosts, so the test relies on the network position of its own workload. The same control applies to the pipeline in NiFi.
+BSI TR-03187 W-16 asks for an allowlist of destinations. Data sources are arbitrary hosts, so the test relies on the network position of its own workload. The same control applies to the pipeline in NiFi. The test shows what a destination answers, and every tenant-wide reader of data sources may test values that no data source holds. Thus the network position, not the permission, decides which destinations a test reaches.
 
 ## Known differences from the pipeline
 
@@ -83,7 +85,6 @@ BSI TR-03187 W-16 asks for an allowlist of destinations. Data sources are arbitr
 | HTTP status 408, 429 or 5xx | a failure like any non-2xx status | retried as transient |
 | HTTP 2xx with an empty body | success | no record |
 | Broker or API with a private CA | fails: the JVM default CAs are trusted | depends on the NiFi pipeline truststore, a copy of the JDK `cacerts` |
-| SQL `where` clause | not run | run |
 | MQTT over WebSocket (`ws://`, `wss://`) | connects to the URL's path, `/` if none | MQTT 3: `/mqtt` if the URL has no path; MQTT 5: the path is dropped |
 | HTTP API that answers slowly | the whole exchange must end within the test's 15 s | 15 s for the headers, then up to 15 s between body reads |
 | MQTT broker that accepts TCP and never answers, with a request that leaves less than 15 s | answered as TIMEOUT when the request runs out; the connection attempt itself ends after 13 s | — |

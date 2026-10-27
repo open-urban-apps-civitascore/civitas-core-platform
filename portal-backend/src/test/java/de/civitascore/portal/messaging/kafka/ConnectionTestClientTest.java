@@ -85,7 +85,8 @@ class ConnectionTestClientTest {
   }
 
   private static ConnectionTestResult success(String requestId) {
-    return new ConnectionTestResult(requestId, Outcome.SUCCESS, null, "1 row", 1, null, 42);
+    return new ConnectionTestResult(
+        requestId, Outcome.SUCCESS, null, "1 row", "id\n1\n", false, 1, null, 42);
   }
 
   private void acknowledgeSends() {

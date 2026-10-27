@@ -26,10 +26,12 @@ import java.util.Set;
 import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -139,8 +141,6 @@ class ConnectorJsonTest {
         "{'connectorType':'MQTT','urls':['tcp://u:pw@broker:1883','no url']}"
             + " | Invalid value: connector.urls[1]",
         "{'connectorType':'SQL','dsn':'postgres://u:pw@ bad'} | Invalid value: connector.dsn",
-        "{'connectorType':'SQL','dsn':'postgres://db.example:5432#@attacker.example/city'}"
-            + " | Invalid value: connector.dsn",
         "['SQL'] | Invalid value: connector",
         "{'connectorType':'HTTP','apiCalls':[{'foo':1}]} | Unknown key: connector.apiCalls[0].foo",
         "{'connectorType':'HTTP','authentication':{'type':'DIGEST'}}"
@@ -264,6 +264,133 @@ class ConnectorJsonTest {
     Map<String, Object> document = ConnectorJson.toDocument(connector, stored, ENCRYPT);
 
     assertThat(document).containsEntry("password", null);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "postgres://db.example:5432/city?sslmode=require&sslmode=require",
+        "postgres://db.example:5432#@attacker.example/city"
+      })
+  void readStored_withADsnThatAWriteRefuses_readsIt(String dsn) {
+    ConnectorConfiguration stored =
+        ConnectorJson.readStored(
+            ConnectorType.SQL, Map.of("connectionType", "sql", "dsn", dsn, "table", "t"));
+
+    assertThat(((SqlConnectorConfiguration) stored).dsn()).isEqualTo(dsn);
+  }
+
+  private static final Map<String, Object> STORED_SQL =
+      Map.of(
+          "connectionType", "sql",
+          "dsn", "postgres://db.example:5432/city?sslmode=require",
+          "password", "ENC(sql)");
+
+  @ParameterizedTest
+  @CsvSource(
+      delimiter = '|',
+      value = {
+        "postgres://other.example:5432/city?sslmode=require",
+        "postgres://db.example:5433/city?sslmode=require",
+        "postgres://db.example:5432/city?sslmode=disable",
+        "postgres://db.example:5432/city?SSLMODE=require"
+      })
+  void toDocument_withStoredSecretForOtherDestination_refusesIt(String dsn) {
+    ConnectorConfiguration connector =
+        ConnectorJson.read(
+            json("{'connectorType':'SQL','dsn':'" + dsn + "','password':'********'}"));
+
+    assertThatThrownBy(() -> ConnectorJson.toDocument(connector, STORED_SQL, ENCRYPT))
+        .isInstanceOf(StoredSecretRefusedException.class)
+        .hasMessage(
+            "The stored secret is kept only for the stored destination; enter it again for another one");
+  }
+
+  /** A merge patch that omits the password keeps it as a placeholder. */
+  @Test
+  void toDocument_withPatchOfTheHostOnly_refusesTheStoredSecret() {
+    ConnectorConfiguration patched =
+        ConnectorJson.patch(
+            ConnectorJson.readStored(ConnectorType.SQL, STORED_SQL),
+            json("{'dsn':'postgres://other.example:5432/city?sslmode=require'}"));
+
+    assertThatThrownBy(() -> ConnectorJson.toDocument(patched, STORED_SQL, ENCRYPT))
+        .isInstanceOf(StoredSecretRefusedException.class);
+  }
+
+  @Test
+  void toDocument_withStoredSecretForSameDestination_keepsIt() {
+    ConnectorConfiguration connector =
+        ConnectorJson.read(
+            json(
+                "{'connectorType':'SQL','dsn':'postgres://db.example:5432/other?sslmode=require',"
+                    + "'table':'other','password':'********'}"));
+
+    assertThat(ConnectorJson.toDocument(connector, STORED_SQL, ENCRYPT))
+        .containsEntry("password", "ENC(sql)");
+  }
+
+  @Test
+  void toDocument_withNewSecretForOtherDestination_storesTheNewSecret() {
+    ConnectorConfiguration connector =
+        ConnectorJson.read(
+            json(
+                "{'connectorType':'SQL','dsn':'postgres://other.example:5432/city',"
+                    + "'password':'new-secret'}"));
+
+    assertThat(ConnectorJson.toDocument(connector, STORED_SQL, ENCRYPT))
+        .containsEntry("password", "ENC(new-secret)");
+  }
+
+  @Test
+  void toDocument_withStoredSecretForOtherBrokerOrApiHost_refusesIt() {
+    Map<String, Object> storedMqtt =
+        Map.of(
+            "connectionType",
+            "mqtt",
+            "urls",
+            List.of("tcp://broker.example:1883"),
+            "password",
+            "ENC(mqtt)");
+    ConnectorConfiguration mqtt =
+        ConnectorJson.read(
+            json(
+                "{'connectorType':'MQTT','urls':['tcp://other.example:1883'],'password':'********'}"));
+    ConnectorConfiguration http =
+        ConnectorJson.read(
+            json(HTTP_BASIC.formatted("********").replace("api.example.org", "other.example")));
+
+    assertThatThrownBy(() -> ConnectorJson.toDocument(mqtt, storedMqtt, ENCRYPT))
+        .isInstanceOf(StoredSecretRefusedException.class);
+    assertThatThrownBy(() -> ConnectorJson.toDocument(http, storedHttpBasic(), ENCRYPT))
+        .isInstanceOf(StoredSecretRefusedException.class);
+  }
+
+  private static final String HTTP_OAUTH2 =
+      "{'connectorType':'HTTP','baseUrl':'https://api.example.org',"
+          + "'authentication':{'type':'OAUTH2','tokenUrl':'%s','clientId':'c',"
+          + "'clientSecret':'%s'},'apiCalls':[{'name':'a','path':'/x'}]}";
+
+  @Test
+  void toDocument_withStoredClientSecretForAnotherTokenHost_refusesIt() {
+    Map<String, Object> stored =
+        ConnectorJson.toDocument(
+            ConnectorJson.read(
+                json(HTTP_OAUTH2.formatted("https://auth.example.org/token", "secret"))),
+            null,
+            ENCRYPT);
+    ConnectorConfiguration otherHost =
+        ConnectorJson.read(json(HTTP_OAUTH2.formatted("https://other.example/token", "********")));
+    ConnectorConfiguration otherPath =
+        ConnectorJson.read(
+            json(HTTP_OAUTH2.formatted("https://auth.example.org/oauth2/token", "********")));
+
+    assertThatThrownBy(() -> ConnectorJson.toDocument(otherHost, stored, ENCRYPT))
+        .isInstanceOf(StoredSecretRefusedException.class);
+    assertThat(ConnectorJson.toDocument(otherPath, stored, ENCRYPT))
+        .extractingByKey("authentication")
+        .asInstanceOf(InstanceOfAssertFactories.MAP)
+        .containsEntry("clientSecret", "ENC(secret)");
   }
 
   @Test

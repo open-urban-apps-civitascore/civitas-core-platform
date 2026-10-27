@@ -119,7 +119,7 @@ public record HttpConnectorConfiguration(
           @NotNull(groups = OnRelease.class, message = "'username' is required") @Pattern(regexp = "^[^:]*$", message = "'username' must not contain ':'") String username,
       @Schema(
               description =
-                  "Basic auth password. Responses show \"********\" for a stored password.",
+                  "Basic auth password. Responses show \"********\" for a stored password; a write keeps it with \"********\" while the destination stays.",
               implementation = String.class,
               accessMode = Schema.AccessMode.WRITE_ONLY,
               format = "password",

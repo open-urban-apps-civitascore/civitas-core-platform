@@ -11,6 +11,7 @@ package de.civitascore.configadapter.connectiontest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -38,13 +39,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPOutputStream;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,6 +61,12 @@ class HttpProberTest {
 
   private static HttpServer server;
   private static final List<HttpExchange> REQUESTS = new CopyOnWriteArrayList<>();
+
+  /** Lets the {@code /slow} handler end with the test that started it. */
+  private static volatile CountDownLatch slowRelease = new CountDownLatch(1);
+
+  /** The Authorization header the echoing API received in this test. */
+  private final AtomicReference<String> echoedAuthorization = new AtomicReference<>();
 
   /** Accepts every host: the server runs on the loopback interface the guard refuses. */
   private static final DestinationCheck ANY_HOST = host -> {};
@@ -75,10 +87,37 @@ class HttpProberTest {
           respond(exchange, 302, "text/plain", "");
         });
     server.createContext(
+        "/large", exchange -> respond(exchange, 200, "text/plain", "ä".repeat(10_000)));
+    server.createContext(
         "/archive",
         exchange -> {
           exchange.getResponseHeaders().add("Content-Type", "application/zip");
           byte[] bytes = new byte[] {0x50, 0x4b, 0x03, 0x04, 0, 0, 0};
+          exchange.sendResponseHeaders(200, bytes.length);
+          try (OutputStream body = exchange.getResponseBody()) {
+            body.write(bytes);
+          }
+        });
+    server.createContext(
+        "/sheet",
+        exchange -> {
+          exchange
+              .getResponseHeaders()
+              .add(
+                  "Content-Type",
+                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+          byte[] bytes = new byte[] {0x50, 0x4b, 0x03, 0x04, 0x14, 0, 0, 0};
+          exchange.sendResponseHeaders(200, bytes.length);
+          try (OutputStream body = exchange.getResponseBody()) {
+            body.write(bytes);
+          }
+        });
+    server.createContext(
+        "/not-gzip",
+        exchange -> {
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.getResponseHeaders().add("Content-Encoding", "gzip");
+          byte[] bytes = "{\"ok\":true}".getBytes(StandardCharsets.UTF_8);
           exchange.sendResponseHeaders(200, bytes.length);
           try (OutputStream body = exchange.getResponseBody()) {
             body.write(bytes);
@@ -102,22 +141,59 @@ class HttpProberTest {
           }
         });
     server.createContext(
-        "/large",
-        exchange ->
-            respond(
-                exchange,
-                200,
-                "application/json",
-                "[" + "{\"id\":1},".repeat(2_000) + "{\"id\":1}]"));
+        "/deflated",
+        exchange -> {
+          ByteArrayOutputStream compressed = new ByteArrayOutputStream();
+          try (DeflaterOutputStream deflate = new DeflaterOutputStream(compressed)) {
+            deflate.write("{\"ok\":true}".getBytes(StandardCharsets.UTF_8));
+          }
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.getResponseHeaders().add("Content-Encoding", "deflate");
+          exchange.sendResponseHeaders(200, compressed.size());
+          try (OutputStream body = exchange.getResponseBody()) {
+            body.write(compressed.toByteArray());
+          }
+        });
+    server.createContext(
+        "/untyped-binary",
+        exchange -> {
+          byte[] bytes = {0x50, 0x4b, 0x00, 0x01};
+          exchange.sendResponseHeaders(200, bytes.length);
+          try (OutputStream body = exchange.getResponseBody()) {
+            body.write(bytes);
+          }
+        });
+    server.createContext(
+        "/brotli",
+        exchange -> {
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.getResponseHeaders().add("Content-Encoding", "br");
+          byte[] bytes = {0x1b, 0x0a, 0x00, 0x00};
+          exchange.sendResponseHeaders(200, bytes.length);
+          try (OutputStream body = exchange.getResponseBody()) {
+            body.write(bytes);
+          }
+        });
     server.createContext(
         "/slow",
         exchange -> {
+          // Records nothing: by the time it ends, another test may run.
           try {
-            Thread.sleep(10_000);
+            slowRelease.await(10, TimeUnit.SECONDS);
           } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
           }
-          respond(exchange, 200, "text/plain", "late");
+          exchange.close();
+        });
+    server.createContext(
+        "/latin1",
+        exchange -> {
+          exchange.getResponseHeaders().add("Content-Type", "text/plain; charset=ISO-8859-1");
+          byte[] bytes = "Grüße".getBytes(StandardCharsets.ISO_8859_1);
+          exchange.sendResponseHeaders(200, bytes.length);
+          try (OutputStream body = exchange.getResponseBody()) {
+            body.write(bytes);
+          }
         });
     server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
     server.start();
@@ -133,12 +209,19 @@ class HttpProberTest {
     REQUESTS.clear();
   }
 
+  @AfterEach
+  void releaseSlowRequests() {
+    slowRelease.countDown();
+    slowRelease = new CountDownLatch(1);
+  }
+
   @Test
-  void returnsTheStatusOfTheNamedApiCall() throws Exception {
+  void returnsTheStatusAndBodyOfTheNamedApiCall() throws Exception {
     ProbeResult result = probe(call("stations", "/stations"), "stations");
 
     assertTrue(result.success());
     assertEquals(200, result.httpStatus());
+    assertEquals("[{\"id\":1}]", result.preview());
     assertEquals("The API answered with HTTP 200.", result.message());
   }
 
@@ -164,11 +247,12 @@ class HttpProberTest {
   }
 
   @Test
-  void aStatusOutside2xxIsAFailureThatKeepsTheStatus() throws Exception {
+  void aStatusOutside2xxIsAFailureThatKeepsStatusAndBody() throws Exception {
     ProbeResult result = probe(call("secured", "/secured"), "secured");
 
     assertFalse(result.success());
     assertEquals(401, result.httpStatus());
+    assertEquals("login first", result.preview());
   }
 
   @Test
@@ -182,12 +266,56 @@ class HttpProberTest {
   }
 
   @Test
-  void failsABinaryBodyAsThePipelineReadsJsonOnly() throws Exception {
+  void keepsTheStartOfALargeBodyAndSaysItIsTruncated() throws Exception {
+    ProbeResult result = probe(call("large", "/large"), "large");
+
+    assertTrue(result.truncated());
+    // The preview and a 1 KB masking margin; the 8 KB cut is ResultText's.
+    assertTrue(result.preview().getBytes(StandardCharsets.UTF_8).length <= 9216);
+    assertTrue(result.preview().startsWith("ää"));
+  }
+
+  @Test
+  void describesABinaryBodyInsteadOfShowingItAndFailsItAsThePipelineReadsJsonOnly()
+      throws Exception {
     ProbeResult result = probe(call("archive", "/archive"), "archive");
 
     assertFalse(result.success());
     assertEquals(200, result.httpStatus());
-    assertTrue(result.message().contains("not JSON"), result.message());
+    assertEquals(
+        "The API answered with HTTP 200. The body is not JSON; the pipeline reads JSON only."
+            + " It holds 7 bytes of application/zip, which the test does not show.",
+        result.message());
+    assertNull(result.preview());
+  }
+
+  @Test
+  void describesAnOfficeDocumentInsteadOfShowingIt() throws Exception {
+    ProbeResult result = probe(call("sheet", "/sheet"), "sheet");
+
+    assertFalse(result.success());
+    assertTrue(
+        result
+            .message()
+            .endsWith(
+                " It holds 8 bytes of"
+                    + " application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,"
+                    + " which the test does not show."),
+        result.message());
+    assertNull(result.preview());
+  }
+
+  @Test
+  void keepsTheStatusOfABodyThatIsNotTheEncodingItNames() throws Exception {
+    ProbeResult result = probe(call("not-gzip", "/not-gzip"), "not-gzip");
+
+    assertFalse(result.success());
+    assertEquals(200, result.httpStatus());
+    assertEquals(
+        "The API answered with HTTP 200. The body is compressed (gzip), which the pipeline does"
+            + " not unpack. It is not valid gzip, so the test does not show it.",
+        result.message());
+    assertNull(result.preview());
   }
 
   @Test
@@ -199,59 +327,87 @@ class HttpProberTest {
   }
 
   @Test
-  void anEmptyBodyIsASuccess() throws Exception {
+  void anEmptyBodyHasNoPreview() throws Exception {
     ProbeResult result = probe(call("empty", "/empty"), "empty");
 
     assertTrue(result.success());
     assertEquals(204, result.httpStatus());
+    assertNull(result.preview());
   }
 
   @Test
-  void failsAGzipEncodedBodyAsThePipelineDoesNotUnpackIt() throws Exception {
+  void showsAGzipEncodedBodyButFailsItAsThePipelineDoesNotUnpackIt() throws Exception {
     ProbeResult result = probe(call("gzipped", "/gzipped"), "gzipped");
 
+    assertEquals("{\"ok\":true}", result.preview());
     assertFalse(result.success());
     assertTrue(result.message().contains("compressed (gzip)"), result.message());
   }
 
   @Test
-  void judgesABodyLongerThanTheReadLimitByItsStart() throws Exception {
-    ProbeResult result = probe(call("large", "/large"), "large");
+  void showsADeflateEncodedBodyButFailsItAsThePipelineDoesNotUnpackIt() throws Exception {
+    ProbeResult result = probe(call("deflated", "/deflated"), "deflated");
 
-    assertTrue(result.success(), result.message());
-    assertEquals("The API answered with HTTP 200.", result.message());
+    assertEquals("{\"ok\":true}", result.preview());
+    assertFalse(result.success());
+    assertTrue(result.message().contains("compressed (deflate)"), result.message());
   }
 
   @Test
-  void sendsTheBasicCredentialOverHttps(@TempDir Path dir) throws Exception {
-    SSLContext tls = selfSignedTls(dir);
-    HttpsServer api =
-        HttpsServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-    api.setHttpsConfigurator(new HttpsConfigurator(tls));
-    api.createContext("/basic", exchange -> respond(exchange, 200, "application/json", "{}"));
-    api.start();
-    Map<String, Object> connector = connector(call("basic", "/basic"));
-    connector.put(
-        "baseUrl",
-        "https://"
-            + InetAddress.getLoopbackAddress().getHostAddress()
-            + ":"
-            + api.getAddress().getPort());
-    connector.put(
-        "authentication", Map.of("type", "BASIC", "username", "user", "password", "s3cret"));
-    SSLContext jvmDefault = SSLContext.getDefault();
-    // The prober trusts the JVM's default context, so the test certificate must be in it.
-    SSLContext.setDefault(tls);
-    try {
-      ProbeResult result = prober.probe(connector, "basic", new Cancellation());
+  void describesABodyWithANulByteAndNoContentTypeInsteadOfShowingIt() throws Exception {
+    ProbeResult result = probe(call("untyped-binary", "/untyped-binary"), "untyped-binary");
 
-      assertTrue(result.success(), result.message());
-      assertEquals(
-          "Basic dXNlcjpzM2NyZXQ=", REQUESTS.get(0).getRequestHeaders().getFirst("Authorization"));
-    } finally {
-      SSLContext.setDefault(jvmDefault);
-      api.stop(0);
-    }
+    assertFalse(result.success());
+    assertTrue(
+        result
+            .message()
+            .endsWith(" It holds 4 bytes of binary data, which the test does not show."),
+        result.message());
+    assertNull(result.preview());
+  }
+
+  @Test
+  void describesABodyInAnEncodingItCannotDecode() throws Exception {
+    ProbeResult result = probe(call("brotli", "/brotli"), "brotli");
+
+    assertTrue(
+        result.message().endsWith(" It holds 4 bytes encoded as br, which the test does not show."),
+        result.message());
+    assertNull(result.preview());
+    assertFalse(result.success());
+  }
+
+  @Test
+  void masksTheBasicCredentialAnEchoingApiReturns(@TempDir Path dir) throws Exception {
+    ProbeResult result = probeEchoingApi(dir, "");
+
+    assertTrue(result.success(), result.message());
+    assertEquals("Basic dXNlcjpzM2NyZXQ=", echoedAuthorization.get());
+    assertEquals("{\"pad\": \"\", \"Authorization\": \"Basic ********\"}", result.preview());
+  }
+
+  @Test
+  void masksAnEchoedCredentialWithJsonEscapedSlashes(@TempDir Path dir) throws Exception {
+    // PHP's json_encode writes "/" as "\/" by default; this credential is dXNlcjpzM2NyZXQ/.
+    ProbeResult result = probeEchoingApi(dir, "", "s3cret?", true);
+
+    assertTrue(result.success(), result.message());
+    assertEquals("{\"pad\": \"\", \"Authorization\": \"Basic ********\"}", result.preview());
+  }
+
+  /**
+   * The credential starts 10 bytes before the preview limit, so a cut there leaves "Basic dXNl".
+   */
+  @Test
+  void masksAnEchoedCredentialThatCrossesThePreviewLimit(@TempDir Path dir) throws Exception {
+    int before = "{\"pad\": \"".length() + "\", \"Authorization\": \"".length();
+    String pad = "x".repeat(ResultText.MAX_PREVIEW_BYTES - 10 - before);
+
+    ProbeResult result = probeEchoingApi(dir, pad);
+
+    assertTrue(
+        result.preview().contains("\"Authorization\": \"Basic ********\""), result.preview());
+    assertFalse(result.preview().contains("dXNl"));
   }
 
   @Test
@@ -271,6 +427,68 @@ class HttpProberTest {
             ConnectionTestFailure.class, () -> prober.probe(connector, "root", new Cancellation()));
 
     assertEquals(Reason.SOURCE_ERROR, failure.reason(), failure.getMessage());
+  }
+
+  /** Probes an HTTPS API that answers with the Authorization header it received. */
+  private ProbeResult probeEchoingApi(Path dir, String pad) throws Exception {
+    return probeEchoingApi(dir, pad, "s3cret", false);
+  }
+
+  /**
+   * @param escapeSlashes whether the API writes each {@code /} of the header as {@code \/}
+   */
+  private ProbeResult probeEchoingApi(Path dir, String pad, String password, boolean escapeSlashes)
+      throws Exception {
+    SSLContext tls = selfSignedTls(dir);
+    HttpsServer echo =
+        HttpsServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+    echo.setHttpsConfigurator(new HttpsConfigurator(tls));
+    echo.createContext(
+        "/headers",
+        exchange -> {
+          String authorization = exchange.getRequestHeaders().getFirst("Authorization");
+          echoedAuthorization.set(authorization);
+          respond(
+              exchange,
+              200,
+              "application/json",
+              "{\"pad\": \""
+                  + pad
+                  + "\", \"Authorization\": \""
+                  + echoed(authorization, escapeSlashes)
+                  + "\"}");
+        });
+    echo.start();
+    Map<String, Object> connector = connector(call("headers", "/headers"));
+    connector.put(
+        "baseUrl",
+        "https://"
+            + InetAddress.getLoopbackAddress().getHostAddress()
+            + ":"
+            + echo.getAddress().getPort());
+    connector.put(
+        "authentication", Map.of("type", "BASIC", "username", "user", "password", password));
+    SSLContext jvmDefault = SSLContext.getDefault();
+    // The prober trusts the JVM's default context, so the test certificate must be in it.
+    SSLContext.setDefault(tls);
+    try {
+      return prober.probe(connector, "headers", new Cancellation());
+    } finally {
+      SSLContext.setDefault(jvmDefault);
+      echo.stop(0);
+    }
+  }
+
+  private static String echoed(String header, boolean escapeSlashes) {
+    return escapeSlashes ? header.replace("/", "\\/") : header;
+  }
+
+  @Test
+  void decodesTheBodyInItsDeclaredCharset() throws Exception {
+    ProbeResult result = probe(call("latin1", "/latin1"), "latin1");
+
+    assertEquals("Grüße", result.preview());
+    assertTrue(result.message().contains("not JSON"), result.message());
   }
 
   @Test
@@ -442,14 +660,14 @@ class HttpProberTest {
 
   /** A context that serves and trusts one self-signed certificate for the loopback address. */
   private static SSLContext selfSignedTls(Path dir) throws Exception {
-    Path keystore = dir.resolve("tls.p12");
+    Path keystore = dir.resolve("echo.p12");
     char[] password = "changeit".toCharArray();
     Process keytool =
         new ProcessBuilder(
                 Path.of(System.getProperty("java.home"), "bin", "keytool").toString(),
                 "-genkeypair",
                 "-alias",
-                "test",
+                "echo",
                 "-keyalg",
                 "EC",
                 "-dname",

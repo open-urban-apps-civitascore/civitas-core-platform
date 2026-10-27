@@ -28,16 +28,19 @@ import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.ConnectionTestInputDTO;
 import de.civitascore.portal.model.output.ConnectionTestResultDTO;
+import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.service.DataSourceService;
 import de.civitascore.portal.util.ConnectionTestBusyException;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.ExternalSystemTimeoutException;
+import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -55,6 +58,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -70,6 +74,7 @@ class DataSourceConnectionTestServiceTest {
   private final DataSourceConnectorStore connectorStore = mock(DataSourceConnectorStore.class);
   private final ConnectionTestClient client = mock(ConnectionTestClient.class);
   private final TextEncryptor encryptor = mock(TextEncryptor.class);
+  private final AllowedScopes scopes = new AllowedScopes();
 
   private DataSourceConnectionTestService service;
   private ListAppender<ILoggingEvent> logs;
@@ -80,6 +85,7 @@ class DataSourceConnectionTestServiceTest {
     when(encryptor.encrypt(any()))
         .thenAnswer(
             call -> "ENC(" + new StringBuilder(call.<String>getArgument(0)).reverse() + ")");
+    scopes.setWildcard();
     service = service(Optional.of(client));
     serviceLogger = (Logger) LoggerFactory.getLogger(DataSourceConnectionTestService.class);
     logs = new ListAppender<>();
@@ -98,14 +104,18 @@ class DataSourceConnectionTestServiceTest {
 
   private DataSourceConnectionTestService service(
       Optional<ConnectionTestClient> kafka, int maxConcurrent) {
+    @SuppressWarnings("unchecked")
+    ObjectProvider<AllowedScopes> allowedScopes = mock(ObjectProvider.class);
+    when(allowedScopes.getObject()).thenAnswer(call -> scopes);
     return new DataSourceConnectionTestService(
         dataSourceService,
         connectorStore,
-        new ConnectorValidator(List.of(new HttpConnectorRules())),
+        new ConnectorValidator(List.of(new HttpConnectorRules(), new SqlConnectorRules())),
         encryptor,
         () -> Optional.of(USER),
         new ConnectionTestProperties("request", "result", 20, maxConcurrent),
-        kafka);
+        kafka,
+        allowedScopes);
   }
 
   private static ConnectionTestInputDTO input(String connectorJson, String apiCall) {
@@ -141,7 +151,15 @@ class DataSourceConnectionTestServiceTest {
 
   private static ConnectionTestResult success(ConnectionTestRequest request) {
     return new ConnectionTestResult(
-        request.requestId(), Outcome.SUCCESS, null, "1 row", 1, null, 9);
+        request.requestId(),
+        Outcome.SUCCESS,
+        null,
+        "1 row",
+        "id,value\n1,20.5\n",
+        false,
+        1,
+        null,
+        9);
   }
 
   private void answer(Function<ConnectionTestRequest, ConnectionTestResult> f) {
@@ -398,6 +416,7 @@ class DataSourceConnectionTestServiceTest {
           arguments(Saved.SQL, "another port", "db.example:5432", "db.example:5433"),
           arguments(Saved.SQL, "another scheme", "postgres://", "postgresql://"),
           arguments(Saved.SQL, "the port left out", "db.example:5432", "db.example"),
+          arguments(Saved.SQL, "TLS turned off", "5432/city", "5432/city?sslmode=disable"),
           arguments(Saved.MQTT, "another host", "broker-b:1883", "broker-c:1883"),
           arguments(Saved.MQTT, "another port", "broker-a:1883", "broker-a:8883"),
           arguments(
@@ -405,7 +424,6 @@ class DataSourceConnectionTestServiceTest {
               "an added URL",
               "'tcp://broker-b:1883'",
               "'tcp://broker-b:1883','tcp://broker-c:1883'"),
-          arguments(Saved.MQTT, "a removed URL", ",'tcp://broker-b:1883'", ""),
           arguments(Saved.HTTP, "another host", "api.example.org", "api.attacker.example"),
           arguments(Saved.HTTP, "another port", "api.example.org/", "api.example.org:8443/"),
           arguments(
@@ -419,8 +437,16 @@ class DataSourceConnectionTestServiceTest {
       return Stream.of(
           arguments(Saved.SQL, "another table", "'readings'", "'stations'"),
           arguments(Saved.SQL, "other columns", "['id','value']", "['id']"),
+          arguments(
+              Saved.SQL, "a where clause", "['id','value']", "['id','value'],'where':'id > 1'"),
           arguments(Saved.SQL, "another database", ":5432/city", ":5432/archive"),
           arguments(Saved.MQTT, "another topic", "sensor/#", "weather/#"),
+          arguments(Saved.MQTT, "a removed URL", ",'tcp://broker-b:1883'", ""),
+          arguments(
+              Saved.MQTT,
+              "the URLs reordered",
+              "'tcp://broker-a:1883','tcp://broker-b:1883'",
+              "'tcp://broker-b:1883','tcp://broker-a:1883'"),
           arguments(Saved.HTTP, "another API call path", "'/stations'", "'/stations/active'"),
           arguments(Saved.HTTP_OAUTH2, "another token path", "/token", "/oauth2/token"));
     }
@@ -429,16 +455,30 @@ class DataSourceConnectionTestServiceTest {
       return Stream.concat(otherDestinations(), otherValuesAtTheSameDestination());
     }
 
-    @ParameterizedTest(name = "{0} with {1}")
-    @MethodSource("otherDestinations")
-    @DisplayName("stored secret of a draft is not sent to another destination")
-    void placeholderOfDraftForAnotherDestination_isRejected(
-        Saved saved, String change, String from, String to) {
-      UUID id = savedDataSource(DataSourceStatus.DRAFT, saved.stored());
+    static Stream<Arguments> changedValuesInEveryStatus() {
+      return Stream.of(DataSourceStatus.values())
+          .flatMap(
+              status ->
+                  changedValues()
+                      .map(
+                          values -> {
+                            Object[] each = values.get();
+                            return arguments(status, each[0], each[1], each[2], each[3]);
+                          }));
+    }
+
+    @ParameterizedTest(name = "{0}: {1} with {2}")
+    @MethodSource("changedValuesInEveryStatus")
+    @DisplayName("stored secret serves only the connector as saved")
+    void placeholderWithChangedValues_isRefused(
+        DataSourceStatus status, Saved saved, String change, String from, String to) {
+      UUID id = savedDataSource(status, saved.stored());
 
       assertThatThrownBy(() -> service.test(id, saved.requested(from, to)))
           .isInstanceOf(MalformedDataSourceRequestException.class)
-          .hasMessage(DataSourceConnectionTestService.STORED_SECRET_FOR_STORED_DESTINATION);
+          .hasMessage(
+              "The stored secret is kept only to test the connector as saved; enter it again to test"
+                  + " other values");
       verify(client, never()).test(any());
       assertThat(singleAuditLine()).endsWith("outcome=REFUSED");
     }
@@ -460,19 +500,6 @@ class DataSourceConnectionTestServiceTest {
       verify(client, never()).test(any());
     }
 
-    @ParameterizedTest(name = "{0} with {1}")
-    @MethodSource("otherValuesAtTheSameDestination")
-    @DisplayName("stored secret of a draft serves other values at the same destination")
-    void placeholderOfDraftForTheSameDestination_takesStoredCiphertext(
-        Saved saved, String change, String from, String to) {
-      UUID id = savedDataSource(DataSourceStatus.DRAFT, saved.stored());
-      answer(DataSourceConnectionTestServiceTest::success);
-
-      service.test(id, saved.requested(from, to));
-
-      assertThat(saved.sentSecret(sentRequest())).isEqualTo(STORED_SECRET);
-    }
-
     @Test
     @DisplayName("a new password may go to another destination")
     void newPasswordForAnotherDestination_isSentEncrypted() {
@@ -489,25 +516,17 @@ class DataSourceConnectionTestServiceTest {
       assertThat(sentRequest().connector()).containsEntry("password", "ENC(terces-wen)");
     }
 
-    @ParameterizedTest(name = "{0} with {1}")
-    @MethodSource("changedValues")
-    @DisplayName("stored secret of a released data source serves only its connector as released")
-    void placeholderOfReleasedDataSourceWithChangedValues_isRejected(
-        Saved saved, String change, String from, String to) {
-      UUID id = savedDataSource(DataSourceStatus.AVAILABLE, saved.stored());
-
-      assertThatThrownBy(() -> service.test(id, saved.requested(from, to)))
-          .isInstanceOf(MalformedDataSourceRequestException.class)
-          .hasMessage(DataSourceConnectionTestService.STORED_SECRET_FOR_RELEASED_CONNECTOR);
-      verify(client, never()).test(any());
-      assertThat(singleAuditLine()).endsWith("outcome=REFUSED");
+    static Stream<Arguments> savedConnectorsInEveryStatus() {
+      return Stream.of(DataSourceStatus.values())
+          .flatMap(status -> Stream.of(Saved.values()).map(saved -> arguments(status, saved)));
     }
 
-    @ParameterizedTest
-    @EnumSource(Saved.class)
-    @DisplayName("stored secret of a released data source tests its connector as released")
-    void placeholderOfReleasedDataSourceAsReleased_takesStoredCiphertext(Saved saved) {
-      UUID id = savedDataSource(DataSourceStatus.AVAILABLE, saved.stored());
+    @ParameterizedTest(name = "{0}: {1}")
+    @MethodSource("savedConnectorsInEveryStatus")
+    @DisplayName("stored secret tests the connector as saved")
+    void placeholderWithTheSavedConnector_takesStoredCiphertext(
+        DataSourceStatus status, Saved saved) {
+      UUID id = savedDataSource(status, saved.stored());
       answer(DataSourceConnectionTestServiceTest::success);
 
       service.test(id, saved.requested());
@@ -529,17 +548,96 @@ class DataSourceConnectionTestServiceTest {
   }
 
   @Nested
+  @DisplayName("Destinations of a saved data source")
+  class SavedDestinations {
+
+    private ConnectionTestInputDTO sqlAt(String host, String password) {
+      return input(
+          "{'connectorType':'SQL','driver':'postgres','dsn':'postgres://"
+              + host
+              + ":5432/city','table':'stations','columns':['id'],'user':'reader','password':'"
+              + password
+              + "'}",
+          null);
+    }
+
+    private void readerOf(UUID dataSourceId) {
+      scopes.setScopeIds(Set.of(dataSourceId));
+    }
+
+    @Test
+    @DisplayName("a reader of this data source only may not test another destination")
+    void readerOfThisDataSource_withAnotherDestination_isDenied() {
+      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
+      readerOf(id);
+
+      assertThatThrownBy(() -> service.test(id, sqlAt("other.example", "typed-secret")))
+          .isInstanceOf(ForbiddenException.class)
+          .hasMessage(
+              "Testing values for another destination needs DATASOURCE_READ for the whole tenant");
+      verify(client, never()).test(any());
+      assertThat(singleAuditLine()).endsWith("outcome=DENIED");
+    }
+
+    @Test
+    @DisplayName("a reader of this data source only tests other values at its destination")
+    void readerOfThisDataSource_atTheStoredDestination_isTested() {
+      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
+      readerOf(id);
+      answer(DataSourceConnectionTestServiceTest::success);
+
+      service.test(id, sqlAt("db.example", "typed-secret"));
+
+      assertThat(sentRequest().connector()).containsEntry("table", "stations");
+    }
+
+    @Test
+    @DisplayName("a DSN that repeats a parameter is refused before anything is sent")
+    void dsnRepeatingAParameter_isRefused() {
+      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
+
+      assertThatThrownBy(
+              () ->
+                  service.test(
+                      id,
+                      input(
+                          "{'connectorType':'SQL','driver':'postgres','dsn':"
+                              + "'postgres://db.example:5432/city?sslmode=require&sslmode=disable',"
+                              + "'table':'readings','columns':['id'],'user':'reader',"
+                              + "'password':'********'}",
+                          null)))
+          .isInstanceOf(ConnectorValidationException.class);
+      verify(client, never()).test(any());
+    }
+
+    @Test
+    @DisplayName("a tenant-wide reader tests another destination")
+    void tenantWideReader_withAnotherDestination_isTested() {
+      UUID id = savedDataSource(DataSourceStatus.DRAFT, sql(PLAIN_PASSWORD));
+      answer(DataSourceConnectionTestServiceTest::success);
+
+      service.test(id, sqlAt("other.example", "typed-secret"));
+
+      assertThat(sentRequest().connector())
+          .containsEntry("dsn", "postgres://other.example:5432/city");
+    }
+  }
+
+  @Nested
   @DisplayName("Result")
   class Result {
 
     @Test
-    @DisplayName("success answers with the message and the row count")
-    void success_answersWithTheMessageAndTheRowCount() {
+    @DisplayName("success answers with the preview")
+    void success_answersWithThePreview() {
       answer(DataSourceConnectionTestServiceTest::success);
 
       ConnectionTestResultDTO answer = service.test(sql(PLAIN_PASSWORD));
 
-      assertThat(answer).isEqualTo(new ConnectionTestResultDTO(true, null, "1 row", 1, null));
+      assertThat(answer)
+          .isEqualTo(
+              new ConnectionTestResultDTO(
+                  true, null, "1 row", "id,value\n1,20.5\n", false, 1, null));
       assertThat(singleAuditLine()).endsWith("outcome=SUCCESS");
     }
 
@@ -566,7 +664,7 @@ class DataSourceConnectionTestServiceTest {
 
       assertThatThrownBy(() -> service.test(sql(PLAIN_PASSWORD)))
           .isInstanceOf(ConnectionTestBusyException.class)
-          .hasMessage(DataSourceConnectionTestService.ADAPTER_BUSY);
+          .hasMessage("Too many connection tests are running; try again later");
       assertThat(singleAuditLine()).endsWith("outcome=BUSY");
     }
 
@@ -651,7 +749,7 @@ class DataSourceConnectionTestServiceTest {
 
       assertThatThrownBy(() -> limited.test(id, sql(PLAIN_PASSWORD)))
           .isInstanceOf(ConnectionTestBusyException.class)
-          .hasMessage(DataSourceConnectionTestService.ADAPTER_BUSY);
+          .hasMessage("Too many connection tests are running; try again later");
       verify(dataSourceService, never()).findByIdOrThrow(id);
       release.countDown();
 
@@ -707,7 +805,7 @@ class DataSourceConnectionTestServiceTest {
 
       assertThatThrownBy(() -> service.test(sql(PLAIN_PASSWORD)))
           .isInstanceOf(ConnectionTestBusyException.class)
-          .hasMessage(DataSourceConnectionTestService.USER_BUSY);
+          .hasMessage("A connection test of this user is still running");
       release.countDown();
 
       assertThat(first.get(5, TimeUnit.SECONDS).success()).isTrue();
@@ -737,7 +835,8 @@ class DataSourceConnectionTestServiceTest {
 
     @Test
     @DisplayName(
-        "audit line names user, request, data source, type, destination, target and outcome")
+        "audit line names user, request, data source, type, destination, target, data and"
+            + " outcome")
     void auditLine_namesWhoTestedWhatWhere() {
       answer(DataSourceConnectionTestServiceTest::success);
 
@@ -749,12 +848,26 @@ class DataSourceConnectionTestServiceTest {
                   + USER
                   + " requestId="
                   + sentRequest().requestId()
-                  + " dataSource=unsaved connectorType=SQL destination=\"db.example:5432\""
-                  + " target=\"readings\" outcome=SUCCESS");
+                  + " dataSource=unsaved connectorType=SQL destination=\"db.example:5432/city\""
+                  + " target=\"readings\" data=shown outcome=SUCCESS");
     }
 
     @Test
-    @DisplayName("no log line carries the connector's secret or query")
+    @DisplayName("audit line says no data was shown when the answer has no preview")
+    void auditLine_withoutPreview_saysNoData() {
+      answer(
+          request ->
+              ConnectionTestResult.failure(request.requestId(), Reason.SOURCE_ERROR, "no", 3));
+
+      service.test(sql(PLAIN_PASSWORD));
+
+      assertThat(singleAuditLine())
+          .contains(" data=none ")
+          .endsWith("outcome=FAILURE:SOURCE_ERROR");
+    }
+
+    @Test
+    @DisplayName("no log line carries the connector's secret, query or the preview")
     void logs_carryNoConnectorValues() {
       answer(DataSourceConnectionTestServiceTest::success);
 
@@ -764,6 +877,7 @@ class DataSourceConnectionTestServiceTest {
           .extracting(ILoggingEvent::getFormattedMessage)
           .noneMatch(message -> message.contains(PLAIN_PASSWORD))
           .noneMatch(message -> message.contains("secret_column"))
+          .noneMatch(message -> message.contains("20.5"))
           .noneMatch(message -> message.contains("ENC("));
     }
 
@@ -775,6 +889,17 @@ class DataSourceConnectionTestServiceTest {
       service.test(mqtt(null));
 
       assertThat(singleAuditLine()).contains("connectorType=MQTT destination=\"broker-a:1883\" ");
+    }
+
+    @Test
+    @DisplayName("target of an HTTP connector is the base path and the path of the call")
+    void target_ofHttp_isTheBasePathAndThePathOfTheCall() {
+      answer(DataSourceConnectionTestServiceTest::success);
+
+      service.test(http("stations"));
+
+      assertThat(singleAuditLine())
+          .contains("destination=\"api.example.org\" target=\"/v1/stations\" data=");
     }
 
     @Test

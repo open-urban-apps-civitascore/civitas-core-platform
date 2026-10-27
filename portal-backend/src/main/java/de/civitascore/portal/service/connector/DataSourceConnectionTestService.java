@@ -6,37 +6,38 @@ import de.civitascore.portal.configuration.ConnectionTestProperties;
 import de.civitascore.portal.messaging.kafka.ConnectionTestClient;
 import de.civitascore.portal.model.connector.ConnectorConfiguration;
 import de.civitascore.portal.model.connector.ConnectorJson;
+import de.civitascore.portal.model.connector.ConnectorUris;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration;
-import de.civitascore.portal.model.connector.HttpConnectorConfiguration.OAuth2;
 import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
 import de.civitascore.portal.model.connector.MqttConnectorConfiguration;
 import de.civitascore.portal.model.connector.SqlConnectorConfiguration;
-import de.civitascore.portal.model.embedded.DataSourceStatus;
+import de.civitascore.portal.model.connector.StoredSecretRefusedException;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.ConnectionTestInputDTO;
 import de.civitascore.portal.model.output.ConnectionTestResultDTO;
 import de.civitascore.portal.model.output.ConnectionTestResultDTO.Reason;
+import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.service.DataSourceService;
 import de.civitascore.portal.util.ConnectionTestBusyException;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.ExternalSystemTimeoutException;
+import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
 import org.springframework.stereotype.Service;
@@ -55,12 +56,11 @@ public class DataSourceConnectionTestService {
   static final String ADAPTER_BUSY = "Too many connection tests are running; try again later";
   private static final String UNSAVED = "unsaved";
   private static final String UNKNOWN = "unknown";
-  static final String STORED_SECRET_FOR_STORED_DESTINATION =
-      "The stored secret is kept only for the stored destination; enter it again to test another"
-          + " one";
-  static final String STORED_SECRET_FOR_RELEASED_CONNECTOR =
-      "The stored secret of a released data source is kept only to test its connector as released;"
-          + " enter it again to test other values";
+  static final String STORED_SECRET_FOR_SAVED_CONNECTOR =
+      "The stored secret is kept only to test the connector as saved; enter it again to test other"
+          + " values";
+  static final String OTHER_DESTINATION_NEEDS_TENANT_READ =
+      "Testing values for another destination needs DATASOURCE_READ for the whole tenant";
 
   private final DataSourceService dataSourceService;
   private final DataSourceConnectorStore connectorStore;
@@ -69,6 +69,7 @@ public class DataSourceConnectionTestService {
   private final AuditorAware<UUID> currentUser;
   private final ConnectionTestProperties properties;
   private final Optional<ConnectionTestClient> client;
+  private final ObjectProvider<AllowedScopes> allowedScopes;
 
   private final Set<String> usersTesting = ConcurrentHashMap.newKeySet();
   private final AtomicInteger running = new AtomicInteger();
@@ -83,30 +84,37 @@ public class DataSourceConnectionTestService {
    * @throws ExternalSystemTimeoutException if no answer arrives in time
    */
   public ConnectionTestResultDTO test(ConnectionTestInputDTO input) {
-    return bounded(() -> audited(null, null, null, input));
+    return bounded(() -> audited(null, SavedSource.NONE, input));
   }
 
   /**
    * Tests connector values for a saved data source in any status. A {@code "********"} placeholder
-   * keeps the stored secret only for a draft's stored destination or a released source's unchanged
-   * connector, so the secret cannot reach another host or other data.
+   * keeps the stored secret only to test the connector as saved, so the secret serves neither
+   * another host nor other data. Only a tenant-wide reader may test another destination.
    *
    * @throws ResourceNotFoundException if no such data source exists
    * @throws MalformedDataSourceRequestException for a placeholder the stored secret may not fill
+   * @throws ForbiddenException for another destination without a tenant-wide grant
    * @see #test(ConnectionTestInputDTO)
    */
   public ConnectionTestResultDTO test(UUID dataSourceId, ConnectionTestInputDTO input) {
     return bounded(
         () -> {
           DataSource dataSource = dataSourceService.findByIdOrThrow(dataSourceId);
-          boolean draft = dataSource.getDataSourceStatus() == DataSourceStatus.DRAFT;
-          if (mayKeepStoredSecrets(draft, input.getConnector(), connectorStore.read(dataSource))) {
-            return audited(dataSourceId, connectorStore.storedDocument(dataSource), null, input);
-          }
+          ConnectorConfiguration requested = input.getConnector();
+          ConnectorConfiguration stored = connectorStore.read(dataSource);
+          boolean unchanged = unchanged(requested, stored);
+          // OPA admits any reader of this data source; another destination needs a tenant-wide
+          // grant.
+          boolean otherDestinationDenied =
+              !allowedScopes.getObject().isWildcard()
+                  && (stored == null || !ConnectorUris.staysAtDestinationsOf(requested, stored));
           return audited(
               dataSourceId,
-              null,
-              draft ? STORED_SECRET_FOR_STORED_DESTINATION : STORED_SECRET_FOR_RELEASED_CONNECTOR,
+              new SavedSource(
+                  unchanged ? connectorStore.storedDocument(dataSource) : null,
+                  !unchanged,
+                  otherDestinationDenied),
               input);
         });
   }
@@ -129,39 +137,52 @@ public class DataSourceConnectionTestService {
     }
   }
 
-  private static boolean mayKeepStoredSecrets(
-      boolean draft, ConnectorConfiguration requested, ConnectorConfiguration stored) {
-    if (stored == null) {
-      return false;
-    }
-    return draft
-        ? destinations(requested).equals(destinations(stored))
-        : ConnectorJson.toMaskedTree(requested).equals(ConnectorJson.toMaskedTree(stored));
+  private static boolean unchanged(
+      ConnectorConfiguration requested, ConnectorConfiguration stored) {
+    return stored != null
+        && ConnectorJson.toMaskedTree(requested).equals(ConnectorJson.toMaskedTree(stored));
   }
 
   /**
-   * @param storedDocument the document whose secrets a placeholder may keep, or null
-   * @param placeholderRefusal why a placeholder may not keep the stored secret, or null
+   * What the stored data source allows a test to use.
+   *
+   * @param storedDocument the stored document, whose secrets a placeholder keeps; null if the
+   *     values differ from it
+   * @param changed whether the values differ from the stored connector
+   * @param otherDestinationDenied whether the values reach a destination the caller may not test
+   */
+  private record SavedSource(
+      Map<String, Object> storedDocument, boolean changed, boolean otherDestinationDenied) {
+
+    /** Values that no data source holds: no stored secret, any destination. */
+    static final SavedSource NONE = new SavedSource(null, false, false);
+  }
+
+  /**
+   * @param dataSourceId the saved data source, or null for unsaved values
+   * @param source what the stored data source allows
+   * @param input the values to test
    */
   private ConnectionTestResultDTO audited(
-      UUID dataSourceId,
-      Map<String, Object> storedDocument,
-      String placeholderRefusal,
-      ConnectionTestInputDTO input) {
+      UUID dataSourceId, SavedSource source, ConnectionTestInputDTO input) {
     String user = currentUser.getCurrentAuditor().map(UUID::toString).orElse(UNKNOWN);
     String requestId = UUID.randomUUID().toString();
     ConnectorConfiguration connector = input.getConnector();
     // Read before the test runs, so that an unknown connector type fails before anything is sent.
-    String destination = destinationHost(connector);
+    String destination = destination(connector);
     String target = target(connector, input.getApiCall());
     String outcome = "ERROR";
+    String data = "none";
     try {
-      ConnectionTestResultDTO answer =
-          run(user, requestId, storedDocument, placeholderRefusal, input);
+      ConnectionTestResultDTO answer = run(user, requestId, source, input);
       outcome = answer.success() ? "SUCCESS" : "FAILURE:" + answer.reason();
+      data = answer.preview() == null ? "none" : "shown";
       return answer;
     } catch (StoredSecretRefusedException e) {
       outcome = "REFUSED";
+      throw e;
+    } catch (ForbiddenException e) {
+      outcome = "DENIED";
       throw e;
     } catch (ConnectorValidationException | MalformedDataSourceRequestException e) {
       outcome = "INVALID";
@@ -176,37 +197,38 @@ public class DataSourceConnectionTestService {
       outcome = "UNAVAILABLE";
       throw e;
     } finally {
-      // TR-03187 L-1/L-6: who tested which destination and how it ended, without secrets or
-      // query. The request id finds the matching line in the connection test service's log.
+      // TR-03187 L-1/L-6: who tested which destination and data, whether data of the source was
+      // shown and how it ended, without secrets, source account, query or preview. The request
+      // id finds the matching line in the connection test service's log.
       log.info(
           "Connection test: user={} requestId={} dataSource={} connectorType={}"
-              + " destination=\"{}\" target=\"{}\" outcome={}",
+              + " destination=\"{}\" target=\"{}\" data={} outcome={}",
           Encode.forJava(user),
           requestId,
           dataSourceId == null ? UNSAVED : dataSourceId,
           connector.connectorType(),
           Encode.forJava(destination),
           Encode.forJava(target),
+          data,
           outcome);
     }
   }
 
   private ConnectionTestResultDTO run(
-      String user,
-      String requestId,
-      Map<String, Object> storedDocument,
-      String placeholderRefusal,
-      ConnectionTestInputDTO input) {
+      String user, String requestId, SavedSource source, ConnectionTestInputDTO input) {
     ConnectorConfiguration connector = input.getConnector();
     String apiCall = blankToNull(input.getApiCall());
     connectorValidator.requireValid(connector, ConnectorValidator.Stage.RELEASE);
     requireFittingApiCall(connector, apiCall);
-    if (placeholderRefusal != null && ConnectorJson.hasPlaceholder(connector)) {
-      throw new StoredSecretRefusedException(placeholderRefusal);
+    if (source.otherDestinationDenied()) {
+      throw new ForbiddenException("DataSource", null, OTHER_DESTINATION_NEEDS_TENANT_READ);
     }
-    ConnectorJson.requireStoredSecrets(connector, storedDocument);
+    if (source.changed() && ConnectorJson.hasPlaceholder(connector)) {
+      throw new StoredSecretRefusedException(STORED_SECRET_FOR_SAVED_CONNECTOR);
+    }
+    ConnectorJson.requireStoredSecrets(connector, source.storedDocument());
     Map<String, Object> document =
-        ConnectorJson.toDocument(connector, storedDocument, textEncryptor::encrypt);
+        ConnectorJson.toDocument(connector, source.storedDocument(), textEncryptor::encrypt);
     ConnectionTestClient kafka =
         client.orElseThrow(
             () ->
@@ -269,70 +291,68 @@ public class DataSourceConnectionTestService {
   private static ConnectionTestResultDTO answer(
       boolean success, Reason reason, ConnectionTestResult result) {
     return new ConnectionTestResultDTO(
-        success, reason, result.message(), result.rowCount(), result.httpStatus());
+        success,
+        reason,
+        result.message(),
+        result.preview(),
+        result.previewTruncated(),
+        result.rowCount(),
+        result.httpStatus());
   }
 
-  /** What the test reads: the SQL table, the first MQTT topic, or the HTTP API call. */
+  /** What the test reads: the table, the first topic, or the path an HTTP call requests. */
   static String target(ConnectorConfiguration connector, String apiCall) {
     String target =
         switch (connector) {
           case SqlConnectorConfiguration sql -> sql.table();
           case MqttConnectorConfiguration mqtt ->
               mqtt.topics() == null || mqtt.topics().isEmpty() ? null : mqtt.topics().getFirst();
-          case HttpConnectorConfiguration http -> apiCall;
+          case HttpConnectorConfiguration http -> requestedPath(http, apiCall);
           default -> null;
         };
     return target == null || target.isBlank() ? UNKNOWN : target;
   }
 
-  /**
-   * Every address the connector connects to, in its order. Throws for an unknown connector type, so
-   * that it cannot keep a stored secret.
-   */
-  private static List<String> addresses(ConnectorConfiguration connector) {
-    List<String> addresses =
-        switch (connector) {
-          case SqlConnectorConfiguration sql -> sql.dsn() == null ? null : List.of(sql.dsn());
-          case MqttConnectorConfiguration mqtt -> mqtt.urls();
-          case HttpConnectorConfiguration http ->
-              Stream.of(
-                      http.baseUrl(),
-                      http.authentication() instanceof OAuth2 oauth2 ? oauth2.tokenUrl() : null)
-                  .filter(Objects::nonNull)
-                  .toList();
-          default ->
-              throw new IllegalArgumentException(
-                  "No addresses of " + connector.getClass().getSimpleName());
-        };
-    return addresses == null ? List.of() : addresses;
+  /** The base URL's path and the path of the named call, without the query. */
+  private static String requestedPath(HttpConnectorConfiguration http, String apiCall) {
+    if (http.apiCalls() == null || http.baseUrl() == null) {
+      return null;
+    }
+    return http.apiCalls().stream()
+        .filter(call -> call.name() != null && call.name().equals(apiCall))
+        .findFirst()
+        .map(call -> basePath(http.baseUrl()) + (call.path() == null ? "" : call.path()))
+        .orElse(null);
   }
 
-  /** Scheme, host and port of every place the connector connects to, in its order. */
-  private static List<String> destinations(ConnectorConfiguration connector) {
-    return addresses(connector).stream().map(DataSourceConnectionTestService::origin).toList();
-  }
-
-  /**
-   * An unparsable URL or a multi-host authority stands for itself and equals only the same text.
-   */
-  private static String origin(String url) {
+  private static String basePath(String baseUrl) {
     try {
-      URI uri = new URI(url);
-      if (uri.getHost() == null) {
-        return uri.getScheme() + "://" + uri.getRawAuthority();
-      }
-      return uri.getScheme() + "://" + uri.getHost() + ":" + uri.getPort();
+      String path = new URI(baseUrl).getRawPath();
+      return path == null || "/".equals(path) ? "" : path.replaceAll("/+$", "");
     } catch (URISyntaxException e) {
-      return url;
+      return "";
     }
   }
 
-  /** The host and port, if any, of the first address of the connector, or {@code unknown}. */
-  static String destinationHost(ConnectorConfiguration connector) {
-    return addresses(connector).stream()
+  /** Host and port of the first address, for SQL with the database, or {@code unknown}. */
+  static String destination(ConnectorConfiguration connector) {
+    return ConnectorUris.addresses(connector).stream()
         .findFirst()
-        .map(DataSourceConnectionTestService::hostAndPort)
+        .map(
+            address ->
+                connector instanceof SqlConnectorConfiguration
+                    ? hostAndPort(address) + databasePath(address)
+                    : hostAndPort(address))
         .orElse(UNKNOWN);
+  }
+
+  private static String databasePath(String dsn) {
+    try {
+      String path = new URI(dsn).getRawPath();
+      return path == null ? "" : path;
+    } catch (URISyntaxException e) {
+      return "";
+    }
   }
 
   private static String hostAndPort(String url) {

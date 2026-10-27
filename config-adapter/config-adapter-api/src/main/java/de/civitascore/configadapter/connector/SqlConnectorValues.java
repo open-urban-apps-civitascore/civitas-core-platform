@@ -12,6 +12,7 @@ package de.civitascore.configadapter.connector;
 import static de.civitascore.configadapter.connector.ConnectorValues.trimmedNonBlank;
 import static de.civitascore.configadapter.connector.ConnectorValues.trimmedString;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -74,6 +75,11 @@ public record SqlConnectorValues(String jdbcUrl, String table, List<String> colu
       throw new ConnectorValueException(
           "SQL 'where' must be literal SQL without bind placeholders (':name' or '?')");
     }
+    // The driver runs each statement of a query, so a ';' would end the SELECT and start another
+    // statement. Refused inside literals too, a false positive that favours safety.
+    if (where.indexOf(';') >= 0) {
+      throw new ConnectorValueException("SQL 'where' must be a single condition without ';'");
+    }
     String dsn = trimmedString(connector.get("dsn"));
     // The JDBC URL takes the host after the last '@' of the authority, also behind a '#'.
     if (dsn.indexOf('#') >= 0) {
@@ -135,6 +141,7 @@ public record SqlConnectorValues(String jdbcUrl, String table, List<String> colu
     if (query < 0) {
       return;
     }
+    Set<String> seen = new HashSet<>();
     for (String pair : dsn.substring(query + 1).split("&")) {
       if (pair.isEmpty()) {
         continue;
@@ -147,6 +154,11 @@ public record SqlConnectorValues(String jdbcUrl, String table, List<String> colu
                 + name
                 + "'; permitted parameters are "
                 + ALLOWED_DSN_PARAMS);
+      }
+      // The driver takes the last value of a name, a check of the parameters may read the first.
+      if (!seen.add(name)) {
+        throw new ConnectorValueException(
+            "SQL source dsn parameter '" + name + "' appears more than once");
       }
     }
   }
