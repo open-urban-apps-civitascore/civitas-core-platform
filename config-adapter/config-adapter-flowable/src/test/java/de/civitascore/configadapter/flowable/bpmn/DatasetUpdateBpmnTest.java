@@ -187,6 +187,24 @@ class DatasetUpdateBpmnTest {
   }
 
   @Test
+  void shouldCallSupersetWhenTheLastDashboardWasDeleted() {
+    stubApisixSuccess();
+    stubSupersetSuccess();
+
+    Map<String, Object> variables = updateVariables(false, false, false);
+    variables.put("hasDashboards", true);
+    variables.put("dashboards", List.of());
+    variables.put("deletedDashboardIds", List.of("10"));
+
+    ProcessInstance instance = runtimeService.startProcessInstanceByKey("dataset-update", variables);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+    verify(supersetHandler)
+        .handle(argThat(cmd -> cmd != null && "REGISTER_DATASET".equals(cmd.operation())));
+  }
+
+  @Test
   void shouldSkipFrostCompensationWhenDatasetHasNoFrostSink() {
     stubApisixFailure("APISIX connection refused");
 
@@ -293,6 +311,12 @@ class DatasetUpdateBpmnTest {
 
   private ProcessInstance startProcess(
       boolean hasPipelines, boolean hasGeoSink, boolean hasFrostSink) {
+    return runtimeService.startProcessInstanceByKey(
+        "dataset-update", updateVariables(hasPipelines, hasGeoSink, hasFrostSink));
+  }
+
+  private Map<String, Object> updateVariables(
+      boolean hasPipelines, boolean hasGeoSink, boolean hasFrostSink) {
     Map<String, Object> variables = new HashMap<>();
     variables.put("sagaId", "saga-test-123");
     variables.put("datasetId", "ds-456");
@@ -309,7 +333,7 @@ class DatasetUpdateBpmnTest {
       variables.put("artifacts", Map.of());
       variables.put("pipelineIds", List.of("p-1"));
     }
-    return runtimeService.startProcessInstanceByKey("dataset-update", variables);
+    return variables;
   }
 
   private void executeAllJobs() {

@@ -277,10 +277,12 @@ public class FlowableTriggerConsumer {
   }
 
   /**
-   * Derives the hasDashboards flag from the trigger payload. Superset physical datasets are only
-   * needed when the dataset has at least one Dashboard artifact.
+   * Run Superset when dashboards need to be synced or removed. In particular, deleting the last
+   * dashboard leaves {@code dashboards} empty but still requires the Superset cleanup step.
    */
   private static boolean deriveHasDashboards(Map<String, Object> trigger) {
-    return trigger.get("dashboards") instanceof List<?> dashboards && !dashboards.isEmpty();
+    return (trigger.get("dashboards") instanceof List<?> dashboards && !dashboards.isEmpty())
+        || (trigger.get("deletedDashboardIds") instanceof List<?> deletedIds
+            && !deletedIds.isEmpty());
   }
 }
