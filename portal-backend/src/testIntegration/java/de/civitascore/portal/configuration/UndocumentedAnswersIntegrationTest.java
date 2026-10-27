@@ -38,6 +38,9 @@ class UndocumentedAnswersIntegrationTest extends BaseKeycloakIntegrationTest {
             "/api-docs", HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
     assertThat(spec.getStatusCode()).isEqualTo(HttpStatus.OK);
     Set<RecordedAnswer> answers = AnswerRecorder.answers();
+    assertThat(answers)
+        .as("recorded answers, which only integration test classes that run before this one give")
+        .isNotEmpty();
 
     List<String> undocumented = UndocumentedAnswers.report(spec.getBody(), answers);
 
