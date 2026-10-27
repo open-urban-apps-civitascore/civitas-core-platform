@@ -63,9 +63,9 @@ import org.owasp.encoder.Encode;
  * branch; {@code projectId} (the dataset's FROST project id — required only when a {@code FROST}
  * sink is present); a {@code dashboards} binding list and an {@code artifacts} map keyed by each
  * Dashboard's {@code modelUrn} (see {@code de.civitascore.configadapter.model.dataset.Dashboard}).
- * The dashboard model is the source of its title, description and release state. PostGIS keeps
- * the physical UUID schema used by GeoServer and exposes the table through a readable per-dataset
- * view schema for Trino. FROST uses the same readable naming rule for its project-scoped views. OPA
+ * The dashboard model is the source of its title, description and release state. PostGIS keeps the
+ * physical UUID schema used by GeoServer and exposes the table through a readable per-dataset view
+ * schema for Trino. FROST uses the same readable naming rule for its project-scoped views. OPA
  * resolves either schema name back to the CORE dataset before checking permission.
  */
 public class SupersetSagaHandler extends AbstractSagaCommandHandler {
@@ -81,8 +81,8 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
    * one PostGIS/GeoServer sinks use ({@code geodata} — see {@code
    * dev-environment/trino-superset/trino/start-trino.sh}, which generates both {@code
    * sensordata.properties} and {@code geodata.properties}). Superset's only registered Trino
-   * connection ({@code CORE}) defaults to the {@code geodata} catalog. FROST datasets
-   * set their catalog explicitly because they live in the separate {@code sensordata} catalog.
+   * connection ({@code CORE}) defaults to the {@code geodata} catalog. FROST datasets set their
+   * catalog explicitly because they live in the separate {@code sensordata} catalog.
    */
   private static final String SENSORDATA_CATALOG = "sensordata";
 
@@ -183,8 +183,8 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
     if (session == null) {
       session = new SupersetSession(supersetClient, baseUrl, adminUsername, adminPassword);
       resourceClient =
-        new SupersetResourceClient(
-            supersetClient, session, baseUrl, legacyTrinoDatabaseId, trinoDatabaseConfig);
+          new SupersetResourceClient(
+              supersetClient, session, baseUrl, legacyTrinoDatabaseId, trinoDatabaseConfig);
     }
     if (session.isAuthenticated()) {
       return;
@@ -240,8 +240,7 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
                 "Could not update Superset dataset id=" + existingDatasetId, 404);
           }
           resourceClient.updateDatasetExtra(
-              existingDatasetId,
-              Map.of(SupersetResourceClient.CIVITAS_DATASET_ID_KEY, datasetId));
+              existingDatasetId, Map.of(SupersetResourceClient.CIVITAS_DATASET_ID_KEY, datasetId));
           supersetDatasetId = existingDatasetId;
         } else {
           supersetDatasetId =
@@ -300,7 +299,8 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
                 existingDatasetId, SENSORDATA_CATALOG, datasetSchemaName, label, sql)) {
           supersetDatasetId = existingDatasetId;
         } else {
-          // existingDatasetId != null but updateDatasetDefinition returned false means Superset-side drift
+          // existingDatasetId != null but updateDatasetDefinition returned false means
+          // Superset-side drift
           // (someone deleted it out of band) — falls through to recreate, self-healing like
           // syncDashboard does for dashboards.
           supersetDatasetId =
@@ -442,10 +442,8 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
     // (e.g. an id that couldn't be resolved), not just the ones the saga happened to track.
     Set<Integer> datasetIds = new LinkedHashSet<>(intList(payload, "datasetIds"));
     if (payload.get("datasetId") instanceof String civitasDatasetId) {
-      datasetIds.addAll(
-          resourceClient.findPostgisDatasetsByCivitasId(civitasDatasetId).values());
-      datasetIds.addAll(
-          resourceClient.findFrostDatasetsByCivitasId(civitasDatasetId).values());
+      datasetIds.addAll(resourceClient.findPostgisDatasetsByCivitasId(civitasDatasetId).values());
+      datasetIds.addAll(resourceClient.findFrostDatasetsByCivitasId(civitasDatasetId).values());
     }
 
     for (int datasetId : datasetIds) {

@@ -196,7 +196,8 @@ class DatasetUpdateBpmnTest {
     variables.put("dashboards", List.of());
     variables.put("deletedDashboardIds", List.of("10"));
 
-    ProcessInstance instance = runtimeService.startProcessInstanceByKey("dataset-update", variables);
+    ProcessInstance instance =
+        runtimeService.startProcessInstanceByKey("dataset-update", variables);
     executeAllJobs();
 
     assertProcessCompleted(instance.getId());

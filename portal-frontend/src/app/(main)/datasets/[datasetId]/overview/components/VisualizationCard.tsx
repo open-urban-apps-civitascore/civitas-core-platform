@@ -49,8 +49,8 @@ export const VisualizationCard = ({
 
   const dashboardParams = new URLSearchParams({
     standalone: String(visualization.standaloneMode),
-    show_filters: visualization.showFilters ? '1' : '0',
   })
+  dashboardParams.set('show_filters', visualization.showFilters ? '1' : '0')
   if (visualization.filterExpansion !== 'DEFAULT') {
     dashboardParams.set('expand_filters', visualization.filterExpansion === 'EXPANDED' ? '1' : '0')
   }
@@ -105,9 +105,7 @@ export const VisualizationCard = ({
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             <div className="flex items-center gap-2">
               <span className="text-sm font-normal text-muted-foreground">{typeLabel}</span>
-              <Badge variant="secondary">
-                {tConfig(visualization.released ? 'releasedBadge' : 'unreleasedBadge')}
-              </Badge>
+              <Badge variant="secondary">{tConfig(visualization.released ? 'releasedBadge' : 'unreleasedBadge')}</Badge>
               {isOpenDataAccess ? (
                 <Badge variant="secondary">{tConfig('openDataBadge')}</Badge>
               ) : (

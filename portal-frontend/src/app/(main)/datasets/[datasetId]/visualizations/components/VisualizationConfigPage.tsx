@@ -29,8 +29,8 @@ import {
   VisualizationTypeQuery,
 } from '@/types/visualizations'
 
-import { VisualizationConfigForm } from './VisualizationConfigForm'
 import { DashboardOptionsForm } from './DashboardOptionsForm'
+import { VisualizationConfigForm } from './VisualizationConfigForm'
 
 type VisualizationConfigTab = 'basicInfo' | 'options'
 
@@ -224,9 +224,7 @@ export const VisualizationConfigPage = ({
               {selectedTab === 'basicInfo' && (
                 <VisualizationConfigForm form={form} typeLabel={typeLabel} isReadOnly={isReadOnly} />
               )}
-              {selectedTab === 'options' && !isCreate && (
-                <DashboardOptionsForm form={form} isReadOnly={isReadOnly} />
-              )}
+              {selectedTab === 'options' && !isCreate && <DashboardOptionsForm form={form} isReadOnly={isReadOnly} />}
             </ContentCard>
           </form>
         </Form>

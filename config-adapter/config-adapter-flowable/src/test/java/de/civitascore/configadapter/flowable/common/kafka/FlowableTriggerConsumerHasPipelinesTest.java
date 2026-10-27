@@ -218,10 +218,14 @@ class FlowableTriggerConsumerHasPipelinesTest {
     byte[] trigger =
         objectMapper.writeValueAsBytes(
             Map.of(
-                "sagaType", "DATASET_UPDATE",
-                "datasetId", "ds-1",
-                "dashboards", List.of(),
-                "deletedDashboardIds", List.of("10")));
+                "sagaType",
+                "DATASET_UPDATE",
+                "datasetId",
+                "ds-1",
+                "dashboards",
+                List.of(),
+                "deletedDashboardIds",
+                List.of("10")));
 
     TriggerTestSupport.processTrigger(consumer, trigger);
 
@@ -233,11 +237,16 @@ class FlowableTriggerConsumerHasPipelinesTest {
     byte[] trigger =
         objectMapper.writeValueAsBytes(
             Map.of(
-                "sagaType", "DATASET_UPDATE",
-                "datasetId", "ds-1",
-                "dashboards", List.of(),
-                "deletedDashboardIds", List.of(),
-                "hasDashboards", true));
+                "sagaType",
+                "DATASET_UPDATE",
+                "datasetId",
+                "ds-1",
+                "dashboards",
+                List.of(),
+                "deletedDashboardIds",
+                List.of(),
+                "hasDashboards",
+                true));
 
     TriggerTestSupport.processTrigger(consumer, trigger);
 

@@ -127,7 +127,8 @@ final class SupersetResourceClient {
             // Trino password embedded in sqlalchemy_uri through saga logs or error responses.
             throw new SagaApiException(
                 "Superset could not create the CORE Trino database connection (HTTP "
-                    + response.getStatus() + ")",
+                    + response.getStatus()
+                    + ")",
                 response.getStatus());
           }
           databaseId = parseId(response, "database");
@@ -151,7 +152,8 @@ final class SupersetResourceClient {
       if (response.getStatus() >= 400) {
         throw new SagaApiException(
             "Superset could not reconcile the CORE Trino database connection (HTTP "
-                + response.getStatus() + ")",
+                + response.getStatus()
+                + ")",
             response.getStatus());
       }
       this.trinoDatabaseId = databaseId;
@@ -221,7 +223,8 @@ final class SupersetResourceClient {
       }
     }
     if (roleId <= 0) {
-      throw new SagaApiException("Superset dashboard dataset creator role could not be resolved", 503);
+      throw new SagaApiException(
+          "Superset dashboard dataset creator role could not be resolved", 503);
     }
     final int resolvedRoleId = roleId;
 
@@ -229,8 +232,7 @@ final class SupersetResourceClient {
     String databasePermission = database.path("result").path("perm").asText();
     if (databasePermission.isBlank()) {
       // Superset 7 formats the database permission menu as [name].(id:id).
-      databasePermission =
-          "[" + trinoDatabaseConfig.databaseName() + "].(id:" + databaseId + ")";
+      databasePermission = "[" + trinoDatabaseConfig.databaseName() + "].(id:" + databaseId + ")";
     }
     Map<String, Integer> desiredPermissions =
         findPermissionViewMenuIds(
@@ -284,8 +286,7 @@ final class SupersetResourceClient {
     try {
       response =
           getJson(
-              "/api/v1/security/permissions-resources/",
-              Map.of("q", "(page:0,page_size:1000)"));
+              "/api/v1/security/permissions-resources/", Map.of("q", "(page:0,page_size:1000)"));
       if (response.getStatus() == 401) {
         response =
             closeAndReauth(
@@ -359,9 +360,7 @@ final class SupersetResourceClient {
         response =
             closeAndReauth(
                 response,
-                () ->
-                    getJson(
-                        "/api/v1/security/roles/", Map.of("q", "(page:0,page_size:1000)")));
+                () -> getJson("/api/v1/security/roles/", Map.of("q", "(page:0,page_size:1000)")));
       }
       checkStatus(response, "list Superset roles");
       for (JsonNode role : readTree(response).path("result")) {
@@ -388,16 +387,24 @@ final class SupersetResourceClient {
       boolean verifyTls) {
 
     TrinoDatabaseConfig {
-      if (databaseName == null || databaseName.isBlank()
-          || url == null || url.getHost() == null
-          || url.getUserInfo() != null || url.getQuery() != null || url.getFragment() != null
+      if (databaseName == null
+          || databaseName.isBlank()
+          || url == null
+          || url.getHost() == null
+          || url.getUserInfo() != null
+          || url.getQuery() != null
+          || url.getFragment() != null
           || (url.getRawPath() != null
               && !url.getRawPath().isBlank()
               && !"/".equals(url.getRawPath()))
-          || username == null || username.isBlank()
-          || catalog == null || catalog.isBlank()
-          || schema == null || schema.isBlank()
-          || httpScheme == null || httpScheme.isBlank()) {
+          || username == null
+          || username.isBlank()
+          || catalog == null
+          || catalog.isBlank()
+          || schema == null
+          || schema.isBlank()
+          || httpScheme == null
+          || httpScheme.isBlank()) {
         throw new IllegalArgumentException("Superset Trino connection configuration is incomplete");
       }
       if (!httpScheme.equals("https") && !httpScheme.equals("http")) {
@@ -429,15 +436,17 @@ final class SupersetResourceClient {
               + encodeUriPart(catalog)
               + "/"
               + encodeUriPart(schema);
-      Map<String, Object> connectArgs =
-          Map.of("http_scheme", httpScheme, "verify", verifyTls);
+      Map<String, Object> connectArgs = Map.of("http_scheme", httpScheme, "verify", verifyTls);
       String extra;
       try {
-        extra = new ObjectMapper().writeValueAsString(Map.of(
-            "metadata_params", Map.of(),
-            "engine_params", Map.of("connect_args", connectArgs),
-            "metadata_cache_timeout", Map.of(),
-            "schemas_allowed_for_file_upload", List.of()));
+        extra =
+            new ObjectMapper()
+                .writeValueAsString(
+                    Map.of(
+                        "metadata_params", Map.of(),
+                        "engine_params", Map.of("connect_args", connectArgs),
+                        "metadata_cache_timeout", Map.of(),
+                        "schemas_allowed_for_file_upload", List.of()));
       } catch (Exception e) {
         throw new SagaApiException("Could not encode Superset Trino connection settings", 500);
       }

@@ -25,9 +25,9 @@ import java.util.Map;
  * @param datapipelines engine-neutral pipeline graphs
  * @param namedApis named API endpoints exposed by this dataset (per concepts #1379 and #1383); one
  *     APISIX route per entry
- * @param artifacts the artifacts that the pipelines and dashboards reference, keyed by the CORE
- *     URN exactly as the referencing artifact carries it: a Data structure as its inlined JSON
- *     Schema, every other artifact as stored (never null; empty when the trigger carries none)
+ * @param artifacts the artifacts that the pipelines and dashboards reference, keyed by the CORE URN
+ *     exactly as the referencing artifact carries it: a Data structure as its inlined JSON Schema,
+ *     every other artifact as stored (never null; empty when the trigger carries none)
  */
 // openDataAccess is intentionally absent: it is no longer part of the saga payload (the
 // portal-backend no longer sends it; open-data access is an OPA per-request decision). Any
