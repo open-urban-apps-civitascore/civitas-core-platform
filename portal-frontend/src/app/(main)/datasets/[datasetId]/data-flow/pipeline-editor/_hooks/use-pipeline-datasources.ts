@@ -25,6 +25,7 @@ import { useDataSourceEntities } from '../_services/entityService'
 export interface PipelineDatasources {
   entities: Datasource[]
   isLoading: boolean
+  isFetching: boolean
   isError: boolean
   canReadDatasources: boolean
   getEntityById: (id: string) => Datasource | undefined
@@ -41,6 +42,7 @@ export const usePipelineDatasources = (): PipelineDatasources => {
   const {
     data: datasetResponse,
     isLoading: isDatasetLoading,
+    isFetching: isDatasetFetching,
     isError: isDatasetError,
   } = useGetDataset({ id: datasetId })
   const datapoolId = datasetResponse?.data?.datapool?.id ?? null
@@ -48,6 +50,7 @@ export const usePipelineDatasources = (): PipelineDatasources => {
   const {
     entities,
     isLoading: isDatasourcesLoading,
+    isFetching: isDatasourcesFetching,
     isError: isDatasourcesError,
     getEntityById,
   } = useDataSourceEntities({
@@ -56,6 +59,7 @@ export const usePipelineDatasources = (): PipelineDatasources => {
   })
 
   const isLoading = isDatasetLoading || isDatasourcesLoading
+  const isFetching = isDatasetFetching || isDatasourcesFetching
 
   const getName = useCallback(
     (entityId: string | undefined): string | undefined => {
@@ -72,6 +76,7 @@ export const usePipelineDatasources = (): PipelineDatasources => {
   return {
     entities,
     isLoading,
+    isFetching,
     isError: isDatasetError || isDatasourcesError,
     canReadDatasources,
     getEntityById,

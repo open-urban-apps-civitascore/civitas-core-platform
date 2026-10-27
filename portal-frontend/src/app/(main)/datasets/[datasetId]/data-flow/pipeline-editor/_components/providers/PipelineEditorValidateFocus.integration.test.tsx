@@ -50,7 +50,7 @@ vi.mock('../../_hooks/use-pipeline-read-only', () => ({
   ReadOnlyProvider: ({ children }: { children: React.ReactNode }) => children,
 }))
 
-const mockDatasources = vi.hoisted(() => ({ entities: [] }))
+const mockDatasources = vi.hoisted(() => ({ entities: [], isFetching: false }))
 vi.mock('../../_hooks/use-pipeline-datasources', () => ({
   usePipelineDatasources: () => mockDatasources,
 }))

@@ -71,7 +71,7 @@ vi.mock('../../_hooks/use-pipeline-read-only', () => ({
 
 const mockDatasetPermissions = vi.hoisted(() => ({ canDeletePipeline: true }))
 
-const mockDatasources = vi.hoisted(() => ({ entities: [] as Datasource[], isLoading: false }))
+const mockDatasources = vi.hoisted(() => ({ entities: [] as Datasource[], isFetching: false }))
 vi.mock('../../_hooks/use-pipeline-datasources', () => ({
   usePipelineDatasources: () => mockDatasources,
 }))
@@ -239,7 +239,7 @@ beforeEach(() => {
   mockReadOnly.isReadOnly = false
   mockDatasetPermissions.canDeletePipeline = true
   mockDatasources.entities = []
-  mockDatasources.isLoading = false
+  mockDatasources.isFetching = false
 
   vi.mocked(buildDataSinkPayloads).mockReturnValue([])
   vi.mocked(buildMappingArtifacts).mockReturnValue([])
@@ -396,6 +396,26 @@ describe('PipelineEditorProviderComponent', () => {
 
     it('is false once both queries are done', () => {
       renderProvider()
+
+      expect(contextRef.current?.isLoadingEditor).toBe(false)
+    })
+
+    it('waits for the first fetch of the Data source list', () => {
+      mockDatasources.isFetching = true
+      const { rerender } = renderProvider()
+      expect(contextRef.current?.isLoadingEditor).toBe(true)
+
+      mockDatasources.isFetching = false
+      rerender()
+
+      expect(contextRef.current?.isLoadingEditor).toBe(false)
+    })
+
+    it('stays false when the Data source list is fetched again later', () => {
+      const { rerender } = renderProvider()
+
+      mockDatasources.isFetching = true
+      rerender()
 
       expect(contextRef.current?.isLoadingEditor).toBe(false)
     })
@@ -2708,7 +2728,7 @@ describe('PipelineEditorProviderComponent', () => {
         data: { data: dtos },
         isLoading: false,
       } as unknown as ReturnType<typeof useGetPipelines>)
-      renderProvider()
+      return renderProvider()
     }
 
     const failValidationFor = (pipelineIds: string[]) => {
@@ -2766,7 +2786,7 @@ describe('PipelineEditorProviderComponent', () => {
       })
 
       it('validates the loaded pipelines when a refetch returns an additional pipeline', () => {
-        mockDatasources.isLoading = true
+        mockDatasources.isFetching = true
         vi.mocked(useGetPipelines).mockReturnValue({
           data: { data: [pipelineDto('pipeline-a')] },
           isLoading: false,
@@ -2777,18 +2797,35 @@ describe('PipelineEditorProviderComponent', () => {
           data: { data: [pipelineDto('pipeline-a'), pipelineDto('pipeline-b')] },
           isLoading: false,
         } as unknown as ReturnType<typeof useGetPipelines>)
-        mockDatasources.isLoading = false
+        mockDatasources.isFetching = false
         rerender()
 
         expect(validatedPipelineIds()).toEqual(['pipeline-a'])
       })
 
-      it('waits until the data sources are loaded', () => {
-        mockDatasources.isLoading = true
-
-        loadPipelines([pipelineDto('pipeline-a')])
-
+      it('waits until the Data source list is fetched', () => {
+        mockDatasources.isFetching = true
+        const { rerender } = loadPipelines([pipelineDto('pipeline-a')])
         expect(validatePipelineWithNodeStatus).not.toHaveBeenCalled()
+
+        mockDatasources.isFetching = false
+        rerender()
+
+        expect(validatedPipelineIds()).toEqual(['pipeline-a'])
+      })
+
+      it('validates with the fetched Data source list, not with the cached list', () => {
+        mockDatasources.entities = [{ id: 'ds-1', connector: { connectorType: 'SQL' } } as unknown as Datasource]
+        mockDatasources.isFetching = true
+        const { rerender } = loadPipelines([pipelineDto('pipeline-a', [dataSourceNode('SQL')])])
+
+        mockDatasources.entities = [{ id: 'ds-1', connector: { connectorType: 'HTTP' } } as unknown as Datasource]
+        mockDatasources.isFetching = false
+        rerender()
+
+        expect(validatePipelineWithNodeStatus).toHaveBeenCalledOnce()
+        const [validatedPipeline] = vi.mocked(validatePipelineWithNodeStatus).mock.calls[0]
+        expect(validatedPipeline.nodes[0].data).toMatchObject({ entityMetadata: { connector: 'HTTP' } })
       })
 
       it('does not validate the default session when there are no pipelines', () => {

@@ -151,6 +151,18 @@ describe('useDataSourceEntities', () => {
       expect(result.current.isLoading).toBe(true)
     })
 
+    it('reflects isFetching state while cached data is shown', () => {
+      vi.mocked(useGetDatasources).mockReturnValue({
+        data: { data: [mockDatasource()] },
+        isLoading: false,
+        isFetching: true,
+        isError: false,
+        error: null,
+      } as unknown as ReturnType<typeof useGetDatasources>)
+      const { result } = renderHook(() => useDataSourceEntities())
+      expect(result.current.isFetching).toBe(true)
+    })
+
     it('reflects isError state and exposes the error', () => {
       const err = new Error('Network failure')
       vi.mocked(useGetDatasources).mockReturnValue({

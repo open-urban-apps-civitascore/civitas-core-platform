@@ -148,7 +148,12 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   const { isReadOnly } = useReadOnly()
 
-  const { entities: datasources, isLoading: isLoadingDatasources } = usePipelineDatasources()
+  const { entities: datasources, isFetching: isFetchingDatasources } = usePipelineDatasources()
+
+  const [hasSettledDatasourcesOnOpen, setHasSettledDatasourcesOnOpen] = useState(false)
+  useEffect(() => {
+    if (!isFetchingDatasources) setHasSettledDatasourcesOnOpen(true)
+  }, [isFetchingDatasources])
 
   const connectorTypeByDatasourceId = useMemo(
     () =>
@@ -515,7 +520,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const hasValidatedOnLoadRef = useRef(false)
   useEffect(() => {
     const loadedPipelineIds = loadedPipelineIdsRef.current
-    if (hasValidatedOnLoadRef.current || !loadedPipelineIds || isLoadingDatasources || isReadOnly) return
+    if (hasValidatedOnLoadRef.current || !loadedPipelineIds || isFetchingDatasources || isReadOnly) return
     const savedSessions = sessionManager.sessions.filter(session => session.pipeline.id)
     const sessionPipelineIds = new Set(savedSessions.map(session => session.pipeline.id))
     if (!loadedPipelineIds.every(pipelineId => sessionPipelineIds.has(pipelineId))) return
@@ -537,7 +542,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       sessionManager.updateSessionPipeline(activeSession.id, withoutSelection)
     }
   }, [
-    isLoadingDatasources,
+    isFetchingDatasources,
     isReadOnly,
     sessionManager,
     sessionManager.sessions,
@@ -594,7 +599,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Loading State =====
   // Without the locks every node looks deletable, so the editor waits for them too.
-  const isLoadingEditor = pipelinesQuery.isLoading || isLoadingSinkLocks
+  const isLoadingEditor = pipelinesQuery.isLoading || isLoadingSinkLocks || !hasSettledDatasourcesOnOpen
 
   // ===== Cross-session state =====
   const hasAnyDirtySession = useMemo(() => sessionManager.sessions.some(s => s.isDirty), [sessionManager.sessions])
