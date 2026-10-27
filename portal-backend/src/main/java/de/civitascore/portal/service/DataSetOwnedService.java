@@ -4,6 +4,9 @@ import de.civitascore.portal.model.entity.base.DataSetOwnedEntity;
 import de.civitascore.portal.model.input.DataSetOwnedInputDTO;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -31,6 +34,12 @@ public abstract class DataSetOwnedService<
     T entity = findByIdOrThrow(id);
     ParentOwnership.requireSameParent(dataSetId, entity.getDataSet().getId(), getEntityName(), id);
     return entity;
+  }
+
+  public Page<T> findAll(UUID dataSetId, Specification<T> spec, Pageable pageable) {
+    Specification<T> inDataSet =
+        (root, query, cb) -> cb.equal(root.get("dataSet").get("id"), dataSetId);
+    return findAll(spec == null ? inDataSet : spec.and(inDataSet), pageable);
   }
 
   /**

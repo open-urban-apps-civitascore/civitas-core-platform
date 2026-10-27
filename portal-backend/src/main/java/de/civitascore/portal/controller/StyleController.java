@@ -43,13 +43,12 @@ public class StyleController {
   @GetMapping
   @Operation(summary = "List all Styles for a dataset")
   public Page<StyleOutputDTO> listStyles(
-      // Typed so that a malformed id answers 400 before StyleSpec reads the path variable.
       @PathVariable UUID dataSetId,
       @ParameterObject StyleSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
-    return styleAssembler.toOutput(styleService.findAll(spec, pageable));
+    return styleAssembler.toOutput(styleService.findAll(dataSetId, spec, pageable));
   }
 
   @GetMapping("/{styleId}")

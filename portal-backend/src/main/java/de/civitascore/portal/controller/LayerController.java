@@ -43,13 +43,12 @@ public class LayerController {
   @GetMapping
   @Operation(summary = "List all Layers for a dataset")
   public Page<LayerOutputDTO> listLayers(
-      // Typed so that a malformed id answers 400 before LayerSpec reads the path variable.
       @PathVariable UUID dataSetId,
       @ParameterObject LayerSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
-    return layerAssembler.toOutput(layerService.findAll(spec, pageable));
+    return layerAssembler.toOutput(layerService.findAll(dataSetId, spec, pageable));
   }
 
   @GetMapping("/{layerId}")

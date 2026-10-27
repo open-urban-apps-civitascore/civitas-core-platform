@@ -52,13 +52,12 @@ public class DataSinkController {
   @GetMapping
   @Operation(summary = "List all DataSinks of a dataset")
   public Page<DataSinkOutputDTO> listDataSinks(
-      // Typed so that a malformed id answers 400 before DataSinkSpec reads the path variable.
       @PathVariable UUID dataSetId,
       @ParameterObject DataSinkSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
-    return dataSinkAssembler.toOutput(dataSinkService.findAll(spec, pageable));
+    return dataSinkAssembler.toOutput(dataSinkService.findAll(dataSetId, spec, pageable));
   }
 
   @GetMapping("/{dataSinkId}")

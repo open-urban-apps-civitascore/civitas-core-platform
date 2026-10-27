@@ -81,6 +81,59 @@ public class DataStructureVersionService
   }
 
   /**
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the data structure does not
+   *     exist
+   */
+  @Transactional
+  public DataStructureVersion create(UUID dataStructureId, DataStructureVersionInputDTO input) {
+    input.setDataStructureId(dataStructureId);
+    return create(input);
+  }
+
+  /**
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the version does not exist or
+   *     belongs to another data structure
+   */
+  @Transactional
+  public DataStructureVersion update(
+      UUID dataStructureId, UUID versionId, DataStructureVersionInputDTO input) {
+    findOwned(dataStructureId, versionId);
+    input.setDataStructureId(dataStructureId);
+    return update(versionId, input);
+  }
+
+  /**
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the version does not exist or
+   *     belongs to another data structure
+   */
+  @Transactional
+  public DataStructureVersion updateReleasedMeta(
+      UUID dataStructureId, UUID versionId, DataStructureVersionMetaInputDTO meta) {
+    findOwned(dataStructureId, versionId);
+    return updateReleasedMeta(versionId, meta);
+  }
+
+  /**
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the version does not exist or
+   *     belongs to another data structure
+   */
+  @Transactional
+  public DataStructureVersion release(UUID dataStructureId, UUID versionId) {
+    findOwned(dataStructureId, versionId);
+    return release(versionId);
+  }
+
+  /**
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the version does not exist or
+   *     belongs to another data structure
+   */
+  @Transactional
+  public DataStructureVersion unrelease(UUID dataStructureId, UUID versionId) {
+    findOwned(dataStructureId, versionId);
+    return unrelease(versionId);
+  }
+
+  /**
    * Resolves and sets the parent data structure relationship after DTO-to-entity conversion.
    *
    * @param entity the data structure version entity

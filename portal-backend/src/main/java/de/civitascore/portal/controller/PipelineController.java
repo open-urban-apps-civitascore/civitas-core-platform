@@ -48,13 +48,12 @@ public class PipelineController {
   @GetMapping
   @Operation(summary = "List all pipelines of a dataset")
   public Page<PipelineOutputDTO> listPipelines(
-      // Typed so that a malformed id answers 400 before PipelineSpec reads the path variable.
       @PathVariable UUID dataSetId,
       @ParameterObject PipelineSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
-    return pipelineAssembler.toOutput(pipelineService.findAll(spec, pageable));
+    return pipelineAssembler.toOutput(pipelineService.findAll(dataSetId, spec, pageable));
   }
 
   @GetMapping("/{pipelineId}")

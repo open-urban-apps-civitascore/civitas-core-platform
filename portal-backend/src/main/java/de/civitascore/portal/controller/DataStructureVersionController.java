@@ -59,8 +59,7 @@ public class DataStructureVersionController {
   })
   public ResponseEntity<DataStructureVersionOutputDTO> createDataStructureVersion(
       @PathVariable UUID dataStructureId, @Valid @RequestBody DataStructureVersionInputDTO input) {
-    input.setDataStructureId(dataStructureId);
-    DataStructureVersion created = dataStructureVersionService.create(input);
+    DataStructureVersion created = dataStructureVersionService.create(dataStructureId, input);
     return ResponseEntity.created(Locations.ofCreated(created.getId()))
         .body(dataStructureVersionAssembler.toOutput(created));
   }
@@ -86,10 +85,8 @@ public class DataStructureVersionController {
       @PathVariable UUID dataStructureId,
       @PathVariable UUID versionId,
       @Valid @RequestBody DataStructureVersionInputDTO input) {
-    dataStructureVersionService.findOwned(dataStructureId, versionId);
-    input.setDataStructureId(dataStructureId);
     return dataStructureVersionAssembler.toOutput(
-        dataStructureVersionService.update(versionId, input));
+        dataStructureVersionService.update(dataStructureId, versionId, input));
   }
 
   @PatchMapping("/{versionId}")
@@ -110,9 +107,8 @@ public class DataStructureVersionController {
         dataStructureVersionAssembler.toInput(
             dataStructureVersionService.findOwned(dataStructureId, versionId));
     DataStructureVersionInputDTO patched = jsonMergePatch.apply(current, updates, versionId);
-    patched.setDataStructureId(dataStructureId);
     return dataStructureVersionAssembler.toOutput(
-        dataStructureVersionService.update(versionId, patched));
+        dataStructureVersionService.update(dataStructureId, versionId, patched));
   }
 
   @DeleteMapping("/{versionId}")
@@ -157,7 +153,7 @@ public class DataStructureVersionController {
             dataStructureVersionService.findOwned(dataStructureId, versionId));
     DataStructureVersion updated =
         dataStructureVersionService.updateReleasedMeta(
-            versionId, jsonMergePatch.apply(current, updates, versionId));
+            dataStructureId, versionId, jsonMergePatch.apply(current, updates, versionId));
     return dataStructureVersionAssembler.toOutput(updated);
   }
 
@@ -177,8 +173,7 @@ public class DataStructureVersionController {
   })
   public DataStructureVersionOutputDTO releaseDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
-    dataStructureVersionService.findOwned(dataStructureId, versionId);
-    DataStructureVersion released = dataStructureVersionService.release(versionId);
+    DataStructureVersion released = dataStructureVersionService.release(dataStructureId, versionId);
     return dataStructureVersionAssembler.toOutput(released);
   }
 
@@ -189,8 +184,8 @@ public class DataStructureVersionController {
   @Problems({ProblemType.NOT_FOUND, ProblemType.RESOURCE_IN_USE})
   public DataStructureVersionOutputDTO unreleaseDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
-    dataStructureVersionService.findOwned(dataStructureId, versionId);
-    DataStructureVersion unreleased = dataStructureVersionService.unrelease(versionId);
+    DataStructureVersion unreleased =
+        dataStructureVersionService.unrelease(dataStructureId, versionId);
     return dataStructureVersionAssembler.toOutput(unreleased);
   }
 

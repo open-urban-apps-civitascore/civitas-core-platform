@@ -19,8 +19,12 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSetOwnedInputDTO;
+import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
+import de.civitascore.portal.model.input.DataStructureVersionMetaInputDTO;
 import de.civitascore.portal.service.DataSetOwnedService;
+import de.civitascore.portal.service.DataStructureVersionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -89,11 +93,24 @@ class ControllerConventionsTest {
           .should()
           .callMethodWhere(
               target(owner(assignableTo(DataSetOwnedService.class)))
-                  .and(not(target(parentCheckedOperation()))))
+                  .and(not(target(dataSetCheckedOperation()))))
           .because(
               "OPA authorizes a nested route against the dataset in its path only, and only the"
-                  + " operations that take the dataset id, or a specification bound to it, reject"
-                  + " an entity of another dataset");
+                  + " operations that take the dataset id reject an entity of another dataset");
+
+  @ArchTest
+  static final ArchRule restControllers_doNotBypassTheParentCheckOfDataStructureVersions =
+      noClasses()
+          .that()
+          .areAnnotatedWith(RestController.class)
+          .should()
+          .callMethodWhere(
+              target(owner(assignableTo(DataStructureVersionService.class)))
+                  .and(not(target(dataStructureCheckedOperation()))))
+          .because(
+              "OPA authorizes a nested route against the data structure in its path only, and only"
+                  + " the operations that take the data structure id reject a version of another"
+                  + " data structure");
 
   private static ArchCondition<JavaClass> haveObjectAsRawSuperclass() {
     return new ArchCondition<>("have java.lang.Object as raw superclass") {
@@ -128,20 +145,40 @@ class ControllerConventionsTest {
                 && !((String) annotation.get("operationId").orElse("")).isEmpty());
   }
 
-  private static DescribedPredicate<CodeUnitCallTarget> parentCheckedOperation() {
-    List<List<String>> signatures =
-        List.of(
-            signature("findOwned", UUID.class, UUID.class),
-            signature("create", UUID.class, DataSetOwnedInputDTO.class),
-            signature("update", UUID.class, UUID.class, DataSetOwnedInputDTO.class),
-            signature("delete", UUID.class, UUID.class),
-            signature("delete", UUID.class, UUID.class, boolean.class),
-            signature("findAll", Specification.class, Pageable.class));
+  private static DescribedPredicate<CodeUnitCallTarget> dataSetCheckedOperation() {
+    return oneOf(
+        "findOwned(dataSetId, id), findAll(dataSetId, spec, pageable), create(dataSetId, input),"
+            + " update(dataSetId, id, input) or delete(dataSetId, id[, confirmDataLoss])",
+        signature("findOwned", UUID.class, UUID.class),
+        signature("findAll", UUID.class, Specification.class, Pageable.class),
+        signature("create", UUID.class, DataSetOwnedInputDTO.class),
+        signature("update", UUID.class, UUID.class, DataSetOwnedInputDTO.class),
+        signature("delete", UUID.class, UUID.class),
+        signature("delete", UUID.class, UUID.class, boolean.class));
+  }
+
+  private static DescribedPredicate<CodeUnitCallTarget> dataStructureCheckedOperation() {
+    return oneOf(
+        "findOwned, create, update, updateReleasedMeta, release or unrelease with the data"
+            + " structure id, or toMetaInput(version)",
+        signature("findOwned", UUID.class, UUID.class),
+        signature("create", UUID.class, DataStructureVersionInputDTO.class),
+        signature("update", UUID.class, UUID.class, DataStructureVersionInputDTO.class),
+        signature(
+            "updateReleasedMeta", UUID.class, UUID.class, DataStructureVersionMetaInputDTO.class),
+        signature("release", UUID.class, UUID.class),
+        signature("unrelease", UUID.class, UUID.class),
+        signature("toMetaInput", DataStructureVersion.class));
+  }
+
+  @SafeVarargs
+  private static DescribedPredicate<CodeUnitCallTarget> oneOf(
+      String description, List<String>... signatures) {
+    List<List<String>> allowed = List.of(signatures);
     return DescribedPredicate.describe(
-        "findOwned(dataSetId, id), create(dataSetId, input), update(dataSetId, id, input),"
-            + " delete(dataSetId, id[, confirmDataLoss]) or findAll(spec, pageable)",
+        description,
         target ->
-            signatures.contains(
+            allowed.contains(
                 Stream.concat(
                         Stream.of(target.getName()),
                         target.getRawParameterTypes().stream().map(JavaClass::getName))
