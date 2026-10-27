@@ -15,6 +15,8 @@ import { TableProps } from '@/types/table'
 import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
 
+import { PipelineStatusCell } from './PipelineStatusCell'
+
 interface DatasetsTableProps extends TableProps<DatasetTableData> {
   datasets: DatasetTableData[]
   onDeleteClick?: (datasetId: string | null) => void
@@ -127,6 +129,15 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
       meta: {
         style: {
           width: '20%',
+        },
+      },
+    }),
+    columnHelper.accessor('pipelines', {
+      header: t('tableHeaders.pipelines'),
+      cell: info => <PipelineStatusCell status={info.row.original.dataSetStatus} pipelines={info.getValue()} />,
+      meta: {
+        style: {
+          width: '15%',
         },
       },
     }),

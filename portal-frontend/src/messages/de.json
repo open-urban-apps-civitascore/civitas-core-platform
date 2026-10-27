@@ -249,7 +249,8 @@
       "lastUpdated": "Aktualisiert",
       "status": "Status",
       "action": "Aktion",
-      "datapool": "Datenpool"
+      "datapool": "Datenpool",
+      "pipelines": "Pipelines"
     },
     "anonymousDatapool": "Anonym",
     "tableValues": {
@@ -257,6 +258,11 @@
       "available": "Verfügbar",
       "ready": "Fertig",
       "yesterday": "Gestern"
+    },
+    "pipelineStatus": {
+      "active": "Aktiv",
+      "error": "Fehler",
+      "stopped": "Gestoppt"
     },
     "form": {
       "title": "Basisinformationen",

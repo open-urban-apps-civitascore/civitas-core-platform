@@ -11,6 +11,7 @@ export const mappedDatasets: DatasetTableData[] = [
     modifiedAt: '2023-09-10T08:00:00Z',
     dataSetStatus: DATASET_STATUS_TYPES.DRAFT,
     datapool: null,
+    pipelines: [],
   },
   {
     id: '2',
@@ -22,5 +23,6 @@ export const mappedDatasets: DatasetTableData[] = [
     modifiedAt: '2023-01-01T08:00:00Z',
     dataSetStatus: DATASET_STATUS_TYPES.AVAILABLE,
     datapool: null,
+    pipelines: [{ id: 'p1', name: 'Pipeline 1', runtimeStatus: { state: 'OK' } }],
   },
 ]
