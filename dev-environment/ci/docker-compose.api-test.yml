@@ -102,7 +102,7 @@ services:
   # the PostGIS sink database and FROST's scoped views. This CI-only Trino has no host port and is
   # reachable only inside api-test-net.
   trino:
-    image: trinodb/trino:481@sha256:5b5e0a97f599a30a2e23c7c7061e4e4d546a914b4fad2a2a002998140ceb4006
+    image: trinodb/trino:484@sha256:2704eb53935af5e582d63d6033e9bf99d20c325e9b0e30b1016ef59a4773979f
     volumes:
       - ./trino/catalog:/etc/trino/catalog:ro
     depends_on:
@@ -537,7 +537,7 @@ services:
         FROM $${SUPERSET_BASE_IMAGE}
         USER root
         ENV PATH="/app/.venv/bin:${PATH}"
-        RUN uv pip install --python /app/.venv/bin/python psycopg2-binary==2.9.12 'trino[sqlalchemy]==0.337.0'
+        RUN uv pip install --python /app/.venv/bin/python 'trino[sqlalchemy]==0.337.0'
         COPY superset_config.py /app/pythonpath/superset_config.py
         COPY bootstrap-superset-ci.py start-superset-ci.sh /app/civitas/
         RUN chmod 755 /app/civitas/start-superset-ci.sh \
@@ -554,15 +554,9 @@ services:
       SUPERSET_DB_PASSWORD: superset
       SUPERSET_ADMIN_USERNAME: admin
       SUPERSET_ADMIN_PASSWORD: admin
-      SUPERSET_TRINO_DATABASE_NAME: CORE
-      SUPERSET_TRINO_SQLALCHEMY_URI: trino://trino@trino:8080/frost/frost_scoped
     depends_on:
       superset-db:
         condition: service_healthy
-      trino:
-        condition: service_healthy
-      trino-frost-bootstrap:
-        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8088/health >/dev/null"]
       interval: 10s
@@ -615,7 +609,7 @@ services:
       HEALTHCHECK_PORT: 8088
       # ConfigAdapter names only — SagaCommandHandlers (nifi among them) are discovered from the
       # classpath independently, so listing a handler-only module here aborts the boot.
-      ADAPTERS: keycloak,apisix,frost,postgis,geoserver
+      ADAPTERS: keycloak,apisix,frost,postgis,geoserver,superset
       EVENTHANDLER_NAME: kafka
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_GROUP_ID: config-adapter-group
@@ -692,7 +686,13 @@ services:
       SUPERSET_URL: http://superset:8088
       SUPERSET_ADMIN_USERNAME: admin
       SUPERSET_ADMIN_PASSWORD: admin
-      SUPERSET_TRINO_DATABASE_ID: "1"
+      SUPERSET_TRINO_DATABASE_NAME: CORE
+      SUPERSET_TRINO_URL: http://trino:8080
+      SUPERSET_TRINO_USERNAME: trino
+      SUPERSET_TRINO_CATALOG: geodata
+      SUPERSET_TRINO_SCHEMA: information_schema
+      SUPERSET_TRINO_HTTP_SCHEME: http
+      SUPERSET_TRINO_TLS_VERIFY: "false"
     depends_on:
       # Flowable's JDBC URL targets postgis-dev-env — wait until it is healthy before boot.
       postgis-dev-env:

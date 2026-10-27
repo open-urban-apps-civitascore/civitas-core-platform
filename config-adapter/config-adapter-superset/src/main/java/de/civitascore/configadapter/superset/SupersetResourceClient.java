@@ -18,6 +18,9 @@ import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -34,7 +37,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Superset REST operations for maintaining physical datasets and dashboards — shared by {@link
  * SupersetSagaHandler}. One Superset "database" per Civitas tenant (configured via {@code
- * superset.trino.database-id}), one schema per dataset.
+ * superset.trino.database-name}), one schema per dataset.
  *
  * <p>Authentication (login + CSRF token) is handled by {@link SupersetSession}; this class re-runs
  * a request once via {@link SupersetSession#authenticate()} on a 401, then surfaces any other
@@ -59,7 +62,8 @@ final class SupersetResourceClient {
   private final Client client;
   private final SupersetSession session;
   private final String baseUrl;
-  private final int trinoDatabaseId;
+  private volatile int trinoDatabaseId;
+  private final TrinoDatabaseConfig trinoDatabaseConfig;
   private final ObjectMapper objectMapper = new ObjectMapper();
   // Group subjects are stable for the lifetime of this adapter. Resolve them once, because a
   // dataset release can sync several datasets and dashboards for the same CORE groups while
@@ -69,10 +73,393 @@ final class SupersetResourceClient {
 
   SupersetResourceClient(
       Client client, SupersetSession session, String baseUrl, int trinoDatabaseId) {
+    this(client, session, baseUrl, trinoDatabaseId, null);
+  }
+
+  SupersetResourceClient(
+      Client client,
+      SupersetSession session,
+      String baseUrl,
+      int trinoDatabaseId,
+      TrinoDatabaseConfig trinoDatabaseConfig) {
     this.client = client;
     this.session = session;
     this.baseUrl = baseUrl;
     this.trinoDatabaseId = trinoDatabaseId;
+    this.trinoDatabaseConfig = trinoDatabaseConfig;
+  }
+
+  /** Ensure the CORE Trino connection exists and return its current Superset ID. */
+  synchronized int ensureTrinoDatabase() {
+    if (trinoDatabaseConfig == null) {
+      if (trinoDatabaseId > 0) {
+        return trinoDatabaseId;
+      }
+      throw new SagaApiException("Superset Trino connection configuration is missing", 503);
+    }
+
+    JsonNode databases = listDatabases();
+    Integer databaseId = findDatabaseId(databases, trinoDatabaseConfig.databaseName());
+    if (databaseId == null && "CORE".equals(trinoDatabaseConfig.databaseName())) {
+      // Preserve existing dataset references when moving the former Trino connection to CORE.
+      databaseId = findDatabaseId(databases, "Trino");
+    }
+    Map<String, Object> body = trinoDatabaseConfig.toSupersetPayload();
+    if (databaseId == null) {
+      Response response = null;
+      try {
+        response = postJson("/api/v1/database/", body);
+        if (response.getStatus() == 401) {
+          response = closeAndReauth(response, () -> postJson("/api/v1/database/", body));
+        }
+        if (response.getStatus() == 422) {
+          // Another adapter replica may have created CORE at the same time. Re-read and reconcile.
+          closeQuietly(response);
+          response = null;
+          databaseId = findDatabaseId(listDatabases(), trinoDatabaseConfig.databaseName());
+          if (databaseId == null) {
+            throw new SagaApiException(
+                "Superset rejected creation of the CORE Trino database connection", 422);
+          }
+        } else {
+          if (response.getStatus() >= 400) {
+            // Superset can echo submitted database fields in validation errors. Do not expose a
+            // Trino password embedded in sqlalchemy_uri through saga logs or error responses.
+            throw new SagaApiException(
+                "Superset could not create the CORE Trino database connection (HTTP "
+                    + response.getStatus() + ")",
+                response.getStatus());
+          }
+          databaseId = parseId(response, "database");
+        }
+      } finally {
+        closeQuietly(response);
+      }
+    }
+
+    if (databaseId == null || databaseId <= 0) {
+      throw new SagaApiException("Superset CORE Trino database ID could not be resolved", 503);
+    }
+
+    Response response = null;
+    try {
+      response = putJson("/api/v1/database/" + databaseId, body);
+      if (response.getStatus() == 401) {
+        int id = databaseId;
+        response = closeAndReauth(response, () -> putJson("/api/v1/database/" + id, body));
+      }
+      if (response.getStatus() >= 400) {
+        throw new SagaApiException(
+            "Superset could not reconcile the CORE Trino database connection (HTTP "
+                + response.getStatus() + ")",
+            response.getStatus());
+      }
+      this.trinoDatabaseId = databaseId;
+      LOG.info(
+          "Reconciled Superset Trino database connection {}",
+          Encode.forJava(trinoDatabaseConfig.databaseName()));
+      return databaseId;
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  private JsonNode listDatabases() {
+    Response response = null;
+    try {
+      response = getJson("/api/v1/database/", Map.of("q", "(page:0,page_size:1000)"));
+      if (response.getStatus() == 401) {
+        response =
+            closeAndReauth(
+                response,
+                () -> getJson("/api/v1/database/", Map.of("q", "(page:0,page_size:1000)")));
+      }
+      if (response.getStatus() >= 400) {
+        throw new SagaApiException(
+            "Superset could not list database connections (HTTP " + response.getStatus() + ")",
+            response.getStatus());
+      }
+      return readTree(response).path("result");
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  private Integer findDatabaseId(JsonNode databases, String databaseName) {
+    for (JsonNode database : databases) {
+      if (databaseName.equals(database.path("database_name").asText())
+          && database.path("id").canConvertToInt()) {
+        return database.path("id").asInt();
+      }
+    }
+    return null;
+  }
+
+  /** Ensure the least-privilege role used by dashboard editor groups can create datasets. */
+  synchronized void ensureDatasetCreatorRole(int databaseId) {
+    int roleId = findDatasetCreatorRoleIdOrNull();
+    if (roleId == 0) {
+      Response response = null;
+      try {
+        response = postJson("/api/v1/security/roles/", Map.of("name", DATASET_CREATOR_ROLE));
+        if (response.getStatus() == 401) {
+          response =
+              closeAndReauth(
+                  response,
+                  () -> postJson("/api/v1/security/roles/", Map.of("name", DATASET_CREATOR_ROLE)));
+        }
+        if (response.getStatus() == 422 || response.getStatus() == 409) {
+          closeQuietly(response);
+          response = null;
+          roleId = findDatasetCreatorRoleIdOrNull();
+        } else {
+          checkStatus(response, "create Superset dashboard dataset creator role");
+          roleId = parseId(response, "role");
+        }
+      } finally {
+        closeQuietly(response);
+      }
+    }
+    if (roleId <= 0) {
+      throw new SagaApiException("Superset dashboard dataset creator role could not be resolved", 503);
+    }
+    final int resolvedRoleId = roleId;
+
+    JsonNode database = getDatabase(databaseId);
+    String databasePermission = database.path("result").path("perm").asText();
+    if (databasePermission.isBlank()) {
+      // Superset 7 formats the database permission menu as [name].(id:id).
+      databasePermission =
+          "[" + trinoDatabaseConfig.databaseName() + "].(id:" + databaseId + ")";
+    }
+    Map<String, Integer> desiredPermissions =
+        findPermissionViewMenuIds(
+            Map.of("database_access", databasePermission, "can_write", "Dataset"));
+
+    Set<Integer> existingPermissionIds = getRolePermissionIds(resolvedRoleId);
+    List<Integer> missingPermissionIds =
+        desiredPermissions.values().stream()
+            .filter(id -> !existingPermissionIds.contains(id))
+            .toList();
+    if (!missingPermissionIds.isEmpty()) {
+      Response response = null;
+      try {
+        response =
+            postJson(
+                "/api/v1/security/roles/" + resolvedRoleId + "/permissions",
+                Map.of("permission_view_menu_ids", missingPermissionIds));
+        if (response.getStatus() == 401) {
+          response =
+              closeAndReauth(
+                  response,
+                  () ->
+                      postJson(
+                          "/api/v1/security/roles/" + resolvedRoleId + "/permissions",
+                          Map.of("permission_view_menu_ids", missingPermissionIds)));
+        }
+        checkStatus(response, "grant Superset dashboard dataset creator permissions");
+      } finally {
+        closeQuietly(response);
+      }
+    }
+  }
+
+  private JsonNode getDatabase(int databaseId) {
+    Response response = null;
+    try {
+      response = getJson("/api/v1/database/" + databaseId, Map.of());
+      if (response.getStatus() == 401) {
+        int id = databaseId;
+        response = closeAndReauth(response, () -> getJson("/api/v1/database/" + id, Map.of()));
+      }
+      checkStatus(response, "get CORE Trino database connection");
+      return readTree(response);
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  private Map<String, Integer> findPermissionViewMenuIds(Map<String, String> desired) {
+    Response response = null;
+    try {
+      response =
+          getJson(
+              "/api/v1/security/permissions-resources/",
+              Map.of("q", "(page:0,page_size:1000)"));
+      if (response.getStatus() == 401) {
+        response =
+            closeAndReauth(
+                response,
+                () ->
+                    getJson(
+                        "/api/v1/security/permissions-resources/",
+                        Map.of("q", "(page:0,page_size:1000)")));
+      }
+      checkStatus(response, "list Superset permission resources");
+      JsonNode result = readTree(response).path("result");
+      Map<String, Integer> found = new LinkedHashMap<>();
+      for (JsonNode permission : result) {
+        String permissionName = permission.path("permission").path("name").asText();
+        String viewMenuName = permission.path("view_menu").path("name").asText();
+        String key = permissionName + "\u0000" + viewMenuName;
+        if (desired.containsKey(permissionName)
+            && desired.get(permissionName).equals(viewMenuName)
+            && permission.path("id").canConvertToInt()) {
+          found.put(key, permission.path("id").asInt());
+        }
+      }
+      for (Map.Entry<String, String> entry : desired.entrySet()) {
+        if (!found.containsKey(entry.getKey() + "\u0000" + entry.getValue())) {
+          throw new SagaApiException(
+              "Required Superset permission is unavailable: "
+                  + entry.getKey()
+                  + " on "
+                  + Encode.forJava(entry.getValue()),
+              503);
+        }
+      }
+      Map<String, Integer> ordered = new LinkedHashMap<>();
+      desired.forEach(
+          (permission, viewMenu) ->
+              ordered.put(permission, found.get(permission + "\u0000" + viewMenu)));
+      return ordered;
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  private Set<Integer> getRolePermissionIds(int roleId) {
+    Response response = null;
+    try {
+      response = getJson("/api/v1/security/roles/" + roleId + "/permissions/", Map.of());
+      if (response.getStatus() == 401) {
+        response =
+            closeAndReauth(
+                response,
+                () -> getJson("/api/v1/security/roles/" + roleId + "/permissions/", Map.of()));
+      }
+      checkStatus(response, "list dashboard dataset creator permissions");
+      Set<Integer> ids = new LinkedHashSet<>();
+      for (JsonNode permission : readTree(response).path("result")) {
+        if (permission.path("id").canConvertToInt()) {
+          ids.add(permission.path("id").asInt());
+        }
+      }
+      return ids;
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  private int findDatasetCreatorRoleIdOrNull() {
+    Response response = null;
+    try {
+      response = getJson("/api/v1/security/roles/", Map.of("q", "(page:0,page_size:1000)"));
+      if (response.getStatus() == 401) {
+        response =
+            closeAndReauth(
+                response,
+                () ->
+                    getJson(
+                        "/api/v1/security/roles/", Map.of("q", "(page:0,page_size:1000)")));
+      }
+      checkStatus(response, "list Superset roles");
+      for (JsonNode role : readTree(response).path("result")) {
+        if (DATASET_CREATOR_ROLE.equals(role.path("name").asText())
+            && role.path("id").canConvertToInt()) {
+          return role.path("id").asInt();
+        }
+      }
+      return 0;
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  /** Immutable, secret-bearing connection settings. Never log or render this value. */
+  record TrinoDatabaseConfig(
+      String databaseName,
+      URI url,
+      String username,
+      String password,
+      String catalog,
+      String schema,
+      String httpScheme,
+      boolean verifyTls) {
+
+    TrinoDatabaseConfig {
+      if (databaseName == null || databaseName.isBlank()
+          || url == null || url.getHost() == null
+          || url.getUserInfo() != null || url.getQuery() != null || url.getFragment() != null
+          || (url.getRawPath() != null
+              && !url.getRawPath().isBlank()
+              && !"/".equals(url.getRawPath()))
+          || username == null || username.isBlank()
+          || catalog == null || catalog.isBlank()
+          || schema == null || schema.isBlank()
+          || httpScheme == null || httpScheme.isBlank()) {
+        throw new IllegalArgumentException("Superset Trino connection configuration is incomplete");
+      }
+      if (!httpScheme.equals("https") && !httpScheme.equals("http")) {
+        throw new IllegalArgumentException("Superset Trino HTTP scheme must be http or https");
+      }
+      if ((!"https".equals(url.getScheme()) && !"http".equals(url.getScheme()))
+          || !httpScheme.equals(url.getScheme())) {
+        throw new IllegalArgumentException("Superset Trino URL scheme does not match http-scheme");
+      }
+    }
+
+    @Override
+    public String toString() {
+      return "TrinoDatabaseConfig[databaseName=" + databaseName + ", password=<redacted>]";
+    }
+
+    Map<String, Object> toSupersetPayload() {
+      String user = encodeUriPart(username);
+      String userInfo = user;
+      if (password != null && !password.isBlank()) {
+        userInfo += ":" + encodeUriPart(password);
+      }
+      String sqlalchemyUri =
+          "trino://"
+              + userInfo
+              + "@"
+              + url.getRawAuthority()
+              + "/"
+              + encodeUriPart(catalog)
+              + "/"
+              + encodeUriPart(schema);
+      Map<String, Object> connectArgs =
+          Map.of("http_scheme", httpScheme, "verify", verifyTls);
+      String extra;
+      try {
+        extra = new ObjectMapper().writeValueAsString(Map.of(
+            "metadata_params", Map.of(),
+            "engine_params", Map.of("connect_args", connectArgs),
+            "metadata_cache_timeout", Map.of(),
+            "schemas_allowed_for_file_upload", List.of()));
+      } catch (Exception e) {
+        throw new SagaApiException("Could not encode Superset Trino connection settings", 500);
+      }
+      Map<String, Object> payload = new LinkedHashMap<>();
+      payload.put("database_name", databaseName);
+      payload.put("sqlalchemy_uri", sqlalchemyUri);
+      payload.put("extra", extra);
+      payload.put("expose_in_sqllab", true);
+      payload.put("allow_run_async", false);
+      payload.put("allow_file_upload", false);
+      payload.put("allow_ctas", false);
+      payload.put("allow_cvas", false);
+      payload.put("allow_dml", false);
+      payload.put("force_ctas_schema", null);
+      payload.put("impersonate_user", true);
+      payload.put("allow_multi_catalog", true);
+      return payload;
+    }
+
+    private static String encodeUriPart(String value) {
+      return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+    }
   }
 
   // ── Dashboard ────────────────────────────────────────────────────────────
@@ -106,13 +493,22 @@ final class SupersetResourceClient {
 
   int createDashboard(
       String title, String description, List<String> editorGroupIds, boolean released) {
+    return createDashboard(title, description, editorGroupIds, List.of(), false, released);
+  }
+
+  int createDashboard(
+      String title,
+      String description,
+      List<String> editorGroupIds,
+      List<String> viewerGroupIds,
+      boolean publicAccess,
+      boolean released) {
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("dashboard_title", title);
     body.put("description", description);
     body.put("published", released);
-    if (editorGroupIds != null && !editorGroupIds.isEmpty()) {
-      body.put("editors", resolveEditorSubjectIds(editorGroupIds));
-    }
+    body.put("editors", resolveEditorSubjectIds(editorGroupIds));
+    body.put("viewers", resolveViewerSubjectIds(viewerGroupIds, publicAccess && released));
 
     Response response = null;
     try {
@@ -132,10 +528,50 @@ final class SupersetResourceClient {
 
   /** Resolve CORE UUID group names to Superset Subject ids used by dashboard editor ACLs. */
   private List<Integer> resolveEditorSubjectIds(List<String> groupIds) {
+    if (groupIds == null || groupIds.isEmpty()) {
+      return List.of();
+    }
     List<String> canonicalGroupIds = canonicalGroupIds(groupIds);
     String cacheKey = String.join(",", canonicalGroupIds);
     return editorSubjectIdsByGroupSet.computeIfAbsent(
         cacheKey, ignored -> resolveEditorSubjectIdsUncached(canonicalGroupIds));
+  }
+
+  private List<Integer> resolveViewerSubjectIds(List<String> groupIds, boolean publicAccess) {
+    Set<Integer> subjectIds = new LinkedHashSet<>(resolveEditorSubjectIds(groupIds));
+    if (publicAccess) {
+      boolean publicRoleFound = false;
+      Response response = null;
+      try {
+        response =
+            getJson(
+                "/api/v1/dashboard/related/viewers", Map.of("q", "(filter:Public,page_size:1000)"));
+        if (response.getStatus() == 401) {
+          response =
+              closeAndReauth(
+                  response,
+                  () ->
+                      getJson(
+                          "/api/v1/dashboard/related/viewers",
+                          Map.of("q", "(filter:Public,page_size:1000)")));
+        }
+        checkStatus(response, "resolve Public viewer role");
+        for (JsonNode subject : readTree(response).path("result")) {
+          if ("Public".equals(subject.path("text").asText())
+              && subject.path("extra").path("type").asInt() == 2
+              && subject.path("value").canConvertToInt()) {
+            subjectIds.add(subject.path("value").asInt());
+            publicRoleFound = true;
+          }
+        }
+        if (!publicRoleFound) {
+          throw new SagaApiException("Superset Public role Subject was not found", 503);
+        }
+      } finally {
+        closeQuietly(response);
+      }
+    }
+    return List.copyOf(subjectIds);
   }
 
   /** Give only the dashboard editor groups access to the CORE connection and dataset creation. */
@@ -190,26 +626,11 @@ final class SupersetResourceClient {
   }
 
   private int findDatasetCreatorRoleId() {
-    Response response = null;
-    try {
-      response = getJson("/api/v1/security/roles/", Map.of("q", "(page:0,page_size:1000)"));
-      if (response.getStatus() == 401) {
-        response =
-            closeAndReauth(
-                response,
-                () -> getJson("/api/v1/security/roles/", Map.of("q", "(page:0,page_size:1000)")));
-      }
-      checkStatus(response, "list Superset roles");
-      for (JsonNode role : readTree(response).path("result")) {
-        if (DATASET_CREATOR_ROLE.equals(role.path("name").asText())
-            && role.path("id").canConvertToInt()) {
-          return role.path("id").asInt();
-        }
-      }
+    int roleId = findDatasetCreatorRoleIdOrNull();
+    if (roleId <= 0) {
       throw new SagaApiException("Superset role " + DATASET_CREATOR_ROLE + " was not found", 503);
-    } finally {
-      closeQuietly(response);
     }
+    return roleId;
   }
 
   private JsonNode listSecurityGroups() {
@@ -355,7 +776,7 @@ final class SupersetResourceClient {
     }
   }
 
-  /** Update the title and add the creator's CORE groups without removing existing editors. */
+  /** Synchronize dashboard access from CORE. */
   boolean syncDashboardEditors(
       int dashboardId, String title, List<String> editorGroupIds, boolean released) {
     return syncDashboardEditors(dashboardId, title, null, editorGroupIds, released);
@@ -367,11 +788,20 @@ final class SupersetResourceClient {
       String description,
       List<String> editorGroupIds,
       boolean released) {
-    if (editorGroupIds == null || editorGroupIds.isEmpty()) {
-      return updateDashboardTitle(dashboardId, title, description, released);
-    }
+    return syncDashboardAccess(
+        dashboardId, title, description, editorGroupIds, List.of(), false, released);
+  }
 
-    Set<Integer> editorIds = new LinkedHashSet<>(resolveEditorSubjectIds(editorGroupIds));
+  boolean syncDashboardAccess(
+      int dashboardId,
+      String title,
+      String description,
+      List<String> editorGroupIds,
+      List<String> viewerGroupIds,
+      boolean publicAccess,
+      boolean released) {
+    List<Integer> editorIds = resolveEditorSubjectIds(editorGroupIds);
+    List<Integer> viewerIds = resolveViewerSubjectIds(viewerGroupIds, publicAccess && released);
     Response response = null;
     try {
       response = getJson("/api/v1/dashboard/" + dashboardId, Map.of());
@@ -383,13 +813,7 @@ final class SupersetResourceClient {
         LOG.info("Superset dashboard id={} not found for editor sync (drift)", dashboardId);
         return false;
       }
-      checkStatus(response, "get dashboard editors");
-      JsonNode current = readTree(response).path("result");
-      for (JsonNode editor : current.path("editors")) {
-        if (editor.path("id").canConvertToInt()) {
-          editorIds.add(editor.path("id").asInt());
-        }
-      }
+      checkStatus(response, "get dashboard access");
     } finally {
       closeQuietly(response);
     }
@@ -397,7 +821,8 @@ final class SupersetResourceClient {
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("dashboard_title", title);
     body.put("description", description);
-    body.put("editors", List.copyOf(editorIds));
+    body.put("editors", editorIds);
+    body.put("viewers", viewerIds);
     body.put("published", released);
     response = null;
     try {
@@ -631,7 +1056,7 @@ final class SupersetResourceClient {
     }
   }
 
-  private void updateDatasetExtra(int datasetId, Map<String, String> extraFields) {
+  void updateDatasetExtra(int datasetId, Map<String, String> extraFields) {
     String extra;
     try {
       extra = objectMapper.writeValueAsString(extraFields);
@@ -654,13 +1079,17 @@ final class SupersetResourceClient {
   }
 
   /**
-   * Renames a dataset's {@code table_name} in place — used to keep FROST's virtual dataset labels
-   * (which embed the dataset's display name) current across renames, mirroring {@link
-   * #updateDashboardTitle}. Returns {@code false} if {@code datasetId} no longer exists in Superset
-   * (404, drift) so the caller can self-heal by creating a replacement instead.
+   * Updates a virtual dataset's Trino schema and SQL in place while keeping its Superset id. This
+   * moves existing FROST datasets to the per-CORE-dataset views without detaching saved charts.
+   * Returns {@code false} if the dataset no longer exists (404, drift).
    */
-  boolean renameDataset(int datasetId, String newTableName) {
-    Map<String, Object> body = Map.of("table_name", newTableName);
+  boolean updateDatasetDefinition(
+      int datasetId, String catalog, String schemaName, String tableName, String sql) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("catalog", catalog);
+    body.put("schema", schemaName);
+    body.put("table_name", tableName);
+    body.put("sql", sql);
     Response response = null;
     try {
       response = putJson("/api/v1/dataset/" + datasetId, body);
@@ -668,14 +1097,15 @@ final class SupersetResourceClient {
         response = closeAndReauth(response, () -> putJson("/api/v1/dataset/" + datasetId, body));
       }
       if (response.getStatus() == 404) {
-        LOG.info("Superset dataset id={} not found for rename (drift)", datasetId);
+        LOG.info("Superset dataset id={} not found for definition update (drift)", datasetId);
         return false;
       }
-      checkStatus(response, "rename dataset");
+      checkStatus(response, "update dataset definition");
       LOG.info(
-          "Renamed Superset dataset id={} to table_name={}",
+          "Updated Superset dataset id={} to schema={}, table_name={}",
           datasetId,
-          Encode.forJava(newTableName));
+          Encode.forJava(schemaName),
+          Encode.forJava(tableName));
       return true;
     } finally {
       closeQuietly(response);
@@ -837,15 +1267,44 @@ final class SupersetResourceClient {
   }
 
   /**
-   * Map of FROST view name (e.g. {@code observations_scoped}) → Superset dataset ID, for every
-   * dataset in {@code schemaName} stamped with {@code extra.civitasDatasetId == civitasDatasetId}
-   * and an {@code extra.frostView}. The idempotency/rename-target lookup for FROST datasets: their
-   * {@code table_name} embeds the mutable dataset display name (see {@code SupersetSagaHandler}),
-   * so unlike {@link #findDatasetMapBySchema} it can't double as a stable matching key — this reads
-   * the stamped, immutable {@code frostView} instead.
+   * Finds PostGIS datasets by their stable CORE dataset stamp across schema renames. Superset does
+   * not support filtering its dataset list by the {@code extra} JSON field, so the database-only
+   * query is narrowed client-side. FROST SQL datasets are excluded by their separate marker.
    */
-  Map<String, Integer> findFrostDatasetsByCivitasId(String schemaName, String civitasDatasetId) {
-    Map<String, String> query = Map.of("q", databaseSchemaQuery(schemaName));
+  Map<String, Integer> findPostgisDatasetsByCivitasId(String civitasDatasetId) {
+    Map<String, String> query = Map.of("q", databaseOnlyQuery());
+    Response response = null;
+    try {
+      response = getJson("/api/v1/dataset/", query);
+      if (response.getStatus() == 401) {
+        response = closeAndReauth(response, () -> getJson("/api/v1/dataset/", query));
+      }
+      checkStatus(response, "list datasets");
+      Map<String, Integer> datasets = new LinkedHashMap<>();
+      for (JsonNode item : readTree(response).path("result")) {
+        String tableName = item.path("table_name").asText("");
+        int id = item.path("id").asInt(-1);
+        if (!tableName.isEmpty()
+            && id != -1
+            && civitasDatasetId.equals(extractExtraField(item, CIVITAS_DATASET_ID_KEY))
+            && extractExtraField(item, FROST_VIEW_KEY) == null) {
+          datasets.put(tableName, id);
+        }
+      }
+      return datasets;
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  /**
+   * Map of FROST view name (e.g. {@code observations_scoped}) to Superset dataset ID, for datasets
+   * in the Trino database stamped with {@code extra.civitasDatasetId == civitasDatasetId} and an
+   * {@code extra.frostView}. The table label and schema embed the mutable dataset display name, so
+   * the stable matching key is the {@code frostView} marker together with the CORE dataset stamp.
+   */
+  Map<String, Integer> findFrostDatasetsByCivitasId(String civitasDatasetId) {
+    Map<String, String> query = Map.of("q", databaseOnlyQuery());
     Response response = null;
     try {
       response = getJson("/api/v1/dataset/", query);
@@ -895,6 +1354,12 @@ final class SupersetResourceClient {
         + "),(col:schema,opr:eq,value:"
         + risonString(schemaName)
         + ")))";
+  }
+
+  private String databaseOnlyQuery() {
+    return "(filters:!((col:database,opr:rel_o_m,value:"
+        + trinoDatabaseId
+        + ")),page:0,page_size:1000)";
   }
 
   /** Rison-quotes a string value: wraps in {@code '...'}, escaping {@code !} and {@code '}. */

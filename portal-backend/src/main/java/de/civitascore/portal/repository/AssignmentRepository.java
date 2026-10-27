@@ -122,6 +122,20 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
           + " WHERE u.externalId = :externalId)")
   List<Assignment> findAllByUserExternalId(@Param("externalId") String externalId);
 
+  /** Groups whose effective dataset scope grants the requested permission. */
+  @Query(
+      "SELECT DISTINCT a.group.id FROM Assignment a JOIN a.role.permissions p"
+          + " WHERE p.name = :permission AND ("
+          + " a.scopeType = de.civitascore.portal.model.embedded.ScopeType.TENANT"
+          + " OR (a.scopeType = de.civitascore.portal.model.embedded.ScopeType.DATASET"
+          + " AND a.dataset.id = :datasetId)"
+          + " OR (a.scopeType = de.civitascore.portal.model.embedded.ScopeType.DATAPOOL"
+          + " AND a.dataPool.id = :poolId))")
+  List<UUID> findGroupIdsWithDatasetPermission(
+      @Param("permission") String permission,
+      @Param("datasetId") UUID datasetId,
+      @Param("poolId") UUID poolId);
+
   /**
    * Finds all assignments with the given scope type that apply to a user via their group
    * memberships.

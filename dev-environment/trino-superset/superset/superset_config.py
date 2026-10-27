@@ -35,8 +35,8 @@ AUTH_TYPE = AUTH_OAUTH
 # alongside real users' OAuth logins, not a workaround for something else.
 AUTH_API_LOGIN_ALLOW_MULTIPLE_PROVIDERS = True
 # Superset must create its local FAB user on the first successful Keycloak login.
-# CivitasSupersetSecurityManager only returns OAuth user info for users in the
-# configured Keycloak group, so this does not enable registration for other users.
+# CivitasSupersetSecurityManager only returns OAuth user info when CORE grants
+# dashboard access (or the user is a designated Superset administrator).
 AUTH_USER_REGISTRATION = True
 AUTH_USER_REGISTRATION_ROLE = "Public"
 PUBLIC_ROLE_LIKE = "Public"
@@ -48,7 +48,7 @@ AUTH_ROLE_PUBLIC = "Public"
 AUTH_ROLES_SYNC_AT_LOGIN = True
 AUTH_ROLES_MAPPING = {
     "superset-admins": ["Admin"],
-    env("KEYCLOAK_SUPERSET_GROUP"): ["Gamma"],
+    "dashboard-users": ["Gamma"],
 }
 CUSTOM_SECURITY_MANAGER = CivitasSupersetSecurityManager
 OAUTH_PROVIDERS = [
@@ -78,11 +78,12 @@ FEATURE_FLAGS = {
     "VIEWER_PROMISCUOUS_MODE": False,
     "ASSIGN_CREATOR_GROUPS_AS_VIEWERS": False,
 }
-# CORE is authoritative for resource membership: only CORE-synchronized FAB Groups can be
-# assigned as Subjects. CORE group IDs/names and each user's membership are synchronized at OAuth
-# login. Groups receive no FAB roles by default; the config adapter grants the narrow
-# CORE Dashboard Dataset Creator role only to groups that edit a CORE-provisioned dashboard.
+# CORE is authoritative for resource membership. CORE-synchronized FAB Groups are available as
+# Subjects; dashboards also permit the Public role Subject for anonymous access. CORE group IDs,
+# names, and memberships are synchronized at OAuth login. Groups receive no FAB roles by default;
+# the adapter grants the narrow CORE Dashboard Dataset Creator role to dashboard editor groups.
 SUBJECTS_RELATED_TYPES = [SubjectType.GROUP]
+SUBJECTS_RELATED_TYPES_DASHBOARDS = [SubjectType.GROUP, SubjectType.ROLE]
 
 
 def core_groups_only(query, *args, **kwargs):

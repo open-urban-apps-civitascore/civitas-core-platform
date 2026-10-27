@@ -20,9 +20,9 @@ import de.civitascore.portal.model.saga.LayerPayload;
 import de.civitascore.portal.model.saga.StylePayload;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.PayloadKind;
+import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.DashboardRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
-import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -46,10 +46,7 @@ import org.springframework.kafka.KafkaException;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Publishes dataset saga trigger messages to Kafka for the config-adapter orchestrator. Supports
@@ -69,7 +66,7 @@ public class DataSetSagaPublisher {
   private final SagaProperties sagaProperties;
   private final DataSinkRepository dataSinkRepository;
   private final DashboardRepository dashboardRepository;
-  private final UserRepository userRepository;
+  private final AssignmentRepository assignmentRepository;
   private final ModelRegistryGateway modelRegistryGateway;
   private final PipelineClosureValidationProperties closureProperties;
 
@@ -79,7 +76,7 @@ public class DataSetSagaPublisher {
       SagaProperties sagaProperties,
       DataSinkRepository dataSinkRepository,
       DashboardRepository dashboardRepository,
-      UserRepository userRepository,
+      AssignmentRepository assignmentRepository,
       ModelRegistryGateway modelRegistryGateway,
       PipelineClosureValidationProperties closureProperties) {
     this.eventKafkaTemplate = eventKafkaTemplate;
@@ -87,7 +84,7 @@ public class DataSetSagaPublisher {
     this.sagaProperties = sagaProperties;
     this.dataSinkRepository = dataSinkRepository;
     this.dashboardRepository = dashboardRepository;
-    this.userRepository = userRepository;
+    this.assignmentRepository = assignmentRepository;
     this.modelRegistryGateway = modelRegistryGateway;
     this.closureProperties = closureProperties;
   }
@@ -117,7 +114,7 @@ public class DataSetSagaPublisher {
             buildPipelines(dataset.getPipelines(), PipelineAction.ADD),
             buildNamedApis(dataset),
             dashboards,
-            editorGroupIds(dataset.getCreatedBy()),
+            groupIdsWithPermission(dataset, "DATASET_UPDATE"),
             buildArtifacts(dataset.getPipelines(), dashboards));
     sendTrigger(trigger);
   }
@@ -156,7 +153,7 @@ public class DataSetSagaPublisher {
             buildNamedApis(dataset),
             dashboards,
             deletedDashboardIds,
-            editorGroupIds(dataset.getCreatedBy()),
+            groupIdsWithPermission(dataset, "DATASET_UPDATE"),
             buildArtifacts(withoutStopped(dataset.getPipelines()), dashboards));
     sendTrigger(trigger);
   }
@@ -545,9 +542,7 @@ public class DataSetSagaPublisher {
     if (dashboards.isEmpty()) {
       return List.of();
     }
-    return dashboards.stream()
-        .map(d -> toDashboardModel(dataset, d))
-        .toList();
+    return dashboards.stream().map(d -> toDashboardModel(dataset, d)).toList();
   }
 
   /** Ensures each engine binding points to a model stored in the DataSet manifest. */
@@ -582,7 +577,9 @@ public class DataSetSagaPublisher {
         entity.getId().toString(),
         entity.getModelUrn(),
         entity.getExternalDashboardId(),
-        editorGroupIds(dataset.getCreatedBy()));
+        groupIdsWithPermission(dataset, "DATASET_UPDATE"),
+        groupIdsWithPermission(dataset, "DATASET_READ"),
+        Boolean.TRUE.equals(dataset.getOpenDataAccess()));
   }
 
   /**
@@ -762,21 +759,7 @@ public class DataSetSagaPublisher {
 
   private String toJson(SagaTrigger trigger) {
     try {
-      JsonNode payload = objectMapper.valueToTree(trigger);
-      if (payload instanceof ObjectNode objectNode
-          && objectNode.path("dashboards") instanceof ArrayNode dashboards) {
-        Map<String, List<String>> editorGroups = dashboardEditorGroupIds(trigger.datasetId());
-        for (JsonNode dashboardNode : dashboards) {
-          if (dashboardNode instanceof ObjectNode dashboard) {
-            List<String> groupIds = editorGroups.get(dashboard.path("id").asString());
-            if (groupIds != null) {
-              ArrayNode ids = dashboard.putArray("editorGroupIds");
-              groupIds.forEach(ids::add);
-            }
-          }
-        }
-      }
-      return objectMapper.writeValueAsString(payload);
+      return objectMapper.writeValueAsString(trigger);
     } catch (JacksonException e) {
       log.error(
           "Failed to serialize saga trigger for dataset {}: {}",
@@ -787,24 +770,14 @@ public class DataSetSagaPublisher {
     }
   }
 
-  private Map<String, List<String>> dashboardEditorGroupIds(String datasetId) {
-    return dashboardRepository.findByDataSetId(UUID.fromString(datasetId)).stream()
-        .collect(
-            Collectors.toMap(
-                dashboard -> dashboard.getId().toString(),
-                dashboard -> editorGroupIds(dashboard.getCreatedBy())));
-  }
-
-  private List<String> editorGroupIds(UUID creatorExternalId) {
-    if (creatorExternalId == null) {
-      return List.of();
-    }
-    return userRepository
-        .findWithGroupsByExternalId(creatorExternalId.toString())
-        .map(
-            user ->
-                user.getGroups().stream().map(group -> group.getId().toString()).sorted().toList())
-        .orElse(List.of());
+  private List<String> groupIdsWithPermission(DataSet dataset, String permission) {
+    UUID poolId = dataset.getDataPool() == null ? null : dataset.getDataPool().getId();
+    return assignmentRepository
+        .findGroupIdsWithDatasetPermission(permission, dataset.getId(), poolId)
+        .stream()
+        .map(UUID::toString)
+        .sorted()
+        .toList();
   }
 
   private static boolean isCausedByRecordTooLarge(Throwable failure) {

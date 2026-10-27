@@ -244,6 +244,11 @@ This accepts the same options as `start-portal-dev.sh`. The regular
 `start-portal-dev.sh` and the direct Compose command continue to use the configured
 registry base image.
 
+The Superset image adds the Trino SQLAlchemy driver. Local Python configuration and
+bootstrap files are mounted into the container. The Config Adapter creates or updates
+Superset's `CORE` Trino connection through the Superset API when it registers a dataset;
+Superset startup does not create a second connection.
+
 ---
 
 ## Key URLs

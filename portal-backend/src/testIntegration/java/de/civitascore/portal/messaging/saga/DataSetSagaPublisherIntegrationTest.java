@@ -21,10 +21,10 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.PayloadKind;
+import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.DashboardRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
-import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.dto.PrincipalUserDetails;
 import de.civitascore.portal.service.validation.PipelineClosureValidator;
@@ -60,7 +60,7 @@ class DataSetSagaPublisherIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataSinkRepository dataSinkRepository;
   @Autowired private DashboardRepository dashboardRepository;
-  @Autowired private UserRepository userRepository;
+  @Autowired private AssignmentRepository assignmentRepository;
   @Autowired private ObjectMapper objectMapper;
   @Autowired private SagaProperties sagaProperties;
   @Autowired private PipelineClosureValidationProperties closureProperties;
@@ -102,7 +102,7 @@ class DataSetSagaPublisherIntegrationTest extends BaseKeycloakIntegrationTest {
             sagaProperties,
             dataSinkRepository,
             dashboardRepository,
-            userRepository,
+            assignmentRepository,
             modelRegistryGateway,
             closureProperties);
     transactionTemplate.executeWithoutResult(

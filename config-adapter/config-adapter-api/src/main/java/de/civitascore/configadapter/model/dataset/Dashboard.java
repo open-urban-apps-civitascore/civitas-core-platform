@@ -40,6 +40,8 @@ import java.util.List;
  * @param modelUrn logical CORE URN of the authoritative Model Forge artifact
  * @param externalDashboardId engine id when known (update), else {@code null} (create)
  * @param editorGroupIds CORE group IDs allowed to edit the engine dashboard
+ * @param viewerGroupIds CORE group IDs allowed to view the published dashboard
+ * @param publicAccess whether the parent CORE dataset is public
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -47,8 +49,11 @@ public record Dashboard(
     String id,
     String modelUrn,
     String externalDashboardId,
-    List<String> editorGroupIds) {
+    List<String> editorGroupIds,
+    List<String> viewerGroupIds,
+    boolean publicAccess) {
   public Dashboard {
     editorGroupIds = editorGroupIds == null ? List.of() : List.copyOf(editorGroupIds);
+    viewerGroupIds = viewerGroupIds == null ? List.of() : List.copyOf(viewerGroupIds);
   }
 }

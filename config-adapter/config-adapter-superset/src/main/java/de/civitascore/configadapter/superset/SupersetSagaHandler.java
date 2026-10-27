@@ -15,7 +15,7 @@ import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
-import de.civitascore.configadapter.model.dataset.WorkspaceNames;
+import de.civitascore.configadapter.model.dataset.DatasetSchemaNames;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import java.util.ArrayList;
@@ -63,14 +63,10 @@ import org.owasp.encoder.Encode;
  * branch; {@code projectId} (the dataset's FROST project id — required only when a {@code FROST}
  * sink is present); a {@code dashboards} binding list and an {@code artifacts} map keyed by each
  * Dashboard's {@code modelUrn} (see {@code de.civitascore.configadapter.model.dataset.Dashboard}).
- * The dashboard model is the source of its title, description and release state. The PostGIS
- * Superset schema is derived from {@code datasetId} via {@link WorkspaceNames#fromDatasetId} — the
- * same rule {@code PostgisSagaHandler}'s {@code PROVISION_SINK} step uses to name the schema, so
- * the two agree on where the table actually lives. FROST datasets have no per-dataset schema — they
- * all live in the shared {@link #FROST_SCHEMA}, isolated per Civitas dataset by baking {@code
- * projectId} into each dataset's {@code sql} (defense in depth only: the real security boundary is
- * OPA's row-filter on the underlying Trino query, see {@code
- * authz/rego/policy/trino_row_filters.rego}).
+ * The dashboard model is the source of its title, description and release state. PostGIS keeps
+ * the physical UUID schema used by GeoServer and exposes the table through a readable per-dataset
+ * view schema for Trino. FROST uses the same readable naming rule for its project-scoped views. OPA
+ * resolves either schema name back to the CORE dataset before checking permission.
  */
 public class SupersetSagaHandler extends AbstractSagaCommandHandler {
 
@@ -84,22 +80,11 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
    * dev-environment/frost/docker-compose.yaml}), exposed to Trino as a separate catalog from the
    * one PostGIS/GeoServer sinks use ({@code geodata} — see {@code
    * dev-environment/trino-superset/trino/start-trino.sh}, which generates both {@code
-   * sensordata.properties} and {@code geodata.properties}). Superset's only registered Trino connection
-   * ({@code trinoDatabaseId}) defaults to the {@code geodata} catalog. FROST datasets set their
-   * catalog explicitly because they live in the separate {@code sensordata} catalog.
+   * sensordata.properties} and {@code geodata.properties}). Superset's only registered Trino
+   * connection ({@code CORE}) defaults to the {@code geodata} catalog. FROST datasets
+   * set their catalog explicitly because they live in the separate {@code sensordata} catalog.
    */
   private static final String SENSORDATA_CATALOG = "sensordata";
-
-  /**
-   * The shared Postgres schema (see {@code
-   * dev-environment/frost/migrations/01-create-scoped-views.sql}) exposing FROST's
-   * Things/Datastreams/Observations etc. to Trino, pre-filtered per row by {@code frost_project_id}
-   * — unlike PostGIS, FROST has no per-dataset schema to point a Superset dataset at directly, so
-   * each entry below becomes a virtual (SQL-defined) Superset dataset instead of a physical table
-   * pointer. {@code projects_scoped} is deliberately excluded: it's always exactly one row (the
-   * project itself), not useful as a chartable dataset on its own.
-   */
-  private static final String FROST_SCHEMA = "frost_scoped";
 
   /** One FROST-scoped view, paired with the human-readable label its Superset dataset gets. */
   private record FrostView(String schemaName, String label) {}
@@ -117,7 +102,8 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
   private String baseUrl;
   private String adminUsername;
   private String adminPassword;
-  private int trinoDatabaseId;
+  private int legacyTrinoDatabaseId;
+  private SupersetResourceClient.TrinoDatabaseConfig trinoDatabaseConfig;
   private Client supersetClient;
   private SupersetSession session;
   private SupersetResourceClient resourceClient;
@@ -132,12 +118,28 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
     baseUrl = requireProperty("url").replaceAll("/+$", "");
     adminUsername = requireProperty("admin.username");
     adminPassword = requireProperty("admin.password");
-    String databaseIdStr = requireProperty("trino.database-id");
-    try {
-      trinoDatabaseId = Integer.parseInt(databaseIdStr.trim());
-    } catch (NumberFormatException e) {
-      throw new IllegalArgumentException(
-          "superset.trino.database-id must be a valid integer, got: " + databaseIdStr);
+    String databaseIdStr = getProperty("trino.database-id");
+    if (databaseIdStr != null && !databaseIdStr.isBlank()) {
+      try {
+        legacyTrinoDatabaseId = Integer.parseInt(databaseIdStr.trim());
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException(
+            "superset.trino.database-id must be a valid integer, got: " + databaseIdStr);
+      }
+    }
+
+    String trinoUrl = getProperty("trino.url");
+    if (trinoUrl != null && !trinoUrl.isBlank()) {
+      trinoDatabaseConfig =
+          new SupersetResourceClient.TrinoDatabaseConfig(
+              getProperty("trino.database-name", "CORE"),
+              java.net.URI.create(trinoUrl),
+              getProperty("trino.username"),
+              getProperty("trino.password"),
+              getProperty("trino.catalog", "geodata"),
+              getProperty("trino.schema", "information_schema"),
+              getProperty("trino.http-scheme", "https"),
+              Boolean.parseBoolean(getProperty("trino.tls-verify", "false")));
     }
     supersetClient =
         ClientBuilder.newBuilder()
@@ -145,9 +147,11 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
             .readTimeout(30, TimeUnit.SECONDS)
             .build();
     log.info(
-        "SupersetSagaHandler initialized for {}, trinoDatabaseId={}",
+        "SupersetSagaHandler initialized for {}, trinoDatabase={}",
         Encode.forJava(baseUrl),
-        trinoDatabaseId);
+        trinoDatabaseConfig == null
+            ? "legacy-id"
+            : Encode.forJava(trinoDatabaseConfig.databaseName()));
   }
 
   private String requireProperty(String key) {
@@ -179,7 +183,8 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
     if (session == null) {
       session = new SupersetSession(supersetClient, baseUrl, adminUsername, adminPassword);
       resourceClient =
-          new SupersetResourceClient(supersetClient, session, baseUrl, trinoDatabaseId);
+        new SupersetResourceClient(
+            supersetClient, session, baseUrl, legacyTrinoDatabaseId, trinoDatabaseConfig);
     }
     if (session.isAuthenticated()) {
       return;
@@ -203,30 +208,51 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
   // ── REGISTER_DATASET ─────────────────────────────────────────────────────
 
   private SagaCommandResult register(SagaCommandMessage command) {
+    int trinoDatabaseId = resourceClient.ensureTrinoDatabase();
     String datasetId = requireString(command, "datasetId");
     List<String> tables = postgisTableNames(command);
     List<DashboardEntry> dashboards = dashboardEntries(command);
     List<String> editorGroupIds = stringList(command.payload(), "editorGroupIds");
+    if (!dashboards.isEmpty() && !editorGroupIds.isEmpty()) {
+      resourceClient.ensureDatasetCreatorRole(trinoDatabaseId);
+    }
 
     Map<String, Object> resultData = new LinkedHashMap<>();
     Map<String, Object> compensationData = new LinkedHashMap<>();
     List<Integer> datasetIds = new ArrayList<>();
 
     if (!tables.isEmpty()) {
-      String schemaName = WorkspaceNames.fromDatasetId(datasetId);
-      Map<String, Integer> existingDatasets = resourceClient.findDatasetMapBySchema(schemaName);
+      String datasetName = requireString(command, "datasetName");
+      String schemaName =
+          DatasetSchemaNames.fromDataset(datasetName, java.util.UUID.fromString(datasetId));
+      Map<String, Integer> existingDatasets =
+          resourceClient.findPostgisDatasetsByCivitasId(datasetId);
       for (String table : tables) {
         Integer existingDatasetId = existingDatasets.get(table);
-        int supersetDatasetId =
-            existingDatasetId != null
-                ? existingDatasetId
-                : resourceClient.createDataset(
-                    "geodata",
-                    schemaName,
-                    table,
-                    null,
-                    Map.of(SupersetResourceClient.CIVITAS_DATASET_ID_KEY, datasetId),
-                    editorGroupIds);
+        int supersetDatasetId;
+        if (existingDatasetId != null) {
+          // Move an existing Superset dataset to the PostGIS view schema in place. This keeps
+          // saved charts attached while the physical ds_<uuid> schema remains available to
+          // GeoServer.
+          if (!resourceClient.updateDatasetDefinition(
+              existingDatasetId, "geodata", schemaName, table, null)) {
+            throw new SagaApiException(
+                "Could not update Superset dataset id=" + existingDatasetId, 404);
+          }
+          resourceClient.updateDatasetExtra(
+              existingDatasetId,
+              Map.of(SupersetResourceClient.CIVITAS_DATASET_ID_KEY, datasetId));
+          supersetDatasetId = existingDatasetId;
+        } else {
+          supersetDatasetId =
+              resourceClient.createDataset(
+                  "geodata",
+                  schemaName,
+                  table,
+                  null,
+                  Map.of(SupersetResourceClient.CIVITAS_DATASET_ID_KEY, datasetId),
+                  editorGroupIds);
+        }
         if (supersetDatasetId <= 0) {
           // Superset created (or already had) a dataset for this table but its id couldn't be
           // resolved — failing loudly here is essential: silently skipping would report this step
@@ -251,48 +277,38 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
 
     if (hasFrostSink(command)) {
       String frostProjectId = requireString(command, "projectId");
-      if (!frostProjectId.matches("\\d+")) {
-        // frostProjectId is spliced directly into a raw SQL string below — Superset's dataset API
-        // takes freeform SQL, not a parameterized query, so this is the injection guard.
-        throw new SagaApiException(
-            "projectId must be numeric for FROST Superset datasets, got: "
-                + Encode.forJava(frostProjectId),
-            422);
-      }
       String datasetName = requireString(command, "datasetName");
-      // Keyed by view, not table_name: unlike PostGIS's per-dataset schema, every FROST dataset's
-      // table_name embeds the (mutable) dataset display name, so it can't double as the
-      // idempotency/rename-target lookup the way postgisTableNames' does — extra.frostView is the
-      // stable key instead (see findFrostDatasetsByCivitasId).
+      String datasetSchemaName =
+          DatasetSchemaNames.fromDataset(datasetName, java.util.UUID.fromString(datasetId));
+      // Search by the stable dataset stamp across schemas. A rename changes the readable schema
+      // too, while updating the existing Superset dataset in place keeps saved charts attached.
       Map<String, Integer> existingFrostDatasets =
-          resourceClient.findFrostDatasetsByCivitasId(FROST_SCHEMA, datasetId);
+          resourceClient.findFrostDatasetsByCivitasId(datasetId);
       for (FrostView view : FROST_SCOPED_VIEWS) {
         String label = frostDatasetLabel(datasetName, view.label(), frostProjectId);
+        String sql =
+            "SELECT * FROM "
+                + SENSORDATA_CATALOG
+                + "."
+                + datasetSchemaName
+                + "."
+                + view.schemaName();
         Integer existingDatasetId = existingFrostDatasets.get(view.schemaName());
         int supersetDatasetId;
-        if (existingDatasetId != null && resourceClient.renameDataset(existingDatasetId, label)) {
+        if (existingDatasetId != null
+            && resourceClient.updateDatasetDefinition(
+                existingDatasetId, SENSORDATA_CATALOG, datasetSchemaName, label, sql)) {
           supersetDatasetId = existingDatasetId;
         } else {
-          // existingDatasetId != null but renameDataset returned false means Superset-side drift
+          // existingDatasetId != null but updateDatasetDefinition returned false means Superset-side drift
           // (someone deleted it out of band) — falls through to recreate, self-healing like
           // syncDashboard does for dashboards.
           supersetDatasetId =
               resourceClient.createDataset(
                   SENSORDATA_CATALOG,
-                  FROST_SCHEMA,
+                  datasetSchemaName,
                   label,
-                  // Catalog-qualified because Superset's CORE Trino connection defaults to the
-                  // "sensordata" catalog. Keep the catalog explicit so dataset metadata remains
-                  // correct if the connection default changes.
-                  "SELECT * FROM "
-                      + SENSORDATA_CATALOG
-                      + "."
-                      + FROST_SCHEMA
-                      + "."
-                      + view.schemaName()
-                      + " WHERE frost_project_id = '"
-                      + frostProjectId
-                      + "'",
+                  sql,
                   Map.of(
                       SupersetResourceClient.CIVITAS_DATASET_ID_KEY,
                       datasetId,
@@ -373,10 +389,21 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
     Integer existingId = parseSupersetId(entry.externalDashboardId());
     if (existingId == null) {
       return resourceClient.createDashboard(
-          entry.title(), entry.description(), entry.editorGroupIds(), entry.released());
+          entry.title(),
+          entry.description(),
+          entry.editorGroupIds(),
+          entry.viewerGroupIds(),
+          entry.publicAccess(),
+          entry.released());
     }
-    if (resourceClient.syncDashboardEditors(
-        existingId, entry.title(), entry.description(), entry.editorGroupIds(), entry.released())) {
+    if (resourceClient.syncDashboardAccess(
+        existingId,
+        entry.title(),
+        entry.description(),
+        entry.editorGroupIds(),
+        entry.viewerGroupIds(),
+        entry.publicAccess(),
+        entry.released())) {
       return existingId;
     }
     log.warn(
@@ -384,7 +411,12 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
         existingId,
         Encode.forJava(entry.id()));
     return resourceClient.createDashboard(
-        entry.title(), entry.description(), entry.editorGroupIds(), entry.released());
+        entry.title(),
+        entry.description(),
+        entry.editorGroupIds(),
+        entry.viewerGroupIds(),
+        entry.publicAccess(),
+        entry.released());
   }
 
   private static Integer parseSupersetId(String externalId) {
@@ -401,6 +433,7 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
   // ── DEREGISTER_DATASET (compensation) ────────────────────────────────────
 
   private SagaCommandResult deregister(SagaCommandMessage command, boolean compensation) {
+    resourceClient.ensureTrinoDatabase();
     Map<String, Object> payload = command.payload();
 
     // Resolve datasets authoritatively via the civitasDatasetId Superset stamps on every dataset
@@ -409,9 +442,10 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
     // (e.g. an id that couldn't be resolved), not just the ones the saga happened to track.
     Set<Integer> datasetIds = new LinkedHashSet<>(intList(payload, "datasetIds"));
     if (payload.get("datasetId") instanceof String civitasDatasetId) {
-      String schemaName = WorkspaceNames.fromDatasetId(civitasDatasetId);
-      datasetIds.addAll(resourceClient.findDatasetIdsByCivitasId(schemaName, civitasDatasetId));
-      datasetIds.addAll(resourceClient.findDatasetIdsByCivitasId(FROST_SCHEMA, civitasDatasetId));
+      datasetIds.addAll(
+          resourceClient.findPostgisDatasetsByCivitasId(civitasDatasetId).values());
+      datasetIds.addAll(
+          resourceClient.findFrostDatasetsByCivitasId(civitasDatasetId).values());
     }
 
     for (int datasetId : datasetIds) {
@@ -488,6 +522,8 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
       String modelUrn,
       String externalDashboardId,
       List<String> editorGroupIds,
+      List<String> viewerGroupIds,
+      boolean publicAccess,
       Map<?, ?> model) {
     String title() {
       return requiredModelString("title");
@@ -534,6 +570,8 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
                 modelUrn,
                 dash.get("externalDashboardId") instanceof String ext ? ext : null,
                 stringList(dash, "editorGroupIds"),
+                stringList(dash, "viewerGroupIds"),
+                Boolean.TRUE.equals(dash.get("publicAccess")),
                 model));
       }
     }

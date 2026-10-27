@@ -46,6 +46,7 @@ final class SqlDdlSupport implements AutoCloseable {
   private static final String JDBC_URL_KEY = "postgis.jdbc.url";
   private static final String JDBC_USER_KEY = "postgis.jdbc.user";
   private static final String JDBC_PASSWORD_KEY = "postgis.jdbc.password";
+  private static final String TRINO_READER_ROLE_KEY = "postgis.trino.readerRole";
   private static final String JDBC_MAX_POOL_SIZE_KEY = "postgis.jdbc.maxPoolSize";
   private static final String JDBC_CONNECTION_TIMEOUT_MS_KEY = "postgis.jdbc.connectionTimeoutMs";
 
@@ -58,6 +59,7 @@ final class SqlDdlSupport implements AutoCloseable {
 
   private ConnectionProvider connectionProvider;
   private SqlDialect dialect;
+  private String trinoReaderRole = "geoserver";
   private byte[] stretchedKey = new byte[0];
 
   /** Read within the transaction to build the statement list, possibly using the connection. */
@@ -76,6 +78,7 @@ final class SqlDdlSupport implements AutoCloseable {
     String jdbcUrl = requireProperty(config, JDBC_URL_KEY);
     String user = requireProperty(config, JDBC_USER_KEY);
     String password = config.getProperty(JDBC_PASSWORD_KEY, "");
+    trinoReaderRole = config.getProperty(TRINO_READER_ROLE_KEY, "geoserver");
     int maxPoolSize =
         Integer.parseInt(config.getProperty(JDBC_MAX_POOL_SIZE_KEY, DEFAULT_MAX_POOL_SIZE));
     long connectionTimeoutMs =
@@ -99,6 +102,10 @@ final class SqlDdlSupport implements AutoCloseable {
 
   SqlDialect dialect() {
     return dialect;
+  }
+
+  String trinoReaderRole() {
+    return trinoReaderRole;
   }
 
   /** Test seam — inject a pre-configured provider before {@link #initialize(AdapterConfig)}. */

@@ -52,14 +52,16 @@ services:
       - FROST_DB_PASSWORD=${FROST_DB_PASSWORD:-changeme-generate-a-strong-password}
       - FROST_DB_NAME=${FROST_DB_NAME:-sensorthings}
       - FROST_TRINO_READER_PASSWORD=${FROST_TRINO_READER_PASSWORD:-dev-only-frost-trino-reader-password}
+      - FROST_DB_MIGRATION_USER=${FROST_DB_MIGRATION_USER:-admin}
+      - FROST_DB_MIGRATION_PASSWORD=${FROST_DB_MIGRATION_PASSWORD:-admin}
     entrypoint:
       - /bin/sh
       - -c
       - |
         set -e
         attempt=0
-        until PGPASSWORD="$$FROST_DB_PASSWORD" psql -v ON_ERROR_STOP=1 \
-            -h postgis-dev-env -U sensorthings -d "$$FROST_DB_NAME" \
+        until PGPASSWORD="$$FROST_DB_MIGRATION_PASSWORD" psql -v ON_ERROR_STOP=1 \
+            -h postgis-dev-env -U "$$FROST_DB_MIGRATION_USER" -d "$$FROST_DB_NAME" \
             -v frost_trino_reader_password="$$FROST_TRINO_READER_PASSWORD" \
             -f /migrations/01-create-scoped-views.sql; do
           attempt=$$((attempt + 1))

@@ -210,7 +210,6 @@ require_env KEYCLOAK_TRINO_CLIENT_SECRET
 require_env KEYCLOAK_TRINO_GROUP
 require_env KEYCLOAK_SUPERSET_CLIENT_ID
 require_env KEYCLOAK_SUPERSET_CLIENT_SECRET
-require_env KEYCLOAK_SUPERSET_GROUP
 require_env TRINO_PUBLIC_URL
 require_env SUPERSET_PUBLIC_URL
 
@@ -221,7 +220,6 @@ write_superset_client_file
 write_groups_mapper_file
 
 trino_group_id="$(ensure_group "$KEYCLOAK_TRINO_GROUP")"
-superset_group_id="$(ensure_group "$KEYCLOAK_SUPERSET_GROUP")"
 
 trino_client_id="$(ensure_client KEYCLOAK_TRINO_CLIENT_ID /tmp/civitas-trino-client.json)"
 superset_client_id="$(ensure_client KEYCLOAK_SUPERSET_CLIENT_ID /tmp/civitas-superset-client.json)"
@@ -231,7 +229,6 @@ ensure_groups_mapper "$superset_client_id"
 
 if [ -n "${KEYCLOAK_DEFAULT_REALM_USER:-}" ]; then
   ensure_group_membership "$KEYCLOAK_DEFAULT_REALM_USER" "$trino_group_id"
-  ensure_group_membership "$KEYCLOAK_DEFAULT_REALM_USER" "$superset_group_id"
 fi
 
 echo "Keycloak Trino/Superset reconcile completed"

@@ -139,20 +139,17 @@ EOF
 cat > /etc/trino/access-control.properties <<EOF
 access-control.name=opa
 opa.policy.uri=http://civitas-opa:8181/v1/data/civitas/trino/allow
-# Verified against the actual Trino 481 OPA plugin jar (io.trino.plugin.opa.OpaConfig's @Config
-# annotations) rather than assumed from docs — the real property is opa.policy.row-filters-uri,
-# not opa.row-filters.uri. Response contract (OpaRowFiltersQueryResult/OpaViewExpression) confirmed
-# to match trino_row_filters.rego's {"result": [{"expression": "..."}]} shape as-is.
+# Keep row-filter configuration on the plugin's `opa.policy.row-filters-uri` property.
 opa.policy.row-filters-uri=http://civitas-opa:8181/v1/data/civitas/trino/row_filters/result
 opa.log-requests=true
 EOF
 
 generate_password_file_entry > /etc/trino/password.db
 
-# Connects as frost_trino_reader, a least-privilege role scoped to the frost_scoped.* views only
+# Connects as frost_trino_reader, a least-privilege role that can read only the per-dataset views
 # (see dev-environment/frost/migrations/01-create-scoped-views.sql) — not FROST-Server's own app
-# user, which has full read-write access to every project's raw tables. Row-level scoping by
-# project/dataset is enforced by the row-filter policy above, not by this connection's own grants.
+# user, which has full read-write access to every project's raw tables. OPA checks the CORE dataset
+# encoded in each view schema, as it does for PostGIS dataset schemas.
 cat > /etc/trino/catalog/sensordata.properties <<EOF
 connector.name=postgresql
 connection-url=jdbc:postgresql://${FROST_DB_HOST}:${FROST_DB_PORT}/${FROST_DB_NAME}

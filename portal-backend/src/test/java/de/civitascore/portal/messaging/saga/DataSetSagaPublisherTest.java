@@ -26,6 +26,7 @@ import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.PipelineRuntimeStatus;
 import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.DashboardRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.util.InvalidInputException;
@@ -69,7 +70,7 @@ class DataSetSagaPublisherTest {
   @Mock private KafkaTemplate<String, String> kafkaTemplate;
   @Mock private DataSinkRepository dataSinkRepository;
   @Mock private DashboardRepository dashboardRepository;
-  @Mock private de.civitascore.portal.repository.UserRepository userRepository;
+  @Mock private AssignmentRepository assignmentRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;
 
   private DataSetSagaPublisher publisher;
@@ -87,7 +88,7 @@ class DataSetSagaPublisherTest {
         new SagaProperties("test.saga.trigger", 5),
         dataSinkRepository,
         dashboardRepository,
-        userRepository,
+        assignmentRepository,
         modelRegistryGateway,
         new PipelineClosureValidationProperties(maxDepth));
   }

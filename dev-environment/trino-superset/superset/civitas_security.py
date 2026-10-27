@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import re
 from typing import Any
 from uuid import UUID
 
@@ -28,6 +27,39 @@ class CivitasSupersetSecurityManager(SupersetSecurityManager):
     def create_login_manager(self, app):
         """Load Superset users for API requests authenticated with a Bearer token."""
         login_manager = super().create_login_manager(app)
+
+        @app.before_request
+        def install_public_dashboard_filter():
+            # Dashboard models cannot be imported while Superset is loading its config.
+            # Install after app initialization, before any dashboard request is handled.
+            if getattr(self, "_public_dashboard_filter_installed", False):
+                return
+            from sqlalchemy import and_, or_
+            from superset.daos.dashboard import DashboardDAO
+            from superset.dashboards.filters import DashboardAccessFilter
+            from superset.models.dashboard import Dashboard
+            from superset.subjects.models import Subject
+            from superset.utils.filters import guest_embedded_dashboard_filter
+
+            class CivitasDashboardAccessFilter(DashboardAccessFilter):
+                """Pass published Public dashboards to CORE's access check."""
+
+                def apply(self, query, value):
+                    if guest_embedded_dashboard_filter() is not None:
+                        return super().apply(query, value)
+                    native_ids = super().apply(query, value).with_entities(Dashboard.id)
+                    public_viewer = Dashboard.viewers.any(
+                        and_(Subject.type == 2, Subject.label == "Public")
+                    )
+                    return query.filter(
+                        or_(
+                            Dashboard.id.in_(native_ids),
+                            and_(Dashboard.published.is_(True), public_viewer),
+                        )
+                    )
+
+            DashboardDAO.base_filter = CivitasDashboardAccessFilter
+            self._public_dashboard_filter_installed = True
 
         @login_manager.request_loader
         def load_user_from_bearer(request):
@@ -58,18 +90,25 @@ class CivitasSupersetSecurityManager(SupersetSecurityManager):
             return super().get_oauth_user_info(provider, resp)
 
         user_info = self.oauth.keycloak.userinfo()
-        required_group = os.getenv("KEYCLOAK_SUPERSET_GROUP", "superset-users")
         groups = user_info.get("groups", []) or []
-        if required_group not in groups:
+        subject = user_info.get("sub", "")
+        try:
+            dashboard_access = _opa.query(
+                "civitas/superset", "dashboard_users", {"user": subject}
+            ) is True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("CORE dashboard access lookup failed: %s", exc)
+            dashboard_access = False
+        if not dashboard_access and "superset-admins" not in groups:
             return {}
 
         return {
             # Trino impersonation uses the Keycloak subject as X-Trino-User.
-            "username": user_info.get("sub", ""),
+            "username": subject,
             "first_name": user_info.get("given_name", ""),
             "last_name": user_info.get("family_name", ""),
             "email": user_info.get("email", ""),
-            "role_keys": groups,
+            "role_keys": [*groups, "dashboard-users"] if dashboard_access else groups,
         }
 
     def auth_user_oauth(self, userinfo: dict[str, Any]):
@@ -212,6 +251,68 @@ class CivitasSupersetSecurityManager(SupersetSecurityManager):
             "can_access_datasource", datasource
         )
 
+    def is_viewer(self, resource) -> bool:
+        """Check live CORE rights for dashboards; accept anonymous public dashboards."""
+        from superset.models.dashboard import Dashboard
+
+        if not isinstance(resource, Dashboard):
+            return super().is_viewer(resource)
+        if self.is_admin():
+            return True
+        subject = self._keycloak_subject()
+        if subject and self._core_dashboard_access(
+            "can_read_core_dashboard", resource, subject
+        ):
+            return True
+        if not getattr(resource, "published", False):
+            return False
+        if not hasattr(resource, "viewers"):
+            return False
+        public_role_viewer = any(
+            subject.type == 2 and subject.label == "Public"
+            for subject in resource.viewers
+        )
+        if not public_role_viewer:
+            return False
+        try:
+            return _opa.query(
+                "civitas/superset",
+                "can_view_public_dashboard",
+                {"externalDashboardId": str(resource.id)},
+            ) is True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Public CORE dashboard check failed: %s", exc)
+            return False
+
+    def is_editor(self, resource) -> bool:
+        from superset.models.dashboard import Dashboard
+
+        if not isinstance(resource, Dashboard):
+            return super().is_editor(resource)
+        if self.is_guest_user():
+            return False
+        if self.is_admin():
+            return True
+        subject = self._keycloak_subject()
+        return bool(subject) and self._core_dashboard_access(
+            "can_edit_core_dashboard", resource, subject
+        )
+
+    def _core_dashboard_access(self, rule, dashboard, subject) -> bool:
+        try:
+            return _opa.query(
+                "civitas/superset",
+                rule,
+                {
+                    "user": subject,
+                    "externalDashboardId": str(dashboard.id),
+                    "published": bool(dashboard.published),
+                },
+            ) is True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("CORE dashboard check failed for %s: %s", rule, exc)
+            return False
+
     def user_view_menu_names(self, permission_name: str) -> set[str]:
         native_permissions = super().user_view_menu_names(permission_name)
         if permission_name != "schema_access":
@@ -222,37 +323,20 @@ class CivitasSupersetSecurityManager(SupersetSecurityManager):
             return native_permissions
 
         try:
-            result = _opa.query("civitas/superset", "schema_access", {"user": subject}) or {}
+            schema_names = (
+                _opa.query(
+                    "civitas/superset", "allowed_geodata_schemas", {"user": subject}
+                )
+                or []
+            )
         except Exception as exc:  # noqa: BLE001
             logger.warning("CORE schema permissions lookup failed: %s", exc)
             return native_permissions
 
-        if result.get("is_tenant_reader"):
-            try:
-                from flask_appbuilder.security.sqla.models import ViewMenu
-                from superset import db
-
-                database_name = os.getenv("SUPERSET_TRINO_DATABASE_NAME", "CORE")
-                core_schema_permissions = {
-                    row.name
-                    for row in db.session.query(ViewMenu.name)
-                    .filter(ViewMenu.name.like(f"[{database_name}].%]"))
-                    .all()
-                }
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Could not list Trino schemas for tenant reader: %s", exc)
-                core_schema_permissions = set()
-        else:
-            database_name = os.getenv("SUPERSET_TRINO_DATABASE_NAME", "CORE")
-            core_schema_permissions = {
-                f"[{database_name}].[geodata].[{self._workspace_name(dataset_id)}]"
-                for dataset_id in result.get("allowed_schemas", [])
-            }
-
+        database_name = os.getenv("SUPERSET_TRINO_DATABASE_NAME", "CORE")
+        core_schema_permissions = {
+            f"[{database_name}].[geodata].[{schema_name}]"
+            for schema_name in schema_names
+            if isinstance(schema_name, str) and schema_name
+        }
         return native_permissions | core_schema_permissions
-
-    @staticmethod
-    def _workspace_name(dataset_id: str) -> str:
-        """Mirror config-adapter's WorkspaceNames.fromDatasetId naming rule."""
-        normalized = re.sub(r"[^a-z0-9_]", "_", dataset_id.lower())
-        return f"ds_{normalized}" if normalized[:1].isdigit() else normalized
