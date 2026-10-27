@@ -56,7 +56,7 @@ public class StyleController {
   @Operation(summary = "Get Style by ID")
   @Problems(ProblemType.NOT_FOUND)
   public StyleOutputDTO getStyle(@PathVariable UUID dataSetId, @PathVariable UUID styleId) {
-    return styleAssembler.toOutput(requireOwned(dataSetId, styleId));
+    return styleAssembler.toOutput(styleService.findOwned(dataSetId, styleId));
   }
 
   @PostMapping
@@ -70,8 +70,7 @@ public class StyleController {
   })
   public ResponseEntity<StyleOutputDTO> createStyle(
       @PathVariable UUID dataSetId, @Valid @RequestBody StyleInputDTO input) {
-    input.setDataSetId(dataSetId);
-    Style created = styleService.create(input);
+    Style created = styleService.create(dataSetId, input);
     return ResponseEntity.created(Locations.ofCreated(created.getId()))
         .body(styleAssembler.toOutput(created));
   }
@@ -88,9 +87,7 @@ public class StyleController {
       @PathVariable UUID dataSetId,
       @PathVariable UUID styleId,
       @Valid @RequestBody StyleInputDTO input) {
-    requireOwned(dataSetId, styleId);
-    input.setDataSetId(dataSetId);
-    return styleAssembler.toOutput(styleService.update(styleId, input));
+    return styleAssembler.toOutput(styleService.update(dataSetId, styleId, input));
   }
 
   @DeleteMapping("/{styleId}")
@@ -103,13 +100,6 @@ public class StyleController {
     ProblemType.RESOURCE_IN_USE
   })
   public void deleteStyle(@PathVariable UUID dataSetId, @PathVariable UUID styleId) {
-    requireOwned(dataSetId, styleId);
-    styleService.deleteById(styleId);
-  }
-
-  private Style requireOwned(UUID dataSetId, UUID styleId) {
-    Style style = styleService.findByIdOrThrow(styleId);
-    ParentOwnership.requireSameParent(dataSetId, style.getDataSet().getId(), Style.class, styleId);
-    return style;
+    styleService.delete(dataSetId, styleId);
   }
 }

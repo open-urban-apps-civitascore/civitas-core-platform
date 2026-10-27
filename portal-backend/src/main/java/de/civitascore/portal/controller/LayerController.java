@@ -56,7 +56,7 @@ public class LayerController {
   @Operation(summary = "Get Layer by ID")
   @Problems(ProblemType.NOT_FOUND)
   public LayerOutputDTO getLayer(@PathVariable UUID dataSetId, @PathVariable UUID layerId) {
-    return layerAssembler.toOutput(requireOwned(dataSetId, layerId));
+    return layerAssembler.toOutput(layerService.findOwned(dataSetId, layerId));
   }
 
   @PostMapping
@@ -70,8 +70,7 @@ public class LayerController {
   })
   public ResponseEntity<LayerOutputDTO> createLayer(
       @PathVariable UUID dataSetId, @Valid @RequestBody LayerInputDTO input) {
-    input.setDataSetId(dataSetId);
-    Layer created = layerService.create(input);
+    Layer created = layerService.create(dataSetId, input);
     return ResponseEntity.created(Locations.ofCreated(created.getId()))
         .body(layerAssembler.toOutput(created));
   }
@@ -88,9 +87,7 @@ public class LayerController {
       @PathVariable UUID dataSetId,
       @PathVariable UUID layerId,
       @Valid @RequestBody LayerInputDTO input) {
-    requireOwned(dataSetId, layerId);
-    input.setDataSetId(dataSetId);
-    return layerAssembler.toOutput(layerService.update(layerId, input));
+    return layerAssembler.toOutput(layerService.update(dataSetId, layerId, input));
   }
 
   @DeleteMapping("/{layerId}")
@@ -98,13 +95,6 @@ public class LayerController {
   @Operation(summary = "Delete a Layer")
   @Problems({ProblemType.NOT_FOUND, ProblemType.DATASET_NOT_EDITABLE, ProblemType.SAGA_IN_FLIGHT})
   public void deleteLayer(@PathVariable UUID dataSetId, @PathVariable UUID layerId) {
-    requireOwned(dataSetId, layerId);
-    layerService.deleteById(layerId);
-  }
-
-  private Layer requireOwned(UUID dataSetId, UUID layerId) {
-    Layer layer = layerService.findByIdOrThrow(layerId);
-    ParentOwnership.requireSameParent(dataSetId, layer.getDataSet().getId(), Layer.class, layerId);
-    return layer;
+    layerService.delete(dataSetId, layerId);
   }
 }

@@ -355,6 +355,17 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
   }
 
   /**
+   * {@link #deleteById(UUID, boolean)} for an entity of the dataset in the path.
+   *
+   * @throws ResourceNotFoundException if the entity does not exist or belongs to another dataset
+   */
+  @Transactional
+  public void delete(UUID dataSetId, UUID id, boolean confirmDataLoss) {
+    findOwned(dataSetId, id);
+    deleteById(id, confirmDataLoss);
+  }
+
+  /**
    * Deletes the DataSink with its Layers, and with the APIs it is the last backing DataSink of (see
    * {@link DataSinkRemovalService}). A provisioned DataSink stays as PENDING_UNPROVISION until the
    * next release removes its storage.

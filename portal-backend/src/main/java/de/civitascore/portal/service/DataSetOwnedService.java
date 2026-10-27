@@ -4,6 +4,7 @@ import de.civitascore.portal.model.entity.base.DataSetOwnedEntity;
 import de.civitascore.portal.model.input.DataSetOwnedInputDTO;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Abstract base service for entities owned by a parent dataset. Its create, update and delete hooks
@@ -21,6 +22,43 @@ public abstract class DataSetOwnedService<
 
   protected DataSetOwnedService(DataSetMutationGuard dataSetMutationGuard) {
     this.dataSetMutationGuard = dataSetMutationGuard;
+  }
+
+  /**
+   * @throws ResourceNotFoundException if the entity does not exist or belongs to another dataset
+   */
+  public T findOwned(UUID dataSetId, UUID id) {
+    T entity = findByIdOrThrow(id);
+    ParentOwnership.requireSameParent(dataSetId, entity.getDataSet().getId(), getEntityName(), id);
+    return entity;
+  }
+
+  /**
+   * @throws ResourceNotFoundException if the dataset does not exist
+   */
+  @Transactional
+  public T create(UUID dataSetId, I input) {
+    input.setDataSetId(dataSetId);
+    return create(input);
+  }
+
+  /**
+   * @throws ResourceNotFoundException if the entity does not exist or belongs to another dataset
+   */
+  @Transactional
+  public T update(UUID dataSetId, UUID id, I input) {
+    findOwned(dataSetId, id);
+    input.setDataSetId(dataSetId);
+    return update(id, input);
+  }
+
+  /**
+   * @throws ResourceNotFoundException if the entity does not exist or belongs to another dataset
+   */
+  @Transactional
+  public void delete(UUID dataSetId, UUID id) {
+    findOwned(dataSetId, id);
+    deleteById(id);
   }
 
   @Override

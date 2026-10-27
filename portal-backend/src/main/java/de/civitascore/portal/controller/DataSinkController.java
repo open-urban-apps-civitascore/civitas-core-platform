@@ -66,7 +66,7 @@ public class DataSinkController {
   @Problems(ProblemType.NOT_FOUND)
   public DataSinkOutputDTO getDataSink(
       @PathVariable UUID dataSetId, @PathVariable UUID dataSinkId) {
-    return dataSinkAssembler.toOutput(requireOwned(dataSetId, dataSinkId));
+    return dataSinkAssembler.toOutput(dataSinkService.findOwned(dataSetId, dataSinkId));
   }
 
   @PostMapping
@@ -81,8 +81,7 @@ public class DataSinkController {
   })
   public ResponseEntity<DataSinkOutputDTO> createDataSink(
       @PathVariable UUID dataSetId, @Valid @RequestBody DataSinkInputDTO input) {
-    input.setDataSetId(dataSetId);
-    DataSink created = dataSinkService.create(input);
+    DataSink created = dataSinkService.create(dataSetId, input);
     return ResponseEntity.created(Locations.ofCreated(created.getId()))
         .body(dataSinkAssembler.toOutput(created));
   }
@@ -101,9 +100,7 @@ public class DataSinkController {
       @PathVariable UUID dataSetId,
       @PathVariable UUID dataSinkId,
       @Valid @RequestBody DataSinkInputDTO input) {
-    requireOwned(dataSetId, dataSinkId);
-    input.setDataSetId(dataSetId);
-    return dataSinkAssembler.toOutput(dataSinkService.update(dataSinkId, input));
+    return dataSinkAssembler.toOutput(dataSinkService.update(dataSetId, dataSinkId, input));
   }
 
   @PatchMapping("/{dataSinkId}")
@@ -120,10 +117,10 @@ public class DataSinkController {
   })
   public DataSinkOutputDTO patchDataSink(
       @PathVariable UUID dataSetId, @PathVariable UUID dataSinkId, @RequestBody JsonNode updates) {
-    DataSinkInputDTO current = dataSinkAssembler.toInput(requireOwned(dataSetId, dataSinkId));
+    DataSinkInputDTO current =
+        dataSinkAssembler.toInput(dataSinkService.findOwned(dataSetId, dataSinkId));
     DataSinkInputDTO patched = jsonMergePatch.apply(current, updates, dataSinkId);
-    patched.setDataSetId(dataSetId);
-    return dataSinkAssembler.toOutput(dataSinkService.update(dataSinkId, patched));
+    return dataSinkAssembler.toOutput(dataSinkService.update(dataSetId, dataSinkId, patched));
   }
 
   @DeleteMapping("/{dataSinkId}")
@@ -148,14 +145,6 @@ public class DataSinkController {
       @PathVariable UUID dataSinkId,
       @Parameter(description = CONFIRM_DATA_LOSS_DESCRIPTION) @RequestParam(defaultValue = "false")
           boolean confirmDataLoss) {
-    requireOwned(dataSetId, dataSinkId);
-    dataSinkService.deleteById(dataSinkId, confirmDataLoss);
-  }
-
-  private DataSink requireOwned(UUID dataSetId, UUID dataSinkId) {
-    DataSink dataSink = dataSinkService.findByIdOrThrow(dataSinkId);
-    ParentOwnership.requireSameParent(
-        dataSetId, dataSink.getDataSet().getId(), DataSink.class, dataSinkId);
-    return dataSink;
+    dataSinkService.delete(dataSetId, dataSinkId, confirmDataLoss);
   }
 }

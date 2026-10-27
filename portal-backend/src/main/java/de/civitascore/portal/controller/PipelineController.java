@@ -62,7 +62,7 @@ public class PipelineController {
   @Problems(ProblemType.NOT_FOUND)
   public PipelineOutputDTO getPipeline(
       @PathVariable UUID dataSetId, @PathVariable UUID pipelineId) {
-    return pipelineAssembler.toOutput(requireOwned(dataSetId, pipelineId));
+    return pipelineAssembler.toOutput(pipelineService.findOwned(dataSetId, pipelineId));
   }
 
   @PostMapping
@@ -78,8 +78,7 @@ public class PipelineController {
   })
   public ResponseEntity<PipelineOutputDTO> createPipeline(
       @PathVariable UUID dataSetId, @Valid @RequestBody PipelineInputDTO input) {
-    input.setDataSetId(dataSetId);
-    Pipeline created = pipelineService.create(input);
+    Pipeline created = pipelineService.create(dataSetId, input);
     return ResponseEntity.created(Locations.ofCreated(created.getId()))
         .body(pipelineAssembler.toOutput(created));
   }
@@ -106,10 +105,8 @@ public class PipelineController {
       @Parameter(description = DataSinkController.CONFIRM_DATA_LOSS_DESCRIPTION)
           @RequestParam(defaultValue = "false")
           boolean confirmDataLoss) {
-    requireOwned(dataSetId, pipelineId);
-    input.setDataSetId(dataSetId);
     input.setConfirmDataLoss(confirmDataLoss);
-    return pipelineAssembler.toOutput(pipelineService.update(pipelineId, input));
+    return pipelineAssembler.toOutput(pipelineService.update(dataSetId, pipelineId, input));
   }
 
   @PatchMapping("/{pipelineId}")
@@ -135,11 +132,11 @@ public class PipelineController {
       @Parameter(description = DataSinkController.CONFIRM_DATA_LOSS_DESCRIPTION)
           @RequestParam(defaultValue = "false")
           boolean confirmDataLoss) {
-    PipelineInputDTO current = pipelineAssembler.toInput(requireOwned(dataSetId, pipelineId));
+    PipelineInputDTO current =
+        pipelineAssembler.toInput(pipelineService.findOwned(dataSetId, pipelineId));
     PipelineInputDTO patched = jsonMergePatch.apply(current, updates, pipelineId);
-    patched.setDataSetId(dataSetId);
     patched.setConfirmDataLoss(confirmDataLoss);
-    return pipelineAssembler.toOutput(pipelineService.update(pipelineId, patched));
+    return pipelineAssembler.toOutput(pipelineService.update(dataSetId, pipelineId, patched));
   }
 
   @DeleteMapping("/{pipelineId}")
@@ -162,14 +159,6 @@ public class PipelineController {
       @Parameter(description = DataSinkController.CONFIRM_DATA_LOSS_DESCRIPTION)
           @RequestParam(defaultValue = "false")
           boolean confirmDataLoss) {
-    requireOwned(dataSetId, pipelineId);
-    pipelineService.deleteById(pipelineId, confirmDataLoss);
-  }
-
-  private Pipeline requireOwned(UUID dataSetId, UUID pipelineId) {
-    Pipeline pipeline = pipelineService.findByIdOrThrow(pipelineId);
-    ParentOwnership.requireSameParent(
-        dataSetId, pipeline.getDataSet().getId(), Pipeline.class, pipelineId);
-    return pipeline;
+    pipelineService.delete(dataSetId, pipelineId, confirmDataLoss);
   }
 }

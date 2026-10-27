@@ -70,6 +70,17 @@ public class DataStructureVersionService
   }
 
   /**
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the version does not exist or
+   *     belongs to another data structure
+   */
+  public DataStructureVersion findOwned(UUID dataStructureId, UUID versionId) {
+    DataStructureVersion version = findByIdOrThrow(versionId);
+    ParentOwnership.requireSameParent(
+        dataStructureId, version.getDataStructure().getId(), getEntityName(), versionId);
+    return version;
+  }
+
+  /**
    * Resolves and sets the parent data structure relationship after DTO-to-entity conversion.
    *
    * @param entity the data structure version entity

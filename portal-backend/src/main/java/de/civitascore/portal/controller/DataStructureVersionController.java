@@ -70,7 +70,8 @@ public class DataStructureVersionController {
   @Problems(ProblemType.NOT_FOUND)
   public DataStructureVersionOutputDTO getDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
-    return dataStructureVersionAssembler.toOutput(requireOwned(dataStructureId, versionId));
+    return dataStructureVersionAssembler.toOutput(
+        dataStructureVersionService.findOwned(dataStructureId, versionId));
   }
 
   @PutMapping("/{versionId}")
@@ -85,7 +86,7 @@ public class DataStructureVersionController {
       @PathVariable UUID dataStructureId,
       @PathVariable UUID versionId,
       @Valid @RequestBody DataStructureVersionInputDTO input) {
-    requireOwned(dataStructureId, versionId);
+    dataStructureVersionService.findOwned(dataStructureId, versionId);
     input.setDataStructureId(dataStructureId);
     return dataStructureVersionAssembler.toOutput(
         dataStructureVersionService.update(versionId, input));
@@ -106,7 +107,8 @@ public class DataStructureVersionController {
       @PathVariable UUID versionId,
       @RequestBody JsonNode updates) {
     DataStructureVersionInputDTO current =
-        dataStructureVersionAssembler.toInput(requireOwned(dataStructureId, versionId));
+        dataStructureVersionAssembler.toInput(
+            dataStructureVersionService.findOwned(dataStructureId, versionId));
     DataStructureVersionInputDTO patched = jsonMergePatch.apply(current, updates, versionId);
     patched.setDataStructureId(dataStructureId);
     return dataStructureVersionAssembler.toOutput(
@@ -130,7 +132,7 @@ public class DataStructureVersionController {
   })
   public void deleteDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
-    requireOwned(dataStructureId, versionId);
+    dataStructureVersionService.findOwned(dataStructureId, versionId);
     dataStructureVersionService.deleteById(versionId);
   }
 
@@ -151,7 +153,8 @@ public class DataStructureVersionController {
       @PathVariable UUID versionId,
       @RequestBody JsonNode updates) {
     DataStructureVersionMetaInputDTO current =
-        dataStructureVersionService.toMetaInput(requireOwned(dataStructureId, versionId));
+        dataStructureVersionService.toMetaInput(
+            dataStructureVersionService.findOwned(dataStructureId, versionId));
     DataStructureVersion updated =
         dataStructureVersionService.updateReleasedMeta(
             versionId, jsonMergePatch.apply(current, updates, versionId));
@@ -174,7 +177,7 @@ public class DataStructureVersionController {
   })
   public DataStructureVersionOutputDTO releaseDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
-    requireOwned(dataStructureId, versionId);
+    dataStructureVersionService.findOwned(dataStructureId, versionId);
     DataStructureVersion released = dataStructureVersionService.release(versionId);
     return dataStructureVersionAssembler.toOutput(released);
   }
@@ -186,7 +189,7 @@ public class DataStructureVersionController {
   @Problems({ProblemType.NOT_FOUND, ProblemType.RESOURCE_IN_USE})
   public DataStructureVersionOutputDTO unreleaseDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
-    requireOwned(dataStructureId, versionId);
+    dataStructureVersionService.findOwned(dataStructureId, versionId);
     DataStructureVersion unreleased = dataStructureVersionService.unrelease(versionId);
     return dataStructureVersionAssembler.toOutput(unreleased);
   }
@@ -211,7 +214,7 @@ public class DataStructureVersionController {
   })
   public ResponseEntity<DataStructureVersionOutputDTO> duplicateDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
-    requireOwned(dataStructureId, versionId);
+    dataStructureVersionService.findOwned(dataStructureId, versionId);
     DataStructureVersion duplicated = dataStructureVersionService.duplicate(versionId);
     URI location =
         ServletUriComponentsBuilder.fromCurrentContextPath()
@@ -220,12 +223,5 @@ public class DataStructureVersionController {
             .toUri();
     return ResponseEntity.created(location)
         .body(dataStructureVersionAssembler.toOutput(duplicated));
-  }
-
-  private DataStructureVersion requireOwned(UUID dataStructureId, UUID versionId) {
-    DataStructureVersion version = dataStructureVersionService.findByIdOrThrow(versionId);
-    ParentOwnership.requireSameParent(
-        dataStructureId, version.getDataStructure().getId(), DataStructureVersion.class, versionId);
-    return version;
   }
 }
