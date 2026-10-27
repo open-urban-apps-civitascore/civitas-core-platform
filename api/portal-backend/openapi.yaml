@@ -6745,11 +6745,11 @@ paths:
       description: "Tests whether the source answers with the given connector values,\
         \ which may differ from the stored ones, for a data source in any status.\
         \ A placeholder \"********\" keeps the stored secret only to test the connector\
-        \ as saved; with changed values, or where no secret is stored, it answers 400.\
-        \ Values for another destination need DATASOURCE_READ for the whole tenant,\
+        \ as saved; with changed values, or where no secret is stored, it answers\
+        \ 400. Values for another destination need DATASOURCE_READ for the whole tenant,\
         \ otherwise it answers 403. The values must meet the rules of a release. The\
-        \ test changes no data source and stores nothing. A user runs one test at a\
-        \ time."
+        \ test changes no data source and stores nothing. A user runs one test at\
+        \ a time."
       operationId: testSavedDataSourceConnection
       parameters:
       - in: path
@@ -12212,6 +12212,10 @@ components:
           oneOf:
           - $ref: "#/components/schemas/HttpConnectorNoAuthentication"
           - $ref: "#/components/schemas/HttpConnectorBasicAuthentication"
+          - $ref: "#/components/schemas/HttpConnectorBearerTokenAuthentication"
+          - $ref: "#/components/schemas/HttpConnectorApiTokenAuthentication"
+          - $ref: "#/components/schemas/HttpConnectorOAuth2Authentication"
+          - $ref: "#/components/schemas/HttpConnectorClientCertificateAuthentication"
         baseUrl:
           type: string
           description: "API host: an http or https URL, which every API call path\
@@ -12255,6 +12259,8 @@ components:
           description: Pagination of the API call. Absent or null is no pagination.
           oneOf:
           - $ref: "#/components/schemas/HttpConnectorPageNumberPagination"
+          - $ref: "#/components/schemas/HttpConnectorLimitOffsetPagination"
+          - $ref: "#/components/schemas/HttpConnectorCursorPagination"
         path:
           type: string
           description: "Path of the API call below the API host. Starts with '/' and\
@@ -12268,12 +12274,50 @@ components:
             \ in clear text, so they must not hold secrets."
           items:
             $ref: "#/components/schemas/HttpConnectorParameter"
+    HttpConnectorApiTokenAuthentication:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorAuthentication"
+      - type: object
+        properties:
+          in:
+            type: string
+            description: Where each request sends the token. A token in a query parameter
+              appears in the access logs of the API host.
+            enum:
+            - QUERY
+            - HEADER
+            example: HEADER
+          name:
+            type: string
+            description: "Name of the header or query parameter that carries the token.\
+              \ It differs from each header or query parameter at the same place of\
+              \ every API call, pagination included. As a header name, it follows\
+              \ the header name rules of an API call, but Authorization, Proxy-Authorization\
+              \ and Cookie are allowed."
+            example: X-API-Key
+          type:
+            type: string
+            enum:
+            - API_TOKEN
+          value:
+            type: string
+            format: password
+            description: The token. Responses show "********" for a stored token.
+            example: secret
+            writeOnly: true
+      description: An API token in a header or a query parameter of each request.
+      required:
+      - type
     HttpConnectorAuthentication:
       type: object
       discriminator:
         mapping:
+          API_TOKEN: "#/components/schemas/HttpConnectorApiTokenAuthentication"
           BASIC: "#/components/schemas/HttpConnectorBasicAuthentication"
+          BEARER_TOKEN: "#/components/schemas/HttpConnectorBearerTokenAuthentication"
+          CLIENT_CERTIFICATE: "#/components/schemas/HttpConnectorClientCertificateAuthentication"
           NONE: "#/components/schemas/HttpConnectorNoAuthentication"
+          OAUTH2: "#/components/schemas/HttpConnectorOAuth2Authentication"
         propertyName: type
       properties:
         type:
@@ -12286,8 +12330,8 @@ components:
           password:
             type: string
             format: password
-            description: "Basic auth password. Responses show \"********\" for a stored\
-              \ password; a write keeps it with \"********\" while the destination stays."
+            description: Basic auth password. Responses show "********" for a stored
+              password; a write keeps it with "********" while the destination stays.
             example: secret
             writeOnly: true
           type:
@@ -12302,6 +12346,145 @@ components:
       description: HTTP basic authentication.
       required:
       - type
+    HttpConnectorBearerTokenAuthentication:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorAuthentication"
+      - type: object
+        properties:
+          token:
+            type: string
+            format: password
+            description: The token. Responses show "********" for a stored token.
+            example: secret
+            writeOnly: true
+          type:
+            type: string
+            enum:
+            - BEARER_TOKEN
+      description: "A bearer token, sent as 'Authorization: Bearer <token>'."
+      required:
+      - type
+    HttpConnectorClientCertificateAuthentication:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorAuthentication"
+      - type: object
+        properties:
+          certificate:
+            type: string
+            format: password
+            description: "The client certificate in PEM, optionally followed by its\
+              \ chain. Responses show \"********\" for a stored certificate."
+            example: |-
+              -----BEGIN CERTIFICATE-----
+              ...
+              -----END CERTIFICATE-----
+            writeOnly: true
+          privateKey:
+            type: string
+            format: password
+            description: "The private key of the certificate in PEM, without a passphrase.\
+              \ Responses show \"********\" for a stored key."
+            example: secret
+            writeOnly: true
+          type:
+            type: string
+            enum:
+            - CLIENT_CERTIFICATE
+      description: A TLS client certificate with its private key.
+      required:
+      - type
+    HttpConnectorCursorPagination:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorPagination"
+      - type: object
+        properties:
+          cursorIn:
+            type: string
+            description: Where each request sends the cursor.
+            enum:
+            - QUERY
+            - HEADER
+            example: QUERY
+          cursorParameter:
+            type: string
+            description: "Name of the query parameter or header that carries the cursor.\
+              \ As a header name, it follows the header name rules of an API call."
+            example: cursor
+          cursorPath:
+            type: string
+            description: JSON path in the response to the cursor of the next request.
+              Only member names and array indexes.
+            example: $.next_cursor
+            pattern: "^\\$(\\.[A-Za-z_][A-Za-z0-9_-]*|\\['[^'\\\\]+'\\]|\\[[0-9]+\\\
+              ])+$"
+          limit:
+            type: integer
+            format: int32
+            description: Number of records per request. At least 1. Required with
+              limitParameter.
+            example: 100
+            minimum: 1
+          limitParameter:
+            type: string
+            description: Query parameter that carries the limit. Required with limit;
+              absent or null sends no limit.
+            example: limit
+          type:
+            type: string
+            enum:
+            - CURSOR
+      description: "Cursor pagination: each request sends the cursor that the previous\
+        \ response holds. Each response is one record, so the Data structure describes\
+        \ the whole response, cursor included."
+      required:
+      - type
+    HttpConnectorLimitOffsetPagination:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorPagination"
+      - type: object
+        properties:
+          countPath:
+            type: string
+            description: "JSON path in the response to the number of records, or to\
+              \ an array whose length is that number. Only member names and array\
+              \ indexes. Absent or null counts the elements of the response, which\
+              \ must then be an array."
+            example: $.meta.count
+            pattern: "^\\$(\\.[A-Za-z_][A-Za-z0-9_-]*|\\['[^'\\\\]+'\\]|\\[[0-9]+\\\
+              ])+$"
+          limit:
+            type: integer
+            format: int32
+            description: Number of records per request. At least 1. Required with
+              limitParameter.
+            example: 100
+            minimum: 1
+          limitParameter:
+            type: string
+            description: Query parameter that carries the limit. Required with limit;
+              absent or null sends no limit.
+            example: limit
+          offset:
+            type: integer
+            format: int32
+            default: 0
+            description: Offset of the first request. At least 0. Absent or null is
+              0.
+            example: 0
+            minimum: 0
+          offsetParameter:
+            type: string
+            description: Query parameter that carries the offset.
+            example: offset
+          type:
+            type: string
+            enum:
+            - LIMIT_OFFSET
+      description: "Limit/offset pagination, with limit and offset as query parameters.\
+        \ Without a limit, the API pages by its default page size, and the offset\
+        \ grows by the number of records of each response."
+      required:
+      - type
     HttpConnectorNoAuthentication:
       allOf:
       - $ref: "#/components/schemas/HttpConnectorAuthentication"
@@ -12312,6 +12495,41 @@ components:
             enum:
             - NONE
       description: No authentication.
+      required:
+      - type
+    HttpConnectorOAuth2Authentication:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorAuthentication"
+      - type: object
+        properties:
+          clientId:
+            type: string
+            description: Client ID at the authorization server.
+            example: civitas-core
+          clientSecret:
+            type: string
+            format: password
+            description: Client secret at the authorization server. Responses show
+              "********" for a stored secret.
+            example: secret
+            writeOnly: true
+          scope:
+            type: string
+            description: "Scope of the access token, space-separated. Absent or null\
+              \ requests no scope."
+            example: read:stations
+          tokenUrl:
+            type: string
+            description: "Token endpoint of the authorization server: an https URL.\
+              \ Embedded credentials are removed; a query or fragment is rejected."
+            example: https://auth.example.org/oauth2/token
+            pattern: "^[hH][tT][tT][pP][sS]:.*$"
+          type:
+            type: string
+            enum:
+            - OAUTH2
+      description: "OAuth 2.0 with the client credentials grant: an access token from\
+        \ the token endpoint, sent as 'Authorization: Bearer <token>'."
       required:
       - type
     HttpConnectorPageNumberPagination:
@@ -12361,6 +12579,8 @@ components:
       type: object
       discriminator:
         mapping:
+          CURSOR: "#/components/schemas/HttpConnectorCursorPagination"
+          LIMIT_OFFSET: "#/components/schemas/HttpConnectorLimitOffsetPagination"
           PAGE_NUMBER: "#/components/schemas/HttpConnectorPageNumberPagination"
         propertyName: type
       properties:
@@ -12537,8 +12757,8 @@ components:
         password:
           type: string
           format: password
-          description: "Broker password. Responses show \"********\" for a stored password;\
-            \ a write keeps it with \"********\" while the destination stays."
+          description: Broker password. Responses show "********" for a stored password;
+            a write keeps it with "********" while the destination stays.
           example: secret
           writeOnly: true
         protocol_version:
@@ -13820,8 +14040,8 @@ components:
         password:
           type: string
           format: password
-          description: "Database password. Responses show \"********\" for a stored password;\
-            \ a write keeps it with \"********\" while the destination stays."
+          description: Database password. Responses show "********" for a stored password;
+            a write keeps it with "********" while the destination stays.
           example: secret
           writeOnly: true
         table:
