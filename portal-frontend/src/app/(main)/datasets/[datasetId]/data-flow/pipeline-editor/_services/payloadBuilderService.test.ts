@@ -300,13 +300,30 @@ describe('buildPipelinePayload — clean CORE Pipeline document', () => {
     const payload = buildPipelinePayload(p)
 
     // styles round-trips the RF graph unchanged (LOAD path hydrates from styles).
-    expect(payload.styles.nodes).toBe(p.nodes)
-    expect(payload.styles.edges).toBe(p.edges)
+    expect(payload.styles.nodes).toEqual(p.nodes)
+    expect(payload.styles.edges).toEqual(p.edges)
     expect(payload.styles.viewport).toEqual({ x: 0, y: 0, zoom: 1 })
 
     // FK wiring ids (portal GUIDs) are still sent.
     expect(payload.dataSourceIds).toEqual(['ds-guid-1'])
     expect(payload.dataSinkIds).toEqual(['sink-guid-1'])
+  })
+
+  it('writes nodes and edges without selection into styles', () => {
+    const p = pipeline([sourceNode(DS_URN), sinkNode(SINK_URN)], [{ source: 'src-1', target: 'sink-1' }])
+    const selected: Pipeline = {
+      ...p,
+      nodes: p.nodes.map(node => ({ ...node, selected: true })),
+      edges: p.edges.map(edge => ({ ...edge, selected: true })),
+    }
+
+    const payload = buildPipelinePayload(selected)
+
+    expect(payload.styles.nodes).toEqual(p.nodes)
+    expect(payload.styles.edges).toEqual(p.edges)
+    payload.styles.nodes.forEach(node => expect(node).not.toHaveProperty('selected'))
+    payload.styles.edges.forEach(edge => expect(edge).not.toHaveProperty('selected'))
+    expect(selected.nodes.every(node => node.selected)).toBe(true)
   })
 
   it('validates the CORE model and throws on an unknown node kind', () => {

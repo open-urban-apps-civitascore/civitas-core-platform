@@ -7,7 +7,7 @@
 
 import type { Pipeline, PipelineOutputDTO, PipelineStylesPayload } from '../_types/pipeline'
 import type { PipelineSession, PipelineSessionAction, PipelineSessionState } from '../_types/session'
-import { createEmptyPipeline } from './pipelineService'
+import { createEmptyPipeline, omitSelectedKey } from './pipelineService'
 
 // ============================================================================
 // Factory Functions
@@ -61,8 +61,7 @@ export const createSessionFromBackendDTO = (dto: PipelineOutputDTO): PipelineSes
     id: dto.id,
     name: dto.name,
     description: dto.description || '',
-    nodes: parsedStyles?.nodes ?? [],
-    edges: parsedStyles?.edges ?? [],
+    ...omitSelectedKey({ nodes: parsedStyles?.nodes ?? [], edges: parsedStyles?.edges ?? [] }),
     viewport: parsedStyles?.viewport ?? { x: 0, y: 0, zoom: 1 },
     createdAt: dto.createdAt ? new Date(dto.createdAt) : now,
     updatedAt: dto.modifiedAt ? new Date(dto.modifiedAt) : now,

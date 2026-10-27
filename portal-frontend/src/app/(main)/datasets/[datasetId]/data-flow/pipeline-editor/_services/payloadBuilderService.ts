@@ -35,6 +35,7 @@ import type {
   PipelinePayload,
   PipelineStylesPayload,
 } from '../_types/pipeline'
+import { omitSelectedKey } from './pipelineService'
 
 /** Maps the React-Flow node `type` to the CORE document `kind`. */
 const KIND_BY_NODE_TYPE: Record<PipelineNodeType, CorePipelineNodeKind> = {
@@ -147,8 +148,7 @@ export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
   const styles: PipelineStylesPayload = {
     viewport: pipeline.viewport,
     nodePositions: Object.fromEntries(pipeline.nodes.map(node => [node.id, node.position])),
-    nodes: pipeline.nodes,
-    edges: pipeline.edges,
+    ...omitSelectedKey(pipeline),
   }
 
   // 2. model — the clean, URN-native CORE Pipeline document; validate it before sending so the
