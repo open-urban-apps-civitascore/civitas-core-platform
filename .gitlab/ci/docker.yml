@@ -59,7 +59,7 @@
 # image (same digest).
 .container-scan:
   image:
-    name: aquasec/trivy:0.55.1
+    name: aquasec/trivy:0.55.2@sha256:addfb8fd6b9e520c25b22c61d8aa5d58ecd7879177aa959f952bf4734f4e3f60
     entrypoint: ['']
   stage: container-qa
   variables:
