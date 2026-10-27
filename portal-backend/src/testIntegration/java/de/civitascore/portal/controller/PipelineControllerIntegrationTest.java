@@ -47,6 +47,11 @@ class PipelineControllerIntegrationTest
     return "pipelines";
   }
 
+  @Override
+  protected UUID createEntityIn(DataSet dataSet) {
+    return portalData.pipeline(dataSet).getId();
+  }
+
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
@@ -880,30 +885,6 @@ class PipelineControllerIntegrationTest
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND for non-existent dataset")
           .isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("Should only return pipelines belonging to the specified dataset")
-    void shouldOnlyReturnPipelinesForSpecifiedDataset() {
-      performCreate(createValidInput());
-
-      DataSet dataSet2 = createTestDataSet();
-      PipelineInputDTO input2 = createValidInput();
-      input2.setName("pipeline_in_other_dataset_" + System.currentTimeMillis());
-      exchange(
-          "/datasets/" + dataSet2.getId() + "/pipelines",
-          org.springframework.http.HttpMethod.POST,
-          createAuthHeaders(),
-          input2,
-          getOutputTypeReference());
-
-      ResponseEntity<RestPage<PipelineOutputDTO>> response = performGetAll();
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTotalElements())
-          .as("Should only return pipelines belonging to the test dataset")
-          .isEqualTo(1);
     }
 
     @Test

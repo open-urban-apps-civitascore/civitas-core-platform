@@ -39,6 +39,11 @@ class StyleControllerIntegrationTest
   }
 
   @Override
+  protected UUID createEntityIn(DataSet dataSet) {
+    return portalData.style(dataSet).getId();
+  }
+
+  @Override
   protected Set<HttpMethod> unservedItemMethods() {
     return Set.of(HttpMethod.PATCH);
   }

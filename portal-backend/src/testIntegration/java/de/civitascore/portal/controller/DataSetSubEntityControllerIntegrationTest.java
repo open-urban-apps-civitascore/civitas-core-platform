@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import de.civitascore.portal.config.PortalTestDataFactory;
+import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.input.DataSetOwnedInputDTO;
 import de.civitascore.portal.model.output.BaseOutputDTO;
+import de.civitascore.portal.util.RestPage;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -38,6 +40,9 @@ public abstract class DataSetSubEntityControllerIntegrationTest<
    * /datasets/{dataSetId}/styles}.
    */
   protected abstract String getSubEntityPathSegment();
+
+  /** Stores a sub-entity in the given dataset without going through the API. */
+  protected abstract UUID createEntityIn(DataSet dataSet);
 
   private boolean supportsPatch() {
     return !unservedItemMethods().contains(HttpMethod.PATCH);
@@ -111,6 +116,22 @@ public abstract class DataSetSubEntityControllerIntegrationTest<
                   .getStatusCode())
           .as("A rejected cross-dataset DELETE must leave the entity in place")
           .isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    @DisplayName("The list holds only the entities of the dataset in the path")
+    void listHoldsOnlyEntitiesOfThePathDataSet() {
+      UUID ownEntityId = createTestEntity();
+      UUID foreignEntityId = createEntityIn(portalData.dataSet());
+
+      ResponseEntity<RestPage<O>> response = performGetAll();
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getContent())
+          .extracting(DataSetSubEntityControllerIntegrationTest.this::getIdFromOutput)
+          .contains(ownEntityId)
+          .doesNotContain(foreignEntityId);
     }
 
     @Test

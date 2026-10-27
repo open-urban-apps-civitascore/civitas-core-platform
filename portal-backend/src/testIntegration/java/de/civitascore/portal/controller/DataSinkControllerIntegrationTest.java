@@ -46,6 +46,11 @@ class DataSinkControllerIntegrationTest
     return "datasinks";
   }
 
+  @Override
+  protected UUID createEntityIn(DataSet dataSet) {
+    return portalData.dataSink(dataSet).getId();
+  }
+
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataSinkRepository dataSinkRepository;
   @Autowired private ModelRegistryGateway modelRegistryGateway;

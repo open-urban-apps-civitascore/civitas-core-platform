@@ -44,6 +44,11 @@ class LayerControllerIntegrationTest
   }
 
   @Override
+  protected UUID createEntityIn(DataSet dataSet) {
+    return portalData.layer(dataSet, portalData.dataSink(dataSet)).getId();
+  }
+
+  @Override
   protected Set<HttpMethod> unservedItemMethods() {
     return Set.of(HttpMethod.PATCH);
   }
