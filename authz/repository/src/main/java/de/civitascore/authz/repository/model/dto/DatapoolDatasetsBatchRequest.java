@@ -25,7 +25,8 @@ public class DatapoolDatasetsBatchRequest {
   @Size(max = 1000)
   private List<
           @Pattern(
-              regexp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              regexp =
+                  "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
               message = "poolIds must be valid UUIDs")
           String>
       poolIds;

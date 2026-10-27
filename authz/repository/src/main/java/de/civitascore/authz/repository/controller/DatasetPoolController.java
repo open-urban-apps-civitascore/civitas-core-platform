@@ -1,7 +1,7 @@
 package de.civitascore.authz.repository.controller;
 
-import de.civitascore.authz.repository.model.dto.DatapoolDatasetsBatchRequest;
 import de.civitascore.authz.repository.model.dto.DatapoolDatasetSchema;
+import de.civitascore.authz.repository.model.dto.DatapoolDatasetsBatchRequest;
 import de.civitascore.authz.repository.model.dto.DatapoolDatasetsResponse;
 import de.civitascore.authz.repository.model.dto.DatasetPoolResponse;
 import de.civitascore.authz.repository.service.DatasetPoolService;
@@ -74,5 +74,4 @@ public class DatasetPoolController {
   public ResponseEntity<List<DatapoolDatasetSchema>> getDatasetSchemas() {
     return ResponseEntity.ok(datasetPoolService.getDatasetSchemas());
   }
-
 }

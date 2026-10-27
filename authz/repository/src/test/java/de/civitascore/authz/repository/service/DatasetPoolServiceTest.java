@@ -125,7 +125,6 @@ class DatasetPoolServiceTest {
       assertThat(result).isPresent();
       assertThat(result.get().isOpenDataAccess()).isFalse();
     }
-
   }
 
   private static DataSet dataset() {

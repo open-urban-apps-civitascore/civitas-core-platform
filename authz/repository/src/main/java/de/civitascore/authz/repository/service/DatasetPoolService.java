@@ -32,8 +32,8 @@ public class DatasetPoolService {
   private final DataSetRepository dataSetRepository;
 
   /**
-   * Returns the authorization attributes of a dataset: its datapool membership, open-data flag,
-   * and availability state. All values come from the CORE dataset record.
+   * Returns the authorization attributes of a dataset: its datapool membership, open-data flag, and
+   * availability state. All values come from the CORE dataset record.
    *
    * @param datasetId the dataset id
    * @return present with the dataset's authorization attributes if it exists; empty otherwise
