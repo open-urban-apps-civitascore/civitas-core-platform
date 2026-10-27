@@ -8,10 +8,12 @@ import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.UserRepository;
+import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +31,7 @@ public class DataPoolService extends BaseDataEntityService<DataPool, DataPoolInp
   private final UserRepository userRepository;
   private final AssignmentFactory assignmentFactory;
   private final AssignmentChangeAuthorizer assignmentChangeAuthorizer;
+  private final ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   public DataPoolService(
       DataPoolRepository dataPoolRepository,
@@ -37,7 +40,8 @@ public class DataPoolService extends BaseDataEntityService<DataPool, DataPoolInp
       DataSourceRepository dataSourceRepository,
       UserRepository userRepository,
       AssignmentFactory assignmentFactory,
-      AssignmentChangeAuthorizer assignmentChangeAuthorizer) {
+      AssignmentChangeAuthorizer assignmentChangeAuthorizer,
+      ObjectProvider<AllowedScopes> allowedScopesProvider) {
     this.dataPoolRepository = dataPoolRepository;
     this.dataPoolMapper = dataPoolMapper;
     this.dataSetRepository = dataSetRepository;
@@ -45,6 +49,7 @@ public class DataPoolService extends BaseDataEntityService<DataPool, DataPoolInp
     this.userRepository = userRepository;
     this.assignmentFactory = assignmentFactory;
     this.assignmentChangeAuthorizer = assignmentChangeAuthorizer;
+    this.allowedScopesProvider = allowedScopesProvider;
   }
 
   @Override
@@ -70,6 +75,11 @@ public class DataPoolService extends BaseDataEntityService<DataPool, DataPoolInp
   @Override
   protected AssignmentChangeAuthorizer getAssignmentChangeAuthorizer() {
     return assignmentChangeAuthorizer;
+  }
+
+  @Override
+  protected ObjectProvider<AllowedScopes> getAllowedScopes() {
+    return allowedScopesProvider;
   }
 
   /**

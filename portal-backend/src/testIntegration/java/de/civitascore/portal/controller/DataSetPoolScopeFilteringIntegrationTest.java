@@ -31,9 +31,10 @@ import org.springframework.http.ResponseEntity;
  * authorized datapool ({@code id IN (scopeIds) OR datapool_id IN (poolIds)}).
  *
  * <p>Exercises the full path against the real database: AllowedScopesFilter → AllowedScopes bean →
- * ScopeFilter.restrict() → ScopeFilteringSpecification.dataSetByScopeOrPool() → SQL. In particular
- * it confirms that accessing {@code dataPool.id} resolves to the foreign-key column (no inner
- * join), so datasets WITHOUT a pool are not wrongly dropped from the scope-id branch of the OR.
+ * DataSetService.scopeSpecification() → ScopeFilteringSpecification.dataSetByScopeOrPool() → SQL.
+ * In particular it confirms that accessing {@code dataPool.id} resolves to the foreign-key column
+ * (no inner join), so datasets WITHOUT a pool are not wrongly dropped from the scope-id branch of
+ * the OR.
  */
 @DisplayName("Dataset Pool-Union Scope Filtering Integration Tests")
 class DataSetPoolScopeFilteringIntegrationTest

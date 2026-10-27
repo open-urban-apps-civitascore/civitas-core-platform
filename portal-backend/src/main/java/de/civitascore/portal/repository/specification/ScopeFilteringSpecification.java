@@ -13,10 +13,9 @@ import org.springframework.data.jpa.domain.Specification;
  * JPA Specifications for scope-based collection filtering (M5.5).
  *
  * <p>These specifications filter collection queries based on user's authorized scope IDs from OPA.
- * Used by controllers to implement collection-level access control.
  *
- * <p>Usage: Controllers pass these specifications to {@code ScopeFilter} to decorate the query spec
- * before passing it to the service layer.
+ * <p>Usage: {@code BaseDataEntityService} applies these specifications to every query of a data
+ * element.
  */
 public final class ScopeFilteringSpecification {
 

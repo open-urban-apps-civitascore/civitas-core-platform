@@ -45,7 +45,6 @@ public class DataStructureController {
   private final DataStructureService dataStructureService;
   private final DataStructureAssembler dataStructureAssembler;
   private final JsonMergePatch jsonMergePatch;
-  private final ScopeFilter scopeFilter;
   private final ScopeAssignments scopeAssignments;
 
   @GetMapping
@@ -55,8 +54,7 @@ public class DataStructureController {
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
-    return dataStructureAssembler.toOutput(
-        dataStructureService.findAll(scopeFilter.restrict(spec), pageable));
+    return dataStructureAssembler.toOutput(dataStructureService.findAll(spec, pageable));
   }
 
   @GetMapping("/{dataStructureId}")

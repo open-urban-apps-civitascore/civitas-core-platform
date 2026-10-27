@@ -28,7 +28,6 @@ import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -54,7 +53,6 @@ public class DataSetController {
   private final DataSetService dataSetService;
   private final DataSetAssembler dataSetAssembler;
   private final JsonMergePatch jsonMergePatch;
-  private final ScopeFilter scopeFilter;
   private final ScopeAssignments scopeAssignments;
 
   @GetMapping
@@ -64,7 +62,7 @@ public class DataSetController {
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
-    return dataSetAssembler.toOutput(dataSetService.findAll(dataSetScope(spec), pageable));
+    return dataSetAssembler.toOutput(dataSetService.findAll(spec, pageable));
   }
 
   @GetMapping("/{dataSetId}")
@@ -151,7 +149,7 @@ public class DataSetController {
   public List<NamedApiOutputDTO> getDataSetApis(@PathVariable UUID dataSetId) {
     DataSet dataSet =
         dataSetService
-            .findOne(dataSetScope(ScopeFilteringSpecification.baseEntityById(Set.of(dataSetId))))
+            .findOne(ScopeFilteringSpecification.baseEntityById(Set.of(dataSetId)))
             .orElseThrow(() -> new ResourceNotFoundException("DataSet", dataSetId));
     // Draft edits must not change the public API surface before the dataset is published.
     return dataSet.getDataSetStatus() == DataSetStatus.AVAILABLE
@@ -262,14 +260,6 @@ public class DataSetController {
       @PathVariable UUID dataSetId, @RequestBody JsonNode updates) {
     return dataSetAssembler.toOutput(
         dataSetService.updateReadyMeta(dataSetId, patchMeta(dataSetId, updates)));
-  }
-
-  private Specification<DataSet> dataSetScope(Specification<DataSet> spec) {
-    return scopeFilter.restrict(
-        spec,
-        scopes ->
-            ScopeFilteringSpecification.dataSetByScopeOrPool(
-                scopes.getScopeIds(), scopes.getPoolIds()));
   }
 
   private DataSetMetaInputDTO patchMeta(UUID dataSetId, JsonNode updates) {

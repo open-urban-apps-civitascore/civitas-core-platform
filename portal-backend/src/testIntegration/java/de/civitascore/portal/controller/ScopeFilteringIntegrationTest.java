@@ -35,7 +35,7 @@ import org.springframework.http.ResponseEntity;
  *
  * <p>Verifies that the X-Allowed-Scope-Ids header filters every data-element list (data pools, data
  * sources, data structures, datasets) by the element's own id. Tests the full path:
- * AllowedScopesFilter → AllowedScopes bean → ScopeFilter → JPA Specification.
+ * AllowedScopesFilter → AllowedScopes bean → BaseDataEntityService → JPA Specification.
  */
 @DisplayName("Scope Filtering Integration Tests")
 class ScopeFilteringIntegrationTest
@@ -112,7 +112,7 @@ class ScopeFilteringIntegrationTest
 
   // --- Every data-element list ---
 
-  // Each controller calls the scope filter itself; these fail when one of its lists does not.
+  // Catches a data-element list that queries past its service, for example through the repository.
   @ParameterizedTest
   @FieldSource("DATA_ELEMENT_LISTS")
   void list_withoutScopeHeader_answers403(String path) {

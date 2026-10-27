@@ -45,7 +45,6 @@ public class DataPoolController {
   private final DataPoolService dataPoolService;
   private final DataPoolAssembler dataPoolAssembler;
   private final JsonMergePatch jsonMergePatch;
-  private final ScopeFilter scopeFilter;
   private final ScopeAssignments scopeAssignments;
 
   @GetMapping
@@ -55,8 +54,7 @@ public class DataPoolController {
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
-    return dataPoolAssembler.toOutput(
-        dataPoolService.findAll(scopeFilter.restrict(spec), pageable));
+    return dataPoolAssembler.toOutput(dataPoolService.findAll(spec, pageable));
   }
 
   @GetMapping("/{dataPoolId}")

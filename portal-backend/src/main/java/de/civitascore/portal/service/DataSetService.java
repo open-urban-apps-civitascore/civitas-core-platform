@@ -23,6 +23,7 @@ import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
+import de.civitascore.portal.repository.specification.ScopeFilteringSpecification;
 import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.service.removal.DataSinkRemovalService;
@@ -47,6 +48,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.encoder.Encode;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -196,6 +198,17 @@ public class DataSetService
   @Override
   protected AssignmentChangeAuthorizer getAssignmentChangeAuthorizer() {
     return assignmentChangeAuthorizer;
+  }
+
+  @Override
+  protected ObjectProvider<AllowedScopes> getAllowedScopes() {
+    return allowedScopesProvider;
+  }
+
+  @Override
+  protected Specification<DataSet> scopeSpecification(AllowedScopes scopes) {
+    return ScopeFilteringSpecification.dataSetByScopeOrPool(
+        scopes.getScopeIds(), scopes.getPoolIds());
   }
 
   @Override

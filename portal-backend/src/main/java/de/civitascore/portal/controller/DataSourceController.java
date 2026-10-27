@@ -54,7 +54,6 @@ public class DataSourceController {
   private final DataSourceAssembler dataSourceAssembler;
   private final DataSourceConnectionTestService connectionTestService;
   private final JsonMergePatch jsonMergePatch;
-  private final ScopeFilter scopeFilter;
   private final ScopeAssignments scopeAssignments;
 
   @GetMapping
@@ -64,8 +63,7 @@ public class DataSourceController {
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
-    return dataSourceAssembler.toOutput(
-        dataSourceService.findAll(scopeFilter.restrict(spec), pageable));
+    return dataSourceAssembler.toOutput(dataSourceService.findAll(spec, pageable));
   }
 
   @GetMapping("/{dataSourceId}")

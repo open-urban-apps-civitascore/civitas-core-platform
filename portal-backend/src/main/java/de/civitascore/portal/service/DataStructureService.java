@@ -5,12 +5,14 @@ import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataStructureRepository;
+import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 /**
@@ -28,6 +30,7 @@ public class DataStructureService
   private final AssignmentChangeAuthorizer assignmentChangeAuthorizer;
   private final ArtifactUsageLookup artifactUsageLookup;
   private final ModelRegistryGateway modelRegistryGateway;
+  private final ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   @Override
   protected DataStructureRepository getRepository() {
@@ -52,6 +55,11 @@ public class DataStructureService
   @Override
   protected AssignmentChangeAuthorizer getAssignmentChangeAuthorizer() {
     return assignmentChangeAuthorizer;
+  }
+
+  @Override
+  protected ObjectProvider<AllowedScopes> getAllowedScopes() {
+    return allowedScopesProvider;
   }
 
   /**
