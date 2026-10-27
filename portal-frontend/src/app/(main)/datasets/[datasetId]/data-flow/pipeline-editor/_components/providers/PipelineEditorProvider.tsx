@@ -535,11 +535,10 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     )
     setValidationResults(previous => ({ ...previous, ...Object.fromEntries(results) }))
 
-    const activeResult = results.find(([sessionId]) => sessionId === activeSession?.id)?.[1]
-    if (activeSession && activeResult && activeResult.errors.length > 0) {
+    const hasActiveResult = results.some(([sessionId]) => sessionId === activeSession?.id)
+    if (hasActiveResult) {
       setIsValidationRequired(false)
       setShouldShowValidationPanel(true)
-      sessionManager.updateSessionPipeline(activeSession.id, withoutSelection)
     }
   }, [
     isFetchingDatasources,

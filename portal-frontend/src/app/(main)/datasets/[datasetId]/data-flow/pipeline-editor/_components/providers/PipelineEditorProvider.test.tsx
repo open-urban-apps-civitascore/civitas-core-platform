@@ -2844,23 +2844,34 @@ describe('PipelineEditorProviderComponent', () => {
         expect(contextRef.current?.sessionIdsWithErrors).toEqual(new Set([contextRef.current?.activeSessionId]))
       })
 
-      it('clears the stored selection when it opens the validation panel', () => {
-        failValidationFor(['pipeline-a'])
+      it('opens the validation panel when the active pipeline is valid', () => {
+        loadPipelines([pipelineDto('pipeline-a')])
+
+        expect(contextRef.current?.shouldShowValidationPanel).toBe(true)
+        expect(contextRef.current?.validationResult?.errors).toEqual([])
+        expect(contextRef.current?.sessionIdsWithErrors.size).toBe(0)
+      })
+
+      it.each([
+        ['an invalid', ['pipeline-a']],
+        ['a valid', []],
+      ])('removes the stored selection of %s pipeline and opens the panel', (_label, failingIds) => {
+        failValidationFor(failingIds)
 
         loadPipelines([pipelineDto('pipeline-a', [{ ...dataSourceNode('SQL'), selected: true }])])
 
         expect(contextRef.current?.shouldShowValidationPanel).toBe(true)
-        expect(contextRef.current?.pipeline?.nodes.every(node => !node.selected)).toBe(true)
+        expect(contextRef.current?.pipeline?.nodes[0]).not.toHaveProperty('selected')
         expect(contextRef.current?.isDirty).toBe(false)
       })
 
-      it('keeps the active tab and the panel closed when only another pipeline has errors', () => {
+      it('keeps the active tab when only another pipeline has errors', () => {
         failValidationFor(['pipeline-b'])
 
         loadPipelines([pipelineDto('pipeline-a'), pipelineDto('pipeline-b')])
 
         expect(contextRef.current?.pipeline?.id).toBe('pipeline-a')
-        expect(contextRef.current?.shouldShowValidationPanel).toBe(false)
+        expect(contextRef.current?.shouldShowValidationPanel).toBe(true)
         expect(contextRef.current?.sessionIdsWithErrors.size).toBe(1)
         expect(contextRef.current?.sessionIdsWithErrors.has(String(contextRef.current?.activeSessionId))).toBe(false)
       })

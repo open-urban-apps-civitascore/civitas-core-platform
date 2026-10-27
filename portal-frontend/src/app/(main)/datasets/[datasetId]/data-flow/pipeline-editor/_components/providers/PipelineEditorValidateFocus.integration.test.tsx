@@ -215,3 +215,52 @@ describe('Pipeline editor: Validate focus', () => {
     expect(screen.queryByText('inspector.noNodeSelected')).toBeNull()
   })
 })
+
+describe('Pipeline editor: validation on load', () => {
+  const INVALID_RESULT = {
+    isValid: false,
+    errors: [
+      { id: 'error-1', type: 'structure' as const, messageKey: 'validation.testError', severity: 'error' as const },
+    ],
+    warnings: [],
+    nodeStatuses: new Map(),
+  }
+  const VALID_RESULT = { isValid: true, errors: [], warnings: [], nodeStatuses: new Map() }
+
+  it.each([
+    ['an invalid', INVALID_RESULT, 'validation.testError'],
+    ['a valid', VALID_RESULT, 'validation.pipelineValid'],
+  ])('shows Validation Results for %s pipeline that was saved with a selected node', (_label, result, content) => {
+    vi.mocked(useGetPipelines).mockReturnValue({
+      data: {
+        data: [
+          {
+            id: 'backend-pipeline-1',
+            name: 'Saved Pipeline',
+            description: '',
+            styles: {
+              nodes: [{ ...makeNode('node-a'), selected: true }],
+              edges: [],
+              nodePositions: {},
+              viewport: { x: 0, y: 0, zoom: 1 },
+            },
+            dataSources: [],
+            apis: [],
+            dataSinks: [],
+            model: {},
+            createdAt: '2024-01-01T00:00:00Z',
+            modifiedAt: '2024-01-01T00:00:00Z',
+          },
+        ],
+      },
+      isLoading: false,
+    } as unknown as ReturnType<typeof useGetPipelines>)
+    vi.mocked(validatePipelineWithNodeStatus).mockReturnValue(result)
+
+    render(<Harness />)
+
+    expect(screen.queryAllByText('validation.results').length).toBeGreaterThan(0)
+    expect(screen.getByText(content)).toBeInTheDocument()
+    expect(screen.queryByText('inspector.properties')).toBeNull()
+  })
+})
