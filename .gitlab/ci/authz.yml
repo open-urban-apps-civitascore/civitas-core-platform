@@ -28,7 +28,8 @@
   image:
     name: openpolicyagent/opa:1.21.0-static-debug@sha256:392ba3778b7e0b4c74f1b1c3ddf299d60982605f73be03f2dc18cdf2cb2e7357
     entrypoint: [""]
-    user: "0:0"
+    docker:
+      user: "0:0"
 
 # =============================================================================
 # Lint Stage
