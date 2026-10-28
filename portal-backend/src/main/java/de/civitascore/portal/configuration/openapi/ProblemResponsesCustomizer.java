@@ -13,7 +13,6 @@ import jakarta.validation.Valid;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
@@ -34,8 +33,9 @@ import org.springframework.web.method.HandlerMethod;
  * ones every operation answers, the ones its parameters imply, and the ones it declares with {@link
  * Problems}. Each error response refers to the catalog example of each of its types.
  *
- * <p>A handler without {@link Problems} keeps its hand-written error responses, and each of them
- * lists every catalog type of its status.
+ * <p>A handler without {@link Problems} keeps its hand-written error responses. Each lists the
+ * implicit types of its status, or else only the first catalog type of that status, because listing
+ * every type of the status would document problems the handler never answers.
  */
 @Component
 public class ProblemResponsesCustomizer implements OperationCustomizer {
@@ -78,7 +78,10 @@ public class ProblemResponsesCustomizer implements OperationCustomizer {
       }
       problems.addAll(Arrays.asList(declared.value()));
     } else {
-      handWritten.keySet().forEach(code -> problems.addAll(catalogTypesOf(code)));
+      handWritten.keySet().stream()
+          .map(Integer::parseInt)
+          .filter(status -> problems.stream().noneMatch(type -> type.status().value() == status))
+          .forEach(status -> problems.add(firstCatalogTypeOf(status)));
     }
 
     byStatus(problems)
@@ -140,10 +143,12 @@ public class ProblemResponsesCustomizer implements OperationCustomizer {
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
-  private static List<ProblemType> catalogTypesOf(String code) {
+  private static ProblemType firstCatalogTypeOf(int status) {
     return Arrays.stream(ProblemType.values())
-        .filter(type -> String.valueOf(type.status().value()).equals(code))
-        .toList();
+        .filter(type -> type.status().value() == status)
+        .findFirst()
+        .orElseThrow(
+            () -> new IllegalStateException("No problem type in the catalog for " + status));
   }
 
   private static SortedMap<HttpStatus, Set<ProblemType>> byStatus(Set<ProblemType> problems) {

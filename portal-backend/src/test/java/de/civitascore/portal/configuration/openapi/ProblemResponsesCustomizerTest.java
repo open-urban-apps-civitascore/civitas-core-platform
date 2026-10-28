@@ -82,19 +82,25 @@ class ProblemResponsesCustomizerTest {
   }
 
   @Test
-  void handWrittenErrorResponse_withoutDeclaredProblems_listsEveryCatalogTypeOfItsStatus() {
+  void handWrittenErrorResponse_withoutDeclaredProblems_listsOnlyTheFirstCatalogTypeOfItsStatus() {
     ApiResponses handWritten =
         new ApiResponses().addApiResponse("409", new ApiResponse().description("Conflict"));
 
     ApiResponse conflict = customize("noParameters", handWritten).get("409");
 
     assertThat(conflict.getDescription()).isEqualTo("Conflict");
-    assertThat(exampleRefs(conflict).keySet())
-        .containsExactlyInAnyOrderElementsOf(
-            Arrays.stream(ProblemType.values())
-                .filter(type -> type.status().value() == 409)
-                .map(ProblemType::name)
-                .toList());
+    assertThat(exampleRefs(conflict)).containsOnlyKeys("UNIQUE_CONSTRAINT_VIOLATION");
+  }
+
+  @Test
+  void handWrittenErrorResponse_withoutDeclaredProblems_keepsTheImplicitTypesOfItsStatus() {
+    ApiResponses handWritten =
+        new ApiResponses().addApiResponse("400", new ApiResponse().description("Bad request"));
+
+    ApiResponse badRequest = customize("validatedBody", handWritten).get("400");
+
+    assertThat(badRequest.getDescription()).isEqualTo("Bad request");
+    assertThat(exampleRefs(badRequest)).containsOnlyKeys("MALFORMED_REQUEST", "VALIDATION_FAILED");
   }
 
   private ApiResponses customize(String fixtureMethod, ApiResponses responses) {
