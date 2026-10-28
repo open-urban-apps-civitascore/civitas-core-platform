@@ -16,45 +16,88 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class JsonPathTest {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
+  private static final List<String> VALID =
+      List.of("$.next_cursor", "$.data[0].id", "$['next cursor']", "$.a-b", "$[0]", "$._x9");
+
+  private static final List<String> INVALID =
+      List.of(
+          "$",
+          "next",
+          "",
+          "$..cursor",
+          "$.items[?(@.id)]",
+          "$.a.*",
+          "$['']",
+          "$['a\\'b']",
+          "$['a\\\\b']",
+          "$[-1]",
+          "$.0a",
+          "$.a[0",
+          "$.a b",
+          " $.a");
+
+  private static final Path PORTAL_CONNECTOR_CONFIGURATION =
+      Path.of(
+          "../../portal-backend/src/main/java/de/civitascore/portal/model/connector"
+              + "/HttpConnectorConfiguration.java");
+
+  private static final Pattern JSON_PATH_CONSTANT =
+      Pattern.compile("JSON_PATH =\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
+
+  private static List<String> valid() {
+    return VALID;
+  }
+
+  private static List<String> invalid() {
+    return INVALID;
+  }
+
+  private static Stream<String> validAndInvalid() {
+    return Stream.concat(VALID.stream(), INVALID.stream());
+  }
+
   @ParameterizedTest
-  @ValueSource(
-      strings = {"$.next_cursor", "$.data[0].id", "$['next cursor']", "$.a-b", "$[0]", "$._x9"})
+  @MethodSource("valid")
   void parse_withMemberNamesIndexesAndQuotedNames_accepts(String text) {
     assertEquals(Optional.of(new JsonPath(text)), JsonPath.parse(text));
   }
 
-  /** Guards against drift from the JSON path grammar of the portal backend. */
   @ParameterizedTest
-  @ValueSource(
-      strings = {
-        "$",
-        "next",
-        "",
-        "$..cursor",
-        "$.items[?(@.id)]",
-        "$.a.*",
-        "$['']",
-        "$['a\\'b']",
-        "$['a\\\\b']",
-        "$[-1]",
-        "$.0a",
-        "$.a[0",
-        "$.a b",
-        " $.a"
-      })
+  @MethodSource("invalid")
   void parse_withAFormOutsideTheGrammar_isEmpty(String text) {
     assertEquals(Optional.empty(), JsonPath.parse(text));
     assertThrows(IllegalArgumentException.class, () -> new JsonPath(text));
+  }
+
+  /**
+   * A grammar changed in the portal backend alone would let it store a path the processor refuses.
+   */
+  @ParameterizedTest
+  @MethodSource("validAndInvalid")
+  void parse_acceptsWhatThePortalBackendAccepts(String text) throws IOException {
+    Matcher constant = JSON_PATH_CONSTANT.matcher(Files.readString(PORTAL_CONNECTOR_CONFIGURATION));
+    assertTrue(constant.find(), PORTAL_CONNECTOR_CONFIGURATION::toString);
+    Pattern portalBackend = Pattern.compile(constant.group(1).replaceAll("\\\\(.)", "$1"));
+
+    assertEquals(portalBackend.matcher(text).matches(), JsonPath.parse(text).isPresent());
   }
 
   @ParameterizedTest
