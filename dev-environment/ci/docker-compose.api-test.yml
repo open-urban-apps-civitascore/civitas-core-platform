@@ -120,6 +120,9 @@ services:
   # FROST creates its schema lazily on startup. Add the scoped views before Superset registers
   # virtual datasets that query them through Trino.
   trino-frost-bootstrap:
+    # This is a one-shot migration. Keep it out of the normal `up --wait` stack;
+    # CI runs it explicitly after the persistent services are healthy.
+    profiles: [seed]
     image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     environment:
       PGPASSWORD: frost-ci-password
@@ -668,6 +671,8 @@ services:
       POSTGIS_JDBC_URL: jdbc:postgresql://postgres-sink:5432/geosink
       POSTGIS_JDBC_USER: geosink
       POSTGIS_JDBC_PASSWORD: geosink
+      # Must match the database identity Trino uses for the geodata catalog.
+      POSTGIS_TRINO_READER_ROLE: geosink
       FLOWABLE_JDBC_URL: jdbc:postgresql://postgis-dev-env:5432/flowable
       FLOWABLE_JDBC_USERNAME: admin
       FLOWABLE_JDBC_PASSWORD: admin

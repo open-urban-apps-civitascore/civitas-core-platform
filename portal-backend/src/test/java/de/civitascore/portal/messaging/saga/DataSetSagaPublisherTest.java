@@ -1333,6 +1333,7 @@ class DataSetSagaPublisherTest {
 
       assertNamedApisInPayload(jsonCaptor.getValue());
       var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      assertThat(payload.get("datasetName").asString()).isEqualTo(dataSet.getName());
       var routeIds = payload.get("routeIds");
       assertThat(routeIds).isNotNull();
       assertThat(routeIds.size()).isEqualTo(2);

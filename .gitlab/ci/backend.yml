@@ -383,6 +383,8 @@ api-test-backend:
         done
         exit 1
       }
+    # This one-shot migration must run after FROST is healthy, outside `up --wait`.
+    - docker compose -p api-test $COMPOSE_FILES run --rm trino-frost-bootstrap
     # Seed APISIX routes (services, plugin config, portal-backend route)
     - docker compose -p api-test $COMPOSE_FILES run --rm apisix-seed
     # Provision the NiFi parameter context the MQTT-TLS flows resolve their truststore password from

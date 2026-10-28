@@ -112,6 +112,7 @@ class DatasetDeleteTriggerTest {
     verify(postgis, times(1)).handle(sinkCaptor.capture());
     SagaCommandMessage sinkCommand = sinkCaptor.getValue();
     assertEquals("DEPROVISION_SINK", sinkCommand.operation());
+    assertEquals("test-dataset", sinkCommand.payload().get("datasetName"));
     List<?> datasinks = (List<?>) sinkCommand.payload().get("datasinks");
     Map<?, ?> sink = (Map<?, ?>) datasinks.get(0);
     assertEquals("POSTGIS", sink.get("type"));
@@ -135,6 +136,7 @@ class DatasetDeleteTriggerTest {
             Map.of(
                 "sagaType", "DATASET_DELETE",
                 "datasetId", "ds-456",
+                "datasetName", "test-dataset",
                 "projectId", "proj-789",
                 "serviceId", "svc-1",
                 "pipelineIds", List.of()));

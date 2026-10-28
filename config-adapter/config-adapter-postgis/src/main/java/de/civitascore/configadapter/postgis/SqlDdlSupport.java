@@ -46,7 +46,7 @@ final class SqlDdlSupport implements AutoCloseable {
   private static final String JDBC_URL_KEY = "postgis.jdbc.url";
   private static final String JDBC_USER_KEY = "postgis.jdbc.user";
   private static final String JDBC_PASSWORD_KEY = "postgis.jdbc.password";
-  private static final String TRINO_READER_ROLE_KEY = "postgis.trino.readerRole";
+  private static final String TRINO_READER_ROLE_KEY = "postgis.trino.reader-role";
   private static final String JDBC_MAX_POOL_SIZE_KEY = "postgis.jdbc.maxPoolSize";
   private static final String JDBC_CONNECTION_TIMEOUT_MS_KEY = "postgis.jdbc.connectionTimeoutMs";
 

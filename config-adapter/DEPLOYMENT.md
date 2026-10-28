@@ -205,7 +205,7 @@ The datastore schema is derived per dataset and is not configurable. Enabling th
 |---|---|
 | `postgis.jdbc.url` | `POSTGIS_JDBC_URL` |
 | `postgis.jdbc.user` | `POSTGIS_JDBC_USER` |
-| `postgis.trino.readerRole` | `POSTGIS_TRINO_READER_ROLE` | Role used by Trino's Postgres connector. The adapter grants this role access to readable dataset views. Keep it equal to `GEODATA_DB_USER`. |
+| `postgis.trino.reader-role` | `POSTGIS_TRINO_READER_ROLE` | Role used by Trino's Postgres connector. The adapter grants this role access to readable dataset views. Keep it equal to `GEODATA_DB_USER`. |
 | `postgis.jdbc.password` | `POSTGIS_JDBC_PASSWORD` |
 | `postgis.jdbc.maxPoolSize` | `POSTGIS_JDBC_MAXPOOLSIZE` |
 | `postgis.jdbc.connectionTimeoutMs` | `POSTGIS_JDBC_CONNECTIONTIMEOUTMS` |

@@ -197,6 +197,7 @@ public sealed interface SagaTrigger
   record DatasetDelete(
       SagaType sagaType,
       String datasetId,
+      String datasetName,
       String projectId,
       String frostBaseUrl,
       Map<String, String> routeIds,
@@ -216,6 +217,7 @@ public sealed interface SagaTrigger
 
     public static DatasetDelete of(
         String datasetId,
+        String datasetName,
         String projectId,
         String frostBaseUrl,
         Map<String, String> routeIds,
@@ -226,6 +228,7 @@ public sealed interface SagaTrigger
       return new DatasetDelete(
           SagaType.DATASET_DELETE,
           datasetId,
+          datasetName,
           projectId,
           frostBaseUrl,
           routeIds,

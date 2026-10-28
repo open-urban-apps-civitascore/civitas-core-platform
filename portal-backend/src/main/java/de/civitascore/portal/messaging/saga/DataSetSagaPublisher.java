@@ -179,6 +179,7 @@ public class DataSetSagaPublisher {
     var trigger =
         SagaTrigger.DatasetDelete.of(
             dataset.getId().toString(),
+            dataset.getName(),
             dataset.getProjectId(),
             dataset.getFrostBaseUrl(),
             buildRouteIds(dataset),
