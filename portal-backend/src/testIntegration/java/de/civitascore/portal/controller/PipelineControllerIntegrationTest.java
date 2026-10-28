@@ -555,7 +555,6 @@ class PipelineControllerIntegrationTest
       assertThat(initialPipeline).isNotNull();
       String originalName = initialPipeline.getName();
 
-      // Use PATCH instead of PUT to avoid BaseController bug
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("name", originalName); // Same name
       patchMap.put("description", "Updated description");
