@@ -14,7 +14,15 @@
     "Record Schema": null,
     "Authentication Type": "NONE",
     "Basic Auth Username": null,
-    "Basic Auth Password": null
+    "Basic Auth Password": null,
+    "Bearer Token": null,
+    "API Token Name": null,
+    "API Token Value": null,
+    "API Token Location": null,
+    "OAuth2 Token URL": null,
+    "OAuth2 Client ID": null,
+    "OAuth2 Client Secret": null,
+    "OAuth2 Scope": null
   },
   "propertyDescriptors": {
     "Web Client Service Provider": {
@@ -64,6 +72,62 @@
       "displayName": "Basic Auth Password",
       "identifiesControllerService": false,
       "sensitive": true,
+      "dynamic": false
+    },
+    "Bearer Token": {
+      "name": "Bearer Token",
+      "displayName": "Bearer Token",
+      "identifiesControllerService": false,
+      "sensitive": true,
+      "dynamic": false
+    },
+    "API Token Name": {
+      "name": "API Token Name",
+      "displayName": "API Token Name",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "API Token Value": {
+      "name": "API Token Value",
+      "displayName": "API Token Value",
+      "identifiesControllerService": false,
+      "sensitive": true,
+      "dynamic": false
+    },
+    "API Token Location": {
+      "name": "API Token Location",
+      "displayName": "API Token Location",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "OAuth2 Token URL": {
+      "name": "OAuth2 Token URL",
+      "displayName": "OAuth2 Token URL",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "OAuth2 Client ID": {
+      "name": "OAuth2 Client ID",
+      "displayName": "OAuth2 Client ID",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "OAuth2 Client Secret": {
+      "name": "OAuth2 Client Secret",
+      "displayName": "OAuth2 Client Secret",
+      "identifiesControllerService": false,
+      "sensitive": true,
+      "dynamic": false
+    },
+    "OAuth2 Scope": {
+      "name": "OAuth2 Scope",
+      "displayName": "OAuth2 Scope",
+      "identifiesControllerService": false,
+      "sensitive": false,
       "dynamic": false
     }
   },

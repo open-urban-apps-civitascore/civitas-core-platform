@@ -215,27 +215,45 @@ public final class BuildContext {
    */
   public void setControllerServiceExpression(String friendlyName, String key, String expression)
       throws FatalAdapterException {
-    for (JsonNode service : controllerServices) {
-      if (friendlyName.equals(service.path("name").asText())) {
-        ((ObjectNode) service.get("properties")).put(key, expression);
-        return;
-      }
-    }
-    throw new FatalAdapterException(
-        AdapterErrorCode.NIFI_FLOW_ERROR,
-        "unresolved controller-service reference: " + friendlyName);
+    controllerServiceProperties(friendlyName).put(key, expression);
+  }
+
+  /**
+   * Sets a property of an already registered controller service to the deterministic id of another
+   * registered service.
+   */
+  public void setControllerServiceReference(
+      String friendlyName, String key, String referencedFriendlyName) throws FatalAdapterException {
+    controllerServiceProperties(friendlyName).put(key, controllerServiceId(referencedFriendlyName));
   }
 
   /** Sets a processor property to the deterministic id of an already registered service. */
   public void setControllerServiceProp(Processor processor, String key, String friendlyName)
       throws FatalAdapterException {
+    setProp(processor, key, controllerServiceId(friendlyName));
+  }
+
+  private ObjectNode controllerServiceProperties(String friendlyName) throws FatalAdapterException {
+    for (JsonNode service : controllerServices) {
+      if (friendlyName.equals(service.path("name").asText())) {
+        return (ObjectNode) service.get("properties");
+      }
+    }
+    throw unresolvedControllerService(friendlyName);
+  }
+
+  private String controllerServiceId(String friendlyName) throws FatalAdapterException {
     String id = csIdByName.get(friendlyName);
     if (id == null) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_FLOW_ERROR,
-          "unresolved controller-service reference: " + friendlyName);
+      throw unresolvedControllerService(friendlyName);
     }
-    setProp(processor, key, id);
+    return id;
+  }
+
+  private static FatalAdapterException unresolvedControllerService(String friendlyName) {
+    return new FatalAdapterException(
+        AdapterErrorCode.NIFI_FLOW_ERROR,
+        "unresolved controller-service reference: " + friendlyName);
   }
 
   /**
@@ -297,12 +315,7 @@ public final class BuildContext {
       if (value.isTextual() && value.asText().startsWith(CS_TOKEN_PREFIX)) {
         String name =
             value.asText().substring(CS_TOKEN_PREFIX.length(), value.asText().length() - 1);
-        String id = csIdByName.get(name);
-        if (id == null) {
-          throw new FatalAdapterException(
-              AdapterErrorCode.NIFI_FLOW_ERROR, "unresolved controller-service reference: " + name);
-        }
-        props.put(entry.getKey(), id);
+        props.put(entry.getKey(), controllerServiceId(name));
       }
     }
   }

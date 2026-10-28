@@ -30,6 +30,7 @@ import de.civitascore.configadapter.nifi.flow.stage.StopSource;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 
 /**
  * HTTP/REST pull source over GetHttpApiCall. The stage maps no field of the API call, so a new
@@ -42,8 +43,27 @@ public final class HttpSourceStage implements SourceStage {
 
   private static final String WEB_CLIENT = "HttpSourceWebClient";
 
+  /**
+   * Friendly name of the client certificate's SSL context, matched like {@link #HTTP_PROCESSOR}.
+   */
+  private static final String SSL_CONTEXT = "HttpSourceSslContext";
+
+  private static final String AUTHENTICATION_TYPE = "Authentication Type";
+
   private static final String NONE = "NONE";
   private static final String BASIC = "BASIC";
+  private static final String BEARER_TOKEN = "BEARER_TOKEN";
+  private static final String API_TOKEN = "API_TOKEN";
+  private static final String OAUTH2 = "OAUTH2";
+  private static final String CLIENT_CERTIFICATE = "CLIENT_CERTIFICATE";
+
+  private static final Map<String, List<String>> SECRET_FIELDS =
+      Map.of(
+          BASIC, List.of("password"),
+          BEARER_TOKEN, List.of("token"),
+          API_TOKEN, List.of("value"),
+          OAUTH2, List.of("clientSecret"),
+          CLIENT_CERTIFICATE, List.of("certificate", "privateKey"));
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -90,32 +110,99 @@ public final class HttpSourceStage implements SourceStage {
     Map<String, Object> recordSchema = dataStructure(source, artifacts);
     Map<String, Object> apiCall = selectApiCall(original.get("apiCalls"), node);
     Map<String, Object> authentication = objectOrEmpty(original.get("authentication"));
-    Object password = authentication.get("password");
-    if (password != null && !String.valueOf(password).isBlank() && !isEncrypted(password)) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          "HTTP/REST source password must be encrypted (plaintext secrets are not accepted)");
-    }
+    String type = authentication.get("type") instanceof String text ? text : NONE;
+    Secrets secrets =
+        secrets(original, authentication, SECRET_FIELDS.getOrDefault(type, List.of()));
 
     putIfPresent(out::putSourceProperty, "Base URL", original.get("baseUrl"));
     out.putSourceProperty("API Call", json(apiCall));
     out.putSourceProperty("Record Schema", json(recordSchema));
-    String type = authentication.get("type") instanceof String text ? text : NONE;
-    out.putSourceProperty("Authentication Type", type);
-    if (BASIC.equals(type)) {
-      putIfPresent(out::putSourceProperty, "Basic Auth Username", authentication.get("username"));
-      if (isEncrypted(password)) {
-        Map<String, Object> plain =
-            objectOrEmpty(credentials.decrypt(original).get("authentication"));
-        out.putSensitive(
-            HTTP_PROCESSOR, "Basic Auth Password", String.valueOf(plain.get("password")));
+    out.putSourceProperty(AUTHENTICATION_TYPE, type);
+    BiConsumer<String, String> processorSecret =
+        (key, value) -> out.putSensitive(HTTP_PROCESSOR, key, value);
+    switch (type) {
+      case BASIC -> {
+        putIfPresent(out::putSourceProperty, "Basic Auth Username", authentication.get("username"));
+        secrets.put(processorSecret, "Basic Auth Password", "password");
+      }
+      case BEARER_TOKEN -> secrets.put(processorSecret, "Bearer Token", "token");
+      case API_TOKEN -> {
+        putIfPresent(out::putSourceProperty, "API Token Name", authentication.get("name"));
+        putIfPresent(out::putSourceProperty, "API Token Location", authentication.get("in"));
+        secrets.put(processorSecret, "API Token Value", "value");
+      }
+      case OAUTH2 -> {
+        putIfPresent(out::putSourceProperty, "OAuth2 Token URL", authentication.get("tokenUrl"));
+        putIfPresent(out::putSourceProperty, "OAuth2 Client ID", authentication.get("clientId"));
+        putIfPresent(out::putSourceProperty, "OAuth2 Scope", authentication.get("scope"));
+        secrets.put(processorSecret, "OAuth2 Client Secret", "clientSecret");
+      }
+      case CLIENT_CERTIFICATE -> {
+        secrets.put(
+            (key, value) -> out.putControllerServiceProperty(SSL_CONTEXT, key, value),
+            "Certificate Chain",
+            "certificate");
+        secrets.put(
+            (key, value) -> out.putSensitive(SSL_CONTEXT, key, value), "Private Key", "privateKey");
+      }
+      default -> {
+        // NONE, and a type the processor refuses as invalid
+      }
+    }
+  }
+
+  /** Refuses a plaintext secret and decrypts the Data source once when a secret is present. */
+  private Secrets secrets(
+      Map<String, Object> original, Map<String, Object> authentication, List<String> fields)
+      throws FatalAdapterException {
+    boolean encrypted = false;
+    for (String field : fields) {
+      Object value = authentication.get(field);
+      if (value != null && !String.valueOf(value).isBlank() && !isEncrypted(value)) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+            "HTTP/REST source "
+                + field
+                + " must be encrypted (plaintext secrets are not accepted)");
+      }
+      encrypted |= isEncrypted(value);
+    }
+    Map<String, Object> plain =
+        encrypted ? objectOrEmpty(credentials.decrypt(original).get("authentication")) : Map.of();
+    return new Secrets(authentication, plain);
+  }
+
+  /**
+   * The encrypted fields of an authentication with their decrypted values. A class, not a record,
+   * so that no {@code toString} shows a secret.
+   */
+  private static final class Secrets {
+
+    private final Map<String, Object> encrypted;
+    private final Map<String, Object> plain;
+
+    Secrets(Map<String, Object> encrypted, Map<String, Object> plain) {
+      this.encrypted = encrypted;
+      this.plain = plain;
+    }
+
+    /** Gives {@code target} the decrypted value of {@code field} if the Data source has one. */
+    void put(BiConsumer<String, String> target, String key, String field) {
+      if (isEncrypted(encrypted.get(field))) {
+        target.accept(key, String.valueOf(plain.get(field)));
       }
     }
   }
 
   @Override
   public void registerControllerServices(BuildContext ctx) throws FatalAdapterException {
+    if (!CLIENT_CERTIFICATE.equals(ctx.spec().sourceProperties().get(AUTHENTICATION_TYPE))) {
+      ctx.addControllerService(Fragment.HTTP_SOURCE_WEB_CLIENT, WEB_CLIENT);
+      return;
+    }
+    ctx.addControllerService(Fragment.HTTP_SOURCE_SSL_CONTEXT, SSL_CONTEXT);
     ctx.addControllerService(Fragment.HTTP_SOURCE_WEB_CLIENT, WEB_CLIENT);
+    ctx.setControllerServiceReference(WEB_CLIENT, "SSL Context Service", SSL_CONTEXT);
   }
 
   @Override
