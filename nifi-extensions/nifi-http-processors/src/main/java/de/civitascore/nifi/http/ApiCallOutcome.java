@@ -71,7 +71,8 @@ sealed interface ApiCallOutcome {
     }
 
     /**
-     * A 2xx response whose body is not the JSON of records that agree with the record schema.
+     * A 2xx response whose body is not the JSON of records that agree with the record schema, or
+     * whose values the pagination cannot use.
      *
      * @param reason names no value of the response
      */
@@ -91,6 +92,17 @@ sealed interface ApiCallOutcome {
     static Failure ofRepeatedPage(String apiCall, int status, String page, String earlierPage) {
       return new Failure(
           ErrorKind.FATAL, status, apiCall + ": " + page + " repeats " + earlierPage);
+    }
+
+    /**
+     * A page that would send the same request as an earlier page of the run, so that the API would
+     * repeat its pages without end.
+     */
+    static Failure ofRepeatedRequest(String apiCall, int status, String page, String earlierPage) {
+      return new Failure(
+          ErrorKind.FATAL,
+          status,
+          apiCall + ": " + page + " would send the same request as " + earlierPage);
     }
 
     /** A run that NiFi stopped before this request. */

@@ -17,17 +17,33 @@ import java.util.Optional;
  * One request of a run of an API call.
  *
  * @param index the position in the run, 0 for the first page
- * @param name what causes and {@code http.page} show for the page; empty when the run has no named
- *     pages
+ * @param position how causes and {@code http.page} name the page; empty when the run has one page
  * @param queryParameters what the page adds after the query parameters of the API call
+ * @param headers what the page adds after the headers of the API call
  */
-record Page(long index, Optional<String> name, List<Parameter> queryParameters) {
+record Page(
+    long index,
+    Optional<Position> position,
+    List<Parameter> queryParameters,
+    List<Parameter> headers) {
 
   Page {
     queryParameters = List.copyOf(queryParameters);
+    headers = List.copyOf(headers);
   }
 
   Optional<String> title() {
-    return name.map(text -> "page " + text);
+    return position.map(Position::title);
+  }
+
+  /**
+   * @param kind for example {@code page}, {@code request} or {@code offset}
+   * @param number the page number, the position of the request in the run from 1, or the offset
+   */
+  record Position(String kind, long number) {
+
+    String title() {
+      return kind + " " + number;
+    }
   }
 }

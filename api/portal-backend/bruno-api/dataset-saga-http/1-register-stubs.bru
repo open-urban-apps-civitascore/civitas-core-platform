@@ -138,6 +138,273 @@ body:json {
             }
           ]
         }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000020",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/cursor-query",
+          "queryParameters": { "limit": { "equalTo": "1" }, "cursor": { "absent": true } }
+        },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": {
+            "name": "HTTP saga cursor-query station 1",
+            "description": "Delivered by the cursor-query API call",
+            "properties": { "reference": "http-saga-cursor-query-1", "next_cursor": "abc123" }
+          }
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000021",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/cursor-query",
+          "queryParameters": { "limit": { "equalTo": "1" }, "cursor": { "equalTo": "abc123" } }
+        },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": {
+            "name": "HTTP saga cursor-query station 2",
+            "description": "Delivered by the cursor-query API call",
+            "properties": { "reference": "http-saga-cursor-query-2", "next_cursor": "def456" }
+          }
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000022",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/cursor-query",
+          "queryParameters": { "limit": { "equalTo": "1" }, "cursor": { "equalTo": "def456" } }
+        },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": {
+            "name": "HTTP saga cursor-query station 3",
+            "description": "Delivered by the cursor-query API call",
+            "properties": { "reference": "http-saga-cursor-query-3" }
+          }
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000030",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/cursor-header",
+          "queryParameters": { "limit": { "absent": true }, "X-Cursor": { "absent": true } },
+          "headers": { "X-Cursor": { "absent": true } }
+        },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": {
+            "name": "HTTP saga cursor-header station 1",
+            "description": "Delivered by the cursor-header API call",
+            "properties": { "reference": "http-saga-cursor-header-1", "next_cursor": "abc123" }
+          }
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000031",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/cursor-header",
+          "queryParameters": { "limit": { "absent": true }, "X-Cursor": { "absent": true } },
+          "headers": { "X-Cursor": { "equalTo": "abc123" } }
+        },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": {
+            "name": "HTTP saga cursor-header station 2",
+            "description": "Delivered by the cursor-header API call",
+            "properties": { "reference": "http-saga-cursor-header-2", "next_cursor": "" }
+          }
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000040",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/offset-limit",
+          "queryParameters": { "limit": { "equalTo": "2" }, "offset": { "equalTo": "80" } }
+        },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": [
+            {
+              "name": "HTTP saga offset-limit station 1",
+              "description": "Delivered by the offset-limit API call",
+              "properties": { "reference": "http-saga-offset-limit-1" }
+            },
+            {
+              "name": "HTTP saga offset-limit station 2",
+              "description": "Delivered by the offset-limit API call",
+              "properties": { "reference": "http-saga-offset-limit-2" }
+            }
+          ]
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000041",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/offset-limit",
+          "queryParameters": { "limit": { "equalTo": "2" }, "offset": { "equalTo": "82" } }
+        },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": [
+            {
+              "name": "HTTP saga offset-limit station 3",
+              "description": "Delivered by the offset-limit API call",
+              "properties": { "reference": "http-saga-offset-limit-3" }
+            },
+            {
+              "name": "HTTP saga offset-limit station 4",
+              "description": "Delivered by the offset-limit API call",
+              "properties": { "reference": "http-saga-offset-limit-4" }
+            }
+          ]
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000042",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/offset-limit",
+          "queryParameters": { "limit": { "equalTo": "2" }, "offset": { "equalTo": "84" } }
+        },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": [
+            {
+              "name": "HTTP saga offset-limit station 5",
+              "description": "Delivered by the offset-limit API call",
+              "properties": { "reference": "http-saga-offset-limit-5" }
+            }
+          ]
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000050",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/offset",
+          "queryParameters": { "limit": { "absent": true }, "offset": { "equalTo": "0" } }
+        },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": [
+            {
+              "name": "HTTP saga offset station 1",
+              "description": "Delivered by the offset API call",
+              "properties": { "reference": "http-saga-offset-1" }
+            },
+            {
+              "name": "HTTP saga offset station 2",
+              "description": "Delivered by the offset API call",
+              "properties": { "reference": "http-saga-offset-2" }
+            }
+          ]
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000051",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/offset",
+          "queryParameters": { "limit": { "absent": true }, "offset": { "equalTo": "2" } }
+        },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": [
+            {
+              "name": "HTTP saga offset station 3",
+              "description": "Delivered by the offset API call",
+              "properties": { "reference": "http-saga-offset-3" }
+            }
+          ]
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000052",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/offset",
+          "queryParameters": { "limit": { "absent": true }, "offset": { "equalTo": "3" } }
+        },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": []
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000060",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/offset-count",
+          "queryParameters": { "limit": { "equalTo": "1" }, "offset": { "equalTo": "0" } }
+        },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": {
+            "name": "HTTP saga offset-count station 1",
+            "description": "Delivered by the offset-count API call",
+            "properties": { "reference": "http-saga-offset-count-1", "count": 1 }
+          }
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000061",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/offset-count",
+          "queryParameters": { "limit": { "equalTo": "1" }, "offset": { "equalTo": "1" } }
+        },
+        "response": {
+          "status": 200,
+          "headers": { "Content-Type": "application/json" },
+          "jsonBody": {
+            "name": "HTTP saga offset-count station 2",
+            "description": "Delivered by the offset-count API call",
+            "properties": { "reference": "http-saga-offset-count-2", "count": 1 }
+          }
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000062",
+        "metadata": { "suite": "dataset-saga-http" },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/offset-count",
+          "queryParameters": { "limit": { "equalTo": "1" }, "offset": { "equalTo": "2" } }
+        },
+        "response": { "status": 404 }
       }
     ]
   }
@@ -150,14 +417,26 @@ tests {
 }
 
 docs {
-  Registers the four API calls of the HTTP/REST Data source in the WireMock of the API test
-  stack, under the path prefix `/dataset-saga-http/`. The stubs carry fixed ids, so a second run
-  replaces them, and the metadata `suite`, by which step 15 removes them.
+  Registers the API calls of the HTTP/REST Data source in the WireMock of the API test stack, under
+  the path prefix `/dataset-saga-http/`. The stubs carry fixed ids, so a second run replaces them,
+  and the metadata `suite`, by which step 15 removes them. A request that no stub matches gets a
+  404.
 
-  | Path | Response |
-  |---|---|
-  | `things` | 200, two Things in the form the FROST port `ThingTree` writes |
-  | `missing` | 404 |
-  | `invalid` | 200, a valid record and a record whose `name` is a number |
-  | `pages` | 200 for `page` 0, 1 and 2 with `size` 2: two, two and one Thing. Any other page is a 404. |
+  | Path | Request | Response |
+  |---|---|---|
+  | `things` | | 200, two Things in the form the FROST port `ThingTree` writes |
+  | `missing` | | 404 |
+  | `invalid` | | 200, a valid record and a record whose `name` is a number |
+  | `pages` | `size` 2, `page` 0, 1, 2 | 200: two, two and one Thing |
+  | `cursor-query` | `limit` 1, no `cursor`, `cursor` `abc123`, `def456` | 200: one Thing each |
+  | `cursor-header` | no `limit`, no `X-Cursor`, header `X-Cursor` `abc123` | 200: one Thing each |
+  | `offset-limit` | `limit` 2, `offset` 80, 82, 84 | 200: two, two and one Thing |
+  | `offset` | no `limit`, `offset` 0, 2, 3 | 200: two Things, one Thing, `[]` |
+  | `offset-count` | `limit` 1, `offset` 0, 1, 2 | 200: one Thing each; then 404 |
+
+  A cursor response and an `offset-count` response are each one record, so each is one Thing: the
+  Data source has one Data structure for all its API calls, and no Mapping comes between the
+  source and the sink. A Thing holds the next cursor in `properties.next_cursor`: `abc123` and
+  `def456` for `cursor-query`, then none; `abc123` for `cursor-header`, then an empty one. An
+  `offset-count` Thing holds the count 1 in `properties.count`.
 }

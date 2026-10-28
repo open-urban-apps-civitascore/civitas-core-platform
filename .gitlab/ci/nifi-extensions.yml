@@ -23,6 +23,7 @@
         - .gitlab/ci/nifi-extensions.yml
         - model-forge/model-forge-runtime/src/main/java/de/civitascore/modelforge/validation/CoreJsonSchemaFactory.java
         - model-forge/model-forge-runtime/src/main/resources/geojson/**/*
+        - portal-backend/src/main/java/de/civitascore/portal/model/connector/HttpConnectorConfiguration.java
 
 .nifi-extensions-maven:
   image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90

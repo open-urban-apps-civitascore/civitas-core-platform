@@ -58,6 +58,9 @@ final class ApiCallClient {
       for (Parameter header : call.headers()) {
         spec = spec.header(header.name(), header.value());
       }
+      for (Parameter header : page.headers()) {
+        spec = spec.header(header.name(), header.value());
+      }
       response = authentication.authenticate(spec).retrieve();
     } catch (WebClientServiceException e) {
       return ApiCallOutcome.Failure.ofTransport(request, e);

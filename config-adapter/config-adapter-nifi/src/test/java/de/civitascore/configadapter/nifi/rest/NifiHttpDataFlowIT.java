@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.nifi.rest;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.absent;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
@@ -21,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.RuntimeMonitorProbe;
@@ -45,11 +47,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.postgresql.Driver;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
@@ -70,6 +76,29 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
   private static final String DB_USER = "nifi";
   private static final String DB_PASSWORD = "nifi-db-secret";
   private static final String DATASET_ID = "ds-1";
+
+  /** Each element of a response array is one record. */
+  private static final String ARRAY_RECORDS =
+      """
+      { "map-1": { "fields": { "$.id": "$.id", "$.name": "$.name" } },
+        "el-1": { "type": "object",
+          "properties": { "id": { "type": "string" }, "name": { "type": "string" } } } }
+      """;
+
+  /**
+   * A response is one record that holds the records under {@code data}, beside a cursor or a count;
+   * the Mapping makes one row of each element of {@code data}.
+   */
+  private static final String OBJECT_RECORD =
+      """
+      { "map-1": { "fields": { "$.id": "$.data[].id", "$.name": "$.data[].name" } },
+        "el-1": { "type": "object",
+          "properties": {
+            "data": { "type": "array", "items": { "type": "object",
+              "properties": { "id": { "type": "string" }, "name": { "type": "string" } } } },
+            "next_cursor": { "type": ["string", "null"] },
+            "meta": { "type": "object", "properties": { "count": { "type": "integer" } } } } } }
+      """;
 
   private static Network network;
   private static GenericContainer<?> api;
@@ -235,6 +264,181 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
   }
 
   @Test
+  void cursorInTheQueryReadsEachPageUntilAResponseWithoutACursor() throws Exception {
+    wireMock.register(
+        get(urlPathEqualTo("/cursor-query"))
+            .withQueryParam("limit", equalTo("2"))
+            .withQueryParam("cursor", absent())
+            .willReturn(okJson(objectRecord(records("A", "B"), "\"next_cursor\":\"abc123\""))));
+    wireMock.register(
+        get(urlPathEqualTo("/cursor-query"))
+            .withQueryParam("limit", equalTo("2"))
+            .withQueryParam("cursor", equalTo("abc123"))
+            .willReturn(okJson(objectRecord(records("C", "D"), "\"next_cursor\":\"def456\""))));
+    wireMock.register(
+        get(urlPathEqualTo("/cursor-query"))
+            .withQueryParam("limit", equalTo("2"))
+            .withQueryParam("cursor", equalTo("def456"))
+            .willReturn(okJson(objectRecord(records("E"), "\"next_cursor\":null"))));
+
+    deploy(
+        "http-cursor-query",
+        map(
+            """
+            { "name": "readings", "method": "GET", "path": "/cursor-query",
+              "pagination": { "type": "CURSOR", "cursorPath": "$.next_cursor",
+                              "cursorParameter": "cursor", "cursorIn": "QUERY",
+                              "limitParameter": "limit", "limit": 2 } }
+            """),
+        OBJECT_RECORD,
+        "http_cursor_query");
+
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(2))
+        .ignoreExceptions()
+        .until(() -> names("http_cursor_query").equals(List.of("A", "B", "C", "D", "E")));
+  }
+
+  @Test
+  void cursorInAHeaderReadsEachPageUntilAResponseWithoutACursor() throws Exception {
+    wireMock.register(
+        get(urlPathEqualTo("/cursor-header"))
+            .withQueryParam("limit", absent())
+            .withHeader("X-Cursor", absent())
+            .willReturn(okJson(objectRecord(records("A", "B"), "\"next_cursor\":\"abc123\""))));
+    wireMock.register(
+        get(urlPathEqualTo("/cursor-header"))
+            .withQueryParam("limit", absent())
+            .withQueryParam("X-Cursor", absent())
+            .withHeader("X-Cursor", equalTo("abc123"))
+            .willReturn(okJson(objectRecord(records("C"), "\"next_cursor\":\"\""))));
+
+    deploy(
+        "http-cursor-header",
+        map(
+            """
+            { "name": "readings", "method": "GET", "path": "/cursor-header",
+              "pagination": { "type": "CURSOR", "cursorPath": "$.next_cursor",
+                              "cursorParameter": "X-Cursor", "cursorIn": "HEADER" } }
+            """),
+        OBJECT_RECORD,
+        "http_cursor_header");
+
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(2))
+        .ignoreExceptions()
+        .until(() -> names("http_cursor_header").equals(List.of("A", "B", "C")));
+  }
+
+  @Test
+  void limitOffsetReadsEachPageUntilAPageWithFewerRecordsThanTheLimit() throws Exception {
+    registerOffset("/offset-limit", 80, okJson(records("A", "B")));
+    registerOffset("/offset-limit", 82, okJson(records("C", "D")));
+    registerOffset("/offset-limit", 84, okJson(records("E")));
+
+    deploy(
+        "http-offset-limit",
+        map(
+            """
+            { "name": "readings", "method": "GET", "path": "/offset-limit",
+              "pagination": { "type": "LIMIT_OFFSET", "offsetParameter": "offset", "offset": 80,
+                              "limitParameter": "limit", "limit": 2 } }
+            """),
+        "http_offset_limit");
+
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(2))
+        .ignoreExceptions()
+        .until(() -> names("http_offset_limit").equals(List.of("A", "B", "C", "D", "E")));
+    assertEquals(0, offsetRequests("/offset-limit", 86));
+  }
+
+  @Test
+  void offsetWithoutALimitReadsEachPageUntilAnEmptyPage() throws Exception {
+    registerOffset("/offset", 0, okJson(records("A", "B")));
+    registerOffset("/offset", 2, okJson(records("C")));
+    registerOffset("/offset", 3, okJson("[]"));
+
+    deploy(
+        "http-offset",
+        map(
+            """
+            { "name": "readings", "method": "GET", "path": "/offset",
+              "pagination": { "type": "LIMIT_OFFSET", "offsetParameter": "offset" } }
+            """),
+        "http_offset");
+
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(2))
+        .ignoreExceptions()
+        .until(() -> names("http_offset").equals(List.of("A", "B", "C")));
+    assertEquals(0, offsetRequests("/offset", 4));
+  }
+
+  @Test
+  void countPathCountsTheRecordsOfAResponseThatIsOneRecord() throws Exception {
+    registerOffset("/offset-count", 0, okJson(objectRecord(records("A", "B"), count(2))));
+    registerOffset("/offset-count", 2, okJson(objectRecord(records("C"), count(1))));
+    registerOffset("/offset-count", 3, okJson(objectRecord(records(), count(0))));
+
+    String processGroupId =
+        deploy(
+            "http-offset-count",
+            map(
+                """
+                { "name": "readings", "method": "GET", "path": "/offset-count",
+                  "pagination": { "type": "LIMIT_OFFSET", "offsetParameter": "offset",
+                                  "countPath": "$.meta.count" } }
+                """),
+            OBJECT_RECORD,
+            "http_offset_count");
+
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(2))
+        .ignoreExceptions()
+        .until(() -> names("http_offset_count").equals(List.of("A", "B", "C")));
+    awaitOffsetRequests("/offset-count", 3, 3);
+    assertEquals(0, offsetRequests("/offset-count", 4));
+    RuntimeStatus status = client.readRuntimeStatus(processGroupId);
+    assertTrue(status.healthy(), status.message());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {400, 404})
+  void limitOffsetEndsTheRunAtAClientErrorAfterTheFirstRequest(int status) throws Exception {
+    String path = "/offset-end-" + status;
+    registerOffset(path, 0, okJson(records("A", "B")));
+    registerOffset(path, 2, okJson(records("C", "D")));
+    registerOffset(path, 4, aResponse().withStatus(status));
+
+    String processGroupId =
+        deploy(
+            "http-offset-end-" + status,
+            map(
+                """
+                { "name": "readings", "method": "GET", "path": "%s",
+                  "pagination": { "type": "LIMIT_OFFSET", "offsetParameter": "offset",
+                                  "limitParameter": "limit", "limit": 2 } }
+                """
+                    .formatted(path)),
+            "http_offset_end_" + status);
+
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(2))
+        .ignoreExceptions()
+        .until(() -> names("http_offset_end_" + status).equals(List.of("A", "B", "C", "D")));
+    awaitOffsetRequests(path, 4, 3);
+    RuntimeStatus runtimeStatus = client.readRuntimeStatus(processGroupId);
+    assertTrue(runtimeStatus.healthy(), runtimeStatus.message());
+  }
+
+  @Test
   void redirectStopsThePipelineAndIsNotFollowed() throws Exception {
     wireMock.register(
         get(urlPathEqualTo("/moved"))
@@ -333,6 +537,15 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
 
   private String deploy(String pipelineId, Map<String, Object> apiCall, String table)
       throws Exception {
+    return deploy(pipelineId, apiCall, ARRAY_RECORDS, table);
+  }
+
+  /**
+   * @param records the Mapping {@code map-1} and the Data structure {@code el-1} of the records
+   */
+  private String deploy(
+      String pipelineId, Map<String, Object> apiCall, String records, String table)
+      throws Exception {
     Datasource source = new Datasource();
     source.setId("ds-" + pipelineId);
     source.setType("http");
@@ -357,13 +570,7 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
                 { "id": "e4", "source": "k", "target": "e" } ] }
             """
                 .formatted(EVERY_SECOND));
-    Map<String, Map<String, Object>> artifacts =
-        NifiTestFixtures.artifacts(
-            """
-            { "map-1": { "fields": { "$.id": "$.id", "$.name": "$.name" } },
-              "el-1": { "type": "object",
-                "properties": { "id": { "type": "string" }, "name": { "type": "string" } } } }
-            """);
+    Map<String, Map<String, Object>> artifacts = NifiTestFixtures.artifacts(records);
     DeploymentPlan plan =
         NifiTestFixtures.planner(
                 new CredentialResolver(new byte[0]),
@@ -438,6 +645,44 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
         .size();
   }
 
+  /** Registers the response to one offset; a request for an offset without a stub gets a 404. */
+  private static void registerOffset(String path, long offset, ResponseDefinitionBuilder response) {
+    wireMock.register(
+        get(urlPathEqualTo(path))
+            .withQueryParam("offset", equalTo(String.valueOf(offset)))
+            .willReturn(response));
+  }
+
+  private static int offsetRequests(String path, long offset) {
+    return wireMock
+        .find(
+            getRequestedFor(urlPathEqualTo(path))
+                .withQueryParam("offset", equalTo(String.valueOf(offset))))
+        .size();
+  }
+
+  private static void awaitOffsetRequests(String path, long offset, int count) {
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> offsetRequests(path, offset) >= count);
+  }
+
+  /** A JSON array with one record for each name, whose id is its name. */
+  private static String records(String... names) {
+    return Stream.of(names)
+        .map("{\"id\":\"%1$s\",\"name\":\"%1$s\"}"::formatted)
+        .collect(Collectors.joining(",", "[", "]"));
+  }
+
+  private static String objectRecord(String records, String member) {
+    return "{\"data\":" + records + "," + member + "}";
+  }
+
+  private static String count(int count) {
+    return "\"meta\":{\"count\":" + count + "}";
+  }
+
   private static int requests(String path) {
     return wireMock.find(getRequestedFor(urlPathEqualTo(path))).size();
   }
@@ -475,6 +720,13 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
               "http_invalid",
               "http_pages",
               "http_end_page",
+              "http_cursor_query",
+              "http_cursor_header",
+              "http_offset_limit",
+              "http_offset",
+              "http_offset_count",
+              "http_offset_end_400",
+              "http_offset_end_404",
               "http_unavailable",
               "http_slow")) {
         st.execute("CREATE TABLE " + table + " (id text PRIMARY KEY, name text)");

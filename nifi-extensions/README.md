@@ -239,11 +239,24 @@ No property supports Expression Language.
 The processor checks the rules of the portal backend again, because it builds the request and the
 credentials from them. `method` is `GET` or absent, `path` matches `^/[A-Za-z0-9._~:/-]*$`, a header
 name is a token and not `Authorization`, `Proxy-Authorization` or `Cookie`. A `pagination` is absent,
-null or of the type `PAGE_NUMBER`, with a `pageParameter`, a `pageSizeParameter` and a `pageSize` of
-at least 1. An absent `startPage` is 0, and an `endPage` is at least the `startPage`. The two
-parameter names differ from each other and from the name of each query parameter of the API call;
-the comparison is case-sensitive, as HTTP query parameter names are. A header must also be one the
-JDK HTTP client behind the web client service sends:
+null, or of the type `PAGE_NUMBER`, `CURSOR` or `LIMIT_OFFSET`:
+
+- `PAGE_NUMBER` has a `pageParameter`, a `pageSizeParameter` and a `pageSize` of at least 1. An
+  absent `startPage` is 0, and an `endPage` is at least the `startPage`.
+- `CURSOR` has a `cursorPath`, a `cursorParameter` and a `cursorIn` of `QUERY` or `HEADER`. A
+  `limitParameter` and a `limit` of at least 1 are optional, but one needs the other. A
+  `cursorParameter` in a header follows the header name rules below.
+- `LIMIT_OFFSET` has an `offsetParameter`. An absent `offset` is 0, and an `offset` is at least 0.
+  A `limitParameter` and a `limit` of at least 1 are optional, but one needs the other. A
+  `countPath` is optional; a blank one is absent.
+
+A JSON path such as `cursorPath` or `countPath` starts with `$` and holds only member names
+(`$.next_cursor`), quoted member names (`$['next cursor']`) and array indexes (`$.data[0].id`). This
+is the grammar of the portal backend; the processor evaluates no filter, wildcard or recursive
+descent. The names that a pagination sends differ from each other and from the names of the API call
+that go to the same place: a query parameter name from each query parameter name, case-sensitive as HTTP query parameter
+names are, and a header name from each header name, without case. A key of another pagination type
+is ignored. A header must also be one the JDK HTTP client behind the web client service sends:
 not `Connection`, `Content-Length`, `Expect`, `Host` or `Upgrade`, and a value of printable
 ISO-8859-1 characters, spaces and tabs only. An unknown key fails. A broken rule makes the
 processor invalid, and the explanation names the key path, for example `headers[1].name`, never the
@@ -273,13 +286,14 @@ A 3xx is fatal because the processor expects a web client service that does not 
 redirects (`Redirect Handling Strategy` = `IGNORED`), so a redirect shows a wrong host or path.
 
 A FlowFile on `success` carries `http.status.code` and `http.request.path`, and with pagination
-`http.page`, the page number. A FlowFile on `stop` or
-`failure` is empty and carries `http.request.path`, `http.error.status` and `http.error.message`.
-`http.error.status` is the status of the response, or `0` when no response came. The message is the
-one the log entry and the bulletin show. It names the API call and its path, never the base URL,
-and on a page of a paginated run the page number. A control character or line separator in the
-message appears as `\r`, `\n` or `\uXXXX`, so no part of it can start a forged log line; every
-other character stays as entered:
+`http.page`: the page number, with cursor pagination the number of the request in the run from 1,
+or with limit/offset pagination the offset. A FlowFile on `stop` or `failure` is empty and carries
+`http.request.path`, `http.error.status` and `http.error.message`. `http.error.status` is the status
+of the response, or `0` when no response came. The message is the one the log entry and the bulletin
+show. It names the API call and its path, never the base URL, and on a page of a paginated run the
+page number, with cursor pagination the request number, or with limit/offset pagination the offset.
+A control character or line separator in the message appears as `\r`, `\n` or `\uXXXX`, so no part
+of it can start a forged log line; every other character stays as entered:
 
 ```text
 API call "Get stations": GET /stations failed with status 404
@@ -294,6 +308,17 @@ API call "Get stations": page 3 is a JSON object, not an array
 API call "Get stations": page 3 repeats page 2
 API call "Get stations": no stop condition after 1000 pages (Max Pages)
 API call "Get stations": GET /stations page 3 not sent, because the processor stopped
+API call "Get items": GET /items request 3 failed with status 404
+API call "Get items": request 3 is a JSON array, not an object
+API call "Get items": request 3: the value at $.next_cursor is a JSON object, not a string or a number
+API call "Get items": request 3: the value at $.next_cursor holds a character that a header value must not hold
+API call "Get items": request 4 would send the same request as request 2
+API call "Get items": GET /items offset 0 failed with status 404
+API call "Get items": offset 100 is a JSON object, not an array
+API call "Get items": offset 100: the value at $.meta.count is not a record count
+API call "Get items": offset 100: the response holds more records than the limit
+API call "Get items": offset 100: the next offset would be larger than 9223372036854775807
+API call "Get items": offset 120 repeats offset 100
 ```
 
 A transient message keeps the word `failed`: the runtime monitor of the NiFi config-adapter counts a
@@ -301,8 +326,10 @@ warn bulletin only when its text names a failure. The message of a stop has no s
 stop is not an error of the Pipeline.
 
 No attribute and no message contains the query, a header value, the username, the password or a
-value of the response. An exception reaches no logger, because its message can hold the URI with its
-query; the message names its class alone.
+value of the response, a cursor included. The one exception is the offset of limit/offset
+pagination without a `limit`, which carries record counts (see
+[Limit/offset pagination](#limitoffset-pagination)). An exception reaches no logger,
+because its message can hold the URI with its query; the message names its class alone.
 
 ### Response validation
 
@@ -339,11 +366,15 @@ as an `ERROR` event of the Pipeline.
 
 ### Pagination
 
-A `PAGE_NUMBER` pagination makes a run read the pages one after the other. Each page is a request
-of its own, through the same request code as an API call without pagination, with the page
-parameter and the page size parameter after the query parameters of the API call. The first page
-is `startPage`, and the page number increases by 1. The run stops after the first page that meets
-one of these conditions, and the records of that page are part of the run:
+A pagination makes a run read the pages one after the other. Each page is a request of its own,
+through the same request code as an API call without pagination. A page adds its parameters after
+the query parameters of the API call, and its headers after the headers of the API call.
+
+#### Page-number pagination
+
+A `PAGE_NUMBER` pagination sends the page parameter and the page size parameter as query parameters.
+The first page is `startPage`, and the page number increases by 1. The run stops after the first page
+that meets one of these conditions, and the records of that page are part of the run:
 
 - The page number is the `endPage`.
 - The page has no records.
@@ -365,42 +396,152 @@ object is one record, and `[]` gives one FlowFile `[]`.
 | A JSON object, a JSON scalar, or not JSON | `stop` |
 | An array with a record that violates the `Record Schema` | `stop` |
 
+**Known limit:** a `pageSize` larger than the maximum page size of the API ends the run after the
+first page, because the API sends fewer records than `pageSize`. The processor cannot tell this from
+a last page, so no error shows.
+
+#### Cursor pagination
+
+A `CURSOR` pagination takes the cursor of each request from the response before it. The first
+request sends no cursor. Each next request sends the value at `cursorPath` of the previous response
+under `cursorParameter`, as a query parameter or as a header by `cursorIn`. With a `limit`, each
+request also sends `limitParameter` with the `limit` as a query parameter, before the cursor. With
+`cursorPath` `$.next_cursor`, `cursorParameter` `cursor`, `cursorIn` `QUERY` and a limit of 20:
+
+```text
+GET /items?limit=20                 -> { "data": [...], "next_cursor": "abc123" }
+GET /items?limit=20&cursor=abc123   -> { "data": [...], "next_cursor": "def456" }
+GET /items?limit=20&cursor=def456   -> { "data": [...] }
+```
+
+A string cursor goes into the request as it is; the query percent-encodes it. A number cursor goes
+in as its JSON text in the response, for example `1.50` as `1.50` and `1e2` as `1e2`. When the
+value at `cursorPath` is absent, `null` or `""`, the run ends, and the records of that response are
+part of the run.
+
+Each response is a JSON object and one record, so the `Record Schema` describes the whole response,
+cursor included. A Mapping takes the records out of it. The processor reads the cursor in the same
+pass as the record validation, from the record that it validates.
+
+| 2xx response of a request | Result |
+|---|---|
+| A JSON object that agrees with the `Record Schema`, with a string or number cursor | one FlowFile on `success`, the body unchanged; the run sends the next request |
+| The same, with the cursor absent, `null` or `""` | one FlowFile on `success`; the run stops there |
+| No body | no FlowFile; the run stops there |
+| A cursor that is a JSON object, array or boolean | `stop` |
+| A cursor in a header with a character outside printable ASCII | `stop` |
+| A cursor that the run already sent | `stop` |
+| A JSON array, a JSON scalar, or not JSON | `stop` |
+| An object that violates the `Record Schema` | `stop` |
+
+A 400 or 404 on a request after the first does not end the run: the cursor comes from the API, so
+the request after it must exist. It goes to `stop`, as in the table above.
+
+A cause and `http.page` name a request by its position in the run, for example `request 3`. They
+never show the cursor, because the cursor is data of the API host. The processor compares each next
+request with the requests of the run that it sent: a request with the same parameters and headers as
+an earlier one goes to `stop` before the processor sends it, because the API would repeat its pages
+without end.
+
+#### Limit/offset pagination
+
+A `LIMIT_OFFSET` pagination sends `offsetParameter` with the offset of each request as a query
+parameter. The first request sends `offset`. With a `limit`, each request also sends
+`limitParameter` with the `limit` as a query parameter, before the offset, and the offset of the next
+request is the offset plus the `limit`. Without a `limit`, the requests send no limit parameter, the
+API uses its default page size, and the offset of the next request is the offset plus the record
+count of the response. With a limit of 20 and an `offset` of 80:
+
+```text
+GET /items?limit=20&offset=80    -> 20 records
+GET /items?limit=20&offset=100   -> 20 records
+GET /items?limit=20&offset=120   -> 7 records; the run stops there
+```
+
+The record count of a response:
+
+- Without `countPath`, the response must be a JSON array. Each element is one record, as with
+  page-number pagination, and the count is the number of elements.
+- With `countPath`, the response must be a JSON object. It is one record, so the `Record Schema`
+  describes the whole response. The value at `countPath` gives the record count: a whole number of
+  at least 0, for example `5` or `5.0`, or an array, whose length is the count. **The count is the
+  number of records in this response, not the total of the API.** The processor reads the count in
+  the same pass as the record validation, from the record that it validates.
+
+The run stops after the first response that meets one of these conditions, and the records of that
+response are part of the run:
+
+- With a `limit`, the response has fewer records than the `limit`.
+- Without a `limit`, the response has no records.
+- A request after the first answers 400 or 404, as with page-number pagination. Some APIs answer an
+  offset past the end so. On the first request, 400 and 404 go to `stop`.
+
+A response with more records than the `limit` goes to `stop`: the API then ignores the `limit`,
+and the next offset would read some of its records again. The offset is a `long`, so an
+`offset` near the `int` maximum does not overflow.
+
+| 2xx response of a request | Result |
+|---|---|
+| Without `countPath`: a JSON array, each record agrees with the `Record Schema` | one FlowFile on `success`, the body unchanged |
+| With `countPath`: a JSON object that agrees with the `Record Schema`, with a count above 0 | one FlowFile on `success`, the body unchanged |
+| `[]`, a count of 0, or no body | no FlowFile; the run stops there |
+| Without `countPath` a JSON object, with `countPath` a JSON array; a JSON scalar, or not JSON | `stop` |
+| With a `limit`, more records than the `limit` | `stop` |
+| A value at `countPath` that is absent, `null`, below 0, a fraction, a string, a boolean or an object | `stop` |
+| A count that makes the next offset larger than 9223372036854775807 | `stop` |
+| A record that violates the `Record Schema` | `stop` |
+
+A cause and `http.page` name a request by its offset, for example `offset 100`, so a Data Steward
+can send the same request. The offset follows from the configuration and from the record counts.
+Without a limit, two offsets in a row thus give the record count of a response, which is the value
+at `countPath` when one is set. A cause shows no other value of a response. An API that ignores
+the offset sends the same page again, and the check for a repeated body below stops the run at the
+second request.
+
+**Known limit:** a `limit` larger than the maximum page size of the API ends the run after the first
+page, because the API sends fewer records than the `limit`. The processor cannot tell this from a
+last page, so no error shows. Without a `limit`, the run continues until a response has no records.
+
+#### Every pagination
+
 **A run delivers all its pages or none.** The page FlowFiles of a run stay in one session, which
 the processor commits when the loop ends. An error on any page, fatal or transient, removes the page
 FlowFiles of the run. The processor then sends one error FlowFile to `stop` or `failure`. Thus each
-failed run gives one FlowFile. The next run starts again at `startPage`. The pages of a run wait in
-the content repository until the commit. This
+failed run gives one FlowFile. The next run starts again at the first page, with limit/offset
+pagination at `offset`. The pages of a run wait
+in the content repository until the commit. This
 applies to what the processor sends: the Data sink writes the pages one FlowFile after the other,
 so a Data sink error on a page leaves the pages before it in the Data storage.
 
 A page whose body is the same as the body of an earlier page of the run goes to `stop`, also in a
 run with an `endPage`, and none of the pages of the run reaches `success`. The same body means that
-the API ignores the page parameter, so the run would deliver the same records again until the
-`endPage` or `Max Pages`. Thus such an API stops at the second page. The processor compares a
-SHA-256 of each body, which it computes while it writes the body into its FlowFile.
+the API ignores the page parameter, the cursor or the offset, so the run would deliver the same
+records again until the `endPage` or `Max Pages`. Thus such an API stops at the second page. The
+processor compares a SHA-256 of each body, which it computes while it writes the body into its
+FlowFile.
 
 `Max Pages` limits a run, also one with an `endPage`. A run that reads `Max Pages` pages and meets no
 stop condition goes to `stop`, and none of its pages reaches `success`. This guards against an API
-that ignores the page parameter and changes its response on each request, for example with a
-timestamp in each record.
+that ignores the page parameter, the cursor or the offset and changes its response on each request,
+for example with a timestamp in each record.
 
 **Page limit:** a run reads at most `Max Pages` pages, 1000 by default. When the page at
-`Max Pages` is full, the run also goes to `stop`, because it cannot know that no further page
-exists. The first run of an API with more pages stops the Pipeline. The config-adapter does not set
-`Max Pages`, and each deployment of the Pipeline replaces a value set in the NiFi UI, so only a code
-change raises the limit.
+`Max Pages` does not end the run, the run also goes to `stop`, because it cannot know that no
+further page exists. The first run of an API with more pages stops the Pipeline. The config-adapter
+does not set `Max Pages`, and each deployment of the Pipeline replaces a value set in the NiFi UI, so
+only a code change raises the limit.
 
 When NiFi stops the processor during a run, the processor sends no further page. It removes the
 pages of the run and sends one FlowFile to `failure`, as for a transient error. Thus a stop of the
 process group waits for one page at most, not for the whole run.
 
-**Known limit:** a `pageSize` larger than the maximum page size of the API ends the run after the
-first page, because the API sends fewer records than `pageSize`. The processor cannot tell this from
-a last page, so no error shows.
+The request code knows no NiFi session. The page loop asks a `Pagination` for the first page, and
+for the shape that each response must have: a JSON array of records, a JSON object that is one
+record, or, without pagination, either. A `ResponseShape` of one object also names the JSON paths
+whose values the pagination reads. From the record count and those values of a page, the
+`Pagination` gives the next page, the end of the run, or a cause for `stop`. A page carries the query
+parameters and the headers that its request adds. A new pagination method adds an implementation of
+`Pagination`, and the page loop and the request code stay as they are.
 
-The request code knows no NiFi session. The page loop asks a `Pagination` for the first page and,
-from the record count of a page, for the next one. The `Pagination` also tells if each page must be
-a JSON array. An offset pagination adds an implementation of `Pagination`, and the page loop stays
-as it is. A cursor or a link header needs the response of a page, which `Pagination` does not get.
 A new authentication type adds a
 value of `Authentication Type`, its properties and a class that implements `Authentication`.

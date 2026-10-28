@@ -15,7 +15,7 @@ import java.util.Optional;
 /** An API call without pagination: each run sends one request. */
 record SinglePage() implements Pagination {
 
-  private static final Page ONLY = new Page(0, Optional.empty(), List.of());
+  private static final Page ONLY = new Page(0, Optional.empty(), List.of(), List.of());
 
   @Override
   public Page first() {
@@ -23,8 +23,8 @@ record SinglePage() implements Pagination {
   }
 
   @Override
-  public boolean pagesAreArrays() {
-    return false;
+  public ResponseShape shape() {
+    return new ResponseShape.ObjectOrArray();
   }
 
   @Override
@@ -33,7 +33,7 @@ record SinglePage() implements Pagination {
   }
 
   @Override
-  public Optional<Page> next(Page page, int records) {
-    return Optional.empty();
+  public Progress next(Page page, PageContent content) {
+    return new Progress.Accepted(content.records(), Optional.empty());
   }
 }

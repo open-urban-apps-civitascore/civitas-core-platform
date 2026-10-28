@@ -457,7 +457,9 @@ public record HttpConnectorConfiguration(
           @NotNull(groups = OnRelease.class, message = "'offsetParameter' is required") String offsetParameter,
       @Schema(
               description =
-                  "Number of records per request. At least 1. Required with limitParameter.",
+                  "Number of records per request. At least 1. Required with limitParameter. It"
+                      + " must not be larger than the maximum page size of the API. With a larger"
+                      + " limit, the run stops after the first page without an error.",
               example = "100")
           @Min(value = 1, message = "'limit' must be at least 1") Integer limit,
       @Schema(
@@ -468,8 +470,11 @@ public record HttpConnectorConfiguration(
       @Schema(
               description =
                   "JSON path in the response to the number of records, or to an array whose length"
-                      + " is that number. Only member names and array indexes. Absent or null"
-                      + " counts the elements of the response, which must then be an array.",
+                      + " is that number. The number is the count of records in this response, not"
+                      + " the total of the API. Only member names and array indexes. With"
+                      + " countPath, the response must be a JSON object, which is one record."
+                      + " Absent or null counts the elements of the response, which must then be"
+                      + " an array.",
               example = "$.meta.count")
           @Pattern(regexp = JSON_PATH, message = "'countPath'" + JSON_PATH_MESSAGE) String countPath)
       implements Pagination {
