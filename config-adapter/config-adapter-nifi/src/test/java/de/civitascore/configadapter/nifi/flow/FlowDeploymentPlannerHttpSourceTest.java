@@ -442,6 +442,29 @@ class FlowDeploymentPlannerHttpSourceTest {
   }
 
   @Test
+  void certificateThatAlsoHoldsAPrivateKeyIsRefused() throws Exception {
+    String certificateAndKey =
+        "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"
+            + "-----BEGIN PRIVATE KEY-----\nMIIEpastedkey\n-----END PRIVATE KEY-----\n";
+    String authentication =
+        mapper.writeValueAsString(
+            Map.of(
+                "type",
+                "CLIENT_CERTIFICATE",
+                "certificate",
+                encrypted(certificateAndKey),
+                "privateKey",
+                encrypted("-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----\n")));
+
+    FatalAdapterException refusal = refusal(httpSource(authentication), MAPPINGS);
+
+    assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, refusal.getErrorCode());
+    String message = refusal.getInternalMessage();
+    assertTrue(message.contains("certificate must hold only PEM certificates"), message);
+    assertFalse(message.contains("pastedkey"), message);
+  }
+
+  @Test
   void withoutClientCertificateTheWebClientHasNoSslContext() throws Exception {
     DeploymentPlan plan = plan(Map.of("type", "BEARER_TOKEN", "token", encrypted(SECRET)));
 

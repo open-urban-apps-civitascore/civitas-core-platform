@@ -31,6 +31,7 @@ import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * HTTP/REST pull source over GetHttpApiCall. The stage maps no field of the API call, so a new
@@ -47,6 +48,8 @@ public final class HttpSourceStage implements SourceStage {
    * Friendly name of the client certificate's SSL context, matched like {@link #HTTP_PROCESSOR}.
    */
   private static final String SSL_CONTEXT = "HttpSourceSslContext";
+
+  private static final Pattern PEM_BEGIN = Pattern.compile("-----BEGIN ([^-]*)-----");
 
   private static final String AUTHENTICATION_TYPE = "Authentication Type";
 
@@ -136,10 +139,11 @@ public final class HttpSourceStage implements SourceStage {
             .ifPresent(value -> out.putSensitive(HTTP_PROCESSOR, "OAuth2 Client Secret", value));
       }
       case CLIENT_CERTIFICATE -> {
-        secrets
-            .value("certificate")
-            .ifPresent(
-                value -> out.putControllerServiceProperty(SSL_CONTEXT, "Certificate Chain", value));
+        Optional<String> certificate = secrets.value("certificate");
+        if (certificate.isPresent()) {
+          out.putControllerServiceProperty(
+              SSL_CONTEXT, "Certificate Chain", certificatesOnly(certificate.get()));
+        }
         Optional<String> privateKey = secrets.value("privateKey");
         if (privateKey.isPresent()) {
           out.putSensitive(SSL_CONTEXT, "Private Key", readablePrivateKey(privateKey.get()));
@@ -163,6 +167,19 @@ public final class HttpSourceStage implements SourceStage {
     throw new FatalAdapterException(
         AdapterErrorCode.NIFI_TEMPLATE_ERROR,
         "HTTP/REST source privateKey must be a PEM key in PKCS#8 form, or in PKCS#1 form for RSA");
+  }
+
+  /** The certificate chain is a property that is not sensitive, so it must not carry a key. */
+  private static String certificatesOnly(String certificate) throws FatalAdapterException {
+    if (PEM_BEGIN
+        .matcher(certificate)
+        .results()
+        .allMatch(begin -> "CERTIFICATE".equals(begin.group(1)))) {
+      return certificate;
+    }
+    throw new FatalAdapterException(
+        AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+        "HTTP/REST source certificate must hold only PEM certificates");
   }
 
   /**
