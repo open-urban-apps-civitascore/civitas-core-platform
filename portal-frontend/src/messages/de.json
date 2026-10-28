@@ -1623,7 +1623,6 @@
       "savingAll": "Speichert...",
       "exit": "Beenden",
       "validationFailed": "Validierung fehlgeschlagen für: {names}",
-      "unchangedPipelinesInvalid": "Diese Pipelines sind nicht gültig: {names}. Bitte die Fehler beheben.",
       "duplicateNames": "Doppelte Pipeline-Namen: {names}",
       "saveFailed": "Speichern fehlgeschlagen: {names}",
       "saveSuccess": "Pipeline \"{name}\" erfolgreich gespeichert",

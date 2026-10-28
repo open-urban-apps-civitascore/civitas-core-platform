@@ -244,7 +244,7 @@ describe('Pipeline editor: Validate focus', () => {
 })
 
 describe('Pipeline editor: validation on save', () => {
-  it('shows Validation Results in every saved pipeline, then the node panel on a click', async () => {
+  it('shows Validation Results only in the changed pipeline, then the node panel on a click', async () => {
     vi.mocked(useGetPipelines).mockReturnValue({
       data: {
         data: [savedPipeline('pipeline-a', [makeNode('node-a')]), savedPipeline('pipeline-b', [makeNode('node-b')])],
@@ -267,7 +267,7 @@ describe('Pipeline editor: validation on save', () => {
     await act(async () => {
       await contextRef.current?.saveAllPipelines()
     })
-    expect(screen.queryAllByText('validation.results').length).toBeGreaterThan(0)
+    expect(screen.queryByText('validation.results')).toBeNull()
 
     act(() => {
       sessionManagerRef.current?.switchToSession(sessionIdOf('pipeline-b'))

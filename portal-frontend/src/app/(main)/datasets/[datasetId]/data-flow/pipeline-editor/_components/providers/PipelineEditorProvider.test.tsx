@@ -2934,7 +2934,7 @@ describe('PipelineEditorProviderComponent', () => {
       it.each([
         ['after a save', []],
         ['when the save stops because of errors', ['changed']],
-      ])('opens the panel in every validated pipeline %s', async (_label, failingIds) => {
+      ])('opens the panel only in the changed pipeline %s', async (_label, failingIds) => {
         failValidationFor(failingIds)
         renderSessions([savedSession('changed', true), savedSession('unchanged', false)])
 
@@ -2944,13 +2944,13 @@ describe('PipelineEditorProviderComponent', () => {
         act(() => {
           sessionManagerRef.current?.switchToSession('unchanged')
         })
-        expect(contextRef.current?.shouldShowValidationPanel).toBe(true)
+        expect(contextRef.current?.shouldShowValidationPanel).toBe(false)
       })
 
       it.each([
         ['after a save', []],
         ['when the save stops because of errors', ['changed']],
-      ])('clears the selection in every validated pipeline %s', async (_label, failingIds) => {
+      ])('clears the selection only in the changed pipeline %s', async (_label, failingIds) => {
         failValidationFor(failingIds)
         const selectedNode = { ...makeNode('node-1'), selected: true }
         renderSessions([
@@ -2961,7 +2961,10 @@ describe('PipelineEditorProviderComponent', () => {
         await saveAll()
 
         const sessions = sessionManagerRef.current?.sessions ?? []
-        expect(sessions.flatMap(session => session.pipeline.nodes).some(node => node.selected)).toBe(false)
+        const isSelectedIn = (sessionId: string) =>
+          sessions.find(session => session.id === sessionId)?.pipeline.nodes.some(node => node.selected)
+        expect(isSelectedIn('changed')).toBe(false)
+        expect(isSelectedIn('unchanged')).toBe(true)
       })
 
       it('saves nothing when a changed pipeline has errors', async () => {
@@ -2974,27 +2977,12 @@ describe('PipelineEditorProviderComponent', () => {
         expect(toast.error).toHaveBeenCalledWith('header.validationFailed')
       })
 
-      it('saves the changed pipelines and reports unchanged pipelines with errors', async () => {
-        failValidationFor(['unchanged'])
+      it('does not validate an unchanged saved pipeline', async () => {
         renderSessions([savedSession('changed', true), savedSession('unchanged', false)])
 
         await saveAll()
 
-        expect(mockUpdatePipelineMutateAsync).toHaveBeenCalledOnce()
-        expect(toast.success).toHaveBeenCalledWith('header.saveSuccess')
-        expect(toast.error).toHaveBeenCalledWith('header.unchangedPipelinesInvalid')
-        expect(contextRef.current?.sessionIdsWithErrors).toEqual(new Set(['unchanged']))
-      })
-
-      it('shows the error toast for unchanged pipelines before the success toast', async () => {
-        failValidationFor(['unchanged'])
-        renderSessions([savedSession('changed', true), savedSession('unchanged', false)])
-
-        await saveAll()
-
-        const [errorOrder] = vi.mocked(toast.error).mock.invocationCallOrder
-        const [successOrder] = vi.mocked(toast.success).mock.invocationCallOrder
-        expect(errorOrder).toBeLessThan(successOrder)
+        expect(validatedPipelineIds()).toEqual(['changed'])
       })
 
       it('does not validate an unchanged pipeline that was never saved', async () => {

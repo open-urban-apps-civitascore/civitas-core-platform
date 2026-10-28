@@ -658,34 +658,21 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       return false
     }
 
-    // Errors in unchanged pipelines do not block the save.
-    const unchangedSavedSessions = sessionManager.sessions.filter(s => !s.isDirty && s.pipeline.id)
     const failedNames: string[] = []
-    const unchangedInvalidNames: string[] = []
-    for (const session of [...dirtySessions, ...unchangedSavedSessions]) {
+    for (const session of dirtySessions) {
       const result = validatePipelineWithNodeStatus(
         currentPipelineOf(session.pipeline),
         validationContextFor(session.id),
       )
       setValidationResultFor(session.id, result)
-      if (result.isValid) continue
-      if (session.isDirty) {
-        failedNames.push(session.name)
-      } else {
-        unchangedInvalidNames.push(session.name)
-      }
+      if (!result.isValid) failedNames.push(session.name)
     }
-    const validatedSessions = [...dirtySessions, ...unchangedSavedSessions]
-    validatedSessions.forEach(session => sessionManager.updateSessionPipeline(session.id, withoutSelection))
-    showValidationPanelFor(validatedSessions.map(session => session.id))
+    dirtySessions.forEach(session => sessionManager.updateSessionPipeline(session.id, withoutSelection))
+    showValidationPanelFor(dirtySessions.map(session => session.id))
 
     if (failedNames.length > 0) {
       toast.error(t('header.validationFailed', { names: failedNames.join(', ') }))
       return false
-    }
-
-    if (unchangedInvalidNames.length > 0) {
-      toast.error(t('header.unchangedPipelinesInvalid', { names: unchangedInvalidNames.join(', ') }))
     }
 
     // A destructive sink change only risks data once the dataset's table physically exists.
