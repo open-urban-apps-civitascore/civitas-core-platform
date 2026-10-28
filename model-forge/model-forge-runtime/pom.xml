@@ -16,8 +16,8 @@
   <packaging>jar</packaging>
 
   <properties>
-    <networknt.version>1.5.8</networknt.version>
-    <xmlschema.version>2.3.2</xmlschema.version>
+    <networknt.version>1.5.9</networknt.version>
+    <xmlschema.version>2.3.3</xmlschema.version>
   </properties>
 
   <name>CIVITAS/CORE Model Forge - Runtime</name>

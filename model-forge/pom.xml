@@ -59,11 +59,11 @@
          job can invoke the short goal `cyclonedx:makeAggregateBom` and have Maven's
          pluginManagement supply this version — which makes the version visible to
          Renovate's maven manager instead of being hidden in an inline CI coordinate. -->
-    <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
+    <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
     <!-- Pin tool versions once; child modules inherit these properties. -->
-    <jacoco.version>0.8.14</jacoco.version>
+    <jacoco.version>0.8.15</jacoco.version>
     <archunit.version>1.4.2</archunit.version>
-    <testcontainers.version>2.0.4</testcontainers.version>
+    <testcontainers.version>2.0.5</testcontainers.version>
     <!-- Apache Wicket: Jakarta-based 10.x line (Servlet 6), used only by the admin-ui demo host. -->
     <wicket.version>10.9.1</wicket.version>
     <!-- Drop once the Spring Boot parent manages Tomcat >= 11.0.25: Boot 4.1.1 pins 11.0.24,
@@ -146,7 +146,7 @@
       <plugin>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>
-        <version>4.10.2.0</version>
+        <version>4.10.5.0</version>
         <configuration>
           <effort>Max</effort>
           <threshold>Medium</threshold>
