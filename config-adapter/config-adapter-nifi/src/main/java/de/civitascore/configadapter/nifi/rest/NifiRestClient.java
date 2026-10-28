@@ -28,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -64,9 +65,14 @@ public class NifiRestClient implements AutoCloseable {
   private static final long POLL_INTERVAL_MS = 1000L;
   private static final Pattern COMPONENT_PREFIX = Pattern.compile("^\\S+\\[id=[^\\]]*\\]\\s*");
 
-  /** NiFi's DisabledServiceValidationResult, which clears once the referenced service enables. */
-  private static final Pattern DISABLED_SERVICE =
-      Pattern.compile("Controller Service with ID \\S+ is disabled$");
+  /**
+   * NiFi's DisabledServiceValidationResult and EnablingServiceValidationResult, which clear once
+   * the referenced service enables.
+   */
+  private static final Pattern REFERENCED_SERVICE_NOT_ENABLED =
+      Pattern.compile(
+          "Controller Service (with ID \\S+ is disabled|\\[.*] Identifier \\[\\S+] state is"
+              + " Enabling)$");
 
   private final String baseUrl;
   private final NifiTokenProvider tokenProvider;
@@ -790,9 +796,10 @@ public class NifiRestClient implements AutoCloseable {
     }
     boolean awaitingEnabled = "ENABLED".equals(state);
     boolean allInState = true;
+    Map<String, String> enablingNamesById = new HashMap<>();
     for (JsonNode service : services) {
       JsonNode component = service.path("component");
-      // A service whose configuration is INVALID will never reach ENABLED, so polling for it is
+      // A service INVALID for a reason of its own will never reach ENABLED, so polling for it is
       // pointless: fail fast and FATALLY (a retryable timeout would loop forever under redelivery).
       if (awaitingEnabled
           && "INVALID".equals(component.path("validationStatus").asText())
@@ -806,11 +813,39 @@ public class NifiRestClient implements AutoCloseable {
                 + validationErrors(component)
                 + provisioningHint(name));
       }
-      if (!state.equals(component.path("state").asText())) {
+      String current = component.path("state").asText();
+      if (!state.equals(current)) {
         allInState = false;
       }
+      if (awaitingEnabled && "ENABLING".equals(current)) {
+        enablingNamesById.put(service.path("id").asText(), component.path("name").asText());
+      }
+    }
+    if (!enablingNamesById.isEmpty()) {
+      failOnEnableError(enablingNamesById);
     }
     return allInState;
+  }
+
+  /**
+   * NiFi retries a failed enable without end and reports the failure only as a bulletin, for
+   * example a private key that an SSL context cannot read.
+   */
+  private void failOnEnableError(Map<String, String> enablingNamesById)
+      throws FatalAdapterException, RetryableAdapterException {
+    for (JsonNode entry : readBulletins()) {
+      JsonNode bulletin = entry.path("bulletin");
+      String name = enablingNamesById.get(bulletin.path("sourceId").asText());
+      if (name != null && "ERROR".equals(bulletin.path("level").asText())) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_FLOW_ERROR,
+            "controller service '"
+                + name
+                + "' failed to enable: "
+                + withoutComponentPrefix(bulletin.path("message").asText())
+                + provisioningHint(name));
+      }
+    }
   }
 
   private static boolean awaitsReferencedServices(JsonNode component) {
@@ -819,7 +854,7 @@ public class NifiRestClient implements AutoCloseable {
       return false;
     }
     for (JsonNode error : errors) {
-      if (!DISABLED_SERVICE.matcher(error.asText()).find()) {
+      if (!REFERENCED_SERVICE_NOT_ENABLED.matcher(error.asText()).find()) {
         return false;
       }
     }

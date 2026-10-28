@@ -475,6 +475,93 @@ class NifiRestClientTest {
     assertTrue(ex.getMessage().contains("HttpSourceWebClient"), ex.getMessage());
   }
 
+  /** NiFi shows this validation error also while a good SSL context enables. */
+  @Test
+  void aServiceInvalidOnlyByAnEnablingReferencedServiceIsAwaited()
+      throws FatalAdapterException, RetryableAdapterException {
+    stubDeploymentUntilServicesEnable();
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .inScenario("enable")
+            .whenScenarioStateIs(Scenario.STARTED)
+            .willReturn(json(webClientAwaitingEnablingSslContext()))
+            .willSetStateTo("enabled"));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .inScenario("enable")
+            .whenScenarioStateIs("enabled")
+            .willReturn(
+                json(
+                    "{ \"controllerServices\": [ { \"id\": \"cs-1\", \"component\": { \"name\":"
+                        + " \"HttpSourceWebClient\", \"state\": \"ENABLED\","
+                        + " \"validationStatus\": \"VALID\" } }, { \"id\": \"cs-2\", \"component\":"
+                        + " { \"name\": \"HttpSourceSslContext\", \"state\": \"ENABLED\","
+                        + " \"validationStatus\": \"VALID\" } } ] }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/bulletin-board"))
+            .willReturn(json("{ \"bulletinBoard\": { \"bulletins\": [] } }")));
+    server.stubFor(put(urlEqualTo("/nifi-api/flow/process-groups/pg-1")).willReturn(json("{}")));
+    stubRunningProcessors();
+
+    DeploymentPlan plan =
+        new DeploymentPlan(
+            "pipeline-x", "{ \"flowContents\": { \"name\": \"pipeline-x\" } }", Map.of());
+
+    assertEquals("pg-1", client.deployFlow(plan));
+  }
+
+  @Test
+  void aServiceThatFailsToEnableFailsFatallyWithItsBulletin() {
+    stubDeploymentUntilServicesEnable();
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(json(webClientAwaitingEnablingSslContext())));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/bulletin-board"))
+            .willReturn(
+                json(
+                    "{ \"bulletinBoard\": { \"bulletins\": [ { \"bulletin\": { \"sourceId\":"
+                        + " \"cs-2\", \"level\": \"ERROR\", \"message\":"
+                        + " \"PEMEncodedSSLContextProvider[id=cs-2] Failed to invoke @OnEnabled"
+                        + " method: Private Key parsing failed\" } } ] } }")));
+
+    DeploymentPlan plan =
+        new DeploymentPlan(
+            "pipeline-x", "{ \"flowContents\": { \"name\": \"pipeline-x\" } }", Map.of());
+
+    FatalAdapterException ex =
+        assertThrows(FatalAdapterException.class, () -> client.deployFlow(plan));
+    assertEquals(
+        "NiFi flow error: controller service 'HttpSourceSslContext' failed to enable: Failed to"
+            + " invoke @OnEnabled method: Private Key parsing failed",
+        ex.getMessage());
+  }
+
+  private void stubDeploymentUntilServicesEnable() {
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .willReturn(json("{ \"id\": \"root-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/root-1"))
+            .willReturn(json("{ \"processGroupFlow\": { \"flow\": { \"processGroups\": [] } } }")));
+    server.stubFor(
+        post(urlPathEqualTo("/nifi-api/process-groups/root-1/process-groups/upload"))
+            .willReturn(json("{ \"id\": \"pg-1\" }")));
+    server.stubFor(
+        put(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(json("{}")));
+  }
+
+  private static String webClientAwaitingEnablingSslContext() {
+    return "{ \"controllerServices\": [ { \"id\": \"cs-1\", \"component\": { \"name\":"
+        + " \"HttpSourceWebClient\", \"state\": \"DISABLED\", \"validationStatus\":"
+        + " \"INVALID\", \"validationErrors\": [ \"'SSL Context Service' validated against"
+        + " 'cs-2' is invalid because Controller Service [HttpSourceSslContext] Identifier [cs-2]"
+        + " state is Enabling\" ] } }, { \"id\": \"cs-2\", \"component\": { \"name\":"
+        + " \"HttpSourceSslContext\", \"state\": \"ENABLING\", \"validationStatus\":"
+        + " \"VALID\" } } ] }";
+  }
+
   @Test
   void missingRevisionVersionIsFatal() {
     // A matching group whose revision.version field is ABSENT must not be silently coerced to 0
