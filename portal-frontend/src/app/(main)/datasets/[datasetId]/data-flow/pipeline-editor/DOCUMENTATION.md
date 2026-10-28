@@ -643,7 +643,7 @@ Before phase 1, `planPipelineSaves()` (`utils/dataSinkRemoval.ts`) calculates wh
 Phase 1, per session:
 
 1. **Save the data sinks** – create a sink for a node that has no `entityId`, update a changed one. The returned `configurationUrn` is stashed on the node and becomes the model's `sinkRef`.
-2. **Save the mappings** – create or version the mapping artifacts. An unchanged mapping is skipped, because the mapping API creates a new version per request.
+2. **Save the mappings** – create or version the mapping artifacts. An unchanged mapping is skipped, so a save sends a request only for the mappings that changed.
 
 Phase 2, per session:
 
