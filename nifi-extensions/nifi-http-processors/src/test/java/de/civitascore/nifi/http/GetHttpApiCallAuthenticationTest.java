@@ -712,6 +712,24 @@ class GetHttpApiCallAuthenticationTest {
   }
 
   @ParameterizedTest
+  @CsvSource({"HEADER, x-cursor", "QUERY, limit"})
+  void validate_withAnApiTokenNameThatTheCursorPaginationSends_isInvalid(
+      ParameterLocation location, String name) throws InitializationException {
+    TestRunner runner = runner(HTTPS_API);
+    runner.setProperty(
+        GetHttpApiCall.API_CALL,
+        "{\"name\": \"Stations\", \"path\": \"/stations\", \"pagination\": {\"type\":"
+            + " \"CURSOR\", \"cursorPath\": \"$.next\", \"cursorParameter\": \"X-Cursor\","
+            + " \"cursorIn\": \"HEADER\", \"limitParameter\": \"limit\", \"limit\": 2}}");
+    apiToken(runner, name, "secret", location);
+
+    Collection<ValidationResult> results = invalid(runner);
+
+    assertEquals(1, results.size(), results::toString);
+    assertEquals("API Token Name", results.iterator().next().getSubject());
+  }
+
+  @ParameterizedTest
   @CsvSource({"QUERY, Key", "QUERY, X-Api-Key", "HEADER, key", "HEADER, page"})
   void validate_withAnApiTokenNameThatDiffersInCaseOrPlace_isValid(
       ParameterLocation location, String name) throws InitializationException {

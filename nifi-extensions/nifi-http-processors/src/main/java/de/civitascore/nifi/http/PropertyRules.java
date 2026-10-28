@@ -87,11 +87,12 @@ final class PropertyRules {
                   GetHttpApiCall.API_TOKEN_VALUE.getDisplayName(),
                   ApiCallParser.FIELD_VALUE_VIOLATION));
         }
-        if (apiCall.stream()
-            .flatMap(call -> call.headers().stream())
-            .anyMatch(header -> header.name().equalsIgnoreCase(name))) {
+        if (sends(apiCall, name, ParameterLocation.HEADER)) {
           results.add(
-              result(nameSubject, "must differ from the name of each header of the API call"));
+              result(
+                  nameSubject,
+                  "must differ from the name of each header of the API call, pagination"
+                      + " included"));
         }
       }
       case QUERY -> {

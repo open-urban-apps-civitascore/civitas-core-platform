@@ -293,7 +293,7 @@ The processor checks the rules of the portal backend again. A header token or a 
 only printable ISO-8859-1 characters, spaces and tabs. The name of a header token is a valid header
 name and not one that the HTTP client sets (`Connection`, `Content-Length`, `Expect`, `Host`,
 `Upgrade`); `Authorization`, `Proxy-Authorization` and `Cookie` are allowed. It differs, ignoring
-case, from each header of the API call. The name of a query token differs from each query parameter
+case, from each header of the API call and of its pagination. The name of a query token differs from each query parameter
 of the API call and of its pagination; the comparison is case-sensitive. An explanation never names
 a value.
 
