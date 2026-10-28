@@ -94,6 +94,17 @@ sealed interface ApiCallOutcome {
           ErrorKind.FATAL, status, apiCall + ": " + page + " repeats " + earlierPage);
     }
 
+    /**
+     * A page that would send the same request as an earlier page of the run, so that the API would
+     * repeat its pages without end.
+     */
+    static Failure ofRepeatedRequest(String apiCall, int status, String page, String earlierPage) {
+      return new Failure(
+          ErrorKind.FATAL,
+          status,
+          apiCall + ": " + page + " would send the same request as " + earlierPage);
+    }
+
     /** A run that NiFi stopped before this request. */
     static Failure ofStopped(String request) {
       return new Failure(

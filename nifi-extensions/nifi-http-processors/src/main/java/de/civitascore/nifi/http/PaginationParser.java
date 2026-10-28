@@ -20,8 +20,14 @@ import java.util.OptionalInt;
 final class PaginationParser {
 
   private static final String PAGE_NUMBER = "PAGE_NUMBER";
+  private static final String CURSOR = "CURSOR";
   private static final String PAGE_PARAMETER = "pagination.pageParameter";
   private static final String PAGE_SIZE_PARAMETER = "pagination.pageSizeParameter";
+  private static final String CURSOR_PATH = "pagination.cursorPath";
+  private static final String CURSOR_PARAMETER = "pagination.cursorParameter";
+  private static final String CURSOR_IN = "pagination.cursorIn";
+  private static final String LIMIT_PARAMETER = "pagination.limitParameter";
+  private static final String LIMIT = "pagination.limit";
 
   private PaginationParser() {}
 
@@ -44,8 +50,9 @@ final class PaginationParser {
     PaginationNames names = new PaginationNames(queryParameters, headers);
     return switch (pagination.type()) {
       case PAGE_NUMBER -> pageNumber(pagination, names, violations);
+      case CURSOR -> cursor(pagination, names, violations);
       case null, default -> {
-        violations.add("pagination.type must be " + PAGE_NUMBER);
+        violations.add("pagination.type must be " + PAGE_NUMBER + " or " + CURSOR);
         yield Optional.empty();
       }
     };
@@ -73,6 +80,79 @@ final class PaginationParser {
                 : OptionalInt.of(pagination.endPage())));
   }
 
+  private static Optional<Pagination> cursor(
+      JsonPagination pagination, PaginationNames names, List<String> violations) {
+    int before = violations.size();
+    Optional<JsonPath> cursorPath = jsonPath(pagination.cursorPath(), CURSOR_PATH, violations);
+    boolean hasCursorParameter =
+        ApiCallParser.notBlank(pagination.cursorParameter(), CURSOR_PARAMETER, violations);
+    Optional<ParameterLocation> cursorIn = location(pagination.cursorIn(), violations);
+    if (hasCursorParameter && cursorIn.isPresent()) {
+      if (cursorIn.get() == ParameterLocation.HEADER) {
+        ApiCallParser.checkHeaderName(pagination.cursorParameter(), CURSOR_PARAMETER, violations);
+      }
+      names.add(CURSOR_PARAMETER, pagination.cursorParameter(), cursorIn.get());
+    }
+    String limitParameter = blankToNull(pagination.limitParameter());
+    if (limitParameter != null) {
+      names.add(LIMIT_PARAMETER, limitParameter, ParameterLocation.QUERY);
+    }
+    Optional<Limit> limit = limit(limitParameter, pagination.limit(), violations);
+    names.check(violations);
+    if (violations.size() > before) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        new CursorPagination(
+            cursorPath.orElseThrow(), pagination.cursorParameter(), cursorIn.orElseThrow(), limit));
+  }
+
+  private static Optional<JsonPath> jsonPath(String text, String keyPath, List<String> violations) {
+    if (!ApiCallParser.notBlank(text, keyPath, violations)) {
+      return Optional.empty();
+    }
+    Optional<JsonPath> path = JsonPath.parse(text);
+    if (path.isEmpty()) {
+      violations.add(keyPath + " must start with $ and hold only member names and array indexes");
+    }
+    return path;
+  }
+
+  private static Optional<ParameterLocation> location(String text, List<String> violations) {
+    for (ParameterLocation location : ParameterLocation.values()) {
+      if (location.name().equals(text)) {
+        return Optional.of(location);
+      }
+    }
+    violations.add(CURSOR_IN + " must be QUERY or HEADER");
+    return Optional.empty();
+  }
+
+  /** A limit and its parameter come together, or the request sends no limit. */
+  private static Optional<Limit> limit(
+      String limitParameter, Integer limit, List<String> violations) {
+    if (limit == null) {
+      if (limitParameter != null) {
+        violations.add(LIMIT + " is required with " + LIMIT_PARAMETER);
+      }
+      return Optional.empty();
+    }
+    int before = violations.size();
+    if (limitParameter == null) {
+      violations.add(LIMIT_PARAMETER + " is required with " + LIMIT);
+    }
+    if (limit <= 0) {
+      violations.add(LIMIT + " must be at least 1");
+    }
+    return violations.size() > before
+        ? Optional.empty()
+        : Optional.of(new Limit(limitParameter, limit));
+  }
+
+  private static String blankToNull(String text) {
+    return text == null || text.isBlank() ? null : text;
+  }
+
   private static void addRequiredQueryName(
       String name, String keyPath, PaginationNames names, List<String> violations) {
     if (ApiCallParser.notBlank(name, keyPath, violations)) {
@@ -93,12 +173,22 @@ final class PaginationParser {
     }
   }
 
-  /** The JSON shape, before the rules are checked. */
+  /**
+   * The JSON shape of each type, before the rules are checked. A type ignores the keys of another
+   * type.
+   *
+   * @param cursorIn a text, so that a wrong value is one violation among the others
+   */
   record JsonPagination(
       String type,
       String pageParameter,
       String pageSizeParameter,
       Integer pageSize,
       Integer startPage,
-      Integer endPage) {}
+      Integer endPage,
+      String cursorPath,
+      String cursorParameter,
+      String cursorIn,
+      String limitParameter,
+      Integer limit) {}
 }

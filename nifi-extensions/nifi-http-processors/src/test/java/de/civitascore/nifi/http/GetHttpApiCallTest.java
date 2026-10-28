@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
@@ -44,6 +45,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -67,6 +69,21 @@ class GetHttpApiCallTest {
   private static final String FULL_PAGE = "[{\"stationid\":\"a1\"},{\"stationid\":\"a2\"}]";
 
   private static final String SHORT_PAGE = "[{\"stationid\":\"a3\"}]";
+
+  /** A response of a cursor pagination is one record; it holds the records under {@code data}. */
+  private static final String CURSOR_SCHEMA =
+      """
+      {"$schema": "https://json-schema.org/draft/2020-12/schema",
+       "type": "object",
+       "required": ["data"],
+       "properties": {"data": {"type": "array",
+                               "items": {"type": "object", "required": ["stationid"]}}}}""";
+
+  private static final String CURSOR_IN_QUERY =
+      "\"cursorParameter\": \"cursor\", \"cursorIn\": \"QUERY\"";
+
+  private static final String CURSOR_IN_HEADER =
+      "\"cursorParameter\": \"X-Cursor\", \"cursorIn\": \"HEADER\"";
 
   @TempDir static Path keys;
 
@@ -1230,6 +1247,344 @@ class GetHttpApiCallTest {
   }
 
   @Test
+  void onTrigger_withCursorInTheQuery_readsEachPageUntilAResponseWithoutACursor()
+      throws InitializationException {
+    String first = cursorPage("a1", "\"abc123\"");
+    String second = cursorPage("a2", "\"def456\"");
+    String last = cursorPage("a3", null);
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(first), Response.json(second), Response.json(last))) {
+      TestRunner runner =
+          cursorRunner(
+              endpoint,
+              "\"cursorParameter\": \"cursor\", \"cursorIn\": \"QUERY\","
+                  + " \"limitParameter\": \"limit\", \"limit\": 20");
+
+      runner.run();
+
+      assertEquals(
+          List.of("limit=20", "limit=20&cursor=abc123", "limit=20&cursor=def456"),
+          rawQueries(endpoint));
+      assertPages(runner, "1", "2", "3");
+      List<MockFlowFile> pages = runner.getFlowFilesForRelationship(GetHttpApiCall.SUCCESS);
+      pages.get(0).assertContentEquals(first);
+      pages.get(2).assertContentEquals(last);
+    }
+  }
+
+  @Test
+  void onTrigger_withCursorInAHeader_sendsTheCursorAsAHeaderAndNotInTheQuery()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(cursorPage("a1", "\"abc123\"")),
+            Response.json(cursorPage("a2", "\"def456\"")),
+            Response.json(cursorPage("a3", null)))) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, CURSOR_SCHEMA);
+      runner.setProperty(
+          GetHttpApiCall.API_CALL,
+          """
+          {"name": "Stations", "path": "/stations",
+           "queryParameters": [{"name": "status", "value": "active"}],
+           "headers": [{"name": "Accept", "value": "application/json"}],
+           "pagination": {"type": "CURSOR", "cursorPath": "$.next_cursor",
+                          "cursorParameter": "X-Cursor", "cursorIn": "HEADER",
+                          "limitParameter": "limit", "limit": 2}}""");
+
+      runner.run();
+
+      assertEquals(
+          List.of("status=active&limit=2", "status=active&limit=2", "status=active&limit=2"),
+          rawQueries(endpoint));
+      List<String> cursors =
+          endpoint.requests().stream()
+              .map(request -> String.valueOf(request.headers().getFirst("X-Cursor")))
+              .toList();
+      assertEquals(List.of("null", "abc123", "def456"), cursors);
+      assertTrue(
+          endpoint.requests().stream()
+              .allMatch(
+                  request -> "application/json".equals(request.headers().getFirst("Accept"))));
+      assertPages(runner, "1", "2", "3");
+    }
+  }
+
+  @Test
+  void onTrigger_withCursorPaginationWithoutALimit_sendsNoLimitParameter()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(cursorPage("a1", "\"abc123\"")), Response.json(cursorPage("a2", null)))) {
+      TestRunner runner = cursorRunner(endpoint, CURSOR_IN_QUERY);
+
+      runner.run();
+
+      assertEquals(Arrays.asList(null, "cursor=abc123"), rawQueries(endpoint));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"absent", "null", "\"\""})
+  void onTrigger_whenTheCursorIsAbsentNullOrEmpty_routesThatResponseToSuccessAndEndsTheRun(
+      String cursor) throws InitializationException {
+    String last = cursorPage("a2", "absent".equals(cursor) ? null : cursor);
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(cursorPage("a1", "\"abc123\"")), Response.json(last))) {
+      TestRunner runner = cursorRunner(endpoint, CURSOR_IN_QUERY);
+
+      runner.run();
+
+      assertEquals(2, endpoint.requests().size());
+      assertPages(runner, "1", "2");
+      runner.getFlowFilesForRelationship(GetHttpApiCall.SUCCESS).get(1).assertContentEquals(last);
+    }
+  }
+
+  @Test
+  void onTrigger_withANumberCursor_sendsItsDigits() throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(cursorPage("a1", "12345678901234567890")),
+            Response.json(cursorPage("a2", null)))) {
+      TestRunner runner = cursorRunner(endpoint, CURSOR_IN_QUERY);
+
+      runner.run();
+
+      assertEquals("cursor=12345678901234567890", rawQueries(endpoint).get(1));
+    }
+  }
+
+  @Test
+  void onTrigger_withReservedCharactersInACursor_percentEncodesThem()
+      throws InitializationException {
+    String cursor = "a b&c=d+e/f?é";
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(cursorPage("a1", "\"" + cursor + "\"")),
+            Response.json(cursorPage("a2", null)))) {
+      TestRunner runner = cursorRunner(endpoint, CURSOR_IN_QUERY);
+
+      runner.run();
+
+      String query = rawQueries(endpoint).get(1);
+      assertEquals("cursor=a%20b%26c%3Dd%2Be%2Ff%3F%C3%A9", query);
+      assertEquals(
+          cursor, URLDecoder.decode(query.substring("cursor=".length()), StandardCharsets.UTF_8));
+    }
+  }
+
+  @Test
+  void onTrigger_whenACursorRepeats_routesTheRunToStopWithoutItsPages()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(cursorPage("a1", "\"c1\"")),
+            Response.json(cursorPage("a2", "\"c2\"")),
+            Response.json(cursorPage("a3", "\"c1\"")))) {
+      TestRunner runner = cursorRunner(endpoint, CURSOR_IN_QUERY);
+
+      runner.run();
+
+      assertEquals(3, endpoint.requests().size());
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": request 4 would send the same request as request 2");
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource(
+      delimiter = '|',
+      quoteCharacter = '\'',
+      value = {"'{\"c\": \"v-61b0\"}' | object", "'[\"v-61b0\"]' | array", "true | boolean"})
+  void onTrigger_whenTheCursorIsNotAStringOrANumber_routesTheRunToStop(String cursor, String type)
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, cursorPage("a1", cursor))) {
+      TestRunner runner = cursorRunner(endpoint, CURSOR_IN_QUERY);
+
+      runner.run();
+
+      assertEquals(1, endpoint.requests().size());
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": request 1: the value at $.next_cursor is a JSON "
+              + type
+              + ", not a string or a number");
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource(
+      delimiter = '|',
+      quoteCharacter = '\'',
+      value = {
+        "'[{\"data\": [], \"next_cursor\": \"c\"}]' | request 2 is a JSON array, not an object",
+        "42                                          | request 2 is a JSON number, not an object",
+        "'<html>val-1f3e</html>'                     | request 2: the response is not JSON"
+      })
+  void onTrigger_whenACursorResponseIsNotAJsonObject_routesTheRunToStop(String body, String cause)
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(cursorPage("a1", "\"abc123\"")), Response.json(body))) {
+      TestRunner runner = cursorRunner(endpoint, CURSOR_IN_QUERY);
+
+      runner.run();
+
+      assertRouted(runner, GetHttpApiCall.STOP, 200, "API call \"Stations\": " + cause);
+    }
+  }
+
+  @Test
+  void onTrigger_whenAHeaderCursorHoldsALineBreak_routesTheRunToStopWithoutTheCursor()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answering(200, cursorPage("a1", "\"cur-9d2e\\r\\nX-Injected: cur-9d2e\""))) {
+      TestRunner runner = cursorRunner(endpoint, CURSOR_IN_HEADER);
+
+      runner.run();
+
+      assertEquals(1, endpoint.requests().size());
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": request 1: the value at $.next_cursor holds a character that a"
+              + " header value must not hold");
+      assertFalse(logged(runner.getLogger()).toString().contains("cur-9d2e"));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {400, 404})
+  void onTrigger_whenACursorRequestAfterTheFirstAnswers400Or404_routesTheRunToStop(int status)
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(cursorPage("a1", "\"abc123\"")), Response.status(status))) {
+      TestRunner runner = cursorRunner(endpoint, CURSOR_IN_QUERY);
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          status,
+          "API call \"Stations\": GET /stations request 2 failed with status " + status);
+    }
+  }
+
+  static List<Response> responsesWithoutABody() {
+    return List.of(new Response(200, Map.of(), null), new Response(204, Map.of(), null));
+  }
+
+  @ParameterizedTest
+  @MethodSource("responsesWithoutABody")
+  void onTrigger_whenACursorResponseHasNoBody_endsTheRunWithTheEarlierPages(Response empty)
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(Response.json(cursorPage("a1", "\"abc123\"")), empty)) {
+      TestRunner runner = cursorRunner(endpoint, CURSOR_IN_QUERY);
+
+      runner.run();
+
+      assertEquals(2, endpoint.requests().size());
+      assertPages(runner, "1");
+    }
+  }
+
+  @Test
+  void onTrigger_whenACursorRequestIsTemporarilyUnavailable_routesTheRunToFailureWithoutItsPages()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(cursorPage("a1", "\"abc123\"")), Response.status(503))) {
+      TestRunner runner = cursorRunner(endpoint, CURSOR_IN_QUERY);
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.FAILURE,
+          503,
+          "API call \"Stations\": GET /stations request 2 failed with status 503");
+    }
+  }
+
+  @Test
+  void onTrigger_whenACursorResponseViolatesTheRecordSchema_routesTheRunToStop()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(cursorPage("a1", "\"abc123\"")),
+            Response.json("{\"next_cursor\": \"def456\"}"))) {
+      TestRunner runner = cursorRunner(endpoint, CURSOR_IN_QUERY);
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": request 2: 1 of 1 records violate the Data structure:"
+              + " record 0: required data");
+    }
+  }
+
+  static Stream<Arguments> runsWithAUniqueCursor() {
+    String cursor = "\"cur-7c1d\"";
+    return Stream.of(
+        Arguments.of(
+            CURSOR_IN_QUERY,
+            List.of(
+                Response.json(cursorPage("a1", cursor)), Response.json(cursorPage("a2", null)))),
+        Arguments.of(
+            CURSOR_IN_HEADER,
+            List.of(Response.json(cursorPage("a1", cursor)), Response.status(404))),
+        Arguments.of(
+            CURSOR_IN_QUERY,
+            List.of(
+                Response.json(cursorPage("a1", cursor)),
+                Response.json(cursorPage("a2", "\"x\"")),
+                Response.json(cursorPage("a3", cursor)))),
+        Arguments.of(
+            CURSOR_IN_HEADER,
+            List.of(
+                Response.json(cursorPage("a1", cursor)),
+                Response.json(cursorPage("a2", "\"cur-7c1d\\n\"")))));
+  }
+
+  @ParameterizedTest
+  @MethodSource("runsWithAUniqueCursor")
+  void onTrigger_withCursorPagination_keepsTheCursorOutOfLogsAttributesAndCauses(
+      String cursorFields, List<Response> responses) throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answeringInTurn(responses.toArray(Response[]::new))) {
+      TestRunner runner = cursorRunner(endpoint, cursorFields);
+
+      runner.run();
+
+      List<String> visible = new ArrayList<>(logged(runner.getLogger()));
+      for (Relationship relationship :
+          List.of(GetHttpApiCall.SUCCESS, GetHttpApiCall.STOP, GetHttpApiCall.FAILURE)) {
+        for (MockFlowFile flowFile : runner.getFlowFilesForRelationship(relationship)) {
+          visible.addAll(flowFile.getAttributes().values());
+        }
+      }
+      assertFalse(visible.isEmpty());
+      for (String text : visible) {
+        assertFalse(text.contains("cur-7c1d"), text);
+      }
+    }
+  }
+
+  @Test
   void basicAuthPassword_isSensitive() {
     assertTrue(GetHttpApiCall.BASIC_AUTH_PASSWORD.isSensitive());
   }
@@ -1436,6 +1791,93 @@ class GetHttpApiCallTest {
     assertEquals(3, invalid(runner).size(), invalid(runner)::toString);
   }
 
+  @ParameterizedTest(name = "{1}: {0}")
+  @CsvSource(
+      delimiter = '|',
+      quoteCharacter = '\'',
+      value = {
+        "\"cursorParameter\":\"c\",\"cursorIn\":\"QUERY\"                                   | pagination.cursorPath",
+        "\"cursorPath\":\" \",\"cursorParameter\":\"c\",\"cursorIn\":\"QUERY\"              | pagination.cursorPath",
+        "\"cursorPath\":\"$..v-61b0\",\"cursorParameter\":\"c\",\"cursorIn\":\"QUERY\"      | pagination.cursorPath",
+        "\"cursorPath\":\"$.items[?(@.v-61b0)]\",\"cursorParameter\":\"c\",\"cursorIn\":\"QUERY\" | pagination.cursorPath",
+        "\"cursorPath\":\"$.c\",\"cursorIn\":\"QUERY\"                                      | pagination.cursorParameter",
+        "\"cursorPath\":\"$.c\",\"cursorParameter\":\" \",\"cursorIn\":\"QUERY\"            | pagination.cursorParameter",
+        "\"cursorPath\":\"$.c\",\"cursorParameter\":\"c\"                                   | pagination.cursorIn",
+        "\"cursorPath\":\"$.c\",\"cursorParameter\":\"c\",\"cursorIn\":\"v-61b0\"           | pagination.cursorIn",
+        "\"cursorPath\":\"$.c\",\"cursorParameter\":\"Authorization\",\"cursorIn\":\"HEADER\" | pagination.cursorParameter",
+        "\"cursorPath\":\"$.c\",\"cursorParameter\":\"host\",\"cursorIn\":\"HEADER\"        | pagination.cursorParameter",
+        "\"cursorPath\":\"$.c\",\"cursorParameter\":\"X v-61b0\",\"cursorIn\":\"HEADER\"    | pagination.cursorParameter",
+        "\"cursorPath\":\"$.c\",\"cursorParameter\":\"x-v-61b0\",\"cursorIn\":\"HEADER\"    | pagination.cursorParameter",
+        "\"cursorPath\":\"$.c\",\"cursorParameter\":\"v-61b0\",\"cursorIn\":\"QUERY\"       | pagination.cursorParameter",
+        "\"cursorPath\":\"$.c\",\"cursorParameter\":\"c\",\"cursorIn\":\"QUERY\",\"limitParameter\":\"limit\" | pagination.limit",
+        "\"cursorPath\":\"$.c\",\"cursorParameter\":\"c\",\"cursorIn\":\"QUERY\",\"limit\":20 | pagination.limitParameter",
+        "\"cursorPath\":\"$.c\",\"cursorParameter\":\"c\",\"cursorIn\":\"QUERY\",\"limitParameter\":\"limit\",\"limit\":0 | pagination.limit",
+        "\"cursorPath\":\"$.c\",\"cursorParameter\":\"c\",\"cursorIn\":\"QUERY\",\"limitParameter\":\"v-61b0\",\"limit\":20 | pagination.limitParameter",
+        "\"cursorPath\":\"$.c\",\"cursorParameter\":\"c\",\"cursorIn\":\"QUERY\",\"limitParameter\":\"c\",\"limit\":20 | pagination.limitParameter",
+        "\"cursorPath\":\"$.c\",\"cursorParameter\":\"c\",\"cursorIn\":\"QUERY\",\"limit\":\"v-61b0\" | pagination.limit"
+      })
+  void validate_withACursorPaginationThatBreaksARule_namesTheKeyPathAndNoValue(
+      String paginationFields, String keyPath) throws InitializationException {
+    TestRunner runner = runner("http://localhost:8080");
+    runner.setProperty(
+        GetHttpApiCall.API_CALL,
+        "{\"name\":\"n\",\"path\":\"/s\","
+            + "\"queryParameters\":[{\"name\":\"v-61b0\",\"value\":\"x\"}],"
+            + "\"headers\":[{\"name\":\"X-V-61B0\",\"value\":\"x\"}],"
+            + "\"pagination\":{\"type\":\"CURSOR\","
+            + paginationFields
+            + "}}");
+
+    Collection<ValidationResult> results = invalid(runner);
+
+    assertTrue(
+        results.stream()
+            .anyMatch(
+                r ->
+                    "API Call".equals(r.getSubject())
+                        && r.getExplanation().startsWith(keyPath + " ")),
+        results::toString);
+    assertFalse(results.toString().contains("v-61b0"), results::toString);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "\"cursorParameter\": \"cursor\", \"cursorIn\": \"QUERY\", \"limitParameter\": null,"
+            + " \"limit\": null",
+        "\"cursorParameter\": \"X-Cursor\", \"cursorIn\": \"HEADER\", \"limitParameter\": \"limit\","
+            + " \"limit\": 100",
+        "\"cursorParameter\": \"cursor\", \"cursorIn\": \"QUERY\", \"limitParameter\": \" \""
+      })
+  void validate_withACursorPaginationInTheFormOfThePortal_isValid(String fields)
+      throws InitializationException {
+    TestRunner runner = runner("http://localhost:8080");
+    runner.setProperty(
+        GetHttpApiCall.API_CALL,
+        "{\"name\": \"Stations\", \"method\": \"GET\", \"path\": \"/stations\","
+            + " \"queryParameters\": [{\"name\": \"Cursor\", \"value\": \"x\"}], \"headers\": [],"
+            + " \"pagination\": {\"type\": \"CURSOR\", \"cursorPath\": \"$['next cursor']\", "
+            + fields
+            + "}}");
+
+    runner.assertValid();
+  }
+
+  @Test
+  void validate_withACursorHeaderNamedLikeAQueryParameter_isValid() throws InitializationException {
+    TestRunner runner = runner("http://localhost:8080");
+    runner.setProperty(
+        GetHttpApiCall.API_CALL,
+        """
+        {"name": "Stations", "path": "/stations",
+         "queryParameters": [{"name": "cursor", "value": "x"}],
+         "pagination": {"type": "CURSOR", "cursorPath": "$.next_cursor",
+                        "cursorParameter": "cursor", "cursorIn": "HEADER",
+                        "limitParameter": "limit", "limit": 5}}""");
+
+    runner.assertValid();
+  }
+
   private static void assertStartFails(ApiEndpoint endpoint, String schema)
       throws InitializationException {
     TestRunner runner = runner(endpoint.baseUrl());
@@ -1466,6 +1908,33 @@ class GetHttpApiCallTest {
             + furtherFields
             + "}}");
     return runner;
+  }
+
+  /** A runner for a cursor pagination at {@code $.next_cursor} with the further fields. */
+  private static TestRunner cursorRunner(ApiEndpoint endpoint, String furtherFields)
+      throws InitializationException {
+    TestRunner runner = runner(endpoint.baseUrl());
+    runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, CURSOR_SCHEMA);
+    runner.setProperty(
+        GetHttpApiCall.API_CALL,
+        "{\"name\": \"Stations\", \"path\": \"/stations\", \"pagination\": {\"type\":"
+            + " \"CURSOR\", \"cursorPath\": \"$.next_cursor\", "
+            + furtherFields
+            + "}}");
+    return runner;
+  }
+
+  /**
+   * A response of a cursor pagination with one record.
+   *
+   * @param cursor the JSON of the cursor, or null for a response without one
+   */
+  private static String cursorPage(String stationId, String cursor) {
+    return "{\"data\": [{\"stationid\": \""
+        + stationId
+        + "\"}]"
+        + (cursor == null ? "" : ", \"next_cursor\": " + cursor)
+        + "}";
   }
 
   /** A page of page size 2 with records of its own, so that no two pages have the same body. */

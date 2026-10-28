@@ -63,7 +63,9 @@ import org.apache.nifi.web.client.provider.api.WebClientServiceProvider;
       description = "The path of the API call, without the query."),
   @WritesAttribute(
       attribute = GetHttpApiCall.PAGE,
-      description = "The page number, on success of an API call with pagination."),
+      description =
+          "The page number, or with cursor pagination the number of the request in the run from"
+              + " 1, on success of an API call with pagination."),
   @WritesAttribute(
       attribute = GetHttpApiCall.ERROR_STATUS,
       description = "The status of the response, or 0 when no response came, on stop and failure."),
@@ -172,7 +174,8 @@ public class GetHttpApiCall extends AbstractProcessor {
           .description(
               "The JSON Schema of the Data structure, with its imports inlined. Each record of a"
                   + " response must agree with it: each element of a JSON array, or, without"
-                  + " pagination, a JSON object as one record. A $ref resolves only inside the"
+                  + " pagination and with cursor pagination, a JSON object as one record. A $ref"
+                  + " resolves only inside the"
                   + " schema or to a GeoJSON geometry of https://geojson.org/schema/, which the NAR"
                   + " holds. The processor does not start with a schema that it cannot compile.")
           .required(true)
@@ -187,7 +190,8 @@ public class GetHttpApiCall extends AbstractProcessor {
               "The maximum number of pages in one run of an API call with pagination. The limit"
                   + " applies also when the API call has an end page. A run that reads this"
                   + " number of pages and meets no stop condition is a fatal error. Thus an API"
-                  + " that ignores the page parameter and changes its response on each request"
+                  + " that ignores the page parameter or the cursor and changes its response on"
+                  + " each request"
                   + " cannot make the processor send requests without end.")
           .required(true)
           .defaultValue("1000")
@@ -210,10 +214,13 @@ public class GetHttpApiCall extends AbstractProcessor {
               "One empty FlowFile for each run with an error that needs a change to the"
                   + " configuration or to the Data structure: 3xx, 4xx except 408 and 429, a"
                   + " request the web client refuses, a response that is not JSON or does not"
-                  + " agree with the Record Schema, a page that is not a JSON array, a page that"
-                  + " repeats an earlier page of the run, and a run that reads Max Pages pages"
-                  + " and meets no stop condition. With pagination, a 400 or 404 on a page after"
-                  + " the first ends the run and is no error.")
+                  + " agree with the Record Schema, a page of the wrong JSON type for its"
+                  + " pagination, a cursor that is not a string or a number or that holds a"
+                  + " character a header cannot carry, a page that repeats an earlier page or"
+                  + " would send the same request as an earlier page of the run, and a run that"
+                  + " reads Max Pages pages and meets no stop condition. With page-number"
+                  + " pagination, a 400 or 404 on a page after the first ends the run and is no"
+                  + " error.")
           .build();
 
   static final Relationship FAILURE =

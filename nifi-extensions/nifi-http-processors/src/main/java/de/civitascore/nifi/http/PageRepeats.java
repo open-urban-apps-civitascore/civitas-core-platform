@@ -9,24 +9,27 @@
  */
 package de.civitascore.nifi.http;
 
+import de.civitascore.nifi.http.ApiCall.Parameter;
 import java.io.InputStream;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
- * The SHA-256 of each page body of one run, to find a page that repeats an earlier page. The page
- * loop reads one body at a time: it reads the stream from {@link #hashing} to its end, then asks
- * {@link #earlierWithSameBody}.
+ * The pages of one run, to find a page that repeats an earlier page: by the SHA-256 of its body, or
+ * by what its request adds to the API call. The page loop reads one body at a time: it reads the
+ * stream from {@link #hashing} to its end, then asks {@link #earlierWithSameBody}.
  */
-final class PageBodies {
+final class PageRepeats {
 
   private final Map<String, Page> pagesByHash = new HashMap<>();
+  private final Map<List<List<Parameter>>, Page> pagesByRequest = new HashMap<>();
   private Supplier<String> currentHash;
 
   /** The body as a stream that hashes what the caller reads from it. */
@@ -48,5 +51,16 @@ final class PageBodies {
    */
   Optional<Page> earlierWithSameBody(Page page) {
     return Optional.ofNullable(pagesByHash.putIfAbsent(currentHash.get(), page));
+  }
+
+  /**
+   * Records the page under the query parameters and headers that its request adds. A page with the
+   * same request as an earlier page makes the API repeat its pages without end.
+   *
+   * @return the earlier page of the run that adds the same
+   */
+  Optional<Page> earlierWithSameRequest(Page page) {
+    return Optional.ofNullable(
+        pagesByRequest.putIfAbsent(List.of(page.queryParameters(), page.headers()), page));
   }
 }

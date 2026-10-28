@@ -78,12 +78,13 @@ final class PageLoop {
   private RunResult readPages(ProcessSession session, Authentication authentication) {
     Pagination pagination = apiCall.pagination();
     List<FlowFile> pages = new ArrayList<>();
-    PageBodies bodies = new PageBodies();
+    PageRepeats repeats = new PageRepeats();
     Page page = pagination.first();
+    repeats.earlierWithSameRequest(page);
     for (int read = 1; ; read++) {
       ApiCallOutcome outcome = client.send(apiCall, page, authentication);
       Optional<Page> next;
-      switch (accept(session, page, outcome, pages, bodies)) {
+      switch (accept(session, page, outcome, pages, repeats)) {
         case PageRead.Failed failed -> {
           return new RunResult.Failed(pages, failed.failure());
         }
@@ -93,6 +94,13 @@ final class PageLoop {
       }
       if (next.isEmpty()) {
         return new RunResult.Complete(pages);
+      }
+      Optional<Page> earlier = repeats.earlierWithSameRequest(next.get());
+      if (earlier.isPresent()) {
+        return new RunResult.Failed(
+            pages,
+            ApiCallOutcome.Failure.ofRepeatedRequest(
+                apiCall.label(), outcome.status(), title(next.get()), title(earlier.get())));
       }
       if (read == maxPages) {
         return new RunResult.Failed(
@@ -115,7 +123,7 @@ final class PageLoop {
       Page page,
       ApiCallOutcome outcome,
       List<FlowFile> pages,
-      PageBodies bodies) {
+      PageRepeats repeats) {
     return switch (outcome) {
       case ApiCallOutcome.Failure failure -> {
         if (apiCall.pagination().isPastTheEnd(page, failure.status())) {
@@ -135,7 +143,7 @@ final class PageLoop {
       }
       case ApiCallOutcome.Body body -> {
         try (body) {
-          yield acceptBody(session, page, body, pages, bodies);
+          yield acceptBody(session, page, body, pages, repeats);
         }
       }
     };
@@ -147,15 +155,15 @@ final class PageLoop {
       Page page,
       ApiCallOutcome.Body body,
       List<FlowFile> pages,
-      PageBodies bodies) {
+      PageRepeats repeats) {
     FlowFile flowFile = session.create();
     try {
-      flowFile = session.importFrom(bodies.hashing(body.content()), flowFile);
+      flowFile = session.importFrom(repeats.hashing(body.content()), flowFile);
     } catch (FlowFileAccessException e) {
       session.remove(flowFile);
       return new PageRead.Failed(ApiCallOutcome.Failure.ofTransport(apiCall.describe(page), e));
     }
-    Optional<Page> earlier = bodies.earlierWithSameBody(page);
+    Optional<Page> earlier = repeats.earlierWithSameBody(page);
     if (earlier.isPresent()) {
       session.remove(flowFile);
       return new PageRead.Failed(
