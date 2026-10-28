@@ -1,0 +1,62 @@
+meta {
+  name: 6h. Create Pipeline (offset-count)
+  type: http
+  seq: 26
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{httpSagaDataSetId}}
+}
+
+body:json {
+  {
+    "name": "HTTP Saga Pipeline offset-count",
+    "description": "Reads the API call offset-count into the FROST Data sink",
+    "dataSourceIds": ["{{httpSagaDataSourceId}}"],
+    "dataSinkIds": ["{{httpSagaOffsetCountSinkId}}"],
+    "model": {
+      "nodes": [
+        { "id": "start", "kind": "start", "label": "Start" },
+        { "id": "cron", "kind": "cron", "label": "CRON", "cronExpression": "0/10 * * * * ?" },
+        {
+          "id": "source",
+          "kind": "source",
+          "label": "HTTP/REST Source",
+          "sourceRef": "{{httpSagaDataSourceLatestUrn}}",
+          "apiCallName": "offset-count"
+        },
+        {
+          "id": "sink",
+          "kind": "sink",
+          "label": "Sensor Data Storage",
+          "sinkRef": "{{httpSagaOffsetCountSinkConfigurationUrn}}"
+        },
+        { "id": "end", "kind": "end", "label": "End" }
+      ],
+      "edges": [
+        { "id": "e1", "source": "start", "target": "cron" },
+        { "id": "e2", "source": "cron", "target": "source" },
+        { "id": "e3", "source": "source", "target": "sink" },
+        { "id": "e4", "source": "sink", "target": "end" }
+      ]
+    }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('httpSagaOffsetCountPipelineId', res.body.id);
+  }
+}
+
+tests {
+  test("Pipeline created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

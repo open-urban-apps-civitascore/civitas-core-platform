@@ -1,7 +1,7 @@
 meta {
   name: 9a. Verify the runtime states of the Pipelines
   type: http
-  seq: 20
+  seq: 30
 }
 
 get {
@@ -71,6 +71,26 @@ tests {
     expect(statusOf(bru.getVar('httpSagaPagesPipelineId')).state).to.equal('OK');
   });
 
+  test("The cursor-query Pipeline is OK", function() {
+    expect(statusOf(bru.getVar('httpSagaCursorQueryPipelineId')).state).to.equal('OK');
+  });
+
+  test("The cursor-header Pipeline is OK", function() {
+    expect(statusOf(bru.getVar('httpSagaCursorHeaderPipelineId')).state).to.equal('OK');
+  });
+
+  test("The offset-limit Pipeline is OK", function() {
+    expect(statusOf(bru.getVar('httpSagaOffsetLimitPipelineId')).state).to.equal('OK');
+  });
+
+  test("The offset Pipeline is OK", function() {
+    expect(statusOf(bru.getVar('httpSagaOffsetPipelineId')).state).to.equal('OK');
+  });
+
+  test("The offset-count Pipeline is OK on the 404 after its first request", function() {
+    expect(statusOf(bru.getVar('httpSagaOffsetCountPipelineId')).state).to.equal('OK');
+  });
+
   test("The missing Pipeline is STOPPED on the 404 of its API call", function() {
     const status = statusOf(bru.getVar('httpSagaMissingPipelineId'));
     expect(status.state).to.equal('STOPPED');
@@ -91,6 +111,6 @@ tests {
 
 docs {
   Polls the Dataset until the runtime monitor has stopped the `missing` and the `invalid`
-  Pipeline. A stop leaves the Dataset released and the other Pipelines running, so the `things`
-  and the `pages` Pipeline stay `OK`.
+  Pipeline. A stop leaves the Dataset released and the other Pipelines running, so they stay `OK`.
+  A cursor Pipeline that sends its cursor to the wrong place gets a 404 and stops.
 }
