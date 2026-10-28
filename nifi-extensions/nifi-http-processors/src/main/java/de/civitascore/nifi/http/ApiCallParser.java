@@ -71,7 +71,7 @@ final class ApiCallParser {
         parameters(call.queryParameters(), "queryParameters", false, violations);
     List<Parameter> headers = parameters(call.headers(), "headers", true, violations);
     Optional<Pagination> pagination =
-        PaginationParser.parse(call.pagination(), queryParameters, violations);
+        PaginationParser.parse(call.pagination(), queryParameters, headers, violations);
 
     if (!violations.isEmpty()) {
       throw new InvalidApiCallException(violations);
@@ -124,30 +124,33 @@ final class ApiCallParser {
       }
       String value = parameter.value() == null ? "" : parameter.value();
       if (notBlank(parameter.name(), path + ".name", violations) && header) {
-        checkHeader(parameter.name(), value, path, violations);
+        checkHeaderName(parameter.name(), path + ".name", violations);
+        if (!value.chars().allMatch(ApiCallParser::isFieldValueCharacter)) {
+          violations.add(
+              path + ".value must hold only printable ISO-8859-1 characters, spaces and tabs");
+        }
       }
       checked.add(new Parameter(parameter.name(), value));
     }
     return checked;
   }
 
-  private static void checkHeader(String name, String value, String path, List<String> violations) {
+  /**
+   * @param keyPath the key path of the name, which each violation starts with
+   */
+  static void checkHeaderName(String name, String keyPath, List<String> violations) {
     String lowerCase = name.toLowerCase(Locale.ROOT);
     if (CREDENTIAL_HEADERS.contains(lowerCase)) {
-      violations.add(path + ".name must not be Authorization, Proxy-Authorization or Cookie");
+      violations.add(keyPath + " must not be Authorization, Proxy-Authorization or Cookie");
     } else if (CLIENT_HEADERS.contains(lowerCase)) {
-      violations.add(path + ".name names a header the HTTP client sets itself");
+      violations.add(keyPath + " names a header the HTTP client sets itself");
     } else if (!HEADER_NAME.matcher(name).matches()) {
-      violations.add(path + ".name is not a valid header name");
-    }
-    if (!value.chars().allMatch(ApiCallParser::isFieldValueCharacter)) {
-      violations.add(
-          path + ".value must hold only printable ISO-8859-1 characters, spaces and tabs");
+      violations.add(keyPath + " is not a valid header name");
     }
   }
 
   /** The field-value characters of RFC 9110, section 5.5. */
-  private static boolean isFieldValueCharacter(int c) {
+  static boolean isFieldValueCharacter(int c) {
     return c == '\t' || (c >= ' ' && c <= '~') || (c >= 0x80 && c <= 0xFF);
   }
 

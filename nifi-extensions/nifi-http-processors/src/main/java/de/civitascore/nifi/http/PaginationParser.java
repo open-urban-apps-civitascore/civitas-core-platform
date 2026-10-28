@@ -26,24 +26,39 @@ final class PaginationParser {
   private PaginationParser() {}
 
   /**
-   * @param queryParameters the query parameters of the API call, which the parameter names of the
-   *     pagination must not repeat
+   * @param queryParameters the query parameters of the API call, which the query parameter names of
+   *     the pagination must not repeat
+   * @param headers the headers of the API call, which the header names of the pagination must not
+   *     repeat
    * @param violations receives one violation for each broken rule
    * @return {@link SinglePage} when the pagination is absent, empty when it breaks a rule
    */
   static Optional<Pagination> parse(
-      JsonPagination pagination, List<Parameter> queryParameters, List<String> violations) {
+      JsonPagination pagination,
+      List<Parameter> queryParameters,
+      List<Parameter> headers,
+      List<String> violations) {
     if (pagination == null) {
       return Optional.of(new SinglePage());
     }
-    if (!PAGE_NUMBER.equals(pagination.type())) {
-      violations.add("pagination.type must be " + PAGE_NUMBER);
-      return Optional.empty();
-    }
+    PaginationNames names = new PaginationNames(queryParameters, headers);
+    return switch (pagination.type()) {
+      case PAGE_NUMBER -> pageNumber(pagination, names, violations);
+      case null, default -> {
+        violations.add("pagination.type must be " + PAGE_NUMBER);
+        yield Optional.empty();
+      }
+    };
+  }
+
+  private static Optional<Pagination> pageNumber(
+      JsonPagination pagination, PaginationNames names, List<String> violations) {
     int before = violations.size();
-    checkParameterNames(pagination, queryParameters, violations);
+    addRequiredQueryName(pagination.pageParameter(), PAGE_PARAMETER, names, violations);
+    addRequiredQueryName(pagination.pageSizeParameter(), PAGE_SIZE_PARAMETER, names, violations);
+    names.check(violations);
     int startPage = pagination.startPage() == null ? 0 : pagination.startPage();
-    checkNumbers(pagination, startPage, violations);
+    checkPageNumbers(pagination, startPage, violations);
     if (violations.size() > before) {
       return Optional.empty();
     }
@@ -58,33 +73,14 @@ final class PaginationParser {
                 : OptionalInt.of(pagination.endPage())));
   }
 
-  /** A request must never send one name with two values, so the names must not collide. */
-  private static void checkParameterNames(
-      JsonPagination pagination, List<Parameter> queryParameters, List<String> violations) {
-    String page = pagination.pageParameter();
-    String pageSize = pagination.pageSizeParameter();
-    boolean hasPage = ApiCallParser.notBlank(page, PAGE_PARAMETER, violations);
-    boolean hasPageSize = ApiCallParser.notBlank(pageSize, PAGE_SIZE_PARAMETER, violations);
-    if (hasPage) {
-      checkNoQueryParameterNamed(page, PAGE_PARAMETER, queryParameters, violations);
-    }
-    if (hasPageSize) {
-      checkNoQueryParameterNamed(pageSize, PAGE_SIZE_PARAMETER, queryParameters, violations);
-    }
-    if (hasPage && hasPageSize && page.equals(pageSize)) {
-      violations.add(PAGE_SIZE_PARAMETER + " must differ from " + PAGE_PARAMETER);
+  private static void addRequiredQueryName(
+      String name, String keyPath, PaginationNames names, List<String> violations) {
+    if (ApiCallParser.notBlank(name, keyPath, violations)) {
+      names.add(keyPath, name, ParameterLocation.QUERY);
     }
   }
 
-  /** HTTP query parameter names are case-sensitive, so the comparison is too. */
-  private static void checkNoQueryParameterNamed(
-      String name, String path, List<Parameter> queryParameters, List<String> violations) {
-    if (queryParameters.stream().anyMatch(parameter -> name.equals(parameter.name()))) {
-      violations.add(path + " must differ from the name of each query parameter");
-    }
-  }
-
-  private static void checkNumbers(
+  private static void checkPageNumbers(
       JsonPagination pagination, int startPage, List<String> violations) {
     if (pagination.pageSize() == null || pagination.pageSize() < 1) {
       violations.add("pagination.pageSize must be at least 1");
