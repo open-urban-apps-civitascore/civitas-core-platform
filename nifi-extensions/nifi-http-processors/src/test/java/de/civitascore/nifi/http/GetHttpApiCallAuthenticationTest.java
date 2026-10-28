@@ -457,6 +457,32 @@ class GetHttpApiCallAuthenticationTest {
   }
 
   @Test
+  void aRefusedTokenRequestAfterA401IsASourceError() throws InitializationException {
+    try (ApiEndpoint token =
+            tokenEndpoint(
+                token("at-1", EXPIRES_IN), Response.status(401, "{\"error\":\"invalid_client\"}"));
+        ApiEndpoint api =
+            ApiEndpoint.answeringInTurnOverTls(
+                tls.server(), Response.json(EMPTY), Response.status(401))) {
+      TestRunner runner = oauth2Runner(api, token);
+
+      runner.run(1, false, true);
+      runner.clearTransferState();
+      runner.run(1, true, false);
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          401,
+          "API call \"Stations\": OAuth2 token request to "
+              + tokenEndpoint(token)
+              + " failed with status 401 (invalid_client)");
+      assertEquals(2, token.requests().size());
+      assertEquals(2, api.requests().size());
+    }
+  }
+
+  @Test
   void a401WithAFreshTokenIsFatalWithoutANewToken() throws InitializationException {
     try (ApiEndpoint token = tokenEndpoint(token("at-1", EXPIRES_IN), token("at-2", EXPIRES_IN));
         ApiEndpoint api =

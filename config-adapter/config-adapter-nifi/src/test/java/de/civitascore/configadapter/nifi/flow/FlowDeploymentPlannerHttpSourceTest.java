@@ -442,6 +442,25 @@ class FlowDeploymentPlannerHttpSourceTest {
   }
 
   @Test
+  void privateKeyInPkcs1FormIsAcceptedForRsa() throws Exception {
+    String pkcs1Key =
+        "-----BEGIN RSA PRIVATE KEY-----\nMIIEpkcs1key\n-----END RSA PRIVATE KEY-----\n";
+    DeploymentPlan plan =
+        plan(
+            Map.of(
+                "type",
+                "CLIENT_CERTIFICATE",
+                "certificate",
+                encrypted("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"),
+                "privateKey",
+                encrypted(pkcs1Key)));
+
+    assertEquals(
+        Map.of("Private Key", pkcs1Key),
+        plan.sensitivePropsByComponent().get("HttpSourceSslContext"));
+  }
+
+  @Test
   void certificateThatAlsoHoldsAPrivateKeyIsRefused() throws Exception {
     String certificateAndKey =
         "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"
