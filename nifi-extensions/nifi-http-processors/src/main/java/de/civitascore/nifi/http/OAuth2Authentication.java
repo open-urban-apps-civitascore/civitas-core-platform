@@ -22,8 +22,7 @@ import org.apache.nifi.web.client.api.HttpRequestHeadersSpec;
  * <p>The access token belongs to the Data source, not to one request: it is kept in memory for the
  * following requests and runs until shortly before its {@code expires_in} ends. A token without a
  * usable {@code expires_in} serves the current run only. The token is never in the NiFi state,
- * which NiFi writes to disk; it goes when NiFi stops the processor. Not thread-safe: the processor
- * runs one run at a time.
+ * which NiFi writes to disk.
  */
 final class OAuth2Authentication implements Authentication {
 

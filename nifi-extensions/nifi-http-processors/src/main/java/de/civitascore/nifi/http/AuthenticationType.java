@@ -29,7 +29,7 @@ enum AuthenticationType {
 
   /**
    * Reads the credentials of this type from the properties. Call it once for each start of the
-   * processor, because the instance keeps what the following runs reuse, such as an access token.
+   * processor.
    *
    * @param webClient the web client service of the API requests, which also sends a token request
    */
