@@ -20,12 +20,18 @@ sealed interface ResponseShape {
   /** The type the body must have, for a cause, for example {@code an array}. */
   String expected();
 
-  /**
-   * The values that the pagination reads from a response that is one record, as in {@link
-   * PageContent#values()}.
-   */
+  /** The paths whose values the pagination reads from a response that is one record. */
+  default List<JsonPath> paths() {
+    return List.of();
+  }
+
+  /** The values at {@link #paths()}, as in {@link PageContent#values()}. */
   default Map<JsonPath, JsonNode> valuesIn(JsonNode record) {
-    return Map.of();
+    Map<JsonPath, JsonNode> values = new HashMap<>();
+    for (JsonPath path : paths()) {
+      values.put(path, path.valueIn(record));
+    }
+    return values;
   }
 
   /** A JSON array; each element is one record, and {@code []} holds none. */
@@ -51,15 +57,6 @@ sealed interface ResponseShape {
     @Override
     public String expected() {
       return "an object";
-    }
-
-    @Override
-    public Map<JsonPath, JsonNode> valuesIn(JsonNode record) {
-      Map<JsonPath, JsonNode> values = new HashMap<>();
-      for (JsonPath path : paths) {
-        values.put(path, path.valueIn(record));
-      }
-      return values;
     }
   }
 

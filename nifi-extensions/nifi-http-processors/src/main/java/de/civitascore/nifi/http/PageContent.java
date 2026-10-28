@@ -18,10 +18,12 @@ import java.util.Map;
  * @param records the number of records: the elements of an array, 1 for an object
  * @param values the value at each path of {@link ResponseShape.RecordObject}, a {@code MissingNode}
  *     where the response has none; empty for any other shape
+ * @param numberTexts the JSON text of each number in {@code values}, as the response writes it
  */
-record PageContent(int records, Map<JsonPath, JsonNode> values) {
+record PageContent(int records, Map<JsonPath, JsonNode> values, Map<JsonPath, String> numberTexts) {
 
   PageContent {
     values = Map.copyOf(values);
+    numberTexts = Map.copyOf(numberTexts);
   }
 }

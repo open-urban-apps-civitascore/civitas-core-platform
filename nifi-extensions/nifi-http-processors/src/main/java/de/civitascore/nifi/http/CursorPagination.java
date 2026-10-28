@@ -56,7 +56,7 @@ record CursorPagination(
               + typeName(value)
               + ", not a string or a number");
     }
-    String cursor = value.asText();
+    String cursor = value.isNumber() ? content.numberTexts().get(cursorPath) : value.textValue();
     if (cursorIn == ParameterLocation.HEADER && !isHeaderValue(cursor)) {
       return new Progress.Rejected(
           "the value at " + cursorPath + " holds a character that a header value must not hold");

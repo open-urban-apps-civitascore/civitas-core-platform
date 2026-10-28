@@ -9,10 +9,13 @@
  */
 package de.civitascore.nifi.http;
 
+import com.fasterxml.jackson.core.JsonStreamContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.MissingNode;
 import java.math.BigInteger;
+import java.util.List;
 import java.util.Optional;
+import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -54,6 +57,27 @@ record JsonPath(String text) {
       current = name != null ? current.path(name) : current.path(index(segment.group(3)));
     }
     return current;
+  }
+
+  /** Whether the current value of a parser, in the given context, is the value at the path. */
+  boolean isAt(JsonStreamContext context) {
+    List<MatchResult> segments = SEGMENT.matcher(text).results().toList();
+    JsonStreamContext current = context;
+    for (int i = segments.size() - 1; i >= 0; i--) {
+      if (current == null || !isAt(segments.get(i), current)) {
+        return false;
+      }
+      current = current.getParent();
+    }
+    return current != null && current.inRoot();
+  }
+
+  private static boolean isAt(MatchResult segment, JsonStreamContext context) {
+    if (segment.group(3) != null) {
+      return context.inArray() && context.getCurrentIndex() == index(segment.group(3));
+    }
+    String name = segment.group(1) != null ? segment.group(1) : segment.group(2);
+    return context.inObject() && name.equals(context.getCurrentName());
   }
 
   /** An index beyond the {@code int} range gives -1, which no array holds. */

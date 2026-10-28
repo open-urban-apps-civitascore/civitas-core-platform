@@ -129,15 +129,16 @@ final class RecordSchema {
         token = parser.nextToken()) {
       violations.add(recordViolations(parser, token));
     }
-    return violations.verdict(Map.of());
+    return violations.verdict(Map.of(), Map.of());
   }
 
   /** A response that is one record, whose tree is in memory for the validation anyway. */
   private Verdict object(JsonParser parser, ResponseShape shape) throws IOException {
-    JsonNode record = RECORD_READER.readTree(parser);
+    NumberTextParser numbers = new NumberTextParser(parser, shape.paths());
+    JsonNode record = RECORD_READER.readTree(numbers);
     Violations violations = new Violations();
     violations.add(violations(record));
-    return violations.verdict(shape.valuesIn(record));
+    return violations.verdict(shape.valuesIn(record), numbers.texts());
   }
 
   private List<String> recordViolations(JsonParser parser, JsonToken token) throws IOException {
@@ -210,9 +211,9 @@ final class RecordSchema {
       records++;
     }
 
-    Verdict verdict(Map<JsonPath, JsonNode> values) {
+    Verdict verdict(Map<JsonPath, JsonNode> values, Map<JsonPath, String> numberTexts) {
       if (invalid == 0) {
-        return new Verdict.Agrees(new PageContent(records, values));
+        return new Verdict.Agrees(new PageContent(records, values, numberTexts));
       }
       return new Verdict.Rejected(
           invalid

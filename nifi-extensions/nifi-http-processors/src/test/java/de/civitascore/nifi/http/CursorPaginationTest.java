@@ -85,11 +85,14 @@ class CursorPaginationTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"42", "-7", "12345678901234567890"})
+  @ValueSource(strings = {"42", "-7", "12345678901234567890", "1.50", "1e2", "-0"})
   void next_withANumberCursor_sendsItsJsonText(String number) throws JsonProcessingException {
     CursorPagination pagination = inQuery(Optional.empty());
+    PageContent content =
+        new PageContent(
+            1, Map.of(CURSOR_PATH, MAPPER.readTree(number)), Map.of(CURSOR_PATH, number));
 
-    Page next = nextPage(pagination, pagination.first(), MAPPER.readTree(number));
+    Page next = nextPage(pagination, pagination.first(), content);
 
     assertEquals(List.of(new Parameter("cursor", number)), next.queryParameters());
   }
@@ -185,13 +188,16 @@ class CursorPaginationTest {
   }
 
   private static PageContent content(JsonNode cursor) {
-    return new PageContent(1, Map.of(CURSOR_PATH, cursor));
+    return new PageContent(1, Map.of(CURSOR_PATH, cursor), Map.of());
   }
 
   private static Page nextPage(CursorPagination pagination, Page page, JsonNode cursor) {
+    return nextPage(pagination, page, content(cursor));
+  }
+
+  private static Page nextPage(CursorPagination pagination, Page page, PageContent content) {
     Pagination.Progress.Accepted accepted =
-        assertInstanceOf(
-            Pagination.Progress.Accepted.class, pagination.next(page, content(cursor)));
+        assertInstanceOf(Pagination.Progress.Accepted.class, pagination.next(page, content));
     return accepted.next().orElseThrow();
   }
 }

@@ -411,10 +411,10 @@ GET /items?limit=20&cursor=abc123   -> { "data": [...], "next_cursor": "def456" 
 GET /items?limit=20&cursor=def456   -> { "data": [...] }
 ```
 
-A string cursor goes into the request as it is; the query percent-encodes it. A number cursor without
-a fraction and an exponent goes in with its digits. Any other number goes in as Java writes a
-`double`, for example `1.50` as `1.5`. When the value at `cursorPath` is absent, `null` or `""`, the run ends,
-and the records of that response are part of the run.
+A string cursor goes into the request as it is; the query percent-encodes it. A number cursor goes
+in as its JSON text in the response, for example `1.50` as `1.50` and `1e2` as `1e2`. When the
+value at `cursorPath` is absent, `null` or `""`, the run ends, and the records of that response are
+part of the run.
 
 Each response is a JSON object and one record, so the `Record Schema` describes the whole response,
 cursor included. A Mapping takes the records out of it. The processor reads the cursor in the same

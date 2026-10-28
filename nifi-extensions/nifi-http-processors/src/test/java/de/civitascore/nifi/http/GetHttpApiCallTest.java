@@ -1349,17 +1349,17 @@ class GetHttpApiCallTest {
     }
   }
 
-  @Test
-  void onTrigger_withANumberCursor_sendsItsDigits() throws InitializationException {
+  @ParameterizedTest
+  @ValueSource(strings = {"12345678901234567890", "1730000000.25", "1.50", "1e2", "1E-7", "-0"})
+  void onTrigger_withANumberCursor_sendsItsJsonText(String number) throws InitializationException {
     try (ApiEndpoint endpoint =
         ApiEndpoint.answeringInTurn(
-            Response.json(cursorPage("a1", "12345678901234567890")),
-            Response.json(cursorPage("a2", null)))) {
+            Response.json(cursorPage("a1", number)), Response.json(cursorPage("a2", null)))) {
       TestRunner runner = cursorRunner(endpoint, CURSOR_IN_QUERY);
 
       runner.run();
 
-      assertEquals("cursor=12345678901234567890", rawQueries(endpoint).get(1));
+      assertEquals("cursor=" + number, rawQueries(endpoint).get(1));
     }
   }
 
