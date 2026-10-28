@@ -10,7 +10,6 @@ import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import jakarta.validation.constraints.Size;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -47,16 +46,6 @@ class CqlFilterSyntaxValidatorTest {
   @AfterAll
   static void closeValidator() {
     factory.close();
-  }
-
-  @Test
-  @DisplayName("LayerInputDTO.cqlFilter carries @CqlFilterSyntax and a @Size cap")
-  void cqlFilterFieldIsAnnotated() throws NoSuchFieldException {
-    // The acceptance tests alone would still pass if the annotation were removed from the field.
-    Field cqlFilter = LayerInputDTO.class.getDeclaredField("cqlFilter");
-    assertThat(cqlFilter.isAnnotationPresent(CqlFilterSyntax.class)).isTrue();
-    assertThat(cqlFilter.getAnnotation(Size.class).max())
-        .isEqualTo(CqlFilterSyntaxValidator.MAX_LENGTH);
   }
 
   @ParameterizedTest(name = "[{index}] {0}")

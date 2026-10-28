@@ -22,13 +22,13 @@ public class CqlFilterSyntaxValidator implements ConstraintValidator<CqlFilterSy
 
   /**
    * Longest filter this validator parses. The parser recurses per bracket and overflows a default
-   * thread stack at about 800 nested brackets, so longer input is left to {@code @Size}.
+   * thread stack from about 600 nested brackets, so longer input is left to {@code @Size}.
    */
   public static final int MAX_LENGTH = 500;
 
   /**
-   * The position of a lexical fault, or of a parse fault, which ends its line. Anchored so that a
-   * string literal the parser echoes cannot pose as the position.
+   * The fault position: it starts a lexical error and ends the first line of a parse error.
+   * Anchored so that a string literal the parser echoes cannot pose as the position.
    */
   private static final Pattern POSITION =
       Pattern.compile(
