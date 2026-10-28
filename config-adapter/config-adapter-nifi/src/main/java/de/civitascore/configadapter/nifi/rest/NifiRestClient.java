@@ -64,6 +64,10 @@ public class NifiRestClient implements AutoCloseable {
   private static final long POLL_INTERVAL_MS = 1000L;
   private static final Pattern COMPONENT_PREFIX = Pattern.compile("^\\S+\\[id=[^\\]]*\\]\\s*");
 
+  /** NiFi's DisabledServiceValidationResult, which clears once the referenced service enables. */
+  private static final Pattern DISABLED_SERVICE =
+      Pattern.compile("Controller Service with ID \\S+ is disabled$");
+
   private final String baseUrl;
   private final NifiTokenProvider tokenProvider;
   private final OkHttpClient client;
@@ -790,7 +794,9 @@ public class NifiRestClient implements AutoCloseable {
       JsonNode component = service.path("component");
       // A service whose configuration is INVALID will never reach ENABLED, so polling for it is
       // pointless: fail fast and FATALLY (a retryable timeout would loop forever under redelivery).
-      if (awaitingEnabled && "INVALID".equals(component.path("validationStatus").asText())) {
+      if (awaitingEnabled
+          && "INVALID".equals(component.path("validationStatus").asText())
+          && !awaitsReferencedServices(component)) {
         String name = component.path("name").asText();
         throw new FatalAdapterException(
             AdapterErrorCode.NIFI_FLOW_ERROR,
@@ -805,6 +811,19 @@ public class NifiRestClient implements AutoCloseable {
       }
     }
     return allInState;
+  }
+
+  private static boolean awaitsReferencedServices(JsonNode component) {
+    JsonNode errors = component.path("validationErrors");
+    if (!errors.isArray() || errors.isEmpty()) {
+      return false;
+    }
+    for (JsonNode error : errors) {
+      if (!DISABLED_SERVICE.matcher(error.asText()).find()) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**

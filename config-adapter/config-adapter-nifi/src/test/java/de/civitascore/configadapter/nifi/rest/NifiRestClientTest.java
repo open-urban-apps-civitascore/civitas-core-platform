@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.nifi.auth.NifiTokenProvider;
@@ -388,6 +389,56 @@ class NifiRestClientTest {
     assertTrue(
         ex.getMessage().contains("PostGISConnectionPool"),
         "the fatal error must name the INVALID controller service");
+  }
+
+  /**
+   * Without it, a web client that refers to an SSL context fails the deployment before NiFi has
+   * enabled the SSL context.
+   */
+  @Test
+  void aServiceInvalidOnlyByADisabledReferencedServiceIsAwaited()
+      throws FatalAdapterException, RetryableAdapterException {
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .willReturn(json("{ \"id\": \"root-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/root-1"))
+            .willReturn(json("{ \"processGroupFlow\": { \"flow\": { \"processGroups\": [] } } }")));
+    server.stubFor(
+        post(urlPathEqualTo("/nifi-api/process-groups/root-1/process-groups/upload"))
+            .willReturn(json("{ \"id\": \"pg-1\" }")));
+    server.stubFor(
+        put(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(json("{}")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .inScenario("enable")
+            .whenScenarioStateIs(Scenario.STARTED)
+            .willReturn(
+                json(
+                    "{ \"controllerServices\": [ { \"id\": \"cs-1\", \"component\": { \"name\":"
+                        + " \"HttpSourceWebClient\", \"state\": \"DISABLED\","
+                        + " \"validationStatus\": \"INVALID\", \"validationErrors\": [ \"'SSL"
+                        + " Context Service' validated against 'cs-2' is invalid because Controller"
+                        + " Service with ID cs-2 is disabled\" ] } } ] }"))
+            .willSetStateTo("enabled"));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .inScenario("enable")
+            .whenScenarioStateIs("enabled")
+            .willReturn(
+                json(
+                    "{ \"controllerServices\": [ { \"id\": \"cs-1\", \"component\": { \"name\":"
+                        + " \"HttpSourceWebClient\", \"state\": \"ENABLED\","
+                        + " \"validationStatus\": \"VALID\" } } ] }")));
+    server.stubFor(put(urlEqualTo("/nifi-api/flow/process-groups/pg-1")).willReturn(json("{}")));
+    stubRunningProcessors();
+
+    DeploymentPlan plan =
+        new DeploymentPlan(
+            "pipeline-x", "{ \"flowContents\": { \"name\": \"pipeline-x\" } }", Map.of());
+
+    assertEquals("pg-1", client.deployFlow(plan));
   }
 
   @Test
