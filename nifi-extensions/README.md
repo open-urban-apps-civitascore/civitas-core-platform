@@ -326,7 +326,9 @@ warn bulletin only when its text names a failure. The message of a stop has no s
 stop is not an error of the Pipeline.
 
 No attribute and no message contains the query, a header value, the username, the password or a
-value of the response, a cursor and a record count included. An exception reaches no logger,
+value of the response, a cursor included. The one exception is the offset of limit/offset
+pagination without a `limit`, which carries record counts (see
+[Limit/offset pagination](#limitoffset-pagination)). An exception reaches no logger,
 because its message can hold the URI with its query; the message names its class alone.
 
 ### Response validation
