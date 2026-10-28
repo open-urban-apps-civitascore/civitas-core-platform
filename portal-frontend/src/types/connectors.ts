@@ -8,6 +8,7 @@ import {
   HTTP_AUTHENTICATION_TYPES,
   HTTP_METHODS,
   HTTP_PAGINATION_TYPES,
+  HTTP_PARAMETER_LOCATIONS,
   MAX_HTTP_API_CALLS,
 } from '@/const/connectors'
 
@@ -266,24 +267,54 @@ const HttpAuthenticationApiResponseSchema = z.discriminatedUnion('type', [
   }),
 ])
 
+const HttpPageNumberPaginationApiResponseSchema = z.object({
+  type: z.literal(HTTP_PAGINATION_TYPES.PAGE_NUMBER),
+  pageParameter: z.string().nullable().optional(),
+  pageSizeParameter: z.string().nullable().optional(),
+  pageSize: z.number().nullable().optional(),
+  startPage: z.number().nullable().optional(),
+  endPage: z.number().nullable().optional(),
+})
+
+const HttpCursorPaginationApiResponseSchema = z.object({
+  type: z.literal(HTTP_PAGINATION_TYPES.CURSOR),
+  cursorPath: z.string().nullable().optional(),
+  cursorParameter: z.string().nullable().optional(),
+  cursorIn: z.enum(HTTP_PARAMETER_LOCATIONS).nullable().optional(),
+  limitParameter: z.string().nullable().optional(),
+  limit: z.number().nullable().optional(),
+})
+
 const HttpPaginationApiResponseSchema = z
-  .object({
-    type: z.literal(HTTP_PAGINATION_TYPES.PAGE_NUMBER),
-    pageParameter: z.string().nullable().optional(),
-    pageSizeParameter: z.string().nullable().optional(),
-    pageSize: z.number().nullable().optional(),
-    startPage: z.number().nullable().optional(),
-    endPage: z.number().nullable().optional(),
+  .discriminatedUnion('type', [HttpPageNumberPaginationApiResponseSchema, HttpCursorPaginationApiResponseSchema])
+  .transform(pagination => {
+    switch (pagination.type) {
+      case HTTP_PAGINATION_TYPES.PAGE_NUMBER: {
+        const { type, pageParameter, pageSizeParameter, pageSize, startPage, endPage } = pagination
+        return {
+          isEnabled: true,
+          type,
+          pageParameter: pageParameter ?? '',
+          pageSizeParameter: pageSizeParameter ?? '',
+          pageSize: pageSize == null ? '' : String(pageSize),
+          startPage: startPage == null ? DEFAULT_START_PAGE : String(startPage),
+          endPage: endPage == null ? '' : String(endPage),
+        }
+      }
+      case HTTP_PAGINATION_TYPES.CURSOR: {
+        const { type, cursorPath, cursorParameter, cursorIn, limitParameter, limit } = pagination
+        return {
+          isEnabled: true,
+          type,
+          cursorPath: cursorPath ?? '',
+          cursorParameter: cursorParameter ?? '',
+          cursorIn: cursorIn ?? HTTP_PARAMETER_LOCATIONS.QUERY,
+          limitParameter: limitParameter ?? '',
+          limit: limit == null ? '' : String(limit),
+        }
+      }
+    }
   })
-  .transform(({ type, pageParameter, pageSizeParameter, pageSize, startPage, endPage }) => ({
-    isEnabled: true,
-    type,
-    pageParameter: pageParameter ?? '',
-    pageSizeParameter: pageSizeParameter ?? '',
-    pageSize: pageSize == null ? '' : String(pageSize),
-    startPage: startPage == null ? DEFAULT_START_PAGE : String(startPage),
-    endPage: endPage == null ? '' : String(endPage),
-  }))
 
 const HttpParameterApiResponseSchema = z
   .object({ name: z.string().nullable().optional(), value: z.string().nullable().optional() })
@@ -356,6 +387,8 @@ const requireBasicCredentials = (authentication: HttpAuthenticationForm, ctx: z.
 const HTTP_PATH = /^\/[A-Za-z0-9._~:/-]*$/
 const HTTP_HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/
 const CREDENTIAL_HEADERS = new Set(['authorization', 'proxy-authorization', 'cookie'])
+const CLIENT_HEADERS = new Set(['connection', 'content-length', 'expect', 'host', 'upgrade'])
+const JSON_PATH = /^\$(\.[A-Za-z_][A-Za-z0-9_-]*|\['[^'\\]+'\]|\[[0-9]+\])+$/
 const LINE_BREAK = /[\r\n]/
 const NON_NEGATIVE_INTEGER = /^\d+$/
 const MAX_PAGE_NUMBER = 2147483647
@@ -392,7 +425,7 @@ const validateHeader = (header: HttpParameterForm, ctx: z.RefinementCtx) => {
   }
 }
 
-const HttpPaginationFormSchema = z.object({
+const HttpPageNumberPaginationFormSchema = z.object({
   isEnabled: z.boolean(),
   type: z.literal(HTTP_PAGINATION_TYPES.PAGE_NUMBER),
   pageParameter: z.string().trim(),
@@ -402,7 +435,30 @@ const HttpPaginationFormSchema = z.object({
   endPage: z.string().trim(),
 })
 
+export type HttpPageNumberPaginationForm = z.input<typeof HttpPageNumberPaginationFormSchema>
+
+const HttpCursorPaginationFormSchema = z.object({
+  isEnabled: z.boolean(),
+  type: z.literal(HTTP_PAGINATION_TYPES.CURSOR),
+  cursorPath: z.string().trim(),
+  cursorParameter: z.string().trim(),
+  cursorIn: z.enum(HTTP_PARAMETER_LOCATIONS),
+  limitParameter: z.string().trim(),
+  limit: z.string().trim(),
+})
+
+export type HttpCursorPaginationForm = z.input<typeof HttpCursorPaginationFormSchema>
+
+const HttpPaginationFormSchema = z.discriminatedUnion('type', [
+  HttpPageNumberPaginationFormSchema,
+  HttpCursorPaginationFormSchema,
+])
+
 export type HttpPaginationForm = z.input<typeof HttpPaginationFormSchema>
+
+export type HttpPaginationType = (typeof HTTP_PAGINATION_TYPES)[keyof typeof HTTP_PAGINATION_TYPES]
+
+export type HttpParameterLocation = (typeof HTTP_PARAMETER_LOCATIONS)[keyof typeof HTTP_PARAMETER_LOCATIONS]
 
 export const EMPTY_PAGINATION: HttpPaginationForm = {
   isEnabled: false,
@@ -414,6 +470,21 @@ export const EMPTY_PAGINATION: HttpPaginationForm = {
   endPage: '',
 }
 
+export const EMPTY_CURSOR_PAGINATION: HttpCursorPaginationForm = {
+  isEnabled: false,
+  type: HTTP_PAGINATION_TYPES.CURSOR,
+  cursorPath: '',
+  cursorParameter: '',
+  cursorIn: HTTP_PARAMETER_LOCATIONS.QUERY,
+  limitParameter: '',
+  limit: '',
+}
+
+export const EMPTY_PAGINATIONS: Record<HttpPaginationType, HttpPaginationForm> = {
+  [HTTP_PAGINATION_TYPES.PAGE_NUMBER]: EMPTY_PAGINATION,
+  [HTTP_PAGINATION_TYPES.CURSOR]: EMPTY_CURSOR_PAGINATION,
+}
+
 const PAGE_NUMBER_FIELDS = ['pageSize', 'startPage', 'endPage'] as const
 
 const getPageNumberError = (value: string) => {
@@ -422,8 +493,32 @@ const getPageNumberError = (value: string) => {
   return undefined
 }
 
-const validatePagination = (pagination: HttpPaginationForm, ctx: z.RefinementCtx) => {
-  if (!pagination.isEnabled) return
+const validateJsonPath = (value: string, field: string, ctx: z.RefinementCtx) => {
+  if (value && !JSON_PATH.test(value)) {
+    ctx.addIssue({ code: 'custom', path: [field], message: 'datasources.errors.invalidJsonPath' })
+  }
+}
+
+const validateLimit = (pagination: { limit: string }, ctx: z.RefinementCtx) => {
+  const { limit } = pagination
+  if (!limit) return
+  if (!NON_NEGATIVE_INTEGER.test(limit) || Number(limit) === 0) {
+    ctx.addIssue({ code: 'custom', path: ['limit'], message: 'datasources.errors.limitInteger' })
+  } else if (Number(limit) > MAX_PAGE_NUMBER) {
+    ctx.addIssue({ code: 'custom', path: ['limit'], message: 'datasources.errors.pageNumberMax' })
+  }
+}
+
+const requireLimitPair = (pagination: { limitParameter: string; limit: string }, ctx: z.RefinementCtx) => {
+  if (pagination.limitParameter && !pagination.limit) {
+    ctx.addIssue({ code: 'custom', path: ['limit'], message: 'datasources.errors.limitRequired' })
+  }
+  if (pagination.limit && !pagination.limitParameter) {
+    ctx.addIssue({ code: 'custom', path: ['limitParameter'], message: 'datasources.errors.limitParameterRequired' })
+  }
+}
+
+const validatePageNumberPagination = (pagination: HttpPageNumberPaginationForm, ctx: z.RefinementCtx) => {
   const invalidFields = PAGE_NUMBER_FIELDS.filter(field => pagination[field] && getPageNumberError(pagination[field]))
   for (const field of invalidFields) {
     ctx.addIssue({ code: 'custom', path: [field], message: getPageNumberError(pagination[field]) })
@@ -437,37 +532,147 @@ const validatePagination = (pagination: HttpPaginationForm, ctx: z.RefinementCtx
   }
 }
 
-const REQUIRED_PAGINATION_FIELDS = ['pageParameter', 'pageSizeParameter', 'pageSize'] as const
+const validateCursorPagination = (pagination: HttpCursorPaginationForm, ctx: z.RefinementCtx) => {
+  validateJsonPath(pagination.cursorPath, 'cursorPath', ctx)
+  validateLimit(pagination, ctx)
+}
 
-const requirePagination = (pagination: HttpPaginationForm, ctx: z.RefinementCtx) => {
+const validatePagination = (pagination: HttpPaginationForm, ctx: z.RefinementCtx) => {
   if (!pagination.isEnabled) return
-  for (const field of REQUIRED_PAGINATION_FIELDS) {
+  switch (pagination.type) {
+    case HTTP_PAGINATION_TYPES.PAGE_NUMBER:
+      validatePageNumberPagination(pagination, ctx)
+      break
+    case HTTP_PAGINATION_TYPES.CURSOR:
+      validateCursorPagination(pagination, ctx)
+      break
+  }
+}
+
+const REQUIRED_PAGE_NUMBER_FIELDS = ['pageParameter', 'pageSizeParameter', 'pageSize'] as const
+const REQUIRED_CURSOR_FIELDS = ['cursorPath', 'cursorParameter'] as const
+
+const requireFields = <K extends string>(pagination: Record<K, string>, fields: readonly K[], ctx: z.RefinementCtx) => {
+  for (const field of fields) {
     if (!pagination[field]) {
       ctx.addIssue({ code: 'custom', path: [field], message: 'common.errors.required' })
     }
   }
 }
 
-const toPaginationApi = (pagination: HttpPaginationForm) => {
-  if (!pagination.isEnabled) return null
-  const toNumber = (value: string) => (value ? Number(value) : null)
-  return {
-    type: pagination.type,
-    pageParameter: pagination.pageParameter || null,
-    pageSizeParameter: pagination.pageSizeParameter || null,
-    pageSize: toNumber(pagination.pageSize),
-    startPage: toNumber(pagination.startPage),
-    endPage: toNumber(pagination.endPage),
+const requirePagination = (pagination: HttpPaginationForm, ctx: z.RefinementCtx) => {
+  if (!pagination.isEnabled) return
+  switch (pagination.type) {
+    case HTTP_PAGINATION_TYPES.PAGE_NUMBER:
+      requireFields(pagination, REQUIRED_PAGE_NUMBER_FIELDS, ctx)
+      break
+    case HTTP_PAGINATION_TYPES.CURSOR:
+      requireFields(pagination, REQUIRED_CURSOR_FIELDS, ctx)
+      requireLimitPair(pagination, ctx)
+      break
   }
 }
 
-const HttpApiCallFormSchema = z.object({
+const toPaginationApi = (pagination: HttpPaginationForm) => {
+  if (!pagination.isEnabled) return null
+  const toNumber = (value: string) => (value ? Number(value) : null)
+  switch (pagination.type) {
+    case HTTP_PAGINATION_TYPES.PAGE_NUMBER:
+      return {
+        type: pagination.type,
+        pageParameter: pagination.pageParameter || null,
+        pageSizeParameter: pagination.pageSizeParameter || null,
+        pageSize: toNumber(pagination.pageSize),
+        startPage: toNumber(pagination.startPage),
+        endPage: toNumber(pagination.endPage),
+      }
+    case HTTP_PAGINATION_TYPES.CURSOR:
+      return {
+        type: pagination.type,
+        cursorPath: pagination.cursorPath || null,
+        cursorParameter: pagination.cursorParameter || null,
+        cursorIn: pagination.cursorIn,
+        limitParameter: pagination.limitParameter || null,
+        limit: toNumber(pagination.limit),
+      }
+  }
+}
+
+type PaginationParameter = { field: string; name: string; location: HttpParameterLocation }
+
+const getPaginationParameters = (pagination: HttpPaginationForm): PaginationParameter[] => {
+  switch (pagination.type) {
+    case HTTP_PAGINATION_TYPES.PAGE_NUMBER:
+      return []
+    case HTTP_PAGINATION_TYPES.CURSOR: {
+      const paginationParameters: PaginationParameter[] = [
+        { field: 'cursorParameter', name: pagination.cursorParameter, location: pagination.cursorIn },
+        { field: 'limitParameter', name: pagination.limitParameter, location: HTTP_PARAMETER_LOCATIONS.QUERY },
+      ]
+      return paginationParameters.filter(parameter => parameter.name)
+    }
+  }
+}
+
+type RequestParameter = Pick<PaginationParameter, 'name' | 'location'>
+
+const isSameName = (a: RequestParameter, b: RequestParameter) => {
+  if (a.location !== b.location) return false
+  if (a.location === HTTP_PARAMETER_LOCATIONS.HEADER) return a.name.toLowerCase() === b.name.toLowerCase()
+  return a.name === b.name
+}
+
+const getHeaderNameError = (name: string) => {
+  if (!HTTP_HEADER_NAME.test(name)) return 'datasources.errors.invalidHeaderName'
+  const lowerCaseName = name.toLowerCase()
+  if (CREDENTIAL_HEADERS.has(lowerCaseName)) return 'datasources.errors.credentialHeader'
+  if (CLIENT_HEADERS.has(lowerCaseName)) return 'datasources.errors.clientHeader'
+  return undefined
+}
+
+const hasParameterName = (
+  parameters: HttpParameterForm[],
+  location: HttpParameterLocation,
+  paginationParameter: RequestParameter,
+) => parameters.some(parameter => isSameName({ name: parameter.name, location }, paginationParameter))
+
+const validatePaginationNames = (apiCall: HttpApiCallBaseFormOutput, ctx: z.RefinementCtx) => {
+  if (!apiCall.pagination.isEnabled) return
+  const paginationParameters = getPaginationParameters(apiCall.pagination)
+  for (const [index, paginationParameter] of paginationParameters.entries()) {
+    const addIssue = (message: string) =>
+      ctx.addIssue({ code: 'custom', path: ['pagination', paginationParameter.field], message })
+    const headerNameError =
+      paginationParameter.location === HTTP_PARAMETER_LOCATIONS.HEADER
+        ? getHeaderNameError(paginationParameter.name)
+        : undefined
+    if (headerNameError) {
+      addIssue(headerNameError)
+    }
+    if (hasParameterName(apiCall.queryParameters, HTTP_PARAMETER_LOCATIONS.QUERY, paginationParameter)) {
+      addIssue('datasources.errors.paginationQueryDuplicate')
+    }
+    if (hasParameterName(apiCall.headers, HTTP_PARAMETER_LOCATIONS.HEADER, paginationParameter)) {
+      addIssue('datasources.errors.paginationHeaderDuplicate')
+    }
+    const earlierParameters = paginationParameters.slice(0, index)
+    if (earlierParameters.some(earlier => isSameName(earlier, paginationParameter))) {
+      addIssue('datasources.errors.paginationParameterDuplicate')
+    }
+  }
+}
+
+const HttpApiCallBaseFormSchema = z.object({
   name: z.string().trim(),
   path: HttpPathSchema,
   queryParameters: z.array(HttpParameterFormSchema).transform(withoutEmptyParameters),
   headers: z.array(HttpParameterFormSchema.superRefine(validateHeader)).transform(withoutEmptyParameters),
   pagination: HttpPaginationFormSchema.superRefine(validatePagination),
 })
+
+type HttpApiCallBaseFormOutput = z.output<typeof HttpApiCallBaseFormSchema>
+
+const HttpApiCallFormSchema = HttpApiCallBaseFormSchema.superRefine(validatePaginationNames)
 
 export type HttpApiCallForm = z.input<typeof HttpApiCallFormSchema>
 
@@ -484,7 +689,7 @@ export type CollapsedApiCallSections = ReadonlyMap<number, ReadonlySet<ApiCallSe
 export type HttpParameterListPath =
   `configuration.apiCalls.${number}.queryParameters` | `configuration.apiCalls.${number}.headers`
 
-const HttpApiCallStrictFormSchema = HttpApiCallFormSchema.extend({
+const HttpApiCallStrictFormSchema = HttpApiCallBaseFormSchema.extend({
   name: z.string().trim().min(1, 'common.errors.required'),
   path: z.string().trim().min(1, 'common.errors.required').pipe(HttpPathSchema),
   queryParameters: z.array(HttpParameterFormSchema.superRefine(requireParameterName)).transform(withoutEmptyParameters),
@@ -492,7 +697,7 @@ const HttpApiCallStrictFormSchema = HttpApiCallFormSchema.extend({
     .array(HttpParameterFormSchema.superRefine(validateHeader).superRefine(requireParameterName))
     .transform(withoutEmptyParameters),
   pagination: HttpPaginationFormSchema.superRefine(validatePagination).superRefine(requirePagination),
-})
+}).superRefine(validatePaginationNames)
 
 const HttpApiCallsLooseSchema = z.array(HttpApiCallFormSchema).max(MAX_HTTP_API_CALLS, 'datasources.errors.apiCallsMax')
 

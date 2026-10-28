@@ -1,10 +1,18 @@
 import { CONNECTOR_TYPES } from '@/const/connectors'
-import { PAGINATION_API, PAGINATION_FORM } from '@/test-support/paginationFixtures'
+import {
+  CURSOR_PAGINATION_API,
+  CURSOR_PAGINATION_FORM,
+  PAGINATION_API,
+  PAGINATION_FORM,
+} from '@/test-support/paginationFixtures'
 
 import {
   ConnectorApiToFormSchema,
   ConnectorFormToApiSchema,
+  EMPTY_CURSOR_PAGINATION,
   EMPTY_PAGINATION,
+  HttpApiCallForm,
+  HttpCursorPaginationForm,
   HttpLooseSchema,
   HttpPaginationForm,
   HttpStrictSchema,
@@ -556,6 +564,227 @@ describe('HTTP API call schemas', () => {
     ] as const)('ignores invalid values of a disabled pagination in the %s schema', (_name, schema) => {
       const pagination = { ...EMPTY_PAGINATION, pageSize: '0', startPage: '5', endPage: '4' }
       expect(issues(schema, [{ ...API_CALL, pagination }])).toEqual([])
+    })
+  })
+
+  describe('cursor pagination', () => {
+    const withCursor = (pagination: Partial<HttpCursorPaginationForm>, apiCall: Partial<HttpApiCallForm> = {}) => ({
+      ...API_CALL,
+      ...apiCall,
+      pagination: { ...EMPTY_CURSOR_PAGINATION, isEnabled: true, ...pagination },
+    })
+    const issue = (field: string, error: string) =>
+      expect.objectContaining({ path: [0, 'pagination', field], message: error })
+
+    it('maps a cursor pagination from the API to the form', () => {
+      const result = ConnectorApiToFormSchema.parse({
+        connectorType: CONNECTOR_TYPES.HTTP,
+        configuration: { apiCalls: [{ path: '/stations', pagination: CURSOR_PAGINATION_API }] },
+      })
+
+      expect(result.configuration).toMatchObject({ apiCalls: [{ pagination: CURSOR_PAGINATION_FORM }] })
+    })
+
+    it('maps empty cursor values from the API to the form', () => {
+      const pagination = {
+        type: 'CURSOR',
+        cursorPath: null,
+        cursorParameter: null,
+        cursorIn: null,
+        limitParameter: null,
+        limit: null,
+      }
+      const result = ConnectorApiToFormSchema.parse({
+        connectorType: CONNECTOR_TYPES.HTTP,
+        configuration: { apiCalls: [{ path: '/stations', pagination }] },
+      })
+
+      expect(result.configuration).toMatchObject({
+        apiCalls: [{ pagination: { ...EMPTY_CURSOR_PAGINATION, isEnabled: true } }],
+      })
+    })
+
+    it('sends a cursor pagination', () => {
+      const result = ConnectorFormToApiSchema.parse({
+        connectorType: CONNECTOR_TYPES.HTTP,
+        configuration: { apiCalls: [{ ...API_CALL, pagination: CURSOR_PAGINATION_FORM }] },
+      })
+
+      expect(result).toMatchObject({ apiCalls: [{ pagination: CURSOR_PAGINATION_API }] })
+    })
+
+    it('sends empty cursor values as null', () => {
+      const result = ConnectorFormToApiSchema.parse({
+        connectorType: CONNECTOR_TYPES.HTTP,
+        configuration: { apiCalls: [withCursor({})] },
+      })
+
+      expect(result).toMatchObject({
+        apiCalls: [
+          {
+            pagination: {
+              type: 'CURSOR',
+              cursorPath: null,
+              cursorParameter: null,
+              cursorIn: 'QUERY',
+              limitParameter: null,
+              limit: null,
+            },
+          },
+        ],
+      })
+    })
+
+    it('accepts empty fields in a draft', () => {
+      expect(issues(HttpLooseSchema, [withCursor({})])).toEqual([])
+    })
+
+    it('accepts a complete cursor pagination for release', () => {
+      expect(issues(HttpStrictSchema, [{ ...API_CALL, pagination: CURSOR_PAGINATION_FORM }])).toEqual([])
+    })
+
+    it.each(['next_cursor', '$', '$..id', '$[?(@.id)]'])('rejects the cursor path %s', cursorPath => {
+      expect(issues(HttpLooseSchema, [withCursor({ cursorPath })])).toContainEqual(
+        issue('cursorPath', 'datasources.errors.invalidJsonPath'),
+      )
+    })
+
+    it.each(['$.next_cursor', '$.data[0].id', "$['next cursor']"])('accepts the cursor path %s', cursorPath => {
+      expect(issues(HttpLooseSchema, [withCursor({ cursorPath })])).toEqual([])
+    })
+
+    it.each(['cursorPath', 'cursorParameter'])('requires %s for release', field => {
+      const apiCall = { ...API_CALL, pagination: { ...CURSOR_PAGINATION_FORM, [field]: '' } }
+      expect(issues(HttpStrictSchema, [apiCall])).toContainEqual(issue(field, 'common.errors.required'))
+      expect(issues(HttpLooseSchema, [apiCall])).toEqual([])
+    })
+
+    it.each([
+      ['an invalid header name', 'my cursor', 'datasources.errors.invalidHeaderName'],
+      ['a credential header', 'Cookie', 'datasources.errors.credentialHeader'],
+      ['a header the HTTP client sets', 'Host', 'datasources.errors.clientHeader'],
+    ])('rejects %s as cursor header', (_name, cursorParameter, error) => {
+      expect(issues(HttpLooseSchema, [withCursor({ cursorParameter, cursorIn: 'HEADER' })])).toContainEqual(
+        issue('cursorParameter', error),
+      )
+    })
+
+    it.each(['my cursor', 'Cookie', 'Host'])('accepts %s as cursor query parameter', cursorParameter => {
+      expect(issues(HttpLooseSchema, [withCursor({ cursorParameter })])).toEqual([])
+    })
+
+    it.each([
+      [
+        'a cursor query parameter equal to a query parameter',
+        withCursor({ cursorParameter: 'cursor' }, { queryParameters: [{ name: 'cursor', value: 'x' }] }),
+        'cursorParameter',
+        'datasources.errors.paginationQueryDuplicate',
+      ],
+      [
+        'a cursor header equal to a header in other case',
+        withCursor(
+          { cursorParameter: 'X-Cursor', cursorIn: 'HEADER' },
+          { headers: [{ name: 'x-cursor', value: 'x' }] },
+        ),
+        'cursorParameter',
+        'datasources.errors.paginationHeaderDuplicate',
+      ],
+      [
+        'a limit parameter equal to a query parameter',
+        withCursor({ limitParameter: 'limit' }, { queryParameters: [{ name: 'limit', value: '5' }] }),
+        'limitParameter',
+        'datasources.errors.paginationQueryDuplicate',
+      ],
+      [
+        'a limit parameter equal to the cursor query parameter',
+        withCursor({ cursorParameter: 'cursor', limitParameter: 'cursor' }),
+        'limitParameter',
+        'datasources.errors.paginationParameterDuplicate',
+      ],
+    ])('rejects %s', (_name, apiCall, field, error) => {
+      expect(issues(HttpLooseSchema, [apiCall])).toContainEqual(issue(field, error))
+    })
+
+    it('rejects a limit parameter that breaks two rules', () => {
+      const apiCall = withCursor(
+        { cursorParameter: 'cursor', limitParameter: 'cursor' },
+        { queryParameters: [{ name: 'cursor', value: 'x' }] },
+      )
+      expect(issues(HttpLooseSchema, [apiCall])).toEqual(
+        expect.arrayContaining([
+          issue('limitParameter', 'datasources.errors.paginationQueryDuplicate'),
+          issue('limitParameter', 'datasources.errors.paginationParameterDuplicate'),
+        ]),
+      )
+    })
+
+    it.each([
+      [
+        'a cursor query parameter equal to a header',
+        withCursor({ cursorParameter: 'cursor' }, { headers: [{ name: 'cursor', value: 'x' }] }),
+      ],
+      [
+        'a limit parameter equal to the cursor header',
+        withCursor({ cursorParameter: 'cursor', cursorIn: 'HEADER', limitParameter: 'cursor' }),
+      ],
+    ])('accepts %s', (_name, apiCall) => {
+      expect(issues(HttpLooseSchema, [apiCall])).toEqual([])
+    })
+
+    it.each([
+      ['abc', 'limitInteger'],
+      ['-1', 'limitInteger'],
+      ['1.5', 'limitInteger'],
+      ['0', 'limitInteger'],
+      ['2147483648', 'pageNumberMax'],
+    ])('rejects the limit %s', (limit, error) => {
+      expect(issues(HttpLooseSchema, [withCursor({ limit })])).toContainEqual(
+        issue('limit', `datasources.errors.${error}`),
+      )
+    })
+
+    it('accepts the limit 1', () => {
+      expect(issues(HttpLooseSchema, [withCursor({ limit: '1' })])).toEqual([])
+    })
+
+    it.each([
+      [
+        'a limit without a limit parameter',
+        { limitParameter: '', limit: '20' },
+        'limitParameter',
+        'limitParameterRequired',
+      ],
+      ['a limit parameter without a limit', { limitParameter: 'limit', limit: '' }, 'limit', 'limitRequired'],
+    ])('rejects %s for release only', (_name, pagination, field, error) => {
+      const apiCall = { ...API_CALL, pagination: { ...CURSOR_PAGINATION_FORM, ...pagination } }
+      expect(issues(HttpStrictSchema, [apiCall])).toContainEqual(issue(field, `datasources.errors.${error}`))
+      expect(issues(HttpLooseSchema, [apiCall])).toEqual([])
+    })
+
+    const DISABLED_CURSOR_CASES = [
+      [
+        'a header cursor',
+        withCursor(
+          { isEnabled: false, cursorPath: 'next', cursorParameter: 'Host', cursorIn: 'HEADER', limit: '0' },
+          { headers: [{ name: 'host', value: 'x' }] },
+        ),
+      ],
+      [
+        'a query cursor',
+        withCursor(
+          { isEnabled: false, cursorParameter: 'cursor', limitParameter: 'cursor' },
+          { queryParameters: [{ name: 'cursor', value: 'x' }] },
+        ),
+      ],
+    ] as const
+
+    describe.each([
+      ['loose', HttpLooseSchema],
+      ['strict', HttpStrictSchema],
+    ] as const)('in the %s schema', (_name, schema) => {
+      it.each(DISABLED_CURSOR_CASES)('ignores invalid values of a disabled pagination with %s', (_case, apiCall) => {
+        expect(issues(schema, [apiCall]).filter(({ path }) => path.includes('pagination'))).toEqual([])
+      })
     })
   })
 })

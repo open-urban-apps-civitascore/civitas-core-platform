@@ -9,9 +9,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { HTTP_PAGINATION_TYPES } from '@/const/connectors'
-import { HttpApiCallsForm, HttpPaginationForm } from '@/types/connectors'
+import { HttpApiCallsForm, HttpPageNumberPaginationForm } from '@/types/connectors'
 
-type PaginationField = Exclude<keyof HttpPaginationForm, 'isEnabled' | 'type'>
+type PaginationField = Exclude<keyof HttpPageNumberPaginationForm, 'isEnabled' | 'type'>
 
 const PAGINATION_FIELDS: { name: PaginationField; isRequired: boolean; isNumeric: boolean }[] = [
   { name: 'pageParameter', isRequired: true, isNumeric: false },

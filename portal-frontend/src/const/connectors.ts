@@ -23,6 +23,12 @@ export const HTTP_METHODS = {
 
 export const HTTP_PAGINATION_TYPES = {
   PAGE_NUMBER: 'PAGE_NUMBER',
+  CURSOR: 'CURSOR',
+} as const
+
+export const HTTP_PARAMETER_LOCATIONS = {
+  QUERY: 'QUERY',
+  HEADER: 'HEADER',
 } as const
 
 export const DEFAULT_START_PAGE = '0'
