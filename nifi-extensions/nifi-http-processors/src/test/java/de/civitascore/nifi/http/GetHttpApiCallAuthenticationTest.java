@@ -29,6 +29,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import javax.net.ssl.SSLHandshakeException;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.reporting.InitializationException;
@@ -386,11 +387,13 @@ class GetHttpApiCallAuthenticationTest {
     try (ApiEndpoint token =
             tokenEndpoint(
                 Response.json("{\"access_token\":\"at-1\"}"),
-                Response.json("{\"access_token\":\"at-2\",\"expires_in\":30}"));
+                Response.json("{\"access_token\":\"at-2\",\"expires_in\":30}"),
+                Response.json("{\"access_token\":\"at-3\"}"));
         ApiEndpoint api =
             ApiEndpoint.answeringInTurnOverTls(
                 tls.server(),
                 Response.json(FULL_PAGE),
+                Response.json(SHORT_PAGE),
                 Response.json(SHORT_PAGE),
                 Response.json(SHORT_PAGE))) {
       TestRunner runner = oauth2Runner(api, token);
@@ -398,10 +401,12 @@ class GetHttpApiCallAuthenticationTest {
 
       runner.run(1, false, true);
       assertEquals(1, token.requests().size());
+      runner.run(1, false, false);
       runner.run(1, true, false);
 
-      assertEquals(2, token.requests().size());
-      assertEquals(List.of("Bearer at-1", "Bearer at-1", "Bearer at-2"), authorizations(api));
+      assertEquals(3, token.requests().size());
+      assertEquals(
+          List.of("Bearer at-1", "Bearer at-1", "Bearer at-2", "Bearer at-3"), authorizations(api));
     }
   }
 
@@ -515,6 +520,28 @@ class GetHttpApiCallAuthenticationTest {
           0,
           "API call \"Stations\": GET /stations failed: SSLHandshakeException");
     }
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @CsvSource({
+    "Received fatal alert: handshake_failure, true",
+    "Received fatal alert: bad_certificate, true",
+    "Received fatal alert: unsupported_certificate, true",
+    "Received fatal alert: certificate_revoked, true",
+    "Received fatal alert: certificate_expired, true",
+    "Received fatal alert: certificate_unknown, true",
+    "Received fatal alert: unknown_ca, true",
+    "Received fatal alert: access_denied, true",
+    "Received fatal alert: certificate_required, true",
+    "Received fatal alert: protocol_version, false",
+    "PKIX path building failed, false"
+  })
+  void onlyAServerAlertThatRefusesTheCertificateIsFatal(String message, boolean fatal) {
+    IOException cause = new IOException(new SSLHandshakeException(message));
+
+    assertEquals(
+        fatal,
+        new ClientCertificateAuthentication().transportFailure("GET /stations", cause).isPresent());
   }
 
   @Test
