@@ -1,0 +1,122 @@
+/**
+ * <p>This work and the accompanying materials are made available under the terms of the European Union Public License (EU-PL) 1.2 which is available at https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
+ *
+ * <p>SPDX-License-Identifier: EUPL-1.2
+ *
+ * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to all the individual contributors:
+ * Copyright (c) 2026 Civitas Connect e. V. and others.
+ *
+ */
+package de.civitascore.nifi.http;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+
+class JsonPathTest {
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {"$.next_cursor", "$.data[0].id", "$['next cursor']", "$.a-b", "$[0]", "$._x9"})
+  void parse_withMemberNamesIndexesAndQuotedNames_accepts(String text) {
+    assertEquals(Optional.of(new JsonPath(text)), JsonPath.parse(text));
+  }
+
+  /** Guards against drift from the JSON path grammar of the portal backend. */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "$",
+        "next",
+        "",
+        "$..cursor",
+        "$.items[?(@.id)]",
+        "$.a.*",
+        "$['']",
+        "$['a\\'b']",
+        "$['a\\\\b']",
+        "$[-1]",
+        "$.0a",
+        "$.a[0",
+        "$.a b",
+        " $.a"
+      })
+  void parse_withAFormOutsideTheGrammar_isEmpty(String text) {
+    assertEquals(Optional.empty(), JsonPath.parse(text));
+    assertThrows(IllegalArgumentException.class, () -> new JsonPath(text));
+  }
+
+  @ParameterizedTest
+  @CsvSource(
+      delimiter = '|',
+      quoteCharacter = '\'',
+      value = {
+        "$.next_cursor         | \"abc\"",
+        "$.data[1].id          | 7",
+        "$['next cursor']      | true",
+        "$['a.b'][0]           | \"dot\"",
+        "$['x][0']             | \"bracket\"",
+        "$.meta.items          | [1,2]"
+      })
+  void valueIn_followsMembersAndIndexes(String path, String expected)
+      throws JsonProcessingException {
+    JsonNode root =
+        MAPPER.readTree(
+            """
+            {"next_cursor": "abc",
+             "data": [{"id": 6}, {"id": 7}],
+             "next cursor": true,
+             "a.b": ["dot"],
+             "x][0": "bracket",
+             "meta": {"items": [1, 2]}}""");
+
+    assertEquals(MAPPER.readTree(expected), new JsonPath(path).valueIn(root));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "$.absent",
+        "$[0]",
+        "$.list.id",
+        "$.list[5]",
+        "$.text.length",
+        "$.text[0]",
+        "$.list[2147483648]",
+        "$.list[99999999999999999999]"
+      })
+  void valueIn_withAStepThatDoesNotFit_isMissing(String path) throws JsonProcessingException {
+    JsonNode root = MAPPER.readTree("{\"list\": [1, 2], \"text\": \"abc\"}");
+
+    assertTrue(new JsonPath(path).valueIn(root).isMissingNode());
+  }
+
+  @Test
+  void valueIn_withLeadingZerosInAnIndex_readsThatIndex() throws JsonProcessingException {
+    JsonNode root = MAPPER.readTree("{\"list\": [1, 2]}");
+
+    assertEquals(2, new JsonPath("$.list[0001]").valueIn(root).intValue());
+  }
+
+  @Test
+  void valueIn_withAQuotedDigitName_readsTheMemberNotAnIndex() throws JsonProcessingException {
+    JsonNode object = MAPPER.readTree("{\"0\": \"member\"}");
+    JsonNode array = MAPPER.readTree("[\"element\"]");
+
+    assertEquals("member", new JsonPath("$['0']").valueIn(object).textValue());
+    assertTrue(new JsonPath("$[0]").valueIn(object).isMissingNode());
+    assertTrue(new JsonPath("$['0']").valueIn(array).isMissingNode());
+    assertEquals("element", new JsonPath("$[0]").valueIn(array).textValue());
+  }
+}

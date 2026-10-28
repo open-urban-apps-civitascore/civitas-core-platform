@@ -41,26 +41,22 @@ record PageNumberPagination(
   }
 
   @Override
-  public boolean pagesAreArrays() {
-    return true;
+  public ResponseShape shape() {
+    return new ResponseShape.RecordArray();
   }
 
-  /**
-   * Some APIs answer a page past the last page with 400 or 404 instead of {@code []}; on the first
-   * page the same status is a configuration error.
-   */
   @Override
   public boolean isPastTheEnd(Page page, int status) {
-    return page.index() > 0 && (status == 400 || status == 404);
+    return Pagination.isPastTheLastPage(page, status);
   }
 
   @Override
-  public Optional<Page> next(Page page, int records) {
+  public Progress next(Page page, PageContent content) {
     boolean endPageDone = endPage.isPresent() && number(page.index()) >= endPage.getAsInt();
-    if (endPageDone || records < pageSize) {
-      return Optional.empty();
+    if (endPageDone || content.records() < pageSize) {
+      return new Progress.Accepted(content.records(), Optional.empty());
     }
-    return Optional.of(page(page.index() + 1));
+    return new Progress.Accepted(content.records(), Optional.of(page(page.index() + 1)));
   }
 
   private long number(long index) {
@@ -71,9 +67,10 @@ record PageNumberPagination(
     long number = number(index);
     return new Page(
         index,
-        Optional.of(Long.toString(number)),
+        Optional.of(new Page.Position("page", number)),
         List.of(
             new Parameter(pageParameter, Long.toString(number)),
-            new Parameter(pageSizeParameter, Integer.toString(pageSize))));
+            new Parameter(pageSizeParameter, Integer.toString(pageSize))),
+        List.of());
   }
 }

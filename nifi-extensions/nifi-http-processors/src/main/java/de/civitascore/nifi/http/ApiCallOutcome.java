@@ -71,7 +71,8 @@ sealed interface ApiCallOutcome {
     }
 
     /**
-     * A 2xx response whose body is not the JSON of records that agree with the record schema.
+     * A 2xx response whose body is not the JSON of records that agree with the record schema, or
+     * whose values the pagination cannot use.
      *
      * @param reason names no value of the response
      */
