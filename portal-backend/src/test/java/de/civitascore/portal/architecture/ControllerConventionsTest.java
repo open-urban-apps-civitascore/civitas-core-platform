@@ -10,8 +10,10 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.AccessTarget.CodeUnitCallTarget;
+import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaCodeUnitReference;
 import com.tngtech.archunit.core.importer.ImportOption.DoNotIncludeTests;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -38,6 +40,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 @AnalyzeClasses(packages = "de.civitascore.portal", importOptions = DoNotIncludeTests.class)
 class ControllerConventionsTest {
+
+  private static final String SERVICE_PACKAGE = "de.civitascore.portal.service";
+  private static final String CONTROLLER_PACKAGE = "de.civitascore.portal.controller..";
 
   private static final String DECLARED_RESPONSES =
       "the 2xx answer comes from the handler signature and the error answers from @Problems";
@@ -86,10 +91,10 @@ class ControllerConventionsTest {
           .because("springdoc names each operation after its handler method");
 
   @ArchTest
-  static final ArchRule restControllers_doNotBypassTheParentCheckOfDataSetOwnedEntities =
+  static final ArchRule controllers_doNotBypassTheParentCheckOfDataSetOwnedEntities =
       noClasses()
           .that()
-          .areAnnotatedWith(RestController.class)
+          .resideInAPackage(CONTROLLER_PACKAGE)
           .should()
           .callMethodWhere(
               target(owner(assignableTo(DataSetOwnedService.class)))
@@ -99,10 +104,10 @@ class ControllerConventionsTest {
                   + " operations that take the dataset id reject an entity of another dataset");
 
   @ArchTest
-  static final ArchRule restControllers_doNotBypassTheParentCheckOfDataStructureVersions =
+  static final ArchRule controllers_doNotBypassTheParentCheckOfDataStructureVersions =
       noClasses()
           .that()
-          .areAnnotatedWith(RestController.class)
+          .resideInAPackage(CONTROLLER_PACKAGE)
           .should()
           .callMethodWhere(
               target(owner(assignableTo(DataStructureVersionService.class)))
@@ -111,6 +116,17 @@ class ControllerConventionsTest {
               "OPA authorizes a nested route against the data structure in its path only, and only"
                   + " the operations that take the data structure id reject a version of another"
                   + " data structure");
+
+  @ArchTest
+  static final ArchRule controllers_referToNoServiceOperationByMethodReference =
+      noClasses()
+          .that()
+          .resideInAPackage(CONTROLLER_PACKAGE)
+          .should()
+          .accessTargetWhere(methodReferenceIntoServices())
+          .because(
+              "a method reference names the class that declares the operation, not the service it"
+                  + " is called on, so the parent-check rules cannot see it");
 
   private static ArchCondition<JavaClass> haveObjectAsRawSuperclass() {
     return new ArchCondition<>("have java.lang.Object as raw superclass") {
@@ -143,6 +159,14 @@ class ControllerConventionsTest {
         annotation ->
             annotation.getRawType().isEquivalentTo(Operation.class)
                 && !((String) annotation.get("operationId").orElse("")).isEmpty());
+  }
+
+  private static DescribedPredicate<JavaAccess<?>> methodReferenceIntoServices() {
+    return DescribedPredicate.describe(
+        "a method reference to a service operation",
+        access ->
+            access instanceof JavaCodeUnitReference<?>
+                && access.getTargetOwner().getPackageName().startsWith(SERVICE_PACKAGE));
   }
 
   private static DescribedPredicate<CodeUnitCallTarget> dataSetCheckedOperation() {
