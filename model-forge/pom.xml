@@ -62,10 +62,10 @@
     <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
     <!-- Pin tool versions once; child modules inherit these properties. -->
     <jacoco.version>0.8.15</jacoco.version>
-    <archunit.version>1.4.2</archunit.version>
+    <archunit.version>1.5.1</archunit.version>
     <testcontainers.version>2.0.5</testcontainers.version>
     <!-- Apache Wicket: Jakarta-based 10.x line (Servlet 6), used only by the admin-ui demo host. -->
-    <wicket.version>10.9.1</wicket.version>
+    <wicket.version>10.11.0</wicket.version>
     <!-- Drop once the Spring Boot parent manages Tomcat >= 11.0.25: Boot 4.1.1 pins 11.0.24,
          affected by GHSA-9xv2-5v5q-p794, GHSA-gcx9-497g-6cp6 and GHSA-h3x4-894j-xpx5. -->
     <tomcat.version>11.0.26</tomcat.version>
@@ -120,7 +120,7 @@
       <plugin>
         <groupId>com.diffplug.spotless</groupId>
         <artifactId>spotless-maven-plugin</artifactId>
-        <version>3.6.0</version>
+        <version>3.10.4</version>
         <configuration>
           <java>
             <includes>
