@@ -76,14 +76,18 @@ test-config-adapter:
 # because the suite cannot be parallelised inside one JVM: modules share a static container per JVM,
 # and the NiFi containers bind fixed host ports.
 #
-# Shards are grouped by module runtime; rebalance when one shard becomes the longest job.
+# Shards are grouped by runtime; rebalance when one shard becomes the longest job. The NiFi IT
+# classes start a NiFi each and cannot share one, so they are split by class (times from pipeline
+# 2993848429: FrostMapping 216 s, Deployment 35 s, Probe 17 s | Sql, DataFlow | HttpDataFlow 108 s |
+# FrostFindOrCreate 201 s, Postgis 106 s). The last NiFi shard runs every IT class the others do not
+# name, so a new IT class always runs in one shard.
 #
 # -pl is used without -am: config-adapter-application depends on every adapter, so -am pulls the
 # whole reactor into a shard, and failsafe runs in every reactor module — that shard would re-run the
 # full IT suite. build-config-adapter installs the modules so a restricted reactor resolves.
-# Each shard is a separate job rather than a parallel:matrix, so that other jobs can reference it in
-# needs: by plain name — a matrix generates names of the form "job: [value]" instead.
-.integration-test-config-adapter:
+# A job that needs integration-test-config-adapter waits for every shard of the matrix.
+# The FROST and HTTP/REST ITs need the NARs from build-nifi-nars; they find them in the sibling build tree.
+integration-test-config-adapter:
   extends:
     - .only-config-adapter-changes
     - .dind
@@ -96,6 +100,18 @@ test-config-adapter:
       artifacts: true
     - job: build-config-adapter
       artifacts: true
+    - job: build-nifi-nars
+      artifacts: true
+  parallel:
+    matrix:
+      - MODULES: config-adapter-nifi
+        IT_FILTER:
+          - 'NifiFrostMappingIT,NifiDeploymentIT,JdbcSqlSourceProbeIT'
+          - 'NifiSqlDataFlowIT,NifiDataFlowIT'
+          - 'NifiHttpDataFlowIT'
+          - '*IT,!NifiFrostMappingIT,!NifiDeploymentIT,!JdbcSqlSourceProbeIT,!NifiSqlDataFlowIT,!NifiDataFlowIT,!NifiHttpDataFlowIT'
+      - MODULES: config-adapter-apisix,config-adapter-keycloak
+      - MODULES: config-adapter-frost,config-adapter-geoserver,config-adapter-postgis,config-adapter-flowable,event-handler-kafka,config-adapter-application,config-adapter-connection-test
   script:
     - cd config-adapter
     # Explicit goals keep package, spotless and spotbugs out of this job.
@@ -108,49 +124,6 @@ test-config-adapter:
     reports:
       junit:
         - config-adapter/*/target/failsafe-reports/TEST-*.xml
-
-# The NiFi shard was one job of 11 minutes, twice the next shard. Its seven IT classes start a NiFi
-# each and cannot share one (fixed host port), so they are split over three jobs of about 3.5 minutes
-# of tests each (class times from the run of pipeline 2967253734: Mapping 154 s, Deployment 35 s,
-# Probe 16 s | Sql 133 s, DataFlow 54 s | FindOrCreate 110 s, Postgis 107 s). The last shard
-# runs every class the other two do not name, so a new IT class always runs in one shard.
-# The FROST and HTTP/REST ITs need the NARs from build-nifi-nars; they find them in the sibling build tree.
-.integration-test-config-adapter-nifi:
-  extends: .integration-test-config-adapter
-  variables:
-    MODULES: config-adapter-nifi
-  needs:
-    - job: setup-version
-      artifacts: true
-    - job: build-config-adapter
-      artifacts: true
-    - job: build-nifi-nars
-      artifacts: true
-
-integration-test-config-adapter-nifi-a:
-  extends: .integration-test-config-adapter-nifi
-  variables:
-    IT_FILTER: 'NifiFrostMappingIT,NifiDeploymentIT,JdbcSqlSourceProbeIT'
-
-integration-test-config-adapter-nifi-b:
-  extends: .integration-test-config-adapter-nifi
-  variables:
-    IT_FILTER: 'NifiSqlDataFlowIT,NifiDataFlowIT'
-
-integration-test-config-adapter-nifi-c:
-  extends: .integration-test-config-adapter-nifi
-  variables:
-    IT_FILTER: '!NifiFrostMappingIT,!NifiDeploymentIT,!JdbcSqlSourceProbeIT,!NifiSqlDataFlowIT,!NifiDataFlowIT'
-
-integration-test-config-adapter-gateway-idm:
-  extends: .integration-test-config-adapter
-  variables:
-    MODULES: config-adapter-apisix,config-adapter-keycloak
-
-integration-test-config-adapter-data-services:
-  extends: .integration-test-config-adapter
-  variables:
-    MODULES: config-adapter-frost,config-adapter-geoserver,config-adapter-postgis,config-adapter-flowable,event-handler-kafka,config-adapter-application,config-adapter-connection-test
 
 # portal-backend compiles against the artifact of this job, so the job runs wherever the backend
 # jobs run, and wherever the API test stack runs.
@@ -237,15 +210,7 @@ publish-config-adapter:
       artifacts: false
     - job: test-config-adapter
       artifacts: false
-    - job: integration-test-config-adapter-nifi-a
-      artifacts: false
-    - job: integration-test-config-adapter-nifi-b
-      artifacts: false
-    - job: integration-test-config-adapter-nifi-c
-      artifacts: false
-    - job: integration-test-config-adapter-gateway-idm
-      artifacts: false
-    - job: integration-test-config-adapter-data-services
+    - job: integration-test-config-adapter
       artifacts: false
     - job: static-analysis-config-adapter
       artifacts: false
@@ -270,11 +235,8 @@ build-config-adapter-image:
       artifacts: true
     - job: build-config-adapter
     - job: test-config-adapter
-    - job: integration-test-config-adapter-nifi-a
-    - job: integration-test-config-adapter-nifi-b
-    - job: integration-test-config-adapter-nifi-c
-    - job: integration-test-config-adapter-gateway-idm
-    - job: integration-test-config-adapter-data-services
+    - job: integration-test-config-adapter
+      artifacts: false
     - job: static-analysis-config-adapter
   script:
     - cd config-adapter

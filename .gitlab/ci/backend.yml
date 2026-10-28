@@ -326,19 +326,7 @@ build-backend-image:
     - job: static-analysis-config-adapter
       artifacts: false
       optional: true
-    - job: integration-test-config-adapter-nifi-a
-      artifacts: false
-      optional: true
-    - job: integration-test-config-adapter-nifi-b
-      artifacts: false
-      optional: true
-    - job: integration-test-config-adapter-nifi-c
-      artifacts: false
-      optional: true
-    - job: integration-test-config-adapter-gateway-idm
-      artifacts: false
-      optional: true
-    - job: integration-test-config-adapter-data-services
+    - job: integration-test-config-adapter
       artifacts: false
       optional: true
   script:
