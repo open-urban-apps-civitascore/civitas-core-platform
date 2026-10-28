@@ -78,9 +78,8 @@ final class PageLoop {
   private RunResult readPages(ProcessSession session, Authentication authentication) {
     Pagination pagination = apiCall.pagination();
     List<FlowFile> pages = new ArrayList<>();
-    PageRepeats repeats = new PageRepeats();
     Page page = pagination.first();
-    repeats.earlierWithSameRequest(page);
+    PageRepeats repeats = new PageRepeats(page);
     for (int read = 1; ; read++) {
       ApiCallOutcome outcome = client.send(apiCall, page, authentication);
       Optional<Page> next;

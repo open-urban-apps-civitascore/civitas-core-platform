@@ -32,6 +32,13 @@ final class PageRepeats {
   private final Map<List<List<Parameter>>, Page> pagesByRequest = new HashMap<>();
   private Supplier<String> currentHash;
 
+  /**
+   * @param first the first page of the run, which a later page must not repeat either
+   */
+  PageRepeats(Page first) {
+    pagesByRequest.put(request(first), first);
+  }
+
   /** The body as a stream that hashes what the caller reads from it. */
   InputStream hashing(InputStream body) {
     MessageDigest digest;
@@ -60,7 +67,10 @@ final class PageRepeats {
    * @return the earlier page of the run that adds the same
    */
   Optional<Page> earlierWithSameRequest(Page page) {
-    return Optional.ofNullable(
-        pagesByRequest.putIfAbsent(List.of(page.queryParameters(), page.headers()), page));
+    return Optional.ofNullable(pagesByRequest.putIfAbsent(request(page), page));
+  }
+
+  private static List<List<Parameter>> request(Page page) {
+    return List.of(page.queryParameters(), page.headers());
   }
 }

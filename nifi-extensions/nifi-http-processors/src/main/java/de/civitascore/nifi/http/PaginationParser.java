@@ -98,11 +98,7 @@ final class PaginationParser {
       }
       names.add(CURSOR_PARAMETER, pagination.cursorParameter(), cursorIn.get());
     }
-    String limitParameter = blankToNull(pagination.limitParameter());
-    if (limitParameter != null) {
-      names.add(LIMIT_PARAMETER, limitParameter, ParameterLocation.QUERY);
-    }
-    Optional<Limit> limit = limit(limitParameter, pagination.limit(), violations);
+    Optional<Limit> limit = limit(pagination, names, violations);
     names.check(violations);
     if (violations.size() > before) {
       return Optional.empty();
@@ -115,12 +111,8 @@ final class PaginationParser {
   private static Optional<Pagination> limitOffset(
       JsonPagination pagination, PaginationNames names, List<String> violations) {
     int before = violations.size();
-    String limitParameter = blankToNull(pagination.limitParameter());
-    if (limitParameter != null) {
-      names.add(LIMIT_PARAMETER, limitParameter, ParameterLocation.QUERY);
-    }
+    Optional<Limit> limit = limit(pagination, names, violations);
     addRequiredQueryName(pagination.offsetParameter(), OFFSET_PARAMETER, names, violations);
-    Optional<Limit> limit = limit(limitParameter, pagination.limit(), violations);
     names.check(violations);
     int offset = pagination.offset() == null ? 0 : pagination.offset();
     if (offset < 0) {
@@ -157,9 +149,17 @@ final class PaginationParser {
     return Optional.empty();
   }
 
-  /** A limit and its parameter come together, or the request sends no limit. */
+  /**
+   * A limit and its parameter come together, or the request sends no limit. The limit parameter
+   * goes into {@code names} as a query name.
+   */
   private static Optional<Limit> limit(
-      String limitParameter, Integer limit, List<String> violations) {
+      JsonPagination pagination, PaginationNames names, List<String> violations) {
+    String limitParameter = blankToNull(pagination.limitParameter());
+    if (limitParameter != null) {
+      names.add(LIMIT_PARAMETER, limitParameter, ParameterLocation.QUERY);
+    }
+    Integer limit = pagination.limit();
     if (limit == null) {
       if (limitParameter != null) {
         violations.add(LIMIT + " is required with " + LIMIT_PARAMETER);
