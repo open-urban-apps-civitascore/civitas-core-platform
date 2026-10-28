@@ -16,25 +16,10 @@ export const INVALID_EDGE_STYLE = { stroke: MISMATCH_COLOR }
  * scalar primitives so Point vs Polygon mismatches can be handled explicitly.
  */
 export type GeometryType =
-  | 'Point'
-  | 'LineString'
-  | 'Polygon'
-  | 'MultiPoint'
-  | 'MultiLineString'
-  | 'MultiPolygon'
-  | 'GeometryCollection'
+  'Point' | 'LineString' | 'Polygon' | 'MultiPoint' | 'MultiLineString' | 'MultiPolygon' | 'GeometryCollection'
 
 export type FieldType =
-  | 'str'
-  | 'int'
-  | 'number'
-  | 'bool'
-  | 'date'
-  | 'datetime'
-  | 'uuid'
-  | GeometryType
-  | 'array'
-  | 'object'
+  'str' | 'int' | 'number' | 'bool' | 'date' | 'datetime' | 'uuid' | GeometryType | 'array' | 'object'
 
 export const GEOMETRY: ReadonlySet<GeometryType> = new Set<GeometryType>([
   'Point',
