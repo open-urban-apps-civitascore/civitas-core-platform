@@ -10,11 +10,13 @@
 package de.civitascore.nifi.http;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.net.Socket;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSocket;
 
 /**
@@ -26,43 +28,56 @@ import javax.net.ssl.SSLSocket;
  */
 final class ClosingTlsEndpoint implements AutoCloseable {
 
-  private final SSLServerSocket socket;
+  private static final int DRAIN_TIMEOUT_MS = 5000;
 
-  private ClosingTlsEndpoint(SSLServerSocket socket) {
-    this.socket = socket;
+  private final ServerSocket socket;
+  private final SSLContext tls;
+  private final boolean refusesClientCertificates;
+
+  private ClosingTlsEndpoint(SSLContext tls, boolean refusesClientCertificates) {
+    try {
+      this.socket = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+    this.tls = tls;
+    this.refusesClientCertificates = refusesClientCertificates;
   }
 
   static ClosingTlsEndpoint start(SSLContext tls) {
-    return start(listen(tls));
+    return start(new ClosingTlsEndpoint(tls, false));
   }
 
   /** Needs a client certificate in a TLS 1.2 handshake, which {@code tls} must not trust. */
   static ClosingTlsEndpoint refusingClientCertificates(SSLContext tls) {
-    SSLServerSocket socket = listen(tls);
-    socket.setNeedClientAuth(true);
-    socket.setEnabledProtocols(new String[] {"TLSv1.2"});
-    return start(socket);
+    return start(new ClosingTlsEndpoint(tls, true));
   }
 
-  private static SSLServerSocket listen(SSLContext tls) {
-    try {
-      return (SSLServerSocket)
-          tls.getServerSocketFactory().createServerSocket(0, 1, InetAddress.getLoopbackAddress());
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
-    }
-  }
-
-  private static ClosingTlsEndpoint start(SSLServerSocket socket) {
-    ClosingTlsEndpoint endpoint = new ClosingTlsEndpoint(socket);
+  private static ClosingTlsEndpoint start(ClosingTlsEndpoint endpoint) {
     Thread.ofVirtual().start(endpoint::answer);
     return endpoint;
   }
 
   private void answer() {
     try (Socket connection = socket.accept()) {
-      ((SSLSocket) connection).startHandshake();
-      connection.getInputStream().read();
+      connection.setSoTimeout(DRAIN_TIMEOUT_MS);
+      SSLSocket tlsConnection =
+          (SSLSocket)
+              tls.getSocketFactory().createSocket(connection, null, connection.getPort(), false);
+      tlsConnection.setUseClientMode(false);
+      if (refusesClientCertificates) {
+        tlsConnection.setNeedClientAuth(true);
+        tlsConnection.setEnabledProtocols(new String[] {"TLSv1.2"});
+      }
+      try {
+        tlsConnection.startHandshake();
+        tlsConnection.getInputStream().read();
+      } catch (SSLException e) {
+        // A close with unread client data sends a TCP reset, which can drop the alert at the
+        // client.
+        connection.shutdownOutput();
+        connection.getInputStream().transferTo(OutputStream.nullOutputStream());
+      }
     } catch (IOException e) {
       // A refused handshake or the end of the test; there is nobody left to answer.
     }

@@ -9,6 +9,7 @@
  */
 package de.civitascore.nifi.http;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -27,6 +28,9 @@ import org.apache.nifi.web.client.provider.service.StandardWebClientServiceProvi
 
 /** The test runner of the processor and what the tests read from it. */
 final class GetHttpApiCallRunners {
+
+  private static final List<Relationship> RELATIONSHIPS =
+      List.of(GetHttpApiCall.SUCCESS, GetHttpApiCall.STOP, GetHttpApiCall.FAILURE);
 
   static final String STATIONS = "{\"name\":\"Stations\",\"path\":\"/stations\"}";
 
@@ -77,12 +81,23 @@ final class GetHttpApiCallRunners {
   /** Asserts the one empty FlowFile of a failed run of {@link #STATIONS}. */
   static void assertRouted(
       TestRunner runner, Relationship relationship, int status, String message) {
-    runner.assertAllFlowFilesTransferred(relationship, 1);
+    assertEquals(List.of(relationship.getName() + ": " + message), routed(runner));
     MockFlowFile failed = runner.getFlowFilesForRelationship(relationship).get(0);
     failed.assertAttributeEquals(GetHttpApiCall.REQUEST_PATH, "/stations");
     failed.assertAttributeEquals(GetHttpApiCall.ERROR_STATUS, Integer.toString(status));
-    failed.assertAttributeEquals(GetHttpApiCall.ERROR_MESSAGE, message);
     failed.assertContentEquals("");
+  }
+
+  /** The relationship and the error message of each FlowFile that the runs transferred. */
+  private static List<String> routed(TestRunner runner) {
+    List<String> routed = new ArrayList<>();
+    for (Relationship relationship : RELATIONSHIPS) {
+      for (MockFlowFile flowFile : runner.getFlowFilesForRelationship(relationship)) {
+        routed.add(
+            relationship.getName() + ": " + flowFile.getAttribute(GetHttpApiCall.ERROR_MESSAGE));
+      }
+    }
+    return routed;
   }
 
   /** Every log message with its arguments and exceptions, as a bulletin would show it. */
@@ -107,8 +122,7 @@ final class GetHttpApiCallRunners {
   /** What the log and the FlowFiles of each relationship show, as {@link #logged} does. */
   static List<String> visible(TestRunner runner) {
     List<String> visible = new ArrayList<>(logged(runner.getLogger()));
-    for (Relationship relationship :
-        List.of(GetHttpApiCall.SUCCESS, GetHttpApiCall.STOP, GetHttpApiCall.FAILURE)) {
+    for (Relationship relationship : RELATIONSHIPS) {
       for (MockFlowFile flowFile : runner.getFlowFilesForRelationship(relationship)) {
         visible.addAll(flowFile.getAttributes().values());
       }
