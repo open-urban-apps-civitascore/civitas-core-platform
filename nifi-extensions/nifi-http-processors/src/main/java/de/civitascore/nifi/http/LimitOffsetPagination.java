@@ -19,8 +19,9 @@ import java.util.OptionalLong;
 /**
  * Sends the offset, and with a limit the limit, as query parameters. With a limit, the offset grows
  * by the limit and a response with fewer records ends the run; without one, the offset grows by the
- * record count and a response without records ends the run. A cause names a page by its offset,
- * which follows from the configuration.
+ * record count and a response without records ends the run. A cause names a page by its offset, so
+ * that a Data Steward can send the same request again; without a limit, the offset thus carries the
+ * record counts of the earlier responses.
  *
  * @param countPath where a response that is one record holds its record count; empty when each
  *     response is an array of records

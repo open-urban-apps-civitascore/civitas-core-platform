@@ -486,9 +486,10 @@ A response with more records than the `limit` is not an error. The offset is a `
 | A count that makes the next offset larger than 9223372036854775807 | `stop` |
 | A record that violates the `Record Schema` | `stop` |
 
-A cause and `http.page` name a request by its offset, for example `offset 100`. The offset follows
-from the configuration and from the record counts, so a Data Steward can send the same request. A
-cause never shows the value at `countPath`, because it is data of the API host. An API that ignores
+A cause and `http.page` name a request by its offset, for example `offset 100`, so a Data Steward
+can send the same request. The offset follows from the configuration and from the record counts.
+Without a limit, two offsets in a row thus give the record count of a response, which is the value
+at `countPath` when one is set. A cause shows no other value of a response. An API that ignores
 the offset sends the same page again, and the check for a repeated body below stops the run at the
 second request.
 
