@@ -127,6 +127,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const nodeName = useNodeName()
   const datasetId = params.datasetId
   const activeSession = sessionManager.getActiveSession()
+  const activeSessionId = activeSession?.id
   const pipeline = activeSession?.pipeline || createEmptyPipeline()
 
   // ===== Track whether initial load has been done =====
@@ -232,10 +233,10 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     // Preselect the session whose backend pipeline id matches the ?pipeline= search param,
     // so deep-links from the dataset overview open the right tab.
     const matchedSession = requestedPipelineId ? sessions.find(s => s.pipeline.id === requestedPipelineId) : undefined
-    const activeSessionId = matchedSession?.id ?? sessions[0]?.id ?? null
+    const initialActiveSessionId = matchedSession?.id ?? sessions[0]?.id ?? null
 
     // Load all sessions into the session manager
-    sessionManager.loadSessions(sessions, activeSessionId)
+    sessionManager.loadSessions(sessions, initialActiveSessionId)
 
     // Create initial data sink and mapping snapshots for change detection. A schema-invalid
     // document here (e.g. stale data predating a schema change) must not crash the whole editor on
@@ -259,7 +260,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Validation State =====
   const [validationResults, setValidationResults] = useState<Record<string, ValidationResultWithNodeStatus>>({})
-  const validationResult = activeSession ? (validationResults[activeSession.id] ?? null) : null
+  const validationResult = activeSessionId ? (validationResults[activeSessionId] ?? null) : null
 
   const setValidationResultFor = useCallback((sessionId: string, result: ValidationResultWithNodeStatus | null) => {
     setValidationResults(previous => {
@@ -279,8 +280,20 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   }, [validationResults])
   /** True when pipeline changed since last validation - requires validation before save */
   const [isValidationRequired, setIsValidationRequired] = useState(true)
-  /** True when validation panel should be shown in inspector */
-  const [shouldShowValidationPanel, setShouldShowValidationPanel] = useState(false)
+  const [sessionIdsWithValidationPanel, setSessionIdsWithValidationPanel] = useState<Set<string>>(new Set())
+  const shouldShowValidationPanel = activeSessionId ? sessionIdsWithValidationPanel.has(activeSessionId) : false
+
+  const showValidationPanelFor = useCallback((sessionIds: string[]) => {
+    setSessionIdsWithValidationPanel(previous => new Set([...previous, ...sessionIds]))
+  }, [])
+
+  const hideValidationPanelFor = useCallback((sessionId: string) => {
+    setSessionIdsWithValidationPanel(previous => {
+      const next = new Set(previous)
+      next.delete(sessionId)
+      return next
+    })
+  }, [])
 
   // ===== Computed: Can Save =====
   // Pipeline can be saved when: isDirty && validation passed (no errors) && validation has been run
@@ -291,18 +304,27 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   }, [activeSession?.isDirty, validationResult?.errors?.length, isValidationRequired])
 
   // ===== Track pipeline changes to invalidate validation =====
-  const previousActiveSessionIdRef = useRef(activeSession?.id)
+  const previousActiveSessionIdRef = useRef(activeSessionId)
   useEffect(() => {
-    const isSameSession = previousActiveSessionIdRef.current === activeSession?.id
-    previousActiveSessionIdRef.current = activeSession?.id
+    const isSameSession = previousActiveSessionIdRef.current === activeSessionId
+    previousActiveSessionIdRef.current = activeSessionId
     // When pipeline changes (and is dirty), mark validation as required
-    if (activeSession?.isDirty) {
+    if (activeSessionId && activeSession?.isDirty) {
       setIsValidationRequired(true)
-      // A tab switch keeps the result of the new active pipeline.
-      if (isSameSession) setValidationResultFor(activeSession.id, null)
-      setShouldShowValidationPanel(false)
+      // A tab switch keeps the result and the panel state of the new active pipeline.
+      if (isSameSession) {
+        setValidationResultFor(activeSessionId, null)
+        hideValidationPanelFor(activeSessionId)
+      }
     }
-  }, [activeSession?.isDirty, activeSession?.id, pipeline.nodes.length, pipeline.edges.length, setValidationResultFor])
+  }, [
+    activeSession?.isDirty,
+    activeSessionId,
+    pipeline.nodes.length,
+    pipeline.edges.length,
+    setValidationResultFor,
+    hideValidationPanelFor,
+  ])
 
   // ===== Memoized Values =====
   const selectedNode = useMemo(() => pipeline.nodes.find(n => n.selected) || null, [pipeline.nodes])
@@ -375,7 +397,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const selectNode = useCallback(
     (nodeId: string, isMultiSelect = false) => {
       // Reset validation panel when selecting a node (latest action wins)
-      setShouldShowValidationPanel(false)
+      if (activeSessionId) hideValidationPanelFor(activeSessionId)
 
       updatePipeline(p => ({
         ...p,
@@ -386,7 +408,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         edges: isMultiSelect ? p.edges : p.edges.map(edge => ({ ...edge, selected: false })),
       }))
     },
-    [updatePipeline],
+    [activeSessionId, updatePipeline, hideValidationPanelFor],
   )
 
   // ===== Edge Operations =====
@@ -419,7 +441,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const selectEdge = useCallback(
     (edgeId: string, isMultiSelect = false) => {
       // Reset validation panel when selecting an edge (latest action wins)
-      setShouldShowValidationPanel(false)
+      if (activeSessionId) hideValidationPanelFor(activeSessionId)
 
       updatePipeline(p => ({
         ...p,
@@ -430,7 +452,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         nodes: isMultiSelect ? p.nodes : p.nodes.map(node => ({ ...node, selected: false })),
       }))
     },
-    [updatePipeline],
+    [activeSessionId, updatePipeline, hideValidationPanelFor],
   )
 
   // ===== Selection Operations =====
@@ -490,20 +512,28 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const runValidation = useCallback(() => {
     const result = validatePipelineWithNodeStatus(
       currentPipelineOf(pipeline),
-      activeSession ? validationContextFor(activeSession.id) : {},
+      activeSessionId ? validationContextFor(activeSessionId) : {},
     )
-    if (activeSession) setValidationResultFor(activeSession.id, result)
+    if (activeSessionId) setValidationResultFor(activeSessionId, result)
     // Mark validation as no longer required (it was just run)
     setIsValidationRequired(false)
     // Show validation panel in inspector
-    setShouldShowValidationPanel(true)
+    if (activeSessionId) showValidationPanelFor([activeSessionId])
     updatePipeline(withoutSelection)
     return result
-  }, [pipeline, activeSession, validationContextFor, updatePipeline, currentPipelineOf, setValidationResultFor])
+  }, [
+    pipeline,
+    activeSessionId,
+    validationContextFor,
+    updatePipeline,
+    currentPipelineOf,
+    setValidationResultFor,
+    showValidationPanelFor,
+  ])
 
   const clearValidation = useCallback(() => {
-    if (activeSession) setValidationResultFor(activeSession.id, null)
-  }, [activeSession, setValidationResultFor])
+    if (activeSessionId) setValidationResultFor(activeSessionId, null)
+  }, [activeSessionId, setValidationResultFor])
 
   const getNodeValidationSeverity = useCallback(
     (nodeId: string): ValidationSeverity => {
@@ -513,8 +543,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   )
 
   const hideValidationPanel = useCallback(() => {
-    setShouldShowValidationPanel(false)
-  }, [])
+    if (activeSessionId) hideValidationPanelFor(activeSessionId)
+  }, [activeSessionId, hideValidationPanelFor])
 
   // ===== Validate all saved pipelines once after load =====
   const hasValidatedOnLoadRef = useRef(false)
@@ -534,20 +564,19 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         ] as const,
     )
     setValidationResults(previous => ({ ...previous, ...Object.fromEntries(results) }))
+    showValidationPanelFor(savedSessions.map(session => session.id))
 
-    const hasActiveResult = results.some(([sessionId]) => sessionId === activeSession?.id)
-    if (hasActiveResult) {
-      setIsValidationRequired(false)
-      setShouldShowValidationPanel(true)
-    }
+    const hasActiveResult = results.some(([sessionId]) => sessionId === activeSessionId)
+    if (hasActiveResult) setIsValidationRequired(false)
   }, [
     isFetchingDatasources,
     isReadOnly,
     sessionManager,
     sessionManager.sessions,
-    activeSession,
+    activeSessionId,
     currentPipelineOf,
     validationContextFor,
+    showValidationPanelFor,
   ])
 
   // ===== Pipeline Operations: Rename =====
@@ -646,6 +675,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         unchangedInvalidNames.push(session.name)
       }
     }
+    const validatedSessions = [...dirtySessions, ...unchangedSavedSessions]
+    validatedSessions.forEach(session => sessionManager.updateSessionPipeline(session.id, withoutSelection))
+    showValidationPanelFor(validatedSessions.map(session => session.id))
 
     if (failedNames.length > 0) {
       toast.error(t('header.validationFailed', { names: failedNames.join(', ') }))
@@ -701,7 +733,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       for (const session of dirtySessions) {
         // Declared outside the try below so the catch can still see whatever refs were stashed
         // onto it before the failing step.
-        let currentPipeline = currentPipelineOf(session.pipeline)
+        let currentPipeline = withoutSelection(currentPipelineOf(session.pipeline))
         try {
           const snapshot = dataSinkSnapshotsRef.current[session.id] ?? {}
 
@@ -904,6 +936,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     validationContextFor,
     currentPipelineOf,
     setValidationResultFor,
+    showValidationPanelFor,
     t,
     isReadOnly,
   ])

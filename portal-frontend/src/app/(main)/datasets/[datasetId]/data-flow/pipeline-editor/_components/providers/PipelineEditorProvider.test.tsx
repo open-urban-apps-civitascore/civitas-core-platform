@@ -2723,12 +2723,31 @@ describe('PipelineEditorProviderComponent', () => {
       modifiedAt: '2024-01-01T00:00:00Z',
     })
 
+    const sessionManagerRef = { current: null as ReturnType<typeof usePipelineSession> | null }
+
     const loadPipelines = (dtos: PipelineOutputDTO[]) => {
       vi.mocked(useGetPipelines).mockReturnValue({
         data: { data: dtos },
         isLoading: false,
       } as unknown as ReturnType<typeof useGetPipelines>)
-      return renderProvider()
+      const Wrapper: React.FC = () => {
+        const sessionManager = usePipelineSession()
+        sessionManagerRef.current = sessionManager
+        return (
+          <PipelineEditorProviderComponent sessionManager={sessionManager}>
+            <Consumer />
+          </PipelineEditorProviderComponent>
+        )
+      }
+      const view = render(<Wrapper />)
+      return { rerender: () => view.rerender(<Wrapper />) }
+    }
+
+    const switchToPipeline = (pipelineId: string) => {
+      const session = sessionManagerRef.current?.sessions.find(candidate => candidate.pipeline.id === pipelineId)
+      act(() => {
+        sessionManagerRef.current?.switchToSession(String(session?.id))
+      })
     }
 
     const failValidationFor = (pipelineIds: string[]) => {
@@ -2741,8 +2760,6 @@ describe('PipelineEditorProviderComponent', () => {
 
     const validatedPipelineIds = () =>
       vi.mocked(validatePipelineWithNodeStatus).mock.calls.map(([pipeline]) => pipeline.id)
-
-    const sessionManagerRef = { current: null as ReturnType<typeof usePipelineSession> | null }
 
     const renderSessions = (sessions: PipelineSession[]) => {
       const Wrapper: React.FC = () => {
@@ -2884,9 +2901,69 @@ describe('PipelineEditorProviderComponent', () => {
         const [validatedPipeline] = vi.mocked(validatePipelineWithNodeStatus).mock.calls[0]
         expect(validatedPipeline.nodes[0].data).toMatchObject({ entityMetadata: { connector: 'HTTP' } })
       })
+
+      it('keeps the panel open in the other pipeline after a tab switch', () => {
+        loadPipelines([pipelineDto('pipeline-a'), pipelineDto('pipeline-b')])
+
+        switchToPipeline('pipeline-b')
+
+        expect(contextRef.current?.pipeline?.id).toBe('pipeline-b')
+        expect(contextRef.current?.shouldShowValidationPanel).toBe(true)
+      })
+
+      it.each([
+        ['selects a node', () => contextRef.current?.selectNode('src-1')],
+        ['selects an element on the canvas', () => contextRef.current?.hideValidationPanel()],
+      ])('closes the panel only in the pipeline where the user %s', (_label, closePanel) => {
+        loadPipelines([pipelineDto('pipeline-a', [dataSourceNode('SQL')]), pipelineDto('pipeline-b')])
+
+        act(() => {
+          closePanel()
+        })
+        expect(contextRef.current?.shouldShowValidationPanel).toBe(false)
+
+        switchToPipeline('pipeline-b')
+        expect(contextRef.current?.shouldShowValidationPanel).toBe(true)
+
+        switchToPipeline('pipeline-a')
+        expect(contextRef.current?.shouldShowValidationPanel).toBe(false)
+      })
     })
 
     describe('on save', () => {
+      it.each([
+        ['after a save', []],
+        ['when the save stops because of errors', ['changed']],
+      ])('opens the panel in every validated pipeline %s', async (_label, failingIds) => {
+        failValidationFor(failingIds)
+        renderSessions([savedSession('changed', true), savedSession('unchanged', false)])
+
+        await saveAll()
+        expect(contextRef.current?.shouldShowValidationPanel).toBe(true)
+
+        act(() => {
+          sessionManagerRef.current?.switchToSession('unchanged')
+        })
+        expect(contextRef.current?.shouldShowValidationPanel).toBe(true)
+      })
+
+      it.each([
+        ['after a save', []],
+        ['when the save stops because of errors', ['changed']],
+      ])('clears the selection in every validated pipeline %s', async (_label, failingIds) => {
+        failValidationFor(failingIds)
+        const selectedNode = { ...makeNode('node-1'), selected: true }
+        renderSessions([
+          savedSession('changed', true, [selectedNode]),
+          savedSession('unchanged', false, [selectedNode]),
+        ])
+
+        await saveAll()
+
+        const sessions = sessionManagerRef.current?.sessions ?? []
+        expect(sessions.flatMap(session => session.pipeline.nodes).some(node => node.selected)).toBe(false)
+      })
+
       it('saves nothing when a changed pipeline has errors', async () => {
         failValidationFor(['changed'])
         renderSessions([savedSession('changed', true), savedSession('unchanged', false)])
@@ -2956,6 +3033,20 @@ describe('PipelineEditorProviderComponent', () => {
       expect(contextRef.current?.validationResult).toBeNull()
     })
 
+    it('opens the panel only for the active pipeline after "Validate"', () => {
+      renderSessions([savedSession('pipeline-1'), savedSession('pipeline-2')])
+
+      act(() => {
+        contextRef.current?.runValidation()
+      })
+      expect(contextRef.current?.shouldShowValidationPanel).toBe(true)
+
+      act(() => {
+        sessionManagerRef.current?.switchToSession('pipeline-2')
+      })
+      expect(contextRef.current?.shouldShowValidationPanel).toBe(false)
+    })
+
     it('keeps the validation result of a changed pipeline when the user switches to its tab', async () => {
       failValidationFor(['pipeline-2'])
       renderSessions([savedSession('pipeline-1', true), savedSession('pipeline-2', true)])
@@ -2967,6 +3058,7 @@ describe('PipelineEditorProviderComponent', () => {
 
       expect(contextRef.current?.validationResult).toBe(INVALID_RESULT)
       expect(contextRef.current?.sessionIdsWithErrors).toEqual(new Set(['pipeline-2']))
+      expect(contextRef.current?.shouldShowValidationPanel).toBe(true)
     })
 
     it('clears the validation result when the user edits the pipeline after a tab switch', async () => {
@@ -2983,6 +3075,7 @@ describe('PipelineEditorProviderComponent', () => {
 
       expect(contextRef.current?.validationResult).toBeNull()
       expect(contextRef.current?.sessionIdsWithErrors.has('pipeline-2')).toBe(false)
+      expect(contextRef.current?.shouldShowValidationPanel).toBe(false)
     })
   })
 })
