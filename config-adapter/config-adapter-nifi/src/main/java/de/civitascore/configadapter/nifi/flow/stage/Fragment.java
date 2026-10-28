@@ -39,6 +39,7 @@ public enum Fragment {
   MQTT_SSL_CONTEXT_SERVICE("mqtt_ssl_context_service"),
   WEB_CLIENT_SERVICE("web_client_service"),
   HTTP_SOURCE_WEB_CLIENT("http_source_web_client"),
+  HTTP_SOURCE_SSL_CONTEXT("http_source_ssl_context"),
   DBCP_CONNECTION_POOL("dbcp_connection_pool");
 
   private final String resource;

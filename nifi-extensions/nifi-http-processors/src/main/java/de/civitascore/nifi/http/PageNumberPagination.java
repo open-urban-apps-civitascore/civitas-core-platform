@@ -59,6 +59,13 @@ record PageNumberPagination(
     return new Progress.Accepted(content.records(), Optional.of(page(page.index() + 1)));
   }
 
+  @Override
+  public List<String> names(ParameterLocation location) {
+    return location == ParameterLocation.QUERY
+        ? List.of(pageParameter, pageSizeParameter)
+        : List.of();
+  }
+
   private long number(long index) {
     return startPage + index;
   }

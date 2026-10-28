@@ -13,17 +13,22 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpsConfigurator;
+import com.sun.net.httpserver.HttpsExchange;
+import com.sun.net.httpserver.HttpsParameters;
 import com.sun.net.httpserver.HttpsServer;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.security.cert.Certificate;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLPeerUnverifiedException;
 
 /**
  * An HTTP API on the loopback interface that records each request and answers each with a scripted
@@ -34,8 +39,19 @@ import javax.net.ssl.SSLContext;
  */
 final class ApiEndpoint implements AutoCloseable {
 
-  /** The request as it arrived, with the path and the query still percent-encoded. */
-  record Request(String method, String rawPath, String rawQuery, Headers headers) {}
+  /**
+   * The request as it arrived, with the path and the query still percent-encoded.
+   *
+   * @param clientCertificates the chain that the client presented in the TLS handshake, empty
+   *     without one
+   */
+  record Request(
+      String method,
+      String rawPath,
+      String rawQuery,
+      Headers headers,
+      String body,
+      List<Certificate> clientCertificates) {}
 
   /** A scripted response; a null body sends none. */
   record Response(int status, Map<String, String> headers, String body) {
@@ -46,6 +62,10 @@ final class ApiEndpoint implements AutoCloseable {
 
     static Response status(int status) {
       return new Response(status, JSON, "{}");
+    }
+
+    static Response status(int status, String body) {
+      return new Response(status, JSON, body);
     }
   }
 
@@ -76,12 +96,17 @@ final class ApiEndpoint implements AutoCloseable {
 
   /** As {@link #answeringInTurn(Response...)}, and calls the action with the index of a request. */
   static ApiEndpoint answeringInTurn(IntConsumer beforeAnswer, Response... responses) {
-    List<Response> script = List.of(responses);
+    IntFunction<Response> script = inTurn(responses);
     return startHttp(
         index -> {
           beforeAnswer.accept(index);
-          return index < script.size() ? script.get(index) : SCRIPT_EXHAUSTED;
+          return script.apply(index);
         });
+  }
+
+  private static IntFunction<Response> inTurn(Response... responses) {
+    List<Response> script = List.of(responses);
+    return index -> index < script.size() ? script.get(index) : SCRIPT_EXHAUSTED;
   }
 
   static ApiEndpoint answering(int status, String body) {
@@ -90,11 +115,42 @@ final class ApiEndpoint implements AutoCloseable {
 
   /** As {@link #answering(int, String)}, over https with the certificate of the context. */
   static ApiEndpoint answeringOverTls(SSLContext tls, int status, String body) {
+    Response response = new Response(status, JSON, body);
+    return startHttps(new HttpsConfigurator(tls), index -> response);
+  }
+
+  /** As {@link #answeringInTurn(Response...)}, over https with the certificate of the context. */
+  static ApiEndpoint answeringInTurnOverTls(SSLContext tls, Response... responses) {
+    return startHttps(new HttpsConfigurator(tls), inTurn(responses));
+  }
+
+  /**
+   * As {@link #answeringInTurnOverTls}, and the handshake needs a client certificate that the
+   * context trusts.
+   *
+   * @param protocol the only TLS version the server accepts, for example {@code TLSv1.2}
+   */
+  static ApiEndpoint answeringOverMutualTls(
+      SSLContext tls, String protocol, Response... responses) {
+    HttpsConfigurator configurator =
+        new HttpsConfigurator(tls) {
+          @Override
+          public void configure(HttpsParameters parameters) {
+            SSLParameters ssl = tls.getDefaultSSLParameters();
+            ssl.setNeedClientAuth(true);
+            ssl.setProtocols(new String[] {protocol});
+            parameters.setSSLParameters(ssl);
+          }
+        };
+    return startHttps(configurator, inTurn(responses));
+  }
+
+  private static ApiEndpoint startHttps(
+      HttpsConfigurator configurator, IntFunction<Response> script) {
     try {
       HttpsServer server = HttpsServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-      server.setHttpsConfigurator(new HttpsConfigurator(tls));
-      Response response = new Response(status, JSON, body);
-      return start(server, "https", index -> response);
+      server.setHttpsConfigurator(configurator);
+      return start(server, "https", script);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
@@ -124,7 +180,9 @@ final class ApiEndpoint implements AutoCloseable {
             exchange.getRequestMethod(),
             exchange.getRequestURI().getRawPath(),
             exchange.getRequestURI().getRawQuery(),
-            exchange.getRequestHeaders()));
+            exchange.getRequestHeaders(),
+            new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8),
+            clientCertificates(exchange)));
     response.headers().forEach(exchange.getResponseHeaders()::add);
     if (response.body() == null) {
       exchange.sendResponseHeaders(response.status(), -1);
@@ -134,6 +192,17 @@ final class ApiEndpoint implements AutoCloseable {
       exchange.getResponseBody().write(bytes);
     }
     exchange.close();
+  }
+
+  private static List<Certificate> clientCertificates(HttpExchange exchange) {
+    if (exchange instanceof HttpsExchange https) {
+      try {
+        return List.of(https.getSSLSession().getPeerCertificates());
+      } catch (SSLPeerUnverifiedException e) {
+        return List.of();
+      }
+    }
+    return List.of();
   }
 
   String baseUrl() {

@@ -11,17 +11,23 @@ package de.civitascore.configadapter.nifi.rest;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.absent;
+import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.encrypted;
+import static de.civitascore.configadapter.nifi.flow.NifiTestFixtures.stretchedKey;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import de.civitascore.configadapter.model.dataset.Datasource;
@@ -37,26 +43,38 @@ import de.civitascore.configadapter.nifi.rest.NifiRestClient.RuntimeStatus;
 import de.civitascore.configadapter.nifi.rest.NifiRestClient.RuntimeStatus.State;
 import de.civitascore.configadapter.testsupport.TestContainerImages;
 import java.io.File;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.KeyStore;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.postgresql.Driver;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -67,6 +85,9 @@ import org.testcontainers.utility.MountableFile;
 /**
  * Runs a Pipeline from an HTTP/REST Data source through a cron node and a Mapping to a PostGIS Data
  * storage in a real NiFi, with WireMock as the API, and watches it with the runtime monitor.
+ *
+ * <p>The authenticated cases need https. A test CA signs the certificates of both API hosts and of
+ * the client certificate, and NiFi trusts it as a JVM default CA, the source the Pipeline uses.
  */
 class NifiHttpDataFlowIT extends AbstractNifiIT {
 
@@ -76,6 +97,12 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
   private static final String DB_USER = "nifi";
   private static final String DB_PASSWORD = "nifi-db-secret";
   private static final String DATASET_ID = "ds-1";
+  private static final String TLS_BASE_URL = "https://api:8443";
+  private static final String MUTUAL_TLS_BASE_URL = "https://api-mtls:8443";
+  private static final String ROWS = "[{\"id\":\"s1\",\"name\":\"North\"}]";
+  // WireMock reads a client-certificate truststore only with this password.
+  private static final String STORE_PASSWORD = "password";
+  private static final String WIREMOCK_TLS = "/home/wiremock/tls/";
 
   /** Each element of a response array is one record. */
   private static final String ARRAY_RECORDS =
@@ -102,8 +129,11 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
 
   private static Network network;
   private static GenericContainer<?> api;
+  private static GenericContainer<?> mutualTlsApi;
   private static PostgreSQLContainer<?> postgres;
   private static WireMock wireMock;
+  private static WireMock mutualTlsWireMock;
+  private static TestPki pki;
 
   private RuntimeMonitorProbe monitor;
 
@@ -115,15 +145,26 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
         "HTTP NAR not built — skipping NiFi HTTP/REST data-flow IT; build nifi-extensions first");
 
     network = Network.newNetwork();
+    pki = TestPki.create();
 
-    api =
-        new GenericContainer<>(DockerImageName.parse(TestContainerImages.WIREMOCK))
-            .withNetwork(network)
-            .withNetworkAliases("api")
-            .withExposedPorts(8080)
-            .waitingFor(Wait.forHttp("/__admin/health").forStatusCode(200).forStatusCode(404));
+    api = httpsWireMock("api");
     api.start();
     wireMock = new WireMock(api.getHost(), api.getMappedPort(8080));
+
+    mutualTlsApi =
+        httpsWireMock(
+                "api-mtls",
+                "--https-require-client-cert",
+                "--https-truststore",
+                WIREMOCK_TLS + "ca.p12",
+                "--truststore-type",
+                "PKCS12",
+                "--truststore-password",
+                STORE_PASSWORD)
+            .withCopyFileToContainer(
+                MountableFile.forHostPath(pki.caTruststore(), 0644), WIREMOCK_TLS + "ca.p12");
+    mutualTlsApi.start();
+    mutualTlsWireMock = new WireMock(mutualTlsApi.getHost(), mutualTlsApi.getMappedPort(8080));
 
     postgres =
         new PostgreSQLContainer<>(
@@ -143,8 +184,53 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
         container -> {
           container.withCopyFileToContainer(
               MountableFile.forHostPath(postgresDriverJar()), "/opt/nifi/drivers/postgresql.jar");
+          // The JVM reads jssecacerts in place of cacerts, so the test CA is the one default CA.
+          container.withCopyFileToContainer(
+              MountableFile.forHostPath(pki.jvmDefaultTruststore(), 0644),
+              javaHome(container) + "/lib/security/jssecacerts");
           installExtensionNars(container);
         });
+  }
+
+  /** A WireMock that answers over http on 8080 and over https on 8443. */
+  private static GenericContainer<?> httpsWireMock(String alias, String... options) {
+    List<String> command =
+        new ArrayList<>(
+            List.of(
+                "--https-port",
+                "8443",
+                "--https-keystore",
+                WIREMOCK_TLS + "server.p12",
+                "--keystore-type",
+                "PKCS12",
+                "--keystore-password",
+                STORE_PASSWORD,
+                "--key-manager-password",
+                STORE_PASSWORD));
+    command.addAll(List.of(options));
+    return new GenericContainer<>(DockerImageName.parse(TestContainerImages.WIREMOCK))
+        .withNetwork(network)
+        .withNetworkAliases(alias)
+        .withExposedPorts(8080)
+        .withCopyFileToContainer(
+            MountableFile.forHostPath(pki.serverKeystore(), 0644), WIREMOCK_TLS + "server.p12")
+        .withCommand(command.toArray(String[]::new))
+        .waitingFor(Wait.forHttp("/__admin/health").forStatusCode(200).forStatusCode(404));
+  }
+
+  private static String javaHome(GenericContainer<?> container) {
+    try {
+      String image = container.getImage().get();
+      for (String variable :
+          DockerClientFactory.lazyClient().inspectImageCmd(image).exec().getConfig().getEnv()) {
+        if (variable.startsWith("JAVA_HOME=")) {
+          return variable.substring("JAVA_HOME=".length());
+        }
+      }
+    } catch (Exception e) {
+      throw new IllegalStateException("cannot inspect the NiFi image", e);
+    }
+    throw new IllegalStateException("the NiFi image sets no JAVA_HOME");
   }
 
   @AfterAll
@@ -155,6 +241,9 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
     }
     if (api != null) {
       api.stop();
+    }
+    if (mutualTlsApi != null) {
+      mutualTlsApi.stop();
     }
     if (network != null) {
       network.close();
@@ -531,8 +620,114 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
         during + " requests in " + window + " with a response delay of " + delay);
   }
 
+  @ParameterizedTest
+  @EnumSource(AuthenticationCase.class)
+  void eachMethodReadsRows(AuthenticationCase authentication) throws Exception {
+    String table = authentication.table("http_auth_");
+    Credential credential = credential(authentication);
+    credential
+        .api()
+        .register(
+            credential
+                .authenticated()
+                .apply(get(urlPathEqualTo("/" + table)))
+                .willReturn(okJson(ROWS)));
+
+    deploy(UUID.randomUUID().toString(), credential, "/" + table, table);
+
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(2))
+        .ignoreExceptions()
+        .until(() -> names(table).equals(List.of("North")));
+  }
+
+  @Test
+  void refusedTokenRequestStopsThePipelineWithTheCause() throws Exception {
+    wireMock.register(
+        post(urlPathEqualTo("/token-refused"))
+            .willReturn(
+                aResponse()
+                    .withStatus(401)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        "{\"error\":\"invalid_client\",\"error_description\":\"unknown client\"}")));
+    String pipelineId = UUID.randomUUID().toString();
+    Credential credential =
+        new Credential(
+            wireMock,
+            TLS_BASE_URL,
+            Map.of(
+                "type",
+                "OAUTH2",
+                "tokenUrl",
+                TLS_BASE_URL + "/token-refused",
+                "clientId",
+                "pipeline",
+                "clientSecret",
+                encrypted("refused-client-secret")),
+            List.of(),
+            UnaryOperator.identity());
+
+    String processGroupId =
+        deploy(pipelineId, credential, "/token-refused-api", "http_token_refused");
+
+    Map<String, Object> stopped = awaitEvent(pipelineId, processGroupId, "STOPPED");
+    assertEquals(
+        "API call \"readings\": OAuth2 token request to api:8443/token-refused failed with status"
+            + " 401 (invalid_client)",
+        stopped.get("message"));
+    assertEquals(0, requests("/token-refused-api"));
+  }
+
+  @ParameterizedTest
+  @EnumSource(AuthenticationCase.class)
+  void uniqueSecretsAppearInNoFlowExportBulletinOrCause(AuthenticationCase authentication)
+      throws Exception {
+    String table = authentication.table("http_refused_");
+    Credential credential = credential(authentication);
+    credential
+        .api()
+        .register(get(urlPathEqualTo("/" + table)).willReturn(aResponse().withStatus(401)));
+    String pipelineId = UUID.randomUUID().toString();
+
+    String processGroupId = deploy(pipelineId, credential, "/" + table, table);
+
+    Map<String, Object> stopped = awaitEvent(pipelineId, processGroupId, "STOPPED");
+    assertEquals(
+        "API call \"readings\": GET /"
+            + table
+            + " failed with status 401 ("
+            + authentication.method
+            + ")",
+        stopped.get("message"));
+    String export = flowExport(processGroupId);
+    String bulletins = client.readBulletins().toString();
+    String log = nifi.execInContainer("cat", "logs/nifi-app.log").getStdout();
+    for (String secret : credential.secrets()) {
+      assertFalse(export.contains(secret), "the flow export holds a secret");
+      assertFalse(bulletins.contains(secret), "a bulletin holds a secret");
+      assertFalse(String.valueOf(stopped).contains(secret), "the cause holds a secret");
+      assertFalse(log.contains(secret), "the NiFi log holds a secret");
+    }
+    if (authentication == AuthenticationCase.CLIENT_CERTIFICATE) {
+      assertTrue(export.contains(pki.clientCertificateLine()), "the export holds the certificate");
+    }
+  }
+
+  private String deploy(String pipelineId, Credential credential, String path, String table)
+      throws Exception {
+    return deploy(
+        pipelineId,
+        credential.baseUrl(),
+        credential.authentication(),
+        apiCall(path),
+        ARRAY_RECORDS,
+        table);
+  }
+
   private String deploy(String pipelineId, String path, String table) throws Exception {
-    return deploy(pipelineId, Map.of("name", "readings", "method", "GET", "path", path), table);
+    return deploy(pipelineId, apiCall(path), table);
   }
 
   private String deploy(String pipelineId, Map<String, Object> apiCall, String table)
@@ -540,17 +735,29 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
     return deploy(pipelineId, apiCall, ARRAY_RECORDS, table);
   }
 
+  private String deploy(
+      String pipelineId, Map<String, Object> apiCall, String records, String table)
+      throws Exception {
+    return deploy(pipelineId, "http://api:8080", Map.of(), apiCall, records, table);
+  }
+
   /**
    * @param records the Mapping {@code map-1} and the Data structure {@code el-1} of the records
    */
   private String deploy(
-      String pipelineId, Map<String, Object> apiCall, String records, String table)
+      String pipelineId,
+      String baseUrl,
+      Map<String, Object> authentication,
+      Map<String, Object> apiCall,
+      String records,
+      String table)
       throws Exception {
     Datasource source = new Datasource();
     source.setId("ds-" + pipelineId);
     source.setType("http");
     source.handleUnknownProperty("element", "el-1");
-    source.handleUnknownProperty("baseUrl", "http://api:8080");
+    source.handleUnknownProperty("baseUrl", baseUrl);
+    source.handleUnknownProperty("authentication", authentication);
     source.handleUnknownProperty("apiCalls", List.of(apiCall));
     Map<String, Object> graph =
         map(
@@ -573,7 +780,7 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
     Map<String, Map<String, Object>> artifacts = NifiTestFixtures.artifacts(records);
     DeploymentPlan plan =
         NifiTestFixtures.planner(
-                new CredentialResolver(new byte[0]),
+                new CredentialResolver(stretchedKey()),
                 SqlSourceProbe.NO_OP,
                 new PlatformSinkConfig(
                     "jdbc:postgresql://postgres:5432/" + DB, DB_USER, DB_PASSWORD),
@@ -586,6 +793,110 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
                     new PostgisSinkSpec(table, List.of("id")),
                     artifacts));
     return client.deployFlow(plan);
+  }
+
+  private static Map<String, Object> apiCall(String path) {
+    return Map.of("name", "readings", "method", "GET", "path", path);
+  }
+
+  private static Credential credential(AuthenticationCase authentication) throws Exception {
+    String unique = UUID.randomUUID().toString();
+    return switch (authentication) {
+      case BEARER_TOKEN -> {
+        String token = "bearer-token-" + unique;
+        yield new Credential(
+            wireMock,
+            TLS_BASE_URL,
+            Map.of("type", "BEARER_TOKEN", "token", encrypted(token)),
+            List.of(token),
+            request -> request.withHeader("Authorization", equalTo("Bearer " + token)));
+      }
+      case API_TOKEN_IN_HEADER -> {
+        String value = "header-token-" + unique;
+        yield new Credential(
+            wireMock,
+            TLS_BASE_URL,
+            Map.of(
+                "type",
+                "API_TOKEN",
+                "name",
+                "X-Api-Key",
+                "in",
+                "HEADER",
+                "value",
+                encrypted(value)),
+            List.of(value),
+            request -> request.withHeader("X-Api-Key", equalTo(value)));
+      }
+      case API_TOKEN_IN_QUERY -> {
+        String value = "query-token-" + unique;
+        // The space and the separators reach the API intact only through percent-encoding.
+        String sent = value + " &=";
+        yield new Credential(
+            wireMock,
+            TLS_BASE_URL,
+            Map.of("type", "API_TOKEN", "name", "api_key", "in", "QUERY", "value", encrypted(sent)),
+            List.of(value),
+            request -> request.withQueryParam("api_key", equalTo(sent)));
+      }
+      case OAUTH2 -> {
+        String clientSecret = "client-secret-" + unique;
+        String accessToken = "access-token-" + UUID.randomUUID();
+        String tokenPath = "/token/" + UUID.randomUUID();
+        wireMock.register(
+            post(urlPathEqualTo(tokenPath))
+                .withBasicAuth("pipeline", clientSecret)
+                .withHeader("Content-Type", containing("application/x-www-form-urlencoded"))
+                .withRequestBody(equalTo("grant_type=client_credentials&scope=read"))
+                .willReturn(
+                    okJson(
+                        "{\"access_token\":\""
+                            + accessToken
+                            + "\",\"token_type\":\"Bearer\",\"expires_in\":3600}")));
+        yield new Credential(
+            wireMock,
+            TLS_BASE_URL,
+            Map.of(
+                "type", "OAUTH2",
+                "tokenUrl", TLS_BASE_URL + tokenPath,
+                "clientId", "pipeline",
+                "clientSecret", encrypted(clientSecret),
+                "scope", "read"),
+            List.of(clientSecret, accessToken),
+            request -> request.withHeader("Authorization", equalTo("Bearer " + accessToken)));
+      }
+      case CLIENT_CERTIFICATE ->
+          new Credential(
+              mutualTlsWireMock,
+              MUTUAL_TLS_BASE_URL,
+              Map.of(
+                  "type", "CLIENT_CERTIFICATE",
+                  "certificate", encrypted(pki.clientCertificateChain()),
+                  "privateKey", encrypted(pki.clientPrivateKey())),
+              List.of(pki.clientPrivateKeyLine()),
+              UnaryOperator.identity());
+    };
+  }
+
+  private static String flowExport(String processGroupId) throws Exception {
+    Request request =
+        new Request.Builder()
+            .url(
+                "https://"
+                    + dockerHost
+                    + ":"
+                    + HOST_PORT
+                    + "/nifi-api/process-groups/"
+                    + processGroupId
+                    + "/download?includeReferencedServices=true")
+            .header("Authorization", "Bearer " + client.authenticate())
+            .get()
+            .build();
+    try (Response response = httpClient.newCall(request).execute()) {
+      String body = response.body().string();
+      assertEquals(200, response.code(), body);
+      return body;
+    }
   }
 
   private Map<String, Object> awaitEvent(String pipelineId, String processGroupId, String status) {
@@ -728,8 +1039,15 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
               "http_offset_end_400",
               "http_offset_end_404",
               "http_unavailable",
-              "http_slow")) {
+              "http_slow",
+              "http_token_refused")) {
         st.execute("CREATE TABLE " + table + " (id text PRIMARY KEY, name text)");
+      }
+      for (AuthenticationCase authentication : AuthenticationCase.values()) {
+        for (String prefix : List.of("http_auth_", "http_refused_")) {
+          st.execute(
+              "CREATE TABLE " + authentication.table(prefix) + " (id text PRIMARY KEY, name text)");
+        }
       }
     }
   }
@@ -744,6 +1062,163 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
           .getAbsolutePath();
     } catch (Exception e) {
       throw new IllegalStateException("cannot locate the postgresql driver jar", e);
+    }
+  }
+
+  /** One authentication method of an HTTP Data source, with the name its causes give it. */
+  private enum AuthenticationCase {
+    BEARER_TOKEN("Bearer Token"),
+    API_TOKEN_IN_HEADER("API Token"),
+    API_TOKEN_IN_QUERY("API Token"),
+    OAUTH2("OAuth2"),
+    CLIENT_CERTIFICATE("Client certificate");
+
+    private final String method;
+
+    AuthenticationCase(String method) {
+      this.method = method;
+    }
+
+    String table(String prefix) {
+      return prefix + name().toLowerCase(Locale.ROOT);
+    }
+  }
+
+  /**
+   * The {@code authentication} of a Data source with its unique secrets and the request match of
+   * the API host that only a request with these credentials passes.
+   */
+  private record Credential(
+      WireMock api,
+      String baseUrl,
+      Map<String, Object> authentication,
+      List<String> secrets,
+      UnaryOperator<MappingBuilder> authenticated) {}
+
+  /** A test CA, the certificate of both API hosts it signed, and a client certificate it signed. */
+  private record TestPki(
+      Path serverKeystore,
+      Path caTruststore,
+      Path jvmDefaultTruststore,
+      String clientCertificateChain,
+      String clientPrivateKey) {
+
+    private static final String KEYTOOL = System.getProperty("java.home") + "/bin/keytool";
+
+    static TestPki create() throws Exception {
+      Path dir = Files.createTempDirectory("http-auth-pki");
+      Path ca = dir.resolve("ca-key.p12");
+      Path caCertificate = dir.resolve("ca.crt");
+      keytool(
+          ca,
+          "-genkeypair",
+          "-alias",
+          "ca",
+          "-keyalg",
+          "EC",
+          "-dname",
+          "CN=Test CA",
+          "-ext",
+          "bc:c");
+      keytool(ca, "-exportcert", "-alias", "ca", "-rfc", "-file", caCertificate.toString());
+
+      Path server = dir.resolve("server.p12");
+      keytool(server, "-genkeypair", "-alias", "server", "-keyalg", "EC", "-dname", "CN=api");
+      Path serverCertificate = sign(ca, server, "server", "-ext", "SAN=dns:api,dns:api-mtls");
+      keytool(
+          server, "-importcert", "-alias", "ca", "-noprompt", "-file", caCertificate.toString());
+      keytool(server, "-importcert", "-alias", "server", "-file", serverCertificate.toString());
+
+      Path client = dir.resolve("client.p12");
+      keytool(client, "-genkeypair", "-alias", "client", "-keyalg", "RSA", "-dname", "CN=pipeline");
+      Path clientCertificate = sign(ca, client, "client");
+
+      Path caTruststore = dir.resolve("ca.p12");
+      keytool(
+          caTruststore,
+          "-importcert",
+          "-alias",
+          "ca",
+          "-noprompt",
+          "-file",
+          caCertificate.toString());
+      Path jvmDefaultTruststore = dir.resolve("jssecacerts");
+      // The JVM opens its default truststore without a password, so nothing in it is encrypted.
+      runKeytool(
+          KEYTOOL,
+          "-J-Dkeystore.pkcs12.certProtectionAlgorithm=NONE",
+          "-J-Dkeystore.pkcs12.macAlgorithm=NONE",
+          "-importcert",
+          "-alias",
+          "civitas-http-test-ca",
+          "-noprompt",
+          "-file",
+          caCertificate.toString(),
+          "-storetype",
+          "PKCS12",
+          "-keystore",
+          jvmDefaultTruststore.toString(),
+          "-storepass",
+          STORE_PASSWORD);
+
+      return new TestPki(
+          server,
+          caTruststore,
+          jvmDefaultTruststore,
+          Files.readString(clientCertificate, StandardCharsets.US_ASCII)
+              + Files.readString(caCertificate, StandardCharsets.US_ASCII),
+          "-----BEGIN PRIVATE KEY-----\n"
+              + Base64.getMimeEncoder(64, new byte[] {'\n'})
+                  .encodeToString(privateKey(client, "client"))
+              + "\n-----END PRIVATE KEY-----\n");
+    }
+
+    /** The first line of the PEM body, unique to this key. */
+    String clientPrivateKeyLine() {
+      return clientPrivateKey.lines().skip(1).findFirst().orElseThrow();
+    }
+
+    /** The first line of the PEM body of the client certificate. */
+    String clientCertificateLine() {
+      return clientCertificateChain.lines().skip(1).findFirst().orElseThrow();
+    }
+
+    private static Path sign(Path ca, Path store, String alias, String... extensions)
+        throws Exception {
+      Path request = store.resolveSibling(alias + ".csr");
+      Path certificate = store.resolveSibling(alias + ".crt");
+      keytool(store, "-certreq", "-alias", alias, "-file", request.toString());
+      List<String> arguments =
+          new ArrayList<>(
+              List.of(
+                  "-gencert",
+                  "-alias",
+                  "ca",
+                  "-rfc",
+                  "-infile",
+                  request.toString(),
+                  "-outfile",
+                  certificate.toString()));
+      arguments.addAll(List.of(extensions));
+      keytool(ca, arguments.toArray(String[]::new));
+      return certificate;
+    }
+
+    private static byte[] privateKey(Path store, String alias) throws Exception {
+      KeyStore keys = KeyStore.getInstance("PKCS12");
+      try (InputStream in = Files.newInputStream(store)) {
+        keys.load(in, STORE_PASSWORD.toCharArray());
+      }
+      return keys.getKey(alias, STORE_PASSWORD.toCharArray()).getEncoded();
+    }
+
+    private static void keytool(Path store, String... arguments) throws Exception {
+      List<String> command = new ArrayList<>(List.of(KEYTOOL));
+      command.addAll(List.of(arguments));
+      command.addAll(
+          List.of(
+              "-storetype", "PKCS12", "-keystore", store.toString(), "-storepass", STORE_PASSWORD));
+      runKeytool(command.toArray(String[]::new));
     }
   }
 }

@@ -28,7 +28,12 @@ final class BasicAuthentication implements Authentication {
   }
 
   @Override
-  public HttpRequestHeadersSpec authenticate(HttpRequestHeadersSpec request) {
+  public String method() {
+    return "Basic Auth";
+  }
+
+  @Override
+  public HttpRequestHeadersSpec headers(HttpRequestHeadersSpec request) {
     String credential = username + ":" + password;
     return request.header(
         "Authorization",

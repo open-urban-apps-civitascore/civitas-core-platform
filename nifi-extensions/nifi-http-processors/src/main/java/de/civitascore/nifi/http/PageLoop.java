@@ -65,6 +65,7 @@ final class PageLoop {
    * session.
    */
   void run(ProcessSession session, Authentication authentication) {
+    authentication.startRun();
     switch (readPages(session, authentication)) {
       case RunResult.Complete complete ->
           session.transfer(complete.pages(), GetHttpApiCall.SUCCESS);

@@ -30,6 +30,8 @@ import de.civitascore.configadapter.nifi.flow.stage.StopSource;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * HTTP/REST pull source over GetHttpApiCall. The stage maps no field of the API call, so a new
@@ -42,8 +44,21 @@ public final class HttpSourceStage implements SourceStage {
 
   private static final String WEB_CLIENT = "HttpSourceWebClient";
 
+  /**
+   * Friendly name of the client certificate's SSL context, matched like {@link #HTTP_PROCESSOR}.
+   */
+  private static final String SSL_CONTEXT = "HttpSourceSslContext";
+
+  private static final Pattern PEM_BEGIN = Pattern.compile("-----BEGIN ([^-]*)-----");
+
+  private static final String AUTHENTICATION_TYPE = "Authentication Type";
+
   private static final String NONE = "NONE";
   private static final String BASIC = "BASIC";
+  private static final String BEARER_TOKEN = "BEARER_TOKEN";
+  private static final String API_TOKEN = "API_TOKEN";
+  private static final String OAUTH2 = "OAUTH2";
+  private static final String CLIENT_CERTIFICATE = "CLIENT_CERTIFICATE";
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -90,32 +105,127 @@ public final class HttpSourceStage implements SourceStage {
     Map<String, Object> recordSchema = dataStructure(source, artifacts);
     Map<String, Object> apiCall = selectApiCall(original.get("apiCalls"), node);
     Map<String, Object> authentication = objectOrEmpty(original.get("authentication"));
-    Object password = authentication.get("password");
-    if (password != null && !String.valueOf(password).isBlank() && !isEncrypted(password)) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.NIFI_TEMPLATE_ERROR,
-          "HTTP/REST source password must be encrypted (plaintext secrets are not accepted)");
-    }
+    String type = authentication.get("type") instanceof String text ? text : NONE;
+    Secrets secrets = new Secrets(original, authentication);
 
     putIfPresent(out::putSourceProperty, "Base URL", original.get("baseUrl"));
     out.putSourceProperty("API Call", json(apiCall));
     out.putSourceProperty("Record Schema", json(recordSchema));
-    String type = authentication.get("type") instanceof String text ? text : NONE;
-    out.putSourceProperty("Authentication Type", type);
-    if (BASIC.equals(type)) {
-      putIfPresent(out::putSourceProperty, "Basic Auth Username", authentication.get("username"));
-      if (isEncrypted(password)) {
-        Map<String, Object> plain =
-            objectOrEmpty(credentials.decrypt(original).get("authentication"));
-        out.putSensitive(
-            HTTP_PROCESSOR, "Basic Auth Password", String.valueOf(plain.get("password")));
+    out.putSourceProperty(AUTHENTICATION_TYPE, type);
+    switch (type) {
+      case BASIC -> {
+        putIfPresent(out::putSourceProperty, "Basic Auth Username", authentication.get("username"));
+        secrets
+            .value("password")
+            .ifPresent(value -> out.putSensitive(HTTP_PROCESSOR, "Basic Auth Password", value));
       }
+      case BEARER_TOKEN ->
+          secrets
+              .value("token")
+              .ifPresent(value -> out.putSensitive(HTTP_PROCESSOR, "Bearer Token", value));
+      case API_TOKEN -> {
+        putIfPresent(out::putSourceProperty, "API Token Name", authentication.get("name"));
+        putIfPresent(out::putSourceProperty, "API Token Location", authentication.get("in"));
+        secrets
+            .value("value")
+            .ifPresent(value -> out.putSensitive(HTTP_PROCESSOR, "API Token Value", value));
+      }
+      case OAUTH2 -> {
+        putIfPresent(out::putSourceProperty, "OAuth2 Token URL", authentication.get("tokenUrl"));
+        putIfPresent(out::putSourceProperty, "OAuth2 Client ID", authentication.get("clientId"));
+        putIfPresent(out::putSourceProperty, "OAuth2 Scope", authentication.get("scope"));
+        secrets
+            .value("clientSecret")
+            .ifPresent(value -> out.putSensitive(HTTP_PROCESSOR, "OAuth2 Client Secret", value));
+      }
+      case CLIENT_CERTIFICATE -> {
+        Optional<String> certificate = secrets.value("certificate");
+        if (certificate.isPresent()) {
+          out.putControllerServiceProperty(
+              SSL_CONTEXT, "Certificate Chain", certificatesOnly(certificate.get()));
+        }
+        Optional<String> privateKey = secrets.value("privateKey");
+        if (privateKey.isPresent()) {
+          out.putSensitive(SSL_CONTEXT, "Private Key", readablePrivateKey(privateKey.get()));
+        }
+      }
+      default -> {
+        // NONE, and a type the processor refuses as invalid
+      }
+    }
+  }
+
+  /**
+   * NiFi reads the key only when it enables the SSL context and then retries the enable without
+   * end, so a key in another form would fail the deployment only as a timeout.
+   */
+  private static String readablePrivateKey(String privateKey) throws FatalAdapterException {
+    if (privateKey.startsWith("-----BEGIN PRIVATE KEY-----")
+        || privateKey.startsWith("-----BEGIN RSA PRIVATE KEY-----")) {
+      return privateKey;
+    }
+    throw new FatalAdapterException(
+        AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+        "HTTP/REST source privateKey must be a PEM key in PKCS#8 form, or in PKCS#1 form for RSA");
+  }
+
+  /** The certificate chain is a property that is not sensitive, so it must not carry a key. */
+  private static String certificatesOnly(String certificate) throws FatalAdapterException {
+    if (PEM_BEGIN
+        .matcher(certificate)
+        .results()
+        .allMatch(begin -> "CERTIFICATE".equals(begin.group(1)))) {
+      return certificate;
+    }
+    throw new FatalAdapterException(
+        AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+        "HTTP/REST source certificate must hold only PEM certificates");
+  }
+
+  /**
+   * The secrets of an authentication. Decrypts the Data source on the first encrypted value. A
+   * class, not a record, so that no {@code toString} shows a secret.
+   */
+  private final class Secrets {
+
+    private final Map<String, Object> original;
+    private final Map<String, Object> authentication;
+    private Map<String, Object> plain;
+
+    Secrets(Map<String, Object> original, Map<String, Object> authentication) {
+      this.original = original;
+      this.authentication = authentication;
+    }
+
+    /** The decrypted value of {@code field}, or empty when the Data source has none. */
+    Optional<String> value(String field) throws FatalAdapterException {
+      Object value = authentication.get(field);
+      if (value == null || String.valueOf(value).isBlank()) {
+        return Optional.empty();
+      }
+      if (!isEncrypted(value)) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+            "HTTP/REST source "
+                + field
+                + " must be encrypted (plaintext secrets are not accepted)");
+      }
+      if (plain == null) {
+        plain = objectOrEmpty(credentials.decrypt(original).get("authentication"));
+      }
+      return Optional.of(String.valueOf(plain.get(field)));
     }
   }
 
   @Override
   public void registerControllerServices(BuildContext ctx) throws FatalAdapterException {
+    if (!CLIENT_CERTIFICATE.equals(ctx.spec().sourceProperties().get(AUTHENTICATION_TYPE))) {
+      ctx.addControllerService(Fragment.HTTP_SOURCE_WEB_CLIENT, WEB_CLIENT);
+      return;
+    }
+    ctx.addControllerService(Fragment.HTTP_SOURCE_SSL_CONTEXT, SSL_CONTEXT);
     ctx.addControllerService(Fragment.HTTP_SOURCE_WEB_CLIENT, WEB_CLIENT);
+    ctx.setControllerServiceReference(WEB_CLIENT, "SSL Context Service", SSL_CONTEXT);
   }
 
   @Override

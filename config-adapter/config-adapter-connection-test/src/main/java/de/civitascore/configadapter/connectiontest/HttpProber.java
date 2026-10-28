@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -114,9 +115,10 @@ final class HttpProber implements ConnectionProber {
                     "Authorization",
                     "Bearer " + accessToken(client, tokenUri, authentication, deadline));
           };
+      List<String> credentials = sentCredentials(authentication, apiTokenIn, header);
       HttpResponse<InputStream> response =
           send(client, request(uri, call, header), "The API", deadline);
-      return result(response, credentialOf(header));
+      return result(response, credentials);
     } finally {
       // close() would wait for an exchange that hangs; the answer is read by now.
       client.shutdownNow();
@@ -174,7 +176,7 @@ final class HttpProber implements ConnectionProber {
             tokenUri,
             required(oauth2, "clientId"),
             required(oauth2, "clientSecret"),
-            trimmedString(oauth2.get("scope")),
+            Objects.toString(oauth2.get("scope"), ""),
             timeout);
     HttpResponse<InputStream> response = send(client, request, "The token endpoint", deadline);
     byte[] body;
@@ -305,32 +307,55 @@ final class HttpProber implements ConnectionProber {
         : new ConnectionTestFailure(message, failed);
   }
 
+  /** The credentials that an API which echoes the request could return. */
+  private static List<String> sentCredentials(
+      Map<String, Object> authentication,
+      ParameterLocation apiTokenIn,
+      Map.Entry<String, String> header)
+      throws ConnectionTestFailure {
+    return apiTokenIn == ParameterLocation.QUERY
+        ? inQuery(required(authentication, "value"))
+        : credentialOf(header);
+  }
+
   /** The credential an authentication header carries: an Authorization value without scheme. */
-  private static String credentialOf(Map.Entry<String, String> header) {
+  private static List<String> credentialOf(Map.Entry<String, String> header) {
     if (header == null) {
-      return null;
+      return List.of();
     }
     String value = header.getValue();
     int space = value.indexOf(' ');
-    return "Authorization".equals(header.getKey()) && space > 0
-        ? value.substring(space + 1)
-        : value;
+    return List.of(
+        "Authorization".equals(header.getKey()) && space > 0 ? value.substring(space + 1) : value);
   }
 
   /**
-   * An API that echoes the request would return the credential it sent, which is a secret, or for
+   * A token in the query as sent and as an API may decode it; the encoded form first, because it
+   * can contain the raw one.
+   */
+  private static List<String> inQuery(String token) {
+    StringBuilder encoded = new StringBuilder();
+    encode(token, encoded);
+    return List.of(encoded.toString(), token);
+  }
+
+  /**
+   * An API that echoes the request would return the credentials it sent, which are secrets, or for
    * OAuth 2.0 an access token. JSON may write its {@code /} as {@code \/}, as PHP's {@code
    * json_encode} does by default.
    */
-  static String maskCredential(String text, String credential) {
-    if (credential == null) {
-      return text;
+  static String maskCredentials(String text, List<String> credentials) {
+    String masked = text;
+    for (String credential : credentials) {
+      masked =
+          masked
+              .replace(credential, ResultText.MASK)
+              .replace(credential.replace("/", "\\/"), ResultText.MASK);
     }
-    return text.replace(credential, ResultText.MASK)
-        .replace(credential.replace("/", "\\/"), ResultText.MASK);
+    return masked;
   }
 
-  private static ProbeResult result(HttpResponse<InputStream> response, String credential)
+  private static ProbeResult result(HttpResponse<InputStream> response, List<String> credentials)
       throws ConnectionTestFailure {
     int status = response.statusCode();
     boolean success = status >= 200 && status < 300;
@@ -353,7 +378,7 @@ final class HttpProber implements ConnectionProber {
       return new ProbeResult(
           success,
           message,
-          maskCredential(body.text(), credential),
+          maskCredentials(body.text(), credentials),
           body.truncated(),
           null,
           status);

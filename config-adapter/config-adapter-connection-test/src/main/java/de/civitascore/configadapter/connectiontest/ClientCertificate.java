@@ -23,23 +23,24 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 
 /** A TLS context that presents a client certificate and trusts the JVM's default CAs. */
 final class ClientCertificate {
 
-  private static final Pattern PKCS8_PEM =
-      Pattern.compile("-----BEGIN PRIVATE KEY-----([A-Za-z0-9+/=\\s]+)-----END PRIVATE KEY-----");
+  private static final String PKCS8_HEADER = "-----BEGIN PRIVATE KEY-----";
+  private static final String PKCS8_FOOTER = "-----END PRIVATE KEY-----";
+  private static final String PKCS1_HEADER = "-----BEGIN RSA PRIVATE KEY-----";
+  private static final String PKCS1_FOOTER = "-----END RSA PRIVATE KEY-----";
 
-  private static final List<String> KEY_ALGORITHMS = List.of("RSA", "EC");
+  private static final List<String> PKCS8_ALGORITHMS = List.of("RSA", "EC", "Ed25519");
 
   private static final String KEY_FORMAT =
-      "The private key must be an unencrypted PKCS#8 PEM key ('BEGIN PRIVATE KEY') of type RSA or"
-          + " EC. 'openssl pkcs8 -topk8 -nocrypt' converts other formats.";
+      "The private key must be an unencrypted PEM key that starts on the first line: PKCS#8 ('BEGIN"
+          + " PRIVATE KEY') of type RSA, EC or Ed25519, or PKCS#1 ('BEGIN RSA PRIVATE KEY').";
 
   private static final char[] IN_MEMORY_PASSWORD = new char[0];
 
@@ -87,26 +88,78 @@ final class ClientCertificate {
     return chain.toArray(new Certificate[0]);
   }
 
+  /**
+   * Reads the key as the pipeline's {@code PEMEncodedSSLContextProvider} does, so that the test
+   * accepts exactly the keys the pipeline accepts.
+   */
   private static PrivateKey privateKey(String pem) throws ConnectionTestFailure {
-    Matcher block = PKCS8_PEM.matcher(pem);
-    if (!block.find()) {
-      throw ConnectionTestFailure.invalid(KEY_FORMAT);
-    }
-    PKCS8EncodedKeySpec spec;
+    Iterator<String> lines = pem.lines().iterator();
+    String header = lines.hasNext() ? lines.next() : "";
     try {
-      spec = new PKCS8EncodedKeySpec(Base64.getMimeDecoder().decode(block.group(1)));
-    } catch (IllegalArgumentException e) {
+      if (PKCS8_HEADER.equals(header)) {
+        return pkcs8(Base64.getDecoder().decode(payload(lines, PKCS8_FOOTER)));
+      }
+      if (PKCS1_HEADER.equals(header)) {
+        return (PrivateKey)
+            KeyFactory.getInstance("RSA")
+                .translateKey(
+                    new Pkcs1RsaKey(Base64.getDecoder().decode(payload(lines, PKCS1_FOOTER))));
+      }
+    } catch (IllegalArgumentException | GeneralSecurityException e) {
       throw ConnectionTestFailure.invalid(KEY_FORMAT, e);
     }
-    for (String algorithm : KEY_ALGORITHMS) {
+    throw ConnectionTestFailure.invalid(KEY_FORMAT);
+  }
+
+  /** The lines up to the footer, or to the end without one. */
+  private static String payload(Iterator<String> lines, String footer) {
+    StringBuilder payload = new StringBuilder();
+    while (lines.hasNext()) {
+      String line = lines.next();
+      if (footer.equals(line)) {
+        break;
+      }
+      payload.append(line);
+    }
+    return payload.toString();
+  }
+
+  private static PrivateKey pkcs8(byte[] der) throws GeneralSecurityException {
+    PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(der);
+    for (String algorithm : PKCS8_ALGORITHMS) {
       try {
         return KeyFactory.getInstance(algorithm).generatePrivate(spec);
       } catch (InvalidKeySpecException ignored) {
         // The JDK reads the algorithm of a PKCS#8 key only by trying a key factory.
-      } catch (GeneralSecurityException e) {
-        throw ConnectionTestFailure.invalid(KEY_FORMAT, e);
       }
     }
-    throw ConnectionTestFailure.invalid(KEY_FORMAT);
+    throw new InvalidKeySpecException("No key factory reads the key");
+  }
+
+  /** The JDK's RSA key factory translates a key in the PKCS#1 format into an RSA private key. */
+  private static final class Pkcs1RsaKey implements PrivateKey {
+
+    private static final long serialVersionUID = 1L;
+
+    private final byte[] encoded;
+
+    Pkcs1RsaKey(byte[] encoded) {
+      this.encoded = encoded.clone();
+    }
+
+    @Override
+    public String getAlgorithm() {
+      return "RSA";
+    }
+
+    @Override
+    public String getFormat() {
+      return "PKCS#1";
+    }
+
+    @Override
+    public byte[] getEncoded() {
+      return encoded.clone();
+    }
   }
 }

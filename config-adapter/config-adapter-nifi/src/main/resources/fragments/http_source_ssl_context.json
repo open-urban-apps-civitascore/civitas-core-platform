@@ -1,0 +1,67 @@
+{
+  "name": "HttpSourceSslContext",
+  "comments": "Client certificate of an HTTP/REST Data source. The private key is pushed after upload; the trusted CAs are the JVM defaults, as for a web client without an SSL context.",
+  "type": "org.apache.nifi.ssl.PEMEncodedSSLContextProvider",
+  "bundle": {
+    "group": "org.apache.nifi",
+    "artifact": "nifi-ssl-context-service-nar",
+    "version": "2.9.0"
+  },
+  "properties": {
+    "TLS Protocol": "TLS",
+    "Private Key Source": "PROPERTIES",
+    "Private Key": null,
+    "Certificate Chain": null,
+    "Certificate Authorities Source": "SYSTEM"
+  },
+  "propertyDescriptors": {
+    "TLS Protocol": {
+      "name": "TLS Protocol",
+      "displayName": "TLS Protocol",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Private Key Source": {
+      "name": "Private Key Source",
+      "displayName": "Private Key Source",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Private Key": {
+      "name": "Private Key",
+      "displayName": "Private Key",
+      "identifiesControllerService": false,
+      "sensitive": true,
+      "dynamic": false
+    },
+    "Certificate Chain": {
+      "name": "Certificate Chain",
+      "displayName": "Certificate Chain",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    },
+    "Certificate Authorities Source": {
+      "name": "Certificate Authorities Source",
+      "displayName": "Certificate Authorities Source",
+      "identifiesControllerService": false,
+      "sensitive": false,
+      "dynamic": false
+    }
+  },
+  "controllerServiceApis": [
+    {
+      "type": "org.apache.nifi.ssl.SSLContextProvider",
+      "bundle": {
+        "group": "org.apache.nifi",
+        "artifact": "nifi-standard-services-api-nar",
+        "version": "2.9.0"
+      }
+    }
+  ],
+  "scheduledState": "DISABLED",
+  "bulletinLevel": "WARN",
+  "componentType": "CONTROLLER_SERVICE"
+}

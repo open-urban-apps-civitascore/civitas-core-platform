@@ -9,6 +9,7 @@
  */
 package de.civitascore.nifi.http;
 
+import java.util.List;
 import java.util.Optional;
 
 /** How the requests of one run of an API call follow each other. */
@@ -29,6 +30,9 @@ sealed interface Pagination
 
   /** What the pagination makes of {@code page}, whose records agree with the Record Schema. */
   Progress next(Page page, PageContent content);
+
+  /** The names that the pages send at {@code location}. */
+  List<String> names(ParameterLocation location);
 
   /**
    * Some APIs answer a page past the last page with 400 or 404 instead of an empty page; on the

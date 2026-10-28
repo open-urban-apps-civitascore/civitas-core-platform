@@ -211,8 +211,11 @@ at a time. The cron schedule of the flow decides when it runs.
 | `Body Read Timeout` | The longest wait for the next bytes of the response body, `15 secs` by default. A longer wait is a transient error. The `Read Timeout` of the web client service ends when the response headers arrive. |
 | `Base URL` | Scheme `http` or `https`, a host, an optional port and an optional path. No user info, no query, no fragment. A trailing `/` is removed. |
 | `API Call` | The API call as JSON, in the form the portal stores it. |
-| `Authentication Type` | `NONE` (default) or `BASIC`. |
-| `Basic Auth Username` / `Basic Auth Password` | Required with `BASIC`, which also requires an `https` Base URL. The username contains no colon; the password is sensitive. |
+| `Authentication Type` | `NONE` (default), `BASIC`, `BEARER_TOKEN`, `API_TOKEN`, `OAUTH2` or `CLIENT_CERTIFICATE`: the authentication types of the portal. Each type other than `NONE` requires an `https` Base URL. See [Authentication](#authentication). |
+| `Basic Auth Username` / `Basic Auth Password` | Required with `BASIC`. The username contains no colon; the password is sensitive. |
+| `Bearer Token` | Required with `BEARER_TOKEN`. Sensitive. |
+| `API Token Name` / `API Token Value` / `API Token Location` | Required with `API_TOKEN`. The location is `HEADER` or `QUERY`; the value is sensitive. |
+| `OAuth2 Token URL` / `OAuth2 Client ID` / `OAuth2 Client Secret` / `OAuth2 Scope` | With `OAUTH2`; the scope is optional. The token URL is `https`, with a host and without user info, query and fragment. The client secret is sensitive. |
 | `Record Schema` | The JSON Schema of the Data structure of the Data source, with its imports inlined. Required. |
 | `Max Pages` | The maximum number of pages in one paginated run, `1000` by default. The config-adapter does not set it, and the portal does not show it. |
 
@@ -267,6 +270,62 @@ space is `%20` and `&`, `=` and `+` in a value stay part of the value. The param
 order, repeated names included. `HttpUriBuilder.addQueryParameter` is not used for this: NiFi's
 implementation does not encode `&`, `=` and `+` in a value.
 
+### Authentication
+
+A Data source has one authentication for all its requests. The processor sends the credentials in
+the same form as the connection test of the NiFi config-adapter (`HttpProber`), and the tests of
+both sides cover the same cases under the same names (`GetHttpApiCallAuthenticationTest`,
+`HttpProberAuthenticationTest`).
+
+| Type | The request sends |
+|---|---|
+| `BASIC` | `Authorization: Basic base64(username:password)` |
+| `BEARER_TOKEN` | `Authorization: Bearer <token>` |
+| `API_TOKEN`, `HEADER` | A header `<name>: <value>` after the headers of the API call |
+| `API_TOKEN`, `QUERY` | A query parameter `<name>=<value>` after the query parameters of the API call and of the page, percent-encoded as they are |
+| `OAUTH2` | `Authorization: Bearer <access token>`, from the client credentials grant |
+| `CLIENT_CERTIFICATE` | Nothing: the web client service presents the certificate in the TLS handshake |
+
+**An API token in the query is visible in the access logs of the API host,** and of each proxy on
+the way, because those logs hold the URL with its query. Use `HEADER` when the API accepts it.
+
+The processor checks the rules of the portal backend again. A header token or a bearer token holds
+only printable ISO-8859-1 characters, spaces and tabs. The name of a header token is a valid header
+name and not one that the HTTP client sets (`Connection`, `Content-Length`, `Expect`, `Host`,
+`Upgrade`); `Authorization`, `Proxy-Authorization` and `Cookie` are allowed. It differs, ignoring
+case, from each header of the API call and of its pagination. The name of a query token differs from each query parameter
+of the API call and of its pagination; the comparison is case-sensitive. An explanation never names
+a value.
+
+**OAuth2.** The processor gets the access token with the client credentials grant (RFC 6749,
+section 4.4): a POST of `grant_type=client_credentials`, with `scope` when it is set, to the token
+URL, with `Content-Type: application/x-www-form-urlencoded`, `Accept: application/json` and the
+client authenticated by HTTP Basic over the percent-encoded client ID and secret. The token request
+goes through the same web client service as the API requests: the same TLS, proxy and timeouts, and
+no redirect, so the client secret goes to no other host. The processor reads at most the first
+64 KiB of the token response.
+
+The processor keeps the access token in memory, never in the NiFi state, which NiFi writes to disk.
+It uses the token until 30 seconds before its `expires_in` ends, also across runs. Without
+`expires_in`, or with an `expires_in` of 30 seconds or less, the token serves the current run only.
+A stop of the processor drops the token. A 401 of the API with a kept token makes the processor
+get one new token and send the request once more; a second 401 goes to `stop`. A 401 with a token
+that was requested for that request goes to `stop` without a new token.
+
+The status of the token endpoint has the classification of an API response: a 3xx and a 4xx other
+than 408 and 429 go to `stop`, and a 5xx, a 408, a 429 and a connection error go to `failure`. Then
+the processor does not call the API. A 2xx without a non-blank string `access_token` in a JSON
+object goes to `stop`.
+
+**Client certificate.** The processor has no property for it. The certificate and its private key
+are properties of the SSL Context Service of the web client service, so a Data source with a client
+certificate needs a web client service of its own. The config-adapter gives it a
+`PEMEncodedSSLContextProvider` with the default CAs as trusted CAs. A TLS handshake that the server
+ends with a certificate alert, or with `handshake_failure`, goes to `stop`. Any other failed
+handshake, for example an untrusted server certificate, goes to `failure`. With TLS 1.3 the server can refuse the certificate after the handshake; the
+JDK then reports either a refused handshake or a closed connection, and a closed connection goes to
+`failure`, as the processor cannot tell it from a network error.
+
 Relationships: `success`, `stop` and `failure`. There is no `retry`; the next cron run is the next
 attempt. `stop` carries an error that the next run cannot repair: the flow stops the Pipeline on it.
 `failure` carries an error that the next run can repair.
@@ -275,11 +334,13 @@ attempt. `stop` carries an error that the next run cannot repair: the flow stops
 |---|---|---|
 | 2xx, each record agrees with the `Record Schema` | `success`, the body unchanged, `mime.type` `application/json` | none |
 | 2xx without a body or with only whitespace, for example 204 | none, no FlowFile | debug |
-| 3xx, 4xx except 408 and 429 | `stop` | error |
+| 3xx, 4xx except 408 and 429, of the API or the OAuth2 token endpoint | `stop` | error |
+| 2xx of the OAuth2 token endpoint without an access token | `stop` | error |
+| A TLS handshake that refuses the client certificate, status `0` | `stop` | error |
 | A request that the web client refuses, status `0` | `stop` | error |
 | 2xx, the body is not JSON, or is a JSON scalar | `stop` | error |
 | 2xx, a record violates the `Record Schema` | `stop` | error |
-| 408, 429, 5xx, any other status | `failure` | warn |
+| 408, 429, 5xx, any other status, of the API or the OAuth2 token endpoint | `failure` | warn |
 | Connection error, timeout, TLS error, body read error, status `0` | `failure` | warn |
 
 A 3xx is fatal because the processor expects a web client service that does not follow
@@ -292,16 +353,23 @@ or with limit/offset pagination the offset. A FlowFile on `stop` or `failure` is
 of the response, or `0` when no response came. The message is the one the log entry and the bulletin
 show. It names the API call and its path, never the base URL, and on a page of a paginated run the
 page number, with cursor pagination the request number, or with limit/offset pagination the offset.
+A 401 or 403 names the authentication method. A failed token request names the host, the port and
+the path of the token URL, and of the token response only an error code of RFC 6749, section 5.2.
 A control character or line separator in the message appears as `\r`, `\n` or `\uXXXX`, so no part
 of it can start a forged log line; every other character stays as entered:
 
 ```text
 API call "Get stations": GET /stations failed with status 404
+API call "Get stations": GET /stations failed with status 401 (Bearer Token)
 API call "Get stations": GET /stations failed: ConnectException
+API call "Get stations": GET /stations failed: TLS handshake with Client certificate failed (SSLHandshakeException)
+API call "Get stations": OAuth2 token request to auth.example.org/realms/city/token failed with status 401 (invalid_client)
+API call "Get stations": OAuth2 token request to auth.example.org/realms/city/token failed: ConnectException
+API call "Get stations": OAuth2 token request to auth.example.org/realms/city/token failed: status 200 without an access token in a JSON object
 API call "Get stations": 2 of 50 records violate the Data structure: record 3: /lat type; record 7: required stationid
 API call "Get stations": the response is a JSON string, not an object or an array
 API call "Get stations": the response is not JSON
-API call "Get stations": GET /stations page 3 failed with status 403
+API call "Get stations": GET /stations page 3 failed with status 403 (API Token)
 API call "Get stations": GET /stations page 3 failed: ConnectException
 API call "Get stations": page 3: 2 of 50 records violate the Data structure: record 3: /lat type; record 7: required stationid
 API call "Get stations": page 3 is a JSON object, not an array
@@ -325,11 +393,12 @@ A transient message keeps the word `failed`: the runtime monitor of the NiFi con
 warn bulletin only when its text names a failure. The message of a stop has no such word, because a
 stop is not an error of the Pipeline.
 
-No attribute and no message contains the query, a header value, the username, the password or a
-value of the response, a cursor included. The one exception is the offset of limit/offset
-pagination without a `limit`, which carries record counts (see
-[Limit/offset pagination](#limitoffset-pagination)). An exception reaches no logger,
-because its message can hold the URI with its query; the message names its class alone.
+No attribute and no message contains the query, a header value, a credential (the username, the
+password, a token, the client secret, an access token) or a value of the response, a cursor
+included. The one exception is the offset of limit/offset pagination without a `limit`, which
+carries record counts (see [Limit/offset pagination](#limitoffset-pagination)). An exception
+reaches no logger, because its message can hold the URI with its query; the message names its class
+alone.
 
 ### Response validation
 

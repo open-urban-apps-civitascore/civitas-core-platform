@@ -36,4 +36,9 @@ record SinglePage() implements Pagination {
   public Progress next(Page page, PageContent content) {
     return new Progress.Accepted(content.records(), Optional.empty());
   }
+
+  @Override
+  public List<String> names(ParameterLocation location) {
+    return List.of();
+  }
 }

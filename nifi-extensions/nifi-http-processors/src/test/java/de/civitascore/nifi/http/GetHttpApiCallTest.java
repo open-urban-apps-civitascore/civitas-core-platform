@@ -9,6 +9,10 @@
  */
 package de.civitascore.nifi.http;
 
+import static de.civitascore.nifi.http.GetHttpApiCallRunners.assertRouted;
+import static de.civitascore.nifi.http.GetHttpApiCallRunners.invalid;
+import static de.civitascore.nifi.http.GetHttpApiCallRunners.logged;
+import static de.civitascore.nifi.http.GetHttpApiCallRunners.visible;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -32,15 +36,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.nifi.components.ValidationResult;
-import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.reporting.InitializationException;
-import org.apache.nifi.ssl.SSLContextProvider;
 import org.apache.nifi.util.LogMessage;
-import org.apache.nifi.util.MockComponentLog;
 import org.apache.nifi.util.MockFlowFile;
 import org.apache.nifi.util.TestRunner;
-import org.apache.nifi.util.TestRunners;
-import org.apache.nifi.web.client.provider.service.StandardWebClientServiceProvider;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -52,20 +51,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class GetHttpApiCallTest {
-
-  private static final String WEB_CLIENT = "web-client";
-  private static final String TLS = "tls";
-
-  private static final String STATIONS = "{\"name\":\"Stations\",\"path\":\"/stations\"}";
-
-  private static final String STATION_SCHEMA =
-      """
-      {"$schema": "https://json-schema.org/draft/2020-12/schema",
-       "type": "object",
-       "required": ["stationid"],
-       "properties": {"stationid": {"type": "string"},
-                      "name": {"type": "string", "maxLength": 20},
-                      "lat": {"type": "number"}}}""";
 
   private static final String FULL_PAGE = "[{\"stationid\":\"a1\"},{\"stationid\":\"a2\"}]";
 
@@ -687,8 +672,15 @@ class GetHttpApiCallTest {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {400, 401, 403, 404, 301, 302})
-  void onTrigger_whenTheStatusNeedsAChangeOfTheConfiguration_routesToStop(int status)
+  @CsvSource({
+    "400, ''",
+    "401, ' (no authentication)'",
+    "403, ' (no authentication)'",
+    "404, ''",
+    "301, ''",
+    "302, ''"
+  })
+  void onTrigger_whenTheStatusNeedsAChangeOfTheConfiguration_routesToStop(int status, String method)
       throws InitializationException {
     try (ApiEndpoint endpoint =
         ApiEndpoint.answering(status, Map.of("Location", "/v1/elsewhere"), "{}")) {
@@ -696,7 +688,7 @@ class GetHttpApiCallTest {
 
       runner.run();
 
-      String message = "API call \"Stations\": GET /stations failed with status " + status;
+      String message = "API call \"Stations\": GET /stations failed with status " + status + method;
       assertRouted(runner, GetHttpApiCall.STOP, status, message);
       assertEquals(1, endpoint.requests().size());
       List<LogMessage> errors = runner.getLogger().getErrorMessages();
@@ -846,18 +838,7 @@ class GetHttpApiCallTest {
 
       runner.run();
 
-      List<String> visible = new ArrayList<>(logged(runner.getLogger()));
-      for (MockFlowFile flowFile : runner.getFlowFilesForRelationship(GetHttpApiCall.SUCCESS)) {
-        visible.addAll(flowFile.getAttributes().values());
-      }
-      for (MockFlowFile flowFile : runner.getFlowFilesForRelationship(GetHttpApiCall.FAILURE)) {
-        visible.addAll(flowFile.getAttributes().values());
-      }
-      for (MockFlowFile flowFile : runner.getFlowFilesForRelationship(GetHttpApiCall.STOP)) {
-        visible.addAll(flowFile.getAttributes().values());
-      }
-      assertFalse(visible.isEmpty());
-      for (String text : visible) {
+      for (String text : visible(runner)) {
         assertFalse(text.contains(password), text);
         assertFalse(text.contains(queryValue), text);
         assertFalse(text.contains(username), text);
@@ -1021,7 +1002,7 @@ class GetHttpApiCallTest {
           runner,
           GetHttpApiCall.STOP,
           403,
-          "API call \"Stations\": GET /stations page 2 failed with status 403");
+          "API call \"Stations\": GET /stations page 2 failed with status 403 (no authentication)");
     }
   }
 
@@ -1576,15 +1557,7 @@ class GetHttpApiCallTest {
 
       runner.run();
 
-      List<String> visible = new ArrayList<>(logged(runner.getLogger()));
-      for (Relationship relationship :
-          List.of(GetHttpApiCall.SUCCESS, GetHttpApiCall.STOP, GetHttpApiCall.FAILURE)) {
-        for (MockFlowFile flowFile : runner.getFlowFilesForRelationship(relationship)) {
-          visible.addAll(flowFile.getAttributes().values());
-        }
-      }
-      assertFalse(visible.isEmpty());
-      for (String text : visible) {
+      for (String text : visible(runner)) {
         assertFalse(text.contains("cur-7c1d"), text);
       }
     }
@@ -2356,61 +2329,13 @@ class GetHttpApiCallTest {
     return endpoint.requests().stream().map(ApiEndpoint.Request::rawQuery).toList();
   }
 
-  private static Collection<ValidationResult> invalid(TestRunner runner) {
-    return runner.validate().stream().filter(result -> !result.isValid()).toList();
-  }
-
-  private static void assertRouted(
-      TestRunner runner, Relationship relationship, int status, String message) {
-    runner.assertAllFlowFilesTransferred(relationship, 1);
-    MockFlowFile failed = runner.getFlowFilesForRelationship(relationship).get(0);
-    failed.assertAttributeEquals(GetHttpApiCall.REQUEST_PATH, "/stations");
-    failed.assertAttributeEquals(GetHttpApiCall.ERROR_STATUS, Integer.toString(status));
-    failed.assertAttributeEquals(GetHttpApiCall.ERROR_MESSAGE, message);
-    failed.assertContentEquals("");
-  }
-
-  /** Every log message with its arguments and exceptions, as a bulletin would show it. */
-  private static List<String> logged(MockComponentLog log) {
-    List<LogMessage> messages = new ArrayList<>();
-    messages.addAll(log.getTraceMessages());
-    messages.addAll(log.getDebugMessages());
-    messages.addAll(log.getInfoMessages());
-    messages.addAll(log.getWarnMessages());
-    messages.addAll(log.getErrorMessages());
-    List<String> texts = new ArrayList<>();
-    for (LogMessage message : messages) {
-      texts.add(message.toString());
-      texts.add(String.valueOf(message.getThrowable()));
-      for (Object argument : message.getArgs() == null ? new Object[0] : message.getArgs()) {
-        texts.add(String.valueOf(argument));
-      }
-    }
-    return texts;
-  }
-
   private static TestRunner runner(String baseUrl) throws InitializationException {
     return runner(baseUrl, null);
   }
 
   /** A runner whose web client service trusts the certificate of {@code trusted}, if given. */
   private static TestRunner runner(String baseUrl, TestTls trusted) throws InitializationException {
-    TestRunner runner = TestRunners.newTestRunner(GetHttpApiCall.class);
-    StandardWebClientServiceProvider webClient = new StandardWebClientServiceProvider();
-    runner.addControllerService(WEB_CLIENT, webClient);
-    runner.setProperty(webClient, "Redirect Handling Strategy", "IGNORED");
-    if (trusted != null) {
-      SSLContextProvider provider = trusted.clientProvider();
-      runner.addControllerService(TLS, provider);
-      runner.enableControllerService(provider);
-      runner.setProperty(webClient, "SSL Context Service", TLS);
-    }
-    runner.enableControllerService(webClient);
-
-    runner.setProperty(GetHttpApiCall.WEB_CLIENT_SERVICE, WEB_CLIENT);
-    runner.setProperty(GetHttpApiCall.BASE_URL, baseUrl);
-    runner.setProperty(GetHttpApiCall.API_CALL, STATIONS);
-    runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, STATION_SCHEMA);
-    return runner;
+    return GetHttpApiCallRunners.runner(
+        new GetHttpApiCall(), baseUrl, trusted == null ? null : trusted.clientProvider());
   }
 }

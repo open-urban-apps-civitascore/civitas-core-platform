@@ -45,7 +45,8 @@ final class ClientCredentialsGrant {
   /**
    * The token URL.
    *
-   * @throws ConnectionTestFailure if it is not an https URL with a host and without credentials
+   * @throws ConnectionTestFailure if it is not an https URL with a host and without credentials,
+   *     query or fragment
    */
   static URI tokenUri(String tokenUrl) throws ConnectionTestFailure {
     URI uri;
@@ -59,6 +60,9 @@ final class ClientCredentialsGrant {
     }
     if (uri.getRawUserInfo() != null) {
       throw ConnectionTestFailure.invalid("The token URL must not contain credentials.");
+    }
+    if (uri.getRawQuery() != null || uri.getRawFragment() != null) {
+      throw ConnectionTestFailure.invalid("The token URL must not contain a query or a fragment.");
     }
     return uri;
   }
