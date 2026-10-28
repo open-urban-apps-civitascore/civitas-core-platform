@@ -126,7 +126,8 @@ class CursorPaginationTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"a\rb", "a\nb", "a\tb", "a\u0000b", "a\u0085b", "a\u007fb", "a€b"})
+  @ValueSource(
+      strings = {"a\rb", "a\nb", "a\tb", "a\u0000b", "a\u0085b", "a\u007fb", "a€b", "café 1"})
   void next_withARefusedCharacterInAHeaderCursor_rejectsWithoutTheCursor(String cursor) {
     CursorPagination pagination =
         new CursorPagination(CURSOR_PATH, "X-Cursor", ParameterLocation.HEADER, Optional.empty());
@@ -148,16 +149,6 @@ class CursorPaginationTest {
     Page next = nextPage(pagination, pagination.first(), new TextNode(cursor));
 
     assertEquals(List.of(new Parameter("cursor", cursor)), next.queryParameters());
-  }
-
-  @Test
-  void next_withAnAccentInAHeaderCursor_sendsIt() {
-    CursorPagination pagination =
-        new CursorPagination(CURSOR_PATH, "X-Cursor", ParameterLocation.HEADER, Optional.empty());
-
-    Page next = nextPage(pagination, pagination.first(), new TextNode("café 1"));
-
-    assertEquals(List.of(new Parameter("X-Cursor", "café 1")), next.headers());
   }
 
   @Test

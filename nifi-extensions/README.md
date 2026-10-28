@@ -426,7 +426,7 @@ pass as the record validation, from the record that it validates.
 | The same, with the cursor absent, `null` or `""` | one FlowFile on `success`; the run stops there |
 | No body | no FlowFile; the run stops there |
 | A cursor that is a JSON object, array or boolean | `stop` |
-| A cursor in a header with a control character, or a character outside ISO-8859-1 | `stop` |
+| A cursor in a header with a character outside printable ASCII | `stop` |
 | A cursor that the run already sent | `stop` |
 | A JSON array, a JSON scalar, or not JSON | `stop` |
 | An object that violates the `Record Schema` | `stop` |

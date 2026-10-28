@@ -74,13 +74,12 @@ record CursorPagination(
   }
 
   /**
-   * Stricter than a configured header value, which may hold a tab and the C1 controls: a cursor is
-   * data of the API host, so no control character reaches a header.
+   * Stricter than a configured header value: a cursor is data of the API host, so no control
+   * character reaches a header, and the HTTP/1.1 client sends a character outside ASCII as {@code
+   * ?}, which gives the API a cursor that it never issued.
    */
   private static boolean isHeaderValue(String cursor) {
-    return cursor
-        .chars()
-        .allMatch(c -> ApiCallParser.isFieldValueCharacter(c) && !Character.isISOControl(c));
+    return cursor.chars().allMatch(c -> c >= ' ' && c <= '~');
   }
 
   private Page page(long index, Optional<String> cursor) {
