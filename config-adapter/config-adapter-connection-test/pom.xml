@@ -16,6 +16,12 @@
     <name>Config Adapter Connection Test</name>
     <description>Tests whether a data source answers with the given connector values, with own SQL, MQTT and HTTP clients</description>
 
+    <properties>
+        <!-- Must track the NiFi version the flows are deployed to (apache/nifi:2.9.0), so the tests
+             compare the client key formats with the reader of the pipeline's SSL context. -->
+        <nifi.version>2.9.0</nifi.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>de.civitas-core</groupId>
@@ -122,6 +128,12 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.nifi</groupId>
+            <artifactId>nifi-security-ssl</artifactId>
+            <version>${nifi.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
