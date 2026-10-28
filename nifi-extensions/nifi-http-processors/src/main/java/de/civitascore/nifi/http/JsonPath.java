@@ -16,15 +16,14 @@ import java.math.BigInteger;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.MatchResult;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * A JSON path of member names, quoted member names and array indexes only, as in {@code
  * $.data[0].id} or {@code $['next cursor']}. It is the grammar of the portal backend, so the
- * processor evaluates no filter and no script expression.
+ * processor evaluates no filter and no script expression. Two paths are equal when their texts are.
  */
-record JsonPath(String text) {
+final class JsonPath {
 
   private static final String MEMBER = "\\.([A-Za-z_][A-Za-z0-9_-]*)";
   private static final String QUOTED_MEMBER = "\\['([^'\\\\]+)'\\]";
@@ -36,11 +35,16 @@ record JsonPath(String text) {
 
   private static final int INT_BITS = 31;
 
-  JsonPath {
+  private final String text;
+  private final List<Segment> segments;
+
+  JsonPath(String text) {
     if (!GRAMMAR.matcher(text).matches()) {
       throw new IllegalArgumentException(
           "a JSON path must start with $ and hold only member names and array indexes");
     }
+    this.text = text;
+    this.segments = SEGMENT.matcher(text).results().map(Segment::fromMatch).toList();
   }
 
   /** Empty when the text is not of the grammar. */
@@ -51,20 +55,18 @@ record JsonPath(String text) {
   /** The value at the path, or a {@link MissingNode} when a step finds nothing. */
   JsonNode valueIn(JsonNode root) {
     JsonNode current = root;
-    Matcher segment = SEGMENT.matcher(text);
-    while (segment.find()) {
-      String name = segment.group(1) != null ? segment.group(1) : segment.group(2);
-      current = name != null ? current.path(name) : current.path(index(segment.group(3)));
+    for (Segment segment : segments) {
+      current =
+          segment.name() != null ? current.path(segment.name()) : current.path(segment.index());
     }
     return current;
   }
 
   /** Whether the current value of a parser, in the given context, is the value at the path. */
   boolean isAt(JsonStreamContext context) {
-    List<MatchResult> segments = SEGMENT.matcher(text).results().toList();
     JsonStreamContext current = context;
     for (int i = segments.size() - 1; i >= 0; i--) {
-      if (current == null || !isAt(segments.get(i), current)) {
+      if (current == null || !segments.get(i).isAt(current)) {
         return false;
       }
       current = current.getParent();
@@ -72,22 +74,41 @@ record JsonPath(String text) {
     return current != null && current.inRoot();
   }
 
-  private static boolean isAt(MatchResult segment, JsonStreamContext context) {
-    if (segment.group(3) != null) {
-      return context.inArray() && context.getCurrentIndex() == index(segment.group(3));
-    }
-    String name = segment.group(1) != null ? segment.group(1) : segment.group(2);
-    return context.inObject() && name.equals(context.getCurrentName());
+  @Override
+  public boolean equals(Object other) {
+    return other instanceof JsonPath path && text.equals(path.text);
   }
 
-  /** An index beyond the {@code int} range gives -1, which no array holds. */
-  private static int index(String digits) {
-    BigInteger index = new BigInteger(digits);
-    return index.bitLength() > INT_BITS ? -1 : index.intValue();
+  @Override
+  public int hashCode() {
+    return text.hashCode();
   }
 
   @Override
   public String toString() {
     return text;
+  }
+
+  /**
+   * @param name the member name; null for an array index
+   * @param index the array index; -1 for a member name, and for an index beyond the {@code int}
+   *     range, which no array holds
+   */
+  private record Segment(String name, int index) {
+
+    static Segment fromMatch(MatchResult match) {
+      if (match.group(3) == null) {
+        return new Segment(match.group(1) != null ? match.group(1) : match.group(2), -1);
+      }
+      BigInteger index = new BigInteger(match.group(3));
+      return new Segment(null, index.bitLength() > INT_BITS ? -1 : index.intValue());
+    }
+
+    boolean isAt(JsonStreamContext context) {
+      if (name == null) {
+        return context.inArray() && context.getCurrentIndex() == index;
+      }
+      return context.inObject() && name.equals(context.getCurrentName());
+    }
   }
 }
