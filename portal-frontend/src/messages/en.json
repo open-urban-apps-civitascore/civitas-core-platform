@@ -1114,7 +1114,8 @@
         "enable": "Use pagination",
         "type": {
           "label": "Pagination type",
-          "pageNumber": "Page Number"
+          "pageNumber": "Page Number",
+          "cursor": "Cursor"
         },
         "pageParameter": {
           "label": "Page parameter"
@@ -1130,6 +1131,24 @@
         },
         "endPage": {
           "label": "End page"
+        },
+        "cursorHint": "The Data structure describes the whole response, cursor included.",
+        "cursorPath": {
+          "label": "Cursor path"
+        },
+        "cursorParameter": {
+          "label": "Cursor parameter"
+        },
+        "cursorIn": {
+          "label": "Send cursor as",
+          "query": "Query parameter",
+          "header": "Header"
+        },
+        "limitParameter": {
+          "label": "Limit parameter"
+        },
+        "limit": {
+          "label": "Limit"
         }
       }
     },

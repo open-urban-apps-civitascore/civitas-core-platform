@@ -16,10 +16,11 @@ interface ApiCallParameterRowsProps {
   typeLabel: string
   isDisabled: boolean
   onRemove: (index: number) => void
+  onNameChange: () => void
 }
 
 export const ApiCallParameterRows = (props: ApiCallParameterRowsProps) => {
-  const { form, name, fields, typeLabel, isDisabled, onRemove } = props
+  const { form, name, fields, typeLabel, isDisabled, onRemove, onNameChange } = props
   const t = useTranslations('datasources.apiCallsTab.parameters')
 
   return (
@@ -37,6 +38,10 @@ export const ApiCallParameterRows = (props: ApiCallParameterRowsProps) => {
                   <FormControl>
                     <Input
                       {...inputField}
+                      onChange={event => {
+                        inputField.onChange(event)
+                        if (key === 'name') onNameChange()
+                      }}
                       aria-label={`${typeLabel} ${t(key)}`}
                       placeholder={isDisabled ? undefined : t(key)}
                       disabled={isDisabled}

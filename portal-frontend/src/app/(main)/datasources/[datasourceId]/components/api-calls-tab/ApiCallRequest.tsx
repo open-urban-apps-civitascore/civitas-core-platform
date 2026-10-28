@@ -39,6 +39,18 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
   const pathWithQuery = formatPathWithQuery(apiCall?.path ?? '', apiCall?.queryParameters ?? [])
   const hasParameters = queryParameters.fields.length > 0 || headers.fields.length > 0
 
+  const revalidatePagination = () => void form.trigger(`${apiCallPath}.pagination`)
+
+  const handleQueryParameterRemove = (parameterIndex: number) => {
+    queryParameters.remove(parameterIndex)
+    revalidatePagination()
+  }
+
+  const handleHeaderRemove = (parameterIndex: number) => {
+    headers.remove(parameterIndex)
+    revalidatePagination()
+  }
+
   const handleCopyUrl = async () => {
     try {
       await navigator.clipboard.writeText(
@@ -154,7 +166,8 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
               fields={queryParameters.fields}
               typeLabel={t('parameters.query')}
               isDisabled={isDisabled}
-              onRemove={queryParameters.remove}
+              onRemove={handleQueryParameterRemove}
+              onNameChange={revalidatePagination}
             />
             <ApiCallParameterRows
               form={form}
@@ -162,7 +175,8 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
               fields={headers.fields}
               typeLabel={t('parameters.header')}
               isDisabled={isDisabled}
-              onRemove={headers.remove}
+              onRemove={handleHeaderRemove}
+              onNameChange={revalidatePagination}
             />
           </div>
         )}

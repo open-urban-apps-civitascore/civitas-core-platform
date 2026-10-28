@@ -1101,7 +1101,8 @@
         "enable": "Paginierung verwenden",
         "type": {
           "label": "Art der Paginierung",
-          "pageNumber": "Seitennummer"
+          "pageNumber": "Seitennummer",
+          "cursor": "Cursor"
         },
         "pageParameter": {
           "label": "Seitenparameter"
@@ -1117,6 +1118,24 @@
         },
         "endPage": {
           "label": "Endseite"
+        },
+        "cursorHint": "Die Datenstruktur beschreibt die ganze Antwort, einschließlich Cursor.",
+        "cursorPath": {
+          "label": "Cursor-Pfad"
+        },
+        "cursorParameter": {
+          "label": "Cursor-Parameter"
+        },
+        "cursorIn": {
+          "label": "Cursor senden als",
+          "query": "Query-Parameter",
+          "header": "Header"
+        },
+        "limitParameter": {
+          "label": "Limit-Parameter"
+        },
+        "limit": {
+          "label": "Limit"
         }
       }
     },

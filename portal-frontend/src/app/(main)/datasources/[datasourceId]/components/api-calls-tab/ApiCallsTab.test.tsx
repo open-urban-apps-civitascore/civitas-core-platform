@@ -7,8 +7,14 @@ import { toast } from 'sonner'
 import { describe, expect, it, vi } from 'vitest'
 
 import { Form } from '@/components/ui/form'
-import { PAGINATION_FORM } from '@/test-support/paginationFixtures'
-import { ApiCallSnapshots, CollapsedApiCallSections, EMPTY_PAGINATION, HttpApiCallForm } from '@/types/connectors'
+import { CURSOR_PAGINATION_FORM, PAGINATION_FORM } from '@/test-support/paginationFixtures'
+import {
+  ApiCallSnapshots,
+  CollapsedApiCallSections,
+  EMPTY_CURSOR_PAGINATION,
+  EMPTY_PAGINATION,
+  HttpApiCallForm,
+} from '@/types/connectors'
 import { DatasourceFormDraft, DatasourceFormDraftSchema } from '@/types/datasources'
 
 import { ApiCallsTab } from './ApiCallsTab'
@@ -90,6 +96,17 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
 
 const openApiCall = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.click(screen.getByRole('button', { name: /stations/ }))
+}
+
+const selectOption = async (user: ReturnType<typeof userEvent.setup>, combobox: string | RegExp, option: string) => {
+  await user.click(screen.getByRole('combobox', { name: combobox }))
+  await user.click(screen.getByRole('option', { name: option }))
+}
+
+const openCursorPagination = async (user: ReturnType<typeof userEvent.setup>) => {
+  await openApiCall(user)
+  await user.click(screen.getByRole('checkbox', { name: 'enable' }))
+  await selectOption(user, 'type.label', 'type.cursor')
 }
 
 describe('ApiCallsTab', () => {
@@ -413,7 +430,7 @@ describe('ApiCallsTab', () => {
 
       await user.click(screen.getByRole('checkbox', { name: 'enable' }))
 
-      expect(screen.getByRole('combobox', { name: 'type.label' })).toBeDisabled()
+      expect(screen.getByRole('combobox', { name: 'type.label' })).toBeEnabled()
       expect(screen.getByRole('textbox', { name: 'startPage.label' })).toHaveValue('0')
       expect(getApiCalls()?.[0].pagination).toEqual({ ...EMPTY_PAGINATION, isEnabled: true })
     })
@@ -499,8 +516,172 @@ describe('ApiCallsTab', () => {
       await openApiCall(user)
 
       expect(screen.getByRole('checkbox', { name: 'enable' })).toBeDisabled()
+      expect(screen.getByRole('combobox', { name: 'type.label' })).toBeDisabled()
       expect(screen.getByRole('textbox', { name: /^pageParameter\.label/ })).toBeDisabled()
       expect(screen.getByRole('textbox', { name: 'endPage.label' })).toBeDisabled()
+    })
+
+    it('offers page number and cursor as type', async () => {
+      const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+      await openApiCall(user)
+      await user.click(screen.getByRole('checkbox', { name: 'enable' }))
+
+      await user.click(screen.getByRole('combobox', { name: 'type.label' }))
+
+      expect(screen.getByRole('option', { name: 'type.pageNumber' })).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: 'type.cursor' })).toBeInTheDocument()
+    })
+
+    describe('cursor', () => {
+      it('shows the cursor fields and the hint instead of the page number fields', async () => {
+        const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [API_CALL] })
+
+        await openCursorPagination(user)
+
+        expect(screen.getByText('cursorHint')).toBeInTheDocument()
+        expect(screen.getByRole('textbox', { name: /^cursorPath\.label/ })).toBeInTheDocument()
+        expect(screen.getByRole('textbox', { name: 'limit.label' })).toBeInTheDocument()
+        expect(screen.queryByRole('textbox', { name: /^pageParameter\.label/ })).not.toBeInTheDocument()
+        expect(getApiCalls()?.[0].pagination).toEqual({ ...EMPTY_CURSOR_PAGINATION, isEnabled: true })
+      })
+
+      it('clears the cursor values when switching back to page number', async () => {
+        const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [API_CALL] })
+        await openCursorPagination(user)
+        await user.type(screen.getByRole('textbox', { name: /^cursorPath\.label/ }), '$.next')
+
+        await selectOption(user, 'type.label', 'type.pageNumber')
+
+        expect(screen.queryByText('cursorHint')).not.toBeInTheDocument()
+        expect(getApiCalls()?.[0].pagination).toEqual({ ...EMPTY_PAGINATION, isEnabled: true })
+      })
+
+      it('sends the cursor as query parameter by default and as header when selected', async () => {
+        const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [API_CALL] })
+        await openCursorPagination(user)
+        expect(screen.getByRole('combobox', { name: /^cursorIn\.label/ })).toHaveTextContent('cursorIn.query')
+
+        await selectOption(user, /^cursorIn\.label/, 'cursorIn.header')
+
+        expect(getApiCalls()?.[0].pagination).toMatchObject({ cursorIn: 'HEADER' })
+      })
+
+      it('writes the entered values into the form', async () => {
+        const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [API_CALL] })
+        await openCursorPagination(user)
+
+        await user.type(screen.getByRole('textbox', { name: /^cursorPath\.label/ }), '$.next_cursor')
+        await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'cursor')
+        await user.type(screen.getByRole('textbox', { name: 'limitParameter.label' }), 'limit')
+        await user.type(screen.getByRole('textbox', { name: 'limit.label' }), '20')
+
+        expect(getApiCalls()?.[0].pagination).toEqual(CURSOR_PAGINATION_FORM)
+      })
+
+      it('marks cursor path, cursor parameter and send cursor as as required', async () => {
+        const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+
+        await openCursorPagination(user)
+
+        expect(screen.getByRole('textbox', { name: 'cursorPath.label *' })).toBeInTheDocument()
+        expect(screen.getByRole('textbox', { name: 'cursorParameter.label *' })).toBeInTheDocument()
+        expect(screen.getByRole('combobox', { name: 'cursorIn.label *' })).toBeInTheDocument()
+        expect(screen.getByRole('textbox', { name: 'limitParameter.label' })).toBeInTheDocument()
+      })
+
+      it('shows the error of an invalid cursor path', async () => {
+        const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+        await openCursorPagination(user)
+
+        await user.type(screen.getByRole('textbox', { name: /^cursorPath\.label/ }), 'next')
+
+        expect(await screen.findByText('datasources.errors.invalidJsonPath')).toBeInTheDocument()
+      })
+
+      it('checks the cursor parameter again when the cursor is sent as header', async () => {
+        const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+        await openCursorPagination(user)
+        await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'my cursor')
+        expect(screen.queryByText('datasources.errors.invalidHeaderName')).not.toBeInTheDocument()
+
+        await selectOption(user, /^cursorIn\.label/, 'cursorIn.header')
+
+        expect(await screen.findByText('datasources.errors.invalidHeaderName')).toBeInTheDocument()
+      })
+
+      it('shows and clears the error when a query parameter gets and loses the cursor name', async () => {
+        const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+        await openCursorPagination(user)
+        await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'cursor')
+        const queryParameterName = screen.getByRole('textbox', { name: 'parameters.query name' })
+
+        await user.clear(queryParameterName)
+        await user.type(queryParameterName, 'cursor')
+        expect(await screen.findByText('datasources.errors.paginationQueryDuplicate')).toBeInTheDocument()
+
+        await user.type(queryParameterName, 's')
+        await waitFor(() =>
+          expect(screen.queryByText('datasources.errors.paginationQueryDuplicate')).not.toBeInTheDocument(),
+        )
+      })
+
+      it('clears the error when the query parameter with the cursor name is removed', async () => {
+        const apiCall = { ...API_CALL, queryParameters: [{ name: 'cursor', value: 'x' }] }
+        const { user } = renderApiCallsTab({ apiCalls: [apiCall] })
+        await openCursorPagination(user)
+        await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'cursor')
+        expect(await screen.findByText('datasources.errors.paginationQueryDuplicate')).toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'parameters.query remove' }))
+
+        await waitFor(() =>
+          expect(screen.queryByText('datasources.errors.paginationQueryDuplicate')).not.toBeInTheDocument(),
+        )
+      })
+
+      it('shows and clears the error when a header gets the cursor name and is removed', async () => {
+        const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+        await openCursorPagination(user)
+        await selectOption(user, /^cursorIn\.label/, 'cursorIn.header')
+        await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'cursor')
+        const headerName = screen.getByRole('textbox', { name: 'parameters.header name' })
+
+        await user.clear(headerName)
+        await user.type(headerName, 'Cursor')
+        expect(await screen.findByText('datasources.errors.paginationHeaderDuplicate')).toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'parameters.header remove' }))
+        await waitFor(() =>
+          expect(screen.queryByText('datasources.errors.paginationHeaderDuplicate')).not.toBeInTheDocument(),
+        )
+      })
+
+      it('shows no error of the old values after switching the type', async () => {
+        const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+        await openCursorPagination(user)
+        await user.type(screen.getByRole('textbox', { name: /^cursorPath\.label/ }), 'next')
+        expect(await screen.findByText('datasources.errors.invalidJsonPath')).toBeInTheDocument()
+
+        await selectOption(user, 'type.label', 'type.pageNumber')
+        await selectOption(user, 'type.label', 'type.cursor')
+
+        expect(screen.getByRole('textbox', { name: /^cursorPath\.label/ })).toHaveValue('')
+        expect(screen.queryByText('datasources.errors.invalidJsonPath')).not.toBeInTheDocument()
+      })
+
+      it('clears the duplicate error at the limit parameter when the cursor parameter changes', async () => {
+        const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+        await openCursorPagination(user)
+        await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'cursor')
+        await user.type(screen.getByRole('textbox', { name: 'limitParameter.label' }), 'cursor')
+        expect(await screen.findByText('datasources.errors.paginationParameterDuplicate')).toBeInTheDocument()
+
+        await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 's')
+
+        await waitFor(() =>
+          expect(screen.queryByText('datasources.errors.paginationParameterDuplicate')).not.toBeInTheDocument(),
+        )
+      })
     })
 
     it('collapses and expands the pagination section', async () => {

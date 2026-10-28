@@ -8,18 +8,52 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { HTTP_PAGINATION_TYPES } from '@/const/connectors'
-import { HttpApiCallsForm, HttpPageNumberPaginationForm } from '@/types/connectors'
+import { HTTP_PAGINATION_TYPES, HTTP_PARAMETER_LOCATIONS } from '@/const/connectors'
+import {
+  EMPTY_PAGINATIONS,
+  HttpApiCallsForm,
+  HttpCursorPaginationForm,
+  HttpPageNumberPaginationForm,
+  HttpPaginationType,
+  HttpParameterLocation,
+} from '@/types/connectors'
 
-type PaginationField = Exclude<keyof HttpPageNumberPaginationForm, 'isEnabled' | 'type'>
+type PageNumberField = Exclude<keyof HttpPageNumberPaginationForm, 'isEnabled' | 'type'>
+type CursorField = Exclude<keyof HttpCursorPaginationForm, 'isEnabled' | 'type' | 'cursorIn'>
 
-const PAGINATION_FIELDS: { name: PaginationField; isRequired: boolean; isNumeric: boolean }[] = [
+interface PaginationFieldConfig<T> {
+  name: T
+  isRequired: boolean
+  isNumeric: boolean
+}
+
+const PAGE_NUMBER_FIELDS: PaginationFieldConfig<PageNumberField>[] = [
   { name: 'pageParameter', isRequired: true, isNumeric: false },
   { name: 'pageSizeParameter', isRequired: true, isNumeric: false },
   { name: 'pageSize', isRequired: true, isNumeric: true },
   { name: 'startPage', isRequired: false, isNumeric: true },
   { name: 'endPage', isRequired: false, isNumeric: true },
 ]
+
+const CURSOR_FIELDS: PaginationFieldConfig<CursorField>[] = [
+  { name: 'cursorPath', isRequired: true, isNumeric: false },
+  { name: 'cursorParameter', isRequired: true, isNumeric: false },
+]
+
+const LIMIT_FIELDS: PaginationFieldConfig<CursorField>[] = [
+  { name: 'limitParameter', isRequired: false, isNumeric: false },
+  { name: 'limit', isRequired: false, isNumeric: true },
+]
+
+const PAGINATION_TYPE_LABELS: Record<HttpPaginationType, string> = {
+  [HTTP_PAGINATION_TYPES.PAGE_NUMBER]: 'type.pageNumber',
+  [HTTP_PAGINATION_TYPES.CURSOR]: 'type.cursor',
+}
+
+const CURSOR_IN_LABELS: Record<HttpParameterLocation, string> = {
+  [HTTP_PARAMETER_LOCATIONS.QUERY]: 'cursorIn.query',
+  [HTTP_PARAMETER_LOCATIONS.HEADER]: 'cursorIn.header',
+}
 
 const ROW_CLASS_NAME = 'grid grid-cols-[220px_1fr] xl:grid-cols-[220px_calc(50%_-_220px)] items-center gap-x-4 gap-y-2'
 
@@ -37,12 +71,51 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
 
   const paginationPath = `configuration.apiCalls.${index}.pagination` as const
   const isEnabled = useWatch({ control: form.control, name: `${paginationPath}.isEnabled` })
+  const type = useWatch({ control: form.control, name: `${paginationPath}.type` })
+  const isCursor = type === HTTP_PAGINATION_TYPES.CURSOR
 
-  const handleEnabledChange = (isChecked: boolean, onChange: (isChecked: boolean) => void) => {
-    onChange(isChecked)
+  const handleChangeAndRevalidate = <T,>(value: T, onChange: (value: T) => void) => {
+    onChange(value)
+    void form.trigger(paginationPath)
+  }
+
+  const handleTypeChange = (newType: HttpPaginationType) => {
+    form.setValue(paginationPath, { ...EMPTY_PAGINATIONS[newType], isEnabled: true }, { shouldDirty: true })
     void form.trigger(paginationPath)
   }
   const typeId = `${paginationPath}.type`
+
+  const renderTextField = (config: PaginationFieldConfig<PageNumberField | CursorField>, isRevalidating: boolean) => {
+    const { name, isRequired, isNumeric } = config
+    return (
+      <FormField
+        key={name}
+        control={form.control}
+        name={`${paginationPath}.${name}`}
+        render={({ field }) => (
+          <FormItem className={ROW_CLASS_NAME}>
+            <FormLabel>
+              {t(`${name}.label`)}
+              {isRequired && <span className="text-red-500 ml-1">*</span>}
+            </FormLabel>
+            <FormControl>
+              <Input
+                {...field}
+                onChange={
+                  isRevalidating
+                    ? event => handleChangeAndRevalidate(event.target.value, field.onChange)
+                    : field.onChange
+                }
+                inputMode={isNumeric ? 'numeric' : undefined}
+                disabled={isDisabled}
+              />
+            </FormControl>
+            <FormMessage className="col-start-2" />
+          </FormItem>
+        )}
+      />
+    )
+  }
 
   return (
     <Collapsible open={isOpen} onOpenChange={onOpenChange} className="group/pagination">
@@ -61,7 +134,7 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
             <Label className="w-fit">
               <Checkbox
                 checked={field.value}
-                onCheckedChange={isChecked => handleEnabledChange(isChecked === true, field.onChange)}
+                onCheckedChange={isChecked => handleChangeAndRevalidate(isChecked === true, field.onChange)}
                 disabled={isDisabled}
               />
               {t('enable')}
@@ -73,35 +146,66 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
           <CollapsibleContent className="flex flex-col gap-4 pt-4">
             <div className={ROW_CLASS_NAME}>
               <Label htmlFor={typeId}>{t('type.label')}</Label>
-              <Select value={HTTP_PAGINATION_TYPES.PAGE_NUMBER} disabled>
+              <Select
+                value={type}
+                onValueChange={value => handleTypeChange(value as HttpPaginationType)}
+                disabled={isDisabled}
+              >
                 <SelectTrigger id={typeId} className="w-full">
-                  <SelectValue>{t('type.pageNumber')}</SelectValue>
+                  <SelectValue>{t(PAGINATION_TYPE_LABELS[type])}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={HTTP_PAGINATION_TYPES.PAGE_NUMBER}>{t('type.pageNumber')}</SelectItem>
+                  {Object.values(HTTP_PAGINATION_TYPES).map(paginationType => (
+                    <SelectItem key={paginationType} value={paginationType}>
+                      {t(PAGINATION_TYPE_LABELS[paginationType])}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              {isCursor && <p className="col-start-2 text-sm text-muted-foreground">{t('cursorHint')}</p>}
             </div>
 
-            {PAGINATION_FIELDS.map(({ name, isRequired, isNumeric }) => (
-              <FormField
-                key={name}
-                control={form.control}
-                name={`${paginationPath}.${name}`}
-                render={({ field }) => (
-                  <FormItem className={ROW_CLASS_NAME}>
-                    <FormLabel>
-                      {t(`${name}.label`)}
-                      {isRequired && <span className="text-red-500 ml-1">*</span>}
-                    </FormLabel>
-                    <FormControl>
-                      <Input {...field} inputMode={isNumeric ? 'numeric' : undefined} disabled={isDisabled} />
-                    </FormControl>
-                    <FormMessage className="col-start-2" />
-                  </FormItem>
-                )}
-              />
-            ))}
+            {!isCursor && PAGE_NUMBER_FIELDS.map(config => renderTextField(config, false))}
+
+            {isCursor && (
+              <>
+                {CURSOR_FIELDS.map(config => renderTextField(config, true))}
+                <FormField
+                  control={form.control}
+                  name={`${paginationPath}.cursorIn`}
+                  render={({ field }) => (
+                    <FormItem className={ROW_CLASS_NAME}>
+                      <FormLabel>
+                        {t('cursorIn.label')}
+                        <span className="text-red-500 ml-1">*</span>
+                      </FormLabel>
+                      <Select
+                        value={field.value}
+                        onValueChange={value =>
+                          handleChangeAndRevalidate(value as HttpParameterLocation, field.onChange)
+                        }
+                        disabled={isDisabled}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue>{t(CURSOR_IN_LABELS[field.value])}</SelectValue>
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {Object.values(HTTP_PARAMETER_LOCATIONS).map(location => (
+                            <SelectItem key={location} value={location}>
+                              {t(CURSOR_IN_LABELS[location])}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage className="col-start-2" />
+                    </FormItem>
+                  )}
+                />
+                {LIMIT_FIELDS.map(config => renderTextField(config, true))}
+              </>
+            )}
           </CollapsibleContent>
         </Collapsible>
       </CollapsibleContent>
