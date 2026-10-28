@@ -24,6 +24,14 @@
             <id>gitlab-maven</id>
             <url>https://gitlab.com/api/v4/projects/72402288/packages/maven</url>
         </repository>
+        <!-- GeoTools is published here, not on Maven Central. -->
+        <repository>
+            <id>osgeo</id>
+            <url>https://repo.osgeo.org/repository/release/</url>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
     </repositories>
 
     <!--  mvn versions:display-property-updates -->
@@ -62,6 +70,9 @@
              -Dmodel-forge.version so the backend builds against its own branch's Model Forge. -->
         <model-forge.version>0.1.0-SNAPSHOT</model-forge.version>
         <archunit.version>1.5.1</archunit.version>
+        <!-- Must match the GeoTools inside the deployed GeoServer Cloud image (3.0.1.1 ships
+             35.1), so a layer's CQL filter is checked by the parser GeoServer runs. -->
+        <geotools.version>35.1</geotools.version>
         <!-- Drop once the Spring Boot parent manages Tomcat >= 11.0.25: Boot 4.1.1 pins 11.0.24,
              affected by GHSA-9xv2-5v5q-p794, GHSA-gcx9-497g-6cp6 and GHSA-h3x4-894j-xpx5. -->
         <tomcat.version>11.0.26</tomcat.version>
@@ -149,6 +160,12 @@
             <groupId>org.owasp.encoder</groupId>
             <artifactId>encoder</artifactId>
             <version>${owasp.encoder.version}</version>
+        </dependency>
+        <!-- The GeoTools ECQL parser GeoServer runs, for checking a layer's CQL filter on save -->
+        <dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-cql</artifactId>
+            <version>${geotools.version}</version>
         </dependency>
         <!-- Kafka -->
         <dependency>

@@ -1,6 +1,7 @@
 package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
@@ -16,11 +17,14 @@ import de.civitascore.portal.util.RestPage;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
@@ -295,6 +299,88 @@ class LayerControllerIntegrationTest
           exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Nested
+  @DisplayName("CQL Filter Validation Tests")
+  class CqlFilterValidationTests {
+
+    private static final String VALIDATION_FAILED_URN = "urn:civitas:error:VALIDATION_FAILED";
+    private static final String INCOMPLETE =
+        "CQL filter is incomplete: a value, condition or closing bracket is missing at the end";
+
+    @Test
+    @DisplayName("Should save a layer whose CQL filter is valid ECQL")
+    void shouldSaveValidFilter() {
+      LayerInputDTO input = createValidInput();
+      input.setCqlFilter("status = 'frei' AND kapazitaet > 50");
+
+      ResponseEntity<LayerOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(layerRepository.findById(response.getBody().getId()).orElseThrow().getCqlFilter())
+          .isEqualTo("status = 'frei' AND kapazitaet > 50");
+    }
+
+    @Test
+    @DisplayName("Should save a layer with an empty CQL filter")
+    void shouldSaveEmptyFilter() {
+      LayerInputDTO input = createValidInput();
+      input.setCqlFilter("");
+
+      assertThat(performCreate(input).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    static Stream<Arguments> syntaxErrors() {
+      return Stream.of(
+          arguments("status = 'frei", "CQL filter is not valid ECQL near line 1, column 15"),
+          arguments("kapazitaet >", "CQL filter is not valid ECQL near line 1, column 12"),
+          arguments("(status = 'frei' OR kapazitaet > 50", INCOMPLETE));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("syntaxErrors")
+    @DisplayName("POST with a CQL syntax error returns 400 at the filter and saves nothing")
+    void createRejectsSyntaxError(String cqlFilter, String expectedMessage) {
+      LayerInputDTO input = createValidInput();
+      input.setCqlFilter(cqlFilter);
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getType()).hasToString(VALIDATION_FAILED_URN);
+      assertThat(response.getBody().getProperties().get("fieldErrors"))
+          .isEqualTo(List.of(Map.of("field", "cqlFilter", "message", expectedMessage)));
+      assertThat(layerRepository.existsByDataSetId(testDataSetId)).isFalse();
+    }
+
+    @Test
+    @DisplayName("PUT with a CQL syntax error returns 400 at the filter and keeps the stored one")
+    void updateRejectsSyntaxError() {
+      LayerInputDTO create = createValidInput();
+      create.setCqlFilter("kapazitaet > 50");
+      UUID id = performCreate(create).getBody().getId();
+      LayerInputDTO update = createUpdateInput();
+      update.setCqlFilter("kapazitaet >");
+
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              getEndpointPath() + "/" + id, HttpMethod.PUT, createAuthHeaders(), update);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getType()).hasToString(VALIDATION_FAILED_URN);
+      assertThat(response.getBody().getProperties().get("fieldErrors"))
+          .isEqualTo(
+              List.of(
+                  Map.of(
+                      "field",
+                      "cqlFilter",
+                      "message",
+                      "CQL filter is not valid ECQL near line 1, column 12")));
+      assertThat(layerRepository.findById(id).orElseThrow().getCqlFilter())
+          .isEqualTo("kapazitaet > 50");
     }
   }
 
