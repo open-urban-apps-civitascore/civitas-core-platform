@@ -88,6 +88,24 @@ class MappingControllerIntegrationTest extends BaseKeycloakIntegrationTest {
   }
 
   @Test
+  void updateMapping_withTheContentOfTheCurrentVersion_keepsThatVersion() {
+    DataSet dataSet = portalData.dataSetWithManifest();
+    MappingOutputDTO created = create(dataSet, "Sensors").getBody();
+
+    MappingOutputDTO saved =
+        exchange(
+                HttpMethod.PUT,
+                item(dataSet.getId(), created.mappingId()),
+                body("Sensors"),
+                MappingOutputDTO.class)
+            .getBody();
+
+    assertThat(saved.version()).isEqualTo(created.version());
+    assertThat(get(dataSet.getId(), created.mappingId()).getBody().version())
+        .isEqualTo(created.version());
+  }
+
+  @Test
   void listMappings_returnsOneEntryPerMappingOfTheDataSet() {
     DataSet dataSet = portalData.dataSetWithManifest();
     MappingOutputDTO first = create(dataSet, "First").getBody();

@@ -72,7 +72,9 @@ public class MappingController {
   @PutMapping("/{mappingId}")
   @Operation(
       summary = "Store a new version of a Mapping",
-      description = "Every request stores a new version, also when the content did not change.")
+      description =
+          "A request whose content and node positions equal the current version stores no new"
+              + " version and answers that version.")
   @Problems({
     ProblemType.NOT_FOUND,
     ProblemType.INVALID_INPUT,

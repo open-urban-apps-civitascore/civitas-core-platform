@@ -60,6 +60,8 @@ public class MappingService {
    */
   public record StoredMapping(ModelPin pin, MappingInputDTO mapping) {}
 
+  private record Document(Map<String, Object> content, Map<String, Object> styles) {}
+
   /**
    * The Mappings of this DataSet, in manifest order.
    *
@@ -96,20 +98,25 @@ public class MappingService {
   public StoredMapping create(UUID dataSetId, MappingInputDTO mapping) {
     DataSet dataSet = dataSetWithManifestOrThrow(dataSetId);
     dataSetMutationGuard.requireMutable(dataSet, "create " + ENTITY_NAME);
-    return store(dataSet.getManifestLogicalUrn(), Optional.empty(), mapping);
+    return store(dataSet.getManifestLogicalUrn(), Optional.empty(), mapping, toDocument(mapping));
   }
 
   /**
-   * Stores a new version of a Mapping of this DataSet, also when the content did not change.
+   * Stores a new version of a Mapping of this DataSet. A Mapping whose content and node layout
+   * equal its current version keeps that version.
    *
    * @throws ResourceNotFoundException when the Mapping is no member of this DataSet
    */
   public StoredMapping update(UUID dataSetId, UUID mappingId, MappingInputDTO mapping) {
     DataSet dataSet = dataSetWithManifestOrThrow(dataSetId);
     String manifestUrn = dataSet.getManifestLogicalUrn();
-    String logicalUrn = currentMemberOrThrow(manifestUrn, mappingId).logicalUrn();
+    ModelPin member = currentMemberOrThrow(manifestUrn, mappingId);
     dataSetMutationGuard.requireMutable(dataSet, "update " + ENTITY_NAME);
-    return store(manifestUrn, Optional.of(logicalUrn), mapping);
+    Document document = toDocument(mapping);
+    if (registry.isUnchanged(member.versionedUrn(), document.content(), document.styles())) {
+      return new StoredMapping(member, mapping);
+    }
+    return store(manifestUrn, Optional.of(member.logicalUrn()), mapping, document);
   }
 
   /**
@@ -128,16 +135,19 @@ public class MappingService {
   }
 
   /**
-   * The editor's UI-only node layout ({@code positions}) is split off the content into {@code
-   * x-ui-styles}; everything else is passed through opaquely to Model Forge.
+   * The editor's UI-only node layout ({@code positions}) goes into {@code x-ui-styles}; the rules
+   * in {@code fields} reach Model Forge unchanged.
    */
-  private StoredMapping store(
-      String manifestUrn, Optional<String> logicalUrn, MappingInputDTO mapping) {
+  private Document toDocument(MappingInputDTO mapping) {
     requireResolvableEndpoint(mapping.getSource(), "source");
     requireResolvableEndpoint(mapping.getTarget(), "target");
     Map<String, Object> content = objectMapper.convertValue(mapping, CONTENT);
     Object positions = content.remove(POSITIONS);
-    Map<String, Object> styles = positions == null ? null : Map.of(POSITIONS, positions);
+    return new Document(content, positions == null ? null : Map.of(POSITIONS, positions));
+  }
+
+  private StoredMapping store(
+      String manifestUrn, Optional<String> logicalUrn, MappingInputDTO mapping, Document document) {
     ModelPin pin =
         registry.storePayload(
             PayloadKind.MAPPING,
@@ -145,8 +155,8 @@ public class MappingService {
             // A Mapping has no portal row, so Model Forge mints its UUID.
             null,
             deriveName(mapping),
-            content,
-            styles,
+            document.content(),
+            document.styles(),
             manifestUrn);
     return new StoredMapping(pin, mapping);
   }

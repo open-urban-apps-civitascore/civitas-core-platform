@@ -41,6 +41,7 @@ tests {
 docs {
   **Precondition:** `dataSetId`, `mappingId`, `mappingLogicalUrn` and `mappingVersion` are set.
 
-  **Expected Response:** 200 OK with the same `logicalUrn` and a new `version`. Every request
-  stores a new version, also when the content did not change.
+  **Expected Response:** 200 OK with the same `logicalUrn` and a new `version`. A request whose
+  content and node positions equal the current version stores no new version and answers that
+  version.
 }
