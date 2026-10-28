@@ -19,7 +19,6 @@ class ProblemTypeTest {
       delimiter = '|',
       textBlock =
           """
-          NOT_FOUND                     | 404
           INVALID_INPUT                 | 400
           MALFORMED_REQUEST             | 400
           VALIDATION_FAILED             | 400
@@ -33,17 +32,24 @@ class ProblemTypeTest {
           INVALID_TOKEN                 | 401
           ACCESS_DENIED                 | 403
           FORBIDDEN                     | 403
+          NOT_FOUND                     | 404
+          METHOD_NOT_ALLOWED            | 405
+          NOT_ACCEPTABLE                | 406
           UNIQUE_CONSTRAINT_VIOLATION   | 409
           FOREIGN_KEY_VIOLATION         | 409
           RESOURCE_IN_USE               | 409
           SAGA_IN_FLIGHT                | 409
           MODEL_MISSING                 | 409
+          PAYLOAD_TOO_LARGE             | 413
+          UNSUPPORTED_MEDIA_TYPE        | 415
           DATASOURCE_SCOPE_VIOLATION    | 422
           PIPELINE_CLOSURE_INVALID      | 422
           TOO_MANY_REQUESTS             | 429
+          INTERNAL_ERROR                | 500
           DATA_INTEGRITY_ERROR          | 500
           PERSISTENCE_ERROR             | 500
           EXTERNAL_SYSTEM_ERROR         | 502
+          SERVICE_UNAVAILABLE           | 503
           REGISTRY_UNAVAILABLE          | 503
           EXTERNAL_SYSTEM_TIMEOUT       | 504
           """)
