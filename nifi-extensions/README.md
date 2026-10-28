@@ -316,6 +316,7 @@ API call "Get items": request 4 would send the same request as request 2
 API call "Get items": GET /items offset 0 failed with status 404
 API call "Get items": offset 100 is a JSON object, not an array
 API call "Get items": offset 100: the value at $.meta.count is not a record count
+API call "Get items": offset 100: the response holds more records than the limit
 API call "Get items": offset 100: the next offset would be larger than 9223372036854775807
 API call "Get items": offset 120 repeats offset 100
 ```
@@ -473,7 +474,8 @@ response are part of the run:
 - A request after the first answers 400 or 404, as with page-number pagination. Some APIs answer an
   offset past the end so. On the first request, 400 and 404 go to `stop`.
 
-A response with more records than the `limit` is not an error. The offset is a `long`, so an
+A response with more records than the `limit` goes to `stop`: the API then ignores the `limit`,
+and the next offset would read some of its records again. The offset is a `long`, so an
 `offset` near the `int` maximum does not overflow.
 
 | 2xx response of a request | Result |
@@ -482,6 +484,7 @@ A response with more records than the `limit` is not an error. The offset is a `
 | With `countPath`: a JSON object that agrees with the `Record Schema`, with a count above 0 | one FlowFile on `success`, the body unchanged |
 | `[]`, a count of 0, or no body | no FlowFile; the run stops there |
 | Without `countPath` a JSON object, with `countPath` a JSON array; a JSON scalar, or not JSON | `stop` |
+| With a `limit`, more records than the `limit` | `stop` |
 | A value at `countPath` that is absent, `null`, below 0, a fraction, a string, a boolean or an object | `stop` |
 | A count that makes the next offset larger than 9223372036854775807 | `stop` |
 | A record that violates the `Record Schema` | `stop` |

@@ -73,12 +73,11 @@ class LimitOffsetPaginationTest {
         withLimit(0, Optional.of(COUNT_PATH)).shape());
   }
 
-  @ParameterizedTest
-  @ValueSource(ints = {20, 25})
-  void next_withALimit_addsTheLimitToTheOffset(int records) {
+  @Test
+  void next_withALimit_addsTheLimitToTheOffset() {
     LimitOffsetPagination pagination = withLimit(80, Optional.empty());
 
-    Page next = nextPage(pagination, pagination.first(), arrayOf(records));
+    Page next = nextPage(pagination, pagination.first(), arrayOf(20));
 
     assertEquals(
         List.of(new Parameter("limit", "20"), new Parameter("offset", "100")),
@@ -106,6 +105,17 @@ class LimitOffsetPaginationTest {
     Pagination.Progress progress = pagination.next(pagination.first(), arrayOf(records));
 
     assertEquals(new Pagination.Progress.Accepted(records, Optional.empty()), progress);
+  }
+
+  @Test
+  void next_withMoreRecordsThanTheLimit_rejects() {
+    LimitOffsetPagination pagination = withLimit(0, Optional.empty());
+
+    Pagination.Progress progress = pagination.next(pagination.first(), arrayOf(21));
+
+    assertEquals(
+        new Pagination.Progress.Rejected("the response holds more records than the limit"),
+        progress);
   }
 
   @Test

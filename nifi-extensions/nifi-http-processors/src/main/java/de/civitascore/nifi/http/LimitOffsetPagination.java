@@ -18,10 +18,11 @@ import java.util.OptionalLong;
 
 /**
  * Sends the offset, and with a limit the limit, as query parameters. With a limit, the offset grows
- * by the limit and a response with fewer records ends the run; without one, the offset grows by the
- * record count and a response without records ends the run. A cause names a page by its offset, so
- * that a Data Steward can send the same request again; without a limit, the offset thus carries the
- * record counts of the earlier responses.
+ * by the limit and a response with fewer records ends the run; a response with more records shows
+ * that the API ignores the limit, and the next offset would read some of its records again. Without
+ * a limit, the offset grows by the record count and a response without records ends the run. A
+ * cause names a page by its offset, so that a Data Steward can send the same request again; without
+ * a limit, the offset thus carries the record counts of the earlier responses.
  *
  * @param countPath where a response that is one record holds its record count; empty when each
  *     response is an array of records
@@ -61,6 +62,9 @@ record LimitOffsetPagination(
           "the value at " + countPath.orElseThrow() + " is not a record count");
     }
     long records = count.getAsLong();
+    if (limit.isPresent() && records > limit.get().size()) {
+      return new Progress.Rejected("the response holds more records than the limit");
+    }
     boolean last = limit.isPresent() ? records < limit.get().size() : records == 0;
     if (last) {
       return new Progress.Accepted(records, Optional.empty());
