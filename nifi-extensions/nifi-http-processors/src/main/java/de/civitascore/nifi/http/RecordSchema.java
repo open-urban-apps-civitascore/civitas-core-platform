@@ -17,14 +17,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.networknt.schema.JsonMetaSchema;
 import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaException;
-import com.networknt.schema.JsonSchemaFactory;
-import com.networknt.schema.NonValidationKeyword;
-import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
-import com.networknt.schema.resource.DisallowSchemaLoader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -36,14 +31,8 @@ import org.apache.nifi.processor.ProcessSession;
 
 /**
  * The Data structure of an HTTP/REST Data source, which each record of a response must agree with.
- *
- * <p>The validator settings are those of Model Forge, so that the processor accepts what Model
- * Forge accepts as data of the Data structure.
  */
 final class RecordSchema {
-
-  static final List<String> NON_VALIDATING_KEYWORDS =
-      List.of("x-core-ref", "x-xsd-source", "x-ui-position");
 
   private static final int REPORTED_VIOLATIONS = 3;
 
@@ -76,7 +65,7 @@ final class RecordSchema {
       throw new InvalidRecordSchemaException("Record Schema is not JSON", e);
     }
     try {
-      JsonSchema schema = factory().getSchema(node);
+      JsonSchema schema = ModelForgeSchemaFactory.create().getSchema(node);
       schema.initializeValidators();
       return new RecordSchema(schema);
     } catch (JsonSchemaException | IllegalArgumentException | StackOverflowError e) {
@@ -232,27 +221,5 @@ final class RecordSchema {
               + " records violate the Data structure: "
               + String.join("; ", reported));
     }
-  }
-
-  /**
-   * A factory of its own for each schema: a factory caches the documents it resolves by their
-   * {@code $id}, and the Pipelines of all tenants share the JVM of NiFi.
-   */
-  private static JsonSchemaFactory factory() {
-    JsonMetaSchema.Builder metaSchemaBuilder = JsonMetaSchema.builder(JsonMetaSchema.getV202012());
-    NON_VALIDATING_KEYWORDS.forEach(
-        keyword -> metaSchemaBuilder.keyword(new NonValidationKeyword(keyword)));
-    JsonMetaSchema metaSchema = metaSchemaBuilder.build();
-    return JsonSchemaFactory.getInstance(
-        SpecVersion.VersionFlag.V202012,
-        builder ->
-            builder
-                .metaSchema(metaSchema)
-                .defaultMetaSchemaIri(metaSchema.getIri())
-                .schemaLoaders(
-                    loaders ->
-                        loaders
-                            .add(new GeoJsonSchemaLoader())
-                            .add(DisallowSchemaLoader.getInstance())));
   }
 }
