@@ -442,6 +442,40 @@ class NifiRestClientTest {
   }
 
   @Test
+  void aServiceInvalidAlsoForItsOwnConfigurationFailsFatally() {
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/process-groups/root"))
+            .willReturn(json("{ \"id\": \"root-1\" }")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/root-1"))
+            .willReturn(json("{ \"processGroupFlow\": { \"flow\": { \"processGroups\": [] } } }")));
+    server.stubFor(
+        post(urlPathEqualTo("/nifi-api/process-groups/root-1/process-groups/upload"))
+            .willReturn(json("{ \"id\": \"pg-1\" }")));
+    server.stubFor(
+        put(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(json("{}")));
+    server.stubFor(
+        get(urlEqualTo("/nifi-api/flow/process-groups/pg-1/controller-services"))
+            .willReturn(
+                json(
+                    "{ \"controllerServices\": [ { \"id\": \"cs-1\", \"component\": { \"name\":"
+                        + " \"HttpSourceWebClient\", \"state\": \"DISABLED\","
+                        + " \"validationStatus\": \"INVALID\", \"validationErrors\": [ \"'SSL"
+                        + " Context Service' validated against 'cs-2' is invalid because Controller"
+                        + " Service with ID cs-2 is disabled\", \"'Connect Timeout' is invalid\""
+                        + " ] } } ] }")));
+
+    DeploymentPlan plan =
+        new DeploymentPlan(
+            "pipeline-x", "{ \"flowContents\": { \"name\": \"pipeline-x\" } }", Map.of());
+
+    FatalAdapterException ex =
+        assertThrows(FatalAdapterException.class, () -> client.deployFlow(plan));
+    assertTrue(ex.getMessage().contains("HttpSourceWebClient"), ex.getMessage());
+  }
+
+  @Test
   void missingRevisionVersionIsFatal() {
     // A matching group whose revision.version field is ABSENT must not be silently coerced to 0
     // (which would be sent as a stale optimistic-lock version) — surface the malformed response.
