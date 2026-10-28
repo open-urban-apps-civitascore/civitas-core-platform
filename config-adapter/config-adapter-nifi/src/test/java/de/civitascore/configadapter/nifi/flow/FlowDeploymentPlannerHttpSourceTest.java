@@ -420,6 +420,28 @@ class FlowDeploymentPlannerHttpSourceTest {
   }
 
   @Test
+  void privateKeyInAFormThatNiFiCannotReadIsRefused() throws Exception {
+    String sec1Key =
+        "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEsec1key\n-----END EC PRIVATE KEY-----\n";
+    String authentication =
+        mapper.writeValueAsString(
+            Map.of(
+                "type",
+                "CLIENT_CERTIFICATE",
+                "certificate",
+                encrypted("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"),
+                "privateKey",
+                encrypted(sec1Key)));
+
+    FatalAdapterException refusal = refusal(httpSource(authentication), MAPPINGS);
+
+    assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, refusal.getErrorCode());
+    String message = refusal.getInternalMessage();
+    assertTrue(message.contains("privateKey must be a PEM key in PKCS#8 form"), message);
+    assertFalse(message.contains("sec1key"), message);
+  }
+
+  @Test
   void withoutClientCertificateTheWebClientHasNoSslContext() throws Exception {
     DeploymentPlan plan = plan(Map.of("type", "BEARER_TOKEN", "token", encrypted(SECRET)));
 

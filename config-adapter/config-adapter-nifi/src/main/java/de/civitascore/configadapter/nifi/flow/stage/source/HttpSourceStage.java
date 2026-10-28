@@ -30,7 +30,7 @@ import de.civitascore.configadapter.nifi.flow.stage.StopSource;
 import de.civitascore.configadapter.nifi.graph.PipelineGraph.GraphNode;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiConsumer;
+import java.util.Optional;
 
 /**
  * HTTP/REST pull source over GetHttpApiCall. The stage maps no field of the API call, so a new
@@ -56,14 +56,6 @@ public final class HttpSourceStage implements SourceStage {
   private static final String API_TOKEN = "API_TOKEN";
   private static final String OAUTH2 = "OAUTH2";
   private static final String CLIENT_CERTIFICATE = "CLIENT_CERTIFICATE";
-
-  private static final Map<String, List<String>> SECRET_FIELDS =
-      Map.of(
-          BASIC, List.of("password"),
-          BEARER_TOKEN, List.of("token"),
-          API_TOKEN, List.of("value"),
-          OAUTH2, List.of("clientSecret"),
-          CLIENT_CERTIFICATE, List.of("certificate", "privateKey"));
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -111,39 +103,47 @@ public final class HttpSourceStage implements SourceStage {
     Map<String, Object> apiCall = selectApiCall(original.get("apiCalls"), node);
     Map<String, Object> authentication = objectOrEmpty(original.get("authentication"));
     String type = authentication.get("type") instanceof String text ? text : NONE;
-    Secrets secrets =
-        secrets(original, authentication, SECRET_FIELDS.getOrDefault(type, List.of()));
+    Secrets secrets = new Secrets(original, authentication);
 
     putIfPresent(out::putSourceProperty, "Base URL", original.get("baseUrl"));
     out.putSourceProperty("API Call", json(apiCall));
     out.putSourceProperty("Record Schema", json(recordSchema));
     out.putSourceProperty(AUTHENTICATION_TYPE, type);
-    BiConsumer<String, String> processorSecret =
-        (key, value) -> out.putSensitive(HTTP_PROCESSOR, key, value);
     switch (type) {
       case BASIC -> {
         putIfPresent(out::putSourceProperty, "Basic Auth Username", authentication.get("username"));
-        secrets.put(processorSecret, "Basic Auth Password", "password");
+        secrets
+            .value("password")
+            .ifPresent(value -> out.putSensitive(HTTP_PROCESSOR, "Basic Auth Password", value));
       }
-      case BEARER_TOKEN -> secrets.put(processorSecret, "Bearer Token", "token");
+      case BEARER_TOKEN ->
+          secrets
+              .value("token")
+              .ifPresent(value -> out.putSensitive(HTTP_PROCESSOR, "Bearer Token", value));
       case API_TOKEN -> {
         putIfPresent(out::putSourceProperty, "API Token Name", authentication.get("name"));
         putIfPresent(out::putSourceProperty, "API Token Location", authentication.get("in"));
-        secrets.put(processorSecret, "API Token Value", "value");
+        secrets
+            .value("value")
+            .ifPresent(value -> out.putSensitive(HTTP_PROCESSOR, "API Token Value", value));
       }
       case OAUTH2 -> {
         putIfPresent(out::putSourceProperty, "OAuth2 Token URL", authentication.get("tokenUrl"));
         putIfPresent(out::putSourceProperty, "OAuth2 Client ID", authentication.get("clientId"));
         putIfPresent(out::putSourceProperty, "OAuth2 Scope", authentication.get("scope"));
-        secrets.put(processorSecret, "OAuth2 Client Secret", "clientSecret");
+        secrets
+            .value("clientSecret")
+            .ifPresent(value -> out.putSensitive(HTTP_PROCESSOR, "OAuth2 Client Secret", value));
       }
       case CLIENT_CERTIFICATE -> {
-        secrets.put(
-            (key, value) -> out.putControllerServiceProperty(SSL_CONTEXT, key, value),
-            "Certificate Chain",
-            "certificate");
-        secrets.put(
-            (key, value) -> out.putSensitive(SSL_CONTEXT, key, value), "Private Key", "privateKey");
+        secrets
+            .value("certificate")
+            .ifPresent(
+                value -> out.putControllerServiceProperty(SSL_CONTEXT, "Certificate Chain", value));
+        Optional<String> privateKey = secrets.value("privateKey");
+        if (privateKey.isPresent()) {
+          out.putSensitive(SSL_CONTEXT, "Private Key", readablePrivateKey(privateKey.get()));
+        }
       }
       default -> {
         // NONE, and a type the processor refuses as invalid
@@ -151,46 +151,52 @@ public final class HttpSourceStage implements SourceStage {
     }
   }
 
-  /** Refuses a plaintext secret and decrypts the Data source once when a secret is present. */
-  private Secrets secrets(
-      Map<String, Object> original, Map<String, Object> authentication, List<String> fields)
-      throws FatalAdapterException {
-    boolean encrypted = false;
-    for (String field : fields) {
+  /**
+   * NiFi reads the key only when it enables the SSL context and then retries the enable without
+   * end, so a key in another form would fail the deployment only as a timeout.
+   */
+  private static String readablePrivateKey(String privateKey) throws FatalAdapterException {
+    if (privateKey.startsWith("-----BEGIN PRIVATE KEY-----")
+        || privateKey.startsWith("-----BEGIN RSA PRIVATE KEY-----")) {
+      return privateKey;
+    }
+    throw new FatalAdapterException(
+        AdapterErrorCode.NIFI_TEMPLATE_ERROR,
+        "HTTP/REST source privateKey must be a PEM key in PKCS#8 form, or in PKCS#1 form for RSA");
+  }
+
+  /**
+   * The secrets of an authentication. Decrypts the Data source on the first encrypted value. A
+   * class, not a record, so that no {@code toString} shows a secret.
+   */
+  private final class Secrets {
+
+    private final Map<String, Object> original;
+    private final Map<String, Object> authentication;
+    private Map<String, Object> plain;
+
+    Secrets(Map<String, Object> original, Map<String, Object> authentication) {
+      this.original = original;
+      this.authentication = authentication;
+    }
+
+    /** The decrypted value of {@code field}, or empty when the Data source has none. */
+    Optional<String> value(String field) throws FatalAdapterException {
       Object value = authentication.get(field);
-      if (value != null && !String.valueOf(value).isBlank() && !isEncrypted(value)) {
+      if (value == null || String.valueOf(value).isBlank()) {
+        return Optional.empty();
+      }
+      if (!isEncrypted(value)) {
         throw new FatalAdapterException(
             AdapterErrorCode.NIFI_TEMPLATE_ERROR,
             "HTTP/REST source "
                 + field
                 + " must be encrypted (plaintext secrets are not accepted)");
       }
-      encrypted |= isEncrypted(value);
-    }
-    Map<String, Object> plain =
-        encrypted ? objectOrEmpty(credentials.decrypt(original).get("authentication")) : Map.of();
-    return new Secrets(authentication, plain);
-  }
-
-  /**
-   * The encrypted fields of an authentication with their decrypted values. A class, not a record,
-   * so that no {@code toString} shows a secret.
-   */
-  private static final class Secrets {
-
-    private final Map<String, Object> encrypted;
-    private final Map<String, Object> plain;
-
-    Secrets(Map<String, Object> encrypted, Map<String, Object> plain) {
-      this.encrypted = encrypted;
-      this.plain = plain;
-    }
-
-    /** Gives {@code target} the decrypted value of {@code field} if the Data source has one. */
-    void put(BiConsumer<String, String> target, String key, String field) {
-      if (isEncrypted(encrypted.get(field))) {
-        target.accept(key, String.valueOf(plain.get(field)));
+      if (plain == null) {
+        plain = objectOrEmpty(credentials.decrypt(original).get("authentication"));
       }
+      return Optional.of(String.valueOf(plain.get(field)));
     }
   }
 
