@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.processor.Relationship;
@@ -70,8 +71,11 @@ class GetHttpApiCallTest {
 
   private static final String SHORT_PAGE = "[{\"stationid\":\"a3\"}]";
 
-  /** A response of a cursor pagination is one record; it holds the records under {@code data}. */
-  private static final String CURSOR_SCHEMA =
+  /**
+   * A response of a cursor pagination, or of a limit/offset pagination with a count path, is one
+   * record; it holds the records under {@code data}.
+   */
+  private static final String ONE_RECORD_SCHEMA =
       """
       {"$schema": "https://json-schema.org/draft/2020-12/schema",
        "type": "object",
@@ -84,6 +88,8 @@ class GetHttpApiCallTest {
 
   private static final String CURSOR_IN_HEADER =
       "\"cursorParameter\": \"X-Cursor\", \"cursorIn\": \"HEADER\"";
+
+  private static final String LIMIT_2 = ", \"limitParameter\": \"limit\", \"limit\": 2";
 
   @TempDir static Path keys;
 
@@ -1282,7 +1288,7 @@ class GetHttpApiCallTest {
             Response.json(cursorPage("a2", "\"def456\"")),
             Response.json(cursorPage("a3", null)))) {
       TestRunner runner = runner(endpoint.baseUrl());
-      runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, CURSOR_SCHEMA);
+      runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, ONE_RECORD_SCHEMA);
       runner.setProperty(
           GetHttpApiCall.API_CALL,
           """
@@ -1585,6 +1591,298 @@ class GetHttpApiCallTest {
   }
 
   @Test
+  void
+      onTrigger_withLimitOffset_sendsTheLimitAndTheOffsetAfterTheQueryParametersFromTheStartOffset()
+          throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(fullPage(0)), Response.json(fullPage(1)), Response.json(SHORT_PAGE))) {
+      TestRunner runner = runner(endpoint.baseUrl());
+      runner.setProperty(
+          GetHttpApiCall.API_CALL,
+          """
+          {"name": "Stations", "path": "/stations",
+           "queryParameters": [{"name": "status", "value": "active"}],
+           "pagination": {"type": "LIMIT_OFFSET", "limitParameter": "limit", "limit": 2,
+                          "offsetParameter": "offset", "offset": 80}}""");
+
+      runner.run();
+
+      assertEquals(
+          List.of(
+              "status=active&limit=2&offset=80",
+              "status=active&limit=2&offset=82",
+              "status=active&limit=2&offset=84"),
+          rawQueries(endpoint));
+      assertPages(runner, "80", "82", "84");
+      runner
+          .getFlowFilesForRelationship(GetHttpApiCall.SUCCESS)
+          .get(2)
+          .assertContentEquals(SHORT_PAGE);
+    }
+  }
+
+  @Test
+  void onTrigger_withLimitOffsetWithoutALimit_advancesByTheRecordCountAndEndsAtAnEmptyResponse()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(fullPage(0)), Response.json(SHORT_PAGE), Response.json("[]"))) {
+      TestRunner runner = limitOffsetRunner(endpoint, "");
+
+      runner.run();
+
+      assertEquals(List.of("offset=0", "offset=2", "offset=3"), rawQueries(endpoint));
+      assertPages(runner, "0", "2");
+    }
+  }
+
+  static Stream<Arguments> countsInAResponseObject() {
+    return Stream.of(
+        Arguments.of("$.meta.count", countPage("1", "a1"), countPage("1", "a2"), countPage("0")),
+        Arguments.of("$.data", countPage(null, "a1"), countPage(null, "a2"), countPage(null)));
+  }
+
+  @ParameterizedTest
+  @MethodSource("countsInAResponseObject")
+  void onTrigger_withACountPathWithoutALimit_advancesByTheCountAndEndsAtACountOf0(
+      String countPath, String first, String second, String empty) throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(first), Response.json(second), Response.json(empty))) {
+      TestRunner runner = limitOffsetRunner(endpoint, ", \"countPath\": \"" + countPath + "\"");
+      runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, ONE_RECORD_SCHEMA);
+
+      runner.run();
+
+      assertEquals(List.of("offset=0", "offset=1", "offset=2"), rawQueries(endpoint));
+      assertPages(runner, "0", "1");
+      runner.getFlowFilesForRelationship(GetHttpApiCall.SUCCESS).get(0).assertContentEquals(first);
+    }
+  }
+
+  @Test
+  void onTrigger_withACountPathAndALimit_endsAtACountBelowTheLimit()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(countPage("2", "a1", "a2")), Response.json(countPage("1", "a3")))) {
+      TestRunner runner = countPathRunner(endpoint, LIMIT_2);
+
+      runner.run();
+
+      assertEquals(List.of("limit=2&offset=0", "limit=2&offset=2"), rawQueries(endpoint));
+      assertPages(runner, "0", "2");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"-7", "1.5", "\"v-61b0\"", "{\"n\": 1}", "null"})
+  void onTrigger_whenTheValueAtTheCountPathIsNotACount_routesTheRunToStopWithoutTheValue(
+      String count) throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(countPage("2", "a1", "a2")), Response.json(countPage(count, "a3")))) {
+      TestRunner runner = countPathRunner(endpoint, LIMIT_2);
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": offset 2: the value at $.meta.count is not a record count");
+    }
+  }
+
+  @Test
+  void onTrigger_whenTheCountPathIsAbsentFromAResponse_routesTheRunToStop()
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, countPage(null, "a1"))) {
+      TestRunner runner = countPathRunner(endpoint, LIMIT_2);
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": offset 0: the value at $.meta.count is not a record count");
+    }
+  }
+
+  @Test
+  void onTrigger_whenALimitOffsetResponseWithoutACountPathIsAJsonObject_routesTheRunToStop()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(FULL_PAGE), Response.json("{\"stationid\": \"a3\"}"))) {
+      TestRunner runner = limitOffsetRunner(endpoint, LIMIT_2);
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": offset 2 is a JSON object, not an array");
+    }
+  }
+
+  @Test
+  void onTrigger_whenALimitOffsetResponseWithACountPathIsAJsonArray_routesTheRunToStop()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(countPage("2", "a1", "a2")), Response.json(SHORT_PAGE))) {
+      TestRunner runner = countPathRunner(endpoint, LIMIT_2);
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": offset 2 is a JSON array, not an object");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {400, 404})
+  void onTrigger_whenALimitOffsetRequestAfterTheFirstAnswers400Or404_routesTheEarlierPagesToSuccess(
+      int status) throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(fullPage(0)), Response.json(fullPage(1)), Response.status(status))) {
+      TestRunner runner = limitOffsetRunner(endpoint, LIMIT_2);
+
+      runner.run();
+
+      assertEquals(3, endpoint.requests().size());
+      assertPages(runner, "0", "2");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {400, 404})
+  void onTrigger_whenTheFirstLimitOffsetRequestAnswers400Or404_routesTheRunToStop(int status)
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(status, "{}")) {
+      TestRunner runner = limitOffsetRunner(endpoint, LIMIT_2 + ", \"offset\": 80");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          status,
+          "API call \"Stations\": GET /stations offset 80 failed with status " + status);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("responsesWithoutABody")
+  void onTrigger_whenALimitOffsetResponseWithACountPathHasNoBody_endsTheRunWithTheEarlierPages(
+      Response empty) throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(Response.json(countPage("2", "a1", "a2")), empty)) {
+      TestRunner runner = countPathRunner(endpoint, LIMIT_2);
+
+      runner.run();
+
+      assertEquals(2, endpoint.requests().size());
+      assertPages(runner, "0");
+    }
+  }
+
+  @Test
+  void onTrigger_whenAnApiIgnoresTheOffset_routesTheRunToStopAtTheSecondRequest()
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, FULL_PAGE)) {
+      TestRunner runner = limitOffsetRunner(endpoint, LIMIT_2);
+
+      runner.run();
+
+      assertEquals(2, endpoint.requests().size());
+      assertRouted(
+          runner, GetHttpApiCall.STOP, 200, "API call \"Stations\": offset 2 repeats offset 0");
+    }
+  }
+
+  @Test
+  void onTrigger_whenMaxPagesLimitOffsetRequestsMeetNoStopCondition_routesTheRunToStop()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(fullPage(0)), Response.json(fullPage(1)), Response.json(fullPage(2)))) {
+      TestRunner runner = limitOffsetRunner(endpoint, LIMIT_2);
+      runner.setProperty(GetHttpApiCall.MAX_PAGES, "3");
+
+      runner.run();
+
+      assertEquals(3, endpoint.requests().size());
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": no stop condition after 3 pages (Max Pages)");
+    }
+  }
+
+  @Test
+  void
+      onTrigger_whenALimitOffsetRequestIsTemporarilyUnavailable_routesTheRunToFailureWithoutItsPages()
+          throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(Response.json(FULL_PAGE), Response.status(503))) {
+      TestRunner runner = limitOffsetRunner(endpoint, LIMIT_2);
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.FAILURE,
+          503,
+          "API call \"Stations\": GET /stations offset 2 failed with status 503");
+    }
+  }
+
+  @Test
+  void onTrigger_afterALimitOffsetRunThatFailed_startsAgainAtTheStartOffset()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json(FULL_PAGE),
+            Response.status(503),
+            Response.json(FULL_PAGE),
+            Response.json(SHORT_PAGE))) {
+      TestRunner runner = limitOffsetRunner(endpoint, LIMIT_2 + ", \"offset\": 80");
+
+      runner.run(2);
+
+      assertEquals(
+          List.of(
+              "limit=2&offset=80", "limit=2&offset=82", "limit=2&offset=80", "limit=2&offset=82"),
+          rawQueries(endpoint));
+      runner.assertTransferCount(GetHttpApiCall.FAILURE, 1);
+      runner.assertTransferCount(GetHttpApiCall.SUCCESS, 2);
+    }
+  }
+
+  @Test
+  void onTrigger_withTheLargestStartOffset_countsPastTheIntRange() throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(Response.json(FULL_PAGE), Response.json(SHORT_PAGE))) {
+      TestRunner runner = limitOffsetRunner(endpoint, LIMIT_2 + ", \"offset\": 2147483647");
+
+      runner.run();
+
+      assertEquals(
+          List.of("limit=2&offset=2147483647", "limit=2&offset=2147483649"), rawQueries(endpoint));
+    }
+  }
+
+  @Test
   void basicAuthPassword_isSensitive() {
     assertTrue(GetHttpApiCall.BASIC_AUTH_PASSWORD.isSensitive());
   }
@@ -1878,6 +2176,70 @@ class GetHttpApiCallTest {
     runner.assertValid();
   }
 
+  @ParameterizedTest(name = "{1}: {0}")
+  @CsvSource(
+      delimiter = '|',
+      quoteCharacter = '\'',
+      value = {
+        "\"limitParameter\":\"limit\",\"limit\":20                                     | pagination.offsetParameter",
+        "\"offsetParameter\":\" \"                                                     | pagination.offsetParameter",
+        "\"offsetParameter\":\"v-61b0\"                                                | pagination.offsetParameter",
+        "\"offsetParameter\":\"o\",\"limitParameter\":\"limit\"                        | pagination.limit",
+        "\"offsetParameter\":\"o\",\"limit\":20                                        | pagination.limitParameter",
+        "\"offsetParameter\":\"o\",\"limitParameter\":\"limit\",\"limit\":0            | pagination.limit",
+        "\"offsetParameter\":\"o\",\"limitParameter\":\"v-61b0\",\"limit\":20          | pagination.limitParameter",
+        "\"offsetParameter\":\"o\",\"limitParameter\":\"o\",\"limit\":20               | pagination.offsetParameter",
+        "\"offsetParameter\":\"o\",\"offset\":-1                                       | pagination.offset",
+        "\"offsetParameter\":\"o\",\"offset\":\"v-61b0\"                               | pagination.offset",
+        "\"offsetParameter\":\"o\",\"countPath\":\"v-61b0\"                            | pagination.countPath",
+        "\"offsetParameter\":\"o\",\"countPath\":\"$..v-61b0\"                         | pagination.countPath",
+        "\"offsetParameter\":\"o\",\"countPath\":\"$.items[?(@.v-61b0)]\"              | pagination.countPath"
+      })
+  void validate_withALimitOffsetPaginationThatBreaksARule_namesTheKeyPathAndNoValue(
+      String paginationFields, String keyPath) throws InitializationException {
+    TestRunner runner = runner("http://localhost:8080");
+    runner.setProperty(
+        GetHttpApiCall.API_CALL,
+        "{\"name\":\"n\",\"path\":\"/s\","
+            + "\"queryParameters\":[{\"name\":\"v-61b0\",\"value\":\"x\"}],"
+            + "\"pagination\":{\"type\":\"LIMIT_OFFSET\","
+            + paginationFields
+            + "}}");
+
+    Collection<ValidationResult> results = invalid(runner);
+
+    assertTrue(
+        results.stream()
+            .anyMatch(
+                r ->
+                    "API Call".equals(r.getSubject())
+                        && r.getExplanation().startsWith(keyPath + " ")),
+        results::toString);
+    assertFalse(results.toString().contains("v-61b0"), results::toString);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "\"limitParameter\": \"limit\", \"limit\": 100, \"offset\": 0, \"countPath\": null",
+        "\"limitParameter\": null, \"limit\": null, \"offset\": null,"
+            + " \"countPath\": \"$['meta']['count']\"",
+        "\"limitParameter\": \" \", \"countPath\": \" \""
+      })
+  void validate_withALimitOffsetPaginationInTheFormOfThePortal_isValid(String fields)
+      throws InitializationException {
+    TestRunner runner = runner("http://localhost:8080");
+    runner.setProperty(
+        GetHttpApiCall.API_CALL,
+        "{\"name\": \"Stations\", \"method\": \"GET\", \"path\": \"/stations\","
+            + " \"queryParameters\": [{\"name\": \"Offset\", \"value\": \"x\"}], \"headers\": [],"
+            + " \"pagination\": {\"type\": \"LIMIT_OFFSET\", \"offsetParameter\": \"offset\", "
+            + fields
+            + "}}");
+
+    runner.assertValid();
+  }
+
   private static void assertStartFails(ApiEndpoint endpoint, String schema)
       throws InitializationException {
     TestRunner runner = runner(endpoint.baseUrl());
@@ -1914,7 +2276,7 @@ class GetHttpApiCallTest {
   private static TestRunner cursorRunner(ApiEndpoint endpoint, String furtherFields)
       throws InitializationException {
     TestRunner runner = runner(endpoint.baseUrl());
-    runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, CURSOR_SCHEMA);
+    runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, ONE_RECORD_SCHEMA);
     runner.setProperty(
         GetHttpApiCall.API_CALL,
         "{\"name\": \"Stations\", \"path\": \"/stations\", \"pagination\": {\"type\":"
@@ -1922,6 +2284,45 @@ class GetHttpApiCallTest {
             + furtherFields
             + "}}");
     return runner;
+  }
+
+  /** A runner for a limit/offset pagination with the offset parameter and the further fields. */
+  private static TestRunner limitOffsetRunner(ApiEndpoint endpoint, String furtherFields)
+      throws InitializationException {
+    TestRunner runner = runner(endpoint.baseUrl());
+    runner.setProperty(
+        GetHttpApiCall.API_CALL,
+        "{\"name\": \"Stations\", \"path\": \"/stations\", \"pagination\": {\"type\":"
+            + " \"LIMIT_OFFSET\", \"offsetParameter\": \"offset\""
+            + furtherFields
+            + "}}");
+    return runner;
+  }
+
+  /** A runner for a limit/offset pagination with the count at {@code $.meta.count}. */
+  private static TestRunner countPathRunner(ApiEndpoint endpoint, String furtherFields)
+      throws InitializationException {
+    TestRunner runner =
+        limitOffsetRunner(endpoint, ", \"countPath\": \"$.meta.count\"" + furtherFields);
+    runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, ONE_RECORD_SCHEMA);
+    return runner;
+  }
+
+  /**
+   * A response of a limit/offset pagination with a count path.
+   *
+   * @param count the JSON at {@code $.meta.count}, or null for a response without one
+   */
+  private static String countPage(String count, String... stationIds) {
+    String records =
+        Arrays.stream(stationIds)
+            .map(id -> "{\"stationid\": \"" + id + "\"}")
+            .collect(Collectors.joining(", "));
+    return "{\"data\": ["
+        + records
+        + "]"
+        + (count == null ? "" : ", \"meta\": {\"count\": " + count + "}")
+        + "}";
   }
 
   /**

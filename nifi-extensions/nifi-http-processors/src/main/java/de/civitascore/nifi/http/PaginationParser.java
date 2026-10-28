@@ -21,6 +21,7 @@ final class PaginationParser {
 
   private static final String PAGE_NUMBER = "PAGE_NUMBER";
   private static final String CURSOR = "CURSOR";
+  private static final String LIMIT_OFFSET = "LIMIT_OFFSET";
   private static final String PAGE_PARAMETER = "pagination.pageParameter";
   private static final String PAGE_SIZE_PARAMETER = "pagination.pageSizeParameter";
   private static final String CURSOR_PATH = "pagination.cursorPath";
@@ -28,6 +29,8 @@ final class PaginationParser {
   private static final String CURSOR_IN = "pagination.cursorIn";
   private static final String LIMIT_PARAMETER = "pagination.limitParameter";
   private static final String LIMIT = "pagination.limit";
+  private static final String OFFSET_PARAMETER = "pagination.offsetParameter";
+  private static final String COUNT_PATH = "pagination.countPath";
 
   private PaginationParser() {}
 
@@ -51,8 +54,10 @@ final class PaginationParser {
     return switch (pagination.type()) {
       case PAGE_NUMBER -> pageNumber(pagination, names, violations);
       case CURSOR -> cursor(pagination, names, violations);
+      case LIMIT_OFFSET -> limitOffset(pagination, names, violations);
       case null, default -> {
-        violations.add("pagination.type must be " + PAGE_NUMBER + " or " + CURSOR);
+        violations.add(
+            "pagination.type must be " + PAGE_NUMBER + ", " + CURSOR + " or " + LIMIT_OFFSET);
         yield Optional.empty();
       }
     };
@@ -105,6 +110,30 @@ final class PaginationParser {
     return Optional.of(
         new CursorPagination(
             cursorPath.orElseThrow(), pagination.cursorParameter(), cursorIn.orElseThrow(), limit));
+  }
+
+  private static Optional<Pagination> limitOffset(
+      JsonPagination pagination, PaginationNames names, List<String> violations) {
+    int before = violations.size();
+    String limitParameter = blankToNull(pagination.limitParameter());
+    if (limitParameter != null) {
+      names.add(LIMIT_PARAMETER, limitParameter, ParameterLocation.QUERY);
+    }
+    addRequiredQueryName(pagination.offsetParameter(), OFFSET_PARAMETER, names, violations);
+    Optional<Limit> limit = limit(limitParameter, pagination.limit(), violations);
+    names.check(violations);
+    int offset = pagination.offset() == null ? 0 : pagination.offset();
+    if (offset < 0) {
+      violations.add("pagination.offset must be at least 0");
+    }
+    String countPathText = blankToNull(pagination.countPath());
+    Optional<JsonPath> countPath =
+        countPathText == null ? Optional.empty() : jsonPath(countPathText, COUNT_PATH, violations);
+    if (violations.size() > before) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        new LimitOffsetPagination(pagination.offsetParameter(), offset, limit, countPath));
   }
 
   private static Optional<JsonPath> jsonPath(String text, String keyPath, List<String> violations) {
@@ -190,5 +219,8 @@ final class PaginationParser {
       String cursorParameter,
       String cursorIn,
       String limitParameter,
-      Integer limit) {}
+      Integer limit,
+      String offsetParameter,
+      Integer offset,
+      String countPath) {}
 }

@@ -37,8 +37,8 @@ record Page(
   }
 
   /**
-   * @param kind for example {@code page} or {@code request}
-   * @param number the page number, or the position of the request in the run from 1
+   * @param kind for example {@code page}, {@code request} or {@code offset}
+   * @param number the page number, the position of the request in the run from 1, or the offset
    */
   record Position(String kind, long number) {
 

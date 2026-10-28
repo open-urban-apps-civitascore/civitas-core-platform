@@ -12,7 +12,8 @@ package de.civitascore.nifi.http;
 import java.util.Optional;
 
 /** How the requests of one run of an API call follow each other. */
-sealed interface Pagination permits CursorPagination, PageNumberPagination, SinglePage {
+sealed interface Pagination
+    permits CursorPagination, LimitOffsetPagination, PageNumberPagination, SinglePage {
 
   /** The page that each run starts with. */
   Page first();
