@@ -92,6 +92,16 @@ record LimitOffsetPagination(
         : OptionalLong.empty();
   }
 
+  @Override
+  public List<String> names(ParameterLocation location) {
+    List<String> names = new ArrayList<>();
+    if (location == ParameterLocation.QUERY) {
+      names.add(offsetParameter);
+      limit.ifPresent(present -> names.add(present.parameter()));
+    }
+    return names;
+  }
+
   private Page page(long index, long offset) {
     List<Parameter> query = new ArrayList<>();
     limit.ifPresent(size -> query.add(size.asParameter()));

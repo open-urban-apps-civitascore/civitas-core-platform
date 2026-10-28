@@ -82,6 +82,18 @@ record CursorPagination(
     return cursor.chars().allMatch(c -> c >= ' ' && c <= '~');
   }
 
+  @Override
+  public List<String> names(ParameterLocation location) {
+    List<String> names = new ArrayList<>();
+    if (cursorIn == location) {
+      names.add(cursorParameter);
+    }
+    if (location == ParameterLocation.QUERY) {
+      limit.ifPresent(present -> names.add(present.parameter()));
+    }
+    return names;
+  }
+
   private Page page(long index, Optional<String> cursor) {
     List<Parameter> query = new ArrayList<>();
     limit.ifPresent(size -> query.add(size.asParameter()));

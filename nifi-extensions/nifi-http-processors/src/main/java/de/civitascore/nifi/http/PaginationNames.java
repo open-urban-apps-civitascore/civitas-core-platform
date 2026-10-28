@@ -12,6 +12,7 @@ package de.civitascore.nifi.http;
 import de.civitascore.nifi.http.ApiCall.Parameter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * The names that a pagination sends, which must differ from each other and from the names of the
@@ -33,6 +34,23 @@ final class PaginationNames {
    */
   void add(String keyPath, String name, ParameterLocation location) {
     sent.add(new SentName(keyPath, name, location));
+  }
+
+  /** The names of {@code call} and the names that its pagination sends. */
+  static PaginationNames sentBy(ApiCall call) {
+    PaginationNames names = new PaginationNames(call.queryParameters(), call.headers());
+    for (ParameterLocation location : ParameterLocation.values()) {
+      for (String name : call.pagination().names(location)) {
+        names.add("", name, location);
+      }
+    }
+    return names;
+  }
+
+  /** Whether a request already sends {@code name} at {@code location}. */
+  boolean sends(String name, ParameterLocation location) {
+    SentName candidate = new SentName("", name, location);
+    return Stream.concat(callNames.stream(), sent.stream()).anyMatch(candidate::collidesWith);
   }
 
   /** Adds one violation for each name that collides. */

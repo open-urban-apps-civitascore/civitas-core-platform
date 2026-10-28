@@ -15,7 +15,12 @@ import org.apache.nifi.web.client.api.HttpRequestHeadersSpec;
 final class NoAuthentication implements Authentication {
 
   @Override
-  public HttpRequestHeadersSpec authenticate(HttpRequestHeadersSpec request) {
+  public String method() {
+    return "no authentication";
+  }
+
+  @Override
+  public HttpRequestHeadersSpec headers(HttpRequestHeadersSpec request) {
     return request;
   }
 }

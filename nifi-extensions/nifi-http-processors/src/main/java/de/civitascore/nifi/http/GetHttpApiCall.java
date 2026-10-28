@@ -9,12 +9,12 @@
  */
 package de.civitascore.nifi.http;
 
-import java.net.URI;
-import java.net.URISyntaxException;
+import java.time.Duration;
+import java.time.InstantSource;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
@@ -25,6 +25,7 @@ import org.apache.nifi.annotation.behavior.WritesAttributes;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnScheduled;
+import org.apache.nifi.annotation.lifecycle.OnStopped;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
@@ -34,6 +35,7 @@ import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.util.StandardValidators;
+import org.apache.nifi.web.client.api.WebClientService;
 import org.apache.nifi.web.client.provider.api.WebClientServiceProvider;
 
 /**
@@ -84,13 +86,6 @@ public class GetHttpApiCall extends AbstractProcessor {
   public static final String ERROR_STATUS = "http.error.status";
   public static final String ERROR_MESSAGE = "http.error.message";
 
-  /** The explanations name no value: a user info in the URL would be a credential. */
-  private static final Validator BASE_URL_VALIDATOR =
-      (subject, input, context) -> result(subject, baseUrlViolation(input));
-
-  private static final Validator USERNAME_VALIDATOR =
-      (subject, input, context) -> result(subject, usernameViolation(input));
-
   static final PropertyDescriptor WEB_CLIENT_SERVICE =
       new PropertyDescriptor.Builder()
           .name("Web Client Service Provider")
@@ -124,7 +119,7 @@ public class GetHttpApiCall extends AbstractProcessor {
               "Scheme http or https, a host, an optional port and an optional path. No user info,"
                   + " no query, no fragment.")
           .required(true)
-          .addValidator(BASE_URL_VALIDATOR)
+          .addValidator(PropertyRules.BASE_URL)
           .build();
 
   static final PropertyDescriptor API_CALL =
@@ -154,7 +149,7 @@ public class GetHttpApiCall extends AbstractProcessor {
           .description("The user the API knows. It contains no colon.")
           .required(true)
           .dependsOn(AUTHENTICATION_TYPE, AuthenticationType.BASIC.name())
-          .addValidator(USERNAME_VALIDATOR)
+          .addValidator(PropertyRules.USERNAME)
           .build();
 
   static final PropertyDescriptor BASIC_AUTH_PASSWORD =
@@ -166,6 +161,101 @@ public class GetHttpApiCall extends AbstractProcessor {
           .sensitive(true)
           .dependsOn(AUTHENTICATION_TYPE, AuthenticationType.BASIC.name())
           .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+          .build();
+
+  static final PropertyDescriptor BEARER_TOKEN =
+      new PropertyDescriptor.Builder()
+          .name("Bearer Token")
+          .displayName("Bearer Token")
+          .description(
+              "The token that the request sends as Authorization: Bearer. It holds only printable"
+                  + " ISO-8859-1 characters, spaces and tabs.")
+          .required(true)
+          .sensitive(true)
+          .dependsOn(AUTHENTICATION_TYPE, AuthenticationType.BEARER_TOKEN.name())
+          .addValidator(PropertyRules.HEADER_VALUE)
+          .build();
+
+  static final PropertyDescriptor API_TOKEN_NAME =
+      new PropertyDescriptor.Builder()
+          .name("API Token Name")
+          .displayName("API Token Name")
+          .description(
+              "The name of the header or the query parameter that carries the API token. It"
+                  + " differs from the name of each header or query parameter of the API call and"
+                  + " of its pagination.")
+          .required(true)
+          .dependsOn(AUTHENTICATION_TYPE, AuthenticationType.API_TOKEN.name())
+          .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
+          .build();
+
+  static final PropertyDescriptor API_TOKEN_VALUE =
+      new PropertyDescriptor.Builder()
+          .name("API Token Value")
+          .displayName("API Token Value")
+          .description(
+              "The API token. In a header, it holds only printable ISO-8859-1 characters, spaces"
+                  + " and tabs. In the query, it is percent-encoded like each query parameter, and"
+                  + " the access log of the API host shows it.")
+          .required(true)
+          .sensitive(true)
+          .dependsOn(AUTHENTICATION_TYPE, AuthenticationType.API_TOKEN.name())
+          .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+          .build();
+
+  static final PropertyDescriptor API_TOKEN_LOCATION =
+      new PropertyDescriptor.Builder()
+          .name("API Token Location")
+          .displayName("API Token Location")
+          .description("Whether the API token goes into a header or into the query.")
+          .required(true)
+          .dependsOn(AUTHENTICATION_TYPE, AuthenticationType.API_TOKEN.name())
+          .allowableValues(ParameterLocation.class)
+          .build();
+
+  static final PropertyDescriptor OAUTH2_TOKEN_URL =
+      new PropertyDescriptor.Builder()
+          .name("OAuth2 Token URL")
+          .displayName("OAuth2 Token URL")
+          .description(
+              "The token endpoint of the client credentials grant: scheme https, a host, an"
+                  + " optional port and an optional path. No user info, no query, no fragment. The"
+                  + " token request goes through the Web Client Service Provider.")
+          .required(true)
+          .dependsOn(AUTHENTICATION_TYPE, AuthenticationType.OAUTH2.name())
+          .addValidator(PropertyRules.TOKEN_URL)
+          .build();
+
+  static final PropertyDescriptor OAUTH2_CLIENT_ID =
+      new PropertyDescriptor.Builder()
+          .name("OAuth2 Client ID")
+          .displayName("OAuth2 Client ID")
+          .description("The client that the token endpoint knows.")
+          .required(true)
+          .dependsOn(AUTHENTICATION_TYPE, AuthenticationType.OAUTH2.name())
+          .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+          .build();
+
+  static final PropertyDescriptor OAUTH2_CLIENT_SECRET =
+      new PropertyDescriptor.Builder()
+          .name("OAuth2 Client Secret")
+          .displayName("OAuth2 Client Secret")
+          .description("The secret of that client.")
+          .required(true)
+          .sensitive(true)
+          .dependsOn(AUTHENTICATION_TYPE, AuthenticationType.OAUTH2.name())
+          .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+          .build();
+
+  static final PropertyDescriptor OAUTH2_SCOPE =
+      new PropertyDescriptor.Builder()
+          .name("OAuth2 Scope")
+          .displayName("OAuth2 Scope")
+          .description(
+              "The scope that the token request asks for. Without a value, it asks for none.")
+          .required(false)
+          .dependsOn(AUTHENTICATION_TYPE, AuthenticationType.OAUTH2.name())
+          .addValidator(Validator.VALID)
           .build();
 
   static final PropertyDescriptor RECORD_SCHEMA =
@@ -213,14 +303,16 @@ public class GetHttpApiCall extends AbstractProcessor {
           .description(
               "One empty FlowFile for each run with an error that needs a change to the"
                   + " configuration or to the Data structure: 3xx, 4xx except 408 and 429, a"
-                  + " request the web client refuses, a response that is not JSON or does not"
-                  + " agree with the Record Schema, a page of the wrong JSON type for its"
-                  + " pagination, a cursor that is not a string or a number or that holds a"
-                  + " character a header cannot carry, a value at the count path that is not a"
-                  + " record count, a page that repeats an earlier page or would send the same"
-                  + " request as an earlier page of the run, and a run that reads Max Pages pages"
-                  + " and meets no stop condition. With page-number or limit/offset pagination, a"
-                  + " 400 or 404 on a page after the first ends the run and is no error.")
+                  + " request the web client refuses, the same statuses of the OAuth2 token"
+                  + " endpoint or its 2xx without an access token, a TLS handshake that refuses"
+                  + " the client certificate, a response that is not JSON or does not agree with"
+                  + " the Record Schema, a page of the wrong JSON type for its pagination, a"
+                  + " cursor that is not a string or a number or that holds a character a header"
+                  + " cannot carry, a value at the count path that is not a record count, a page"
+                  + " that repeats an earlier page or would send the same request as an earlier"
+                  + " page of the run, and a run that reads Max Pages pages and meets no stop"
+                  + " condition. With page-number or limit/offset pagination, a 400 or 404 on a"
+                  + " page after the first ends the run and is no error.")
           .build();
 
   static final Relationship FAILURE =
@@ -228,8 +320,8 @@ public class GetHttpApiCall extends AbstractProcessor {
           .name("failure")
           .description(
               "One empty FlowFile for each run with an error that the next run can repair: 408,"
-                  + " 429, 5xx, a failed connection, a timeout, and a run that NiFi stops between"
-                  + " pages.")
+                  + " 429, 5xx, a failed connection, a timeout, the same errors of the OAuth2 token"
+                  + " request, and a run that NiFi stops between pages.")
           .build();
 
   private static final List<PropertyDescriptor> PROPERTIES =
@@ -241,12 +333,35 @@ public class GetHttpApiCall extends AbstractProcessor {
           AUTHENTICATION_TYPE,
           BASIC_AUTH_USERNAME,
           BASIC_AUTH_PASSWORD,
+          BEARER_TOKEN,
+          API_TOKEN_NAME,
+          API_TOKEN_VALUE,
+          API_TOKEN_LOCATION,
+          OAUTH2_TOKEN_URL,
+          OAUTH2_CLIENT_ID,
+          OAUTH2_CLIENT_SECRET,
+          OAUTH2_SCOPE,
           RECORD_SCHEMA,
           MAX_PAGES);
 
   private static final Set<Relationship> RELATIONSHIPS = Set.of(SUCCESS, STOP, FAILURE);
 
-  private volatile PageLoop pageLoop;
+  private final InstantSource clock;
+
+  /** What the start built, empty while NiFi does not schedule the processor. */
+  private volatile Optional<Scheduled> scheduled = Optional.empty();
+
+  public GetHttpApiCall() {
+    this(InstantSource.system());
+  }
+
+  /**
+   * @param clock decides when a kept OAuth2 access token expires
+   */
+  GetHttpApiCall(InstantSource clock) {
+    super();
+    this.clock = clock;
+  }
 
   @Override
   protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
@@ -261,25 +376,16 @@ public class GetHttpApiCall extends AbstractProcessor {
   @Override
   protected Collection<ValidationResult> customValidate(ValidationContext context) {
     List<ValidationResult> results = new ArrayList<>();
+    Optional<ApiCall> apiCall = Optional.empty();
     try {
-      ApiCallParser.parse(context.getProperty(API_CALL).getValue());
+      apiCall = Optional.of(ApiCallParser.parse(context.getProperty(API_CALL).getValue()));
     } catch (InvalidApiCallException e) {
       for (String violation : e.violations()) {
-        results.add(result(API_CALL.getDisplayName(), violation));
+        results.add(PropertyRules.result(API_CALL.getDisplayName(), violation));
       }
     }
-    if (sendsCredentialsInClearText(context)) {
-      results.add(
-          result(BASE_URL.getDisplayName(), "must use https when the request authenticates"));
-    }
+    results.addAll(PropertyRules.authenticationViolations(context, apiCall));
     return results;
-  }
-
-  private static boolean sendsCredentialsInClearText(ValidationContext context) {
-    AuthenticationType type =
-        context.getProperty(AUTHENTICATION_TYPE).asAllowableValue(AuthenticationType.class);
-    String scheme = URI.create(context.getProperty(BASE_URL).getValue()).getScheme();
-    return type != AuthenticationType.NONE && "http".equalsIgnoreCase(scheme);
   }
 
   @OnScheduled
@@ -287,76 +393,41 @@ public class GetHttpApiCall extends AbstractProcessor {
       throws InvalidApiCallException, InvalidRecordSchemaException {
     ApiCall apiCall = ApiCallParser.parse(context.getProperty(API_CALL).getValue());
     RecordSchema recordSchema = RecordSchema.compile(context.getProperty(RECORD_SCHEMA).getValue());
+    WebClientService webClient =
+        context
+            .getProperty(WEB_CLIENT_SERVICE)
+            .asControllerService(WebClientServiceProvider.class)
+            .getWebClientService();
+    Duration bodyReadTimeout = context.getProperty(BODY_READ_TIMEOUT).asDuration();
     ApiCallClient client =
-        new ApiCallClient(
-            context
-                .getProperty(WEB_CLIENT_SERVICE)
-                .asControllerService(WebClientServiceProvider.class)
-                .getWebClientService(),
-            context.getProperty(BASE_URL).getValue(),
-            context.getProperty(BODY_READ_TIMEOUT).asDuration());
-    pageLoop =
-        new PageLoop(
-            apiCall,
-            client,
-            recordSchema,
-            context.getProperty(MAX_PAGES).asInteger(),
-            this::isScheduled,
-            getLogger());
+        new ApiCallClient(webClient, context.getProperty(BASE_URL).getValue(), bodyReadTimeout);
+    scheduled =
+        Optional.of(
+            new Scheduled(
+                new PageLoop(
+                    apiCall,
+                    client,
+                    recordSchema,
+                    context.getProperty(MAX_PAGES).asInteger(),
+                    this::isScheduled,
+                    getLogger()),
+                context
+                    .getProperty(AUTHENTICATION_TYPE)
+                    .asAllowableValue(AuthenticationType.class)
+                    .authentication(context, webClient, bodyReadTimeout, clock)));
+  }
+
+  /** Drops what the start built, so that a kept access token does not outlive the schedule. */
+  @OnStopped
+  public void dropConfiguration() {
+    scheduled = Optional.empty();
   }
 
   @Override
   public void onTrigger(ProcessContext context, ProcessSession session) {
-    Authentication authentication =
-        context
-            .getProperty(AUTHENTICATION_TYPE)
-            .asAllowableValue(AuthenticationType.class)
-            .authentication(context);
-
-    pageLoop.run(session, authentication);
+    Scheduled current = scheduled.orElseThrow();
+    current.pageLoop().run(session, current.authentication());
   }
 
-  private static String baseUrlViolation(String input) {
-    URI uri;
-    try {
-      uri = new URI(input);
-    } catch (URISyntaxException e) {
-      return "is not a URL";
-    }
-    String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
-    if (!"http".equals(scheme) && !"https".equals(scheme)) {
-      return "must use the scheme http or https";
-    }
-    if (uri.getRawUserInfo() != null) {
-      return "must not contain user info";
-    }
-    if (uri.getHost() == null) {
-      return "must name a host";
-    }
-    if (uri.getRawQuery() != null) {
-      return "must not contain a query";
-    }
-    if (uri.getRawFragment() != null) {
-      return "must not contain a fragment";
-    }
-    return null;
-  }
-
-  private static String usernameViolation(String input) {
-    if (input == null || input.isEmpty()) {
-      return "must not be empty";
-    }
-    if (input.indexOf(':') >= 0) {
-      return "must not contain a colon";
-    }
-    return null;
-  }
-
-  private static ValidationResult result(String subject, String violation) {
-    return new ValidationResult.Builder()
-        .subject(subject)
-        .valid(violation == null)
-        .explanation(violation)
-        .build();
-  }
+  private record Scheduled(PageLoop pageLoop, Authentication authentication) {}
 }
