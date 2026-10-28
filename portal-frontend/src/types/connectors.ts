@@ -482,8 +482,7 @@ export type ApiCallSection = (typeof API_CALL_SECTIONS)[number]
 export type CollapsedApiCallSections = ReadonlyMap<number, ReadonlySet<ApiCallSection>>
 
 export type HttpParameterListPath =
-  | `configuration.apiCalls.${number}.queryParameters`
-  | `configuration.apiCalls.${number}.headers`
+  `configuration.apiCalls.${number}.queryParameters` | `configuration.apiCalls.${number}.headers`
 
 const HttpApiCallStrictFormSchema = HttpApiCallFormSchema.extend({
   name: z.string().trim().min(1, 'common.errors.required'),

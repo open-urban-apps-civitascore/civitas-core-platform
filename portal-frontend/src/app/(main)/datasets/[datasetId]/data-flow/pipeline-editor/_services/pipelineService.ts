@@ -185,9 +185,7 @@ export const pipelineReducer = (state: Pipeline, action: PipelineAction): Pipeli
  * Extended action types for React Flow integration.
  */
 export type PipelineReducerAction =
-  | PipelineAction
-  | { type: 'NODE_CHANGES'; payload: NodeChange[] }
-  | { type: 'EDGE_CHANGES'; payload: EdgeChange[] }
+  PipelineAction | { type: 'NODE_CHANGES'; payload: NodeChange[] } | { type: 'EDGE_CHANGES'; payload: EdgeChange[] }
 
 export const isSemanticPipelineChange = (action: PipelineReducerAction): boolean => {
   if (action.type === 'MARK_CLEAN') return false
