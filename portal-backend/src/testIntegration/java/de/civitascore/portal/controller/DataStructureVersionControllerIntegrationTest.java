@@ -680,6 +680,32 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .as("Should return NOT_FOUND status")
           .isEqualTo(HttpStatus.NOT_FOUND);
     }
+
+    @Test
+    @DisplayName("PATCH with an unknown field answers 400 and applies no field")
+    void patchWithUnknownField_answers400AndAppliesNoField() {
+      Map<String, Object> patchMap = Map.of("description", "Patched", "noSuchField", "value");
+
+      ResponseEntity<ProblemDetail> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1,
+              HttpMethod.PATCH,
+              new HttpEntity<>(patchMap, createAuthHeaders()),
+              ProblemDetail.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:INVALID_INPUT");
+      assertThat(
+              restTemplate
+                  .exchange(
+                      getEndpoint() + "/" + versionId1,
+                      HttpMethod.GET,
+                      new HttpEntity<>(createAuthHeaders()),
+                      getOutputTypeReference())
+                  .getBody()
+                  .getDescription())
+          .isNotEqualTo("Patched");
+    }
   }
 
   @Nested
