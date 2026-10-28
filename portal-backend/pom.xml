@@ -39,12 +39,12 @@
              ships a fixed jackson-bom. -->
         <jackson-bom.version>3.2.3</jackson-bom.version>
         <springdoc-openapi.version>3.0.3</springdoc-openapi.version>
-        <commons-io.version>2.21.0</commons-io.version>
+        <commons-io.version>2.22.0</commons-io.version>
         <testcontainers.version>2.0.4</testcontainers.version>
-        <testcontainers-keycloak.version>4.1.1</testcontainers-keycloak.version>
+        <testcontainers-keycloak.version>4.4.0</testcontainers-keycloak.version>
         <specification-arg-resolver.version>4.0.0</specification-arg-resolver.version>
         <hibernate-processor.version>${hibernate.version}</hibernate-processor.version>
-        <spotless.version>3.4.0</spotless.version>
+        <spotless.version>3.10.4</spotless.version>
         <skipUnitTests>false</skipUnitTests>
         <jacoco.version>0.8.15</jacoco.version>
         <mapstruct.version>1.6.3</mapstruct.version>
@@ -61,7 +61,7 @@
              resolves something the registry actually holds. CI overrides it with
              -Dmodel-forge.version so the backend builds against its own branch's Model Forge. -->
         <model-forge.version>0.1.0-SNAPSHOT</model-forge.version>
-        <archunit.version>1.4.2</archunit.version>
+        <archunit.version>1.5.1</archunit.version>
         <!-- Drop once the Spring Boot parent manages Tomcat >= 11.0.25: Boot 4.1.1 pins 11.0.24,
              affected by GHSA-9xv2-5v5q-p794, GHSA-gcx9-497g-6cp6 and GHSA-h3x4-894j-xpx5. -->
         <tomcat.version>11.0.26</tomcat.version>
