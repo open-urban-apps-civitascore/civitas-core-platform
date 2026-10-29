@@ -10,6 +10,10 @@ delete {
   auth: inherit
 }
 
+params:query {
+  ~confirmedRemovalIds:
+}
+
 params:path {
   dataSetId: {{dataSetId}}
   id: {{dataSinkId}}
@@ -24,9 +28,18 @@ tests {
 }
 
 docs {
-  **Precondition:** `dataSetId` and `dataSinkId` are set. The DataSink must not be in use by a Layer (delete dependent Layers first) and must not be provisioned: a provisioned DataSink is refused with `409` and goes only together with its DataSet, whose teardown removes its storage.
+  **Precondition:** `dataSetId` and `dataSinkId` are set. The DataSet is in `DRAFT`.
 
-  **Expected Response:** 204 No Content. 409 if the DataSink is provisioned or a Layer references it.
+  A direct delete applies only to a DataSink that no Pipeline links. For a linked DataSink the backend answers `409` with type `urn:civitas:error:RESOURCE_IN_USE` and changes nothing: remove the DataSink from its Pipelines first (Pipeline `PUT`/`PATCH` without it in `dataSinkIds`, or the Pipeline delete).
+
+  The delete makes the DataSink inactive. In the same transaction:
+
+  - A DataSink that was never provisioned is deleted together with its Layers. A provisioned one is marked `PENDING_UNPROVISION`: its Layers are deleted, the record stays until the next release removes its storage, and it is no longer returned by the DataSink endpoints (`404`).
+  - An API of the DataSet goes, together with its Layers, when no active DataSink of a kind that backs it remains: PostGIS for OWS, FROST for STA.
+
+  **Confirmation:** When the delete removes a provisioned DataSink, a Layer or an API, the request must name each of them in `confirmedRemovalIds` (repeatable UUID query parameter). Get the ids from `datasets/get-removal-impact` with `deletedDataSinkIds`, or from the `impact` of a `409`. Without them the backend answers `409` with type `urn:civitas:error:REMOVAL_CONFIRMATION_REQUIRED` and changes nothing. The DataSink of this collection is not provisioned and backs no Layer or API, so it goes without confirmation.
+
+  **Expected Response:** 204 No Content. 409 `RESOURCE_IN_USE` if a Pipeline still links the DataSink. 409 `REMOVAL_CONFIRMATION_REQUIRED` with property `impact` (`dataSinks`, `layers`, `apis`, `requiresConfirmation`) if the confirmation is missing or incomplete.
 
   **Verification:** Issue `get-datasink-by-id` for the same `dataSinkId` and confirm 404.
 
@@ -34,7 +47,7 @@ docs {
 
   | Layer | Effect |
   |---|---|
-  | Backend | DataSink record removed |
-  | Config Adapter | — |
+  | Backend | DataSink deleted or marked `PENDING_UNPROVISION`; its Layers deleted; APIs without an active backing DataSink deleted |
+  | Config Adapter | the next release removes the storage of a `PENDING_UNPROVISION` DataSink |
   | External System | — |
 }

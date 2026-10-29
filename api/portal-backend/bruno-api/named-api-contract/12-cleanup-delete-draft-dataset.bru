@@ -1,7 +1,7 @@
 meta {
   name: 12. Cleanup - Delete the contract DataSet
   type: http
-  seq: 12
+  seq: 16
 }
 
 delete {
@@ -26,10 +26,10 @@ tests {
 docs {
   **Contract step 12** — Delete the contract fixture (cleanup).
 
-  Removes the DRAFT dataset created in step 1 together with its two cascaded named-API rows. The
+  Removes the DRAFT dataset created in step 1 together with its DataSink and its named API. The
   dataset never left `DRAFT`, so no saga teardown is involved and the delete is synchronous.
 
-  The rejection steps (4-10) create nothing, so this is the folder's only cleanup.
+  The rejection steps (3a-10) create nothing, so this is the folder's only cleanup.
 
   **Precondition:** `napiContractDataSetId` is set (step 1).
 
@@ -42,7 +42,7 @@ docs {
 
   | Layer | Effect |
   |---|---|
-  | Backend | DataSet + its NamedApi rows removed from `portal_backend` DB |
+  | Backend | DataSet, its DataSink and its NamedApi row removed from `portal_backend` DB |
   | Config Adapter | — |
   | External System | — |
 }

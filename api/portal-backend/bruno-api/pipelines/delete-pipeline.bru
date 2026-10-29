@@ -10,6 +10,10 @@ delete {
   auth: inherit
 }
 
+params:query {
+  ~confirmedRemovalIds: 
+}
+
 params:path {
   dataSetId: {{dataSetId}}
   id: {{pipelineId}}
@@ -22,9 +26,13 @@ tests {
 }
 
 docs {
-  **Precondition:** `dataSetId` and `pipelineId` are set.
+  **Precondition:** `dataSetId` and `pipelineId` are set. The DataSet is in `DRAFT`.
 
-  **Expected Response:** 204 No Content.
+  Each DataSink that loses its last Pipeline with this delete becomes inactive: a never provisioned one is deleted, a provisioned one is marked `PENDING_UNPROVISION` until the next release removes its storage. Its Layers are deleted. An API of the DataSet goes, together with its Layers, when no active DataSink of a kind that backs it remains: PostGIS for OWS, FROST for STA. All of this happens in one transaction.
+
+  **Confirmation:** When the delete removes a provisioned DataSink, a Layer or an API, the request must name each of them in `confirmedRemovalIds` (repeatable UUID query parameter). Get the ids from `datasets/get-removal-impact` with `deletedPipelineIds`, or from the `impact` of a `409`. Without them the backend answers `409` with type `urn:civitas:error:REMOVAL_CONFIRMATION_REQUIRED` and changes nothing. The Pipeline of this collection has no DataSink at this point, so it goes without confirmation; `dataset-saga-workflow` steps 14c to 15a show the confirmed delete.
+
+  **Expected Response:** 204 No Content. 409 `REMOVAL_CONFIRMATION_REQUIRED` with property `impact` (`dataSinks`, `layers`, `apis`, `requiresConfirmation`) if the confirmation is missing or incomplete.
 
   **Verification:** Issue TC-PIPE-02 for same `pipelineId` and confirm 404.
 
@@ -32,7 +40,7 @@ docs {
 
   | Layer | Effect |
   |---|---|
-  | Backend | Pipeline record removed |
-  | Config Adapter | -- |
+  | Backend | Pipeline record removed; DataSinks without a Pipeline deleted or marked `PENDING_UNPROVISION`, with their Layers and the APIs they alone backed |
+  | Config Adapter | -- (the next release removes the storage of `PENDING_UNPROVISION` DataSinks) |
   | External System | -- |
 }

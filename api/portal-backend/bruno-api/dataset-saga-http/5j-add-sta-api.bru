@@ -1,0 +1,35 @@
+meta {
+  name: 5j. Add the STA API
+  type: http
+  seq: 19
+}
+
+patch {
+  url: {{baseUrl}}/datasets/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{httpSagaDataSetId}}
+}
+
+body:json {
+  {
+    "namedApis": [
+      { "name": "Things", "slug": "things", "standard": "STA", "version": "1.1" }
+    ]
+  }
+}
+
+tests {
+  test("STA API added", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body.namedApis).to.have.lengthOf(1);
+  });
+}
+
+docs {
+  An STA API can be added only while the Dataset has an active FROST Data sink, so it is added
+  after the Data sinks of step 5 and not with the Dataset create in step 4.
+}

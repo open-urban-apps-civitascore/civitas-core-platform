@@ -84,7 +84,7 @@ bruno-api/
 ├── datasources/                 # DataSource CRUD + lifecycle
 ├── datastructures/              # DataStructure + Version CRUD + lifecycle
 ├── groups/                      # Group CRUD
-├── named-api-contract/          # Named-API slug validation + discovery contract (no saga)
+├── named-api-contract/          # Named-API slug, backing-DataSink and one-per-standard rules + discovery (no saga)
 ├── permissions/                 # Permission read endpoints
 ├── pipelines/                   # Pipeline CRUD
 ├── roles/                       # Role CRUD

@@ -1,0 +1,62 @@
+meta {
+  name: 14c. Cleanup - Preview the Pipeline delete
+  type: http
+  seq: 37
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id/removal-impact?deletedPipelineIds={{sagaPipelineId}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  deletedPipelineIds: {{sagaPipelineId}}
+}
+
+params:path {
+  id: {{sagaDataSetId}}
+}
+
+tests {
+  const body = res.body || {};
+  const sinks = body.dataSinks || [];
+  const apis = body.apis || [];
+
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("The FROST DataSink becomes inactive and is provisioned", function() {
+    const frost = sinks.find(s => s.id === bru.getVar('sagaDataSinkId'));
+    expect(frost).to.be.an('object');
+    expect(frost.dataSinkType).to.equal('FROST');
+    expect(frost.provisioned).to.equal(true);
+  });
+  test("The POSTGIS DataSink stays: no Pipeline links it", function() {
+    expect(sinks.map(s => s.id)).to.not.include(bru.getVar('sagaPostgisDataSinkId'));
+  });
+  test("The STA API goes, the OWS API stays", function() {
+    expect(apis.map(a => a.standard)).to.deep.equal(['STA']);
+  });
+  test("The delete needs a confirmation", function() {
+    expect(body.requiresConfirmation).to.equal(true);
+  });
+}
+
+docs {
+  **Saga step 14c** — Preview what the Pipeline delete of step 15 removes.
+
+  The Pipeline links the FROST DataSink of step 4c, which the release in step 8 provisioned. Without the Pipeline the DataSink becomes inactive and is marked `PENDING_UNPROVISION`. No other active FROST DataSink backs the STA API, so the API goes too. The POSTGIS DataSink of step 4d has no Pipeline and stays active, and with it the OWS API.
+
+  **Precondition:** steps 4 to 12 ran; the dataset is `DRAFT` again.
+
+  **Expected Response:** 200 OK, `dataSinks` holds the provisioned FROST DataSink, `apis` the STA API, `requiresConfirmation` is `true`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | — (read-only) |
+  | Config Adapter | — |
+  | External System | — |
+}

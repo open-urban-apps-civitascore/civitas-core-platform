@@ -10,6 +10,10 @@ put {
   auth: inherit
 }
 
+params:query {
+  ~confirmedRemovalIds: 
+}
+
 params:path {
   dataSetId: {{dataSetId}}
   id: {{pipelineId}}
@@ -206,6 +210,8 @@ docs {
   **Precondition:** `dataSetId` and `pipelineId` are set.
 
   **Expected Response:** 200 OK, body reflects updated values.
+
+  **Removed DataSinks:** A DataSink that loses its last Pipeline because `dataSinkIds` no longer lists it becomes inactive, with the same effects and the same `confirmedRemovalIds` rule as `delete-pipeline` (preview with `removedLinks=<pipelineId>:<dataSinkId>`). The impact is calculated on the state after the request, so an API stays when the request replaces its DataSink with a new one of the same kind. Without the confirmation the backend answers `409` `REMOVAL_CONFIRMATION_REQUIRED` and changes nothing. The Pipeline of this collection links no DataSink at this point, so the request removes none.
 
   **System Impact:**
 

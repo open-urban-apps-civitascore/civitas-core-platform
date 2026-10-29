@@ -38,7 +38,7 @@ docs {
 
   | Layer | Effect |
   |---|---|
-  | Backend | Pipeline-to-DataSink association recorded; the DataSink's `pipeline` reference is set by `PipelineService` |
+  | Backend | Pipeline-to-DataSink link recorded; the DataSink lists the Pipeline in `pipelineIds` |
   | Config Adapter | — (the association affects the saga trigger only when the parent DataSet is released) |
   | External System | — |
 }

@@ -1,7 +1,7 @@
 meta {
   name: Update Dataset
   type: http
-  seq: 4
+  seq: 5
 }
 
 put {
@@ -23,8 +23,7 @@ body:json {
     "datapoolId": "{{dataPoolId}}",
     "assignments": [],
     "namedApis": [
-      { "name": "Traffic Sensor Readings", "slug": "traffic", "standard": "STA", "version": "1.1", "description": "Live traffic counter readings from city sensors." },
-      { "name": "Weather Sensor Readings", "slug": "weather", "standard": "STA", "version": "1.1" }
+      { "name": "Traffic Sensor Readings", "slug": "traffic", "standard": "STA", "version": "1.1", "description": "Live traffic counter readings from city sensors." }
     ]
   }
 }
@@ -44,7 +43,9 @@ tests {
 }
 
 docs {
-  **Precondition:** `dataSetId` and `dataPoolId` are set.
+  **Precondition:** `dataSetId` and `dataPoolId` are set; `create-frost-datasink-for-sta-api` created the active FROST DataSink that backs the STA API.
+
+  A new OWS or STA API needs an active DataSink of a kind that backs it (PostGIS for OWS, FROST for STA), and a DataSet has at most one OWS and one STA API. Otherwise the update answers `400` on `namedApis`.
 
   **Expected Response:** 200 OK, body reflects updated values.
 
@@ -52,7 +53,7 @@ docs {
 
   | Layer | Effect |
   |---|---|
-  | Backend | DataSet record updated in `portal_backend` DB |
+  | Backend | DataSet record updated in `portal_backend` DB; STA API `traffic` added |
   | Config Adapter | — |
   | External System | — |
 }

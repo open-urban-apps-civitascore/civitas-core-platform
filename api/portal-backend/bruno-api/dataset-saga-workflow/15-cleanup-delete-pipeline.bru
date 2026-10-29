@@ -1,7 +1,7 @@
 meta {
-  name: 15. Cleanup - Delete Pipeline
+  name: 15. Cleanup - Delete Pipeline without confirmation
   type: http
-  seq: 36
+  seq: 38
 }
 
 delete {
@@ -15,25 +15,41 @@ params:path {
   id: {{sagaPipelineId}}
 }
 
+script:post-response {
+  const impact = (res.body && res.body.impact) || {};
+  const ids = [].concat(impact.dataSinks || [], impact.layers || [], impact.apis || []).map(e => e.id);
+  bru.setVar('sagaPipelineConfirmation', ids.map(id => 'confirmedRemovalIds=' + id).join('&'));
+}
+
 tests {
-  test("Pipeline deleted or already gone", function() {
-    const status = res.getStatus();
-    // 204=deleted, 404=already gone, 400=invalid ID (unset var on first run)
-    expect(status === 204 || status === 404 || status === 400).to.be.true;
+  const body = res.body || {};
+
+  test("Delete refused until the removal is confirmed", function() {
+    expect(res.getStatus()).to.equal(409);
+    expect(body.type).to.equal('urn:civitas:error:REMOVAL_CONFIRMATION_REQUIRED');
+  });
+  test("The 409 carries the impact of step 14c", function() {
+    expect(body.impact.requiresConfirmation).to.equal(true);
+    expect(body.impact.dataSinks.map(s => s.id)).to.include(bru.getVar('sagaDataSinkId'));
+    expect(body.impact.apis.map(a => a.standard)).to.deep.equal(['STA']);
   });
 }
 
 docs {
-  **Saga step 15 of 18** — Delete the pipeline (cleanup).
+  **Saga step 15** — Delete the Pipeline without `confirmedRemovalIds`.
 
-  Removes the pipeline created in step 5. The DATASET_DELETE saga (step 11) must have completed before this step, ensuring the pipeline was already undeployed from the pipeline engine.
+  The delete would remove the provisioned FROST DataSink and the STA API (step 14c), so the backend refuses it with `409` and changes nothing. The problem document carries the impact in `impact`; the post-response script turns its ids into the query of step 15a.
 
-  **Expected Response:** 204 No Content. 404 if already deleted. 400 if `sagaPipelineId` is not set (first run, pipeline was never created).
+  **Precondition:** step 14c ran.
+
+  **Expected Response:** 409 Conflict, type `urn:civitas:error:REMOVAL_CONFIRMATION_REQUIRED`, property `impact` as in step 14c.
+
+  **Post-condition:** Saves `sagaPipelineConfirmation` (`confirmedRemovalIds=<id>&...`).
 
   **System Impact:**
 
   | Layer | Effect |
   |---|---|
-  | Backend | Pipeline record removed from `portal_backend` DB |
-  | Pipeline engine | Pipeline already undeployed by the DATASET_DELETE saga |
+  | Backend | — (nothing changes) |
+  | Config Adapter | — |
 }

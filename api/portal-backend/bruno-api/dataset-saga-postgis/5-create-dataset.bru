@@ -14,10 +14,7 @@ body:json {
   {
     "name": "PostGIS Saga DataSet",
     "description": "Dataset for end-to-end PostGIS + geoPoint saga workflow test",
-    "openDataAccess": false,
-    "namedApis": [
-      { "name": "Things", "slug": "things", "standard": "STA", "version": "1.1" }
-    ]
+    "openDataAccess": false
   }
 }
 
@@ -25,10 +22,6 @@ script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('pgDataSetId', res.body.id);
   }
-  const slug =
-    (res.body && res.body.namedApis && res.body.namedApis[0] && res.body.namedApis[0].slug) ||
-    'things';
-  bru.setVar('pgSlug', slug);
 }
 
 tests {

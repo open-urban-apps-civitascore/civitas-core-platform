@@ -54,7 +54,7 @@ docs {
 
   **Expected Response:** 201 Created, body contains `id` and `dataSinkType: "FROST"`.
 
-  **Post-condition:** Save `sagaDataSinkId` from `body.id` (referenced by the pipeline in step 5, deleted in cleanup step 12b).
+  **Post-condition:** Save `sagaDataSinkId` from `body.id` (referenced by the pipeline in step 5, made inactive by the Pipeline delete in step 15a).
 
   **System Impact:**
 

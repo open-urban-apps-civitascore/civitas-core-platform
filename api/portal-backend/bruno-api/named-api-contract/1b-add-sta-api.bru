@@ -1,0 +1,52 @@
+meta {
+  name: 1b. Add the STA API
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/datasets/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{napiContractDataSetId}}
+}
+
+body:json {
+  {
+    "namedApis": [
+      { "name": "Things", "slug": "things", "standard": "STA", "version": "1.1" }
+    ]
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("The STA API is persisted", function() {
+    expect(res.body.namedApis).to.be.an('array');
+    expect(res.body.namedApis).to.have.lengthOf(1);
+    expect(res.body.namedApis[0].standard).to.equal('STA');
+  });
+}
+
+docs {
+  **Contract step 1b** — Add the `STA` API to the dataset.
+
+  The FROST DataSink of step 1a is active, so the `STA` API is accepted.
+
+  **Precondition:** `napiContractDataSetId` is set (step 1); step 1a created the FROST DataSink.
+
+  **Expected Response:** 200 OK, `namedApis` holds the `things` (STA) entry.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | NamedApi row created for the dataset |
+  | Config Adapter | — |
+  | External System | — |
+}

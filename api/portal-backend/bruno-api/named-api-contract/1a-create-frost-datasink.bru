@@ -1,0 +1,48 @@
+meta {
+  name: 1a. Create the FROST DataSink that backs the STA API
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{napiContractDataSetId}}
+}
+
+body:json {
+  {
+    "dataSinkType": "FROST",
+    "configuration": {}
+  }
+}
+
+tests {
+  test("DataSink created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
+
+docs {
+  **Contract step 1a** — Create the FROST DataSink that backs the `STA` API of step 1b.
+
+  The dataset gets no PostGIS DataSink, so step 3a can show that an `OWS` API is refused without one.
+
+  **Precondition:** `napiContractDataSetId` is set (step 1).
+
+  **Expected Response:** 201 Created.
+
+  **Post-condition:** none — step 12 removes the DataSink together with the dataset.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSink record created, linked to the dataset |
+  | Config Adapter | — |
+  | External System | — |
+}

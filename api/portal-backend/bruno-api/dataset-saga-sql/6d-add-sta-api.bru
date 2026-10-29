@@ -1,0 +1,49 @@
+meta {
+  name: 6d. Add the STA API
+  type: http
+  seq: 16
+}
+
+patch {
+  url: {{baseUrl}}/datasets/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{sqlDataSetId}}
+}
+
+body:json {
+  {
+    "namedApis": [
+      { "name": "Things", "slug": "things", "standard": "STA", "version": "1.1" }
+    ]
+  }
+}
+
+tests {
+  test("STA API added", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.body.namedApis).to.have.lengthOf(1);
+  });
+}
+
+docs {
+  **SQL saga step 6d** — Add the dataset's STA named API.
+
+  An STA API can be added only while the dataset has an active FROST DataSink, so this step runs
+  after step 6b and not with the dataset create in step 5.
+
+  **Precondition:** `sqlDataSetId` is set (step 5); the FROST DataSink of step 6b exists.
+
+  **Expected Response:** 200 OK, `namedApis` holds the `things` (STA) entry.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | NamedApi row created for the dataset |
+  | Config Adapter | — (the route is provisioned when the dataset is released) |
+  | External System | — |
+}

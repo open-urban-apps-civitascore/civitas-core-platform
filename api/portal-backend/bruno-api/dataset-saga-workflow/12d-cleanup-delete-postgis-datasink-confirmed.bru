@@ -1,0 +1,40 @@
+meta {
+  name: 12d. Cleanup - Delete POSTGIS DataSink with confirmation
+  type: http
+  seq: 42
+}
+
+delete {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks/:id?{{sagaPostgisConfirmation}}
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{sagaDataSetId}}
+  id: {{sagaPostgisDataSinkId}}
+}
+
+tests {
+  test("DataSink deleted", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  **Saga step 12d** — Delete the POSTGIS DataSink and confirm the removal.
+
+  In one transaction the backend marks the DataSink `PENDING_UNPROVISION` and deletes the OWS API. The dataset now has no active DataSink and no API; the dataset delete in step 13 removes the PostGIS table, the GeoServer workspace and the FROST project.
+
+  **Precondition:** step 12c saved `sagaPostgisConfirmation`.
+
+  **Expected Response:** 204 No Content.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | POSTGIS DataSink marked `PENDING_UNPROVISION`; OWS API deleted |
+  | Config Adapter | — |
+  | External System | — (storage stays until the dataset delete) |
+}

@@ -1,7 +1,7 @@
 meta {
-  name: 12b. Cleanup - Delete DataSink
+  name: 12b. Cleanup - Delete the pending FROST DataSink
   type: http
-  seq: 37
+  seq: 40
 }
 
 delete {
@@ -16,27 +16,24 @@ params:path {
 }
 
 tests {
-  test("Provisioned FROST DataSink refused", function() {
+  test("A PENDING_UNPROVISION DataSink is not found", function() {
     const status = res.getStatus();
-    // 409=provisioned by the release in step 8, 404=already gone, 400=sagaDataSinkId never set (aborted run)
-    expect(status === 409 || status === 404 || status === 400).to.be.true;
-    if (status === 409) {
-      expect(res.getBody().type).to.equal("urn:civitas:error:RESOURCE_IN_USE");
-    }
+    // 404=marked PENDING_UNPROVISION by step 15a, 400=sagaDataSinkId never set (aborted run)
+    expect(status === 404 || status === 400).to.be.true;
   });
 }
 
 docs {
-  **Saga step 12b** — Delete the FROST DataSink (refused).
+  **Saga step 12b** — Delete the FROST DataSink after step 15a made it inactive.
 
-  The release in step 8 provisioned the DataSink created in step 4c. A provisioned DataSink keeps its storage after an unrelease, and only the DataSet teardown removes that storage, so a standalone delete is refused with `409` even though the DataSet is a draft again. The DataSink goes together with the DataSet in step 13.
+  Step 15a marked the provisioned FROST DataSink `PENDING_UNPROVISION`. Such a DataSink waits only for its storage to be removed: the DataSink endpoints no longer return it, and get, update and delete answer `404`. The dataset delete in step 13 removes its FROST project and then the record.
 
-  **Expected Response:** 409 Conflict (`RESOURCE_IN_USE`). 404 if already deleted. 400 if `sagaDataSinkId` is not set (first run / aborted earlier).
+  **Expected Response:** 404 Not Found. 400 if `sagaDataSinkId` is not set (first run / aborted earlier).
 
   **System Impact:**
 
   | Layer | Effect |
   |---|---|
-  | Backend | — (DataSink record kept) |
+  | Backend | — (DataSink record kept as `PENDING_UNPROVISION`) |
   | Config Adapter | — |
 }

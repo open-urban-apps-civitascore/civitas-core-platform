@@ -1,0 +1,66 @@
+meta {
+  name: Get Removal Impact
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id/removal-impact
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~deletedPipelineIds: {{pipelineId}}
+  ~removedLinks: {{pipelineId}}:{{dataSinkId}}
+  ~deletedDataSinkIds: {{dataSinkId}}
+}
+
+params:path {
+  id: {{dataSetId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Impact lists DataSinks, Layers and APIs", function() {
+    expect(res.body.dataSinks).to.be.an('array');
+    expect(res.body.layers).to.be.an('array');
+    expect(res.body.apis).to.be.an('array');
+  });
+  test("An empty request removes nothing", function() {
+    expect(res.body.dataSinks).to.have.lengthOf(0);
+    expect(res.body.layers).to.have.lengthOf(0);
+    expect(res.body.apis).to.have.lengthOf(0);
+    expect(res.body.requiresConfirmation).to.equal(false);
+  });
+}
+
+docs {
+  **Read-only preview** of what a Pipeline delete, a Pipeline update or a DataSink delete would remove. Requires `DATASET_READ`.
+
+  | Query parameter (repeatable, optional) | Change to preview |
+  |---|---|
+  | `deletedPipelineIds=<pipelineId>` | `DELETE /datasets/{id}/pipelines/{pipelineId}` |
+  | `removedLinks=<pipelineId>:<dataSinkId>` | a Pipeline `PUT`/`PATCH` whose `dataSinkIds` no longer lists the DataSink |
+  | `deletedDataSinkIds=<dataSinkId>` | `DELETE /datasets/{id}/datasinks/{dataSinkId}` |
+
+  The impact is calculated on the state after all given changes together, so one call covers a save that changes several Pipelines. An id that does not belong to the DataSet answers `404`. A `deletedDataSinkIds` entry that a Pipeline still links after the given changes answers `409` with type `urn:civitas:error:RESOURCE_IN_USE`: remove the DataSink from its Pipelines first.
+
+  The response lists the DataSinks that become inactive (`id`, `dataSinkType`, `provisioned`), the Layers that go (`id`, `layerName`, `title`) and the APIs that go (`id`, `slug`, `name`, `standard`). `requiresConfirmation` is `true` when a provisioned DataSink, a Layer or an API goes. The mutation then needs the ids of all of these in `confirmedRemovalIds`, otherwise it answers `409` `REMOVAL_CONFIRMATION_REQUIRED`.
+
+  This request sends no change, so the impact is empty. Enable the query parameters to preview a change; `dataset-saga-workflow` step 14c previews a Pipeline delete with a non-empty impact.
+
+  **Precondition:** `dataSetId` is set.
+
+  **Expected Response:** 200 OK, body `{ "dataSinks": [], "layers": [], "apis": [], "requiresConfirmation": false }`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | — (read-only) |
+  | Config Adapter | — |
+  | External System | — |
+}
