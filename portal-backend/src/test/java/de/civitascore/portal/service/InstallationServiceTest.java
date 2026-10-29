@@ -165,14 +165,36 @@ class InstallationServiceTest {
 
   @Test
   void install_whenPackageIsInstalled_throwsUniqueConstraintViolation() {
-    when(installationRepository.existsByPackageIdAndUninstalledAtIsNull(PACKAGE_ID))
-        .thenReturn(true);
+    when(installationRepository.existsActive(PACKAGE_ID, null)).thenReturn(true);
 
     assertThatThrownBy(() -> installationService.install(request(tree())))
         .isInstanceOf(UniqueConstraintViolationException.class)
         .hasMessageContaining("is already installed");
 
     verifyNoChange();
+  }
+
+  @Test
+  void install_whenPackageIsInstalledInTheDatapool_throwsUniqueConstraintViolationWithThePool() {
+    when(installationRepository.existsActive(PACKAGE_ID, DATAPOOL_ID)).thenReturn(true);
+
+    assertThatThrownBy(
+            () -> installationService.install(request(DATAPOOL_ID, tree(), sqlSource(FOREIGN_URN))))
+        .isInstanceOf(UniqueConstraintViolationException.class)
+        .hasMessageContaining(DATAPOOL_ID.toString());
+
+    verifyNoChange();
+  }
+
+  @Test
+  void install_whenPackageHasOnlyDataStructures_recordsNoDatapool() {
+    stubCreate();
+
+    // The request names a Data pool, but no member of the package goes into it.
+    Installation installation = installationService.install(request(DATAPOOL_ID, tree()));
+
+    assertThat(installation.getDatapoolId()).isNull();
+    verify(installationRepository).existsActive(PACKAGE_ID, null);
   }
 
   @Test
@@ -384,6 +406,7 @@ class InstallationServiceTest {
               assertThat(connector.dsn()).isEqualTo("postgres://trees-db:5432/city");
               assertThat(connector.table()).isEqualTo("trees");
             });
+    assertThat(installation.getDatapoolId()).isEqualTo(DATAPOOL_ID);
     assertThat(installation.getArtifacts())
         .filteredOn(line -> line.getArtifactType() == InstalledArtifactType.DATA_SOURCE)
         .singleElement()
