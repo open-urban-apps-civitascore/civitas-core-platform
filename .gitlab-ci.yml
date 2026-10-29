@@ -178,4 +178,5 @@ gitlab-advanced-sast:
   needs: []
   timeout: 1h
   tags:
-    - saas-linux-medium-amd64
+    # - saas-linux-medium-amd64
+    - external
