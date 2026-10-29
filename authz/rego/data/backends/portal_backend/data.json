@@ -97,6 +97,9 @@
     "/v1/datasets/{id}/apis": {
       "GET": "DATASET_READ"
     },
+    "/v1/datasets/{id}/removal-impact": {
+      "GET": "DATASET_READ"
+    },
     "/v1/datasets/{id}/datasinks": {
       "GET": "DATASET_READ",
       "POST": "DATASET_UPDATE"

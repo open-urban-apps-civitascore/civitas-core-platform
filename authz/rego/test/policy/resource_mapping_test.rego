@@ -243,6 +243,7 @@ test_sub_resource_paths if {
 		["/v1/datasets/abc/unstage", "/v1/datasets/{id}/unstage"],
 		["/v1/datasets/abc/assignments", "/v1/datasets/{id}/assignments"],
 		["/v1/datasets/abc/pipelines", "/v1/datasets/{id}/pipelines"],
+		["/v1/datasets/abc/removal-impact", "/v1/datasets/{id}/removal-impact"],
 		["/v1/datasources/abc/release", "/v1/datasources/{id}/release"],
 		["/v1/datasources/abc/unrelease", "/v1/datasources/{id}/unrelease"],
 		["/v1/datasources/abc/connection-test", "/v1/datasources/{id}/connection-test"],

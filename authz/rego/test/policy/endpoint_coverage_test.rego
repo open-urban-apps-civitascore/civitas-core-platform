@@ -40,6 +40,7 @@ dataset_read_subresource_paths := {
 	"/v1/datasets/dataset-abc/styles/style-1",
 	"/v1/datasets/dataset-abc/pipelines",
 	"/v1/datasets/dataset-abc/pipelines/pipe-1",
+	"/v1/datasets/dataset-abc/removal-impact",
 }
 
 # The matching DATASET scope grants read and carries the dataset id as the scope header.
