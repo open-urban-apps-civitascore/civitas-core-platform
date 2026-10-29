@@ -260,9 +260,6 @@
     },
     "anonymousDatapool": "Anonymous",
     "tableValues": {
-      "draft": "Draft",
-      "available": "Available",
-      "ready": "Ready",
       "yesterday": "Yesterday"
     },
     "pipelineStatus": {
@@ -994,10 +991,6 @@
       "lastActive": "Last active",
       "status": "Status",
       "action": "Action"
-    },
-    "status": {
-      "DRAFT": "Draft",
-      "AVAILABLE": "Available"
     },
     "deleteModal": {
       "title": "Really delete Data source?",
@@ -1896,10 +1889,6 @@
           "connector": "Connector",
           "lastActive": "Last updated",
           "status": "Status"
-        },
-        "status": {
-          "DRAFT": "Draft",
-          "AVAILABLE": "Available"
         }
       },
       "datasetsTab": {

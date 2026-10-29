@@ -116,27 +116,6 @@ describe('LinkCell', () => {
     expect(link.children[0]).toHaveTextContent(/^Test Link$/)
   })
 
-  it.each([
-    ['false', false],
-    ['an empty string', ''],
-  ])('renders no extra wrapper for a suffix of %s', (_, suffix) => {
-    render(
-      <LinkCell href="/test-link" suffix={suffix}>
-        Test Link
-      </LinkCell>,
-    )
-    expect(screen.getByRole('link').children[0]).toHaveClass('flex-1', 'truncate')
-  })
-
-  it('renders a suffix of zero', () => {
-    render(
-      <LinkCell href="/test-link" suffix={0}>
-        Test Link
-      </LinkCell>,
-    )
-    expect(screen.getByRole('link')).toHaveTextContent(/^Test Link0$/)
-  })
-
   it('renders the suffix next to the text when isDisabled is true', () => {
     render(
       <LinkCell href="/test-link" isDisabled suffix={<span data-testid="suffix">3</span>}>

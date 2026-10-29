@@ -259,9 +259,6 @@
     },
     "anonymousDatapool": "Anonym",
     "tableValues": {
-      "draft": "Entwurf",
-      "available": "Verfügbar",
-      "ready": "Fertig",
       "yesterday": "Gestern"
     },
     "pipelineStatus": {
@@ -986,10 +983,6 @@
       "lastActive": "Aktivität vor",
       "status": "Status",
       "action": "Aktion"
-    },
-    "status": {
-      "DRAFT": "Entwurf",
-      "AVAILABLE": "Verfügbar"
     },
     "deleteModal": {
       "title": "Datenquelle wirklich löschen?",
@@ -1883,10 +1876,6 @@
           "connector": "Konnektor",
           "lastActive": "Aktualisiert vor",
           "status": "Status"
-        },
-        "status": {
-          "DRAFT": "Entwurf",
-          "AVAILABLE": "Verfügbar"
         }
       },
       "datasetsTab": {

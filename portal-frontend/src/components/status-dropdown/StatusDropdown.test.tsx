@@ -55,6 +55,20 @@ describe('StatusDropdown', () => {
     expect(availableOption).toHaveAttribute('data-disabled')
   })
 
+  it.each([
+    [STATUS_TYPES.DRAFT, 'lucide-circle-dashed'],
+    [STATUS_TYPES.READY, 'lucide-circle-check'],
+    [STATUS_TYPES.AVAILABLE, 'lucide-circle-check-big'],
+  ])('shows the same %s icon in the dropdown trigger as in the status badge', (status, iconClass) => {
+    const statusOptions = [STATUS_TYPES.DRAFT, STATUS_TYPES.READY, STATUS_TYPES.AVAILABLE] as const
+    const { unmount } = render(<StatusDropdown {...defaultProps} status={status} statusOptions={statusOptions} />)
+    expect(screen.getByTestId('statusDropdown').querySelector('svg')).toHaveClass(iconClass)
+    unmount()
+
+    render(<StatusDropdown {...defaultProps} status={status} statusOptions={statusOptions} isReadOnly={true} />)
+    expect(screen.getByTestId('statusBadge').querySelector('svg')).toHaveClass(iconClass)
+  })
+
   it('shows the status badge and no dropdown trigger when isReadOnly is true', () => {
     render(<StatusDropdown {...defaultProps} isReadOnly={true} />)
 

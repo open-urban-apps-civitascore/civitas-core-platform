@@ -12,7 +12,7 @@ interface StatusBadgeProps {
   testId?: string
 }
 
-const STATUS_ICONS: Record<StatusTypes, LucideIcon> = {
+export const STATUS_ICONS: Record<StatusTypes, LucideIcon> = {
   [STATUS_TYPES.DRAFT]: CircleDashed,
   [STATUS_TYPES.READY]: CircleCheck,
   [STATUS_TYPES.AVAILABLE]: CircleCheckBig,

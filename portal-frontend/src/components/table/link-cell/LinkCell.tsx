@@ -1,6 +1,6 @@
 import { ChevronRight } from 'lucide-react'
 import { LinkProps } from 'next/link'
-import React, { JSX, ReactNode, useRef } from 'react'
+import React, { JSX, useRef } from 'react'
 
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { useIsTruncated } from '@/hooks/use-is-truncated'
@@ -12,13 +12,13 @@ interface LinkCellProps extends LinkProps {
   className?: string
   target?: React.HTMLAttributeAnchorTarget
   isDisabled?: boolean
-  suffix?: ReactNode
+  suffix?: JSX.Element
 }
 export const LinkCell = (props: LinkCellProps) => {
   const { children, href, className, target, isDisabled, suffix, ...linkProps } = props
   const ref = useRef<HTMLDivElement>(null)
   const isTruncated = useIsTruncated(ref)
-  const hasSuffix = suffix !== undefined && suffix !== null && typeof suffix !== 'boolean' && suffix !== ''
+  const hasSuffix = suffix !== undefined
   const suffixElement = hasSuffix ? <span className="shrink-0">{suffix}</span> : null
 
   return (

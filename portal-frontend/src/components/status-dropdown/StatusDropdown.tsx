@@ -1,9 +1,9 @@
 'use client'
 
-import { ChevronDown, CircleCheckBig, CircleCheckIcon, CircleDashed, Info } from 'lucide-react'
+import { ChevronDown, Info } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
-import { StatusBadge } from '@/components/status-badge/StatusBadge'
+import { STATUS_ICONS, StatusBadge } from '@/components/status-badge/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
@@ -41,16 +41,8 @@ export const StatusDropdown = <T extends StatusTypes>(props: StatusDropdownProps
   }
 
   const getStatusIcon = (statusType: StatusTypes) => {
-    switch (statusType) {
-      case STATUS_TYPES.DRAFT:
-        return <CircleDashed className="w-4 h-4 text-muted-foreground" />
-      case STATUS_TYPES.AVAILABLE:
-        return <CircleCheckBig className="w-4 h-4 text-muted-foreground" />
-      case STATUS_TYPES.READY:
-        return <CircleCheckIcon className="w-4 h-4 text-muted-foreground" />
-      default:
-        return null
-    }
+    const Icon = STATUS_ICONS[statusType]
+    return <Icon className="w-4 h-4 text-muted-foreground" />
   }
 
   return (
