@@ -2,12 +2,12 @@ import { ChevronDown } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { UseFormReturn, useWatch } from 'react-hook-form'
 
+import { FormSelect } from '@/components/form/fields/FormSelect'
+import { TextField } from '@/components/form/fields/TextField'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
+import { FormField } from '@/components/ui/form'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { HTTP_PAGINATION_TYPES, HTTP_PARAMETER_LOCATIONS } from '@/const/connectors'
 import {
   EMPTY_PAGINATIONS,
@@ -86,32 +86,35 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
     form.setValue(paginationPath, { ...EMPTY_PAGINATIONS[newType], isEnabled: true }, { shouldDirty: true })
     revalidateParameterNameCollisions()
   }
-  const typeId = `${paginationPath}.type`
+
+  const handleCursorInChange = (value: string) => {
+    form.setValue(`${paginationPath}.cursorIn`, value as HttpParameterLocation, { shouldDirty: true })
+    revalidateParameterNameCollisions()
+  }
+
+  const typeId = `${paginationPath}.type` as const
+  const paginationTypeOptions = Object.values(HTTP_PAGINATION_TYPES).map(paginationType => ({
+    value: paginationType,
+    label: t(PAGINATION_TYPE_LABELS[paginationType]),
+  }))
+  const cursorInOptions = Object.values(HTTP_PARAMETER_LOCATIONS).map(location => ({
+    value: location,
+    label: t(CURSOR_IN_LABELS[location]),
+  }))
 
   const renderTextField = (config: PaginationFieldConfig<PageNumberField | CursorField>) => {
     const { name, isRequired, isNumeric } = config
     return (
-      <FormField
+      <TextField
         key={name}
-        control={form.control}
+        form={form}
         name={`${paginationPath}.${name}`}
-        render={({ field }) => (
-          <FormItem className={ROW_CLASS_NAME}>
-            <FormLabel>
-              {t(`${name}.label`)}
-              {isRequired && <span className="text-red-500 ml-1">*</span>}
-            </FormLabel>
-            <FormControl>
-              <Input
-                {...field}
-                onChange={event => handleChangeAndRevalidate(event.target.value, field.onChange)}
-                inputMode={isNumeric ? 'numeric' : undefined}
-                disabled={isDisabled}
-              />
-            </FormControl>
-            <FormMessage className="col-start-2" />
-          </FormItem>
-        )}
+        label={t(`${name}.label`)}
+        required={isRequired}
+        inputMode={isNumeric ? 'numeric' : undefined}
+        disabled={isDisabled}
+        formItemProps={{ className: ROW_CLASS_NAME }}
+        onValueChange={revalidateParameterNameCollisions}
       />
     )
   }
@@ -144,23 +147,16 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
         <Collapsible open={isEnabled}>
           <CollapsibleContent className="flex flex-col gap-4 pt-4">
             <div className={ROW_CLASS_NAME}>
-              <Label htmlFor={typeId}>{t('type.label')}</Label>
-              <Select
-                value={type}
-                onValueChange={value => handleTypeChange(value as HttpPaginationType)}
+              <FormSelect
+                id={typeId}
+                form={form}
+                name={typeId}
+                label={t('type.label')}
+                options={paginationTypeOptions}
                 disabled={isDisabled}
-              >
-                <SelectTrigger id={typeId} className="w-full">
-                  <SelectValue>{t(PAGINATION_TYPE_LABELS[type])}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(HTTP_PAGINATION_TYPES).map(paginationType => (
-                    <SelectItem key={paginationType} value={paginationType}>
-                      {t(PAGINATION_TYPE_LABELS[paginationType])}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                formItemProps={{ className: 'contents' }}
+                onChange={value => handleTypeChange(value as HttpPaginationType)}
+              />
               {isCursor && <p className="col-start-2 text-sm text-muted-foreground">{t('cursorHint')}</p>}
             </div>
 
@@ -169,38 +165,16 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
             {isCursor && (
               <>
                 {CURSOR_FIELDS.map(renderTextField)}
-                <FormField
-                  control={form.control}
+                <FormSelect
+                  id={`${paginationPath}.cursorIn`}
+                  form={form}
                   name={`${paginationPath}.cursorIn`}
-                  render={({ field }) => (
-                    <FormItem className={ROW_CLASS_NAME}>
-                      <FormLabel>
-                        {t('cursorIn.label')}
-                        <span className="text-red-500 ml-1">*</span>
-                      </FormLabel>
-                      <Select
-                        value={field.value}
-                        onValueChange={value =>
-                          handleChangeAndRevalidate(value as HttpParameterLocation, field.onChange)
-                        }
-                        disabled={isDisabled}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue>{t(CURSOR_IN_LABELS[field.value])}</SelectValue>
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {Object.values(HTTP_PARAMETER_LOCATIONS).map(location => (
-                            <SelectItem key={location} value={location}>
-                              {t(CURSOR_IN_LABELS[location])}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage className="col-start-2" />
-                    </FormItem>
-                  )}
+                  label={t('cursorIn.label')}
+                  options={cursorInOptions}
+                  required
+                  disabled={isDisabled}
+                  formItemProps={{ className: ROW_CLASS_NAME }}
+                  onChange={handleCursorInChange}
                 />
                 {LIMIT_FIELDS.map(renderTextField)}
               </>

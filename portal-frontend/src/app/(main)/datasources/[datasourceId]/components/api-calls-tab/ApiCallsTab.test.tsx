@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
-import { useForm, UseFormReturn } from 'react-hook-form'
+import { useForm, UseFormReturn, useFormState } from 'react-hook-form'
 import { toast } from 'sonner'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -55,6 +55,7 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
     configuration: { baseUrl, authentication: { type: 'NONE', username: '', password: '' }, apiCalls },
   }
   let form: UseFormReturn<DatasourceFormDraft> | undefined
+  let isFormDirty = false
   let remountTab: (() => void) | undefined
 
   const Wrapper = () => {
@@ -63,6 +64,7 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
       mode: 'onChange',
       defaultValues,
     })
+    isFormDirty = useFormState({ control: form.control }).isDirty
     const [editingApiCalls, setEditingApiCalls] = useState<ApiCallSnapshots>(new Map())
     const [collapsedSections, setCollapsedSections] = useState<CollapsedApiCallSections>(new Map())
     const [tabKey, setTabKey] = useState(0)
@@ -88,7 +90,7 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
 
   render(<Wrapper />)
   const getApiCalls = () => form?.getValues('configuration.apiCalls') as HttpApiCallForm[] | undefined
-  const isDirty = () => form?.formState.isDirty
+  const isDirty = () => isFormDirty
   const resetForm = () => act(() => form?.reset(defaultValues))
   const remount = () => act(() => remountTab?.())
   return { user: userEvent.setup(), getApiCalls, isDirty, resetForm, remount }
@@ -489,7 +491,7 @@ describe('ApiCallsTab', () => {
       expect(getApiCalls()?.[0].pagination).toEqual(PAGINATION_FORM)
     })
 
-    it('shows the page size error', async () => {
+    it('shows the page size error and marks the field as invalid', async () => {
       const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
       await openApiCall(user)
       await user.click(screen.getByRole('checkbox', { name: 'enable' }))
@@ -497,6 +499,7 @@ describe('ApiCallsTab', () => {
       await user.type(screen.getByRole('textbox', { name: /^pageSize\.label/ }), '0')
 
       expect(await screen.findByText('datasources.errors.pageSizeMin')).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: /^pageSize\.label/ })).toHaveAttribute('aria-invalid', 'true')
     })
 
     it('hides the errors when unchecked', async () => {
@@ -596,6 +599,17 @@ describe('ApiCallsTab', () => {
         expect(getApiCalls()?.[0].pagination).toMatchObject({ cursorIn: 'HEADER' })
       })
 
+      it('marks the form as dirty only while the cursor location differs from the saved one', async () => {
+        const { user, isDirty } = renderApiCallsTab({ apiCalls: [{ ...API_CALL, pagination: CURSOR_PAGINATION_FORM }] })
+        await openApiCall(user)
+
+        await selectOption(user, 'cursorIn.label', 'cursorIn.header')
+        expect(isDirty()).toBe(true)
+
+        await selectOption(user, 'cursorIn.label', 'cursorIn.query')
+        expect(isDirty()).toBe(false)
+      })
+
       it('writes the entered values into the form', async () => {
         const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [API_CALL] })
         await openCursorPagination(user)
@@ -615,7 +629,9 @@ describe('ApiCallsTab', () => {
 
         expect(screen.getByRole('textbox', { name: 'cursorPath.label *' })).toBeInTheDocument()
         expect(screen.getByRole('textbox', { name: 'cursorParameter.label *' })).toBeInTheDocument()
-        expect(screen.getByRole('combobox', { name: 'cursorIn.label *' })).toBeInTheDocument()
+        const cursorInLabel = screen.getByText('cursorIn.label', { selector: 'label' })
+        expect(cursorInLabel).toHaveTextContent('cursorIn.label*')
+        expect(cursorInLabel).toHaveAttribute('for', screen.getByRole('combobox', { name: 'cursorIn.label' }).id)
         expect(screen.getByRole('textbox', { name: 'limitParameter.label' })).toBeInTheDocument()
       })
 

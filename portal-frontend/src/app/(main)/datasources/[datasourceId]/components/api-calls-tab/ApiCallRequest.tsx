@@ -3,10 +3,10 @@ import { useTranslations } from 'next-intl'
 import { useFieldArray, UseFormReturn, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
+import { TextField } from '@/components/form/fields/TextField'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
+import { FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form'
 import { InputGroup, InputGroupInput } from '@/components/ui/input-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -136,26 +136,15 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
           )}
         />
 
-        <FormField
-          control={form.control}
+        <TextField
+          form={form}
           name={`${apiCallPath}.name`}
-          render={({ field }) => (
-            <FormItem className="flex flex-col gap-2">
-              <FormLabel>
-                {t('name.label')}
-                <span className="text-red-500 ml-1">*</span>
-              </FormLabel>
-              <FormControl>
-                <Input
-                  {...field}
-                  className="h-12"
-                  placeholder={isDisabled ? undefined : t('name.placeholder')}
-                  disabled={isDisabled}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+          label={t('name.label')}
+          placeholder={t('name.placeholder')}
+          required
+          disabled={isDisabled}
+          formItemProps={{ className: 'flex flex-col gap-2' }}
+          inputClassName="h-12 disabled:h-12"
         />
 
         {hasParameters && (
