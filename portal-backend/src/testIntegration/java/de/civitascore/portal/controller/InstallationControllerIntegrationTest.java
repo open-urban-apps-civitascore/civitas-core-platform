@@ -180,6 +180,49 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
   }
 
   @Test
+  @DisplayName("POST installs the same package in two Data pools and records the Data pool of each")
+  void install_whenPackageIsInstalledInAnotherDatapool_installsItAgain() {
+    DataPool first = portalData.dataPool();
+    DataPool second = portalData.dataPool();
+
+    ResponseEntity<String> inFirst =
+        post(request(first.getId(), PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
+    ResponseEntity<String> inSecond =
+        post(
+            request(second.getId(), PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
+
+    assertThat(inFirst.getStatusCode()).as("%s", inFirst.getBody()).isEqualTo(HttpStatus.CREATED);
+    assertThat(inSecond.getStatusCode()).as("%s", inSecond.getBody()).isEqualTo(HttpStatus.CREATED);
+    assertThat(json(inFirst.getBody()).get("datapoolId").asString())
+        .isEqualTo(first.getId().toString());
+    assertThat(json(inSecond.getBody()).get("datapoolId").asString())
+        .isEqualTo(second.getId().toString());
+    assertThat(shellIdOf(linesOf(inSecond), SOURCE_URN))
+        .isNotEqualTo(shellIdOf(linesOf(inFirst), SOURCE_URN));
+    assertThat(shellIdOf(linesOf(inSecond), FOREIGN_URN))
+        .isNotEqualTo(shellIdOf(linesOf(inFirst), FOREIGN_URN));
+  }
+
+  @Test
+  @DisplayName("POST refuses a second install of the same package in the same Data pool")
+  void install_whenPackageIsInstalledInTheDatapool_returnsConflict() {
+    DataPool pool = portalData.dataPool();
+    ResponseEntity<String> installed =
+        post(request(pool.getId(), PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
+    assertThat(installed.getStatusCode())
+        .as("%s", installed.getBody())
+        .isEqualTo(HttpStatus.CREATED);
+    long sources = dataSourceRepository.count();
+
+    ResponseEntity<String> again =
+        post(request(pool.getId(), PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
+
+    assertThat(again.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(installationRepository.count()).isEqualTo(1);
+    assertThat(dataSourceRepository.count()).isEqualTo(sources);
+  }
+
+  @Test
   @DisplayName("GET returns the installations, the newest first")
   void getAll_whenTwoPackagesAreInstalled_returnsTheNewestFirst() {
     assertThat(post(request(PACKAGE_ID, member("Tree cadastre", treeModel()))).getStatusCode())
@@ -220,6 +263,20 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
     // Two installs that run at the same time both pass the check. Then the index decides.
     assertThatThrownBy(() -> installationRepository.saveAndFlush(installationOf(PACKAGE_ID)))
         .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  @DisplayName("The database keeps one active record of a package in each Data pool")
+  void saveAndFlush_whenPackageIsInTwoDatapools_keepsOneActiveRecordInEach() {
+    // The record has no foreign key to the Data pool, so these Data pools need not exist.
+    UUID first = UUID.randomUUID();
+    UUID second = UUID.randomUUID();
+    installationRepository.saveAndFlush(installationOf(PACKAGE_ID, first));
+    installationRepository.saveAndFlush(installationOf(PACKAGE_ID, second));
+
+    assertThatThrownBy(() -> installationRepository.saveAndFlush(installationOf(PACKAGE_ID, first)))
+        .isInstanceOf(DataIntegrityViolationException.class);
+    assertThat(installationRepository.count()).isEqualTo(2);
   }
 
   @Test
@@ -440,7 +497,7 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
 
     assertThat(again.getStatusCode()).as("%s", again.getBody()).isEqualTo(HttpStatus.CREATED);
     assertThat(installationRepository.count()).isEqualTo(2);
-    assertThat(installationRepository.existsByPackageIdAndUninstalledAtIsNull(PACKAGE_ID)).isTrue();
+    assertThat(installationRepository.existsActive(PACKAGE_ID, null)).isTrue();
   }
 
   @Test
@@ -464,7 +521,7 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
     assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     assertThat(dataSourceRepository.existsById(sourceId)).isTrue();
     assertThat(dataStructureRepository.existsById(shellIdOf(lines, FOREIGN_URN))).isTrue();
-    assertThat(installationRepository.existsByPackageIdAndUninstalledAtIsNull(PACKAGE_ID)).isTrue();
+    assertThat(installationRepository.existsActive(PACKAGE_ID, pool.getId())).isTrue();
   }
 
   @Test
@@ -900,9 +957,14 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
   }
 
   private static Installation installationOf(String packageId) {
+    return installationOf(packageId, null);
+  }
+
+  private static Installation installationOf(String packageId, UUID datapoolId) {
     Installation installation = new Installation();
     installation.setPackageId(packageId);
     installation.setPackageVersion("1.0.0");
+    installation.setDatapoolId(datapoolId);
     return installation;
   }
 
