@@ -23,10 +23,20 @@ CREATE TEMPORARY TABLE api_backing_kinds (standard, data_sink_type) AS
 VALUES ('OWS', 'POSTGIS'),
        ('STA', 'FROST');
 
--- The API of a released Dataset holds the route that its unrelease removes, so it stays, and the
--- newest provisioned Data sink without a Pipeline stays active to back it when no linked one does.
+-- A released Dataset publishes the Layers of its Data sinks, so a provisioned Data sink without a
+-- Pipeline that has Layers stays active with them. The API of a released Dataset holds the route
+-- that its unrelease removes, so it stays, and when no linked Data sink backs it, the newest
+-- provisioned Data sink without a Pipeline stays active to back it, one with Layers first.
 CREATE TEMPORARY TABLE kept_unlinked_sinks AS
-SELECT DISTINCT ON (s.dataset_id, s.data_sink_type) s.id, s.dataset_id, s.data_sink_type
+SELECT s.id, s.dataset_id, s.data_sink_type
+FROM data_sinks s
+         JOIN datasets d ON d.id = s.dataset_id
+WHERE d.status = 'AVAILABLE'
+  AND s.pipeline_id IS NULL
+  AND s.provisioned
+  AND EXISTS (SELECT 1 FROM layers l WHERE l.datasink_id = s.id)
+UNION
+(SELECT DISTINCT ON (s.dataset_id, s.data_sink_type) s.id, s.dataset_id, s.data_sink_type
 FROM data_sinks s
          JOIN datasets d ON d.id = s.dataset_id
 WHERE d.status = 'AVAILABLE'
@@ -42,7 +52,9 @@ WHERE d.status = 'AVAILABLE'
                   WHERE linked.dataset_id = s.dataset_id
                     AND linked.data_sink_type = s.data_sink_type
                     AND linked.pipeline_id IS NOT NULL)
-ORDER BY s.dataset_id, s.data_sink_type, s.created_at DESC, s.id DESC;
+ORDER BY s.dataset_id, s.data_sink_type,
+         EXISTS (SELECT 1 FROM layers l WHERE l.datasink_id = s.id) DESC,
+         s.created_at DESC, s.id DESC);
 
 DO
 $$
@@ -58,6 +70,22 @@ $$;
 
 -- Any other Data sink without a Pipeline counts as removed. Its Model Forge configuration cannot be
 -- removed from SQL and stays behind.
+DO
+$$
+    DECLARE
+        removed RECORD;
+    BEGIN
+        FOR removed IN SELECT l.dataset_id, l.layer_name, s.id AS data_sink_id
+                       FROM layers l
+                                JOIN data_sinks s ON s.id = l.datasink_id
+                       WHERE s.pipeline_id IS NULL
+                         AND s.id NOT IN (SELECT id FROM kept_unlinked_sinks)
+            LOOP
+                RAISE NOTICE 'Dataset % loses Layer % of Data sink % without a Pipeline', removed.dataset_id, removed.layer_name, removed.data_sink_id;
+            END LOOP;
+    END
+$$;
+
 DELETE FROM layers l
 USING data_sinks s
 WHERE l.datasink_id = s.id

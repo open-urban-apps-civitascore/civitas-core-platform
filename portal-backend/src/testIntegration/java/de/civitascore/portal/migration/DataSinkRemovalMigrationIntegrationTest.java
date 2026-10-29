@@ -48,6 +48,9 @@ class DataSinkRemovalMigrationIntegrationTest {
   private static final String RELEASED_NEWER_SINK = "61000000-0000-4000-8000-000000000002";
   private static final String RELEASED_OWS_API = "62000000-0000-4000-8000-000000000001";
   private static final String RELEASED_LAYER = "63000000-0000-4000-8000-000000000001";
+  private static final String PUBLISHED_OLDER_SINK = "71000000-0000-4000-8000-000000000001";
+  private static final String UNPUBLISHED_NEWER_SINK = "71000000-0000-4000-8000-000000000002";
+  private static final String PUBLISHED_LAYER = "73000000-0000-4000-8000-000000000001";
 
   private static PostgreSQLContainer postgres;
   private static JdbcClient jdbc;
@@ -156,6 +159,13 @@ class DataSinkRemovalMigrationIntegrationTest {
     assertThat(stateOf(RELEASED_NEWER_SINK)).isEqualTo("ACTIVE");
     assertThat(namedApiOf(RELEASED_LAYER)).isEqualTo(RELEASED_OWS_API);
     assertThat(stateOf(RELEASED_OLDER_SINK)).isEqualTo("PENDING_UNPROVISION");
+  }
+
+  @Test
+  void migrate_keepsTheUnlinkedSinkWithTheLayerOfAReleasedDatasetActive() {
+    assertThat(stateOf(PUBLISHED_OLDER_SINK)).isEqualTo("ACTIVE");
+    assertThat(layerExists(PUBLISHED_LAYER)).isTrue();
+    assertThat(stateOf(UNPUBLISHED_NEWER_SINK)).isEqualTo("PENDING_UNPROVISION");
   }
 
   @Test

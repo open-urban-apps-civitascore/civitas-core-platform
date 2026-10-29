@@ -83,3 +83,21 @@ VALUES ('62000000-0000-4000-8000-000000000001', now(), '60000000-0000-4000-8000-
 INSERT INTO layers (id, created_at, dataset_id, datasink_id, layer_name)
 VALUES ('63000000-0000-4000-8000-000000000001', now(), '60000000-0000-4000-8000-000000000001',
         '61000000-0000-4000-8000-000000000002', 'lights');
+
+-- A released Dataset whose only Layer is on the older of two Data sinks without a Pipeline.
+INSERT INTO datasets (id, name, created_at, status)
+VALUES ('70000000-0000-4000-8000-000000000001', 'Benches', now(), 'AVAILABLE');
+
+INSERT INTO data_sinks (id, created_at, data_sink_type, dataset_id, pipeline_id, provisioned)
+VALUES ('71000000-0000-4000-8000-000000000001', now() - INTERVAL '1 day', 'POSTGIS',
+        '70000000-0000-4000-8000-000000000001', NULL, true),
+       ('71000000-0000-4000-8000-000000000002', now(), 'POSTGIS',
+        '70000000-0000-4000-8000-000000000001', NULL, true);
+
+INSERT INTO named_apis (id, created_at, dataset_id, name, slug, standard, route_id)
+VALUES ('72000000-0000-4000-8000-000000000001', now(), '70000000-0000-4000-8000-000000000001',
+        'Benches maps', 'benches-maps', 'OWS', 'benches-maps-route');
+
+INSERT INTO layers (id, created_at, dataset_id, datasink_id, layer_name)
+VALUES ('73000000-0000-4000-8000-000000000001', now(), '70000000-0000-4000-8000-000000000001',
+        '71000000-0000-4000-8000-000000000001', 'benches');
