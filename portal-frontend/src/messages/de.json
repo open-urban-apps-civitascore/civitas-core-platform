@@ -1016,6 +1016,7 @@
       "paginationQueryDuplicate": "Ein Query-Parameter dieses API-Aufrufs hat bereits diesen Namen.",
       "paginationHeaderDuplicate": "Ein Header dieses API-Aufrufs hat bereits diesen Namen.",
       "paginationParameterDuplicate": "Ein anderer Paginierungsparameter hat bereits diesen Namen.",
+      "parameterPaginationDuplicate": "Ein Paginierungsparameter hat bereits diesen Namen.",
       "limitRequired": "Geben Sie ein Limit für den Limit-Parameter ein.",
       "limitParameterRequired": "Geben Sie einen Limit-Parameter für das Limit ein.",
       "limitInteger": "Geben Sie eine ganze Zahl ab 1 ein.",

@@ -407,6 +407,14 @@ const isEmptyParameter = (parameter: HttpParameterForm) => !parameter.name && !p
 const withoutEmptyParameters = (parameters: HttpParameterForm[]) =>
   parameters.filter(parameter => !isEmptyParameter(parameter))
 
+const removeEmptyParameters = <T extends { queryParameters: HttpParameterForm[]; headers: HttpParameterForm[] }>(
+  apiCall: T,
+) => ({
+  ...apiCall,
+  queryParameters: withoutEmptyParameters(apiCall.queryParameters),
+  headers: withoutEmptyParameters(apiCall.headers),
+})
+
 const requireParameterName = (parameter: HttpParameterForm, ctx: z.RefinementCtx) => {
   if (!parameter.name && parameter.value) {
     ctx.addIssue({ code: 'custom', path: ['name'], message: 'common.errors.required' })
@@ -628,11 +636,27 @@ const isSameName = (a: RequestParameter, b: RequestParameter) => {
   return a.name === b.name
 }
 
-const hasParameterName = (
+const getParameterIndexes = (
   parameters: HttpParameterForm[],
   location: HttpParameterLocation,
   paginationParameter: RequestParameter,
-) => parameters.some(parameter => isSameName({ name: parameter.name, location }, paginationParameter))
+) =>
+  parameters.flatMap((parameter, index) =>
+    isSameName({ name: parameter.name, location }, paginationParameter) ? [index] : [],
+  )
+
+const PARAMETER_LISTS = [
+  {
+    list: 'queryParameters',
+    location: HTTP_PARAMETER_LOCATIONS.QUERY,
+    message: 'datasources.errors.paginationQueryDuplicate',
+  },
+  {
+    list: 'headers',
+    location: HTTP_PARAMETER_LOCATIONS.HEADER,
+    message: 'datasources.errors.paginationHeaderDuplicate',
+  },
+] as const
 
 const validatePaginationNames = (apiCall: HttpApiCallBaseFormOutput, ctx: z.RefinementCtx) => {
   if (!apiCall.pagination.isEnabled) return
@@ -647,11 +671,18 @@ const validatePaginationNames = (apiCall: HttpApiCallBaseFormOutput, ctx: z.Refi
     if (headerNameError) {
       addIssue(headerNameError)
     }
-    if (hasParameterName(apiCall.queryParameters, HTTP_PARAMETER_LOCATIONS.QUERY, paginationParameter)) {
-      addIssue('datasources.errors.paginationQueryDuplicate')
-    }
-    if (hasParameterName(apiCall.headers, HTTP_PARAMETER_LOCATIONS.HEADER, paginationParameter)) {
-      addIssue('datasources.errors.paginationHeaderDuplicate')
+    for (const { list, location, message } of PARAMETER_LISTS) {
+      const parameterIndexes = getParameterIndexes(apiCall[list], location, paginationParameter)
+      if (parameterIndexes.length) {
+        addIssue(message)
+      }
+      for (const parameterIndex of parameterIndexes) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [list, parameterIndex, 'name'],
+          message: 'datasources.errors.parameterPaginationDuplicate',
+        })
+      }
     }
     const earlierParameters = paginationParameters.slice(0, index)
     if (earlierParameters.some(earlier => isSameName(earlier, paginationParameter))) {
@@ -663,14 +694,15 @@ const validatePaginationNames = (apiCall: HttpApiCallBaseFormOutput, ctx: z.Refi
 const HttpApiCallBaseFormSchema = z.object({
   name: z.string().trim(),
   path: HttpPathSchema,
-  queryParameters: z.array(HttpParameterFormSchema).transform(withoutEmptyParameters),
-  headers: z.array(HttpParameterFormSchema.superRefine(validateHeader)).transform(withoutEmptyParameters),
+  queryParameters: z.array(HttpParameterFormSchema),
+  headers: z.array(HttpParameterFormSchema.superRefine(validateHeader)),
   pagination: HttpPaginationFormSchema.superRefine(validatePagination),
 })
 
 type HttpApiCallBaseFormOutput = z.output<typeof HttpApiCallBaseFormSchema>
 
-const HttpApiCallFormSchema = HttpApiCallBaseFormSchema.superRefine(validatePaginationNames)
+const HttpApiCallFormSchema =
+  HttpApiCallBaseFormSchema.superRefine(validatePaginationNames).transform(removeEmptyParameters)
 
 export type HttpApiCallForm = z.input<typeof HttpApiCallFormSchema>
 
@@ -687,15 +719,22 @@ export type CollapsedApiCallSections = ReadonlyMap<number, ReadonlySet<ApiCallSe
 export type HttpParameterListPath =
   `configuration.apiCalls.${number}.queryParameters` | `configuration.apiCalls.${number}.headers`
 
+export const getParameterNameCollisionPaths = (index: number) =>
+  [
+    `configuration.apiCalls.${index}.pagination`,
+    `configuration.apiCalls.${index}.queryParameters`,
+    `configuration.apiCalls.${index}.headers`,
+  ] as const
+
 const HttpApiCallStrictFormSchema = HttpApiCallBaseFormSchema.extend({
   name: z.string().trim().min(1, 'common.errors.required'),
   path: z.string().trim().min(1, 'common.errors.required').pipe(HttpPathSchema),
-  queryParameters: z.array(HttpParameterFormSchema.superRefine(requireParameterName)).transform(withoutEmptyParameters),
-  headers: z
-    .array(HttpParameterFormSchema.superRefine(validateHeader).superRefine(requireParameterName))
-    .transform(withoutEmptyParameters),
+  queryParameters: z.array(HttpParameterFormSchema.superRefine(requireParameterName)),
+  headers: z.array(HttpParameterFormSchema.superRefine(validateHeader).superRefine(requireParameterName)),
   pagination: HttpPaginationFormSchema.superRefine(validatePagination).superRefine(requirePagination),
-}).superRefine(validatePaginationNames)
+})
+  .superRefine(validatePaginationNames)
+  .transform(removeEmptyParameters)
 
 const HttpApiCallsLooseSchema = z.array(HttpApiCallFormSchema).max(MAX_HTTP_API_CALLS, 'datasources.errors.apiCallsMax')
 

@@ -706,6 +706,64 @@ describe('HTTP API call schemas', () => {
       expect(issues(HttpLooseSchema, [apiCall])).toContainEqual(issue(field, error))
     })
 
+    it.each([
+      [
+        'a query parameter equal to the cursor query parameter',
+        withCursor({ cursorParameter: 'cursor' }, { queryParameters: [{ name: 'cursor', value: 'x' }] }),
+        [0, 'queryParameters', 0, 'name'],
+      ],
+      [
+        'a query parameter after an empty row',
+        withCursor(
+          { cursorParameter: 'cursor' },
+          {
+            queryParameters: [
+              { name: '', value: '' },
+              { name: 'cursor', value: 'x' },
+            ],
+          },
+        ),
+        [0, 'queryParameters', 1, 'name'],
+      ],
+      [
+        'a header equal to the cursor header in other case',
+        withCursor(
+          { cursorParameter: 'X-Cursor', cursorIn: 'HEADER' },
+          { headers: [{ name: 'x-cursor', value: 'x' }] },
+        ),
+        [0, 'headers', 0, 'name'],
+      ],
+      [
+        'a query parameter equal to the limit parameter',
+        withCursor(
+          { cursorParameter: 'cursor', limitParameter: 'limit' },
+          { queryParameters: [{ name: 'limit', value: '5' }] },
+        ),
+        [0, 'queryParameters', 0, 'name'],
+      ],
+    ])('rejects %s also at the row', (_name, apiCall, path) => {
+      expect(issues(HttpLooseSchema, [apiCall])).toContainEqual(
+        expect.objectContaining({ path, message: 'datasources.errors.parameterPaginationDuplicate' }),
+      )
+    })
+
+    it('rejects a query parameter after an empty row also at the row for release', () => {
+      const apiCall = {
+        ...API_CALL,
+        queryParameters: [
+          { name: '', value: '' },
+          { name: 'cursor', value: 'x' },
+        ],
+        pagination: { ...CURSOR_PAGINATION_FORM, cursorParameter: 'cursor' },
+      }
+      expect(issues(HttpStrictSchema, [apiCall])).toContainEqual(
+        expect.objectContaining({
+          path: [0, 'queryParameters', 1, 'name'],
+          message: 'datasources.errors.parameterPaginationDuplicate',
+        }),
+      )
+    })
+
     it('rejects a limit parameter that breaks two rules', () => {
       const apiCall = withCursor(
         { cursorParameter: 'cursor', limitParameter: 'cursor' },

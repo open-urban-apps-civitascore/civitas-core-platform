@@ -11,7 +11,7 @@ import { InputGroup, InputGroupInput } from '@/components/ui/input-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { HTTP_METHODS } from '@/const/connectors'
-import { HttpApiCallsForm } from '@/types/connectors'
+import { getParameterNameCollisionPaths, HttpApiCallsForm } from '@/types/connectors'
 import { buildApiCallUrl, formatPathWithQuery } from '@/utils/connectors'
 
 import { ApiCallParameterRows } from './ApiCallParameterRows'
@@ -39,16 +39,16 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
   const pathWithQuery = formatPathWithQuery(apiCall?.path ?? '', apiCall?.queryParameters ?? [])
   const hasParameters = queryParameters.fields.length > 0 || headers.fields.length > 0
 
-  const revalidatePagination = () => void form.trigger(`${apiCallPath}.pagination`)
+  const revalidateParameterNameCollisions = () => void form.trigger([...getParameterNameCollisionPaths(index)])
 
   const handleQueryParameterRemove = (parameterIndex: number) => {
     queryParameters.remove(parameterIndex)
-    revalidatePagination()
+    revalidateParameterNameCollisions()
   }
 
   const handleHeaderRemove = (parameterIndex: number) => {
     headers.remove(parameterIndex)
-    revalidatePagination()
+    revalidateParameterNameCollisions()
   }
 
   const handleCopyUrl = async () => {
@@ -167,7 +167,7 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
               typeLabel={t('parameters.query')}
               isDisabled={isDisabled}
               onRemove={handleQueryParameterRemove}
-              onNameChange={revalidatePagination}
+              onNameChange={revalidateParameterNameCollisions}
             />
             <ApiCallParameterRows
               form={form}
@@ -176,7 +176,7 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
               typeLabel={t('parameters.header')}
               isDisabled={isDisabled}
               onRemove={handleHeaderRemove}
-              onNameChange={revalidatePagination}
+              onNameChange={revalidateParameterNameCollisions}
             />
           </div>
         )}

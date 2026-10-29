@@ -1024,6 +1024,7 @@
       "paginationQueryDuplicate": "A query parameter of this API call already has this name.",
       "paginationHeaderDuplicate": "A header of this API call already has this name.",
       "paginationParameterDuplicate": "Another pagination parameter already has this name.",
+      "parameterPaginationDuplicate": "A pagination parameter already has this name.",
       "limitRequired": "Enter a limit for the limit parameter.",
       "limitParameterRequired": "Enter a limit parameter for the limit.",
       "limitInteger": "Enter a whole number of 1 or more.",

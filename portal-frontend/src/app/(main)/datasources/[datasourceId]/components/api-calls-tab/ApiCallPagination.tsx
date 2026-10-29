@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { HTTP_PAGINATION_TYPES, HTTP_PARAMETER_LOCATIONS } from '@/const/connectors'
 import {
   EMPTY_PAGINATIONS,
+  getParameterNameCollisionPaths,
   HttpApiCallsForm,
   HttpCursorPaginationForm,
   HttpPageNumberPaginationForm,
@@ -74,14 +75,16 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
   const type = useWatch({ control: form.control, name: `${paginationPath}.type` })
   const isCursor = type === HTTP_PAGINATION_TYPES.CURSOR
 
+  const revalidateParameterNameCollisions = () => void form.trigger([...getParameterNameCollisionPaths(index)])
+
   const handleChangeAndRevalidate = <T,>(value: T, onChange: (value: T) => void) => {
     onChange(value)
-    void form.trigger(paginationPath)
+    revalidateParameterNameCollisions()
   }
 
   const handleTypeChange = (newType: HttpPaginationType) => {
     form.setValue(paginationPath, { ...EMPTY_PAGINATIONS[newType], isEnabled: true }, { shouldDirty: true })
-    void form.trigger(paginationPath)
+    revalidateParameterNameCollisions()
   }
   const typeId = `${paginationPath}.type`
 

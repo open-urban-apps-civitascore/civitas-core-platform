@@ -625,6 +625,47 @@ describe('ApiCallsTab', () => {
         )
       })
 
+      it('shows the error also at the query parameter with the cursor name', async () => {
+        const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+        await openCursorPagination(user)
+        await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'cursor')
+        const queryParameterName = screen.getByRole('textbox', { name: 'parameters.query name' })
+
+        await user.clear(queryParameterName)
+        await user.type(queryParameterName, 'cursor')
+
+        expect(await screen.findByText('datasources.errors.parameterPaginationDuplicate')).toBeInTheDocument()
+        expect(screen.getByText('datasources.errors.paginationQueryDuplicate')).toBeInTheDocument()
+      })
+
+      it('clears the error at the query parameter when the cursor parameter changes', async () => {
+        const apiCall = { ...API_CALL, queryParameters: [{ name: 'cursor', value: 'x' }] }
+        const { user } = renderApiCallsTab({ apiCalls: [apiCall] })
+        await openCursorPagination(user)
+        await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'cursor')
+        expect(await screen.findByText('datasources.errors.parameterPaginationDuplicate')).toBeInTheDocument()
+
+        await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 's')
+
+        await waitFor(() =>
+          expect(screen.queryByText('datasources.errors.parameterPaginationDuplicate')).not.toBeInTheDocument(),
+        )
+      })
+
+      it('clears the error at the query parameter when the pagination is unchecked', async () => {
+        const apiCall = { ...API_CALL, queryParameters: [{ name: 'cursor', value: 'x' }] }
+        const { user } = renderApiCallsTab({ apiCalls: [apiCall] })
+        await openCursorPagination(user)
+        await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'cursor')
+        expect(await screen.findByText('datasources.errors.parameterPaginationDuplicate')).toBeInTheDocument()
+
+        await user.click(screen.getByRole('checkbox', { name: 'enable' }))
+
+        await waitFor(() =>
+          expect(screen.queryByText('datasources.errors.parameterPaginationDuplicate')).not.toBeInTheDocument(),
+        )
+      })
+
       it('clears the error when the query parameter with the cursor name is removed', async () => {
         const apiCall = { ...API_CALL, queryParameters: [{ name: 'cursor', value: 'x' }] }
         const { user } = renderApiCallsTab({ apiCalls: [apiCall] })
