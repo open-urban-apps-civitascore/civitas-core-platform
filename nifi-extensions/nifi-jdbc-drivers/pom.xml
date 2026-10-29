@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>de.civitas-core</groupId>
+		<artifactId>nifi-extensions-parent</artifactId>
+		<version>${revision}</version>
+	</parent>
+
+	<artifactId>nifi-jdbc-drivers</artifactId>
+	<packaging>pom</packaging>
+
+	<name>Civitas NiFi JDBC drivers</name>
+	<description>The JDBC drivers the Pipelines' database connection pools load</description>
+
+	<!-- The driver comes in at build time, so a NiFi pod downloads no code at start, the image scan
+	     sees the driver, and Renovate updates it like any other dependency. -->
+	<dependencies>
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<version>42.7.14</version>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<!-- The config-adapter names the driver by this path without a version:
+			     /opt/nifi/drivers/postgresql.jar. -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<version>3.11.0</version>
+				<executions>
+					<execution>
+						<id>copy-drivers</id>
+						<phase>package</phase>
+						<goals>
+							<goal>copy-dependencies</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>${project.build.directory}/drivers</outputDirectory>
+							<includeArtifactIds>postgresql</includeArtifactIds>
+							<stripVersion>true</stripVersion>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+</project>

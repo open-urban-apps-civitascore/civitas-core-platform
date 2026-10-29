@@ -25,6 +25,7 @@
 		<module>nifi-frost-nar</module>
 		<module>nifi-http-processors</module>
 		<module>nifi-http-nar</module>
+		<module>nifi-jdbc-drivers</module>
 	</modules>
 
 	<properties>

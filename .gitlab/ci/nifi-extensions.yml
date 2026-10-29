@@ -122,6 +122,7 @@ build-nifi-extensions:
     expire_in: 1 month
     paths:
       - nifi-extensions/*/target/*.nar
+      - nifi-extensions/*/target/drivers/*.jar
       - nifi-extensions/*/target/nifi-extensions.json
       - nifi-extensions/*/target/surefire-reports/
       - nifi-extensions/*/target/site/jacoco/
