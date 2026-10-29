@@ -11,6 +11,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
@@ -48,6 +49,14 @@ public class Installation extends BaseEntity {
 
   @Column(name = "package_version", length = PACKAGE_VERSION_LENGTH)
   private String packageVersion;
+
+  /**
+   * The Data pool of the Data sources and of the Dataset that the install created. Null when the
+   * package has neither. A Data pool can have only one active installation of a package, and an
+   * instance can have only one active installation of a package without a Data pool.
+   */
+  @Column(name = "datapool_id")
+  private UUID datapoolId;
 
   /**
    * The time of the uninstall. Null while the installation is active. A package can be installed

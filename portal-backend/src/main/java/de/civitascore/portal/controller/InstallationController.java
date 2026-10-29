@@ -59,7 +59,8 @@ public class InstallationController {
           "Creates a copy of each member of the package on this instance and keeps a record of the"
               + " install. Each copy gets a URN of this instance. The record keeps the identity of"
               + " each member in the package as the origin of the copy. Each Data structure stays"
-              + " DRAFT. If one member fails, the install keeps nothing.")
+              + " DRAFT. If one member fails, the install keeps nothing. The same package can be"
+              + " installed in more than one Data pool.")
   @ApiResponse(responseCode = "201", description = "The package is installed")
   @ApiResponse(
       responseCode = "400",
@@ -67,7 +68,9 @@ public class InstallationController {
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @ApiResponse(
       responseCode = "409",
-      description = "The package is already installed on this instance",
+      description =
+          "The package is already installed in the Data pool, or, for a package without Data"
+              + " sources and without a Dataset, on this instance",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @PostMapping
   public ResponseEntity<InstallationOutputDTO> install(
