@@ -6,12 +6,17 @@ import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.DataSetMetaInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
+import de.civitascore.portal.model.output.DataSinkRemovalImpactDTO;
 import de.civitascore.portal.model.output.NamedApiOutputDTO;
 import de.civitascore.portal.model.output.assembler.DataSetAssembler;
 import de.civitascore.portal.repository.specification.DataSetSpec;
 import de.civitascore.portal.repository.specification.ScopeFilteringSpecification;
 import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.service.DataSetService;
+import de.civitascore.portal.service.removal.DataSinkRemovalRequest;
+import de.civitascore.portal.service.removal.DataSinkRemovalService;
+import de.civitascore.portal.service.removal.PipelineDataSinkLink;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -23,8 +28,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -42,6 +49,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
 
@@ -56,6 +64,7 @@ public class DataSetController
 
   private final DataSetService dataSetService;
   private final DataSetAssembler dataSetAssembler;
+  private final DataSinkRemovalService dataSinkRemovalService;
 
   @Parameters({
     @Parameter(
@@ -178,6 +187,75 @@ public class DataSetController
             ? dataSetAssembler.toOutput(dataSet).getNamedApis()
             : List.of();
     return ResponseEntity.ok(namedApis);
+  }
+
+  /**
+   * Shows what deleting Pipelines, removing links between a Pipeline and a DataSink, and deleting
+   * DataSinks would take with it, without changing anything.
+   *
+   * @param id the dataset UUID
+   * @param deletedPipelineIds Pipelines the planned request deletes
+   * @param removedLinks links the planned request removes, each as {@code pipelineId:dataSinkId}
+   * @param deletedDataSinkIds DataSinks the planned request deletes
+   * @return HTTP 200 with the impact
+   */
+  @GetMapping("/{id}/removal-impact")
+  @Operation(
+      operationId = "getDataSetRemovalImpact",
+      summary = "Preview what a removal takes with it",
+      description =
+          "Returns the DataSinks that become inactive and the Layers and APIs that are deleted when"
+              + " the given Pipelines are deleted, the given links removed and the given DataSinks"
+              + " deleted together. A DELETE or update that makes these removals needs the"
+              + " confirmationIds in confirmedRemovalIds.")
+  @ApiResponse(responseCode = "200", description = "Impact returned successfully")
+  @ApiResponse(
+      responseCode = "400",
+      description = "A removed link is not of the form pipelineId:dataSinkId",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "404",
+      description =
+          "Dataset not found or out of scope, or a Pipeline or DataSink is not in the dataset",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  public ResponseEntity<DataSinkRemovalImpactDTO> getRemovalImpact(
+      @PathVariable UUID id,
+      @RequestParam(required = false) Set<UUID> deletedPipelineIds,
+      @Parameter(description = "Removed links, each as pipelineId:dataSinkId. Repeatable.")
+          @RequestParam(required = false)
+          List<String> removedLinks,
+      @RequestParam(required = false) Set<UUID> deletedDataSinkIds) {
+    Specification<DataSet> scopedById =
+        applyScopeFilter(ScopeFilteringSpecification.baseEntityById(Set.of(id)));
+    DataSet dataSet =
+        dataSetService
+            .findOne(scopedById)
+            .orElseThrow(() -> new ResourceNotFoundException("DataSet", id));
+    DataSinkRemovalRequest request =
+        new DataSinkRemovalRequest(
+            Objects.requireNonNullElse(deletedPipelineIds, Set.of()),
+            parseLinks(id, Objects.requireNonNullElse(removedLinks, List.of())),
+            Objects.requireNonNullElse(deletedDataSinkIds, Set.of()));
+    return ResponseEntity.ok(dataSinkRemovalService.preview(dataSet, request));
+  }
+
+  private static Set<PipelineDataSinkLink> parseLinks(UUID dataSetId, List<String> links) {
+    try {
+      return links.stream()
+          .map(link -> link.split(":", -1))
+          .map(
+              parts -> {
+                if (parts.length != 2) {
+                  throw new IllegalArgumentException();
+                }
+                return new PipelineDataSinkLink(
+                    UUID.fromString(parts[0].trim()), UUID.fromString(parts[1].trim()));
+              })
+          .collect(Collectors.toSet());
+    } catch (IllegalArgumentException e) {
+      throw new InvalidInputException(
+          "removedLinks", dataSetId, "Each removed link must be pipelineId:dataSinkId");
+    }
   }
 
   /**

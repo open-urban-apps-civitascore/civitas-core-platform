@@ -15,6 +15,7 @@ import de.civitascore.portal.util.ModelMissingException;
 import de.civitascore.portal.util.ModelReferenceNotAvailableException;
 import de.civitascore.portal.util.ModelRootMissingException;
 import de.civitascore.portal.util.PipelineClosureValidationException;
+import de.civitascore.portal.util.RemovalConfirmationRequiredException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.SagaInFlightException;
@@ -205,6 +206,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         Encode.forJava(ex.getMessage()),
         Encode.forJava(ex.getBlockedBy().toString()));
     return createProblemDetail(HttpStatus.CONFLICT, "RESOURCE_IN_USE", ex.getMessage(), request);
+  }
+
+  @ExceptionHandler(RemovalConfirmationRequiredException.class)
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public ProblemDetail handleRemovalConfirmationRequired(
+      RemovalConfirmationRequiredException ex, HttpServletRequest request) {
+    log.info("Removal not confirmed: {}", Encode.forJava(ex.getMessage()));
+    // TR-03187 W-18/W-19: the impact lists only Data sinks, Layers and APIs of the addressed
+    // Dataset, which GET datasinks, GET layers and GET dataset already show to the same scope.
+    ProblemDetail problemDetail =
+        createProblemDetail(
+            HttpStatus.CONFLICT, "REMOVAL_CONFIRMATION_REQUIRED", ex.getMessage(), request);
+    problemDetail.setProperty("impact", ex.getImpact());
+    return problemDetail;
   }
 
   @ExceptionHandler(SagaInFlightException.class)

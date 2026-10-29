@@ -29,10 +29,14 @@ import lombok.experimental.SuperBuilder;
 @Entity
 @Table(
     name = "named_apis",
-    uniqueConstraints =
-        @UniqueConstraint(
-            name = "uk_named_api_dataset_slug",
-            columnNames = {"dataset_id", "slug"}),
+    uniqueConstraints = {
+      @UniqueConstraint(
+          name = "uk_named_api_dataset_slug",
+          columnNames = {"dataset_id", "slug"}),
+      @UniqueConstraint(
+          name = "uk_named_api_dataset_singleton_key",
+          columnNames = {"dataset_id", "singleton_key"})
+    },
     indexes = {@Index(name = "idx_named_api_dataset", columnList = "dataset_id")})
 @Getter
 @Setter
@@ -54,6 +58,13 @@ public class NamedApi extends NamedEntity {
 
   @Column(name = "version", length = 32)
   private String version;
+
+  /**
+   * The {@code standard} name for a standard a Dataset can expose at most once, else null. The
+   * unique key on {@code (dataset_id, singleton_key)} enforces that limit in the database.
+   */
+  @Column(name = "singleton_key", length = 16)
+  private String singletonKey;
 
   /**
    * Populated by the saga result handler after release; null before release and after unrelease.

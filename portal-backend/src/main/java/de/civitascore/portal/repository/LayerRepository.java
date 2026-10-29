@@ -1,6 +1,7 @@
 package de.civitascore.portal.repository;
 
 import de.civitascore.portal.model.entity.Layer;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
@@ -12,6 +13,8 @@ public interface LayerRepository extends BaseRepository<Layer, UUID> {
   boolean existsByDataSinkId(UUID dataSinkId);
 
   boolean existsByDataSetId(UUID dataSetId);
+
+  List<Layer> findByDataSetId(UUID dataSetId);
 
   Optional<Layer> findByDataSetIdAndLayerName(UUID dataSetId, String layerName);
 

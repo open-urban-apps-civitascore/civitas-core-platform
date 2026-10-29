@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -27,9 +28,14 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.security.AllowedScopes;
+import de.civitascore.portal.service.removal.DataSinkRemovalPlan;
+import de.civitascore.portal.service.removal.DataSinkRemovalRequest;
+import de.civitascore.portal.service.removal.DataSinkRemovalService;
+import de.civitascore.portal.service.removal.PipelineDataSinkLink;
 import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.RemovalConfirmationRequiredException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +47,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -64,6 +71,7 @@ class PipelineServiceTest {
 
   @Mock private DataSetMutationGuard dataSetMutationGuard;
   @Mock private ModelRegistryGateway modelRegistryGateway;
+  @Mock private DataSinkRemovalService dataSinkRemovalService;
 
   @InjectMocks private PipelineService pipelineService;
 
@@ -120,7 +128,7 @@ class PipelineServiceTest {
                 saved.setId(pipelineId);
                 return saved;
               });
-      when(dataSinkRepository.findByPipelineId(any())).thenReturn(List.of());
+      when(dataSinkRepository.findByPipelinesId(any())).thenReturn(List.of());
       when(modelRegistryGateway.storePayload(any(), any(), any(), any(), any(), any(), any()))
           .thenReturn(
               new ModelRegistryGateway.ModelPin(logicalUrn, logicalUrn + ":1.0.0", "1.0.0"));
@@ -170,7 +178,7 @@ class PipelineServiceTest {
           .thenReturn(List.of(draftDataSource));
       when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
       when(pipelineRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-      when(dataSinkRepository.findByPipelineId(entity.getId())).thenReturn(List.of());
+      when(dataSinkRepository.findByPipelinesId(entity.getId())).thenReturn(List.of());
 
       Pipeline result = pipelineService.create(input);
 
@@ -247,7 +255,7 @@ class PipelineServiceTest {
           .thenReturn(List.of(availableDataSource));
       when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
       when(pipelineRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-      when(dataSinkRepository.findByPipelineId(any())).thenReturn(List.of());
+      when(dataSinkRepository.findByPipelinesId(any())).thenReturn(List.of());
 
       Pipeline result = pipelineService.create(input);
 
@@ -273,7 +281,7 @@ class PipelineServiceTest {
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
       when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
       when(pipelineRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-      when(dataSinkRepository.findByPipelineId(any())).thenReturn(List.of());
+      when(dataSinkRepository.findByPipelinesId(any())).thenReturn(List.of());
 
       Pipeline result = pipelineService.create(input);
 
@@ -309,7 +317,7 @@ class PipelineServiceTest {
       when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
       when(pipelineRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
       when(dataSinkRepository.findAllById(Set.of(sinkId))).thenReturn(List.of(freeSink));
-      when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of());
+      when(dataSinkRepository.findByPipelinesId(pipelineId)).thenReturn(List.of());
 
       pipelineService.create(input);
 
@@ -318,8 +326,8 @@ class PipelineServiceTest {
               argThat(
                   s ->
                       s.getId().equals(sinkId)
-                          && s.getPipeline() != null
-                          && s.getPipeline().getId().equals(pipelineId)));
+                          && s.getPipelines().stream()
+                              .anyMatch(p -> p.getId().equals(pipelineId))));
     }
 
     @Test
@@ -340,18 +348,18 @@ class PipelineServiceTest {
       DataSink linkedSink = new DataSink();
       linkedSink.setId(removedSinkId);
       linkedSink.setDataSet(dataSet);
-      linkedSink.setPipeline(existing);
+      linkedSink.getPipelines().add(existing);
 
       when(pipelineRepository.findById(pipelineId)).thenReturn(Optional.of(existing));
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
       when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
       when(pipelineRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-      when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of(linkedSink));
+      when(dataSinkRepository.findByPipelinesId(pipelineId)).thenReturn(List.of(linkedSink));
 
       pipelineService.update(pipelineId, input);
 
       verify(dataSinkRepository)
-          .save(argThat(s -> s.getId().equals(removedSinkId) && s.getPipeline() == null));
+          .save(argThat(s -> s.getId().equals(removedSinkId) && s.getPipelines().isEmpty()));
     }
 
     @Test
@@ -406,7 +414,7 @@ class PipelineServiceTest {
       DataSink occupiedSink = new DataSink();
       occupiedSink.setId(sinkId);
       occupiedSink.setDataSet(dataSet);
-      occupiedSink.setPipeline(otherPipeline);
+      occupiedSink.getPipelines().add(otherPipeline);
 
       when(pipelineMapper.toEntity(any())).thenReturn(pipelineEntity);
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(dataSet));
@@ -446,21 +454,88 @@ class PipelineServiceTest {
     }
 
     @Test
-    @DisplayName("Deleting a pipeline unlinks its DataSinks but does not delete them")
-    void deletePipelineUnlinksDataSinks() {
+    @DisplayName(
+        "Deleting a pipeline unlinks its DataSinks and deletes its artifact before the removal")
+    void deletePipelineUnlinksDataSinksAndDeletesItsArtifactFirst() {
       UUID pipelineId = UUID.randomUUID();
       UUID dataSetId = UUID.randomUUID();
       DataSet dataSet = draftDataSet(dataSetId);
 
       Pipeline existing = pipeline(pipelineId, dataSet);
+      String artifactUrn = "urn:core:platform:civitas:pipeline:common:" + pipelineId;
+      existing.setModelLogicalUrn(artifactUrn);
 
+      DataSinkRemovalPlan plan = new DataSinkRemovalPlan(dataSet, List.of(), List.of(), List.of());
       when(pipelineRepository.findById(pipelineId)).thenReturn(Optional.of(existing));
-      when(pipelineRepository.existsById(pipelineId)).thenReturn(true);
+      when(dataSinkRemovalService.planConfirmed(
+              dataSet, DataSinkRemovalRequest.deletePipeline(pipelineId), Set.of()))
+          .thenReturn(plan);
 
       pipelineService.deleteById(pipelineId);
 
-      verify(dataSinkService).unlinkByPipelineId(pipelineId);
+      InOrder inOrder =
+          inOrder(
+              dataSinkService, pipelineRepository, modelRegistryGateway, dataSinkRemovalService);
+      inOrder.verify(dataSinkService).unlinkByPipelineId(pipelineId);
+      inOrder.verify(pipelineRepository).deleteById(pipelineId);
+      inOrder.verify(modelRegistryGateway).deleteArtifact(artifactUrn, true);
+      inOrder.verify(dataSinkRemovalService).apply(plan);
       verify(dataSinkService, never()).deleteById(any());
+    }
+
+    @Test
+    @DisplayName("Refuses an unconfirmed pipeline delete before any write")
+    void deleteRefusesUnconfirmedRemoval() {
+      UUID pipelineId = UUID.randomUUID();
+      DataSet dataSet = draftDataSet(UUID.randomUUID());
+      Pipeline existing = pipeline(pipelineId, dataSet);
+      when(pipelineRepository.findById(pipelineId)).thenReturn(Optional.of(existing));
+      when(dataSinkRemovalService.planConfirmed(any(), any(), any()))
+          .thenThrow(new RemovalConfirmationRequiredException(null));
+
+      assertThatThrownBy(() -> pipelineService.deleteById(pipelineId))
+          .isInstanceOf(RemovalConfirmationRequiredException.class);
+
+      verify(dataSinkService, never()).unlinkByPipelineId(any());
+      verify(pipelineRepository, never()).deleteById(any());
+    }
+
+    @Test
+    @DisplayName("Refuses an update that removes an unconfirmed DataSink link before any write")
+    void updateRefusesUnconfirmedRemovalBeforeAnyWrite() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID pipelineId = UUID.randomUUID();
+      UUID removedSinkId = UUID.randomUUID();
+      UUID confirmedId = UUID.randomUUID();
+      DataSet dataSet = draftDataSet(dataSetId);
+      Pipeline existing = pipeline(pipelineId, dataSet);
+      DataSink linkedSink = new DataSink();
+      linkedSink.setId(removedSinkId);
+      linkedSink.setDataSet(dataSet);
+      linkedSink.getPipelines().add(existing);
+
+      PipelineInputDTO input = new PipelineInputDTO();
+      input.setName("test-pipeline");
+      input.setDataSetId(dataSetId);
+      input.setDataSinkIds(Set.of());
+      input.setConfirmedRemovalIds(Set.of(confirmedId));
+
+      when(pipelineRepository.findById(pipelineId)).thenReturn(Optional.of(existing));
+      when(dataSinkRepository.findByPipelinesId(pipelineId)).thenReturn(List.of(linkedSink));
+      when(dataSinkRemovalService.planConfirmed(
+              dataSet,
+              DataSinkRemovalRequest.removeLinks(
+                  Set.of(new PipelineDataSinkLink(pipelineId, removedSinkId))),
+              Set.of(confirmedId)))
+          .thenThrow(new RemovalConfirmationRequiredException(null));
+
+      assertThatThrownBy(() -> pipelineService.update(pipelineId, input))
+          .isInstanceOf(RemovalConfirmationRequiredException.class);
+
+      verify(pipelineMapper, never()).updateEntity(any(), any());
+      verify(modelRegistryGateway, never())
+          .storePayload(any(), any(), any(), any(), any(), any(), any());
+      verify(pipelineRepository, never()).save(any());
     }
   }
 
@@ -549,7 +624,7 @@ class PipelineServiceTest {
       when(dataSourceRepository.findAllById(Set.of(dsId))).thenReturn(List.of(allDs));
       when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
       when(pipelineRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-      when(dataSinkRepository.findByPipelineId(any())).thenReturn(List.of());
+      when(dataSinkRepository.findByPipelinesId(any())).thenReturn(List.of());
 
       Pipeline result = pipelineService.create(createInput(dataSetId, dsId));
 
@@ -595,7 +670,7 @@ class PipelineServiceTest {
       when(dataSourceRepository.findAllById(Set.of(dsId))).thenReturn(List.of(specificDs));
       when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
       when(pipelineRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-      when(dataSinkRepository.findByPipelineId(any())).thenReturn(List.of());
+      when(dataSinkRepository.findByPipelinesId(any())).thenReturn(List.of());
 
       Pipeline result = pipelineService.create(createInput(dataSetId, dsId));
 

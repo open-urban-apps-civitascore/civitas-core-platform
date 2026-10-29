@@ -14,9 +14,14 @@ import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.dto.PrincipalUserDetails;
+import de.civitascore.portal.service.removal.DataSinkRemovalPlan;
+import de.civitascore.portal.service.removal.DataSinkRemovalRequest;
+import de.civitascore.portal.service.removal.DataSinkRemovalService;
+import de.civitascore.portal.service.removal.PipelineDataSinkLink;
 import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.RemovalConfirmationRequiredException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.Collection;
@@ -35,6 +40,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for managing {@link Pipeline} entities, which define data processing pipelines belonging
@@ -54,6 +60,7 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
   private final ModelRegistryGateway modelRegistryGateway;
   private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
   private final ObjectProvider<AllowedScopes> allowedScopesProvider;
+  private final DataSinkRemovalService dataSinkRemovalService;
 
   public PipelineService(
       PipelineRepository pipelineRepository,
@@ -65,7 +72,8 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
       ModelRegistryGateway modelRegistryGateway,
       DataSourceDatapoolScopeValidator datapoolScopeValidator,
       ObjectProvider<AllowedScopes> allowedScopesProvider,
-      DataSetMutationGuard dataSetMutationGuard) {
+      DataSetMutationGuard dataSetMutationGuard,
+      DataSinkRemovalService dataSinkRemovalService) {
     super(dataSetMutationGuard);
     this.pipelineRepository = pipelineRepository;
     this.pipelineMapper = pipelineMapper;
@@ -76,6 +84,7 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
     this.modelRegistryGateway = modelRegistryGateway;
     this.datapoolScopeValidator = datapoolScopeValidator;
     this.allowedScopesProvider = allowedScopesProvider;
+    this.dataSinkRemovalService = dataSinkRemovalService;
   }
 
   @Override
@@ -91,6 +100,20 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
   @Override
   protected String getEntityName() {
     return Pipeline.class.getSimpleName();
+  }
+
+  /**
+   * Refuses the update before any write when it removes DataSink links whose consequences the input
+   * does not confirm.
+   *
+   * @throws RemovalConfirmationRequiredException if the update takes something not confirmed
+   */
+  @Override
+  protected PipelineInputDTO preProcessUpdateInput(
+      PipelineInputDTO input, Pipeline existingEntity) {
+    PipelineInputDTO guarded = super.preProcessUpdateInput(input, existingEntity);
+    planDataSinkRemoval(existingEntity, guarded);
+    return guarded;
   }
 
   /**
@@ -214,20 +237,22 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
   }
 
   /**
-   * Rewires the {@code pipeline_id} FK on the DataSinks listed in {@code input.dataSinkIds}: any
+   * Rewires the links from this pipeline to the DataSinks listed in {@code input.dataSinkIds}: any
    * DataSink previously linked to this pipeline that is no longer in the list is detached; any
-   * DataSink in the list that is not yet linked to this pipeline is attached. Cross-dataset and
-   * cross-pipeline references are rejected.
+   * DataSink in the list that is not yet linked to this pipeline is attached. Cross-dataset
+   * references and a DataSink that another pipeline writes into are rejected. A detached DataSink
+   * that loses its last pipeline is removed (see {@link DataSinkRemovalPlan}).
    */
   @Override
   protected Pipeline postSave(Pipeline saved, PipelineInputDTO input) {
-    Set<UUID> requestedIds =
-        input.getDataSinkIds() != null ? new HashSet<>(input.getDataSinkIds()) : Set.of();
+    DataSinkRemovalPlan removal = planDataSinkRemoval(saved, input);
+    Set<UUID> requestedIds = requestedDataSinkIds(input);
     UUID pipelineId = saved.getId();
     UUID dataSetId = saved.getDataSet().getId();
 
     if (!requestedIds.isEmpty()) {
-      List<DataSink> requested = dataSinkRepository.findAllById(requestedIds);
+      List<DataSink> requested =
+          dataSinkRepository.findAllById(requestedIds).stream().filter(DataSink::isActive).toList();
       if (requested.size() != requestedIds.size()) {
         throw new InvalidInputException(
             "Pipeline", "dataSinkIds", "One or more DataSink IDs not found");
@@ -239,7 +264,7 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
               "dataSinkIds",
               "DataSink " + sink.getId() + " belongs to a different DataSet");
         }
-        if (sink.getPipeline() != null && !pipelineId.equals(sink.getPipeline().getId())) {
+        if (isLinkedToOtherPipeline(sink, pipelineId)) {
           throw new InvalidInputException(
               "Pipeline",
               "dataSinkIds",
@@ -247,22 +272,48 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
         }
       }
       for (DataSink sink : requested) {
-        if (sink.getPipeline() == null) {
-          sink.setPipeline(saved);
+        if (!isLinkedTo(sink, pipelineId)) {
+          sink.getPipelines().add(saved);
           dataSinkRepository.save(sink);
         }
       }
     }
 
-    dataSinkRepository.findByPipelineId(pipelineId).stream()
+    dataSinkRepository.findByPipelinesId(pipelineId).stream()
         .filter(sink -> !requestedIds.contains(sink.getId()))
         .forEach(
             sink -> {
-              sink.setPipeline(null);
+              sink.getPipelines().removeIf(pipeline -> pipelineId.equals(pipeline.getId()));
               dataSinkRepository.save(sink);
             });
 
+    dataSinkRemovalService.apply(removal);
     return saved;
+  }
+
+  private DataSinkRemovalPlan planDataSinkRemoval(Pipeline pipeline, PipelineInputDTO input) {
+    Set<UUID> requestedIds = requestedDataSinkIds(input);
+    Set<PipelineDataSinkLink> removedLinks =
+        dataSinkRepository.findByPipelinesId(pipeline.getId()).stream()
+            .filter(sink -> !requestedIds.contains(sink.getId()))
+            .map(sink -> new PipelineDataSinkLink(pipeline.getId(), sink.getId()))
+            .collect(Collectors.toSet());
+    return dataSinkRemovalService.planConfirmed(
+        pipeline.getDataSet(),
+        DataSinkRemovalRequest.removeLinks(removedLinks),
+        input.getConfirmedRemovalIds());
+  }
+
+  private static Set<UUID> requestedDataSinkIds(PipelineInputDTO input) {
+    return input.getDataSinkIds() != null ? new HashSet<>(input.getDataSinkIds()) : Set.of();
+  }
+
+  private static boolean isLinkedTo(DataSink sink, UUID pipelineId) {
+    return sink.getPipelines().stream().anyMatch(pipeline -> pipelineId.equals(pipeline.getId()));
+  }
+
+  private static boolean isLinkedToOtherPipeline(DataSink sink, UUID pipelineId) {
+    return sink.getPipelines().stream().anyMatch(pipeline -> !pipelineId.equals(pipeline.getId()));
   }
 
   /**
@@ -354,10 +405,31 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
             });
   }
 
-  /** Detaches the pipeline's DataSinks, which survive the deletion. */
+  /** Deletes the pipeline without a confirmation, see {@link #deleteById(UUID, Set)}. */
   @Override
-  protected void onDelete(Pipeline pipeline) {
-    dataSinkService.unlinkByPipelineId(pipeline.getId());
+  @Transactional
+  public void deleteById(UUID id) {
+    deleteById(id, Set.of());
+  }
+
+  /**
+   * Deletes the pipeline. Its DataSinks stay with the dataset unless this pipeline was their last
+   * one; those are removed (see {@link DataSinkRemovalPlan}). The Pipeline's Model Forge artifact
+   * goes first: Model Forge refuses to delete a Data sink configuration that it still references.
+   *
+   * @param confirmedRemovalIds the ids of the DataSinks, Layers and APIs the caller confirmed
+   * @throws RemovalConfirmationRequiredException if the delete takes something not confirmed
+   */
+  @Transactional
+  public void deleteById(UUID id, Set<UUID> confirmedRemovalIds) {
+    Pipeline pipeline = preProcessDelete(id);
+    DataSinkRemovalPlan removal =
+        dataSinkRemovalService.planConfirmed(
+            pipeline.getDataSet(), DataSinkRemovalRequest.deletePipeline(id), confirmedRemovalIds);
+    dataSinkService.unlinkByPipelineId(id);
+    pipelineRepository.deleteById(id);
+    postDelete(pipeline);
+    dataSinkRemovalService.apply(removal);
   }
 
   /**
@@ -366,8 +438,8 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
    * definition was ever stored.
    *
    * <p>A mapping left behind would still name the two data structures it joined and refuse their
-   * deletion, and no route reaches a mapping once its pipeline is gone. The data source and data
-   * sink the pipeline wired belong to the data set and stay.
+   * deletion, and no route reaches a mapping once its pipeline is gone. The data source the
+   * pipeline wired belongs to the data set and stays.
    *
    * @param entity the deleted pipeline
    */

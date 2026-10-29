@@ -7,6 +7,12 @@ import de.civitascore.portal.model.output.assembler.DataSinkAssembler;
 import de.civitascore.portal.repository.specification.DataSinkSpec;
 import de.civitascore.portal.service.DataSinkService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.io.IOException;
@@ -17,6 +23,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -89,8 +96,24 @@ public class DataSinkController
   }
 
   @Override
-  @Operation(operationId = "deleteDataSink", summary = "Delete a DataSink")
+  @Operation(
+      operationId = "deleteDataSink",
+      summary = "Delete a DataSink",
+      description =
+          "Removes the DataSink from its Pipelines and deletes it with its Layers, and with the APIs"
+              + " it is the last backing DataSink of. A provisioned DataSink is no longer listed;"
+              + " its stored data is deleted at the next release.")
+  @Parameter(
+      name = CONFIRMED_REMOVAL_IDS,
+      in = ParameterIn.QUERY,
+      description = CONFIRMED_REMOVAL_IDS_DESCRIPTION,
+      array = @ArraySchema(schema = @Schema(type = "string", format = "uuid")))
+  @ApiResponse(
+      responseCode = "409",
+      description = REMOVAL_CONFLICT_DESCRIPTION,
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public void delete(@PathVariable UUID id) {
-    super.delete(id);
+    requireOwnedByPathDataSet(id);
+    dataSinkService.deleteById(id, extractConfirmedRemovalIds());
   }
 }

@@ -3,6 +3,7 @@ package de.civitascore.portal.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -57,6 +58,7 @@ class LayerControllerIntegrationTest
     if (testDataSetId == null || dataSetRepository.findById(testDataSetId).isEmpty()) {
       DataSet ds = portalData.dataSet();
       testDataSetId = ds.getId();
+      portalData.namedApi(ds, ApiStandard.OWS);
       Pipeline pipeline = portalData.pipeline(ds);
       testDataSink = portalData.dataSink(ds, pipeline);
     }

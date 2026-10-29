@@ -609,26 +609,22 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should detach (not delete) DataSinks when pipeline is deleted")
-    void shouldDetachDataSinksWhenPipelineIsDeleted() {
+    @DisplayName("Should delete an unprovisioned DataSink whose last pipeline is deleted")
+    void shouldDeleteUnprovisionedDataSinkWithItsLastPipeline() {
       UUID pipelineId = createTestEntity();
       Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
 
       DataSink sink = new DataSink();
       sink.setDataSet(pipeline.getDataSet());
-      sink.setPipeline(pipeline);
+      sink.getPipelines().add(pipeline);
       sink.setDataSinkType(DataSinkType.FROST);
       DataSink savedSink = dataSinkRepository.save(sink);
-      assertThat(dataSinkRepository.findByPipelineId(pipelineId)).hasSize(1);
+      assertThat(dataSinkRepository.findByPipelinesId(pipelineId)).hasSize(1);
 
       ResponseEntity<Void> deleteResponse = performDelete(pipelineId);
       assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
-      assertThat(dataSinkRepository.findById(savedSink.getId()))
-          .as("DataSink survives pipeline deletion")
-          .isPresent()
-          .get()
-          .satisfies(s -> assertThat(s.getPipeline()).isNull());
+      assertThat(dataSinkRepository.findById(savedSink.getId())).isEmpty();
     }
 
     @Test
@@ -1333,23 +1329,24 @@ class PipelineControllerIntegrationTest
       UUID pipelineId = response.getBody().getId();
 
       assertThat(response.getBody().getDataSinkIds()).containsExactly(sink.getId());
-      assertThat(dataSinkRepository.findByPipelineId(pipelineId))
+      assertThat(dataSinkRepository.findByPipelinesId(pipelineId))
           .extracting(DataSink::getId)
           .containsExactly(sink.getId());
     }
 
     @Test
-    @DisplayName("Updating a pipeline with empty dataSinkIds detaches but preserves DataSinks")
-    void shouldDetachDataSinksOnEmptyList() {
+    @DisplayName(
+        "Updating a pipeline with empty dataSinkIds deletes an unprovisioned DataSink without it")
+    void shouldDeleteUnprovisionedDataSinkOnEmptyList() {
       UUID pipelineId = createTestEntity();
       Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
       DataSet dataSet = pipeline.getDataSet();
 
       DataSink sink = saveFreeSink(dataSet);
-      sink.setPipeline(pipeline);
+      sink.getPipelines().add(pipeline);
       dataSinkRepository.save(sink);
       UUID sinkId = sink.getId();
-      assertThat(dataSinkRepository.findByPipelineId(pipelineId)).hasSize(1);
+      assertThat(dataSinkRepository.findByPipelinesId(pipelineId)).hasSize(1);
 
       PipelineInputDTO updateInput = createUpdateInput();
       updateInput.setDataSinkIds(Set.of());
@@ -1357,10 +1354,8 @@ class PipelineControllerIntegrationTest
       ResponseEntity<PipelineOutputDTO> response = performUpdate(pipelineId, updateInput);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(dataSinkRepository.findByPipelineId(pipelineId)).isEmpty();
-      assertThat(dataSinkRepository.findById(sinkId))
-          .as("DataSink should survive pipeline detachment")
-          .isPresent();
+      assertThat(dataSinkRepository.findByPipelinesId(pipelineId)).isEmpty();
+      assertThat(dataSinkRepository.findById(sinkId)).isEmpty();
     }
 
     @Test
@@ -1371,7 +1366,7 @@ class PipelineControllerIntegrationTest
       DataSet dataSet = pipeline.getDataSet();
 
       DataSink sink = saveFreeSink(dataSet);
-      sink.setPipeline(pipeline);
+      sink.getPipelines().add(pipeline);
       DataSink saved = dataSinkRepository.save(sink);
 
       ResponseEntity<PipelineOutputDTO> response = performGetById(pipelineId);
@@ -1420,7 +1415,7 @@ class PipelineControllerIntegrationTest
                   .dataSet(dataSet)
                   .build());
       DataSink sink = saveFreeSink(dataSet);
-      sink.setPipeline(otherPipeline);
+      sink.getPipelines().add(otherPipeline);
       dataSinkRepository.save(sink);
 
       PipelineInputDTO updateInput = createUpdateInput();
@@ -1432,24 +1427,20 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Deleting a pipeline detaches its DataSinks but does not delete them")
-    void deletingPipelineDetachesDataSinks() {
+    @DisplayName("Deleting a pipeline deletes the unprovisioned DataSinks it was the last one of")
+    void deletingPipelineDeletesItsUnprovisionedDataSinks() {
       UUID pipelineId = createTestEntity();
       DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
       Pipeline pipeline = pipelineRepository.findById(pipelineId).orElseThrow();
 
       DataSink sink = saveFreeSink(dataSet);
-      sink.setPipeline(pipeline);
+      sink.getPipelines().add(pipeline);
       DataSink saved = dataSinkRepository.save(sink);
 
       ResponseEntity<Void> response = performDelete(pipelineId);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-      assertThat(dataSinkRepository.findById(saved.getId()))
-          .as("DataSink should survive pipeline deletion")
-          .isPresent()
-          .get()
-          .satisfies(s -> assertThat(s.getPipeline()).isNull());
+      assertThat(dataSinkRepository.findById(saved.getId())).isEmpty();
     }
   }
 

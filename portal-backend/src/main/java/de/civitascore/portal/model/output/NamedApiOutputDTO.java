@@ -2,17 +2,22 @@ package de.civitascore.portal.model.output;
 
 import de.civitascore.portal.model.embedded.ApiStandard;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.UUID;
 import lombok.Data;
 
 /**
  * Output DTO for a named API endpoint exposed by a dataset (per concepts #1379 / #1383 / #1384, ADR
  * #1362). Used in {@link DataSetOutputDTO#getNamedApis()} for GET responses.
  *
- * <p>Mirrors {@link de.civitascore.portal.model.input.NamedApiInputDTO} plus a server-built {@code
- * previewUrl}, which is the predicted public URL once the dataset reaches AVAILABLE.
+ * <p>Mirrors {@link de.civitascore.portal.model.input.NamedApiInputDTO} plus its {@code id} and a
+ * server-built {@code previewUrl}, which is the predicted public URL once the dataset reaches
+ * AVAILABLE.
  */
 @Data
 public class NamedApiOutputDTO {
+
+  @Schema(description = "Id of the named API.", accessMode = Schema.AccessMode.READ_ONLY)
+  private UUID id;
 
   @Schema(
       description = "Human-readable display label for this named API.",

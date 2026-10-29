@@ -1,9 +1,11 @@
 package de.civitascore.portal.service;
 
+import de.civitascore.portal.kind.ApiKindRegistry;
 import de.civitascore.portal.mapper.LayerMapper;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.Layer;
+import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.model.input.LayerInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
@@ -36,6 +38,7 @@ public class LayerService extends DataSetOwnedService<Layer, LayerInputDTO> {
   private final DataSetRepository dataSetRepository;
   private final DataSinkRepository dataSinkRepository;
   private final StyleRepository styleRepository;
+  private final ApiKindRegistry apiKinds;
 
   public LayerService(
       LayerRepository layerRepository,
@@ -43,13 +46,15 @@ public class LayerService extends DataSetOwnedService<Layer, LayerInputDTO> {
       DataSetRepository dataSetRepository,
       DataSinkRepository dataSinkRepository,
       StyleRepository styleRepository,
-      DataSetMutationGuard dataSetMutationGuard) {
+      DataSetMutationGuard dataSetMutationGuard,
+      ApiKindRegistry apiKinds) {
     super(dataSetMutationGuard);
     this.layerRepository = layerRepository;
     this.layerMapper = layerMapper;
     this.dataSetRepository = dataSetRepository;
     this.dataSinkRepository = dataSinkRepository;
     this.styleRepository = styleRepository;
+    this.apiKinds = apiKinds;
   }
 
   @Override
@@ -119,10 +124,11 @@ public class LayerService extends DataSetOwnedService<Layer, LayerInputDTO> {
 
   /**
    * Resolves the parent dataset, DataSink, default Style, and alternative Styles from the input
-   * DTO.
+   * DTO, and links the Layer to the dataset's API that publishes Layers.
    *
-   * @throws ResourceNotFoundException if the dataset, DataSink, or any referenced Style is not
-   *     found
+   * @throws ResourceNotFoundException if the dataset, an active DataSink, or any referenced Style
+   *     is not found
+   * @throws InvalidInputException if the dataset has no API that publishes Layers
    */
   @Override
   protected Layer postConvertToEntity(Layer entity, LayerInputDTO input) {
@@ -138,6 +144,7 @@ public class LayerService extends DataSetOwnedService<Layer, LayerInputDTO> {
     DataSink dataSink =
         Optional.ofNullable(input.getDataSinkId())
             .flatMap(dataSinkRepository::findById)
+            .filter(DataSink::isActive)
             .orElseThrow(
                 () ->
                     new ResourceNotFoundException(
@@ -146,6 +153,7 @@ public class LayerService extends DataSetOwnedService<Layer, LayerInputDTO> {
       throw new ResourceNotFoundException(DataSink.class.getSimpleName(), input.getDataSinkId());
     }
     entity.setDataSink(dataSink);
+    entity.setNamedApi(publishingApiOf(entity.getDataSet()));
 
     if (input.getDefaultStyleId() != null) {
       Style defaultStyle =
@@ -165,6 +173,17 @@ public class LayerService extends DataSetOwnedService<Layer, LayerInputDTO> {
     validateStyleOwnership(entity);
 
     return super.postConvertToEntity(entity, input);
+  }
+
+  private NamedApi publishingApiOf(DataSet dataSet) {
+    return apiKinds
+        .layerPublishingApi(dataSet.getNamedApis())
+        .orElseThrow(
+            () ->
+                new InvalidInputException(
+                    getEntityName(),
+                    "namedApis",
+                    "The dataset has no named API that publishes Layers; add one first"));
   }
 
   private void validateStyleOwnership(Layer entity) {

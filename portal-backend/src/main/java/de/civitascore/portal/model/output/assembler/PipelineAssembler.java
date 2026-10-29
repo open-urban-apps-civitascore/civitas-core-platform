@@ -83,7 +83,7 @@ public class PipelineAssembler implements BaseAssembler<Pipeline, PipelineOutput
   }
 
   private List<UUID> findDataSinkIds(Pipeline entity) {
-    return dataSinkRepository.findByPipelineId(entity.getId()).stream()
+    return dataSinkRepository.findByPipelinesId(entity.getId()).stream()
         .map(DataSink::getId)
         .toList();
   }

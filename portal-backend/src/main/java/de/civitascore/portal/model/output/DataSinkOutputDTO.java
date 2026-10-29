@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import de.civitascore.portal.model.datasink.DataSinkConfigurationOutput;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.List;
 import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -16,7 +17,10 @@ import lombok.EqualsAndHashCode;
 public class DataSinkOutputDTO extends BaseOutputDTO {
 
   private UUID dataSetId;
-  private UUID pipelineId;
+
+  @Schema(description = "Ids of the Pipelines that write into this DataSink, sorted")
+  private List<UUID> pipelineIds = List.of();
+
   private DataSinkType dataSinkType;
 
   @Schema(description = "True if this DataSink is linked to a Pipeline")

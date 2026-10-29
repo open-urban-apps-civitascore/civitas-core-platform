@@ -6,10 +6,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.portal.kind.ApiKindRegistry;
+import de.civitascore.portal.kind.TestKinds;
 import de.civitascore.portal.mapper.LayerMapper;
+import de.civitascore.portal.model.embedded.ApiStandard;
+import de.civitascore.portal.model.embedded.DataSinkState;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.Layer;
+import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.model.input.LayerInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
@@ -33,6 +38,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,13 +51,19 @@ class LayerServiceTest {
   @Mock private StyleRepository styleRepository;
 
   @Mock private DataSetMutationGuard dataSetMutationGuard;
+  @Spy private ApiKindRegistry apiKinds = TestKinds.apiKindRegistry();
 
   @InjectMocks private LayerService layerService;
 
+  private final NamedApi owsApi =
+      NamedApi.builder().name("Maps").slug("maps").standard(ApiStandard.OWS).build();
+
+  /** A dataset with an OWS API, which every Layer needs. */
   private DataSet dataSet(UUID id) {
     DataSet ds = new DataSet();
     ds.setId(id);
     ds.setName("ds-" + id);
+    ds.getNamedApis().add(owsApi);
     return ds;
   }
 
@@ -93,6 +105,45 @@ class LayerServiceTest {
 
       assertThat(result.getDataSet()).isSameAs(ds);
       assertThat(result.getDataSink()).isSameAs(dataSink);
+      assertThat(result.getNamedApi()).isSameAs(owsApi);
+    }
+
+    @Test
+    @DisplayName("Should reject a Layer in a dataset without an OWS API")
+    void shouldRejectLayerWithoutOwsApi() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dataSinkId = UUID.randomUUID();
+      DataSet ds = dataSet(dataSetId);
+      ds.setNamedApis(
+          List.of(NamedApi.builder().name("s").slug("s").standard(ApiStandard.STA).build()));
+      DataSink dataSink = new DataSink();
+      dataSink.setId(dataSinkId);
+      dataSink.setDataSet(ds);
+      when(layerMapper.toEntity(any())).thenReturn(new Layer());
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.findById(dataSinkId)).thenReturn(Optional.of(dataSink));
+
+      assertThatThrownBy(() -> layerService.create(baseInput(dataSetId, dataSinkId)))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("no named API that publishes Layers");
+    }
+
+    @Test
+    @DisplayName("Should not find a dataSink pending unprovision")
+    void shouldNotFindPendingDataSink() {
+      UUID dataSetId = UUID.randomUUID();
+      UUID dataSinkId = UUID.randomUUID();
+      DataSet ds = dataSet(dataSetId);
+      DataSink dataSink = new DataSink();
+      dataSink.setId(dataSinkId);
+      dataSink.setDataSet(ds);
+      dataSink.setState(DataSinkState.PENDING_UNPROVISION);
+      when(layerMapper.toEntity(any())).thenReturn(new Layer());
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
+      when(dataSinkRepository.findById(dataSinkId)).thenReturn(Optional.of(dataSink));
+
+      assertThatThrownBy(() -> layerService.create(baseInput(dataSetId, dataSinkId)))
+          .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test

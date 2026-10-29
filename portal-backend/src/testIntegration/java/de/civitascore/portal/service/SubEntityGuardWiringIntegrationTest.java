@@ -6,12 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.Layer;
+import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.model.entity.base.DataSetOwnedEntity;
@@ -105,7 +107,8 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
     registry.put(
         Layer.class,
         (data, dataSet) -> {
-          Layer layer = data.layer(dataSet, data.dataSink(dataSet));
+          NamedApi ows = data.namedApi(dataSet, ApiStandard.OWS);
+          Layer layer = data.layer(dataSet, data.dataSink(dataSet), ows);
           LayerInputDTO input = new LayerInputDTO();
           input.setLayerName(layer.getLayerName());
           input.setDataSinkId(layer.getDataSink().getId());

@@ -14,6 +14,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
+import de.civitascore.portal.model.embedded.DataSinkState;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -24,8 +25,10 @@ import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
-import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
+import de.civitascore.portal.service.removal.DataSinkRemovalPlan;
+import de.civitascore.portal.service.removal.DataSinkRemovalRequest;
+import de.civitascore.portal.service.removal.DataSinkRemovalService;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -55,7 +58,7 @@ class DataSinkServiceTest {
   @Mock private DataSinkMapper dataSinkMapper;
   @Mock private DataSetRepository dataSetRepository;
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
-  @Mock private LayerRepository layerRepository;
+  @Mock private DataSinkRemovalService dataSinkRemovalService;
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private ScopeAccessAuthorizer scopeAccessAuthorizer;
 
@@ -127,7 +130,7 @@ class DataSinkServiceTest {
       DataSink result = dataSinkService.create(input);
 
       assertThat(result.getDataSet()).isSameAs(dataSet);
-      assertThat(result.getPipeline()).isNull();
+      assertThat(result.getPipelines()).isEmpty();
     }
 
     @Test
@@ -235,46 +238,41 @@ class DataSinkServiceTest {
     }
 
     @Test
-    @DisplayName("Delete removes the backing configuration artifact from the registry")
-    void deleteRemovesConfigurationArtifact() {
+    @DisplayName("Delete runs the removal rules with the confirmed ids")
+    void deleteRunsRemovalRules() {
       UUID sinkId = UUID.randomUUID();
       DataSink sink = new DataSink();
       sink.setId(sinkId);
       sink.setDataSet(dataSet(UUID.randomUUID()));
       sink.setDataSinkType(DataSinkType.POSTGIS);
-      sink.setConfigurationLogicalUrn(STORED_LOGICAL_URN);
-      sink.setConfigurationUrn(STORED_VERSIONED_URN);
-
-      when(dataSinkRepository.existsById(sinkId)).thenReturn(true);
+      Set<UUID> confirmed = Set.of(sinkId);
+      DataSinkRemovalPlan plan =
+          new DataSinkRemovalPlan(sink.getDataSet(), List.of(sink), List.of(), List.of());
       when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(sink));
-      when(layerRepository.existsByDataSinkId(sinkId)).thenReturn(false);
+      when(dataSinkRemovalService.planConfirmed(
+              sink.getDataSet(), DataSinkRemovalRequest.deleteDataSink(sinkId), confirmed))
+          .thenReturn(plan);
 
-      dataSinkService.deleteById(sinkId);
+      dataSinkService.deleteById(sinkId, confirmed);
 
-      verify(dataSinkRepository).deleteById(sinkId);
-      verify(modelRegistryGateway).deletePayload(STORED_LOGICAL_URN);
+      verify(dataSinkRemovalService).apply(plan);
+      verify(dataSinkRepository, never()).deleteById(any());
     }
 
     @Test
-    @DisplayName("Delete refuses a provisioned sink and keeps its configuration artifact")
-    void deleteRefusesProvisionedSink() {
+    @DisplayName("A sink pending unprovision is not found")
+    void pendingSinkIsNotFound() {
       UUID sinkId = UUID.randomUUID();
       DataSink sink = new DataSink();
       sink.setId(sinkId);
       sink.setDataSet(dataSet(UUID.randomUUID()));
-      sink.setDataSinkType(DataSinkType.POSTGIS);
-      sink.setProvisioned(true);
-      sink.setConfigurationLogicalUrn(STORED_LOGICAL_URN);
-
-      when(dataSinkRepository.existsById(sinkId)).thenReturn(true);
+      sink.setState(DataSinkState.PENDING_UNPROVISION);
       when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(sink));
 
       assertThatThrownBy(() -> dataSinkService.deleteById(sinkId))
-          .isInstanceOf(ResourceInUseException.class)
-          .hasMessageContaining("provisioned");
-
-      verify(dataSinkRepository, never()).deleteById(sinkId);
-      verify(modelRegistryGateway, never()).deletePayload(any());
+          .isInstanceOf(ResourceNotFoundException.class);
+      assertThat(dataSinkService.findById(sinkId)).isEmpty();
+      verify(dataSinkRemovalService, never()).apply(any());
     }
   }
 

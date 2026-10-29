@@ -1,5 +1,6 @@
 package de.civitascore.portal.config;
 
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
@@ -16,6 +17,7 @@ import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Layer;
+import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Permission;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Role;
@@ -424,7 +426,9 @@ public class PortalTestDataFactory {
   public DataSink dataSink(DataSet dataSet, Pipeline pipeline, Consumer<DataSink> customizer) {
     DataSink sink = new DataSink();
     sink.setDataSet(dataSet);
-    sink.setPipeline(pipeline);
+    if (pipeline != null) {
+      sink.getPipelines().add(pipeline);
+    }
     sink.setDataSinkType(DataSinkType.FROST);
     customizer.accept(sink);
     return dataSinkRepository.save(sink);
@@ -455,12 +459,45 @@ public class PortalTestDataFactory {
   // ---------------------------------------------------------------------------
 
   public Layer layer(DataSet dataSet, DataSink dataSink) {
+    return layer(dataSet, dataSink, null);
+  }
+
+  public Layer layer(DataSet dataSet, DataSink dataSink, NamedApi namedApi) {
     long seq = nextSeq();
     Layer layer = new Layer();
     layer.setDataSet(dataSet);
     layer.setDataSink(dataSink);
+    layer.setNamedApi(namedApi);
     layer.setLayerName("layer-" + seq);
     return layerRepository.save(layer);
+  }
+
+  // ---------------------------------------------------------------------------
+  // NamedApi (required parent: DataSet)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Adds an API of the given standard to the dataset, bypassing the rules of a dataset update. The
+   * given dataset holds the persisted APIs afterwards, so it can be saved again.
+   */
+  public NamedApi namedApi(DataSet dataSet, ApiStandard standard) {
+    String slug = standard.name().toLowerCase(Locale.ROOT) + "-" + nextSeq();
+    dataSet
+        .getNamedApis()
+        .add(
+            NamedApi.builder()
+                .name(slug)
+                .slug(slug)
+                .standard(standard)
+                .singletonKey(standard == ApiStandard.CUSTOM ? null : standard.name())
+                .dataSet(dataSet)
+                .build());
+    DataSet saved = dataSetRepository.save(dataSet);
+    dataSet.setNamedApis(saved.getNamedApis());
+    return saved.getNamedApis().stream()
+        .filter(api -> api.getSlug().equals(slug))
+        .findFirst()
+        .orElseThrow();
   }
 
   // ---------------------------------------------------------------------------

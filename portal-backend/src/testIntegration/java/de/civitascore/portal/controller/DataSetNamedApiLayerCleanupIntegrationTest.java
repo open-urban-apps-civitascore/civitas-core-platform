@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.ApiStandard;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.NamedApi;
@@ -52,12 +53,18 @@ class DataSetNamedApiLayerCleanupIntegrationTest extends BaseKeycloakIntegration
     DataSet ds = portalData.dataSet();
     ds.setNamedApis(
         List.of(
-            NamedApi.builder().name("OWS Service").slug("ows").standard(ApiStandard.OWS).build()));
+            NamedApi.builder()
+                .name("OWS Service")
+                .slug("ows")
+                .standard(ApiStandard.OWS)
+                .singletonKey("OWS")
+                .build()));
     ds = portalData.saveDataSet(ds);
 
     Pipeline pipeline = portalData.pipeline(ds);
-    DataSink sink = portalData.dataSink(ds, pipeline);
-    portalData.layer(ds, sink);
+    DataSink sink = portalData.dataSink(ds, pipeline, s -> s.setDataSinkType(DataSinkType.POSTGIS));
+    portalData.dataSink(ds, pipeline);
+    portalData.layer(ds, sink, ds.getNamedApis().iterator().next());
     return new OwsFixture(ds, sink);
   }
 
@@ -129,6 +136,8 @@ class DataSetNamedApiLayerCleanupIntegrationTest extends BaseKeycloakIntegration
   void owsAndStaNamedApisCoexist() {
     DataSet ds = portalData.dataSet();
     UUID id = ds.getId();
+    portalData.dataSink(ds, null, s -> s.setDataSinkType(DataSinkType.POSTGIS));
+    portalData.dataSink(ds, null);
 
     ResponseEntity<JsonNode> patch =
         patchNamedApis(

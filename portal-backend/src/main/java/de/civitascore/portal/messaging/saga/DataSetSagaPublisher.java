@@ -5,6 +5,7 @@ import de.civitascore.configadapter.model.dataset.NamedApi;
 import de.civitascore.portal.configuration.PipelineClosureValidationProperties;
 import de.civitascore.portal.configuration.SagaProperties;
 import de.civitascore.portal.model.datasink.PostgisConfiguration;
+import de.civitascore.portal.model.embedded.DataSinkState;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.PipelineAction;
 import de.civitascore.portal.model.embedded.PipelineRuntimeState;
@@ -86,7 +87,8 @@ public class DataSetSagaPublisher {
    * Repository), not by saga-time route/FROST configuration.
    *
    * <p>The FROST adapter finds a prior release's project itself, by looking up the datasetId suffix
-   * of its name — a create trigger carries no {@code projectId} hint.
+   * of its name. The {@code projectId} the trigger carries only names the project to delete when no
+   * active FROST Data sink remains.
    */
   public void publishCreateRequested(DataSet dataset) {
     verifyLayerStyleReferences(dataset);
@@ -95,7 +97,9 @@ public class DataSetSagaPublisher {
             dataset.getId().toString(),
             dataset.getName(),
             dataset.getDescription(),
-            buildDatasinks(dataset),
+            dataset.getProjectId(),
+            buildDatasinks(dataset, DataSinkState.ACTIVE),
+            buildPendingUnprovisionDatasinks(dataset),
             buildLayers(dataset),
             buildStyles(dataset),
             buildPipelines(dataset.getPipelines(), PipelineAction.ADD),
@@ -124,7 +128,7 @@ public class DataSetSagaPublisher {
             buildRouteIds(dataset),
             dataset.getServiceId(),
             dataset.getPipelineIds(),
-            buildDatasinks(dataset),
+            buildDatasinks(dataset, DataSinkState.ACTIVE),
             buildLayers(dataset),
             buildStyles(dataset),
             buildPipelineDiff(previousPipelines, dataset.getPipelines()),
@@ -163,7 +167,7 @@ public class DataSetSagaPublisher {
             // the delete is 404-tolerant, so an already-torn-down route is a clean no-op.
             dataset.getId().toString(),
             dataset.getPipelineIds(),
-            buildDatasinks(dataset),
+            buildDatasinks(dataset, DataSinkState.ACTIVE, DataSinkState.PENDING_UNPROVISION),
             buildNamedApis(dataset));
     sendTrigger(trigger);
   }
@@ -188,11 +192,19 @@ public class DataSetSagaPublisher {
                     "Stored configuration not found in the model registry: " + urn));
   }
 
-  /** All datasinks belonging to the dataset, regardless of pipeline attachment. */
-  private List<DataSinkPayload> buildDatasinks(DataSet dataset) {
+  /** The datasinks of the dataset in the given states, regardless of pipeline attachment. */
+  private List<DataSinkPayload> buildDatasinks(DataSet dataset, DataSinkState... states) {
+    Set<DataSinkState> wanted = Set.of(states);
     return dataSinkRepository.findByDataSetId(dataset.getId()).stream()
+        .filter(sink -> wanted.contains(sink.getState()))
         .map(this::toDataSinkPayload)
         .toList();
+  }
+
+  /** Returns {@code null} when nothing is pending, so the JSON field is omitted. */
+  private List<DataSinkPayload> buildPendingUnprovisionDatasinks(DataSet dataset) {
+    List<DataSinkPayload> pending = buildDatasinks(dataset, DataSinkState.PENDING_UNPROVISION);
+    return pending.isEmpty() ? null : pending;
   }
 
   private DataSinkPayload toDataSinkPayload(DataSink sink) {
@@ -594,7 +606,7 @@ public class DataSetSagaPublisher {
 
   /** The Data sink counterpart of {@link #dataSourceUrns}. */
   private List<String> dataSinkUrns(Pipeline pipeline) {
-    return dataSinkRepository.findByPipelineId(pipeline.getId()).stream()
+    return dataSinkRepository.findByPipelinesId(pipeline.getId()).stream()
         .map(DataSink::getConfigurationUrn)
         .filter(Objects::nonNull)
         .sorted()
