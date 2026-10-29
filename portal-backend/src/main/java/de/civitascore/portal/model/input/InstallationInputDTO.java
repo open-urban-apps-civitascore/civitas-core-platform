@@ -14,7 +14,8 @@ public class InstallationInputDTO {
   @Schema(
       description =
           "The Data pool of the Data sources and of the Dataset of the package. It is necessary"
-              + " when the package has a member of the kind datasource or dataset.")
+              + " when the package has a member of the kind datasource or dataset. A Data pool can"
+              + " have only one active installation of a package.")
   private UUID datapoolId;
 
   @Valid @NotNull(message = "package is required") @JsonProperty("package")
