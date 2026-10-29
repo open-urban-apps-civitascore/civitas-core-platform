@@ -155,7 +155,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
   private SagaResultPayload sagaResultFor(UUID datasetId) {
     return new SagaResultPayload(
-        datasetId.toString(), null, null, null, null, null, null, null, null, null, null);
+        datasetId.toString(), null, null, null, null, null, null, null, null, null);
   }
 
   private DataSet createInitialDataSet() {

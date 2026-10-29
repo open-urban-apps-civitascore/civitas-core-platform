@@ -1930,54 +1930,50 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("CREATE: the last FROST sink gone, the dataset forgets its FROST project")
-    void createForgetsFrostProjectWithLastFrostSink() {
+    @DisplayName("CREATE: the saga reports the project deleted, the dataset forgets it")
+    void createForgetsFrostProjectReportedDeleted() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(PendingSagaType.CREATE);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
       stubPendingSinks(id, List.of(pendingSink(DataSinkType.FROST, null)));
-      when(dataSinkRepository.existsByDataSetIdAndStateAndDataSinkTypeIn(
-              id, DataSinkState.ACTIVE, Set.of(DataSinkType.FROST)))
-          .thenReturn(false);
 
-      createService()
-          .handleSagaCompleted(
-              id,
-              new SagaResultPayload(
-                  id.toString(),
-                  "proj-1",
-                  "https://frost.example.com/Projects(1)",
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null));
+      createService().handleSagaCompleted(id, projectDeletedResult(id));
 
       assertThat(ds.getProjectId()).isNull();
       assertThat(ds.getFrostBaseUrl()).isNull();
     }
 
     @Test
-    @DisplayName("CREATE: with another active FROST sink the dataset keeps its FROST project")
-    void createKeepsFrostProjectWithActiveFrostSink() {
+    @DisplayName("CREATE: without a reported deletion the dataset keeps its FROST project")
+    void createKeepsFrostProjectWithoutReportedDeletion() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(PendingSagaType.CREATE);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
       stubPendingSinks(id, List.of(pendingSink(DataSinkType.FROST, null)));
-      when(dataSinkRepository.existsByDataSetIdAndStateAndDataSinkTypeIn(
-              id, DataSinkState.ACTIVE, Set.of(DataSinkType.FROST)))
-          .thenReturn(true);
 
       createService().handleSagaCompleted(id, emptyResult(id));
 
       assertThat(ds.getProjectId()).isEqualTo("proj-1");
       assertThat(ds.getFrostBaseUrl()).isEqualTo("https://frost.example.com/Projects(1)");
+    }
+
+    @Test
+    @DisplayName("UPDATE: the saga reports the project deleted, the dataset forgets it")
+    void updateForgetsFrostProjectReportedDeleted() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().handleSagaCompleted(id, projectDeletedResult(id));
+
+      assertThat(ds.getProjectId()).isNull();
+      assertThat(ds.getFrostBaseUrl()).isNull();
     }
 
     @Test
@@ -2016,6 +2012,11 @@ class DataSetServiceTest {
     private static SagaResultPayload emptyResult(UUID id) {
       return new SagaResultPayload(
           id.toString(), null, null, null, null, null, null, null, null, null);
+    }
+
+    private static SagaResultPayload projectDeletedResult(UUID id) {
+      return new SagaResultPayload(
+          id.toString(), null, null, true, null, null, null, null, null, null, null, null);
     }
 
     @Test
@@ -2481,11 +2482,6 @@ class DataSetServiceTest {
       DataSet ds = readyDataSet(id);
       ds.setProvisioned(false);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
-      lenient()
-          .when(
-              dataSinkRepository.existsByDataSetIdAndStateAndDataSinkTypeIn(
-                  id, DataSinkState.ACTIVE, Set.of(DataSinkType.POSTGIS)))
-          .thenReturn(true);
       when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of());
 
       createService().deleteById(id);

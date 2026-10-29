@@ -52,6 +52,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   private static final String ADAPTER_NAME = "frost";
   private static final String DEFAULT_SERVER_URL = "http://localhost:8080/v1.1";
   private static final String KEY_PROJECT_ID = "projectId";
+  private static final String KEY_PROJECT_DELETED = "projectDeleted";
   private static final String KEY_DATASET_ID = "datasetId";
   private static final String KEY_CREATED = "created";
   private static final String KEY_NAME = "name";
@@ -408,9 +409,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       log.info(
           "DELETE_PROJECT: no project provisioned for this dataset — nothing to delete. saga={}",
           Encode.forJava(command.sagaId()));
-      return compensating
-          ? SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId())
-          : SagaCommandResult.success(command.sagaId(), command.stepId(), Map.of(), Map.of());
+      return deleteProjectSuccess(command, compensating);
     }
 
     // created=false marks a reused, data-bearing project; deleting it as a CREATE_PROJECT
@@ -444,9 +443,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
             "DELETE_PROJECT: project {} already absent (404) — treating as success. saga={}",
             Encode.forJava(projectId),
             Encode.forJava(command.sagaId()));
-        return compensating
-            ? SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId())
-            : SagaCommandResult.success(command.sagaId(), command.stepId(), Map.of(), Map.of());
+        return deleteProjectSuccess(command, compensating);
       }
 
       checkResponse(response, "DELETE_PROJECT");
@@ -456,10 +453,16 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
           Encode.forJava(projectId),
           Encode.forJava(command.sagaId()));
 
-      return compensating
-          ? SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId())
-          : SagaCommandResult.success(command.sagaId(), command.stepId(), Map.of(), Map.of());
+      return deleteProjectSuccess(command, compensating);
     }
+  }
+
+  private static SagaCommandResult deleteProjectSuccess(
+      SagaCommandMessage command, boolean compensating) {
+    return compensating
+        ? SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId())
+        : SagaCommandResult.success(
+            command.sagaId(), command.stepId(), Map.of(KEY_PROJECT_DELETED, true), Map.of());
   }
 
   /**

@@ -746,7 +746,7 @@ public class DataSetService
       case CREATE -> {
         applyInfrastructureResult(dataSet, result);
         markProvisioned(dataSet);
-        forgetUnprovisionedDataSinks(dataSet);
+        dataSinkRemovalService.deleteUnprovisioned(dataSet);
         pipelineRuntimeStatusService.markDeploymentSucceeded(deployedPipelineIds(dataSet, result));
         log.info("Saga CREATE completed for dataset {}, infrastructure provisioned", datasetId);
       }
@@ -1008,23 +1008,6 @@ public class DataSetService
   }
 
   /**
-   * Deletes the pending sinks whose storage the completed release removed. The release deletes the
-   * FROST project together with the last FROST sink, so the dataset forgets it then; the saga
-   * result may still echo the project id the trigger carried.
-   */
-  private void forgetUnprovisionedDataSinks(DataSet dataSet) {
-    List<DataSink> unprovisioned = dataSinkRemovalService.deleteUnprovisioned(dataSet);
-    boolean frostProjectDeleted =
-        unprovisioned.stream().anyMatch(sink -> sink.getDataSinkType() == DataSinkType.FROST)
-            && !dataSinkRepository.existsByDataSetIdAndStateAndDataSinkTypeIn(
-                dataSet.getId(), DataSinkState.ACTIVE, Set.of(DataSinkType.FROST));
-    if (frostProjectDeleted) {
-      dataSet.setProjectId(null);
-      dataSet.setFrostBaseUrl(null);
-    }
-  }
-
-  /**
    * The pipeline ids a completed saga reports, narrowed to those still attached to the dataset. An
    * UPDATE result also carries the ids the same saga tore down, and marking a removed pipeline as
    * successfully deployed would leave a permanently healthy status on a flow that no longer exists.
@@ -1061,6 +1044,10 @@ public class DataSetService
   }
 
   private void applyInfrastructureResult(DataSet dataSet, SagaResultPayload result) {
+    if (Boolean.TRUE.equals(result.projectDeleted())) {
+      dataSet.setProjectId(null);
+      dataSet.setFrostBaseUrl(null);
+    }
     if (result.projectId() != null) {
       dataSet.setProjectId(result.projectId());
     }

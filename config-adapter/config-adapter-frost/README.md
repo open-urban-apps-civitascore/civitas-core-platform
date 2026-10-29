@@ -89,8 +89,10 @@ Kafka. It handles project-level operations only:
   data access is an authorization decision made per request at the gateway, never granted through FROST
   project visibility.
 - **`DELETE_PROJECT` is idempotent.** An absent `projectId`, and an absent project (HTTP 404), are both the
-  goal state and succeed forward and compensating. Deleting a Thing cascades to its Datastreams and
-  Observations, while deleting a project cascades to nothing — which is why the Things are removed first.
+  goal state and succeed forward and compensating. A forward delete reports `projectDeleted: true` in all
+  three cases, so the portal forgets the project id and `baseUrl`; a compensating delete reports nothing.
+  Deleting a Thing cascades to its Datastreams and Observations, while deleting a project cascades to
+  nothing — which is why the Things are removed first.
 - **Results carry the public service root.** `baseUrl` derives from `frost.public.url`, so consumers
   receive a reachable URL even when the adapter itself reaches FROST over an internal address.
 

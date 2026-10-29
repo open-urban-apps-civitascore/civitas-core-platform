@@ -104,11 +104,9 @@ public class DataSinkRemovalService {
    *
    * <p>A configuration Model Forge does not delete is only logged and stays stranded: the storage
    * is already gone, and failing here would leave the release in flight.
-   *
-   * @return the deleted Data sinks
    */
   @Transactional
-  public List<DataSink> deleteUnprovisioned(DataSet dataSet) {
+  public void deleteUnprovisioned(DataSet dataSet) {
     List<DataSink> pending =
         dataSinkRepository.findByDataSetIdAndState(
             dataSet.getId(), DataSinkState.PENDING_UNPROVISION);
@@ -125,7 +123,6 @@ public class DataSinkRemovalService {
             Encode.forJava(e.getMessage()));
       }
     }
-    return pending;
   }
 
   private DataSinkRemovalPlan plan(

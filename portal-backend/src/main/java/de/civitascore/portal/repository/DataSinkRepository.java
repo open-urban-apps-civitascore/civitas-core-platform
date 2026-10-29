@@ -1,7 +1,6 @@
 package de.civitascore.portal.repository;
 
 import de.civitascore.portal.model.embedded.DataSinkState;
-import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSink;
 import java.util.Collection;
 import java.util.List;
@@ -33,9 +32,6 @@ public interface DataSinkRepository extends BaseRepository<DataSink, UUID> {
   List<DataSink> findByDataSetId(UUID dataSetId);
 
   List<DataSink> findByDataSetIdAndState(UUID dataSetId, DataSinkState state);
-
-  boolean existsByDataSetIdAndStateAndDataSinkTypeIn(
-      UUID dataSetId, DataSinkState state, Collection<DataSinkType> dataSinkTypes);
 
   /** Whether each sink's Dataset is released, keyed by the sink's logical URN. */
   @Query(

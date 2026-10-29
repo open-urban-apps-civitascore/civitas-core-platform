@@ -562,7 +562,7 @@ class FrostSagaHandlerTest {
   class DeleteProject {
 
     @Test
-    @DisplayName("returns success on forward delete")
+    @DisplayName("reports the project deleted on forward delete")
     void shouldDeleteProjectSuccessfully() {
       try (FrostSagaHandler handler = createHandler()) {
         server.enqueue(emptyThingsPage());
@@ -575,6 +575,7 @@ class FrostSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         assertNull(result.error());
+        assertEquals(Map.of("projectDeleted", true), result.resultData());
       }
     }
 
@@ -591,6 +592,7 @@ class FrostSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         assertNull(result.error());
+        assertEquals(Map.of("projectDeleted", true), result.resultData());
         assertEquals(0, server.getRequestCount());
       }
     }
@@ -910,6 +912,7 @@ class FrostSagaHandlerTest {
         // idempotent, not fail the delete saga on the missing project.
         assertEquals("STEP_COMPLETED", result.type());
         assertNull(result.error());
+        assertEquals(Map.of("projectDeleted", true), result.resultData());
       }
     }
 
@@ -926,6 +929,7 @@ class FrostSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("COMPENSATION_COMPLETED", result.type());
+        assertEquals(Map.of(), result.resultData());
       }
     }
 
