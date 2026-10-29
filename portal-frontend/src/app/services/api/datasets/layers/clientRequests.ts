@@ -5,11 +5,11 @@ import { DATASINKS_QUERY_KEY } from '@/app/services/api/datasets/datasinks/clien
 import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { CreateLayerInput, Layer, UpdateLayerInput } from '@/types/layers'
 
-const key = 'layers'
+export const LAYERS_QUERY_KEY = 'layers'
 
 export const useGetLayers = (datasetId: string) =>
   useQuery<ApiServiceResponse<Layer[]>, AxiosError>({
-    queryKey: [key, datasetId],
+    queryKey: [LAYERS_QUERY_KEY, datasetId],
     queryFn: () =>
       apiRequest<Layer[]>({
         method: 'GET',
@@ -31,7 +31,7 @@ export const useCreateLayer = () => {
         errorMessage: 'An error occurred while creating the layer.',
       }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: [key] })
+      queryClient.invalidateQueries({ queryKey: [LAYERS_QUERY_KEY] })
       queryClient.invalidateQueries({ queryKey: [DATASINKS_QUERY_KEY, variables.datasetId] })
     },
   })
@@ -49,7 +49,7 @@ export const useUpdateLayer = () => {
         errorMessage: 'An error occurred while updating the layer.',
       }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: [key] })
+      queryClient.invalidateQueries({ queryKey: [LAYERS_QUERY_KEY] })
       queryClient.invalidateQueries({ queryKey: [DATASINKS_QUERY_KEY, variables.datasetId] })
     },
   })
@@ -66,7 +66,7 @@ export const useDeleteLayer = () => {
         errorMessage: 'An error occurred while deleting the layer.',
       }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: [key] })
+      queryClient.invalidateQueries({ queryKey: [LAYERS_QUERY_KEY] })
       queryClient.invalidateQueries({ queryKey: [DATASINKS_QUERY_KEY, variables.datasetId] })
     },
   })

@@ -3,8 +3,10 @@ import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { mockApiError } from '@/__mocks__/errors/apiError.mock'
+import { getRemovalImpact } from '@/app/services/api/datasets/removal-impact/clientRequests'
 import { PipelineBasicInfo } from '@/types/datasets'
-import { PipelineDeleteBlockReason } from '@/utils/pipelineDeleteGuard'
+import { DataSinkRemovalImpact } from '@/types/removalImpact'
 
 import { PipelineCard } from './PipelineCard'
 
@@ -36,6 +38,10 @@ vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
   useDeletePipeline: () => ({ mutateAsync: mockDeletePipelineMutateAsync, isPending: false }),
 }))
 
+vi.mock('@/app/services/api/datasets/removal-impact/clientRequests', () => ({
+  getRemovalImpact: vi.fn(),
+}))
+
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
@@ -51,8 +57,22 @@ const defaultProps = {
   pipeline: makePipeline(),
   badges: [] as string[],
   canDelete: true,
-  deleteBlockReason: null as PipelineDeleteBlockReason | null,
-  isDeleteDisabled: false,
+}
+
+const NO_IMPACT: DataSinkRemovalImpact = {
+  dataSinks: [],
+  layers: [],
+  apis: [],
+  confirmationIds: [],
+  requiresConfirmation: false,
+}
+
+const LAYER_IMPACT: DataSinkRemovalImpact = {
+  dataSinks: [{ id: 'sink-1', dataSinkType: 'POSTGIS', provisioned: true }],
+  layers: [{ id: 'layer-1', layerName: 'trees', title: 'Trees' }],
+  apis: [{ id: 'api-1', slug: 'ows', name: 'Trees API', standard: 'OWS' }],
+  confirmationIds: ['sink-1', 'layer-1', 'api-1'],
+  requiresConfirmation: true,
 }
 
 const renderComponent = (props: Partial<typeof defaultProps> = {}) =>
@@ -63,6 +83,7 @@ describe('PipelineCard', () => {
     vi.clearAllMocks()
     mockHasUnsavedChanges = false
     mockDeletePipelineMutateAsync.mockResolvedValue(undefined)
+    vi.mocked(getRemovalImpact).mockResolvedValue(NO_IMPACT)
   })
 
   const openMenu = () => userEvent.click(screen.getByTestId('pipelineCardMenu-pipeline-1'))
@@ -142,12 +163,6 @@ describe('PipelineCard', () => {
       expect(screen.getByTestId('pipelineCardMenuDelete-pipeline-1')).toBeInTheDocument()
     })
 
-    it('disables the delete item when isDeleteDisabled is true', async () => {
-      renderComponent({ isDeleteDisabled: true })
-      await openMenu()
-      expect(screen.getByTestId('pipelineCardMenuDelete-pipeline-1')).toHaveAttribute('data-disabled')
-    })
-
     it('hides the delete item when canDelete is false', async () => {
       renderComponent({ canDelete: false })
       await openMenu()
@@ -168,37 +183,79 @@ describe('PipelineCard', () => {
   })
 
   describe('Delete flow', () => {
-    it('opens the delete confirmation modal when delete is clicked', async () => {
-      renderComponent()
+    const startDelete = async () => {
       await openMenu()
       await userEvent.click(screen.getByTestId('pipelineCardMenuDelete-pipeline-1'))
-      expect(screen.getByTestId('exitWarningModal')).toBeInTheDocument()
+      await screen.findByTestId('exitWarningModal')
+    }
+
+    it('asks the removal impact of the pipeline before it opens the confirmation', async () => {
+      renderComponent()
+      await startDelete()
+      expect(getRemovalImpact).toHaveBeenCalledWith('dataset-123', { deletedPipelineIds: ['pipeline-1'] })
+    })
+
+    it('shows no Layers or APIs when the delete takes none', async () => {
+      renderComponent()
+      await startDelete()
+      expect(screen.queryByTestId('removalConfirmLayers')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('removalConfirmApis')).not.toBeInTheDocument()
+    })
+
+    it('lists the Layers and APIs that the delete takes', async () => {
+      vi.mocked(getRemovalImpact).mockResolvedValue(LAYER_IMPACT)
+      renderComponent()
+      await startDelete()
+      expect(screen.getByTestId('removalConfirmLayers')).toHaveTextContent('Trees')
+      expect(screen.getByTestId('removalConfirmApis')).toHaveTextContent('Trees API')
+      expect(screen.getByTestId('removalConfirmStoredData')).toBeInTheDocument()
     })
 
     it('closes the modal without deleting when cancel is clicked', async () => {
       renderComponent()
-      await openMenu()
-      await userEvent.click(screen.getByTestId('pipelineCardMenuDelete-pipeline-1'))
+      await startDelete()
       fireEvent.click(screen.getByTestId('discardButton'))
-      expect(screen.queryByTestId('exitWarningModal')).not.toBeInTheDocument()
+      await waitFor(() => expect(screen.queryByTestId('exitWarningModal')).not.toBeInTheDocument())
       expect(mockDeletePipelineMutateAsync).not.toHaveBeenCalled()
     })
 
-    it('calls deletePipeline with the pipeline id on confirm', async () => {
+    it('deletes the pipeline with the confirmed removal ids on confirm', async () => {
+      vi.mocked(getRemovalImpact).mockResolvedValue(LAYER_IMPACT)
       renderComponent()
-      await openMenu()
-      await userEvent.click(screen.getByTestId('pipelineCardMenuDelete-pipeline-1'))
+      await startDelete()
       fireEvent.click(screen.getByTestId('confirmButton'))
 
       await waitFor(() => {
-        expect(mockDeletePipelineMutateAsync).toHaveBeenCalledWith('pipeline-1')
+        expect(mockDeletePipelineMutateAsync).toHaveBeenCalledWith({
+          pipelineId: 'pipeline-1',
+          confirmedRemovalIds: ['sink-1', 'layer-1', 'api-1'],
+        })
       })
+    })
+
+    it('shows the new impact when the backend asks to confirm a changed impact', async () => {
+      mockDeletePipelineMutateAsync.mockRejectedValueOnce(
+        mockApiError(409, 'Confirm', 'urn:civitas:error:REMOVAL_CONFIRMATION_REQUIRED', { impact: LAYER_IMPACT }),
+      )
+      renderComponent()
+      await startDelete()
+      fireEvent.click(screen.getByTestId('confirmButton'))
+
+      expect(await screen.findByTestId('removalConfirmLayers')).toHaveTextContent('Trees')
+      fireEvent.click(screen.getByTestId('confirmButton'))
+
+      await waitFor(() => {
+        expect(mockDeletePipelineMutateAsync).toHaveBeenLastCalledWith({
+          pipelineId: 'pipeline-1',
+          confirmedRemovalIds: ['sink-1', 'layer-1', 'api-1'],
+        })
+      })
+      expect(mockDeletePipelineMutateAsync).toHaveBeenCalledTimes(2)
     })
 
     it('shows success toast and refreshes the page after successful delete', async () => {
       renderComponent()
-      await openMenu()
-      await userEvent.click(screen.getByTestId('pipelineCardMenuDelete-pipeline-1'))
+      await startDelete()
       fireEvent.click(screen.getByTestId('confirmButton'))
 
       await waitFor(() => {
@@ -207,37 +264,25 @@ describe('PipelineCard', () => {
       })
     })
 
-    it('shows the info modal instead of the confirmation when the delete is blocked', async () => {
-      renderComponent({ deleteBlockReason: 'inUseByLayer' })
-      await openMenu()
-      await userEvent.click(screen.getByTestId('pipelineCardMenuDelete-pipeline-1'))
-
-      expect(screen.getByTestId('infoModal')).toBeInTheDocument()
-      expect(screen.getByText('deleteBlocked.title')).toBeInTheDocument()
-      expect(screen.getByText('deleteBlocked.inUseByLayer')).toBeInTheDocument()
-      expect(screen.queryByTestId('exitWarningModal')).not.toBeInTheDocument()
-    })
-
-    it('closes the info modal without deleting the pipeline', async () => {
-      renderComponent({ deleteBlockReason: 'lastFrostWithSta' })
-      await openMenu()
-      await userEvent.click(screen.getByTestId('pipelineCardMenuDelete-pipeline-1'))
-      await userEvent.click(screen.getByTestId('closeButton'))
-
-      expect(screen.queryByTestId('infoModal')).not.toBeInTheDocument()
-      expect(mockDeletePipelineMutateAsync).not.toHaveBeenCalled()
-    })
-
     it('shows an error toast when deletePipeline rejects', async () => {
       mockDeletePipelineMutateAsync.mockRejectedValueOnce(new Error('network'))
       renderComponent()
-      await openMenu()
-      await userEvent.click(screen.getByTestId('pipelineCardMenuDelete-pipeline-1'))
+      await startDelete()
       fireEvent.click(screen.getByTestId('confirmButton'))
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalled()
       })
+    })
+
+    it('shows an error toast and no confirmation when the removal impact cannot be loaded', async () => {
+      vi.mocked(getRemovalImpact).mockRejectedValueOnce(new Error('network'))
+      renderComponent()
+      await openMenu()
+      await userEvent.click(screen.getByTestId('pipelineCardMenuDelete-pipeline-1'))
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalled())
+      expect(screen.queryByTestId('exitWarningModal')).not.toBeInTheDocument()
     })
   })
 })

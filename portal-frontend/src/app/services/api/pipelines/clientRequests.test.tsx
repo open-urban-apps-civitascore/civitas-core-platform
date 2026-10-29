@@ -48,8 +48,44 @@ describe('pipeline mutations', () => {
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
     const { result } = renderHook(() => useDeletePipeline('dataset-1'), { wrapper })
 
-    await result.current.mutateAsync('pipeline-1')
+    await result.current.mutateAsync({ pipelineId: 'pipeline-1' })
 
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['datasinks', 'dataset-1'] })
+  })
+
+  it('invalidates the datasets and layers after delete, because the delete can take APIs and Layers', async () => {
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
+    const { result } = renderHook(() => useDeletePipeline('dataset-1'), { wrapper })
+
+    await result.current.mutateAsync({ pipelineId: 'pipeline-1' })
+
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['datasets'] })
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['layers'] })
+  })
+
+  it('sends each confirmed removal id as a repeated query param on delete', async () => {
+    const { result } = renderHook(() => useDeletePipeline('dataset-1'), { wrapper })
+
+    await result.current.mutateAsync({ pipelineId: 'pipeline-1', confirmedRemovalIds: ['layer-1', 'api-1'] })
+
+    const params = vi.mocked(apiRequest).mock.calls[0][0].params
+    expect(params?.getAll('confirmedRemovalIds')).toEqual(['layer-1', 'api-1'])
+  })
+
+  it('sends each confirmed removal id as a repeated query param on update', async () => {
+    const { result } = renderHook(() => useUpdatePipeline('dataset-1'), { wrapper })
+
+    await result.current.mutateAsync({ pipelineId: 'pipeline-1', data: payload, confirmedRemovalIds: ['sink-1'] })
+
+    const params = vi.mocked(apiRequest).mock.calls[0][0].params
+    expect(params?.getAll('confirmedRemovalIds')).toEqual(['sink-1'])
+  })
+
+  it('sends no query params without confirmed removal ids', async () => {
+    const { result } = renderHook(() => useDeletePipeline('dataset-1'), { wrapper })
+
+    await result.current.mutateAsync({ pipelineId: 'pipeline-1' })
+
+    expect(vi.mocked(apiRequest).mock.calls[0][0].params).toBeUndefined()
   })
 })

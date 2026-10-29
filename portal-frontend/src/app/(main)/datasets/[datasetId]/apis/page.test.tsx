@@ -48,8 +48,8 @@ const makeDataset = (overrides: Partial<Dataset> = {}): Dataset => ({
 const mockDataset = (overrides: Partial<Dataset> = {}) =>
   vi.mocked(getDataset).mockResolvedValue({ data: makeDataset(overrides) } as Awaited<ReturnType<typeof getDataset>>)
 
-const frostSink = { id: 'sink-1', dataSinkType: DATASINK_TYPES.FROST, pipelineId: 'pipeline-1' } as DataSink
-const postgisSink = { id: 'sink-2', dataSinkType: DATASINK_TYPES.POSTGIS, pipelineId: 'pipeline-1' } as DataSink
+const frostSink = { id: 'sink-1', dataSinkType: DATASINK_TYPES.FROST, pipelineIds: ['pipeline-1'] } as DataSink
+const postgisSink = { id: 'sink-2', dataSinkType: DATASINK_TYPES.POSTGIS, pipelineIds: ['pipeline-1'] } as DataSink
 
 const mockDataSinks = (dataSinks: DataSink[]) =>
   vi.mocked(getDataSinks).mockResolvedValue({ data: dataSinks } as Awaited<ReturnType<typeof getDataSinks>>)
@@ -116,7 +116,7 @@ describe('ApisPage', () => {
 
   describe('data sink guard', () => {
     it('redirects to the dataset when no FROST sink of a pipeline exists for a SensorThings api', async () => {
-      mockDataSinks([postgisSink, { ...frostSink, pipelineId: undefined } as unknown as DataSink])
+      mockDataSinks([postgisSink, { ...frostSink, pipelineIds: [] }])
 
       await expect(openPage('sensorthings')).rejects.toThrow(REDIRECT)
       expect(redirect).toHaveBeenCalledWith(`/datasets/${DATASET_ID}`)

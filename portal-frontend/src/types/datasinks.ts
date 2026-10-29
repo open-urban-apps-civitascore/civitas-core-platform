@@ -14,7 +14,7 @@ export type DataSinkType = (typeof DATASINK_TYPES)[keyof typeof DATASINK_TYPES]
 export type DataSink = {
   id: string
   datasetId: string
-  pipelineId: string
+  pipelineIds: string[]
   dataSinkType: DataSinkType
   configuration: {
     tableName: string

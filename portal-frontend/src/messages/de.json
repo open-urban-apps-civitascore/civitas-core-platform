@@ -156,6 +156,11 @@
       "select": "Datei auswählen",
       "noFile": "Keine Datei ausgewählt",
       "unreadable": "Die Datei kann nicht gelesen werden. Wählen Sie sie erneut aus."
+    },
+    "removalConfirmModal": {
+      "layers": "Diese Layer werden gelöscht:",
+      "apis": "Diese APIs werden gelöscht:",
+      "storedData": "Die gespeicherten Daten werden bei der nächsten Freigabe des Datensatzes gelöscht."
     }
   },
   "languages": {
@@ -343,12 +348,6 @@
               "title": "Pipeline löschen",
               "description": "Möchtest du die Pipeline „{name}“ wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
               "confirm": "Löschen"
-            },
-            "deleteBlocked": {
-              "title": "Pipeline kann nicht gelöscht werden",
-              "inUseByLayer": "Ein Geodaten-Speicher der Pipeline wird von einem Layer der WFS/WMS API verwendet. Zuerst muss der Layer gelöscht werden.",
-              "lastPostgisWithOws": "Ein Geodaten-Speicher der Pipeline wird von der WFS/WMS API verwendet. Zuerst muss die API gelöscht werden.",
-              "lastFrostWithSta": "Ein Sensordaten-Speicher der Pipeline wird von der SensorThings API verwendet. Zuerst muss die API gelöscht werden."
             },
             "messages": {
               "deleteSuccess": "Pipeline wurde erfolgreich gelöscht.",
@@ -1578,26 +1577,12 @@
       "locked": {
         "provisioned": {
           "title": "Bereitgestellt",
-          "description": "Dieser Datenspeicher wurde bereitgestellt und kann nicht mehr bearbeitet oder entfernt werden."
+          "description": "Dieser Datenspeicher wurde bereitgestellt und kann nicht mehr bearbeitet werden."
         },
         "inUseByLayer": {
           "title": "In Verwendung",
-          "tooltip": "Dieser Datenspeicher wird von API-Layern verwendet. Zum Bearbeiten oder Entfernen müssen zuerst die Layer-Zuordnungen aufgehoben werden."
-        },
-        "inUseBySta": {
-          "title": "In Verwendung",
-          "tooltip": "Dieser Datenspeicher wird von einer SensorThings API verwendet. Zum Löschen des Datenspeichers muss zuerst die API gelöscht werden."
-        },
-        "inUseByOws": {
-          "title": "In Verwendung",
-          "tooltip": "Dieser Datenspeicher wird von der WFS/WMS API verwendet. Zum Löschen des Datenspeichers muss zuerst die API gelöscht werden."
+          "tooltip": "Dieser Datenspeicher wird von API-Layern verwendet. Zum Bearbeiten müssen zuerst die Layer-Zuordnungen aufgehoben werden."
         }
-      },
-      "notRemovable": {
-        "provisioned": "Datenspeicher kann nicht entfernt werden. Dieser Datenspeicher wurde bereitgestellt und kann nicht mehr entfernt werden.",
-        "inUseByLayer": "Datenspeicher kann nicht entfernt werden. Dieser Datenspeicher wird von API-Layern verwendet. Heben Sie zuerst die Layer-Zuordnungen auf.",
-        "inUseBySta": "Datenspeicher kann nicht gelöscht werden. Dieser Datenspeicher wird von einer SensorThings API verwendet. Zuerst muss die API gelöscht werden.",
-        "inUseByOws": "Datenspeicher kann nicht gelöscht werden. Dieser Datenspeicher wird von der WFS/WMS API verwendet. Zuerst muss die API gelöscht werden."
       }
     },
     "frostPanel": {
@@ -1749,6 +1734,11 @@
       "description": "Diese Änderung verwirft alle gespeicherten Daten dieses Datensatzes. Die Daten werden beim nächsten Ausführen der Pipeline neu erzeugt. Alle bisher gespeicherten Daten gehen dauerhaft verloren.",
       "confirm": "Gespeicherte Daten verwerfen"
     },
+    "removalConfirm": {
+      "title": "Datenspeicher löschen?",
+      "description": "Die aus den Pipelines entfernten Datenspeicher werden beim Speichern gelöscht.",
+      "confirm": "Speichern und löschen"
+    },
     "header": {
       "loadFailed": "Es konnten nicht alle Daten geladen werden. Das Bearbeiten der Pipelines ist daher nicht möglich. Bitte versuchen Sie es später erneut.",
       "saveAll": "Alle speichern",
@@ -1765,8 +1755,6 @@
       "missingDataStructureUrn": "{names} kann nicht gespeichert werden: Der Geo-Persistenz-Knoten ist nicht valide. Weise ihm seine Datenstruktur neu zu oder lösche ihn und lege ihn neu an.",
       "notDraftError": "Der Datensatz muss im Entwurfsstatus sein, um Änderungen vorzunehmen.",
       "sagaInFlightError": "Der Datensatz wird gerade verarbeitet. Bitte versuche es später erneut.",
-      "sinkStillInUse": "{names} wurde gespeichert, ein entfernter Datenspeicher wird aber noch verwendet und kann nicht gelöscht werden.",
-      "sinkDeleteFailed": "{names} wurde gespeichert, ein entfernter Datenspeicher konnte aber nicht gelöscht werden.",
       "mappingStillInUse": "Ein aus Pipeline {name} entferntes Mapping kann nicht gelöscht werden, weil es noch von einer anderen Pipeline verwendet wird.",
       "mappingCleanupFailed": "Ein aus Pipeline {name} entferntes Mapping konnte nicht gelöscht werden."
     },

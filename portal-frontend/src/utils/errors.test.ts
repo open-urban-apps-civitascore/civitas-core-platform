@@ -17,6 +17,7 @@ import {
   isStoredSecretRefusedError,
   isTableNameConflictError,
   isUnconfirmedDataLossError,
+  removalImpactToConfirm,
   toConnectionTestProblem,
   unreachableModelMembers,
 } from './errors'
@@ -472,5 +473,38 @@ describe('toConnectionTestProblem', () => {
 
   it('returns UNKNOWN without details for non-axios errors', () => {
     expect(toConnectionTestProblem(new Error('plain error'))).toEqual({ code: 'UNKNOWN', details: [] })
+  })
+})
+
+describe('removalImpactToConfirm', () => {
+  const impact = {
+    dataSinks: [{ id: 'sink-1', dataSinkType: 'POSTGIS', provisioned: true }],
+    layers: [{ id: 'layer-1', layerName: 'trees', title: 'Trees' }],
+    apis: [{ id: 'api-1', slug: 'ows', name: 'Trees API', standard: 'OWS' }],
+    confirmationIds: ['sink-1', 'layer-1', 'api-1'],
+    requiresConfirmation: true,
+  }
+
+  it('returns the impact of a 409 refusal that asks for confirmation', () => {
+    const error = mockApiError(409, 'Confirm', 'urn:civitas:error:REMOVAL_CONFIRMATION_REQUIRED', { impact })
+    expect(removalImpactToConfirm(error)).toEqual(impact)
+  })
+
+  it('accepts a Layer without a title', () => {
+    const untitled = { ...impact, layers: [{ id: 'layer-1', layerName: 'trees', title: null }] }
+    const error = mockApiError(409, 'Confirm', 'urn:civitas:error:REMOVAL_CONFIRMATION_REQUIRED', { impact: untitled })
+    expect(removalImpactToConfirm(error)).toEqual(untitled)
+  })
+
+  it('returns null for a 409 error with a different type', () => {
+    const error = mockApiError(409, 'In use', 'urn:civitas:error:RESOURCE_IN_USE', { impact })
+    expect(removalImpactToConfirm(error)).toBeNull()
+  })
+
+  it('returns null when the impact does not have the expected shape', () => {
+    const error = mockApiError(409, 'Confirm', 'urn:civitas:error:REMOVAL_CONFIRMATION_REQUIRED', {
+      impact: { layers: 'none' },
+    })
+    expect(removalImpactToConfirm(error)).toBeNull()
   })
 })

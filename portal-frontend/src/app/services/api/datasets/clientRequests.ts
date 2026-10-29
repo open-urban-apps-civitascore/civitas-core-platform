@@ -11,12 +11,12 @@ import { GetItemInput, GetListInput } from '@/types/common'
 import { Dataset, DatasetCreateApiData, DatasetPatchApiData, DatasetUpdateApiData } from '@/types/datasets'
 import { NamedApi, NamedApiPayload } from '@/types/namedApis'
 
-const key = 'datasets'
+export const DATASETS_QUERY_KEY = 'datasets'
 
 export const useGetDataset = ({ id, isEnabled }: GetItemInput) =>
   useDataQuery<Dataset>({
     id,
-    key,
+    key: DATASETS_QUERY_KEY,
     isEnabled,
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while loading dataset.',
@@ -24,7 +24,7 @@ export const useGetDataset = ({ id, isEnabled }: GetItemInput) =>
 
 export const useGetDatasets = ({ params, isEnabled }: GetListInput = {}) =>
   useDataQuery<Dataset[]>({
-    key,
+    key: DATASETS_QUERY_KEY,
     params,
     isEnabled,
     headers: { 'x-api-request': 'true' },
@@ -33,7 +33,7 @@ export const useGetDatasets = ({ params, isEnabled }: GetListInput = {}) =>
 
 export const useCreateDataset = () =>
   useCreateMutation<Dataset, DatasetCreateApiData>({
-    key,
+    key: DATASETS_QUERY_KEY,
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occured while creating dataset',
   })
@@ -41,7 +41,7 @@ export const useCreateDataset = () =>
 export const useUpdateDataset = () =>
   useUpdateMutation<Dataset, DatasetUpdateApiData>({
     method: 'PUT',
-    key,
+    key: DATASETS_QUERY_KEY,
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occured while updating dataset',
   })
@@ -49,14 +49,14 @@ export const useUpdateDataset = () =>
 export const usePatchDataset = () =>
   useUpdateMutation<Dataset, DatasetPatchApiData>({
     method: 'PATCH',
-    key,
+    key: DATASETS_QUERY_KEY,
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occured while updating dataset',
   })
 
 export const useDeleteDataset = () =>
   useDeleteMutation({
-    key,
+    key: DATASETS_QUERY_KEY,
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while deleting the dataset.',
   })
@@ -89,7 +89,7 @@ export const useCreateNamedApi = () => {
       })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [key] })
+      queryClient.invalidateQueries({ queryKey: [DATASETS_QUERY_KEY] })
     },
     onError: error => {
       console.error('Error creating named API:', error.message)
@@ -108,7 +108,7 @@ const useDatasetTransition = (action: 'stage' | 'unstage' | 'release' | 'unrelea
         errorMessage: `An error occurred while trying to ${action} dataset`,
       }),
     onSuccess: (_data, id) => {
-      queryClient.invalidateQueries({ queryKey: [key] })
+      queryClient.invalidateQueries({ queryKey: [DATASETS_QUERY_KEY] })
       // After provisioning and back in DRAFT the pipeline editor needs the final `provisioned` flag of the sinks.
       if (action === 'unstage') queryClient.invalidateQueries({ queryKey: [DATASINKS_QUERY_KEY, id] })
     },
@@ -135,7 +135,7 @@ export const useUpdateReadyDatasetMeta = () => {
         errorMessage: 'An error occurred while updating ready dataset metadata',
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [key] })
+      queryClient.invalidateQueries({ queryKey: [DATASETS_QUERY_KEY] })
     },
     onError: error => {
       console.error('Error updating ready dataset metadata:', (error as Error).message)
@@ -155,7 +155,7 @@ export const useUpdateReleasedDatasetMeta = () => {
         errorMessage: 'An error occurred while updating released dataset metadata',
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [key] })
+      queryClient.invalidateQueries({ queryKey: [DATASETS_QUERY_KEY] })
     },
     onError: error => {
       console.error('Error updating released dataset metadata:', (error as Error).message)

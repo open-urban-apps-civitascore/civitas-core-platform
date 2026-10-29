@@ -326,7 +326,6 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
           <PipelineList
             datasetId={dataset.id}
             pipelines={pipelineList}
-            namedApis={namedApiList}
             canCreatePipeline={canCreatePipeline && isSelectedDraftState}
             canDeletePipeline={canDeletePipeline && isSelectedDraftState}
           />

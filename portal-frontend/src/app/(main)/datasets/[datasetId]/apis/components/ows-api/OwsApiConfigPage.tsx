@@ -94,7 +94,9 @@ export const OwsApiConfigPage = ({ dataset, existingApi, testId }: OwsApiConfigP
   const postgisDataSinks = useMemo(() => {
     const currentPipelineIds = dataset.pipelines.map(pipeline => pipeline.id)
     return (dataSinksData?.data || []).filter(
-      dataSink => dataSink.dataSinkType === DATASINK_TYPES.POSTGIS && currentPipelineIds.includes(dataSink.pipelineId),
+      dataSink =>
+        dataSink.dataSinkType === DATASINK_TYPES.POSTGIS &&
+        dataSink.pipelineIds.some(pipelineId => currentPipelineIds.includes(pipelineId)),
     )
   }, [dataSinksData, dataset.pipelines])
 

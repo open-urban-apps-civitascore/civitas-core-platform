@@ -6,42 +6,33 @@ import { useLocale, useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
+import { getRemovalImpact } from '@/app/services/api/datasets/removal-impact/clientRequests'
 import { useDeletePipeline } from '@/app/services/api/pipelines/clientRequests'
 import { ActivityBadge } from '@/components/activity-badge/ActivityBadge'
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
-import { InfoModal } from '@/components/modals/info-modal/InfoModal'
-import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
+import { RemovalConfirmModal } from '@/components/modals/removal-confirm-modal/RemovalConfirmModal'
 import { BasicTooltip } from '@/components/tooltip/Tooltip'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { useRemovalConfirmation } from '@/hooks/use-removal-confirmation'
 import { PipelineBasicInfo } from '@/types/datasets'
 import { formatDate } from '@/utils/formatDate'
-import { PipelineDeleteBlockReason } from '@/utils/pipelineDeleteGuard'
 
 interface PipelineCardProps {
   datasetId: string
   pipeline: PipelineBasicInfo
   badges: string[]
   canDelete: boolean
-  deleteBlockReason: PipelineDeleteBlockReason | null
-  isDeleteDisabled: boolean
 }
 
-export const PipelineCard = ({
-  datasetId,
-  pipeline,
-  badges,
-  canDelete,
-  deleteBlockReason,
-  isDeleteDisabled,
-}: PipelineCardProps) => {
+export const PipelineCard = ({ datasetId, pipeline, badges, canDelete }: PipelineCardProps) => {
   const t = useTranslations('datasets.overview.completion.dataFlow.pipelines')
   const locale = useLocale()
   const router = useRouter()
   const deletePipeline = useDeletePipeline(datasetId)
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-  const [isDeleteBlockedOpen, setIsDeleteBlockedOpen] = useState(false)
+  const { runConfirmed, dialog: removalDialog } = useRemovalConfirmation()
+  const [isDeleteRunning, setIsDeleteRunning] = useState(false)
 
   const hasError = pipeline.runtimeStatus?.state === 'ERROR'
   const isActive = pipeline.runtimeStatus?.state === 'OK'
@@ -49,14 +40,21 @@ export const PipelineCard = ({
 
   const editorUrl = `/datasets/${datasetId}/data-flow/pipeline-editor?pipeline=${pipeline.id}`
 
-  const handleConfirmDelete = async () => {
+  const handleDelete = async () => {
+    setIsDeleteRunning(true)
     try {
-      await deletePipeline.mutateAsync(pipeline.id)
+      const impact = await getRemovalImpact(datasetId, { deletedPipelineIds: [pipeline.id] })
+      const isDeleted = await runConfirmed(
+        confirmedRemovalIds => deletePipeline.mutateAsync({ pipelineId: pipeline.id, confirmedRemovalIds }),
+        { impact },
+      )
+      if (!isDeleted) return
       toast.success(t('messages.deleteSuccess'))
-      setIsDeleteOpen(false)
       router.refresh()
     } catch {
       toast.error(t('messages.deleteError'))
+    } finally {
+      setIsDeleteRunning(false)
     }
   }
 
@@ -99,14 +97,10 @@ export const PipelineCard = ({
               {canDelete && (
                 <DropdownMenuItem
                   variant="destructive"
-                  disabled={isDeleteDisabled}
+                  disabled={isDeleteRunning}
                   onClick={e => {
                     e.stopPropagation()
-                    if (deleteBlockReason) {
-                      setIsDeleteBlockedOpen(true)
-                      return
-                    }
-                    setIsDeleteOpen(true)
+                    handleDelete()
                   }}
                   data-testid={`pipelineCardMenuDelete-${pipeline.id}`}
                 >
@@ -165,26 +159,12 @@ export const PipelineCard = ({
         )}
       </GuardedLink>
 
-      <WarningModal
-        open={isDeleteOpen}
-        onOpenChange={setIsDeleteOpen}
+      <RemovalConfirmModal
+        dialog={removalDialog}
         title={t('deleteConfirm.title')}
         description={t('deleteConfirm.description', { name: pipeline.name })}
         confirmButtonTitle={t('deleteConfirm.confirm')}
-        onDiscard={() => setIsDeleteOpen(false)}
-        onConfirm={handleConfirmDelete}
-        isLoading={deletePipeline.isPending}
       />
-
-      {deleteBlockReason && (
-        <InfoModal
-          open={isDeleteBlockedOpen}
-          onOpenChange={setIsDeleteBlockedOpen}
-          title={t('deleteBlocked.title')}
-          description={t(`deleteBlocked.${deleteBlockReason}`)}
-          onClose={() => setIsDeleteBlockedOpen(false)}
-        />
-      )}
     </>
   )
 }

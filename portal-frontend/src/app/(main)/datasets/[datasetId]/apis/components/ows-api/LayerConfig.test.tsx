@@ -28,7 +28,7 @@ const mockStyleList: Style[] = [
 const mockDataSink: DataSink = {
   id: '00000000-0000-0000-0000-000000000003',
   datasetId: '00000000-0000-0000-0000-000000000002',
-  pipelineId: '00000000-0000-0000-0000-000000000004',
+  pipelineIds: ['00000000-0000-0000-0000-000000000004'],
   dataSinkType: DATASINK_TYPES.POSTGIS,
   configuration: {
     tableName: 'table_1',
