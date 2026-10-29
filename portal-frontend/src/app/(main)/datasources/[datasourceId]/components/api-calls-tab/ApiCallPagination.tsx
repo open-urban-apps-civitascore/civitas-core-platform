@@ -1,5 +1,6 @@
 import { ChevronDown } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { ReactElement } from 'react'
 import { UseFormReturn, useWatch } from 'react-hook-form'
 
 import { FormSelect } from '@/components/form/fields/FormSelect'
@@ -119,6 +120,31 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
     )
   }
 
+  const renderPaginationFields = (): ReactElement => {
+    switch (type) {
+      case HTTP_PAGINATION_TYPES.PAGE_NUMBER:
+        return <>{PAGE_NUMBER_FIELDS.map(renderTextField)}</>
+      case HTTP_PAGINATION_TYPES.CURSOR:
+        return (
+          <>
+            {CURSOR_FIELDS.map(renderTextField)}
+            <FormSelect
+              id={`${paginationPath}.cursorIn`}
+              form={form}
+              name={`${paginationPath}.cursorIn`}
+              label={t('cursorIn.label')}
+              options={cursorInOptions}
+              required
+              disabled={isDisabled}
+              formItemProps={{ className: ROW_CLASS_NAME }}
+              onChange={handleCursorInChange}
+            />
+            {LIMIT_FIELDS.map(renderTextField)}
+          </>
+        )
+    }
+  }
+
   return (
     <Collapsible open={isOpen} onOpenChange={onOpenChange} className="group/pagination">
       <CollapsibleTrigger asChild>
@@ -160,25 +186,7 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
               {isCursor && <p className="col-start-2 text-sm text-muted-foreground">{t('cursorHint')}</p>}
             </div>
 
-            {!isCursor && PAGE_NUMBER_FIELDS.map(renderTextField)}
-
-            {isCursor && (
-              <>
-                {CURSOR_FIELDS.map(renderTextField)}
-                <FormSelect
-                  id={`${paginationPath}.cursorIn`}
-                  form={form}
-                  name={`${paginationPath}.cursorIn`}
-                  label={t('cursorIn.label')}
-                  options={cursorInOptions}
-                  required
-                  disabled={isDisabled}
-                  formItemProps={{ className: ROW_CLASS_NAME }}
-                  onChange={handleCursorInChange}
-                />
-                {LIMIT_FIELDS.map(renderTextField)}
-              </>
-            )}
+            {renderPaginationFields()}
           </CollapsibleContent>
         </Collapsible>
       </CollapsibleContent>
