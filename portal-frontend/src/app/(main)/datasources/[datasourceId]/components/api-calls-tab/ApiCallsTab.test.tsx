@@ -6,6 +6,10 @@ import { useForm, UseFormReturn, useFormState } from 'react-hook-form'
 import { toast } from 'sonner'
 import { describe, expect, it, vi } from 'vitest'
 
+import {
+  DISABLED_CHECKBOX_CLASS_NAME,
+  DISABLED_INPUT_CLASS_NAME,
+} from '@/components/form/fields/disabledFieldClassNames'
 import { Form } from '@/components/ui/form'
 import { CURSOR_PAGINATION_FORM, PAGINATION_FORM } from '@/test-support/paginationFixtures'
 import {
@@ -95,6 +99,10 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
   const remount = () => act(() => remountTab?.())
   return { user: userEvent.setup(), getApiCalls, isDirty, resetForm, remount }
 }
+
+const DISABLED_INPUT_CLASSES = DISABLED_INPUT_CLASS_NAME.split(' ')
+const DISABLED_CHECKBOX_CLASSES = DISABLED_CHECKBOX_CLASS_NAME.split(' ')
+const DISABLED_INPUT_CLASSES_WITHOUT_HEIGHT = DISABLED_INPUT_CLASSES.filter(className => className !== 'disabled:h-9')
 
 const openApiCall = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.click(screen.getByRole('button', { name: /stations/ }))
@@ -359,6 +367,7 @@ describe('ApiCallsTab', () => {
     const method = screen.getByRole('combobox', { name: 'method.label' })
     expect(method).toBeDisabled()
     expect(method).toHaveTextContent('GET')
+    expect(method.querySelector('svg')).toBeInTheDocument()
   })
 
   it('shows query parameters before headers', async () => {
@@ -434,9 +443,18 @@ describe('ApiCallsTab', () => {
 
     const inputs = screen.getAllByRole('textbox')
     inputs.forEach(input => expect(input).toBeDisabled())
+    const pathInput = screen.getByRole('textbox', { name: 'path.label' })
+    const nameInput = screen.getByRole('textbox', { name: /^name\.label/ })
+    const parameterInputs = inputs.filter(input => input !== pathInput && input !== nameInput)
+    parameterInputs.forEach(input => expect(input).toHaveClass(...DISABLED_INPUT_CLASSES))
+    expect(pathInput).toHaveClass('disabled:opacity-100')
+    expect(screen.getByRole('group')).toHaveClass('h-12', 'border-transparent', 'shadow-none')
+    expect(nameInput).toHaveClass(...DISABLED_INPUT_CLASSES_WITHOUT_HEIGHT, 'h-12', 'disabled:h-12')
+    expect(nameInput).not.toHaveClass('disabled:h-9')
     expect(screen.queryByRole('button', { name: 'parameters.addQuery' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'parameters.addHeader' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /remove$/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'method.label' }).querySelector('svg')).not.toBeInTheDocument()
   })
 
   describe('pagination', () => {
@@ -552,6 +570,28 @@ describe('ApiCallsTab', () => {
       expect(screen.getByRole('combobox', { name: 'type.label' })).toBeDisabled()
       expect(screen.getByRole('textbox', { name: /^pageParameter\.label/ })).toBeDisabled()
       expect(screen.getByRole('textbox', { name: 'endPage.label' })).toBeDisabled()
+      expect(screen.getByRole('checkbox', { name: 'enable' })).toHaveClass(...DISABLED_CHECKBOX_CLASSES)
+      const fields = [...screen.getAllByRole('combobox'), ...screen.getAllByRole('textbox')]
+      const requestFields = [
+        screen.getByRole('combobox', { name: 'method.label' }),
+        screen.getByRole('textbox', { name: 'path.label' }),
+        screen.getByRole('textbox', { name: /^name\.label/ }),
+      ]
+      const paginationFields = fields.filter(field => !requestFields.includes(field))
+      paginationFields.forEach(field => expect(field).toHaveClass(...DISABLED_INPUT_CLASSES))
+    })
+
+    it('disables the cursor fields when read-only', async () => {
+      const { user } = renderApiCallsTab({
+        apiCalls: [{ ...API_CALL, pagination: CURSOR_PAGINATION_FORM }],
+        isReadOnly: true,
+      })
+      await openApiCall(user)
+
+      const cursorIn = screen.getByRole('combobox', { name: 'cursorIn.label' })
+      expect(cursorIn).toBeDisabled()
+      expect(cursorIn).toHaveClass(...DISABLED_INPUT_CLASSES)
+      expect(screen.getByRole('textbox', { name: /^cursorParameter\.label/ })).toHaveClass(...DISABLED_INPUT_CLASSES)
     })
 
     it('offers page number and cursor as type', async () => {

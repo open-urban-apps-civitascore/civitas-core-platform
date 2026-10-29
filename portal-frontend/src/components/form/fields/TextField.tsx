@@ -7,6 +7,8 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 import { InputPropsWithoutForm } from '@/types/common'
 
+import { DISABLED_INPUT_CLASS_NAME } from './disabledFieldClassNames'
+
 interface TextFieldProps<T extends FieldValues> extends InputPropsWithoutForm {
   form: UseFormReturn<T>
   name: Path<T>
@@ -70,10 +72,7 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
                 type={type}
                 inputMode={inputMode}
                 autoComplete={autoComplete ?? (type === 'password' ? 'new-password' : undefined)}
-                className={cn(
-                  'disabled:opacity-100 disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0',
-                  inputClassName,
-                )}
+                className={cn(DISABLED_INPUT_CLASS_NAME, inputClassName)}
                 placeholder={disabled ? undefined : placeholder}
                 maxLength={maxLength}
                 {...field}

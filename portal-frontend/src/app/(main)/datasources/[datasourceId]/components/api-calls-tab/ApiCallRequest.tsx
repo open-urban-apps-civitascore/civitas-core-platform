@@ -11,6 +11,7 @@ import { InputGroup, InputGroupInput } from '@/components/ui/input-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { HTTP_METHODS } from '@/const/connectors'
+import { cn } from '@/lib/utils'
 import { getParameterNameCollisionPaths, HttpApiCallsForm } from '@/types/connectors'
 import { buildApiCallUrl, formatPathWithQuery } from '@/utils/connectors'
 
@@ -109,10 +110,11 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
           name={`${apiCallPath}.path`}
           render={({ field }) => (
             <FormItem>
-              <InputGroup className="h-12">
+              <InputGroup className={cn('h-12', isDisabled && 'border-transparent shadow-none')}>
                 <Select value={HTTP_METHODS.GET} disabled>
                   <SelectTrigger
                     aria-label={t('method.label')}
+                    disabled={isDisabled}
                     className="w-28 rounded-r-none border-0 bg-muted text-primary shadow-none disabled:opacity-100 data-[size=default]:h-full"
                   >
                     <SelectValue>{HTTP_METHODS.GET}</SelectValue>
@@ -125,7 +127,7 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
                   <InputGroupInput
                     {...field}
                     aria-label={t('path.label')}
-                    className="h-full font-mono"
+                    className="h-full font-mono disabled:opacity-100"
                     placeholder={isDisabled ? undefined : '/stations'}
                     disabled={isDisabled}
                   />
@@ -143,7 +145,7 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
           placeholder={t('name.placeholder')}
           required
           disabled={isDisabled}
-          formItemProps={{ className: 'flex flex-col gap-2' }}
+          formItemProps={{ className: 'flex flex-col gap-2 pt-2' }}
           inputClassName="h-12 disabled:h-12"
         />
 

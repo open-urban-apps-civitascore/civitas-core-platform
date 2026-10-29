@@ -3,6 +3,7 @@ import { useTranslations } from 'next-intl'
 import { ReactElement } from 'react'
 import { UseFormReturn, useWatch } from 'react-hook-form'
 
+import { DISABLED_CHECKBOX_CLASS_NAME } from '@/components/form/fields/disabledFieldClassNames'
 import { FormSelect } from '@/components/form/fields/FormSelect'
 import { TextField } from '@/components/form/fields/TextField'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -146,7 +147,7 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
   }
 
   return (
-    <Collapsible open={isOpen} onOpenChange={onOpenChange} className="group/pagination">
+    <Collapsible open={isOpen} onOpenChange={onOpenChange} className="group/pagination pt-2">
       <CollapsibleTrigger asChild>
         <button type="button" className="flex w-full items-center justify-between text-left">
           <span className="text-sm font-semibold uppercase tracking-wide text-primary">{t('title')}</span>
@@ -154,13 +155,14 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
         </button>
       </CollapsibleTrigger>
 
-      <CollapsibleContent className="flex flex-col pt-4">
+      <CollapsibleContent className="flex flex-col pt-6">
         <FormField
           control={form.control}
           name={`${paginationPath}.isEnabled`}
           render={({ field }) => (
             <Label className="w-fit">
               <Checkbox
+                className={DISABLED_CHECKBOX_CLASS_NAME}
                 checked={field.value}
                 onCheckedChange={isChecked => handleChangeAndRevalidate(isChecked === true, field.onChange)}
                 disabled={isDisabled}
@@ -171,7 +173,7 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
         />
 
         <Collapsible open={isEnabled}>
-          <CollapsibleContent className="flex flex-col gap-4 pt-4">
+          <CollapsibleContent className="flex flex-col gap-4 pt-6">
             <div className={ROW_CLASS_NAME}>
               <FormSelect
                 id={typeId}
