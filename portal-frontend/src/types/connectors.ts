@@ -413,12 +413,18 @@ const requireParameterName = (parameter: HttpParameterForm, ctx: z.RefinementCtx
   }
 }
 
+const getHeaderNameError = (name: string) => {
+  if (!HTTP_HEADER_NAME.test(name)) return 'datasources.errors.invalidHeaderName'
+  const lowerCaseName = name.toLowerCase()
+  if (CREDENTIAL_HEADERS.has(lowerCaseName)) return 'datasources.errors.credentialHeader'
+  if (CLIENT_HEADERS.has(lowerCaseName)) return 'datasources.errors.clientHeader'
+  return undefined
+}
+
 const validateHeader = (header: HttpParameterForm, ctx: z.RefinementCtx) => {
-  if (header.name && !HTTP_HEADER_NAME.test(header.name)) {
-    ctx.addIssue({ code: 'custom', path: ['name'], message: 'datasources.errors.invalidHeaderName' })
-  }
-  if (CREDENTIAL_HEADERS.has(header.name.toLowerCase())) {
-    ctx.addIssue({ code: 'custom', path: ['name'], message: 'datasources.errors.credentialHeader' })
+  const nameError = header.name ? getHeaderNameError(header.name) : undefined
+  if (nameError) {
+    ctx.addIssue({ code: 'custom', path: ['name'], message: nameError })
   }
   if (LINE_BREAK.test(header.value)) {
     ctx.addIssue({ code: 'custom', path: ['value'], message: 'datasources.errors.headerValueLineBreak' })
@@ -620,14 +626,6 @@ const isSameName = (a: RequestParameter, b: RequestParameter) => {
   if (a.location !== b.location) return false
   if (a.location === HTTP_PARAMETER_LOCATIONS.HEADER) return a.name.toLowerCase() === b.name.toLowerCase()
   return a.name === b.name
-}
-
-const getHeaderNameError = (name: string) => {
-  if (!HTTP_HEADER_NAME.test(name)) return 'datasources.errors.invalidHeaderName'
-  const lowerCaseName = name.toLowerCase()
-  if (CREDENTIAL_HEADERS.has(lowerCaseName)) return 'datasources.errors.credentialHeader'
-  if (CLIENT_HEADERS.has(lowerCaseName)) return 'datasources.errors.clientHeader'
-  return undefined
 }
 
 const hasParameterName = (

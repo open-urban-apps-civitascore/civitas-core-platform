@@ -326,6 +326,7 @@ describe('HTTP API call schemas', () => {
     ['an invalid header name', 'Bad Name', 'datasources.errors.invalidHeaderName'],
     ['an Authorization header', 'Authorization', 'datasources.errors.credentialHeader'],
     ['a cookie header', 'cookie', 'datasources.errors.credentialHeader'],
+    ['a header the HTTP client sets', 'Host', 'datasources.errors.clientHeader'],
   ])('rejects %s', (_name, name, message) => {
     expect(issues(HttpLooseSchema, [{ ...API_CALL, headers: [{ name, value: 'x' }] }])).toContainEqual(
       expect.objectContaining({ path: [0, 'headers', 0, 'name'], message }),
