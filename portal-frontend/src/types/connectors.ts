@@ -616,8 +616,13 @@ type PaginationParameter = { field: string; name: string; location: HttpParamete
 
 const getPaginationParameters = (pagination: HttpPaginationForm): PaginationParameter[] => {
   switch (pagination.type) {
-    case HTTP_PAGINATION_TYPES.PAGE_NUMBER:
-      return []
+    case HTTP_PAGINATION_TYPES.PAGE_NUMBER: {
+      const paginationParameters: PaginationParameter[] = [
+        { field: 'pageParameter', name: pagination.pageParameter, location: HTTP_PARAMETER_LOCATIONS.QUERY },
+        { field: 'pageSizeParameter', name: pagination.pageSizeParameter, location: HTTP_PARAMETER_LOCATIONS.QUERY },
+      ]
+      return paginationParameters.filter(parameter => parameter.name)
+    }
     case HTTP_PAGINATION_TYPES.CURSOR: {
       const paginationParameters: PaginationParameter[] = [
         { field: 'cursorParameter', name: pagination.cursorParameter, location: pagination.cursorIn },
@@ -685,8 +690,14 @@ const validatePaginationNames = (apiCall: HttpApiCallBaseFormOutput, ctx: z.Refi
       }
     }
     const earlierParameters = paginationParameters.slice(0, index)
-    if (earlierParameters.some(earlier => isSameName(earlier, paginationParameter))) {
+    const earlierParameter = earlierParameters.find(earlier => isSameName(earlier, paginationParameter))
+    if (earlierParameter) {
       addIssue('datasources.errors.paginationParameterDuplicate')
+      ctx.addIssue({
+        code: 'custom',
+        path: ['pagination', earlierParameter.field],
+        message: 'datasources.errors.paginationParameterDuplicate',
+      })
     }
   }
 }

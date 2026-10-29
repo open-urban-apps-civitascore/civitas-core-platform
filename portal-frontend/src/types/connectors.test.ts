@@ -555,6 +555,47 @@ describe('HTTP API call schemas', () => {
       ).toContainEqual(expect.objectContaining({ path: [0, 'pagination', field], message: 'common.errors.required' }))
     })
 
+    it('rejects a page size parameter equal to the page parameter once at each field', () => {
+      const result = issues(HttpLooseSchema, [withPagination({ pageParameter: 'page', pageSizeParameter: 'page' })])
+      const duplicates = result.filter(issue => issue.message === 'datasources.errors.paginationParameterDuplicate')
+      const paths = duplicates.map(issue => issue.path)
+      expect(paths).toHaveLength(2)
+      expect(paths).toEqual(
+        expect.arrayContaining([
+          [0, 'pagination', 'pageParameter'],
+          [0, 'pagination', 'pageSizeParameter'],
+        ]),
+      )
+    })
+
+    it('rejects a page parameter equal to a query parameter at both fields', () => {
+      const apiCall = { ...withPagination({ pageParameter: 'page' }), queryParameters: [{ name: 'page', value: '1' }] }
+      const result = issues(HttpLooseSchema, [apiCall])
+      expect(result).toContainEqual(
+        expect.objectContaining({
+          path: [0, 'pagination', 'pageParameter'],
+          message: 'datasources.errors.paginationQueryDuplicate',
+        }),
+      )
+      expect(result).toContainEqual(
+        expect.objectContaining({
+          path: [0, 'queryParameters', 0, 'name'],
+          message: 'datasources.errors.parameterPaginationDuplicate',
+        }),
+      )
+    })
+
+    it('accepts a page parameter equal to a header', () => {
+      const apiCall = { ...withPagination({ pageParameter: 'page' }), headers: [{ name: 'page', value: '1' }] }
+      expect(issues(HttpLooseSchema, [apiCall])).toEqual([])
+    })
+
+    it('accepts equal names in a disabled pagination', () => {
+      const pagination = { ...EMPTY_PAGINATION, pageParameter: 'page', pageSizeParameter: 'page' }
+      const apiCall = { ...API_CALL, queryParameters: [{ name: 'page', value: '1' }], pagination }
+      expect(issues(HttpLooseSchema, [apiCall])).toEqual([])
+    })
+
     it('accepts a disabled pagination without values for release', () => {
       expect(issues(HttpStrictSchema, [API_CALL])).toEqual([])
     })
@@ -769,12 +810,18 @@ describe('HTTP API call schemas', () => {
         { cursorParameter: 'cursor', limitParameter: 'cursor' },
         { queryParameters: [{ name: 'cursor', value: 'x' }] },
       )
-      expect(issues(HttpLooseSchema, [apiCall])).toEqual(
+      const result = issues(HttpLooseSchema, [apiCall])
+      expect(result).toEqual(
         expect.arrayContaining([
           issue('limitParameter', 'datasources.errors.paginationQueryDuplicate'),
           issue('limitParameter', 'datasources.errors.paginationParameterDuplicate'),
+          issue('cursorParameter', 'datasources.errors.paginationParameterDuplicate'),
         ]),
       )
+      const duplicates = result.filter(
+        resultIssue => resultIssue.message === 'datasources.errors.paginationParameterDuplicate',
+      )
+      expect(duplicates).toHaveLength(2)
     })
 
     it.each([

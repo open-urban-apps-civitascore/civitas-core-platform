@@ -496,6 +496,21 @@ describe('ApiCallsTab', () => {
       await waitFor(() => expect(screen.queryByText('datasources.errors.pageSizeMin')).not.toBeInTheDocument())
     })
 
+    it('shows the error at both fields and clears it when the page size parameter has the page parameter name', async () => {
+      const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+      await openApiCall(user)
+      await user.click(screen.getByRole('checkbox', { name: 'enable' }))
+      await user.type(screen.getByRole('textbox', { name: /^pageParameter\.label/ }), 'page')
+      await user.type(screen.getByRole('textbox', { name: /^pageSizeParameter\.label/ }), 'page')
+      expect(await screen.findAllByText('datasources.errors.paginationParameterDuplicate')).toHaveLength(2)
+
+      await user.type(screen.getByRole('textbox', { name: /^pageParameter\.label/ }), 's')
+
+      await waitFor(() =>
+        expect(screen.queryByText('datasources.errors.paginationParameterDuplicate')).not.toBeInTheDocument(),
+      )
+    })
+
     it('restores the pagination after cancel', async () => {
       const apiCall = { ...API_CALL, pagination: PAGINATION_FORM }
       const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [apiCall] })
@@ -710,12 +725,12 @@ describe('ApiCallsTab', () => {
         expect(screen.queryByText('datasources.errors.invalidJsonPath')).not.toBeInTheDocument()
       })
 
-      it('clears the duplicate error at the limit parameter when the cursor parameter changes', async () => {
+      it('clears the duplicate error at both fields when the cursor parameter changes', async () => {
         const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
         await openCursorPagination(user)
         await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'cursor')
         await user.type(screen.getByRole('textbox', { name: 'limitParameter.label' }), 'cursor')
-        expect(await screen.findByText('datasources.errors.paginationParameterDuplicate')).toBeInTheDocument()
+        expect(await screen.findAllByText('datasources.errors.paginationParameterDuplicate')).toHaveLength(2)
 
         await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 's')
 

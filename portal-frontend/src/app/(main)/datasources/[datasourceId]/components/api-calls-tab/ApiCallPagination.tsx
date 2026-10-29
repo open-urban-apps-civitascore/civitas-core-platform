@@ -88,7 +88,7 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
   }
   const typeId = `${paginationPath}.type`
 
-  const renderTextField = (config: PaginationFieldConfig<PageNumberField | CursorField>, isRevalidating: boolean) => {
+  const renderTextField = (config: PaginationFieldConfig<PageNumberField | CursorField>) => {
     const { name, isRequired, isNumeric } = config
     return (
       <FormField
@@ -104,11 +104,7 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
             <FormControl>
               <Input
                 {...field}
-                onChange={
-                  isRevalidating
-                    ? event => handleChangeAndRevalidate(event.target.value, field.onChange)
-                    : field.onChange
-                }
+                onChange={event => handleChangeAndRevalidate(event.target.value, field.onChange)}
                 inputMode={isNumeric ? 'numeric' : undefined}
                 disabled={isDisabled}
               />
@@ -168,11 +164,11 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
               {isCursor && <p className="col-start-2 text-sm text-muted-foreground">{t('cursorHint')}</p>}
             </div>
 
-            {!isCursor && PAGE_NUMBER_FIELDS.map(config => renderTextField(config, false))}
+            {!isCursor && PAGE_NUMBER_FIELDS.map(renderTextField)}
 
             {isCursor && (
               <>
-                {CURSOR_FIELDS.map(config => renderTextField(config, true))}
+                {CURSOR_FIELDS.map(renderTextField)}
                 <FormField
                   control={form.control}
                   name={`${paginationPath}.cursorIn`}
@@ -206,7 +202,7 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
                     </FormItem>
                   )}
                 />
-                {LIMIT_FIELDS.map(config => renderTextField(config, true))}
+                {LIMIT_FIELDS.map(renderTextField)}
               </>
             )}
           </CollapsibleContent>
