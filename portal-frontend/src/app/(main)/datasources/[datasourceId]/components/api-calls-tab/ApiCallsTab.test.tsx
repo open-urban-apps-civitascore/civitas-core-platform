@@ -249,6 +249,21 @@ describe('ApiCallsTab', () => {
     expect(isDirty()).toBe(false)
   })
 
+  it('clears the errors of the discarded values after cancel', async () => {
+    const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+    await openApiCall(user)
+    await user.type(screen.getByDisplayValue('Accept'), ' x')
+    expect(await screen.findByText('datasources.errors.invalidHeaderName')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'cancel' }))
+
+    const apiCallRow = screen.getByRole('button', { name: /stations/ }).parentElement
+    await waitFor(() => expect(apiCallRow).not.toHaveClass('border-destructive'))
+    await openApiCall(user)
+    expect(screen.getByDisplayValue('Accept')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('datasources.errors.invalidHeaderName')).not.toBeInTheDocument())
+  })
+
   it('removes a created API call after cancel', async () => {
     const { user, getApiCalls } = renderApiCallsTab()
     await user.click(screen.getByRole('button', { name: 'add' }))
