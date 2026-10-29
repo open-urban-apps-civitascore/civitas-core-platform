@@ -176,6 +176,6 @@ secret_detection:
 gitlab-advanced-sast:
   stage: qa
   needs: []
-  timeout: 1h
-  tags:
-    - saas-linux-medium-amd64
+  # timeout: 1h
+  # tags:
+  #   - saas-linux-medium-amd64
