@@ -18,15 +18,15 @@ public record DataSinkRemovalRequest(
     deletedDataSinkIds = Set.copyOf(deletedDataSinkIds);
   }
 
-  public static DataSinkRemovalRequest deletePipeline(UUID pipelineId) {
+  static DataSinkRemovalRequest deletePipeline(UUID pipelineId) {
     return new DataSinkRemovalRequest(Set.of(pipelineId), Set.of(), Set.of());
   }
 
-  public static DataSinkRemovalRequest removeLinks(Set<PipelineDataSinkLink> links) {
+  static DataSinkRemovalRequest removeLinks(Set<PipelineDataSinkLink> links) {
     return new DataSinkRemovalRequest(Set.of(), links, Set.of());
   }
 
-  public static DataSinkRemovalRequest deleteDataSink(UUID dataSinkId) {
+  static DataSinkRemovalRequest deleteDataSink(UUID dataSinkId) {
     return new DataSinkRemovalRequest(Set.of(), Set.of(), Set.of(dataSinkId));
   }
 

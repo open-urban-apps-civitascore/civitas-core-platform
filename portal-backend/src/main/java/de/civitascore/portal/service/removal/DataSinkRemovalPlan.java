@@ -7,10 +7,6 @@ import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
-import de.civitascore.portal.model.output.DataSinkRemovalImpactDTO;
-import de.civitascore.portal.model.output.DataSinkRemovalImpactDTO.ApiImpact;
-import de.civitascore.portal.model.output.DataSinkRemovalImpactDTO.DataSinkImpact;
-import de.civitascore.portal.model.output.DataSinkRemovalImpactDTO.LayerImpact;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -32,7 +28,7 @@ import java.util.stream.Stream;
  * @param layers the Layers that are deleted
  * @param apis the APIs that are deleted
  */
-public record DataSinkRemovalPlan(
+record DataSinkRemovalPlan(
     DataSet dataSet, List<DataSink> deactivatedDataSinks, List<Layer> layers, List<NamedApi> apis) {
 
   static DataSinkRemovalPlan empty(DataSet dataSet) {
@@ -104,7 +100,7 @@ public record DataSinkRemovalPlan(
    * The ids a request must confirm: provisioned Data sinks, whose stored data is deleted at the
    * next release, and every Layer and API. A Data sink that holds no data goes without one.
    */
-  public Set<UUID> needsConfirmation() {
+  Set<UUID> needsConfirmation() {
     return Stream.of(
             deactivatedDataSinks.stream().filter(DataSink::isProvisioned).map(DataSink::getId),
             layers.stream().map(Layer::getId),
@@ -113,25 +109,7 @@ public record DataSinkRemovalPlan(
         .collect(Collectors.toSet());
   }
 
-  public boolean isEmpty() {
+  boolean isEmpty() {
     return deactivatedDataSinks.isEmpty() && layers.isEmpty() && apis.isEmpty();
-  }
-
-  public DataSinkRemovalImpactDTO toImpact() {
-    Set<UUID> confirmationIds = needsConfirmation();
-    return new DataSinkRemovalImpactDTO(
-        deactivatedDataSinks.stream()
-            .map(
-                sink ->
-                    new DataSinkImpact(sink.getId(), sink.getDataSinkType(), sink.isProvisioned()))
-            .toList(),
-        layers.stream()
-            .map(layer -> new LayerImpact(layer.getId(), layer.getLayerName(), layer.getTitle()))
-            .toList(),
-        apis.stream()
-            .map(api -> new ApiImpact(api.getId(), api.getSlug(), api.getName(), api.getStandard()))
-            .toList(),
-        confirmationIds.stream().sorted().toList(),
-        !confirmationIds.isEmpty());
   }
 }

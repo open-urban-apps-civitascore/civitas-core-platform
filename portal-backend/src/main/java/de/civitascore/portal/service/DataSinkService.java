@@ -15,8 +15,7 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
-import de.civitascore.portal.service.removal.DataSinkRemovalPlan;
-import de.civitascore.portal.service.removal.DataSinkRemovalRequest;
+import de.civitascore.portal.service.removal.DataSinkChange;
 import de.civitascore.portal.service.removal.DataSinkRemovalService;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.RemovalConfirmationRequiredException;
@@ -356,22 +355,6 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
         : "datasink";
   }
 
-  /**
-   * Removes the links from the given pipeline to its DataSinks. The DataSinks themselves stay with
-   * their dataset.
-   *
-   * @param pipelineId the pipeline whose DataSink links are removed
-   */
-  public void unlinkByPipelineId(UUID pipelineId) {
-    dataSinkRepository
-        .findByPipelinesId(pipelineId)
-        .forEach(
-            sink -> {
-              sink.getPipelines().removeIf(pipeline -> pipelineId.equals(pipeline.getId()));
-              dataSinkRepository.save(sink);
-            });
-  }
-
   /** Deletes the DataSink without a confirmation, see {@link #deleteById(UUID, Set)}. */
   @Override
   @Transactional
@@ -381,7 +364,7 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
 
   /**
    * Deletes the DataSink with its Layers, and with the APIs it is the last backing DataSink of (see
-   * {@link DataSinkRemovalPlan}). A provisioned DataSink stays as PENDING_UNPROVISION until the
+   * {@link DataSinkRemovalService}). A provisioned DataSink stays as PENDING_UNPROVISION until the
    * next release removes its storage.
    *
    * @param confirmedRemovalIds the ids of the provisioned DataSink, Layers and APIs the caller
@@ -393,8 +376,7 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
   public void deleteById(UUID id, Set<UUID> confirmedRemovalIds) {
     DataSink sink = preProcessDelete(id);
     dataSinkRemovalService.apply(
-        dataSinkRemovalService.planConfirmed(
-            sink.getDataSet(), DataSinkRemovalRequest.deleteDataSink(id), confirmedRemovalIds));
+        dataSinkRemovalService.prepare(DataSinkChange.deleteDataSink(sink), confirmedRemovalIds));
   }
 
   private void validateConfiguration(DataSinkType type, Map<String, Object> config) {

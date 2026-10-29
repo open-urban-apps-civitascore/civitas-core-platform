@@ -357,6 +357,56 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
     }
 
     @Test
+    @DisplayName("PATCH with confirmation removes the link, pends the sink and deletes the API")
+    void patchConfirmed_removesTheApi() {
+      DataSink sink = frostSink(pipeline, true);
+      NamedApi sta = addApi(ApiStandard.STA);
+
+      ResponseEntity<JsonNode> response =
+          exchange(
+              HttpMethod.PATCH,
+              pipelinePath() + confirming(sink.getId(), sta.getId()),
+              Map.of("dataSinkIds", List.of()));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(stateOf(sink)).isEqualTo(DataSinkState.PENDING_UNPROVISION);
+      assertThat(dataSinkRepository.findByPipelinesId(pipeline.getId())).isEmpty();
+      assertThat(apiStandards()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("an unknown Data sink id answers 400 before the confirmation and stores nothing")
+    void unknownDataSinkId_answers400BeforeTheConfirmation() {
+      DataSink sink = frostSink(pipeline, true);
+      addApi(ApiStandard.STA);
+      Map<String, Object> body =
+          Map.of(
+              "name",
+              pipeline.getName(),
+              "dataSinkIds",
+              List.of(UUID.randomUUID()),
+              "model",
+              Map.of(
+                  "nodes",
+                  List.of(
+                      Map.of("id", "source-1", "kind", "source"),
+                      Map.of("id", "sink-1", "kind", "sink")),
+                  "edges",
+                  List.of(Map.of("id", "edge-1", "source", "source-1", "target", "sink-1"))));
+
+      ResponseEntity<JsonNode> response = exchange(HttpMethod.PUT, pipelinePath(), body);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      Pipeline stored = pipelineRepository.findById(pipeline.getId()).orElseThrow();
+      assertThat(stored.getModelLogicalUrn()).isNull();
+      assertThat(stored.getVersion()).isEqualTo(pipeline.getVersion());
+      assertThat(dataSinkRepository.findByPipelinesId(pipeline.getId()))
+          .extracting(DataSink::getId)
+          .containsExactly(sink.getId());
+      assertThat(apiStandards()).containsExactly("STA");
+    }
+
+    @Test
     @DisplayName("replacing the sink in one request keeps the API and drops the old Layer")
     void replacement_keepsTheApi() {
       MapSurface surface = mapSurface(true);

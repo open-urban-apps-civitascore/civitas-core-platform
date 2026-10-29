@@ -11,7 +11,6 @@ import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
-import de.civitascore.portal.model.output.DataSinkRemovalImpactDTO;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -124,30 +123,24 @@ class DataSinkRemovalPlanTest {
   }
 
   @Test
-  void toImpact_unprovisionedSinkAlone_needsNoConfirmation() {
+  void needsConfirmation_unprovisionedSinkAlone_isEmpty() {
     Pipeline pipeline = pipeline();
     DataSink sink = sink(DataSinkType.FROST, false, pipeline);
 
-    DataSinkRemovalImpactDTO impact =
-        compute(DataSinkRemovalRequest.deletePipeline(pipeline.getId())).toImpact();
+    DataSinkRemovalPlan plan = compute(DataSinkRemovalRequest.deletePipeline(pipeline.getId()));
 
-    assertThat(impact.dataSinks())
-        .containsExactly(
-            new DataSinkRemovalImpactDTO.DataSinkImpact(sink.getId(), DataSinkType.FROST, false));
-    assertThat(impact.confirmationIds()).isEmpty();
-    assertThat(impact.requiresConfirmation()).isFalse();
+    assertThat(plan.deactivatedDataSinks()).containsExactly(sink);
+    assertThat(plan.needsConfirmation()).isEmpty();
   }
 
   @Test
-  void toImpact_provisionedSink_needsConfirmation() {
+  void needsConfirmation_provisionedSink_containsIt() {
     Pipeline pipeline = pipeline();
     DataSink sink = sink(DataSinkType.FROST, true, pipeline);
 
-    DataSinkRemovalImpactDTO impact =
-        compute(DataSinkRemovalRequest.deletePipeline(pipeline.getId())).toImpact();
+    DataSinkRemovalPlan plan = compute(DataSinkRemovalRequest.deletePipeline(pipeline.getId()));
 
-    assertThat(impact.confirmationIds()).containsExactly(sink.getId());
-    assertThat(impact.requiresConfirmation()).isTrue();
+    assertThat(plan.needsConfirmation()).containsExactly(sink.getId());
   }
 
   private DataSinkRemovalPlan compute(DataSinkRemovalRequest request) {

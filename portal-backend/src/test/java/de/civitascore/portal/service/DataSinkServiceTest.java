@@ -26,8 +26,6 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
-import de.civitascore.portal.service.removal.DataSinkRemovalPlan;
-import de.civitascore.portal.service.removal.DataSinkRemovalRequest;
 import de.civitascore.portal.service.removal.DataSinkRemovalService;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
@@ -235,28 +233,6 @@ class DataSinkServiceTest {
               isNull());
       assertThat(result.getConfigurationLogicalUrn()).isEqualTo(STORED_LOGICAL_URN);
       assertThat(result.getConfigurationUrn()).isEqualTo(STORED_VERSIONED_URN);
-    }
-
-    @Test
-    @DisplayName("Delete runs the removal rules with the confirmed ids")
-    void deleteRunsRemovalRules() {
-      UUID sinkId = UUID.randomUUID();
-      DataSink sink = new DataSink();
-      sink.setId(sinkId);
-      sink.setDataSet(dataSet(UUID.randomUUID()));
-      sink.setDataSinkType(DataSinkType.POSTGIS);
-      Set<UUID> confirmed = Set.of(sinkId);
-      DataSinkRemovalPlan plan =
-          new DataSinkRemovalPlan(sink.getDataSet(), List.of(sink), List.of(), List.of());
-      when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(sink));
-      when(dataSinkRemovalService.planConfirmed(
-              sink.getDataSet(), DataSinkRemovalRequest.deleteDataSink(sinkId), confirmed))
-          .thenReturn(plan);
-
-      dataSinkService.deleteById(sinkId, confirmed);
-
-      verify(dataSinkRemovalService).apply(plan);
-      verify(dataSinkRepository, never()).deleteById(any());
     }
 
     @Test

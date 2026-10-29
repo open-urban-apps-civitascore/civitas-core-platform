@@ -74,12 +74,23 @@ public abstract class BaseService<T, I extends BaseInputDTO> {
   @Transactional
   public T update(UUID id, I input) {
     T entity = findByIdOrThrow(id);
-    I preProcessedInput = preProcessUpdateInput(input, entity);
-    getMapper().updateEntity(entity, preProcessedInput);
-    entity = postConvertToEntity(entity, preProcessedInput);
-    entity = preSave(entity);
-    T saved = getRepository().save(entity);
-    return postSave(saved, preProcessedInput);
+    return saveUpdate(entity, preProcessUpdateInput(input, entity));
+  }
+
+  /**
+   * The write part of {@link #update(UUID, BaseInputDTO)}: applies the pre-processed input to the
+   * loaded entity and saves it, through {@link #postConvertToEntity}, {@link #preSave} and {@link
+   * #postSave}. Runs in the caller's transaction.
+   *
+   * @param entity the loaded entity
+   * @param input the pre-processed input DTO
+   * @return the updated entity
+   */
+  protected T saveUpdate(T entity, I input) {
+    getMapper().updateEntity(entity, input);
+    T converted = postConvertToEntity(entity, input);
+    T saved = getRepository().save(preSave(converted));
+    return postSave(saved, input);
   }
 
   /**
