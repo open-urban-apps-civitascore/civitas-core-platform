@@ -12,7 +12,7 @@ import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
 import { DataModelImportModal } from '@/app/(main)/datasources/[datasourceId]/components/datastructure-tab/DataModelImportModal'
-import { StatusBadge } from '@/components/status-badge/StatusBadge'
+import { StatusBadge } from '@/components/status/status-badge/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'

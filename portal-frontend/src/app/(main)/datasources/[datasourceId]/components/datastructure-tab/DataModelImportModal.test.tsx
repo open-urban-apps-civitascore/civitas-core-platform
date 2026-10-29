@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DataModelImportModal } from './DataModelImportModal'
@@ -212,6 +212,58 @@ describe('DataModelImportModal', () => {
 
     expect(screen.getByRole('checkbox', { name: 'Select datastructure Version 1.0' })).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Select datastructure Version 2.0' })).toBeInTheDocument()
+  })
+
+  it('shows the version count per status on the data structure row and the status on each version row', () => {
+    mockUseGetDatastructures.mockReturnValue({
+      data: { data: [mixedDatastructures[0]], totalElements: 1 },
+      isFetching: false,
+    })
+    render(<DataModelImportModal {...defaultProps} />)
+
+    fireEvent.click(screen.getByTestId('expanderCell').querySelector('button')!)
+
+    const rowOf = (name: string) => screen.getByRole('checkbox', { name }).closest('tr') as HTMLElement
+    expect(within(rowOf('Select datastructure Version 1.0')).getByTestId('statusBadge')).toHaveTextContent(
+      /^status.AVAILABLE$/,
+    )
+    expect(within(rowOf('Select datastructure Version 2.0')).getByTestId('statusBadge')).toHaveTextContent(
+      /^status.DRAFT$/,
+    )
+    const datastructureRow = screen.getByText('Available DS').closest('tr') as HTMLElement
+    expect(
+      within(datastructureRow)
+        .getAllByTestId('statusBadge')
+        .map(badge => badge.textContent),
+    ).toEqual(['statusCount.AVAILABLE {"count":1}', 'statusCount.DRAFT {"count":1}'])
+  })
+
+  it('counts only the versions the modal shows', () => {
+    const withModelLessVersion = {
+      ...mixedDatastructures[1],
+      dataStructureVersions: [
+        ...mixedDatastructures[1].dataStructureVersions,
+        {
+          id: 'v-5',
+          version: null,
+          description: 'Draft without a stored model',
+          dataStructureVersionStatus: 'DRAFT' as const,
+          dataStructureVersionSource: null,
+        },
+      ],
+    }
+    mockUseGetDatastructures.mockReturnValue({
+      data: { data: [withModelLessVersion], totalElements: 1 },
+      isFetching: false,
+    })
+    render(<DataModelImportModal {...defaultProps} />)
+
+    const datastructureRow = screen.getByText('Draft DS').closest('tr') as HTMLElement
+    expect(
+      within(datastructureRow)
+        .getAllByTestId('statusBadge')
+        .map(badge => badge.textContent),
+    ).toEqual(['statusCount.AVAILABLE {"count":1}'])
   })
 
   it('does not narrow the request to available data structures', () => {

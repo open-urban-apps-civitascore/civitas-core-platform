@@ -139,7 +139,7 @@ describe('DatastructuresTable', () => {
     expect(within(subRow).getByTestId('statusBadge')).toHaveTextContent(/^Verfügbar$/)
   })
 
-  it('shows a dash in the status column of a data structure row without versions', () => {
+  it('leaves the status column of a data structure row without versions empty', () => {
     const [datastructure] = mockDatastructures
     renderTable({
       ...defaultProps,
@@ -150,8 +150,7 @@ describe('DatastructuresTable', () => {
     const [topLevelRow] = screen.getAllByRole('row').slice(1)
     const statusColumnIndex = screen.getAllByRole('columnheader').findIndex(header => header.textContent === 'Status')
     const statusCell = within(topLevelRow).getAllByRole('cell')[statusColumnIndex]
-    expect(statusCell).toHaveTextContent(/^-$/)
-    expect(within(statusCell).queryByTestId('statusBadge')).toBeNull()
+    expect(statusCell).toBeEmptyDOMElement()
   })
 
   it('shows the draft status on a draft version row', () => {

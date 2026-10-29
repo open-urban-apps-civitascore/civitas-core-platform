@@ -1,6 +1,6 @@
 import { useTranslations } from 'next-intl'
 
-import { StatusBadge } from '@/components/status-badge/StatusBadge'
+import { StatusBadge } from '@/components/status/status-badge/StatusBadge'
 import { DatastructureVersion } from '@/types/datastructures'
 
 interface DatastructureVersionInfoProps {

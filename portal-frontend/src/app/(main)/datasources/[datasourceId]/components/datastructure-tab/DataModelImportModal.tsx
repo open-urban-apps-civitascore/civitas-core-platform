@@ -17,7 +17,8 @@ import { useGetDatastructures } from '@/app/services/api/datastructures/clientRe
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SearchHeader } from '@/components/search-area/SearchArea'
-import { StatusBadge } from '@/components/status-badge/StatusBadge'
+import { StatusBadge } from '@/components/status/status-badge/StatusBadge'
+import { VersionStatusCounts } from '@/components/status/version-status-counts/VersionStatusCounts'
 import { DataTable } from '@/components/table/DataTable'
 import { ExpanderCell } from '@/components/table/expander-cell/ExpanderCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
@@ -183,8 +184,11 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
     }),
     columnHelper.accessor('status', {
       header: tDatastructures('tableHeaders.status'),
-      cell: info => {
-        const status = info.getValue()
+      cell: ({ row }: CellContext<DatastructuresListData, unknown>) => {
+        if (row.depth === 0) {
+          return <VersionStatusCounts versionCountByStatus={row.original.versionCountByStatus} />
+        }
+        const { status } = row.original
         return status ? <StatusBadge status={status} /> : '-'
       },
       meta: {

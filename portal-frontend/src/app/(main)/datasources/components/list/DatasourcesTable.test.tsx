@@ -74,14 +74,14 @@ describe('DatasourcesTable', () => {
     expect(cells1[0]).toHaveTextContent('MQTT Sensor Data')
     expect(cells1[1]).toHaveTextContent('Temperature sensor data via MQTT')
     expect(cells1[2]).toHaveTextContent('MQTT')
-    expect(cells1[5]).toHaveTextContent('Entwurf')
+    expect(within(cells1[5]).getByTestId('statusBadge')).toHaveTextContent(/^Entwurf$/)
 
     const dataRow2 = rows[2]
     const cells2 = within(dataRow2).getAllByRole('cell')
     expect(cells2[0]).toHaveTextContent('SQL Database Import')
     expect(cells2[1]).toHaveTextContent('Importing data from PostgreSQL')
     expect(cells2[2]).toHaveTextContent('SQL')
-    expect(cells2[5]).toHaveTextContent('Verfügbar')
+    expect(within(cells2[5]).getByTestId('statusBadge')).toHaveTextContent(/^Verfügbar$/)
 
     const cells4 = within(rows[4]).getAllByRole('cell')
     expect(cells4[0]).toHaveTextContent('HTTP Weather API')

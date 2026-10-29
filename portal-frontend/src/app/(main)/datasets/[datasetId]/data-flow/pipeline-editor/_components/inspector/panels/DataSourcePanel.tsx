@@ -11,7 +11,7 @@ import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
-import { StatusBadge } from '@/components/status-badge/StatusBadge'
+import { StatusBadge } from '@/components/status/status-badge/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { CONNECTOR_TYPES } from '@/const/connectors'

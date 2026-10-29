@@ -4,7 +4,7 @@ import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable }
 import { formatDistanceStrict } from 'date-fns'
 import { useLocale, useTranslations } from 'next-intl'
 
-import { StatusBadge } from '@/components/status-badge/StatusBadge'
+import { StatusBadge } from '@/components/status/status-badge/StatusBadge'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'

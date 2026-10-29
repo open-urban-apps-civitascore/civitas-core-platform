@@ -53,6 +53,14 @@ describe('VersionsTable', () => {
     expect(screen.getByRole('columnheader', { name: 'Verwendung' })).toBeDefined()
   })
 
+  it('shows the status of each version as a status badge', () => {
+    renderTable()
+    const rows = screen.getAllByRole('row')
+
+    expect(within(rows[1]).getByTestId('statusBadge')).toHaveTextContent(/^Verfügbar$/)
+    expect(within(rows[2]).getByTestId('statusBadge')).toHaveTextContent(/^Entwurf$/)
+  })
+
   it('marks only the version a released entity references', () => {
     renderTable()
     const rows = screen.getAllByRole('row')

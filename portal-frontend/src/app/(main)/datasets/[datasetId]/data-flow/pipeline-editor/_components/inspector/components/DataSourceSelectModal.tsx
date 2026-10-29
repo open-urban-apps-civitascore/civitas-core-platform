@@ -15,7 +15,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { SearchHeader } from '@/components/search-area/SearchArea'
-import { StatusBadge } from '@/components/status-badge/StatusBadge'
+import { StatusBadge } from '@/components/status/status-badge/StatusBadge'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Checkbox } from '@/components/ui/checkbox'

@@ -12,7 +12,8 @@ import { useTranslations } from 'next-intl'
 import { CountBadge } from '@/components/count-badge/CountBadge'
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { InUseIndicator } from '@/components/in-use-indicator/InUseIndicator'
-import { StatusBadge } from '@/components/status-badge/StatusBadge'
+import { StatusBadge } from '@/components/status/status-badge/StatusBadge'
+import { VersionStatusCounts } from '@/components/status/version-status-counts/VersionStatusCounts'
 import { DataTable } from '@/components/table/DataTable'
 import { ExpanderCell } from '@/components/table/expander-cell/ExpanderCell'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
@@ -20,7 +21,7 @@ import { SortableTableHeader } from '@/components/table/sortable-table-header/So
 import { usePermissions } from '@/hooks/use-permissions'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
-import { DATASTRUCTURE_STATUS_TYPES, DatastructuresListData } from '@/types/datastructures'
+import { DatastructuresListData } from '@/types/datastructures'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
@@ -136,15 +137,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
           const { status } = row.original
           return status ? <StatusBadge status={status} /> : '-'
         }
-        const availableCount = row.original.versionCountByStatus?.[DATASTRUCTURE_STATUS_TYPES.AVAILABLE] ?? 0
-        const draftCount = row.original.versionCountByStatus?.[DATASTRUCTURE_STATUS_TYPES.DRAFT] ?? 0
-        if (!availableCount && !draftCount) return '-'
-        return (
-          <div className="flex items-center gap-2">
-            {availableCount > 0 && <StatusBadge status={DATASTRUCTURE_STATUS_TYPES.AVAILABLE} count={availableCount} />}
-            {draftCount > 0 && <StatusBadge status={DATASTRUCTURE_STATUS_TYPES.DRAFT} count={draftCount} />}
-          </div>
-        )
+        return <VersionStatusCounts versionCountByStatus={row.original.versionCountByStatus} />
       },
       meta: {
         style: {

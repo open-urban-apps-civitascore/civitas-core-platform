@@ -3,13 +3,12 @@
 import { ChevronDown, Info } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
-import { STATUS_ICONS, StatusBadge } from '@/components/status-badge/StatusBadge'
+import { STATUS_ICONS, StatusBadge } from '@/components/status/status-badge/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { STATUS_TYPES, StatusTypes } from '@/types/common'
-
-import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 
 interface StatusDropdownProps<T extends StatusTypes> {
   status: T

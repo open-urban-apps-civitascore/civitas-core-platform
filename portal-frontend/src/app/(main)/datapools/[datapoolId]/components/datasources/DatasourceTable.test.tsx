@@ -74,14 +74,14 @@ describe('DatasourceTable', () => {
     renderTable()
     const rows = screen.getAllByRole('row')
     const cells = within(rows[1]).getAllByRole('cell')
-    expect(cells[4]).toHaveTextContent('status.DRAFT')
+    expect(within(cells[4]).getByTestId('statusBadge')).toHaveTextContent(/^status.DRAFT$/)
   })
 
   it('renders AVAILABLE status with translated key', () => {
     renderTable()
     const rows = screen.getAllByRole('row')
     const cells = within(rows[2]).getAllByRole('cell')
-    expect(cells[4]).toHaveTextContent('status.AVAILABLE')
+    expect(within(cells[4]).getByTestId('statusBadge')).toHaveTextContent(/^status.AVAILABLE$/)
   })
 
   it('shows loading skeleton when isLoading is true', () => {

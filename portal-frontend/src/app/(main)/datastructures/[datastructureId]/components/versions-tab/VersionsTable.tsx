@@ -2,7 +2,7 @@ import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable }
 import { useTranslations } from 'next-intl'
 
 import { InUseIndicator } from '@/components/in-use-indicator/InUseIndicator'
-import { StatusBadge } from '@/components/status-badge/StatusBadge'
+import { StatusBadge } from '@/components/status/status-badge/StatusBadge'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
