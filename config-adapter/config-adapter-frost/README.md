@@ -69,7 +69,8 @@ Kafka. It handles project-level operations only:
   cosmetic (FROST has no other notion of the portal's dataset name); only the datasetId suffix is
   load-bearing, since it survives a dataset rename that the display-name portion does not.
 - **A project exists only for a DataSet with a FROST data sink.** The orchestrator gates `CREATE_PROJECT`
-  and `UPDATE_PROJECT` on it and leaves `DELETE_PROJECT` ungated — see
+  and `UPDATE_PROJECT` on it, leaves `DELETE_PROJECT` ungated in the delete saga, and runs `DELETE_PROJECT`
+  with the recorded `projectId` in a release that leaves only pending FROST sinks — see
   [../config-adapter-flowable/README.md](../config-adapter-flowable/README.md).
 - **`CREATE_PROJECT` finds or creates, surviving a rename across an unrelease.** The lookup matches on
   the datasetId suffix of the name (`endswith(name,'({datasetId})')`), not the full name, so it still

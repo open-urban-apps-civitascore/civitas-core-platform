@@ -39,6 +39,8 @@ import org.mockito.ArgumentCaptor;
 
 class DatasetCreateBpmnTest {
 
+  private static final String RECORDED_PROJECT_ID = "proj-recorded";
+
   private ProcessEngine processEngine;
   private RuntimeService runtimeService;
   private HistoryService historyService;
@@ -475,6 +477,131 @@ class DatasetCreateBpmnTest {
     assertEquals(true, deprovision.get("createdSchema"));
   }
 
+  @Test
+  void shouldDeleteWorkspaceThenUnprovisionWhenOnlyPendingGeoSinksRemain() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+    stubPipelineSuccess();
+
+    ProcessInstance instance = startProcessWithPendingSinks(true, false, true, true, false);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+    var inOrder = inOrder(pipelineHandler, geoserverHandler, postgisHandler);
+    inOrder.verify(pipelineHandler).handle(any());
+    inOrder.verify(geoserverHandler).handle(operation("DELETE_WORKSPACE"));
+    inOrder.verify(postgisHandler).handle(operation("UNPROVISION_SINKS"));
+    assertEquals(List.of("UNPROVISION_SINKS"), operations(postgisHandler, 1));
+    assertEquals(List.of("CREATE_PROJECT"), operations(frostHandler, 1));
+  }
+
+  @Test
+  void shouldKeepWorkspaceAndUnprovisionAfterPruneWhileAnActiveGeoSinkRemains() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+
+    ProcessInstance instance = startProcessWithPendingSinks(false, true, true, true, false);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+    var inOrder = inOrder(geoserverHandler, postgisHandler);
+    inOrder.verify(geoserverHandler).handle(operation("PRUNE_FEATURE_TYPES"));
+    inOrder.verify(postgisHandler).handle(operation("UNPROVISION_SINKS"));
+    assertEquals(
+        List.of("CREATE_WORKSPACE", "CREATE_DATASTORE", "PRUNE_FEATURE_TYPES"),
+        operations(geoserverHandler, 3));
+    assertEquals(List.of("PROVISION_SINK", "UNPROVISION_SINKS"), operations(postgisHandler, 2));
+  }
+
+  @Test
+  void shouldDeleteTheRecordedFrostProjectLastWhenOnlyPendingFrostSinksRemain() {
+    stubApisixSuccess();
+    stubFrostSuccess();
+
+    ProcessInstance instance = startProcessWithPendingSinks(false, false, false, true, true);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+    var inOrder = inOrder(apisixHandler, postgisHandler, frostHandler);
+    inOrder.verify(apisixHandler).handle(any());
+    inOrder.verify(postgisHandler).handle(operation("UNPROVISION_SINKS"));
+    inOrder.verify(frostHandler).handle(operation("DELETE_PROJECT"));
+    ArgumentCaptor<SagaCommandMessage> frost = ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(frostHandler).handle(frost.capture());
+    assertEquals("EXECUTE_STEP", frost.getValue().type());
+    assertEquals(RECORDED_PROJECT_ID, frost.getValue().payload().get("projectId"));
+  }
+
+  @Test
+  void shouldKeepTheFrostProjectWhileAnActiveFrostSinkRemains() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+
+    ProcessInstance instance = startProcessWithPendingSinks(false, false, true, false, true);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+    assertEquals(List.of("CREATE_PROJECT"), operations(frostHandler, 1));
+    verify(postgisHandler, never()).handle(any());
+    verify(geoserverHandler, never()).handle(any());
+  }
+
+  @Test
+  void shouldFailAndCompensateTheReleaseWhenUnprovisioningFails() {
+    stubFrostSuccess();
+    stubApisixSuccess();
+    stubApisixCompensationSuccess();
+    stubFrostCompensationSuccess();
+    stubPipelineSuccess();
+    stubPipelineCompensationSuccess();
+    when(postgisHandler.handle(operation("UNPROVISION_SINKS")))
+        .thenReturn(SagaCommandResult.failure("saga-test-123", "unprovision-sinks", "DB down"));
+
+    ProcessInstance instance = startProcessWithPendingSinks(true, false, true, true, false);
+    executeAllJobs();
+
+    assertProcessFinished(instance.getId());
+    assertEquals(
+        List.of("publish-failure"),
+        FlowableTestSupport.getPublishedResultTaskIds(historyService, instance.getId()));
+    var inOrder = inOrder(pipelineHandler, apisixHandler, frostHandler);
+    inOrder.verify(pipelineHandler).handle(operation("DELETE_PIPELINES"));
+    inOrder.verify(apisixHandler).handle(operation("DELETE_ROUTE"));
+    inOrder.verify(frostHandler).handle(operation("DELETE_PROJECT"));
+    assertEquals(
+        List.of("DELETE_WORKSPACE"),
+        operations(geoserverHandler, 1),
+        "no active geo sink, so GeoServer has nothing to compensate");
+  }
+
+  @Test
+  void shouldCompensateTheRouteWhenUnprovisioningFailsWithoutPipelinesOrActiveGeoSink() {
+    stubApisixSuccess();
+    stubApisixCompensationSuccess();
+    when(postgisHandler.handle(operation("UNPROVISION_SINKS")))
+        .thenReturn(SagaCommandResult.failure("saga-test-123", "unprovision-sinks", "DB down"));
+
+    ProcessInstance instance = startProcessWithPendingSinks(false, false, false, true, false);
+    executeAllJobs();
+
+    assertProcessFinished(instance.getId());
+    assertEquals(
+        List.of("publish-failure"),
+        FlowableTestSupport.getPublishedResultTaskIds(historyService, instance.getId()));
+    assertEquals("DELETE_ROUTE", captureCompensation(apisixHandler).operation());
+    verify(pipelineHandler, never()).handle(any());
+  }
+
+  private static SagaCommandMessage operation(String operation) {
+    return argThat(cmd -> cmd != null && operation.equals(cmd.operation()));
+  }
+
+  private static List<String> operations(SagaCommandHandler handler, int expectedCalls) {
+    ArgumentCaptor<SagaCommandMessage> captor = ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(handler, times(expectedCalls)).handle(captor.capture());
+    return captor.getAllValues().stream().map(SagaCommandMessage::operation).toList();
+  }
+
   private SagaCommandMessage captureCompensation(SagaCommandHandler handler) {
     ArgumentCaptor<SagaCommandMessage> captor = ArgumentCaptor.forClass(SagaCommandMessage.class);
     verify(handler, times(2)).handle(captor.capture());
@@ -494,6 +621,33 @@ class DatasetCreateBpmnTest {
   }
 
   private ProcessInstance startProcessWithGeo(
+      boolean hasPipelines, boolean hasGeoSink, boolean hasLayers, boolean hasFrostSink) {
+    return runtimeService.startProcessInstanceByKey(
+        "dataset-create", variables(hasPipelines, hasGeoSink, hasLayers, hasFrostSink));
+  }
+
+  private ProcessInstance startProcessWithPendingSinks(
+      boolean hasPipelines,
+      boolean hasGeoSink,
+      boolean hasFrostSink,
+      boolean hasPendingGeoSink,
+      boolean hasPendingFrostSink) {
+    Map<String, Object> variables = variables(hasPipelines, hasGeoSink, false, hasFrostSink);
+    variables.put("hasPendingGeoSink", hasPendingGeoSink);
+    variables.put("hasPendingFrostSink", hasPendingFrostSink);
+    variables.put("projectId", RECORDED_PROJECT_ID);
+    List<Map<String, Object>> pendingSinks = new ArrayList<>();
+    if (hasPendingGeoSink) {
+      pendingSinks.add(Map.of("type", "POSTGIS", "configuration", Map.of("tableName", "gone")));
+    }
+    if (hasPendingFrostSink) {
+      pendingSinks.add(Map.of("type", "FROST", "configuration", Map.of()));
+    }
+    variables.put("pendingUnprovisionDatasinks", pendingSinks);
+    return runtimeService.startProcessInstanceByKey("dataset-create", variables);
+  }
+
+  private static Map<String, Object> variables(
       boolean hasPipelines, boolean hasGeoSink, boolean hasLayers, boolean hasFrostSink) {
     Map<String, Object> variables = new HashMap<>();
     variables.put("sagaId", "saga-test-123");
@@ -522,7 +676,7 @@ class DatasetCreateBpmnTest {
     if (hasLayers) {
       variables.put("layers", List.of(Map.of("layerName", "t1", "crs", "EPSG:4326")));
     }
-    return runtimeService.startProcessInstanceByKey("dataset-create", variables);
+    return variables;
   }
 
   private void executeAllJobs() {

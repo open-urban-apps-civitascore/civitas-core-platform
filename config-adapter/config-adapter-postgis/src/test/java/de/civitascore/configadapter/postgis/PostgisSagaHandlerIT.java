@@ -222,6 +222,93 @@ class PostgisSagaHandlerIT extends AbstractPostgisIT {
     assertFalse(schemaExists("delete_it"));
   }
 
+  @Test
+  void unprovisionSinksDropsThePendingTableAndRoleAndKeepsTheActiveSiblingAndSchema()
+      throws Exception {
+    Map<String, Object> activeSink = sinkWithReadRole("active_t", "unprov_it_active_geo");
+    Map<String, Object> pendingSink = sinkWithReadRole("pending_t", "unprov_it_pending_geo");
+    handler.handle(
+        execute(
+            "PROVISION_SINK",
+            Map.of("datasetId", "unprov-it", "datasinks", List.of(activeSink, pendingSink))));
+    insertRow("unprov_it", "active_t");
+
+    SagaCommandResult result =
+        handler.handle(
+            execute(
+                "UNPROVISION_SINKS",
+                Map.of(
+                    "datasetId",
+                    "unprov-it",
+                    "datasinks",
+                    List.of(activeSink),
+                    "pendingUnprovisionDatasinks",
+                    List.of(pendingSink))));
+
+    assertEquals("STEP_COMPLETED", result.type(), result.error());
+    assertFalse(tableExists("unprov_it", "pending_t"));
+    assertFalse(roleExists("unprov_it_pending_geo"));
+    assertTrue(schemaExists("unprov_it"));
+    assertEquals(1, rowCount("unprov_it", "active_t"));
+    assertTrue(roleExists("unprov_it_active_geo"));
+    assertTrue(hasTablePrivilege("unprov_it_active_geo", "unprov_it.active_t", "SELECT"));
+  }
+
+  @Test
+  void unprovisionSinksDropsTheSchemaWithTheLastPostgisSink() throws Exception {
+    Map<String, Object> pendingSink = sinkWithReadRole("last_t", "unprov_last_it_geo");
+    handler.handle(
+        execute(
+            "PROVISION_SINK",
+            Map.of("datasetId", "unprov-last-it", "datasinks", List.of(pendingSink))));
+
+    SagaCommandResult result =
+        handler.handle(
+            execute(
+                "UNPROVISION_SINKS",
+                Map.of(
+                    "datasetId",
+                    "unprov-last-it",
+                    "pendingUnprovisionDatasinks",
+                    List.of(pendingSink))));
+
+    assertEquals("STEP_COMPLETED", result.type(), result.error());
+    assertFalse(tableExists("unprov_last_it", "last_t"));
+    assertFalse(roleExists("unprov_last_it_geo"));
+    assertFalse(schemaExists("unprov_last_it"));
+  }
+
+  @Test
+  void unprovisionSinksToleratesMissingTableRoleAndSchema() {
+    SagaCommandResult result =
+        handler.handle(
+            execute(
+                "UNPROVISION_SINKS",
+                Map.of(
+                    "datasetId",
+                    "unprov-absent-it",
+                    "pendingUnprovisionDatasinks",
+                    List.of(sinkWithReadRole("absent_t", "unprov_absent_it_geo")))));
+
+    assertEquals("STEP_COMPLETED", result.type(), result.error());
+  }
+
+  private static Map<String, Object> sinkWithReadRole(String table, String readRole) {
+    return Map.of(
+        "type",
+        "POSTGIS",
+        "configuration",
+        Map.of(
+            "tableName",
+            table,
+            "columns",
+            List.of(Map.of("name", "id", "type", "BIGINT", "nullable", false)),
+            "primaryKey",
+            List.of("id"),
+            "readRole",
+            Map.of("name", readRole, "privileges", List.of("USAGE"))));
+  }
+
   /** The payload a saga compensation receives: the step's compensation data over the trigger. */
   private static Map<String, Object> withCompensationData(
       Map<String, Object> trigger, SagaCommandResult step) {

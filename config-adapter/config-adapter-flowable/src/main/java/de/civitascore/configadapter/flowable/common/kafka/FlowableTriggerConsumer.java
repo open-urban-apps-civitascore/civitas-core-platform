@@ -46,6 +46,8 @@ public class FlowableTriggerConsumer {
   private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
   private static final String DATASINK_TYPE_POSTGIS = "POSTGIS";
   private static final String DATASINK_TYPE_FROST = "FROST";
+  private static final String ACTIVE_SINKS = "datasinks";
+  private static final String PENDING_SINKS = "pendingUnprovisionDatasinks";
 
   private final RuntimeService runtimeService;
   private final HistoryService historyService;
@@ -220,10 +222,15 @@ public class FlowableTriggerConsumer {
     // Always derive — never trust external payload for these control flags
     variables.put("hasPipelines", deriveHasPipelines(trigger));
     // A POSTGIS sink gates the GeoServer branch (GeoServer publishes it via a PostGIS datastore); a
-    // FROST sink gates FROST provisioning. FROST teardown is deliberately ungated: it keys on the
-    // recorded project id, so removing the sink first cannot orphan the project.
-    variables.put("hasGeoSink", hasDataSinkOfType(trigger, DATASINK_TYPE_POSTGIS));
-    variables.put("hasFrostSink", hasDataSinkOfType(trigger, DATASINK_TYPE_FROST));
+    // FROST sink gates FROST provisioning. FROST teardown in the delete saga is deliberately
+    // ungated: it keys on the recorded project id, so removing the sink first cannot orphan the
+    // project.
+    variables.put("hasGeoSink", hasDataSinkOfType(trigger, ACTIVE_SINKS, DATASINK_TYPE_POSTGIS));
+    variables.put("hasFrostSink", hasDataSinkOfType(trigger, ACTIVE_SINKS, DATASINK_TYPE_FROST));
+    variables.put(
+        "hasPendingGeoSink", hasDataSinkOfType(trigger, PENDING_SINKS, DATASINK_TYPE_POSTGIS));
+    variables.put(
+        "hasPendingFrostSink", hasDataSinkOfType(trigger, PENDING_SINKS, DATASINK_TYPE_FROST));
     variables.put("hasLayers", deriveHasLayers(trigger));
 
     ProcessInstance instance =
@@ -258,11 +265,13 @@ public class FlowableTriggerConsumer {
   }
 
   /**
-   * True if the trigger carries a data sink of the given type. Absent, non-list and empty {@code
-   * datasinks} all collapse to false, so the derived flags are total over any payload shape.
+   * True if the trigger's sink list {@code field} carries a data sink of the given type. Absent,
+   * non-list and empty lists all collapse to false, so the derived flags are total over any payload
+   * shape.
    */
-  private static boolean hasDataSinkOfType(Map<String, Object> trigger, String sinkType) {
-    return trigger.get("datasinks") instanceof List<?> datasinks
+  private static boolean hasDataSinkOfType(
+      Map<String, Object> trigger, String field, String sinkType) {
+    return trigger.get(field) instanceof List<?> datasinks
         && datasinks.stream()
             .anyMatch(sink -> sink instanceof Map<?, ?> map && sinkType.equals(map.get("type")));
   }
