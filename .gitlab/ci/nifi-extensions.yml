@@ -146,15 +146,18 @@ integration-test-nifi-extensions:
 # it from.
 publish-nifi-extensions:
   extends:
-    - .only-nifi-extensions-changes
+    - .rules-protected
     - .nifi-extensions-maven
-  stage: deploy-package
+  stage: publish
   interruptible: false
   needs:
     - job: setup-version
       artifacts: true
     - job: build-nifi-extensions
     - job: static-analysis-nifi-extensions
+      artifacts: false
+    - job: integration-test-nifi-extensions
+      artifacts: false
   script:
     - cd nifi-extensions
     - |
