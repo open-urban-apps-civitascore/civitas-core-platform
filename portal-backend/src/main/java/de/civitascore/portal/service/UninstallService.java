@@ -58,15 +58,36 @@ public class UninstallService {
    */
   @Transactional
   public void uninstall(UUID id) {
-    Installation installation =
+    uninstall(
         installationRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Installation", id.toString()));
+            .orElseThrow(() -> new ResourceNotFoundException("Installation", id.toString())));
+  }
+
+  /**
+   * Uninstalls an installation of a Data pool, as {@link #uninstall(UUID)} does. For an
+   * installation of another Data pool, the result is the same as for an installation that does not
+   * exist, and nothing changes.
+   *
+   * @param datapoolId the Data pool
+   * @param id the id of the installation
+   * @throws ResourceNotFoundException if the installation does not exist in the Data pool
+   * @throws ResourceInUseException under the same conditions as {@link #uninstall(UUID)}
+   */
+  @Transactional
+  public void uninstallInDatapool(UUID datapoolId, UUID id) {
+    uninstall(
+        installationRepository
+            .findByIdAndDatapoolId(id, datapoolId)
+            .orElseThrow(() -> new ResourceNotFoundException("Installation", id.toString())));
+  }
+
+  private void uninstall(Installation installation) {
     if (installation.isUninstalled()) {
       return;
     }
     List<InstalledArtifact> lines = installation.getArtifacts();
-    uninstallGuard.requireRemovable(id, lines);
+    uninstallGuard.requireRemovable(installation.getId(), lines);
 
     lines.reversed().forEach(this::remove);
 
@@ -74,7 +95,7 @@ public class UninstallService {
     installationRepository.save(installation);
     log.info(
         "Uninstalled installation {} of package {}",
-        id,
+        installation.getId(),
         Encode.forJava(installation.getPackageId()));
   }
 

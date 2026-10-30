@@ -66,6 +66,33 @@ class UninstallServiceTest {
   }
 
   @Test
+  void uninstallInDatapool_whenInstallationIsInAnotherDatapool_throwsResourceNotFound() {
+    UUID datapoolId = UUID.fromString("b0b0b0b0-b0b0-4000-8000-00000000000b");
+    when(installationRepository.findByIdAndDatapoolId(INSTALLATION_ID, datapoolId))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> uninstallService.uninstallInDatapool(datapoolId, INSTALLATION_ID))
+        .isInstanceOf(ResourceNotFoundException.class);
+
+    verifyNoInteractions(uninstallGuard, dataSetService, dataSourceService, dataStructureService);
+  }
+
+  @Test
+  void uninstallInDatapool_whenInstallationIsInTheDatapool_removesItsArtifacts() {
+    UUID datapoolId = UUID.fromString("b0b0b0b0-b0b0-4000-8000-00000000000b");
+    Installation installation = treeMap();
+    when(installationRepository.findByIdAndDatapoolId(INSTALLATION_ID, datapoolId))
+        .thenReturn(Optional.of(installation));
+    allArtifactsExist();
+
+    uninstallService.uninstallInDatapool(datapoolId, INSTALLATION_ID);
+
+    verify(uninstallGuard).requireRemovable(INSTALLATION_ID, installation.getArtifacts());
+    verify(dataSetService).deleteById(DATASET_ID);
+    assertThat(installation.isUninstalled()).isTrue();
+  }
+
+  @Test
   void uninstall_whenInstallationIsUninstalled_changesNothing() {
     Installation installation = treeMap();
     LocalDateTime uninstalledAt = LocalDateTime.of(2026, 10, 23, 9, 0);

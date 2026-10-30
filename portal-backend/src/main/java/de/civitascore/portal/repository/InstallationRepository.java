@@ -1,7 +1,10 @@
 package de.civitascore.portal.repository;
 
 import de.civitascore.portal.model.entity.Installation;
+import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /**
@@ -30,4 +33,22 @@ public interface InstallationRepository extends JpaRepository<Installation, UUID
   boolean existsByPackageIdAndDatapoolIdIsNullAndUninstalledAtIsNull(String packageId);
 
   boolean existsByPackageIdAndDatapoolIdAndUninstalledAtIsNull(String packageId, UUID datapoolId);
+
+  /**
+   * Returns a page of the installations of a Data pool, the active and the uninstalled ones.
+   *
+   * @param datapoolId the Data pool
+   * @param pageable the page and the sort order
+   * @return the installations of the page
+   */
+  Page<Installation> findByDatapoolId(UUID datapoolId, Pageable pageable);
+
+  /**
+   * Returns an installation only if it is in the Data pool.
+   *
+   * @param id the id of the installation
+   * @param datapoolId the Data pool
+   * @return the installation, or empty if it does not exist or is in another Data pool
+   */
+  Optional<Installation> findByIdAndDatapoolId(UUID id, UUID datapoolId);
 }
