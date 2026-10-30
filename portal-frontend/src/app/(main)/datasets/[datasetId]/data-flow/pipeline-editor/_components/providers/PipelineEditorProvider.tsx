@@ -96,6 +96,7 @@ import type { PipelineSession, UsePipelineSessionReturn } from '../../_types/ses
 import type { ValidationSeverity } from '../nodes/base/BasePipelineNode'
 
 type CreatedDataSink = { nodeId: string; dataSinkId: string }
+type CreatedMapping = { nodeId: string; logicalUrn: string }
 
 const withoutSelection = (pipeline: Pipeline): Pipeline => ({
   ...pipeline,
@@ -724,6 +725,22 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       return restored
     }
 
+    // No Pipeline references a mapping that a cancelled save created, so the Dataset would keep it after the user
+    // discards the session.
+    const withoutCreatedMappings = async (pipeline: Pipeline, createdMappings: CreatedMapping[]) => {
+      let restored = pipeline
+      for (const { nodeId, logicalUrn } of createdMappings) {
+        try {
+          await deleteMappingMutation.mutateAsync(logicalUrn)
+          restored = updateNodeData(restored, nodeId, { mappingRef: undefined, mappingLogicalUrn: undefined })
+        } catch (error) {
+          // The kept ref lets the next save version this mapping instead of creating another one.
+          console.error('Failed to delete a mapping of the unsaved pipeline:', logicalUrn, error)
+        }
+      }
+      return restored
+    }
+
     try {
       if (hasDestructiveChange) {
         const isConfirmed = await confirmDataLoss()
@@ -737,6 +754,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         pipeline: Pipeline
         removedSinkIds: string[]
         createdDataSinks: CreatedDataSink[]
+        createdMappings: CreatedMapping[]
       }[] = []
       // Serialize saves to avoid concurrent mutation state issues
       for (const session of dirtySessions) {
@@ -744,6 +762,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         // onto it before the failing step.
         let currentPipeline = withoutSelection(currentPipelineOf(session.pipeline))
         const createdDataSinks: CreatedDataSink[] = []
+        const createdMappings: CreatedMapping[] = []
         try {
           const snapshot = dataSinkSnapshotsRef.current[session.id] ?? {}
           const removedSinkIds = getRemovedDataSinkIds(currentPipeline, snapshot)
@@ -792,13 +811,20 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
             const response = logicalUrn
               ? await updateMappingMutation.mutateAsync({ logicalUrn, ...body })
               : await createMappingMutation.mutateAsync(body)
+            if (!logicalUrn) createdMappings.push({ nodeId, logicalUrn: response.data.logicalUrn })
             currentPipeline = updateNodeData(currentPipeline, nodeId, {
               mappingRef: response.data.versionedUrn,
               mappingLogicalUrn: response.data.logicalUrn,
             })
           }
 
-          preparedSessions.push({ session, pipeline: currentPipeline, removedSinkIds, createdDataSinks })
+          preparedSessions.push({
+            session,
+            pipeline: currentPipeline,
+            removedSinkIds,
+            createdDataSinks,
+            createdMappings,
+          })
         } catch (error) {
           // A later step may fail after an earlier step already created a mapping and stashed its refs onto
           // currentPipeline. Persist that partial progress — still dirty — so a retry sees the stashed
@@ -828,10 +854,11 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         }
       }
 
-      // Phase 3 saves the pipelines. After an abort it keeps the mappings of phase 1, as the catch above does.
-      for (const { session, pipeline: prepared, createdDataSinks } of preparedSessions) {
+      // Phase 3 saves the pipelines.
+      for (const { session, pipeline: prepared, createdDataSinks, createdMappings } of preparedSessions) {
         if (isAborted) {
-          sessionManager.updateSessionPipeline(session.id, await withoutCreatedDataSinks(prepared, createdDataSinks))
+          const restored = await withoutCreatedDataSinks(prepared, createdDataSinks)
+          sessionManager.updateSessionPipeline(session.id, await withoutCreatedMappings(restored, createdMappings))
           continue
         }
         let currentPipeline = prepared

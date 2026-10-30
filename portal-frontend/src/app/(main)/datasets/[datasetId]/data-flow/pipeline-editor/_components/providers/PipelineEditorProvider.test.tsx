@@ -1881,6 +1881,67 @@ describe('PipelineEditorProviderComponent', () => {
         })
       })
 
+      describe('mappings saved by a cancelled save', () => {
+        const mockDeleteMappingMutateAsync = vi.fn()
+        const mappingNodeData = () =>
+          contextRef.current?.pipeline?.nodes.find(node => node.id === 'map-1')?.data as
+            { mappingRef?: string; mappingLogicalUrn?: string } | undefined
+
+        const saveWithMappingAndCancel = async (logicalUrn: string | undefined) => {
+          const actual = await vi.importActual<typeof import('../../_services/payloadBuilderService')>(
+            '../../_services/payloadBuilderService',
+          )
+          vi.mocked(updateNodeData).mockImplementation(actual.updateNodeData)
+          mockDeleteMappingMutateAsync.mockReset().mockResolvedValue({})
+          vi.mocked(useDeleteMapping).mockReturnValue({
+            mutate: vi.fn(),
+            mutateAsync: mockDeleteMappingMutateAsync,
+            isPending: false,
+          } as unknown as ReturnType<typeof useDeleteMapping>)
+          vi.mocked(getRemovedDataSinkIds).mockReturnValue(['old-sink-1'])
+          vi.mocked(getDatasetResources).mockResolvedValue(LAYER_REMOVAL)
+          vi.mocked(buildMappingArtifacts).mockReturnValue([
+            { nodeId: 'map-1', logicalUrn, body: { title: 'Src-to-Tgt' } as never },
+          ])
+          renderProvider(
+            makeSession({
+              isDirty: true,
+              pipeline: {
+                ...createEmptyPipeline('Test'),
+                id: 'pipeline-1',
+                nodes: [makeNode('map-1', PIPELINE_NODE_TYPES.Mapping)],
+              },
+            }),
+          )
+
+          let savePromise: Promise<boolean | undefined> | undefined
+          await act(async () => {
+            savePromise = contextRef.current?.saveAllPipelines()
+          })
+          let result: boolean | undefined
+          await act(async () => {
+            saveDialog()?.onCancel()
+            result = await savePromise
+          })
+          return result
+        }
+
+        it('deletes the mappings it created and clears their refs', async () => {
+          expect(await saveWithMappingAndCancel(undefined)).toBe(false)
+
+          expect(mockDeleteMappingMutateAsync).toHaveBeenCalledWith('urn:logical')
+          expect(mappingNodeData()?.mappingRef).toBeUndefined()
+          expect(mappingNodeData()?.mappingLogicalUrn).toBeUndefined()
+        })
+
+        it('keeps a mapping that existed before the save', async () => {
+          expect(await saveWithMappingAndCancel('urn:logical')).toBe(false)
+
+          expect(mockDeleteMappingMutateAsync).not.toHaveBeenCalled()
+          expect(mappingNodeData()?.mappingLogicalUrn).toBe('urn:logical')
+        })
+      })
+
       it('does not load the Dataset resources when no node was removed', async () => {
         renderProvider(savedSession('session-1', 'pipeline-1'))
 
