@@ -312,6 +312,7 @@ build-nifi-nars-api-test:
     expire_in: 1 day
     paths:
       - nifi-extensions/nifi-*-nar/target/*.nar
+      - nifi-extensions/nifi-jdbc-drivers/target/drivers/*.jar
 
 # Bruno API smoke tests — spins up a real backend stack (PostgreSQL, Keycloak,
 # Kafka, Portal Backend) via Docker Compose and runs the full Bruno CLI test

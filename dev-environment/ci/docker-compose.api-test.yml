@@ -331,21 +331,18 @@ services:
     # ./drivers, but CI runs in Docker-in-Docker where host bind mounts don't work, so it is baked
     # into the image instead.
     build:
-      # Every NAR of the NiFi extensions, which the build-nifi-nars-api-test job builds: the saga
-      # collections deploy Pipelines that use PutFrostRecord and GetHttpApiCall. The .dockerignore
-      # of the extensions admits only the NARs. Run `mvn -f nifi-extensions/pom.xml package` first
-      # when starting this stack by hand.
+      # Every NAR and JDBC driver of the NiFi extensions, which the build-nifi-nars-api-test job
+      # builds: the saga collections deploy Pipelines that use PutFrostRecord and GetHttpApiCall.
+      # The .dockerignore of the extensions admits only the NARs and the drivers. Run
+      # `mvn -f nifi-extensions/pom.xml package` first when starting this stack by hand.
       context: ../../nifi-extensions
       dockerfile_inline: |
         FROM apache/nifi:2.9.0
         # lib/, not the auto-load directory: NiFi loads lib/ before it answers a request, so the
         # first deployment already finds the processors of the extensions.
         COPY --chown=nifi:nifi nifi-*-nar/target/*.nar /opt/nifi/nifi-current/lib/
+        COPY --chown=nifi:nifi nifi-jdbc-drivers/target/drivers/*.jar /opt/nifi/drivers/
         USER root
-        RUN mkdir -p /opt/nifi/drivers \
-          && curl -fsSL -o /opt/nifi/drivers/postgresql.jar \
-               https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar \
-          && chown -R nifi:nifi /opt/nifi/drivers
         # AUTH=oidc needs an explicit keystore/truststore (single-user's auto-generation is gone).
         # Bake a throwaway self-signed pair; the config-adapter trusts all certs (NIFI_TLS_INSECURE).
         RUN mkdir -p /opt/nifi/certs \

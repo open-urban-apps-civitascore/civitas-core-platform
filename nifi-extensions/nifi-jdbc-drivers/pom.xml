@@ -42,7 +42,7 @@
 						</goals>
 						<configuration>
 							<outputDirectory>${project.build.directory}/drivers</outputDirectory>
-							<includeArtifactIds>postgresql</includeArtifactIds>
+							<excludeTransitive>true</excludeTransitive>
 							<stripVersion>true</stripVersion>
 						</configuration>
 					</execution>
