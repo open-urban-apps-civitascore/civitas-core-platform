@@ -658,7 +658,7 @@ Phase 3, per session:
 
 If a step throws, the partial progress is written back to the session — still dirty — so a retry updates the artifacts that were already created instead of creating duplicates. An error is classified and reported in a toast.
 
-If the removal is cancelled in phase 2, every session whose pipeline was not saved is written back the same way, except for the data sinks that phase 1 created: no pipeline links them, so they are deleted again (`DELETE /datasets/{datasetId}/datasinks/{id}`; a sink without storage or Layers needs no confirmation) and their nodes lose `entityId` and `configurationUrn`. A sink whose delete fails keeps its ref, so the next save links it.
+If the removal is cancelled in phase 2, every session whose pipeline was not saved is written back the same way, except for the data sinks that phase 1 created: no pipeline links them, so they are deleted again (`DELETE /datasets/{datasetId}/datasinks/{id}`; a sink without storage or Layers needs no confirmation) and their nodes lose `entityId` and `configurationUrn`. A sink whose delete fails keeps its ref, so the next save links it. A pipeline save that fails in phase 3 keeps the data sinks that phase 1 created, with their refs: the removal check counted them as staying, and deleting them could remove an API without a confirmation.
 
 ### Pipeline Delete
 

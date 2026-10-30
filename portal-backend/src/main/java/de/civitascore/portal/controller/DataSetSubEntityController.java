@@ -144,9 +144,8 @@ public abstract class DataSetSubEntityController<
   /** Whether the {@value #CONFIRM_DATA_LOSS} query parameter is {@code true}. */
   protected boolean isDataLossConfirmed() {
     ServletRequestAttributes attributes =
-        (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-    return attributes != null
-        && Boolean.parseBoolean(attributes.getRequest().getParameter(CONFIRM_DATA_LOSS));
+        (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+    return Boolean.parseBoolean(attributes.getRequest().getParameter(CONFIRM_DATA_LOSS));
   }
 
   private UUID extractDataSetId() {

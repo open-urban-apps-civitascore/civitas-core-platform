@@ -1829,7 +1829,8 @@ describe('PipelineEditorProviderComponent', () => {
           expect(nodeData()?.configurationUrn).toBeUndefined()
         })
 
-        it('deletes them and clears their refs when the pipeline update fails', async () => {
+        // Deleting them here would remove an API that the removal check counted on, without a confirmation.
+        it('keeps them and their refs when the pipeline update fails', async () => {
           mockUpdatePipelineMutateAsync.mockRejectedValueOnce(new Error('Pipeline save failed'))
           await renderWithNewSinkNode()
 
@@ -1839,11 +1840,8 @@ describe('PipelineEditorProviderComponent', () => {
           })
 
           expect(result).toBe(false)
-          expect(mockDeleteDataSinkMutateAsync).toHaveBeenCalledWith({
-            datasetId: 'dataset-1',
-            dataSinkId: 'new-sink-id',
-          })
-          expect(nodeData()?.entityId).toBeUndefined()
+          expect(mockDeleteDataSinkMutateAsync).not.toHaveBeenCalled()
+          expect(nodeData()?.entityId).toBe('new-sink-id')
         })
 
         it('deletes them when a later step of the same pipeline fails', async () => {

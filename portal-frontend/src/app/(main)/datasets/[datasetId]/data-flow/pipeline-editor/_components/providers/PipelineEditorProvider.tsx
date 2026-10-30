@@ -708,8 +708,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       }
     }
 
-    // A Data sink that no Pipeline links stays active and keeps its APIs, so an aborted or failed save deletes the
-    // ones it created and clears their refs from the nodes.
+    // A Data sink that no Pipeline links stays active and keeps its APIs, so a save that is cancelled or fails before
+    // any pipeline update deletes the ones it created and clears their refs from the nodes.
     const withoutCreatedDataSinks = async (pipeline: Pipeline, createdDataSinks: CreatedDataSink[]) => {
       let restored = pipeline
       for (const { nodeId, dataSinkId } of createdDataSinks) {
@@ -871,10 +871,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
           mappingSnapshotsRef.current[session.id] = createMappingSnapshot(currentPipeline)
           toast.success(t('header.saveSuccess', { name: currentPipeline.name }))
         } catch (error) {
-          sessionManager.updateSessionPipeline(
-            session.id,
-            await withoutCreatedDataSinks(currentPipeline, createdDataSinks),
-          )
+          // The removal check counted these new sinks as staying, so deleting them now could remove an API without
+          // the user's confirmation. Their kept refs let the next save link them.
+          sessionManager.updateSessionPipeline(session.id, currentPipeline)
           classifySaveError(session.name, error)
         }
       }
