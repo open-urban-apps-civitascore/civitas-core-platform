@@ -95,7 +95,7 @@ publish-portal-model:
   script:
     - cd portal-model
     - |
-      mvn deploy -DskipTests -Drevision=$PORTAL_MODEL_VERSION \
+      mvn deploy -DskipTests -DskipITs -Drevision=$PORTAL_MODEL_VERSION \
         -Dspotless.check.skip=true \
         -DaltDeploymentRepository=gitlab-maven::default::${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/maven \
         -s ci_settings.xml

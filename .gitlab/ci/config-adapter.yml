@@ -195,7 +195,7 @@ static-analysis-config-adapter:
       artifacts: true
   script:
     - cd config-adapter
-    - mvn $MAVEN_CLI_OPTS verify -DskipTests -Drevision=$CONFIG_ADAPTER_VERSION -Djacoco.skip=true
+    - mvn $MAVEN_CLI_OPTS verify -DskipTests -DskipITs -Drevision=$CONFIG_ADAPTER_VERSION -Djacoco.skip=true
 
 # Publish config-adapter artifacts to the GitLab Maven repository. This is the release gate: only a
 # commit on a protected branch whose tests and static analysis passed is published. Merge requests
@@ -222,7 +222,7 @@ publish-config-adapter:
     - cd config-adapter
     # Version suffix (SNAPSHOT) is already applied by setup-version
     - |
-      mvn deploy -DskipTests -Drevision=$CONFIG_ADAPTER_VERSION \
+      mvn deploy -DskipTests -DskipITs -Drevision=$CONFIG_ADAPTER_VERSION \
         -Dspotless.check.skip=true -Dpmd.skip=true -Dcpd.skip=true -Dspotbugs.skip=true -Djacoco.skip=true \
         -DaltDeploymentRepository=gitlab-maven::default::${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/maven \
         -s ci_settings.xml

@@ -165,7 +165,7 @@ publish-nifi-extensions:
   script:
     - cd nifi-extensions
     - |
-      mvn deploy -DskipTests -Drevision=$NIFI_EXTENSIONS_VERSION \
+      mvn deploy -DskipTests -DskipITs -Drevision=$NIFI_EXTENSIONS_VERSION \
         -Dspotless.check.skip=true -Dpmd.skip=true -Dcpd.skip=true -Dspotbugs.skip=true -Djacoco.skip=true \
         -DaltDeploymentRepository=gitlab-maven::default::${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/maven \
         -s ci_settings.xml

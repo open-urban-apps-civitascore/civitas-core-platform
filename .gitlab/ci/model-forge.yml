@@ -172,7 +172,7 @@ static-analysis-model-forge:
       artifacts: true
   script:
     - cd model-forge
-    - mvn $MAVEN_CLI_OPTS verify -DskipTests -Drevision=$MODEL_FORGE_VERSION -Djacoco.skip=true
+    - mvn $MAVEN_CLI_OPTS verify -DskipTests -DskipITs -Drevision=$MODEL_FORGE_VERSION -Djacoco.skip=true
 
 # The Maven artifacts of this pipeline, for portal-backend. No tests and no checks: they run in
 # test-model-forge and static-analysis-model-forge, and the release gate is publish-model-forge.
@@ -252,7 +252,7 @@ publish-model-forge:
   script:
     - cd model-forge
     - |
-      mvn deploy -DskipTests -Drevision=$MODEL_FORGE_VERSION \
+      mvn deploy -DskipTests -DskipITs -Drevision=$MODEL_FORGE_VERSION \
         -Dspotless.check.skip=true \
         -Dspotbugs.skip=true \
         -Djacoco.skip=true \
