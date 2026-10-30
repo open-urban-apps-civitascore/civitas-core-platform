@@ -22,7 +22,7 @@
 # Common OPA configuration for CI jobs (lint, test, qa, bundle)
 # which GitLab CI requires to execute script commands.
 .opa-common:
-  image: registry.gitlab.com/civitas-connect/civitas-core/docker-images/cicd:2.0.0-beta
+  image: registry.gitlab.com/civitas-connect/civitas-core/docker-images/cicd:2.0.0-beta@sha256:20e19e438cc0ce290e8b3e91b8e06506c8842953490667f4b4c8d4fdbeca4e1f
 
 # =============================================================================
 # Rego: format, strict type check, unit tests and the OPA bundle in one job
