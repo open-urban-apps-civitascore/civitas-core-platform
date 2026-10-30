@@ -160,7 +160,7 @@
     "removalConfirmModal": {
       "layers": "Diese Layer werden gelöscht:",
       "apis": "Diese APIs werden gelöscht:",
-      "storedData": "Die gespeicherten Daten werden bei der nächsten Freigabe des Datensatzes gelöscht."
+      "storedData": "Die gespeicherten Daten werden gelöscht."
     }
   },
   "languages": {

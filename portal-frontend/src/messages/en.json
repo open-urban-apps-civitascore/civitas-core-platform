@@ -161,7 +161,7 @@
     "removalConfirmModal": {
       "layers": "These Layers are deleted:",
       "apis": "These APIs are deleted:",
-      "storedData": "The stored data is deleted with the next release of the Dataset."
+      "storedData": "The stored data is deleted."
     }
   },
   "languages": {
