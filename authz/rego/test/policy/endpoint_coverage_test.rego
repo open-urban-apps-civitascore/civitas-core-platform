@@ -178,3 +178,122 @@ test_ready_meta_denied_unauthenticated if {
 	result := authz.decision with input as portal_request_no_auth("PATCH", "/v1/datasets/dataset-abc/ready/meta")
 	result.allow == false
 }
+
+# =============================================================================
+# INSTALLATIONS
+# =============================================================================
+# An installation is a resource of the whole tenant: it has no scope of its own.
+# Only a tenant-wide grant gives access. An install creates the artifacts of a
+# package: Data structures and their first versions, Data sources, a Dataset and
+# the sub-resources of the Dataset. So POST /v1/installations needs all
+# permissions in installer_permissions (an AND list in data.json): the
+# permissions that the API needs for the same work.
+
+installer_permissions := [
+	"INSTALLATION_CREATE",
+	"DATASTRUCTURE_CREATE",
+	"DATASTRUCTURE_UPDATE",
+	"DATASOURCE_CREATE",
+	"DATASET_CREATE",
+	"DATASET_UPDATE",
+]
+
+# The installer permissions without the given one.
+installer_permissions_without(name) := [permission | some permission in installer_permissions; permission != name]
+
+mock_send_installation_reader(_) := {"status_code": 200, "body": mock_http.user_with_permissions(["INSTALLATION_READ"])}
+mock_send_installer(_) := {"status_code": 200, "body": mock_http.user_with_permissions(installer_permissions)}
+mock_send_installer_without_installation_create(_) := {"status_code": 200, "body": mock_http.user_with_permissions(installer_permissions_without("INSTALLATION_CREATE"))}
+mock_send_installer_without_datastructure_create(_) := {"status_code": 200, "body": mock_http.user_with_permissions(installer_permissions_without("DATASTRUCTURE_CREATE"))}
+mock_send_installer_without_datastructure_update(_) := {"status_code": 200, "body": mock_http.user_with_permissions(installer_permissions_without("DATASTRUCTURE_UPDATE"))}
+mock_send_installer_without_datasource_create(_) := {"status_code": 200, "body": mock_http.user_with_permissions(installer_permissions_without("DATASOURCE_CREATE"))}
+mock_send_installer_without_dataset_create(_) := {"status_code": 200, "body": mock_http.user_with_permissions(installer_permissions_without("DATASET_CREATE"))}
+mock_send_installer_without_dataset_update(_) := {"status_code": 200, "body": mock_http.user_with_permissions(installer_permissions_without("DATASET_UPDATE"))}
+mock_send_pool_installer(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(installer_permissions, "DATAPOOL", "pool-1")}
+
+test_installation_read_allowed_with_tenant_grant if {
+	result := authz.decision with http.send as mock_send_installation_reader
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/installations/installation-1")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.required_permissions == {"INSTALLATION_READ"}
+}
+
+test_install_allowed_with_all_required_permissions if {
+	result := authz.decision with http.send as mock_send_installer
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/installations")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.required_permissions == {permission | some permission in installer_permissions}
+}
+
+# The permission to install does not include the permission to create Data structures.
+test_install_denied_without_datastructure_create if {
+	result := authz.decision with http.send as mock_send_installer_without_datastructure_create
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/installations")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# The permission to create Data structures does not include the permission to create their versions.
+test_install_denied_without_datastructure_update if {
+	result := authz.decision with http.send as mock_send_installer_without_datastructure_update
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/installations")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# The permissions for the artifacts of a package do not include the permission to install.
+test_install_denied_without_installation_create if {
+	result := authz.decision with http.send as mock_send_installer_without_installation_create
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/installations")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# The permission to install does not include the permission to create Data sources.
+test_install_denied_without_datasource_create if {
+	result := authz.decision with http.send as mock_send_installer_without_datasource_create
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/installations")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# The permission to install does not include the permission to create Datasets.
+test_install_denied_without_dataset_create if {
+	result := authz.decision with http.send as mock_send_installer_without_dataset_create
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/installations")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# The permission to create a Dataset does not include the permission to change it.
+# The install adds Mappings, Data sinks, Pipelines, Styles and Layers to the Dataset.
+test_install_denied_without_dataset_update if {
+	result := authz.decision with http.send as mock_send_installer_without_dataset_update
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/installations")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# A grant on one data pool is not tenant-wide, so it does not reach the installations.
+test_install_denied_with_pool_grant if {
+	result := authz.decision with http.send as mock_send_pool_installer
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/installations")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+test_install_denied_unauthenticated if {
+	result := authz.decision with input as portal_request_no_auth("POST", "/v1/installations")
+	result.allow == false
+}

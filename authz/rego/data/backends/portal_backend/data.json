@@ -226,6 +226,14 @@
     },
     "/v1/datapools/{id}/assignments": {
       "GET": "DATAPOOL_READ"
+    },
+    "/v1/installations": {
+      "_collection": true,
+      "GET": "INSTALLATION_READ",
+      "POST": ["INSTALLATION_CREATE", "DATASTRUCTURE_CREATE", "DATASTRUCTURE_UPDATE", "DATASOURCE_CREATE", "DATASET_CREATE", "DATASET_UPDATE"]
+    },
+    "/v1/installations/{id}": {
+      "GET": "INSTALLATION_READ"
     }
   }
 }

@@ -270,6 +270,51 @@ class ConnectorJsonTest {
   }
 
   @Test
+  void readDocument_withPackageDocument_readsTheConnectorWithoutTheDocumentKeys() {
+    Map<String, Object> document =
+        Map.of(
+            "$schema", "https://civitasconnect.digital/core/datasource/v1",
+            "id", "urn:core:standard:test:datasource:environment:treedb:a1b2c3d4e5",
+            "title", "Tree database",
+            "description", "Reads the trees",
+            "connectionType", "sql",
+            "element", "urn:core:standard:test:datastructure:environment:tree:f6g7h8i9j0",
+            "driver", "postgres",
+            "dsn", "postgres://db:5432/x",
+            "columns", List.of("id"),
+            "password", "pw");
+
+    assertThat(ConnectorJson.readDocument(document))
+        .isEqualTo(
+            new SqlConnectorConfiguration(
+                "postgres",
+                "postgres://db:5432/x",
+                null,
+                List.of("id"),
+                null,
+                null,
+                Secret.of("pw")));
+  }
+
+  @Test
+  void readDocument_withKeyThatTheConnectorDoesNotHave_namesTheKey() {
+    Map<String, Object> document = Map.of("connectionType", "mqtt", "client_id", "trees");
+
+    assertThatThrownBy(() -> ConnectorJson.readDocument(document))
+        .isInstanceOf(MalformedDataSourceRequestException.class)
+        .hasMessage("Unknown key: connector.client_id");
+  }
+
+  @Test
+  void readDocument_withoutConnectionType_namesTheMissingType() {
+    Map<String, Object> document = Map.of("title", "Tree database", "table", "trees");
+
+    assertThatThrownBy(() -> ConnectorJson.readDocument(document))
+        .isInstanceOf(MalformedDataSourceRequestException.class)
+        .hasMessage("Missing connector.connectorType");
+  }
+
+  @Test
   void toDocument_ofStoredConnector_keepsTheStoredCiphertext() {
     Map<String, Object> stored =
         Map.of("connectionType", "sql", "dsn", "postgres://db/x", "password", "ENC(stored)");
