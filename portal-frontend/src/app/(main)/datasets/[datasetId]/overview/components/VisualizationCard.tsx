@@ -56,9 +56,10 @@ export const VisualizationCard = ({
   if (visualization.filterExpansion !== 'DEFAULT') {
     dashboardParams.set('expand_filters', visualization.filterExpansion === 'EXPANDED' ? '1' : '0')
   }
-  const supersetUrl = visualization.externalDashboardId && supersetPublicUrl
-    ? `${supersetPublicUrl.replace(/\/$/, '')}/dashboard/${visualization.externalDashboardId}/?${dashboardParams}`
-    : undefined
+  const supersetUrl =
+    visualization.externalDashboardId && supersetPublicUrl
+      ? `${supersetPublicUrl.replace(/\/$/, '')}/dashboard/${visualization.externalDashboardId}/?${dashboardParams}`
+      : undefined
 
   const handleConfirmDelete = async () => {
     try {

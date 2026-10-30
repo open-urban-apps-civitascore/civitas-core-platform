@@ -70,7 +70,7 @@ export const VisualizationConfigPage = ({
     dataset.datapool?.id,
   )
   const canModify = canEdit && (!isCreate || dataset.dataSetStatus === DATASET_STATUS_TYPES.DRAFT)
-  const formIsReadOnly = isReadOnly || !canModify
+  const isFormReadOnly = isReadOnly || !canModify
 
   const defaultValues: VisualizationFormData = {
     name: existingVisualization?.name ?? '',
@@ -184,7 +184,7 @@ export const VisualizationConfigPage = ({
 
   useRegisterUnsavedChanges(hasUnsavedChanges, handleSave)
 
-  const buttonGroup = formIsReadOnly ? (
+  const buttonGroup = isFormReadOnly ? (
     <Button data-testid="editButton" type="button" onClick={() => updateMode(true)}>
       {tCommon('actions.edit')}
     </Button>
@@ -226,9 +226,11 @@ export const VisualizationConfigPage = ({
           >
             <ContentCard>
               {selectedTab === 'basicInfo' && (
-                <VisualizationConfigForm form={form} typeLabel={typeLabel} isReadOnly={formIsReadOnly} />
+                <VisualizationConfigForm form={form} typeLabel={typeLabel} isReadOnly={isFormReadOnly} />
               )}
-              {selectedTab === 'options' && !isCreate && <DashboardOptionsForm form={form} isReadOnly={formIsReadOnly} />}
+              {selectedTab === 'options' && !isCreate && (
+                <DashboardOptionsForm form={form} isReadOnly={isFormReadOnly} />
+              )}
             </ContentCard>
           </form>
         </Form>
