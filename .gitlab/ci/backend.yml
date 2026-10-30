@@ -86,7 +86,10 @@ test-backend:
     - .maven-backend
   image: maven:3.9.16-eclipse-temurin-25-alpine
   stage: test
-  needs: !reference [.backend-dependencies, needs]
+  needs:
+    - !reference [.backend-dependencies, needs]
+    - job: build-backend
+      artifacts: true
   cache:
     policy: pull-push
     when: always
@@ -96,11 +99,11 @@ test-backend:
     # This job pushes the cache. It must not carry the components of this pipeline into it.
     - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitascore $CI_PROJECT_DIR/.m2/repository/de/civitas-core
   script:
-    # Compile test sources, then run unit tests
-    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent surefire:test jacoco:report $MVN_VERSIONS || TESTS_FAILED=1
+    # The classes and test classes come from build-backend; this job only runs the tests
+    - mvn $MAVEN_CLI_OPTS org.jacoco:jacoco-maven-plugin:prepare-agent surefire:test jacoco:report $MVN_VERSIONS || TESTS_FAILED=1
     # Unused or undeclared dependencies (this was the job dependency-prune-backend). It runs after a failed
     # test too, so one pipeline shows both results; the job fails if either failed.
-    - mvn $MAVEN_CLI_OPTS dependency:analyze $MVN_VERSIONS -DfailOnWarning=true -DignoreNonCompile=false || DEPENDENCIES_FAILED=1
+    - mvn $MAVEN_CLI_OPTS dependency:analyze-only $MVN_VERSIONS -DfailOnWarning=true -DignoreNonCompile=false || DEPENDENCIES_FAILED=1
     - test -z "$TESTS_FAILED$DEPENDENCIES_FAILED"
   artifacts:
     when: always
@@ -121,12 +124,15 @@ integration-test-backend:
   image: maven:3.9.16-eclipse-temurin-25
   stage: test
   timeout: 1h
-  needs: !reference [.backend-dependencies, needs]
+  needs:
+    - !reference [.backend-dependencies, needs]
+    - job: build-backend
+      artifacts: true
   before_script:
     - !reference [.backend-dependencies, before_script]
   script:
-    # Compile test sources, then run integration tests only. Saga-tagged tests are excluded via pom.xml (run in saga-e2e-test-backend)
-    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true $MVN_VERSIONS
+    # The classes come from build-backend. Run integration tests only. Saga-tagged tests are excluded via pom.xml (run in saga-e2e-test-backend)
+    - mvn $MAVEN_CLI_OPTS org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true $MVN_VERSIONS
   artifacts:
     when: always
     expire_in: 1 month
@@ -147,7 +153,10 @@ saga-e2e-test-backend:
   image: maven:3.9.16-eclipse-temurin-25
   stage: test
   timeout: 1h
-  needs: !reference [.backend-dependencies, needs]
+  needs:
+    - !reference [.backend-dependencies, needs]
+    - job: build-backend
+      artifacts: true
   rules:
     - !reference [.rules-protected, rules]
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -165,12 +174,13 @@ saga-e2e-test-backend:
   before_script:
     - !reference [.backend-dependencies, before_script]
   script:
-    - mvn $MAVEN_CLI_OPTS test-compile org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true $MVN_VERSIONS -Psaga -Dfailsafe.rerunFailingTestsCount=1
+    - mvn $MAVEN_CLI_OPTS org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true $MVN_VERSIONS -Psaga -Dfailsafe.rerunFailingTestsCount=1 -Djacoco.destFile=target/jacoco-saga.exec
   artifacts:
     when: always
     expire_in: 1 month
     paths:
       - portal-backend/target/failsafe-reports/
+      - portal-backend/target/jacoco-saga.exec
     reports:
       junit: portal-backend/target/failsafe-reports/TEST-*.xml
 
@@ -261,18 +271,22 @@ api-test-backend:
     expire_in: 30 days
 
 report-test-backend:
-  extends: .only-backend-changes
+  extends:
+    - .only-backend-changes
+    - .maven-backend
   image: maven:3.9.16-eclipse-temurin-25
   stage: test
-  dependencies:
-    - build-backend
-    - test-backend
-    - integration-test-backend
-  needs: ['build-backend', 'test-backend', 'integration-test-backend']
+  # The execution data and target/classes of the test jobs are all that the merge and the report need.
+  # The saga job is optional because its rules are narrower than the rules of this job.
+  needs:
+    - job: test-backend
+    - job: integration-test-backend
+    - job: saga-e2e-test-backend
+      optional: true
   before_script:
     - cd portal-backend
   script:
-    - mvn jacoco:merge jacoco:report
+    - mvn $MAVEN_CLI_OPTS jacoco:merge jacoco:report
     - cat target/site/jacoco/index.html | grep -o 'Total[^%]*%' || true
   coverage: '/Total.*?([0-9]{1,3})%/'
   artifacts:
@@ -305,6 +319,9 @@ build-backend:
     when: on_success
     paths:
       - portal-backend/target/*.jar
+      # The test jobs run on these and do not compile again
+      - portal-backend/target/classes/
+      - portal-backend/target/test-classes/
     expire_in: 1 month
 
 build-backend-image:
