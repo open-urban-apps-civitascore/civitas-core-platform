@@ -173,6 +173,11 @@ export const DatasourceApiToFormSchema = DatasourceApiResponseSchema.transform(
   },
 )
 
+export const getConnectorIssues = (connector: Datasource['connector']) =>
+  connector ? (ConnectorApiToFormSchema.safeParse(toConnectorFormShape(connector)).error?.issues ?? []) : []
+
+export const isConnectorReadable = (connector: Datasource['connector']) => getConnectorIssues(connector).length === 0
+
 export const DatasourceCreateFormSchema = z.object({
   name: z
     .string()

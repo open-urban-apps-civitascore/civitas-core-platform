@@ -1025,6 +1025,7 @@
       "paginationHeaderDuplicate": "A header already has this name.",
       "paginationParameterDuplicate": "Another pagination parameter already has this name.",
       "parameterPaginationDuplicate": "A pagination parameter already has this name.",
+      "unreadableDatasource": "Data source cannot be loaded.",
       "limitRequired": "Enter a limit for the limit parameter.",
       "limitParameterRequired": "Enter a limit parameter for the limit.",
       "limitInteger": "Enter a whole number of 1 or more.",

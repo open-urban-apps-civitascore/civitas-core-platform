@@ -1,7 +1,8 @@
 import { getTranslations } from 'next-intl/server'
 
 import { getDatasource, getDatasourceAssignments } from '@/app/services/api/datasources/serverRequests'
-import { DatasourceApiResponseSchema } from '@/types/datasources'
+import { ErrorPage } from '@/components/error-page/ErrorPage'
+import { DatasourceApiResponseSchema, getConnectorIssues } from '@/types/datasources'
 import { mapAssignmentApiResponseToTable } from '@/utils/assignments'
 
 import { DatasourceOverview } from './components/DatasourceOverview'
@@ -13,6 +14,7 @@ type Props = {
 const DatasourceDetailsPage = async ({ params }: Props) => {
   const { datasourceId } = await params
   const t = await getTranslations('common')
+  const tErrors = await getTranslations('datasources.errors')
   const [datasourceResponse, assignmentsResponse] = await Promise.all([
     getDatasource(datasourceId),
     getDatasourceAssignments(datasourceId),
@@ -21,6 +23,12 @@ const DatasourceDetailsPage = async ({ params }: Props) => {
   if (!parsedDatasource.success) {
     console.error(t('errors.loadingError'), parsedDatasource)
     throw new Error()
+  }
+
+  const connectorIssues = getConnectorIssues(parsedDatasource.data.connector)
+  if (connectorIssues.length > 0) {
+    console.error(t('errors.loadingError'), connectorIssues)
+    return <ErrorPage testId="datasourceLoadingErrorPage" errorText={tErrors('unreadableDatasource')} />
   }
 
   const initialAssignments = mapAssignmentApiResponseToTable(assignmentsResponse.data)

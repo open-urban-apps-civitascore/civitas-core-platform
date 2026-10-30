@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label'
 import { CONNECTOR_TYPES } from '@/const/connectors'
 import { useDatasetPermissionsById } from '@/hooks/use-dataset-permissions'
 import { cn } from '@/lib/utils'
-import type { Datasource } from '@/types/datasources'
+import { type Datasource, isConnectorReadable } from '@/types/datasources'
 
 import { useDatastructureVersionInfo } from '../../../_hooks/use-datastructure-version-info'
 import { usePipelineDatasources } from '../../../_hooks/use-pipeline-datasources'
@@ -123,7 +123,7 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
           entities={selectableApiCalls}
           selectedId={data.apiCallName}
           isLoading={isLoading}
-          isError={isError}
+          isError={isError || !isConnectorReadable(selectedEntity.connector)}
           onChange={apiCall => onUpdate({ apiCallName: apiCall?.name })}
           fallbackName={data.apiCallName}
           renderEntityName={renderApiCallName}
