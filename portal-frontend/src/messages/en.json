@@ -1148,11 +1148,20 @@
           "query": "Query parameter",
           "header": "Header"
         },
+        "offsetParameter": {
+          "label": "Offset parameter"
+        },
+        "offset": {
+          "label": "Offset"
+        },
         "limitParameter": {
           "label": "Limit parameter"
         },
         "limit": {
           "label": "Limit"
+        },
+        "countPath": {
+          "label": "Count path"
         }
       }
     },

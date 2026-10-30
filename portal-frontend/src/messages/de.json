@@ -1135,11 +1135,20 @@
           "query": "Query-Parameter",
           "header": "Header"
         },
+        "offsetParameter": {
+          "label": "Offset-Parameter"
+        },
+        "offset": {
+          "label": "Offset"
+        },
         "limitParameter": {
           "label": "Limit-Parameter"
         },
         "limit": {
           "label": "Limit"
+        },
+        "countPath": {
+          "label": "Pfad zur Anzahl"
         }
       }
     },

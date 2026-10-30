@@ -15,6 +15,7 @@ import {
   getParameterNameCollisionPaths,
   HttpApiCallsForm,
   HttpCursorPaginationForm,
+  HttpLimitOffsetPaginationForm,
   HttpPageNumberPaginationForm,
   HttpPaginationType,
   HttpParameterLocation,
@@ -22,6 +23,8 @@ import {
 
 type PageNumberField = Exclude<keyof HttpPageNumberPaginationForm, 'isEnabled' | 'type'>
 type CursorField = Exclude<keyof HttpCursorPaginationForm, 'isEnabled' | 'type' | 'cursorIn'>
+type LimitField = 'limitParameter' | 'limit'
+type LimitOffsetField = Exclude<keyof HttpLimitOffsetPaginationForm, 'isEnabled' | 'type'>
 
 interface PaginationFieldConfig<T> {
   name: T
@@ -42,9 +45,16 @@ const CURSOR_FIELDS: PaginationFieldConfig<CursorField>[] = [
   { name: 'cursorParameter', isRequired: true, isNumeric: false },
 ]
 
-const LIMIT_FIELDS: PaginationFieldConfig<CursorField>[] = [
+const LIMIT_FIELDS: PaginationFieldConfig<LimitField>[] = [
   { name: 'limitParameter', isRequired: false, isNumeric: false },
   { name: 'limit', isRequired: false, isNumeric: true },
+]
+
+const LIMIT_OFFSET_FIELDS: PaginationFieldConfig<LimitOffsetField>[] = [
+  { name: 'offsetParameter', isRequired: true, isNumeric: false },
+  { name: 'offset', isRequired: false, isNumeric: true },
+  ...LIMIT_FIELDS,
+  { name: 'countPath', isRequired: false, isNumeric: false },
 ]
 
 const PAGINATION_TYPE_LABELS: Record<HttpPaginationType, string> = {
@@ -104,7 +114,7 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
     label: t(CURSOR_IN_LABELS[location]),
   }))
 
-  const renderTextField = (config: PaginationFieldConfig<PageNumberField | CursorField>) => {
+  const renderTextField = (config: PaginationFieldConfig<PageNumberField | CursorField | LimitOffsetField>) => {
     const { name, isRequired, isNumeric } = config
     return (
       <TextField
@@ -126,7 +136,7 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
       case HTTP_PAGINATION_TYPES.PAGE_NUMBER:
         return <>{PAGE_NUMBER_FIELDS.map(renderTextField)}</>
       case HTTP_PAGINATION_TYPES.LIMIT_OFFSET:
-        return <></>
+        return <>{LIMIT_OFFSET_FIELDS.map(renderTextField)}</>
       case HTTP_PAGINATION_TYPES.CURSOR:
         return (
           <>

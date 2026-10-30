@@ -8,11 +8,16 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { DISABLED_INPUT_CLASS_NAME } from '@/components/form/fields/disabledFieldClassNames'
 import { Form } from '@/components/ui/form'
-import { CURSOR_PAGINATION_FORM, PAGINATION_FORM } from '@/test-support/paginationFixtures'
+import {
+  CURSOR_PAGINATION_FORM,
+  LIMIT_OFFSET_PAGINATION_FORM,
+  PAGINATION_FORM,
+} from '@/test-support/paginationFixtures'
 import {
   ApiCallSnapshots,
   CollapsedApiCallSections,
   EMPTY_CURSOR_PAGINATION,
+  EMPTY_LIMIT_OFFSET_PAGINATION,
   EMPTY_PAGINATION,
   HttpApiCallForm,
 } from '@/types/connectors'
@@ -109,10 +114,10 @@ const selectOption = async (user: ReturnType<typeof userEvent.setup>, combobox: 
   await user.click(screen.getByRole('option', { name: option }))
 }
 
-const openCursorPagination = async (user: ReturnType<typeof userEvent.setup>) => {
+const openPagination = async (user: ReturnType<typeof userEvent.setup>, typeLabel: string) => {
   await openApiCall(user)
   await user.click(screen.getByRole('checkbox', { name: 'enable' }))
-  await selectOption(user, 'type.label', 'type.cursor')
+  await selectOption(user, 'type.label', typeLabel)
 }
 
 describe('ApiCallsTab', () => {
@@ -590,7 +595,7 @@ describe('ApiCallsTab', () => {
       expect(screen.getByRole('textbox', { name: /^cursorParameter\.label/ })).toHaveClass(...DISABLED_INPUT_CLASSES)
     })
 
-    it('offers page number and cursor as type', async () => {
+    it('offers all pagination types', async () => {
       const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
       await openApiCall(user)
       await user.click(screen.getByRole('checkbox', { name: 'enable' }))
@@ -598,6 +603,7 @@ describe('ApiCallsTab', () => {
       await user.click(screen.getByRole('combobox', { name: 'type.label' }))
 
       expect(screen.getByRole('option', { name: 'type.pageNumber' })).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: 'type.limitOffset' })).toBeInTheDocument()
       expect(screen.getByRole('option', { name: 'type.cursor' })).toBeInTheDocument()
     })
 
@@ -605,7 +611,7 @@ describe('ApiCallsTab', () => {
       it('shows the cursor fields and the hint instead of the page number fields', async () => {
         const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [API_CALL] })
 
-        await openCursorPagination(user)
+        await openPagination(user, 'type.cursor')
 
         expect(screen.getByText('cursorHint')).toBeInTheDocument()
         expect(screen.getByRole('textbox', { name: /^cursorPath\.label/ })).toBeInTheDocument()
@@ -616,7 +622,7 @@ describe('ApiCallsTab', () => {
 
       it('clears the cursor values when switching back to page number', async () => {
         const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [API_CALL] })
-        await openCursorPagination(user)
+        await openPagination(user, 'type.cursor')
         await user.type(screen.getByRole('textbox', { name: /^cursorPath\.label/ }), '$.next')
 
         await selectOption(user, 'type.label', 'type.pageNumber')
@@ -627,7 +633,7 @@ describe('ApiCallsTab', () => {
 
       it('sends the cursor as query parameter by default and as header when selected', async () => {
         const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [API_CALL] })
-        await openCursorPagination(user)
+        await openPagination(user, 'type.cursor')
         expect(screen.getByRole('combobox', { name: /^cursorIn\.label/ })).toHaveTextContent('cursorIn.query')
 
         await selectOption(user, /^cursorIn\.label/, 'cursorIn.header')
@@ -648,7 +654,7 @@ describe('ApiCallsTab', () => {
 
       it('writes the entered values into the form', async () => {
         const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [API_CALL] })
-        await openCursorPagination(user)
+        await openPagination(user, 'type.cursor')
 
         await user.type(screen.getByRole('textbox', { name: /^cursorPath\.label/ }), '$.next_cursor')
         await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'cursor')
@@ -661,7 +667,7 @@ describe('ApiCallsTab', () => {
       it('marks cursor path, cursor parameter and send cursor as as required', async () => {
         const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
 
-        await openCursorPagination(user)
+        await openPagination(user, 'type.cursor')
 
         expect(screen.getByRole('textbox', { name: 'cursorPath.label *' })).toBeInTheDocument()
         expect(screen.getByRole('textbox', { name: 'cursorParameter.label *' })).toBeInTheDocument()
@@ -673,7 +679,7 @@ describe('ApiCallsTab', () => {
 
       it('shows the error of an invalid cursor path', async () => {
         const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
-        await openCursorPagination(user)
+        await openPagination(user, 'type.cursor')
 
         await user.type(screen.getByRole('textbox', { name: /^cursorPath\.label/ }), 'next')
 
@@ -682,7 +688,7 @@ describe('ApiCallsTab', () => {
 
       it('checks the cursor parameter again when the cursor is sent as header', async () => {
         const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
-        await openCursorPagination(user)
+        await openPagination(user, 'type.cursor')
         await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'my cursor')
         expect(screen.queryByText('datasources.errors.invalidHeaderName')).not.toBeInTheDocument()
 
@@ -693,7 +699,7 @@ describe('ApiCallsTab', () => {
 
       it('shows and clears the error when a query parameter gets and loses the cursor name', async () => {
         const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
-        await openCursorPagination(user)
+        await openPagination(user, 'type.cursor')
         await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'cursor')
         const queryParameterName = screen.getByRole('textbox', { name: 'parameters.query name' })
 
@@ -709,7 +715,7 @@ describe('ApiCallsTab', () => {
 
       it('shows the error also at the query parameter with the cursor name', async () => {
         const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
-        await openCursorPagination(user)
+        await openPagination(user, 'type.cursor')
         await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'cursor')
         const queryParameterName = screen.getByRole('textbox', { name: 'parameters.query name' })
 
@@ -723,7 +729,7 @@ describe('ApiCallsTab', () => {
       it('clears the error at the query parameter when the cursor parameter changes', async () => {
         const apiCall = { ...API_CALL, queryParameters: [{ name: 'cursor', value: 'x' }] }
         const { user } = renderApiCallsTab({ apiCalls: [apiCall] })
-        await openCursorPagination(user)
+        await openPagination(user, 'type.cursor')
         await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'cursor')
         expect(await screen.findByText('datasources.errors.parameterPaginationDuplicate')).toBeInTheDocument()
 
@@ -737,7 +743,7 @@ describe('ApiCallsTab', () => {
       it('clears the error at the query parameter when the pagination is unchecked', async () => {
         const apiCall = { ...API_CALL, queryParameters: [{ name: 'cursor', value: 'x' }] }
         const { user } = renderApiCallsTab({ apiCalls: [apiCall] })
-        await openCursorPagination(user)
+        await openPagination(user, 'type.cursor')
         await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'cursor')
         expect(await screen.findByText('datasources.errors.parameterPaginationDuplicate')).toBeInTheDocument()
 
@@ -751,7 +757,7 @@ describe('ApiCallsTab', () => {
       it('clears the error when the query parameter with the cursor name is removed', async () => {
         const apiCall = { ...API_CALL, queryParameters: [{ name: 'cursor', value: 'x' }] }
         const { user } = renderApiCallsTab({ apiCalls: [apiCall] })
-        await openCursorPagination(user)
+        await openPagination(user, 'type.cursor')
         await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'cursor')
         expect(await screen.findByText('datasources.errors.paginationQueryDuplicate')).toBeInTheDocument()
 
@@ -764,7 +770,7 @@ describe('ApiCallsTab', () => {
 
       it('shows and clears the error when a header gets the cursor name and is removed', async () => {
         const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
-        await openCursorPagination(user)
+        await openPagination(user, 'type.cursor')
         await selectOption(user, /^cursorIn\.label/, 'cursorIn.header')
         await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'cursor')
         const headerName = screen.getByRole('textbox', { name: 'parameters.header name' })
@@ -781,7 +787,7 @@ describe('ApiCallsTab', () => {
 
       it('shows no error of the old values after switching the type', async () => {
         const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
-        await openCursorPagination(user)
+        await openPagination(user, 'type.cursor')
         await user.type(screen.getByRole('textbox', { name: /^cursorPath\.label/ }), 'next')
         expect(await screen.findByText('datasources.errors.invalidCursorPath')).toBeInTheDocument()
 
@@ -794,7 +800,7 @@ describe('ApiCallsTab', () => {
 
       it('clears the duplicate error at both fields when the cursor parameter changes', async () => {
         const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
-        await openCursorPagination(user)
+        await openPagination(user, 'type.cursor')
         await user.type(screen.getByRole('textbox', { name: /^cursorParameter\.label/ }), 'cursor')
         await user.type(screen.getByRole('textbox', { name: 'limitParameter.label' }), 'cursor')
         expect(await screen.findAllByText('datasources.errors.paginationParameterDuplicate')).toHaveLength(2)
@@ -804,6 +810,110 @@ describe('ApiCallsTab', () => {
         await waitFor(() =>
           expect(screen.queryByText('datasources.errors.paginationParameterDuplicate')).not.toBeInTheDocument(),
         )
+      })
+    })
+
+    describe('limit/offset', () => {
+      it('shows the limit/offset fields instead of the page number fields', async () => {
+        const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [API_CALL] })
+
+        await openPagination(user, 'type.limitOffset')
+
+        expect(screen.getByRole('textbox', { name: /^offsetParameter\.label/ })).toBeInTheDocument()
+        expect(screen.getByRole('textbox', { name: 'offset.label' })).toHaveValue('0')
+        expect(screen.getByRole('textbox', { name: 'limitParameter.label' })).toBeInTheDocument()
+        expect(screen.getByRole('textbox', { name: 'limit.label' })).toBeInTheDocument()
+        expect(screen.getByRole('textbox', { name: 'countPath.label' })).toBeInTheDocument()
+        expect(screen.queryByRole('textbox', { name: /^pageParameter\.label/ })).not.toBeInTheDocument()
+        expect(screen.queryByText('cursorHint')).not.toBeInTheDocument()
+        expect(getApiCalls()?.[0].pagination).toEqual({ ...EMPTY_LIMIT_OFFSET_PAGINATION, isEnabled: true })
+      })
+
+      it('clears the limit/offset values when switching to cursor', async () => {
+        const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [API_CALL] })
+        await openPagination(user, 'type.limitOffset')
+        await user.type(screen.getByRole('textbox', { name: /^offsetParameter\.label/ }), 'offset')
+
+        await selectOption(user, 'type.label', 'type.cursor')
+
+        expect(getApiCalls()?.[0].pagination).toEqual({ ...EMPTY_CURSOR_PAGINATION, isEnabled: true })
+      })
+
+      it('writes the entered values into the form', async () => {
+        const { user, getApiCalls } = renderApiCallsTab({ apiCalls: [API_CALL] })
+        await openPagination(user, 'type.limitOffset')
+
+        await user.type(screen.getByRole('textbox', { name: /^offsetParameter\.label/ }), 'offset')
+        await user.clear(screen.getByRole('textbox', { name: 'offset.label' }))
+        await user.type(screen.getByRole('textbox', { name: 'offset.label' }), '80')
+        await user.type(screen.getByRole('textbox', { name: 'limitParameter.label' }), 'limit')
+        await user.type(screen.getByRole('textbox', { name: 'limit.label' }), '20')
+        await user.type(screen.getByRole('textbox', { name: 'countPath.label' }), '$.meta.count')
+
+        expect(getApiCalls()?.[0].pagination).toEqual(LIMIT_OFFSET_PAGINATION_FORM)
+      })
+
+      it('marks only the offset parameter as required', async () => {
+        const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+
+        await openPagination(user, 'type.limitOffset')
+
+        expect(screen.getByRole('textbox', { name: 'offsetParameter.label *' })).toBeInTheDocument()
+        expect(screen.getByRole('textbox', { name: 'offset.label' })).toBeInTheDocument()
+        expect(screen.getByRole('textbox', { name: 'limitParameter.label' })).toBeInTheDocument()
+        expect(screen.getByRole('textbox', { name: 'limit.label' })).toBeInTheDocument()
+        expect(screen.getByRole('textbox', { name: 'countPath.label' })).toBeInTheDocument()
+      })
+
+      it.each([
+        ['offset.label', '-1', 'pageNumberInteger'],
+        ['limit.label', '0', 'limitInteger'],
+        ['countPath.label', 'meta.count', 'invalidCountPath'],
+      ])('shows the error of an invalid value in %s', async (label, value, error) => {
+        const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+        await openPagination(user, 'type.limitOffset')
+        const field = screen.getByRole('textbox', { name: label })
+
+        await user.clear(field)
+        await user.type(field, value)
+
+        await waitFor(() => expect(field).toHaveAccessibleDescription(`datasources.errors.${error}`))
+      })
+
+      it('shows and clears the error when a query parameter gets and loses the offset parameter name', async () => {
+        const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
+        await openPagination(user, 'type.limitOffset')
+        const offsetParameter = screen.getByRole('textbox', { name: /^offsetParameter\.label/ })
+        await user.type(offsetParameter, 'offset')
+        const queryParameterName = screen.getByRole('textbox', { name: 'parameters.query name' })
+
+        await user.clear(queryParameterName)
+        await user.type(queryParameterName, 'offset')
+        await waitFor(() =>
+          expect(offsetParameter).toHaveAccessibleDescription('datasources.errors.paginationQueryDuplicate'),
+        )
+        expect(queryParameterName).toHaveAccessibleDescription('datasources.errors.parameterPaginationDuplicate')
+
+        await user.type(queryParameterName, 's')
+        await waitFor(() => expect(offsetParameter).toHaveAccessibleDescription(''))
+        expect(queryParameterName).toHaveAccessibleDescription('')
+      })
+
+      it('disables the limit/offset fields when read-only', async () => {
+        const { user } = renderApiCallsTab({
+          apiCalls: [{ ...API_CALL, pagination: LIMIT_OFFSET_PAGINATION_FORM }],
+          isReadOnly: true,
+        })
+        await openApiCall(user)
+
+        const labels = [
+          /^offsetParameter\.label/,
+          'offset.label',
+          'limitParameter.label',
+          'limit.label',
+          'countPath.label',
+        ]
+        labels.forEach(name => expect(screen.getByRole('textbox', { name })).toHaveClass(...DISABLED_INPUT_CLASSES))
       })
     })
 
