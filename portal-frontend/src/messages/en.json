@@ -159,9 +159,9 @@
       "unreadable": "The file cannot be read. Select it again."
     },
     "removalConfirmModal": {
-      "layers": "These Layers are deleted:",
-      "apis": "These APIs are deleted:",
-      "storedData": "The stored data is deleted."
+      "layers": "The following Layers will be deleted:",
+      "apis": "The following APIs will be deleted:",
+      "storedData": "The stored data will be deleted."
     }
   },
   "languages": {
@@ -1749,7 +1749,7 @@
     },
     "removalConfirm": {
       "title": "Delete Data storage?",
-      "description": "The Data storage removed from the Pipelines is deleted on save.",
+      "description": "The Data storage removed from the Pipelines will be deleted on save. This action cannot be undone.",
       "confirm": "Save and delete"
     },
     "header": {

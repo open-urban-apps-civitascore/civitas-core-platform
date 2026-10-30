@@ -158,8 +158,8 @@
       "unreadable": "Die Datei kann nicht gelesen werden. Wählen Sie sie erneut aus."
     },
     "removalConfirmModal": {
-      "layers": "Diese Layer werden gelöscht:",
-      "apis": "Diese APIs werden gelöscht:",
+      "layers": "Folgende Layer werden gelöscht:",
+      "apis": "Folgende APIs werden gelöscht:",
       "storedData": "Die gespeicherten Daten werden gelöscht."
     }
   },
@@ -1736,7 +1736,7 @@
     },
     "removalConfirm": {
       "title": "Datenspeicher löschen?",
-      "description": "Die aus den Pipelines entfernten Datenspeicher werden beim Speichern gelöscht.",
+      "description": "Die aus den Pipelines entfernten Datenspeicher werden beim Speichern gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
       "confirm": "Speichern und löschen"
     },
     "header": {
