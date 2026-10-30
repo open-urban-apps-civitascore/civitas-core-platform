@@ -229,6 +229,15 @@
     "/v1/datapools/{id}/assignments": {
       "GET": "DATAPOOL_READ"
     },
+    "_comment_datapool_installations": "The installations of one data pool. The same permissions as /v1/installations, but the {id} of the data pool is the scopeId: a grant on the data pool is sufficient.",
+    "/v1/datapools/{id}/installations": {
+      "GET": "INSTALLATION_READ",
+      "POST": ["INSTALLATION_CREATE", "DATASTRUCTURE_CREATE", "DATASTRUCTURE_UPDATE", "DATASOURCE_CREATE", "DATASET_CREATE", "DATASET_UPDATE"]
+    },
+    "/v1/datapools/{id}/installations/{id}": {
+      "GET": "INSTALLATION_READ",
+      "DELETE": ["INSTALLATION_DELETE", "DATASET_DELETE", "DATASOURCE_DELETE", "DATASTRUCTURE_DELETE"]
+    },
     "/v1/installations": {
       "_collection": true,
       "GET": "INSTALLATION_READ",
