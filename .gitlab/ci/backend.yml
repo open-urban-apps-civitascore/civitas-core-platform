@@ -397,9 +397,9 @@ api-test-backend:
     - |
       set +e
       docker exec bruno-runner sh -c '
-        npm install -g @usebruno/cli 2>/dev/null
+        npm install -g @usebruno/cli@4.2.1 || exit $?
         cd /tests
-        npx @usebruno/cli run --env ci --exclude-tags payload-example > /tests/bruno-output.txt 2>&1
+        bru run --env ci --exclude-tags payload-example > /tests/bruno-output.txt 2>&1
         RESULT=$?
         cat /tests/bruno-output.txt
         exit $RESULT
