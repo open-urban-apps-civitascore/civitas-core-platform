@@ -53,12 +53,7 @@ class DataSetNamedApiLayerCleanupIntegrationTest extends BaseKeycloakIntegration
     DataSet ds = portalData.dataSet();
     ds.setNamedApis(
         List.of(
-            NamedApi.builder()
-                .name("OWS Service")
-                .slug("ows")
-                .standard(ApiStandard.OWS)
-                .singletonKey("OWS")
-                .build()));
+            NamedApi.builder().name("OWS Service").slug("ows").standard(ApiStandard.OWS).build()));
     ds = portalData.saveDataSet(ds);
 
     Pipeline pipeline = portalData.pipeline(ds);

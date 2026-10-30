@@ -484,14 +484,7 @@ public class PortalTestDataFactory {
     String slug = standard.name().toLowerCase(Locale.ROOT) + "-" + nextSeq();
     dataSet
         .getNamedApis()
-        .add(
-            NamedApi.builder()
-                .name(slug)
-                .slug(slug)
-                .standard(standard)
-                .singletonKey(standard == ApiStandard.CUSTOM ? null : standard.name())
-                .dataSet(dataSet)
-                .build());
+        .add(NamedApi.builder().name(slug).slug(slug).standard(standard).dataSet(dataSet).build());
     DataSet saved = dataSetRepository.save(dataSet);
     dataSet.setNamedApis(saved.getNamedApis());
     return saved.getNamedApis().stream()

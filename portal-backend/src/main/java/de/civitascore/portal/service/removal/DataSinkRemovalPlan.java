@@ -8,7 +8,6 @@ import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -50,10 +49,7 @@ record DataSinkRemovalPlan(
       DataSinkRemovalRequest request,
       ApiKindRegistry apiKinds) {
     List<DataSink> deactivated =
-        activeDataSinks.stream()
-            .filter(sink -> becomesInactive(sink, request))
-            .sorted(Comparator.comparing(DataSink::getId))
-            .toList();
+        activeDataSinks.stream().filter(sink -> becomesInactive(sink, request)).toList();
     Set<UUID> deactivatedIds = idsOf(deactivated.stream().map(DataSink::getId));
     Set<DataSinkType> remainingKinds =
         activeDataSinks.stream()
@@ -64,7 +60,6 @@ record DataSinkRemovalPlan(
     List<NamedApi> removedApis =
         apis.stream()
             .filter(api -> !apiKinds.get(api.getStandard()).isBackedBy(remainingKinds))
-            .sorted(Comparator.comparing(NamedApi::getSlug))
             .toList();
     Set<UUID> removedApiIds = idsOf(removedApis.stream().map(NamedApi::getId));
 
@@ -75,7 +70,6 @@ record DataSinkRemovalPlan(
                     deactivatedIds.contains(layer.getDataSink().getId())
                         || (layer.getNamedApi() != null
                             && removedApiIds.contains(layer.getNamedApi().getId())))
-            .sorted(Comparator.comparing(Layer::getLayerName))
             .toList();
 
     return new DataSinkRemovalPlan(dataSet, deactivated, removedLayers, removedApis);

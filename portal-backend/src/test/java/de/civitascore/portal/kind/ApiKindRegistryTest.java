@@ -1,22 +1,11 @@
 package de.civitascore.portal.kind;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.civitascore.portal.model.embedded.ApiStandard;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ApiKindRegistryTest {
-
-  @Test
-  void singletonKeyOf_kindLimitedToOne_isTheStandardName() {
-    ApiKindRegistry registry = TestKinds.apiKindRegistry();
-
-    assertThat(registry.singletonKeyOf(ApiStandard.OWS)).isEqualTo("OWS");
-    assertThat(registry.singletonKeyOf(ApiStandard.STA)).isEqualTo("STA");
-    assertThat(registry.singletonKeyOf(ApiStandard.CUSTOM)).isNull();
-  }
 
   @Test
   void constructor_standardWithoutKind_failsFast() {

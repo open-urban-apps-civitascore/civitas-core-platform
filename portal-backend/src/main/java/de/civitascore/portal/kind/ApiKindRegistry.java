@@ -29,12 +29,4 @@ public class ApiKindRegistry {
   public Optional<NamedApi> layerPublishingApi(Collection<NamedApi> apis) {
     return apis.stream().filter(api -> get(api.getStandard()).publishesLayers()).findFirst();
   }
-
-  /**
-   * The value of {@code named_apis.singleton_key} for an API of the given standard: the standard's
-   * name when a Dataset can have at most one such API, else null.
-   */
-  public String singletonKeyOf(ApiStandard id) {
-    return get(id).maxPerDataSet().orElse(Integer.MAX_VALUE) == 1 ? id.name() : null;
-  }
 }

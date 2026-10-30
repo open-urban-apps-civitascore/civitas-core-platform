@@ -302,7 +302,6 @@ public class DataSetService
           api.setVersion(dto.getVersion());
           api.setDescription(dto.getDescription());
         }
-        api.setSingletonKey(apiKinds.singletonKeyOf(dto.getStandard()));
       }
       relinkLayersToPublishingApi(entity, incomingSlugs);
       entity.getNamedApis().removeIf(api -> !incomingSlugs.contains(api.getSlug()));
@@ -336,9 +335,6 @@ public class DataSetService
   }
 
   /**
-   * Checked here because the unique key on {@code singleton_key} that backs this limit in the
-   * database would only answer an opaque error.
-   *
    * @throws InvalidInputException if the input names more APIs of a kind than a dataset can have
    */
   private void requireApiCardinality(DataSet entity, List<NamedApiInputDTO> incoming) {

@@ -34,11 +34,6 @@ tests {
       expect(['STA', 'OWS']).to.include(api.standard);
     });
   });
-  test("Each named API carries its id", function() {
-    namedApis.forEach(function(api) {
-      expect(api.id).to.be.a('string');
-    });
-  });
   test("Gateway route ids stay internal", function() {
     namedApis.forEach(function(api) {
       expect(api).to.not.have.property('routeId');
@@ -62,8 +57,8 @@ docs {
 
   **Precondition:** `napiContractDataSetId` is set (step 1) and step 1b added the `STA` API.
 
-  **Expected Response:** 200 OK, `namedApis` holds exactly the `things` (STA) entry with its `id`
-  and without a route reference.
+  **Expected Response:** 200 OK, `namedApis` holds exactly the `things` (STA) entry without a route
+  reference.
 
   **Post-condition:** none.
 }

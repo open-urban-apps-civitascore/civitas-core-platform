@@ -881,9 +881,7 @@ class DataSetServiceTest {
 
       createService().postConvertToEntity(entity, input);
 
-      assertThat(entity.getNamedApis())
-          .extracting(NamedApi::getSingletonKey)
-          .containsExactly(null, null);
+      assertThat(entity.getNamedApis()).hasSize(2);
       verify(dataSinkRepository, never()).findByDataSetIdAndState(any(), any());
     }
 
@@ -903,8 +901,8 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("adds an OWS named API with its singleton key when an active POSTGIS sink exists")
-    void addsOwsApiWithSingletonKey() {
+    @DisplayName("adds an OWS named API when an active POSTGIS sink exists")
+    void addsOwsApiWithActivePostgisSink() {
       UUID id = UUID.randomUUID();
       DataSet entity = new DataSet();
       entity.setId(id);
@@ -918,8 +916,8 @@ class DataSetServiceTest {
 
       assertThat(entity.getNamedApis())
           .singleElement()
-          .extracting(NamedApi::getSingletonKey)
-          .isEqualTo("OWS");
+          .extracting(NamedApi::getStandard)
+          .isEqualTo(ApiStandard.OWS);
     }
 
     @Test
