@@ -100,9 +100,10 @@ public class DataSinkController
       operationId = "deleteDataSink",
       summary = "Delete a DataSink",
       description =
-          "Removes the DataSink from its Pipelines and deletes it with its Layers, and with the APIs"
-              + " it is the last backing DataSink of. A provisioned DataSink is no longer listed;"
-              + " its stored data is deleted at the next release.")
+          "Deletes the DataSink with its Layers, and with the APIs it is the last backing DataSink"
+              + " of. A DataSink that a Pipeline links answers 409 RESOURCE_IN_USE; remove it from"
+              + " its Pipelines first. A provisioned DataSink is no longer listed; its stored data"
+              + " is deleted at the next release.")
   @Parameter(
       name = CONFIRMED_REMOVAL_IDS,
       in = ParameterIn.QUERY,

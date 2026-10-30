@@ -355,6 +355,37 @@ class PipelineServiceTest {
       verifyNothingWritten();
     }
 
+    @Test
+    @DisplayName("Refuses a create with a DataSink it cannot link before the Model Forge write")
+    void createRefusesUnlinkableDataSinkBeforeTheModelForgeWrite() {
+      UUID dataSetId = UUID.randomUUID();
+      PipelineInputDTO input = new PipelineInputDTO();
+      input.setName("test-pipeline");
+      input.setDataSetId(dataSetId);
+      input.setModel(Map.of("nodes", List.of(), "edges", List.of()));
+      input.setDataSinkIds(Set.of(UUID.randomUUID()));
+      Pipeline entity = new Pipeline();
+      entity.setName("test-pipeline");
+      when(pipelineMapper.toEntity(any())).thenReturn(entity);
+      when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(draftDataSet(dataSetId)));
+      when(pipelineRepository.findAllByNameAndDataSetId(any(), any())).thenReturn(Set.of());
+      when(pipelineRepository.save(any()))
+          .thenAnswer(
+              invocation -> {
+                Pipeline saved = invocation.getArgument(0);
+                saved.setId(UUID.randomUUID());
+                return saved;
+              });
+      when(dataSinkRemovalService.prepare(any(), any()))
+          .thenThrow(new InvalidInputException("Pipeline", "dataSinkIds", "not found"));
+
+      assertThatThrownBy(() -> pipelineService.create(input))
+          .isInstanceOf(InvalidInputException.class);
+
+      verify(modelRegistryGateway, never())
+          .storePayload(any(), any(), any(), any(), any(), any(), any());
+    }
+
     private Pipeline updatedPipelineWithoutDataSinks(UUID pipelineId) {
       Pipeline existing = pipeline(pipelineId, draftDataSet(UUID.randomUUID()));
       when(pipelineRepository.findById(pipelineId)).thenReturn(Optional.of(existing));

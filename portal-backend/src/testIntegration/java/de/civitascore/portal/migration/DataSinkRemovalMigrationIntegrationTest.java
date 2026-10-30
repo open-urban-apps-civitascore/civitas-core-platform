@@ -125,7 +125,18 @@ class DataSinkRemovalMigrationIntegrationTest {
   @Test
   void migrate_linksEachLayerToTheOwsApiOfItsDataset() {
     assertThat(namedApiOf(LINKED_LAYER)).isEqualTo(OWS_API);
+    assertThat(layerExists(UNSERVED_LAYER)).isTrue();
     assertThat(namedApiOf(UNSERVED_LAYER)).isNull();
+  }
+
+  @Test
+  void migrate_rejectsASecondStaApiWithTheSingletonKey() {
+    assertThatThrownBy(
+            () ->
+                jdbc.sql("UPDATE named_apis SET singleton_key = 'STA' WHERE id = :id::uuid")
+                    .param("id", NEWER_STA_API)
+                    .update())
+        .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   @Test

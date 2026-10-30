@@ -355,7 +355,10 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
         : "datasink";
   }
 
-  /** Deletes the DataSink without a confirmation, see {@link #deleteById(UUID, Set)}. */
+  /**
+   * Confirms nothing, so a delete that needs a confirmation answers 409; see {@link
+   * #deleteById(UUID, Set)}.
+   */
   @Override
   @Transactional
   public void deleteById(UUID id) {

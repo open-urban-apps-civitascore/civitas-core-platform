@@ -514,6 +514,56 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(exchange(HttpMethod.DELETE, sinkPath(sink), null).getStatusCode())
           .isEqualTo(HttpStatus.NOT_FOUND);
     }
+
+    @Test
+    @DisplayName("the list of a Dataset leaves out a pending sink")
+    void pendingSink_isNotListed() {
+      DataSink active = frostSink(null, false);
+      pendingSink();
+
+      JsonNode list =
+          exchange(HttpMethod.GET, "/datasets/" + dataSet.getId() + "/datasinks", null).getBody();
+
+      assertThat(ids(list, "content")).containsExactly(active.getId().toString());
+    }
+
+    @Test
+    @DisplayName("accepts the confirmed ids comma-separated in one query parameter")
+    void commaSeparatedConfirmation_isAccepted() {
+      MapSurface surface = mapSurface(null, true);
+
+      ResponseEntity<JsonNode> response =
+          exchange(
+              HttpMethod.DELETE,
+              sinkPath(surface.sink())
+                  + "?confirmedRemovalIds="
+                  + surface.sink().getId()
+                  + ","
+                  + surface.layer().getId()
+                  + ","
+                  + surface.ows().getId(),
+              null);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+      assertThat(stateOf(surface.sink())).isEqualTo(DataSinkState.PENDING_UNPROVISION);
+    }
+
+    @Test
+    @DisplayName("a confirmed id that is not a UUID answers 400 and changes nothing")
+    void malformedConfirmation_answers400AndChangesNothing() {
+      MapSurface surface = mapSurface(null, true);
+
+      ResponseEntity<JsonNode> response =
+          exchange(
+              HttpMethod.DELETE,
+              sinkPath(surface.sink()) + "?confirmedRemovalIds=not-a-uuid",
+              null);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(stateOf(surface.sink())).isEqualTo(DataSinkState.ACTIVE);
+      assertThat(layerRepository.existsById(surface.layer().getId())).isTrue();
+      assertThat(apiStandards()).containsExactly("OWS");
+    }
   }
 
   @Nested

@@ -1617,63 +1617,6 @@ describe('PipelineEditorProviderComponent', () => {
       consoleError.mockRestore()
     })
 
-    it('retains refs obtained before a later save step fails, so a retry does not re-POST', async () => {
-      const mockCreateDataSinkMutateAsync = vi.fn().mockResolvedValue({
-        data: {
-          id: 'new-dataSink-id',
-          configurationUrn: 'urn:core:platform:civitas:datasink:common:00000000-0000-4000-8000-000000000046:1.0.0',
-        },
-      })
-      vi.mocked(useCreateDataSink).mockReturnValue({
-        mutate: vi.fn(),
-        mutateAsync: mockCreateDataSinkMutateAsync,
-        isPending: false,
-      } as unknown as ReturnType<typeof useCreateDataSink>)
-
-      vi.mocked(buildDataSinkPayloads).mockReturnValue([
-        { nodeId: 'persist-node-1', entityId: null, payload: { name: 'sink-1', type: 'postgres' } as never },
-      ])
-
-      // The sink create succeeds and stashes its entityId onto the node (mirrors updateNodeEntityId's
-      // real behavior, driven here via the mock since it is stubbed out for the whole file).
-      const pipelineWithStashedSink = {
-        ...createEmptyPipeline('Test'),
-        id: 'pipeline-1',
-        nodes: [makeGeoPersistenceNode('persist-node-1', 'new-dataSink-id')],
-      }
-      vi.mocked(updateNodeEntityId).mockReturnValue(pipelineWithStashedSink)
-      vi.mocked(updateNodeData).mockReturnValue(pipelineWithStashedSink)
-
-      // The pipeline save itself (after the sink was already created) fails.
-      vi.mocked(useUpdatePipeline).mockReturnValue({
-        mutate: vi.fn(),
-        mutateAsync: vi.fn().mockRejectedValue(new Error('Pipeline save failed')),
-        isPending: false,
-      } as unknown as ReturnType<typeof useUpdatePipeline>)
-
-      const session = makeSession({
-        isDirty: true,
-        pipeline: {
-          ...createEmptyPipeline('Test'),
-          id: 'pipeline-1',
-          nodes: [makeGeoPersistenceNode('persist-node-1')],
-        },
-      })
-      renderProvider(session)
-
-      let result: boolean | undefined
-      await act(async () => {
-        result = await contextRef.current?.saveAllPipelines()
-      })
-
-      expect(result).toBe(false)
-      // The sink WAS created — the partial pipeline (with the new entityId stashed) must be
-      // persisted back into the session so a retry sees it and PUTs instead of re-POSTing.
-      expect(contextRef.current?.pipeline?.nodes.find(n => n.id === 'persist-node-1')).toMatchObject({
-        data: expect.objectContaining({ entityId: 'new-dataSink-id' }),
-      })
-    })
-
     it('does not call updateDataSink when dataSink has not changed', async () => {
       const mockUpdateDataSinkMutateAsync = vi.fn().mockResolvedValue({})
       vi.mocked(useUpdateDataSink).mockReturnValue({
@@ -1830,7 +1773,7 @@ describe('PipelineEditorProviderComponent', () => {
         expect(toast.error).not.toHaveBeenCalled()
       })
 
-      describe('data sinks created by an aborted save', () => {
+      describe('data sinks created by an aborted or failed save', () => {
         const nodeData = () =>
           contextRef.current?.pipeline?.nodes.find(node => node.id === 'persist-new')?.data as
             { entityId?: string; configurationUrn?: string } | undefined
@@ -1896,6 +1839,48 @@ describe('PipelineEditorProviderComponent', () => {
 
           expect(await saveAndCancel()).toBe(false)
 
+          expect(mockDeleteDataSinkMutateAsync).toHaveBeenCalledWith({
+            datasetId: 'dataset-1',
+            dataSinkId: 'new-sink-id',
+          })
+          expect(nodeData()?.entityId).toBeUndefined()
+        })
+
+        it('deletes them and clears their refs when the pipeline update fails', async () => {
+          mockUpdatePipelineMutateAsync.mockRejectedValueOnce(new Error('Pipeline save failed'))
+          await renderWithNewSinkNode()
+
+          let result: boolean | undefined
+          await act(async () => {
+            result = await contextRef.current?.saveAllPipelines()
+          })
+
+          expect(result).toBe(false)
+          expect(mockDeleteDataSinkMutateAsync).toHaveBeenCalledWith({
+            datasetId: 'dataset-1',
+            dataSinkId: 'new-sink-id',
+          })
+          expect(nodeData()?.entityId).toBeUndefined()
+        })
+
+        it('deletes them when a later step of the same pipeline fails', async () => {
+          vi.mocked(useCreateMapping).mockReturnValue({
+            mutate: vi.fn(),
+            mutateAsync: vi.fn().mockRejectedValue(new Error('Mapping create failed')),
+            isPending: false,
+          } as unknown as ReturnType<typeof useCreateMapping>)
+          vi.mocked(buildMappingArtifacts).mockReturnValue([
+            { nodeId: 'map-1', logicalUrn: undefined, body: { title: 'Src-to-Tgt' } as never },
+          ])
+          await renderWithNewSinkNode()
+
+          let result: boolean | undefined
+          await act(async () => {
+            result = await contextRef.current?.saveAllPipelines()
+          })
+
+          expect(result).toBe(false)
+          expect(mockUpdatePipelineMutateAsync).not.toHaveBeenCalled()
           expect(mockDeleteDataSinkMutateAsync).toHaveBeenCalledWith({
             datasetId: 'dataset-1',
             dataSinkId: 'new-sink-id',

@@ -332,7 +332,10 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
             });
   }
 
-  /** Deletes the pipeline without a confirmation, see {@link #deleteById(UUID, Set)}. */
+  /**
+   * Confirms nothing, so a delete that needs a confirmation answers 409; see {@link
+   * #deleteById(UUID, Set)}.
+   */
   @Override
   @Transactional
   public void deleteById(UUID id) {

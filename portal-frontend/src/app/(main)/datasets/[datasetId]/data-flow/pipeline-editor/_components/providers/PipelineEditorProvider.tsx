@@ -711,8 +711,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       }
     }
 
-    // A Data sink that no Pipeline links stays active and keeps its APIs, so an aborted save deletes the ones it
-    // created and clears their refs from the nodes.
+    // A Data sink that no Pipeline links stays active and keeps its APIs, so an aborted or failed save deletes the
+    // ones it created and clears their refs from the nodes.
     const withoutCreatedDataSinks = async (pipeline: Pipeline, createdDataSinks: CreatedDataSink[]) => {
       let restored = pipeline
       for (const { nodeId, dataSinkId } of createdDataSinks) {
@@ -721,7 +721,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
           restored = updateNodeData(restored, nodeId, { entityId: undefined, configurationUrn: undefined })
         } catch (error) {
           // The kept ref lets the next save link this sink instead of creating another one.
-          console.error('Failed to delete a data sink of the aborted save:', dataSinkId, error)
+          console.error('Failed to delete a data sink of the unsaved pipeline:', dataSinkId, error)
         }
       }
       return restored
@@ -746,10 +746,10 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         // Declared outside the try below so the catch can still see whatever refs were stashed
         // onto it before the failing step.
         let currentPipeline = withoutSelection(currentPipelineOf(session.pipeline))
+        const createdDataSinks: CreatedDataSink[] = []
         try {
           const snapshot = dataSinkSnapshotsRef.current[session.id] ?? {}
           const removedSinkIds = getRemovedDataSinkIds(currentPipeline, snapshot)
-          const createdDataSinks: CreatedDataSink[] = []
 
           // Save data sinks (create new / update changed). Stash the sink's CORE configurationUrn back onto
           // the node so it is emitted as the CORE model's `sinkRef`.
@@ -803,11 +803,13 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
           preparedSessions.push({ session, pipeline: currentPipeline, removedSinkIds, createdDataSinks })
         } catch (error) {
-          // A later step may fail after an earlier step already created backend artifacts (a data sink,
-          // a mapping) and stashed their refs onto currentPipeline. Persist that partial progress — still
-          // dirty — so a retry sees the stashed entityId/logicalUrn and PUT-updates the existing artifact
-          // instead of re-POSTing and leaking a duplicate.
-          sessionManager.updateSessionPipeline(session.id, currentPipeline)
+          // A later step may fail after an earlier step already created a mapping and stashed its refs onto
+          // currentPipeline. Persist that partial progress — still dirty — so a retry sees the stashed
+          // logicalUrn and PUT-updates the existing mapping instead of re-POSTing and leaking a duplicate.
+          sessionManager.updateSessionPipeline(
+            session.id,
+            await withoutCreatedDataSinks(currentPipeline, createdDataSinks),
+          )
           classifySaveError(session.name, error)
         }
       }
@@ -883,7 +885,10 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
           mappingSnapshotsRef.current[session.id] = createMappingSnapshot(currentPipeline)
           toast.success(t('header.saveSuccess', { name: currentPipeline.name }))
         } catch (error) {
-          sessionManager.updateSessionPipeline(session.id, currentPipeline)
+          sessionManager.updateSessionPipeline(
+            session.id,
+            await withoutCreatedDataSinks(currentPipeline, createdDataSinks),
+          )
           classifySaveError(session.name, error)
         }
       }

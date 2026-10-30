@@ -92,6 +92,25 @@ WHERE l.datasink_id = s.id
   AND s.pipeline_id IS NULL
   AND s.id NOT IN (SELECT id FROM kept_unlinked_sinks);
 
+DO
+$$
+    DECLARE
+        removed RECORD;
+    BEGIN
+        FOR removed IN SELECT id, dataset_id, data_sink_type, provisioned
+                       FROM data_sinks
+                       WHERE pipeline_id IS NULL
+                         AND id NOT IN (SELECT id FROM kept_unlinked_sinks)
+            LOOP
+                IF removed.provisioned THEN
+                    RAISE NOTICE 'Dataset % marks % Data sink % without a Pipeline PENDING_UNPROVISION; the next release deletes its storage', removed.dataset_id, removed.data_sink_type, removed.id;
+                ELSE
+                    RAISE NOTICE 'Dataset % deletes unprovisioned % Data sink % without a Pipeline', removed.dataset_id, removed.data_sink_type, removed.id;
+                END IF;
+            END LOOP;
+    END
+$$;
+
 UPDATE data_sinks
 SET state = 'PENDING_UNPROVISION'
 WHERE pipeline_id IS NULL

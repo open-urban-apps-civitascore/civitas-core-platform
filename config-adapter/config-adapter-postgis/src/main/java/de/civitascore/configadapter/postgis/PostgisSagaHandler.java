@@ -320,10 +320,22 @@ public class PostgisSagaHandler implements SagaCommandHandler {
 
   private SagaCommandResult unprovisionSinks(SagaCommandMessage command) throws SQLException {
     List<SinkSpec> pendingSinks = parseSinks(command, PENDING_SINKS, false);
-    boolean activeSinkRemains = !postgisSinkEntries(command, ACTIVE_SINKS).isEmpty();
+    Set<String> activeTables =
+        new HashSet<>(
+            postgisSinkEntries(command, ACTIVE_SINKS).stream()
+                .map(sink -> stringValue(mapValue(sink, "configuration"), "tableName"))
+                .toList());
+    boolean activeSinkRemains = !activeTables.isEmpty();
     List<String> statements = new ArrayList<>();
     Set<String> schemasToDrop = new LinkedHashSet<>();
     for (SinkSpec sink : pendingSinks) {
+      if (activeTables.contains(sink.table().getName())) {
+        logger.warn(
+            "PostGIS table {} is also named by an active sink, keeping it and its data, saga={}",
+            Encode.forJava(sink.table().qualifiedName()),
+            Encode.forJava(command.sagaId()));
+        continue;
+      }
       statements.addAll(dropSinkObjects(sink));
       if (!activeSinkRemains && sink.hasDroppableSchema()) {
         schemasToDrop.add(sink.schema().getName());

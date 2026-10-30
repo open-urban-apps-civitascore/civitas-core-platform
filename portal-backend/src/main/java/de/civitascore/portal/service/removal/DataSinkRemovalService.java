@@ -127,12 +127,12 @@ public class DataSinkRemovalService {
 
   /**
    * Deletes the PENDING_UNPROVISION Data sinks of the Dataset with their Model Forge
-   * configurations, once a release removed their storage. Runs in the caller's transaction.
+   * configurations, once a release removed their storage.
    *
    * <p>A configuration Model Forge does not delete is only logged and stays stranded: the storage
    * is already gone, and failing here would leave the release in flight.
    */
-  @Transactional
+  @Transactional(propagation = Propagation.MANDATORY)
   public void deleteUnprovisioned(DataSet dataSet) {
     List<DataSink> pending =
         dataSinkRepository.findByDataSetIdAndState(
