@@ -151,7 +151,6 @@ stages: [
   ]
 
 variables:
-  DOCKER_VERSION: '27.5.1' # CLI and dind image, see .gitlab/ci/docker.yml
   BRUNO_CLI_VERSION: '4.3.0' # api-test-backend; was installed unpinned on every run
   CHECK_JSONSCHEMA_VERSION: '0.38.2' # validate-schemas-model-forge
   DEPCHECK_VERSION: '1.4.7' # lint-frontend

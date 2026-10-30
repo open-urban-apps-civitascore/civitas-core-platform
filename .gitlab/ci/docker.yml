@@ -1,13 +1,13 @@
-# Docker for CI jobs. DOCKER_VERSION (.gitlab-ci.yml) pins the CLI image and the daemon image together.
+# Docker for CI jobs. The CLI and the daemon image are pinned by digest, in the lines below.
 
 # Docker CLI only. Enough for jobs that talk to a registry (imagetools, syft): no daemon needed.
 .docker-cli:
-  image: docker:${DOCKER_VERSION}
+  image: docker:27.5.1@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
 
 # A daemon (dind service) without TLS, for jobs that run containers: Testcontainers, docker compose.
 .dind:
   services:
-    - name: docker:${DOCKER_VERSION}-dind
+    - name: docker:27.5.1-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
       alias: docker
   variables:
     DOCKER_HOST: tcp://docker:2375
@@ -20,7 +20,7 @@
 .docker-build:
   extends: .docker-cli
   services:
-    - name: docker:${DOCKER_VERSION}-dind
+    - name: docker:27.5.1-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
       alias: docker
   variables:
     DOCKER_TLS_CERTDIR: '/certs'
