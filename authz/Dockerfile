@@ -46,10 +46,10 @@ RUN mkdir /out && \
     printf '{\n  "authz_repository_url": "http://civitas-authz-repository:8091/api/v1/user-context",\n  "dataset_pool_membership_url": "http://civitas-authz-repository:8091/api/v1/dataset-pool",\n  "authz_cache_duration_seconds": 0\n}\n' > /out/config.json
 
 
-# Pinned: openpolicyagent/opa:1.21.0-static (2026-09-24). Update digest on base image updates.
+# Pinned: openpolicyagent/opa:1.21.1-static (the OPA of the cicd image that builds the bundle). Update digest on base image updates.
 # Bumps golang.org/x/crypto to v0.55.0 (CVE-2026-56854) and google.golang.org/grpc
 # to v1.83.2 (CVE-2026-84304, CVE-2026-84445).
-FROM openpolicyagent/opa:1.21.0-static@sha256:9eb36ac3ceb3b855e776e60926a8a5142f96109a219a5fcd490fa1744c755bec AS opa
+FROM openpolicyagent/opa:1.21.1-static@sha256:4675ab04ad1627f74741d2d9c5142698c79e18b7b09f192587d31d6dba20838e AS opa
 
 COPY --from=fetcher /out/config.json /data/config.json
 COPY --from=fetcher /out/bundle/policy /policies
