@@ -318,3 +318,26 @@ test_scope_type_installations if {
 test_is_collection_endpoint_installations if {
 	portal_backend.is_collection_endpoint with input as portal_request("POST", "/v1/installations")
 }
+
+test_path_pattern_datapool_installations if {
+	result := portal_backend.path_pattern with input as portal_request("POST", "/v1/datapools/pool-123/installations")
+	result == "/v1/datapools/{id}/installations"
+}
+
+test_path_pattern_datapool_installation_with_id if {
+	result := portal_backend.path_pattern with input as portal_request("GET", "/v1/datapools/pool-123/installations/installation-123")
+	result == "/v1/datapools/{id}/installations/{id}"
+}
+
+# Under the path of a data pool, the scope is the data pool, and the scopeId is its id
+test_scope_of_datapool_installations if {
+	scope_type := portal_backend.expected_scope_type with input as portal_request("POST", "/v1/datapools/pool-123/installations")
+	scope_type == "DATAPOOL"
+	scope_id := portal_backend.resource_id with input as portal_request("POST", "/v1/datapools/pool-123/installations")
+	scope_id == "pool-123"
+}
+
+# Not a collection: else a POST would need a tenant-wide grant
+test_not_collection_endpoint_datapool_installations if {
+	not portal_backend.is_collection_endpoint with input as portal_request("POST", "/v1/datapools/pool-123/installations")
+}

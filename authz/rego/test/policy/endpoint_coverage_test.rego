@@ -388,3 +388,100 @@ test_uninstall_denied_unauthenticated if {
 	result := authz.decision with input as portal_request_no_auth("DELETE", "/v1/installations/installation-1")
 	result.allow == false
 }
+
+# =============================================================================
+# INSTALLATIONS IN A DATA POOL
+# =============================================================================
+# The same permissions as above, under the path of a data pool. The {id} of the
+# data pool is the scopeId, so a grant on the data pool is sufficient. OPA does
+# not see in which data pool an installation is: the backend answers 404 for an
+# installation of another data pool.
+
+mock_send_pool_reader(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["INSTALLATION_READ"], "DATAPOOL", "pool-1")}
+mock_send_pool_installer_without_datastructure_create(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(installer_permissions_without("DATASTRUCTURE_CREATE"), "DATAPOOL", "pool-1")}
+
+test_install_in_pool_allowed_with_pool_grant if {
+	result := authz.decision with http.send as mock_send_pool_installer
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/datapools/pool-1/installations")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.required_permissions == {permission | some permission in installer_permissions}
+	result.headers["X-Allowed-Scope-Ids"] == "pool-1"
+}
+
+test_install_in_pool_allowed_with_tenant_grant if {
+	result := authz.decision with http.send as mock_send_installer
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/datapools/pool-1/installations")
+	result.allow == true
+	result.headers["X-Allowed-Scope-Ids"] == "*"
+}
+
+# A grant on one data pool does not reach another data pool.
+test_install_in_pool_denied_with_grant_on_other_pool if {
+	result := authz.decision with http.send as mock_send_pool_installer
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/datapools/pool-2/installations")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# In a data pool too, the install needs all permissions of the AND list.
+test_install_in_pool_denied_without_datastructure_create if {
+	result := authz.decision with http.send as mock_send_pool_installer_without_datastructure_create
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v1/datapools/pool-1/installations")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+test_install_in_pool_denied_unauthenticated if {
+	result := authz.decision with input as portal_request_no_auth("POST", "/v1/datapools/pool-1/installations")
+	result.allow == false
+}
+
+test_installations_of_pool_read_allowed_with_pool_grant if {
+	every path in {"/v1/datapools/pool-1/installations", "/v1/datapools/pool-1/installations/installation-1"} {
+		result := authz.decision with http.send as mock_send_pool_reader
+			with data.config as mock_http.mock_config
+			with input as portal_request("GET", path)
+		result.allow == true
+		result.required_permissions == {"INSTALLATION_READ"}
+		result.headers["X-Allowed-Scope-Ids"] == "pool-1"
+	}
+}
+
+test_installations_of_pool_read_denied_with_grant_on_other_pool if {
+	result := authz.decision with http.send as mock_send_pool_reader
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datapools/pool-2/installations")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+test_uninstall_in_pool_allowed_with_pool_grant if {
+	result := authz.decision with http.send as mock_send_pool_uninstaller
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/datapools/pool-1/installations/installation-1")
+	result.allow == true
+	result.required_permissions == {permission | some permission in uninstaller_permissions}
+	result.headers["X-Allowed-Scope-Ids"] == "pool-1"
+}
+
+test_uninstall_in_pool_denied_with_grant_on_other_pool if {
+	result := authz.decision with http.send as mock_send_pool_uninstaller
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/datapools/pool-2/installations/installation-1")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# The permissions to install do not include the permission to uninstall, also in a data pool.
+test_uninstall_in_pool_denied_with_installer_permissions if {
+	result := authz.decision with http.send as mock_send_pool_installer
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/datapools/pool-1/installations/installation-1")
+	result.allow == false
+	result.reason == "permission_denied"
+}

@@ -198,6 +198,54 @@ class InstallationServiceTest {
   }
 
   @Test
+  void installInDatapool_whenPackageHasOnlyDataStructures_recordsTheDatapool() {
+    stubDatapool();
+    stubCreate();
+
+    Installation installation = installationService.installInDatapool(DATAPOOL_ID, request(tree()));
+
+    assertThat(installation.getDatapoolId()).isEqualTo(DATAPOOL_ID);
+    verify(installationRepository).existsActive(PACKAGE_ID, DATAPOOL_ID);
+  }
+
+  @Test
+  void installInDatapool_whenRequestLeavesOutTheDatapool_createsTheDataSourceInThePathDatapool() {
+    stubCreate();
+    stubDatapool();
+    stubDataSource();
+
+    installationService.installInDatapool(DATAPOOL_ID, request(tree(), sqlSource(FOREIGN_URN)));
+
+    verify(dataSourceService).create(sourceCaptor.capture());
+    assertThat(sourceCaptor.getValue().getDatapoolScope().getDatapoolIds())
+        .containsExactly(DATAPOOL_ID);
+  }
+
+  @Test
+  void installInDatapool_whenRequestNamesAnotherDatapool_changesNothing() {
+    UUID otherDatapoolId = UUID.fromString("22222222-2222-4000-8000-000000000002");
+
+    assertThatThrownBy(
+            () ->
+                installationService.installInDatapool(
+                    DATAPOOL_ID, request(otherDatapoolId, tree())))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining(otherDatapoolId.toString());
+
+    verifyNoChange();
+  }
+
+  @Test
+  void installInDatapool_whenDatapoolDoesNotExist_throwsResourceNotFound() {
+    when(dataPoolRepository.existsById(DATAPOOL_ID)).thenReturn(false);
+
+    assertThatThrownBy(() -> installationService.installInDatapool(DATAPOOL_ID, request(tree())))
+        .isInstanceOf(ResourceNotFoundException.class);
+
+    verifyNoChange();
+  }
+
+  @Test
   void install_whenUniqueIndexRefusesTheRecord_createsNothing() {
     // The check passes, because the other install has not committed yet. The index refuses the row.
     when(installationRepository.saveAndFlush(any()))

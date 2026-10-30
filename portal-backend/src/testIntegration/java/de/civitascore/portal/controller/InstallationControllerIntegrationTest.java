@@ -223,6 +223,118 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
   }
 
   @Test
+  @DisplayName("POST under a Data pool installs the package in the Data pool of the path")
+  void installInDatapool_whenBodyHasNoDatapool_installsInTheDatapoolOfThePath() {
+    DataPool pool = portalData.dataPool();
+
+    ResponseEntity<String> installed =
+        postIn(pool.getId(), request(PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
+
+    assertThat(installed.getStatusCode())
+        .as("%s", installed.getBody())
+        .isEqualTo(HttpStatus.CREATED);
+    assertThat(json(installed.getBody()).get("datapoolId").asString())
+        .isEqualTo(pool.getId().toString());
+    JsonNode source =
+        json(get("/datasources/" + shellIdOf(linesOf(installed), SOURCE_URN)).getBody());
+    assertThat(source.at("/datapoolScope/datapoolIds/0").asString())
+        .isEqualTo(pool.getId().toString());
+  }
+
+  @Test
+  @DisplayName("POST under a Data pool records the Data pool also for a package of Data structures")
+  void installInDatapool_whenPackageHasOnlyDataStructures_recordsTheDatapool() {
+    DataPool pool = portalData.dataPool();
+
+    ResponseEntity<String> installed =
+        postIn(pool.getId(), request(PACKAGE_ID, member("Tree cadastre", treeModel())));
+
+    assertThat(installed.getStatusCode())
+        .as("%s", installed.getBody())
+        .isEqualTo(HttpStatus.CREATED);
+    assertThat(json(installed.getBody()).get("datapoolId").asString())
+        .isEqualTo(pool.getId().toString());
+    JsonNode page = json(get(inDatapool(pool.getId())).getBody());
+    assertThat(page.get("content").size()).isEqualTo(1);
+    assertThat(page.at("/content/0/packageId").asString()).isEqualTo(PACKAGE_ID);
+  }
+
+  @Test
+  @DisplayName("POST under a Data pool refuses a body that names another Data pool")
+  void installInDatapool_whenBodyNamesAnotherDatapool_returnsBadRequestAndCreatesNothing() {
+    DataPool pool = portalData.dataPool();
+    DataPool other = portalData.dataPool();
+    long structures = dataStructureRepository.count();
+
+    ResponseEntity<String> refused =
+        postIn(
+            pool.getId(),
+            request(other.getId(), PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
+
+    assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(refused.getBody()).contains(other.getId().toString());
+    assertThat(installationRepository.count()).isZero();
+    assertThat(dataStructureRepository.count()).isEqualTo(structures);
+  }
+
+  @Test
+  @DisplayName("POST and GET under a Data pool that does not exist return 404")
+  void installInDatapool_whenDatapoolIsUnknown_returnsNotFound() {
+    UUID unknown = UUID.randomUUID();
+
+    ResponseEntity<String> refused =
+        postIn(unknown, request(PACKAGE_ID, member("Tree cadastre", treeModel())));
+
+    assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    assertThat(installationRepository.count()).isZero();
+    assertThat(get(inDatapool(unknown)).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("GET and DELETE under a Data pool do not find an installation of another Data pool")
+  void inDatapool_whenInstallationIsInAnotherDatapool_returnsNotFoundAndChangesNothing() {
+    DataPool pool = portalData.dataPool();
+    DataPool other = portalData.dataPool();
+    ResponseEntity<String> installed =
+        postIn(pool.getId(), request(PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
+    assertThat(installed.getStatusCode())
+        .as("%s", installed.getBody())
+        .isEqualTo(HttpStatus.CREATED);
+    String id = json(installed.getBody()).get("id").asString();
+
+    assertThat(get(inDatapool(other.getId()) + "/" + id).getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
+    assertThat(delete(inDatapool(other.getId()) + "/" + id).getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
+    assertThat(json(get(inDatapool(other.getId())).getBody()).get("content").size()).isZero();
+    assertThat(installationRepository.existsActive(PACKAGE_ID, pool.getId())).isTrue();
+    assertThat(dataSourceRepository.existsById(shellIdOf(linesOf(installed), SOURCE_URN)))
+        .isTrue();
+  }
+
+  @Test
+  @DisplayName("DELETE under a Data pool uninstalls an installation of the Data pool")
+  void uninstallInDatapool_whenInstallationIsInTheDatapool_removesItsArtifacts() {
+    DataPool pool = portalData.dataPool();
+    ResponseEntity<String> installed =
+        postIn(pool.getId(), request(PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
+    assertThat(installed.getStatusCode())
+        .as("%s", installed.getBody())
+        .isEqualTo(HttpStatus.CREATED);
+    String path = inDatapool(pool.getId()) + "/" + json(installed.getBody()).get("id").asString();
+
+    ResponseEntity<String> uninstalled = delete(path);
+
+    assertThat(uninstalled.getStatusCode())
+        .as("%s", uninstalled.getBody())
+        .isEqualTo(HttpStatus.NO_CONTENT);
+    assertThat(get(path).getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(installationRepository.existsActive(PACKAGE_ID, pool.getId())).isFalse();
+    assertThat(dataSourceRepository.existsById(shellIdOf(linesOf(installed), SOURCE_URN)))
+        .isFalse();
+  }
+
+  @Test
   @DisplayName("GET returns the installations, the newest first")
   void getAll_whenTwoPackagesAreInstalled_returnsTheNewestFirst() {
     assertThat(post(request(PACKAGE_ID, member("Tree cadastre", treeModel()))).getStatusCode())
@@ -1022,6 +1134,22 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
   private ResponseEntity<String> post(Object body) {
     return restTemplate.exchange(
         "/installations", HttpMethod.POST, new HttpEntity<>(body, authHeaders()), String.class);
+  }
+
+  /**
+   * Installs under the path of a Data pool. The header grants the whole platform, as for {@link
+   * #post}. A test with a grant on the Data pool only needs assignments of the test user.
+   */
+  private ResponseEntity<String> postIn(UUID datapoolId, Object body) {
+    return restTemplate.exchange(
+        inDatapool(datapoolId),
+        HttpMethod.POST,
+        new HttpEntity<>(body, authHeaders()),
+        String.class);
+  }
+
+  private static String inDatapool(UUID datapoolId) {
+    return "/datapools/" + datapoolId + "/installations";
   }
 
   private ResponseEntity<String> get(String path) {
