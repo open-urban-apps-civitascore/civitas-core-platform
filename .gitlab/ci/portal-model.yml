@@ -14,6 +14,10 @@
       changes:
         - portal-model/**/*
         - .gitlab-ci.yml
+        - .gitlab/ci/docker.yml
+        - .gitlab/ci/maven.yml
+        - .gitlab/ci/rules.yml
+        - .gitlab/ci/scripts/api-test-stack.sh
         - .gitlab/ci/portal-model.yml
 
 # Generate maven dependency graph JSON for license scanning

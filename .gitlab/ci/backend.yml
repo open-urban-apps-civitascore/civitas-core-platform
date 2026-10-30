@@ -10,6 +10,10 @@
         - portal-model/**/* # Backend depends on portal-model, so run when model changes too
         - model-forge/**/* # Backend depends on model-forge, so run when it changes too
         - .gitlab-ci.yml
+        - .gitlab/ci/docker.yml
+        - .gitlab/ci/maven.yml
+        - .gitlab/ci/rules.yml
+        - .gitlab/ci/scripts/api-test-stack.sh
         - .gitlab/ci/backend.yml
         - .gitlab/ci/portal-model.yml # Also run when portal-model changes since backend depends on it
         - .gitlab/ci/model-forge.yml # Also run when model-forge changes since backend depends on it
@@ -152,6 +156,10 @@ saga-e2e-test-backend:
         - portal-model/**/*
         - model-forge/**/*
         - .gitlab-ci.yml
+        - .gitlab/ci/docker.yml
+        - .gitlab/ci/maven.yml
+        - .gitlab/ci/rules.yml
+        - .gitlab/ci/scripts/api-test-stack.sh
         - .gitlab/ci/backend.yml
 
   before_script:

@@ -11,6 +11,10 @@
         # change here must run the conformance and drift tests in the MR that causes it.
         - model-forge/model-forge-runtime/src/main/resources/*.schema.json
         - .gitlab-ci.yml
+        - .gitlab/ci/docker.yml
+        - .gitlab/ci/maven.yml
+        - .gitlab/ci/rules.yml
+        - .gitlab/ci/scripts/api-test-stack.sh
         - .gitlab/ci/frontend.yml
 
 

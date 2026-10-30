@@ -32,6 +32,10 @@
         - portal-backend/**/*
         - portal-model/**/*
         - .gitlab-ci.yml
+        - .gitlab/ci/docker.yml
+        - .gitlab/ci/maven.yml
+        - .gitlab/ci/rules.yml
+        - .gitlab/ci/scripts/api-test-stack.sh
         - .gitlab/ci/model-forge.yml
         - .gitlab/ci/backend.yml
         - .gitlab/ci/portal-model.yml

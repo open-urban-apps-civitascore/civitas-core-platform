@@ -13,6 +13,10 @@
       changes:
         - nifi-extensions/**/*
         - .gitlab-ci.yml
+        - .gitlab/ci/docker.yml
+        - .gitlab/ci/maven.yml
+        - .gitlab/ci/rules.yml
+        - .gitlab/ci/scripts/api-test-stack.sh
         - .gitlab/ci/nifi-extensions.yml
         - model-forge/model-forge-runtime/src/main/java/de/civitascore/modelforge/validation/CoreJsonSchemaFactory.java
         - model-forge/model-forge-runtime/src/main/resources/geojson/**/*
