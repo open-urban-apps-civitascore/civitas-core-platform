@@ -31,6 +31,55 @@ body:json {
             "pageSizeParameter": "size",
             "pageSize": 2
           }
+        },
+        {
+          "name": "cursor-query",
+          "path": "/cursor-query",
+          "pagination": {
+            "type": "CURSOR",
+            "cursorPath": "$.properties.next_cursor",
+            "cursorParameter": "cursor",
+            "cursorIn": "QUERY",
+            "limitParameter": "limit",
+            "limit": 1
+          }
+        },
+        {
+          "name": "cursor-header",
+          "path": "/cursor-header",
+          "pagination": {
+            "type": "CURSOR",
+            "cursorPath": "$.properties.next_cursor",
+            "cursorParameter": "X-Cursor",
+            "cursorIn": "HEADER"
+          }
+        },
+        {
+          "name": "offset-limit",
+          "path": "/offset-limit",
+          "pagination": {
+            "type": "LIMIT_OFFSET",
+            "offsetParameter": "offset",
+            "offset": 80,
+            "limitParameter": "limit",
+            "limit": 2
+          }
+        },
+        {
+          "name": "offset",
+          "path": "/offset",
+          "pagination": { "type": "LIMIT_OFFSET", "offsetParameter": "offset" }
+        },
+        {
+          "name": "offset-count",
+          "path": "/offset-count",
+          "pagination": {
+            "type": "LIMIT_OFFSET",
+            "offsetParameter": "offset",
+            "limitParameter": "limit",
+            "limit": 1,
+            "countPath": "$.properties.count"
+          }
         }
       ]
     },

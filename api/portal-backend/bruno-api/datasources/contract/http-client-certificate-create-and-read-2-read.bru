@@ -1,0 +1,29 @@
+meta {
+  name: Contract HTTP — client certificate create + read (2/3 read)
+  type: http
+  seq: 134
+}
+
+get {
+  url: {{baseUrl}}/datasources/{{contractHttpClientCertificateId}}
+  body: none
+  auth: inherit
+}
+
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("The authentication reads back with the certificate and the private key masked", function() {
+    expect(res.body.connector.authentication).to.deep.equal({
+      "type": "CLIENT_CERTIFICATE",
+      "certificate": "********",
+      "privateKey": "********"
+    });
+  });
+  test("No response field holds the secret in clear text", function() {
+    expect(JSON.stringify(res.body)).to.not.include("http-s3cret");
+    expect(JSON.stringify(res.body)).to.not.include("BEGIN CERTIFICATE");
+  });
+}

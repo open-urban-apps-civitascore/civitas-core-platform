@@ -34,6 +34,7 @@
 		<module>config-adapter-flowable</module>
 		<module>config-adapter-postgis</module>
 		<module>config-adapter-superset</module>
+		<module>config-adapter-connection-test</module>
 	</modules>
 
 	<properties>
@@ -50,8 +51,8 @@
 		<kafka.version>4.1.2</kafka.version>
 		<keycloak.version>26.0.12</keycloak.version>
 		<cloudevents.version>3.0.0</cloudevents.version>
-		<slf4j.version>2.0.18</slf4j.version>
-		<jackson.version>2.22.3</jackson.version>
+		<slf4j.version>2.0.20</slf4j.version>
+		<jackson.version>2.22.4</jackson.version>
 		<okhttp.version>5.3.2</okhttp.version>
 		<jersey.version>3.1.12</jersey.version>
 		<commons.configuration2.version>2.15.1</commons.configuration2.version>
@@ -66,12 +67,14 @@
 		<commons.lang.version>3.20.0</commons.lang.version>
 		<commons.compress.version>1.28.0</commons.compress.version>
 		<at.yawk.lz4.version>1.11.4</at.yawk.lz4.version>
-		<owasp.encoder.version>1.4.0</owasp.encoder.version>
+		<owasp.encoder.version>1.4.1</owasp.encoder.version>
 		<flowable.version>7.1.0</flowable.version>
 		<spring.version>6.2.19</spring.version>
 		<hikaricp.version>6.2.1</hikaricp.version>
-		<postgresql.version>42.7.13</postgresql.version>
+		<postgresql.version>42.7.14</postgresql.version>
 		<h2.version>2.4.240</h2.version>
+		<!-- MQTT client of the connection test -->
+		<hivemq-mqtt-client.version>1.4.1</hivemq-mqtt-client.version>
 		<cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
 	</properties>
 
@@ -230,6 +233,18 @@
 				<artifactId>postgresql</artifactId>
 				<version>${postgresql.version}</version>
 			</dependency>
+			<!-- MQTT client -->
+			<dependency>
+				<groupId>com.hivemq</groupId>
+				<artifactId>hivemq-mqtt-client</artifactId>
+				<version>${hivemq-mqtt-client.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.hivemq</groupId>
+				<artifactId>hivemq-mqtt-client-websocket</artifactId>
+				<version>${hivemq-mqtt-client.version}</version>
+				<type>pom</type>
+			</dependency>
 			<dependency>
 				<groupId>com.h2database</groupId>
 				<artifactId>h2</artifactId>
@@ -299,12 +314,12 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-surefire-plugin</artifactId>
-					<version>3.2.3</version>
+					<version>3.2.5</version>
 				</plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-failsafe-plugin</artifactId>
-					<version>3.2.3</version>
+					<version>3.2.5</version>
 				</plugin>
 				<plugin>
 					<groupId>org.jacoco</groupId>
@@ -353,6 +368,7 @@
 						<ignoredUnusedDeclaredDependency>commons-beanutils:commons-beanutils</ignoredUnusedDeclaredDependency>
 						<ignoredUnusedDeclaredDependency>org.postgresql:postgresql</ignoredUnusedDeclaredDependency>
 						<ignoredUnusedDeclaredDependency>com.h2database:h2</ignoredUnusedDeclaredDependency>
+						<ignoredUnusedDeclaredDependency>com.hivemq:hivemq-mqtt-client-websocket</ignoredUnusedDeclaredDependency>
 					</ignoredUnusedDeclaredDependencies>
 					<!-- Required at runtime by the adapters' REST clients and JSON mapping;
 					     the analyzer sees direct imports only in test code. -->

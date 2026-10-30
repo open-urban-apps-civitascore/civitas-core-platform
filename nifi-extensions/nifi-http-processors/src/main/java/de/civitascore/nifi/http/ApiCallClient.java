@@ -34,6 +34,8 @@ import org.apache.nifi.web.client.api.WebClientServiceException;
 final class ApiCallClient {
 
   private static final char[] HEX = "0123456789ABCDEF".toCharArray();
+  private static final int UNAUTHORIZED = 401;
+  private static final int FORBIDDEN = 403;
 
   private final WebClientService webClient;
   private final String baseUrl;
@@ -49,31 +51,59 @@ final class ApiCallClient {
     this.bodyReadTimeout = bodyReadTimeout;
   }
 
+  /**
+   * Sends the request of the page with the credentials of the authentication. After a 401 that the
+   * authentication can renew, it sends the request once more.
+   */
   ApiCallOutcome send(ApiCall call, Page page, Authentication authentication) {
     String request = call.describe(page);
-    HttpResponseEntity response;
+    Attempt attempt = attempt(call, page, authentication, request);
+    if (attempt.unauthorized() && authentication.renewAfterUnauthorized()) {
+      attempt.discard();
+      attempt = attempt(call, page, authentication, request);
+    }
+    return switch (attempt) {
+      case Attempt.Failed(ApiCallOutcome.Failure failure) -> failure;
+      case Attempt.Responded(HttpResponseEntity response) ->
+          classify(request, response, authentication);
+    };
+  }
+
+  private Attempt attempt(ApiCall call, Page page, Authentication authentication, String request) {
+    Optional<ApiCallOutcome.Failure> notReady = authentication.prepare(call);
+    if (notReady.isPresent()) {
+      return new Attempt.Failed(notReady.get());
+    }
     try {
       HttpRequestHeadersSpec spec =
-          webClient.method(call.method().requestMethod()).uri(uri(call, page));
+          webClient.method(call.method().requestMethod()).uri(uri(call, page, authentication));
       for (Parameter header : call.headers()) {
         spec = spec.header(header.name(), header.value());
       }
-      response = authentication.authenticate(spec).retrieve();
+      for (Parameter header : page.headers()) {
+        spec = spec.header(header.name(), header.value());
+      }
+      return new Attempt.Responded(authentication.headers(spec).retrieve());
     } catch (WebClientServiceException e) {
-      return ApiCallOutcome.Failure.ofTransport(request, e);
+      return new Attempt.Failed(
+          authentication
+              .transportFailure(request, e)
+              .orElseGet(() -> ApiCallOutcome.Failure.ofTransport(request, e)));
     } catch (IllegalArgumentException e) {
       // The last guard: the JDK HTTP client puts the header value into the exception message.
-      return ApiCallOutcome.Failure.ofRejectedRequest(request, e);
+      return new Attempt.Failed(ApiCallOutcome.Failure.ofRejectedRequest(request, e));
     }
-    return classify(request, response);
   }
 
-  private ApiCallOutcome classify(String request, HttpResponseEntity response) {
+  private ApiCallOutcome classify(
+      String request, HttpResponseEntity response, Authentication authentication) {
     int status = response.statusCode();
     Optional<ErrorKind> error = StatusClassification.errorKind(status);
     if (error.isPresent()) {
       discard(response);
-      return ApiCallOutcome.Failure.ofStatus(request, status, error.get());
+      return status == UNAUTHORIZED || status == FORBIDDEN
+          ? ApiCallOutcome.Failure.ofRefusedCredential(request, status, authentication.method())
+          : ApiCallOutcome.Failure.ofStatus(request, status, error.get());
     }
     Optional<InputStream> content;
     try {
@@ -118,9 +148,10 @@ final class ApiCallClient {
     }
   }
 
-  private URI uri(ApiCall call, Page page) {
+  private URI uri(ApiCall call, Page page, Authentication authentication) {
     List<Parameter> parameters = new ArrayList<>(call.queryParameters());
     parameters.addAll(page.queryParameters());
+    parameters.addAll(authentication.queryParameters());
     String query = query(parameters);
     return URI.create(baseUrl + call.path() + (query.isEmpty() ? "" : "?" + query));
   }
@@ -143,7 +174,7 @@ final class ApiCallClient {
   }
 
   /** Percent-encodes all but the unreserved characters of RFC 3986, so a space is {@code %20}. */
-  private static void encode(String text, StringBuilder out) {
+  static void encode(String text, StringBuilder out) {
     for (byte b : text.getBytes(StandardCharsets.UTF_8)) {
       int c = b & 0xFF;
       if (unreserved(c)) {
@@ -162,5 +193,30 @@ final class ApiCallClient {
         || c == '.'
         || c == '_'
         || c == '~';
+  }
+
+  /** One request: the response, or the failure that came instead. */
+  private sealed interface Attempt {
+
+    default boolean unauthorized() {
+      return false;
+    }
+
+    default void discard() {}
+
+    record Responded(HttpResponseEntity response) implements Attempt {
+
+      @Override
+      public boolean unauthorized() {
+        return response.statusCode() == UNAUTHORIZED;
+      }
+
+      @Override
+      public void discard() {
+        ApiCallClient.discard(response);
+      }
+    }
+
+    record Failed(ApiCallOutcome.Failure failure) implements Attempt {}
   }
 }

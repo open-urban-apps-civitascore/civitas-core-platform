@@ -11,6 +11,7 @@ package de.civitascore.nifi.http;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Optional;
 import org.apache.nifi.web.client.api.HttpResponseEntity;
 
 /** What one request of an API call gave. */
@@ -61,6 +62,12 @@ sealed interface ApiCallOutcome {
       return new Failure(kind, status, request + " failed with status " + status);
     }
 
+    /** A 401 or a 403 of the API, which names the authentication method that it refused. */
+    static Failure ofRefusedCredential(String request, int status, String method) {
+      return new Failure(
+          ErrorKind.FATAL, status, request + " failed with status " + status + " (" + method + ")");
+    }
+
     /**
      * A request that got no complete response. The message names the exception class alone, because
      * an exception message can hold the URI with its query.
@@ -70,8 +77,59 @@ sealed interface ApiCallOutcome {
           ErrorKind.TRANSIENT, 0, request + " failed: " + transportCause(cause).getSimpleName());
     }
 
+    /** A client certificate that the server refused in the TLS handshake. */
+    static Failure ofRefusedHandshake(String request, String method) {
+      return new Failure(
+          ErrorKind.FATAL,
+          0,
+          request + " failed: TLS handshake with " + method + " failed (SSLHandshakeException)");
+    }
+
     /**
-     * A 2xx response whose body is not the JSON of records that agree with the record schema.
+     * An error status of the OAuth2 token endpoint.
+     *
+     * @param tokenEndpoint the host, the port and the path of the token URL, never its query
+     * @param errorCode an error code of RFC 6749, section 5.2, the only text of the response that
+     *     the message repeats
+     */
+    static Failure ofTokenStatus(
+        String apiCall,
+        String tokenEndpoint,
+        int status,
+        ErrorKind kind,
+        Optional<String> errorCode) {
+      return new Failure(
+          kind,
+          status,
+          tokenRequest(apiCall, tokenEndpoint)
+              + " failed with status "
+              + status
+              + errorCode.map(code -> " (" + code + ")").orElse(""));
+    }
+
+    /** A token request that got no complete response. */
+    static Failure ofTokenTransport(String apiCall, String tokenEndpoint, Throwable cause) {
+      return ofTransport(tokenRequest(apiCall, tokenEndpoint), cause);
+    }
+
+    /** A 2xx of the token endpoint that holds no access token. */
+    static Failure ofMissingAccessToken(String apiCall, String tokenEndpoint, int status) {
+      return new Failure(
+          ErrorKind.FATAL,
+          status,
+          tokenRequest(apiCall, tokenEndpoint)
+              + " failed: status "
+              + status
+              + " without an access token in a JSON object");
+    }
+
+    private static String tokenRequest(String apiCall, String tokenEndpoint) {
+      return apiCall + ": OAuth2 token request to " + tokenEndpoint;
+    }
+
+    /**
+     * A 2xx response whose body is not the JSON of records that agree with the record schema, or
+     * whose values the pagination cannot use.
      *
      * @param reason names no value of the response
      */
@@ -91,6 +149,17 @@ sealed interface ApiCallOutcome {
     static Failure ofRepeatedPage(String apiCall, int status, String page, String earlierPage) {
       return new Failure(
           ErrorKind.FATAL, status, apiCall + ": " + page + " repeats " + earlierPage);
+    }
+
+    /**
+     * A page that would send the same request as an earlier page of the run, so that the API would
+     * repeat its pages without end.
+     */
+    static Failure ofRepeatedRequest(String apiCall, int status, String page, String earlierPage) {
+      return new Failure(
+          ErrorKind.FATAL,
+          status,
+          apiCall + ": " + page + " would send the same request as " + earlierPage);
     }
 
     /** A run that NiFi stopped before this request. */

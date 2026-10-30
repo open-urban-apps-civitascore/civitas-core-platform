@@ -10,14 +10,14 @@ export-openapi-spec:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - .gitlab/ci/openapi.yml
-  image: docker:27
+  image: docker:27@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   stage: test
   needs:
     - job: build-backend
       artifacts: true
       optional: true
   services:
-    - name: docker:27-dind
+    - name: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_HOST: tcp://docker:2375

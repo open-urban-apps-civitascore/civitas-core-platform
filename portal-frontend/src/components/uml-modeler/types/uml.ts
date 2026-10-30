@@ -3,13 +3,7 @@ export type Visibility = 'public' | 'private' | 'protected' | 'package'
 export type UMLPrimitiveType = 'String' | 'Integer' | 'Boolean' | 'Number' | 'Date' | 'DateTime' | 'Uuid'
 
 export type UMLGeometryType =
-  | 'Point'
-  | 'LineString'
-  | 'Polygon'
-  | 'MultiPoint'
-  | 'MultiLineString'
-  | 'MultiPolygon'
-  | 'GeometryCollection'
+  'Point' | 'LineString' | 'Polygon' | 'MultiPoint' | 'MultiLineString' | 'MultiPolygon' | 'GeometryCollection'
 
 export interface UMLTypeReference {
   id: string
@@ -108,12 +102,7 @@ export type UMLElement = UMLClass | UMLInterface | UMLAbstractClass | UMLEnumera
 // or pick is defined once as RELATIONSHIP_PALETTE_ITEMS in constants/paletteItems.ts. Out-of-scope
 // types are not rejected — legacy models keep them — but carry no semantics and are ignored on export.
 export type UMLRelationshipType =
-  | 'association'
-  | 'aggregation'
-  | 'composition'
-  | 'inheritance'
-  | 'realization'
-  | 'dependency'
+  'association' | 'aggregation' | 'composition' | 'inheritance' | 'realization' | 'dependency'
 
 export interface UMLRelationship {
   id: string

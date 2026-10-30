@@ -89,6 +89,17 @@ public class ConnectorValidator {
     return violations;
   }
 
+  /**
+   * @param connector the connector, or null for none
+   * @throws ConnectorValidationException with the violations of {@link #validate}, if there are any
+   */
+  public void requireValid(ConnectorConfiguration connector, Stage stage) {
+    List<ConnectorViolation> violations = validate(connector, stage);
+    if (!violations.isEmpty()) {
+      throw new ConnectorValidationException(violations);
+    }
+  }
+
   @PreDestroy
   void close() {
     validatorFactory.close();

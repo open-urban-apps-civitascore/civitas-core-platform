@@ -20,13 +20,21 @@ tests {
     expect(res.body.title).to.equal("Bad Request");
     expect(res.body.status).to.equal(400);
   });
-  test("fieldErrors name the missing path and pagination fields by their connector path", function() {
+  test("fieldErrors name the missing authentication, path and pagination fields by their connector path", function() {
     const fields = res.body.fieldErrors.map(function(error) { return error.field; });
     expect(fields).to.have.members([
+      "connector.authentication.token",
       "connector.apiCalls[0].path",
       "connector.apiCalls[0].pagination.pageSizeParameter",
-      "connector.apiCalls[0].pagination.pageSize"
+      "connector.apiCalls[0].pagination.pageSize",
+      "connector.apiCalls[1].pagination.offsetParameter",
+      "connector.apiCalls[2].pagination.cursorParameter",
+      "connector.apiCalls[2].pagination.limitParameter"
     ]);
+  });
+  test("A limit without its parameter names the missing parameter", function() {
+    const error = res.body.fieldErrors.find(function(e) { return e.field === "connector.apiCalls[2].pagination.limitParameter"; });
+    expect(error.message).to.equal("'limitParameter' is required with 'limit'");
   });
 }
 

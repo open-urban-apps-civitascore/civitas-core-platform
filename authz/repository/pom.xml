@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.1</version>
+        <version>4.1.2</version>
         <relativePath/>
     </parent>
 
@@ -18,8 +18,8 @@
 
     <properties>
         <java.version>25</java.version>
-        <testcontainers.version>2.0.4</testcontainers.version>
-        <owasp.encoder.version>1.4.0</owasp.encoder.version>
+        <testcontainers.version>2.0.5</testcontainers.version>
+        <owasp.encoder.version>1.4.1</owasp.encoder.version>
         <portal-model.version>1.0.0</portal-model.version>
         <assertj.version>3.27.7</assertj.version>
         <!-- Drop once the Spring Boot parent manages Tomcat >= 11.0.25: Boot 4.1.1 pins 11.0.24,
@@ -52,7 +52,7 @@
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-compress</artifactId>
-                <version>1.26.1</version>
+                <version>1.26.2</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -202,7 +202,7 @@
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
-                <version>3.4.0</version>
+                <version>3.10.4</version>
                 <configuration>
                     <java>
                         <googleJavaFormat/>
@@ -215,7 +215,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.14</version>
+                <version>0.8.15</version>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>

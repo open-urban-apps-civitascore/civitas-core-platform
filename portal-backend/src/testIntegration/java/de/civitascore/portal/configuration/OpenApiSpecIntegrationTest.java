@@ -90,13 +90,37 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"MqttConnector", "SqlConnector", "HttpConnectorBasicAuthentication"})
-  @DisplayName("Should describe each connector password as write-only")
-  void shouldDescribePasswordAsWriteOnly(String schema) {
-    JsonNode password = propertiesOf(component(schema)).path("password");
+  @CsvSource({
+    "MqttConnector, password",
+    "SqlConnector, password",
+    "HttpConnectorBasicAuthentication, password",
+    "HttpConnectorBearerTokenAuthentication, token",
+    "HttpConnectorApiTokenAuthentication, value",
+    "HttpConnectorOAuth2Authentication, clientSecret",
+    "HttpConnectorClientCertificateAuthentication, certificate",
+    "HttpConnectorClientCertificateAuthentication, privateKey"
+  })
+  @DisplayName("Should describe each connector secret as write-only")
+  void shouldDescribeSecretAsWriteOnly(String schema, String secret) {
+    JsonNode secretProperty = propertiesOf(component(schema)).path(secret);
 
-    assertThat(password.path("writeOnly").asBoolean()).isTrue();
-    assertThat(password.path("format").asString()).isEqualTo("password");
+    assertThat(secretProperty.path("writeOnly").asBoolean()).isTrue();
+    assertThat(secretProperty.path("format").asString()).isEqualTo("password");
+  }
+
+  @Test
+  @DisplayName("Should export each HTTP/REST connector pattern as a portable, anchored expression")
+  void shouldExportHttpConnectorPatternsAnchoredWithoutInlineFlags() {
+    List<String> patterns = new ArrayList<>();
+    spec.path("components").path("schemas").properties().stream()
+        .filter(schema -> schema.getKey().startsWith("HttpConnector"))
+        .forEach(schema -> collectPatterns(schema.getValue(), patterns));
+
+    // A JSON Schema pattern matches anywhere in the value, and JavaScript knows no (?i).
+    assertThat(patterns)
+        .isNotEmpty()
+        .allSatisfy(
+            pattern -> assertThat(pattern).startsWith("^").endsWith("$").doesNotContain("(?"));
   }
 
   @Test
@@ -119,7 +143,13 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
     "HttpConnectorParameter",
     "HttpConnectorNoAuthentication",
     "HttpConnectorBasicAuthentication",
-    "HttpConnectorPageNumberPagination"
+    "HttpConnectorBearerTokenAuthentication",
+    "HttpConnectorApiTokenAuthentication",
+    "HttpConnectorOAuth2Authentication",
+    "HttpConnectorClientCertificateAuthentication",
+    "HttpConnectorPageNumberPagination",
+    "HttpConnectorLimitOffsetPagination",
+    "HttpConnectorCursorPagination"
   })
   @DisplayName("Should describe every connector field")
   void shouldDescribeEveryConnectorField(String schema) {
@@ -141,9 +171,15 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
   @ParameterizedTest
   @CsvSource({
     "HttpConnector, authentication, HttpConnectorAuthentication,"
-        + " NONE=HttpConnectorNoAuthentication BASIC=HttpConnectorBasicAuthentication",
+        + " NONE=HttpConnectorNoAuthentication BASIC=HttpConnectorBasicAuthentication"
+        + " BEARER_TOKEN=HttpConnectorBearerTokenAuthentication"
+        + " API_TOKEN=HttpConnectorApiTokenAuthentication"
+        + " OAUTH2=HttpConnectorOAuth2Authentication"
+        + " CLIENT_CERTIFICATE=HttpConnectorClientCertificateAuthentication",
     "HttpConnectorApiCall, pagination, HttpConnectorPagination,"
         + " PAGE_NUMBER=HttpConnectorPageNumberPagination"
+        + " LIMIT_OFFSET=HttpConnectorLimitOffsetPagination"
+        + " CURSOR=HttpConnectorCursorPagination"
   })
   @DisplayName(
       "Should describe each nested HTTP/REST variant as oneOf with a type discriminator,"
@@ -274,6 +310,16 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
       node = node.path(segment);
     }
     return node;
+  }
+
+  private static void collectPatterns(JsonNode node, List<String> patterns) {
+    if (node.isObject()) {
+      JsonNode pattern = node.get("pattern");
+      if (pattern != null && pattern.isString()) {
+        patterns.add(pattern.asString());
+      }
+    }
+    node.values().forEach(child -> collectPatterns(child, patterns));
   }
 
   private void collectDanglingReferences(JsonNode node, List<String> dangling) {

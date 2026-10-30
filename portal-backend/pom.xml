@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.1</version>
+        <version>4.1.2</version>
         <relativePath/>
     </parent>
 
@@ -39,20 +39,20 @@
              ships a fixed jackson-bom. -->
         <jackson-bom.version>3.2.3</jackson-bom.version>
         <springdoc-openapi.version>3.0.3</springdoc-openapi.version>
-        <commons-io.version>2.21.0</commons-io.version>
+        <commons-io.version>2.22.0</commons-io.version>
         <testcontainers.version>2.0.4</testcontainers.version>
-        <testcontainers-keycloak.version>4.1.1</testcontainers-keycloak.version>
+        <testcontainers-keycloak.version>4.4.0</testcontainers-keycloak.version>
         <specification-arg-resolver.version>4.0.0</specification-arg-resolver.version>
         <hibernate-processor.version>${hibernate.version}</hibernate-processor.version>
-        <spotless.version>3.4.0</spotless.version>
+        <spotless.version>3.10.4</spotless.version>
         <skipUnitTests>false</skipUnitTests>
         <jacoco.version>0.8.15</jacoco.version>
         <mapstruct.version>1.6.3</mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
-        <lombok.version>1.18.44</lombok.version>
+        <lombok.version>1.18.48</lombok.version>
         <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
         <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
-        <owasp.encoder.version>1.4.0</owasp.encoder.version>
+        <owasp.encoder.version>1.4.1</owasp.encoder.version>
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
         <config-adapter.version>1.0.2-SNAPSHOT</config-adapter.version>
         <portal-model.version>1.0.0</portal-model.version>
@@ -61,7 +61,7 @@
              resolves something the registry actually holds. CI overrides it with
              -Dmodel-forge.version so the backend builds against its own branch's Model Forge. -->
         <model-forge.version>0.1.0-SNAPSHOT</model-forge.version>
-        <archunit.version>1.4.2</archunit.version>
+        <archunit.version>1.5.1</archunit.version>
         <!-- Drop once the Spring Boot parent manages Tomcat >= 11.0.25: Boot 4.1.1 pins 11.0.24,
              affected by GHSA-9xv2-5v5q-p794, GHSA-gcx9-497g-6cp6 and GHSA-h3x4-894j-xpx5. -->
         <tomcat.version>11.0.26</tomcat.version>
@@ -213,7 +213,7 @@
         <dependency>
             <groupId>org.keycloak</groupId>
             <artifactId>keycloak-admin-client</artifactId>
-            <version>26.0.8</version>
+            <version>26.0.12</version>
             <scope>test</scope>
         </dependency>
         <!-- Runtime requirement of commons-compress, which Testcontainers uses to tar files
@@ -397,6 +397,11 @@
                         <ignoredNonTestScopedDependency>com.nimbusds:nimbus-jose-jwt</ignoredNonTestScopedDependency>
                         <ignoredNonTestScopedDependency>ch.qos.logback:*</ignoredNonTestScopedDependency>
                         <ignoredNonTestScopedDependency>org.springframework.boot:spring-boot-restclient</ignoredNonTestScopedDependency>
+                        <!-- Jackson 2 comes with config-adapter-api; the connection test IT uses it to
+                             play the connection test service, which serializes with Jackson 2. -->
+                        <ignoredNonTestScopedDependency>com.fasterxml.jackson.core:jackson-databind</ignoredNonTestScopedDependency>
+                        <ignoredNonTestScopedDependency>com.fasterxml.jackson.core:jackson-core</ignoredNonTestScopedDependency>
+                        <ignoredNonTestScopedDependency>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</ignoredNonTestScopedDependency>
                     </ignoredNonTestScopedDependencies>
                     <!-- The used-undeclared check is off: compiling against a starter's or aggregator's
                          transitive closure is deliberate here, so every finding is a false positive. -->

@@ -9,11 +9,7 @@ import { buildUMLModelPayload } from './modelUploadService'
 export const MAX_IMPORT_FILE_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB
 
 export type DiagramImportErrorCode =
-  | 'FILE_TOO_LARGE'
-  | 'INVALID_JSON'
-  | 'INVALID_DATASTRUCTURE_DOCUMENT'
-  | 'INVALID_DIAGRAM_SCHEMA'
-  | 'UNREADABLE_MODEL'
+  'FILE_TOO_LARGE' | 'INVALID_JSON' | 'INVALID_DATASTRUCTURE_DOCUMENT' | 'INVALID_DIAGRAM_SCHEMA' | 'UNREADABLE_MODEL'
 
 export class DiagramImportError extends Error {
   readonly code: DiagramImportErrorCode

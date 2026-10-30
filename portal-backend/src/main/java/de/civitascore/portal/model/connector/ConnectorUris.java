@@ -3,12 +3,15 @@ package de.civitascore.portal.model.connector;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /** Parses the URLs of a connector configuration and removes the credentials they carry. */
-final class ConnectorUris {
+public final class ConnectorUris {
 
   private static final String JDBC_PREFIX = "jdbc:";
   private static final Set<String> HTTP_SCHEMES = Set.of("http", "https");
@@ -58,12 +61,29 @@ final class ConnectorUris {
   }
 
   /**
-   * The API host URL without user info and without a trailing {@code /}. A blank URL is null.
+   * The API host URL as {@link #httpUrl} cleans it, and without a trailing {@code /}.
+   *
+   * @throws InvalidConnectorValueException as {@link #httpUrl} does
+   */
+  static String httpBaseUrl(String url, String key) {
+    String cleaned = httpUrl(url, key);
+    if (cleaned == null) {
+      return null;
+    }
+    int end = cleaned.length();
+    while (cleaned.charAt(end - 1) == '/') {
+      end--;
+    }
+    return cleaned.substring(0, end);
+  }
+
+  /**
+   * The http or https URL without user info. A blank URL is null.
    *
    * @throws InvalidConnectorValueException naming {@code key} for a URL without host, with a scheme
    *     other than {@code http} or {@code https}, or with a query or fragment
    */
-  static String httpBaseUrl(String url, String key) {
+  static String httpUrl(String url, String key) {
     if (url == null || url.isBlank()) {
       return null;
     }
@@ -74,12 +94,114 @@ final class ConnectorUris {
         || uri.getRawFragment() != null) {
       throw new InvalidConnectorValueException(key);
     }
-    String cleaned = withoutUserInfo(uri, key).toString();
-    int end = cleaned.length();
-    while (cleaned.charAt(end - 1) == '/') {
-      end--;
+    return withoutUserInfo(uri, key).toString();
+  }
+
+  /**
+   * Every address the connector connects to, in its order. Throws for an unknown connector type, so
+   * that it cannot keep a stored secret.
+   */
+  public static List<String> addresses(ConnectorConfiguration connector) {
+    List<String> addresses =
+        switch (connector) {
+          case SqlConnectorConfiguration sql -> sql.dsn() == null ? null : List.of(sql.dsn());
+          case MqttConnectorConfiguration mqtt -> mqtt.urls();
+          case HttpConnectorConfiguration http ->
+              Stream.of(
+                      http.baseUrl(),
+                      http.authentication() instanceof HttpConnectorConfiguration.OAuth2 oauth2
+                          ? oauth2.tokenUrl()
+                          : null)
+                  .filter(Objects::nonNull)
+                  .toList();
+          default ->
+              throw new IllegalArgumentException(
+                  "No addresses of " + connector.getClass().getSimpleName());
+        };
+    return addresses == null ? List.of() : addresses;
+  }
+
+  /**
+   * Whether every destination of {@code requested} is a destination of {@code stored}, in any
+   * order. A stored secret follows the connector only to destinations it was stored for.
+   */
+  public static boolean staysAtDestinationsOf(
+      ConnectorConfiguration requested, ConnectorConfiguration stored) {
+    return new HashSet<>(destinations(stored)).containsAll(destinations(requested));
+  }
+
+  /** Scheme, host, port and {@code sslmode} of every address. */
+  static List<String> destinations(ConnectorConfiguration connector) {
+    return addresses(connector).stream()
+        .map(address -> origin(address) + " sslmode=" + sslmode(address))
+        .toList();
+  }
+
+  /**
+   * An unparsable URL or a multi-host authority stands for itself and equals only the same text.
+   */
+  private static String origin(String url) {
+    try {
+      URI uri = new URI(url);
+      if (uri.getHost() == null) {
+        return uri.getScheme() + "://" + uri.getRawAuthority();
+      }
+      return uri.getScheme() + "://" + uri.getHost() + ":" + uri.getPort();
+    } catch (URISyntaxException e) {
+      return url;
     }
-    return cleaned.substring(0, end);
+  }
+
+  /**
+   * Whether a DSN has a fragment: the connection test and the pipeline read the host after the last
+   * {@code @}, also behind a {@code #}, where the destination check reads the host before it.
+   */
+  public static boolean hasFragment(String dsn) {
+    return dsn.indexOf('#') >= 0;
+  }
+
+  /**
+   * Whether a parameter name of a DSN occurs twice, in any case: the driver takes the last value,
+   * the destination check the {@code sslmode} it finds.
+   */
+  public static boolean repeatsAParameter(String dsn) {
+    int start = dsn.indexOf('?');
+    if (start < 0) {
+      return false;
+    }
+    String query = dsn.substring(start + 1);
+    Set<String> names = new HashSet<>();
+    for (String parameter : query.split("&")) {
+      int equals = parameter.indexOf('=');
+      String name = equals < 0 ? parameter : parameter.substring(0, equals);
+      if (!name.isEmpty() && !names.add(name.toLowerCase(Locale.ROOT))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * The {@code sslmode} parameter of an address, or null if it has none. The name is matched as the
+   * driver matches it, case-sensitively.
+   */
+  private static String sslmode(String dsn) {
+    try {
+      String query = new URI(dsn).getRawQuery();
+      if (query == null) {
+        return null;
+      }
+      for (String parameter : query.split("&")) {
+        int equals = parameter.indexOf('=');
+        String name = equals < 0 ? parameter : parameter.substring(0, equals);
+        if ("sslmode".equals(name)) {
+          return equals < 0 ? "" : parameter.substring(equals + 1);
+        }
+      }
+      return null;
+    } catch (URISyntaxException e) {
+      return null;
+    }
   }
 
   private static URI parse(String value, String key) {

@@ -23,7 +23,7 @@
 # - develop: snapshot version (e.g., 1.0.2-SNAPSHOT)
 # - MR: merge request version (e.g., 1.0.2-MR-123)
 setup-version-config-adapter:
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: .pre
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
@@ -66,7 +66,7 @@ setup-version-config-adapter:
 # This must always run (needs: []) to ensure dependency scanning has the graph
 # even when the build job is skipped due to no changes
 generate-graph-config-adapter:
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: lint
   needs:
     - job: setup-version-config-adapter
@@ -104,7 +104,7 @@ generate-graph-config-adapter:
 
 lint-config-adapter:
   extends: .api-test-stack-changes
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: lint
   needs:
     - job: setup-version-config-adapter
@@ -124,7 +124,7 @@ lint-config-adapter:
 
 dependency-prune-config-adapter:
   extends: .api-test-stack-changes
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: lint
   needs:
     - job: setup-version-config-adapter
@@ -146,7 +146,7 @@ dependency-prune-config-adapter:
 # this job requires no Docker.
 test-config-adapter:
   extends: .only-config-adapter-changes
-  image: maven:3.9-eclipse-temurin-25
+  image: maven:3.9-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: build-package
   needs:
     - job: setup-version-config-adapter
@@ -201,14 +201,14 @@ test-config-adapter:
 # needs: by plain name — a matrix generates names of the form "job: [value]" instead.
 .integration-test-config-adapter:
   extends: .only-config-adapter-changes
-  image: maven:3.9-eclipse-temurin-25
+  image: maven:3.9-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: build-package
   needs:
     - job: setup-version-config-adapter
     - job: build-config-adapter
       artifacts: true
   services:
-    - name: docker:27-dind
+    - name: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
       alias: docker
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
@@ -261,11 +261,11 @@ integration-test-config-adapter-gateway-idm:
 integration-test-config-adapter-data-services:
   extends: .integration-test-config-adapter
   variables:
-    MODULES: config-adapter-frost,config-adapter-geoserver,config-adapter-postgis,config-adapter-flowable,event-handler-kafka,config-adapter-application
+    MODULES: config-adapter-frost,config-adapter-geoserver,config-adapter-postgis,config-adapter-flowable,event-handler-kafka,config-adapter-application,config-adapter-connection-test
 
 build-config-adapter:
   extends: .api-test-stack-changes
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: build-package
   needs:
     - job: setup-version-config-adapter
@@ -310,7 +310,7 @@ build-config-adapter:
 # Runs in QA stage so backend tests can use the published artifacts
 publish-config-adapter:
   extends: .only-config-adapter-changes # overridden by rules: below, kept for documentation
-  image: maven:3.9-eclipse-temurin-25-alpine
+  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: deploy-package
   rules:
     # Same conditions as .only-config-adapter-changes, but with per-rule needs:
@@ -404,7 +404,7 @@ publish-config-adapter:
 
 build-config-adapter-image:
   extends: .only-config-adapter-changes
-  image: docker:27-dind
+  image: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   stage: publish
   needs:
     - job: setup-version
@@ -418,7 +418,7 @@ build-config-adapter-image:
     - job: api-test-backend
       optional: true
   services:
-    - name: docker:27-dind
+    - name: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
@@ -450,7 +450,7 @@ build-config-adapter-image:
 container-scan-config-adapter:
   extends: .only-config-adapter-changes
   image:
-    name: aquasec/trivy:0.55.1
+    name: aquasec/trivy:0.55.2@sha256:addfb8fd6b9e520c25b22c61d8aa5d58ecd7879177aa959f952bf4734f4e3f60
     entrypoint: ['']
   stage: container-qa
   needs:
@@ -473,7 +473,7 @@ container-scan-config-adapter:
 
 deploy-config-adapter:
   extends: .only-config-adapter-changes
-  image: docker:27-dind
+  image: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   stage: deploy
   needs:
     - job: setup-version
@@ -481,7 +481,7 @@ deploy-config-adapter:
     - job: container-scan-config-adapter
 
   services:
-    - docker:27-dind
+    - docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
@@ -505,14 +505,14 @@ deploy-config-adapter:
 
 sbom-config-adapter-image:
   extends: .only-config-adapter-changes
-  image: docker:27-dind
+  image: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   stage: report
   needs:
     - job: setup-version
       artifacts: true
     - job: deploy-config-adapter
   services:
-    - docker:27-dind
+    - docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'

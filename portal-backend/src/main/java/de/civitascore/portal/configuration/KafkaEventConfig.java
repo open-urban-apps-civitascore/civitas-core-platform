@@ -106,6 +106,27 @@ public class KafkaEventConfig {
     return factory;
   }
 
+  /**
+   * Reads connection test results from the latest offset, since only a waiting request needs one. A
+   * record that the listener cannot process is dropped without retries.
+   */
+  @Bean
+  public ConcurrentKafkaListenerContainerFactory<String, String>
+      connectionTestKafkaListenerContainerFactory() {
+    Map<String, Object> consumerProps = new HashMap<>();
+    consumerProps.put(
+        ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaProperties.getBootstrapServers());
+    consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+    consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+    consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+
+    ConcurrentKafkaListenerContainerFactory<String, String> factory =
+        new ConcurrentKafkaListenerContainerFactory<>();
+    factory.setConsumerFactory(new DefaultKafkaConsumerFactory<>(consumerProps));
+    factory.setCommonErrorHandler(new DefaultErrorHandler(new FixedBackOff(0L, 0L)));
+    return factory;
+  }
+
   private static DefaultErrorHandler sagaErrorHandler(ConsumerRecordRecoverer deadLetterRecoverer) {
     DefaultErrorHandler errorHandler =
         new DefaultErrorHandler(

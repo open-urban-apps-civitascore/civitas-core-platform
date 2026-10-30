@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.civitascore.configadapter.connector.ConnectorValueException;
 import de.civitascore.configadapter.crypto.CredentialEncryptor;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
@@ -201,7 +202,11 @@ class FlowDeploymentPlannerReferenceInjectionTest {
                               input.artifacts())));
 
       assertEquals(AdapterErrorCode.NIFI_TEMPLATE_ERROR, ex.getErrorCode());
-      assertInstanceOf(UnsafePropertyValueException.class, ex.getCause());
+      // A '#' in a DSN is refused as a fragment before any reference check.
+      boolean fragment = "SQL dsn".equals(field) && reference.startsWith("#");
+      Class<? extends Exception> refusal =
+          fragment ? ConnectorValueException.class : UnsafePropertyValueException.class;
+      assertInstanceOf(refusal, ex.getCause());
       assertFalse(String.valueOf(ex.getMessage()).contains(reference), ex.getMessage());
     }
   }

@@ -70,10 +70,7 @@ export interface PassiveFlowDeclaration {
  * does.
  */
 export type NodeFlowDeclaration =
-  | SourceFlowDeclaration
-  | TransformFlowDeclaration
-  | SinkFlowDeclaration
-  | PassiveFlowDeclaration
+  SourceFlowDeclaration | TransformFlowDeclaration | SinkFlowDeclaration | PassiveFlowDeclaration
 
 const DATA_SOURCE_OUTPUT_BY_CONNECTOR: Record<string, PayloadForm> = {
   HTTP: 'RAW_JSON',

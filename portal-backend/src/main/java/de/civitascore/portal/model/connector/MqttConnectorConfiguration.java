@@ -55,7 +55,8 @@ public record MqttConnectorConfiguration(
     @Schema(description = "TLS configuration.") @Valid Tls tls,
     @Schema(description = "Broker username.", example = "mqttuser") String user,
     @Schema(
-            description = "Broker password. Responses show \"********\" for a stored password.",
+            description =
+                "Broker password. Responses show \"********\" for a stored password; a write keeps it with \"********\" while the destination stays.",
             implementation = String.class,
             accessMode = Schema.AccessMode.WRITE_ONLY,
             format = "password",

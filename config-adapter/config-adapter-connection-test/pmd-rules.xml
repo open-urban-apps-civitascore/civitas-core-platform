@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<ruleset name="Config Adapter Connection Test"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0
+           https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+  <description>PMD rules for the config-adapter-connection-test module.
+    Noise rules are excluded; only actionable findings remain.</description>
+
+  <!-- Best Practices -->
+  <rule ref="category/java/bestpractices.xml">
+    <exclude name="GuardLogStatement"/>          <!-- SLF4J parameterized logging is lazy -->
+  </rule>
+
+  <!-- Design -->
+  <rule ref="category/java/design.xml">
+    <exclude name="LawOfDemeter"/>               <!-- Too strict for the fluent client builders -->
+    <exclude name="CyclomaticComplexity"/>       <!-- Value checks and status mapping are branchy by nature -->
+    <exclude name="TooManyMethods"/>             <!-- Small focused helpers in the probers -->
+    <exclude name="ExcessiveImports"/>           <!-- The probers wire a client library each -->
+    <exclude name="CouplingBetweenObjects"/>     <!-- The factory is the intended composition point -->
+    <exclude name="GodClass"/>                   <!-- A prober keeps its client handling in one place -->
+  </rule>
+
+  <!-- Error Prone -->
+  <rule ref="category/java/errorprone.xml">
+    <exclude name="NullAssignment"/>             <!-- Optional values (reason, preview, rowCount, httpStatus) are null by design -->
+    <exclude name="AvoidLiteralsInIfCondition"/> <!-- HTTP status codes and SQLSTATEs read clearer as literals -->
+    <exclude name="AvoidDuplicateLiterals"/>     <!-- Repeated message fragments are clearer inline -->
+    <exclude name="AvoidFieldNameMatchingMethodName"/> <!-- Record-style accessors -->
+  </rule>
+
+  <!-- Code Style -->
+  <rule ref="category/java/codestyle.xml">
+    <exclude name="LocalVariableCouldBeFinal"/>  <!-- Style preference, not enforced project-wide -->
+    <exclude name="MethodArgumentCouldBeFinal"/> <!-- Same -->
+    <exclude name="CommentDefaultAccessModifier"/><!-- Package-private is intentional in this module -->
+    <exclude name="OnlyOneReturn"/>              <!-- Multiple returns are idiomatic in guard clauses -->
+    <exclude name="AtLeastOneConstructor"/>       <!-- Utility classes with private constructors are fine -->
+    <exclude name="LongVariable"/>               <!-- Descriptive names are fine -->
+    <exclude name="ShortVariable"/>              <!-- Variables like id, e are clear in context -->
+    <exclude name="UseExplicitTypes"/>           <!-- var is used for builder types only -->
+    <exclude name="TooManyStaticImports"/>       <!-- Explicit static imports are fine -->
+  </rule>
+</ruleset>

@@ -19,6 +19,7 @@ Multi-module framework that consumes CloudEvents describing desired configuratio
 | `config-adapter-geoserver` | Workspaces, datastores, feature types, layers and styles via the GeoServer REST API | `geoserver` (adapter, saga) | [README](config-adapter-geoserver/README.md) |
 | `config-adapter-nifi` | Translates the engine-neutral pipeline graph into a NiFi flow and deploys it over the NiFi REST API | `nifi` (saga only) | [README](config-adapter-nifi/README.md) |
 | `config-adapter-postgis` | Tables, schemas, database roles and schema grants via DDL over JDBC | `postgis` (adapter, saga) | [README](config-adapter-postgis/README.md) |
+| `config-adapter-connection-test` | Tests whether a data source answers to the portal's connector values, with its own SQL, MQTT and HTTP clients. Not an adapter or saga handler: runs as a workload of its own (`ConnectionTestApplication`) | — | [README](config-adapter-connection-test/README.md) |
 | `config-adapter-examples` | `dummylog` adapter, which logs the events it receives; adapter skeleton and test fixture | `dummylog` (adapter) | — |
 
 `config-adapter-nifi` registers a `SagaCommandHandler` and no `ConfigAdapter`. It is reachable only through saga dispatch, is unreachable over the CloudEvent path, and **MUST NOT** appear in `adapters` — no adapter of that name exists to discover, so startup fails.
@@ -111,6 +112,8 @@ Deployed environments are configured from the separate `civitas-core-deployment`
 - **A renamed or removed topic MUST be reflected in the per-adapter `*_TOPICS` values.** An unknown topic name is rejected against the topic registry at startup.
 
 Confirm the deployed image tag and environment values in that repository before releasing a change to any of the three.
+
+The connection test is a second workload of the same image ([DEPLOYMENT.md §2.5](DEPLOYMENT.md#25-connection-test)). Its topic names must match portal-backend's `connection-test.*-topic`, and its pods must not carry config-adapter's labels.
 
 ## Extending
 

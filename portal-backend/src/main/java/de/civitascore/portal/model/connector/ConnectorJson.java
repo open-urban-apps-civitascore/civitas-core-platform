@@ -2,6 +2,7 @@ package de.civitascore.portal.model.connector;
 
 import de.civitascore.portal.model.embedded.ConnectorType;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -15,6 +16,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ValueDeserializer;
 import tools.jackson.databind.cfg.CoercionAction;
 import tools.jackson.databind.cfg.CoercionInputShape;
+import tools.jackson.databind.cfg.EnumFeature;
 import tools.jackson.databind.exc.InvalidTypeIdException;
 import tools.jackson.databind.exc.UnrecognizedPropertyException;
 import tools.jackson.databind.json.JsonMapper;
@@ -44,6 +46,9 @@ public final class ConnectorJson {
   /** The registry document member that names the Data structure version of the Data source. */
   public static final String ELEMENT = "element";
 
+  public static final String STORED_SECRET_FOR_STORED_DESTINATION =
+      "The stored secret is kept only for the stored destination; enter it again for another one";
+
   /**
    * Keys of a registry document that the registry and the shared schema own. A stored connector is
    * read without them.
@@ -55,6 +60,7 @@ public final class ConnectorJson {
       JsonMapper.builder()
           .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
           .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
+          .enable(EnumFeature.FAIL_ON_NUMBERS_FOR_ENUMS)
           .withCoercionConfig(
               LogicalType.Integer,
               config -> {
@@ -119,12 +125,43 @@ public final class ConnectorJson {
    * if {@code storedDocument} has none there or belongs to another connector type.
    *
    * @param storedDocument the current registry document, or null if none is stored
+   * @throws StoredSecretRefusedException if a placeholder would take a stored secret to another
+   *     destination
    */
   public static Map<String, Object> toDocument(
       ConnectorConfiguration connector,
       Map<String, Object> storedDocument,
       UnaryOperator<String> encrypt) {
-    return writeDocument(connector, readStoredDocument(storedDocument), encrypt);
+    ConnectorConfiguration stored = readStoredDocument(storedDocument);
+    if (stored != null
+        && stored.connectorType() == connector.connectorType()
+        && hasPlaceholder(connector)
+        && !ConnectorUris.staysAtDestinationsOf(connector, stored)) {
+      throw new StoredSecretRefusedException(STORED_SECRET_FOR_STORED_DESTINATION);
+    }
+    return writeDocument(connector, stored, encrypt);
+  }
+
+  /**
+   * Requires a stored secret for every {@value Secret#PLACEHOLDER}, which {@link #toDocument} would
+   * otherwise turn into no secret.
+   *
+   * @param storedDocument the current registry document, or null if none is stored
+   * @throws MalformedDataSourceRequestException naming the key path of each placeholder without a
+   *     stored secret
+   */
+  public static void requireStoredSecrets(
+      ConnectorConfiguration connector, Map<String, Object> storedDocument) {
+    List<String> unresolved =
+        PlaceholderResolver.unresolvedPlaceholders(connector, readStoredDocument(storedDocument));
+    if (!unresolved.isEmpty()) {
+      throw new MalformedDataSourceRequestException(
+          "No stored secret for " + Secret.PLACEHOLDER + " at " + String.join(", ", unresolved));
+    }
+  }
+
+  public static boolean hasPlaceholder(ConnectorConfiguration connector) {
+    return !PlaceholderResolver.unresolvedPlaceholders(connector, null).isEmpty();
   }
 
   static Map<String, Object> writeDocument(

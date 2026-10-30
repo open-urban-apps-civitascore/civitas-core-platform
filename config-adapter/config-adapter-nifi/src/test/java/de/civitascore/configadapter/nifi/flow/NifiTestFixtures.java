@@ -11,6 +11,7 @@ package de.civitascore.configadapter.nifi.flow;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.civitascore.configadapter.crypto.CredentialEncryptor;
 import de.civitascore.configadapter.crypto.CryptoKeyLoader;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.nifi.credentials.CredentialResolver;
@@ -141,8 +142,16 @@ public final class NifiTestFixtures {
     return new PipelineDeploymentRequest(pipelineId, graph, source, sink, MAPPINGS);
   }
 
-  static byte[] stretchedKey() throws Exception {
+  public static byte[] stretchedKey() throws Exception {
     return CryptoKeyLoader.stretchMasterKey(CryptoKeyLoader.hexStringToBytes(MASTER_KEY_HEX));
+  }
+
+  /** The {@code ENC(...)} form of a Data source secret, as the portal backend stores it. */
+  public static String encrypted(String secret) throws Exception {
+    return "ENC("
+        + CredentialEncryptor.encrypt(
+            secret, stretchedKey(), CredentialEncryptor.DATASOURCE_CREDENTIAL_CONTEXT)
+        + ")";
   }
 
   public static StageRegistry stageRegistry(

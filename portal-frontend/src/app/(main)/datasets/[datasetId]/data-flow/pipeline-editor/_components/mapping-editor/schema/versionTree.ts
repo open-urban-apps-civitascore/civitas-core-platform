@@ -30,8 +30,7 @@ export interface VersionSchemaTree {
  */
 export const versionToSchemaTree = (
   version:
-    | (Pick<DatastructureVersion, 'model' | 'styles'> & Partial<Pick<DatastructureVersion, 'version'>>)
-    | undefined,
+    (Pick<DatastructureVersion, 'model' | 'styles'> & Partial<Pick<DatastructureVersion, 'version'>>) | undefined,
   fallbackName: string,
 ): VersionSchemaTree => {
   const treeVersion = version?.version ?? null

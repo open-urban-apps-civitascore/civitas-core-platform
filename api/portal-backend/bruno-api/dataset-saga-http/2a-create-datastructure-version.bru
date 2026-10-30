@@ -28,7 +28,9 @@ body:json {
         "properties": {
           "type": "object",
           "properties": {
-            "reference": { "type": "string" }
+            "reference": { "type": "string" },
+            "next_cursor": { "type": "string" },
+            "count": { "type": "integer" }
           },
           "required": ["reference"]
         },
@@ -67,5 +69,6 @@ tests {
 docs {
   The Data structure of the HTTP/REST Data source. GetHttpApiCall validates each record of each
   response against it. The `$ref` to the GeoJSON Point stays in the inlined schema, and the
-  processor resolves it from the copy in its NAR, without a network call.
+  processor resolves it from the copy in its NAR, without a network call. A response with a cursor
+  or a count is one record, so the Data structure also describes `next_cursor` and `count`.
 }

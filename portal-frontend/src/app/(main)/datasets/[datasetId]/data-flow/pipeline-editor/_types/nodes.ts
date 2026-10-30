@@ -208,12 +208,7 @@ export interface MappingNodeData extends BasePipelineNodeData {
  *
  */
 export type PipelineNodeData =
-  | ControlNodeData
-  | DataSourceNodeData
-  | FrostNodeData
-  | GeoPersistenceNodeData
-  | CronNodeData
-  | MappingNodeData
+  ControlNodeData | DataSourceNodeData | FrostNodeData | GeoPersistenceNodeData | CronNodeData | MappingNodeData
 
 // ============================================================================
 // Node Data Type Guards

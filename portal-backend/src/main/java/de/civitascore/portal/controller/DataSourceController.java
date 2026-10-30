@@ -5,18 +5,24 @@ import de.civitascore.portal.model.connector.MalformedDataSourceRequestException
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.input.ConnectionTestInputDTO;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataSourceMetaInputDTO;
+import de.civitascore.portal.model.output.ConnectionTestResultDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
 import de.civitascore.portal.model.output.assembler.DataSourceAssembler;
 import de.civitascore.portal.repository.specification.DataSourceSpec;
 import de.civitascore.portal.service.DataSourceService;
+import de.civitascore.portal.service.connector.DataSourceConnectionTestService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.io.IOException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -25,8 +31,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -49,6 +57,7 @@ public class DataSourceController
 
   private final DataSourceService dataSourceService;
   private final DataSourceAssembler dataSourceAssembler;
+  private final DataSourceConnectionTestService connectionTestService;
 
   /** {@inheritDoc} */
   @Override
@@ -139,6 +148,90 @@ public class DataSourceController
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
     return super.getAll(spec, pageable);
+  }
+
+  @PostMapping("/connection-test")
+  @Operation(
+      operationId = "testDataSourceConnection",
+      summary = "Test connector values",
+      description =
+          "Tests whether the source answers with the given connector values, before a data source"
+              + " holds them. The values must meet the rules of a release. SQL reads up to 5 rows"
+              + " of the table, MQTT subscribes to the topic, HTTP runs the named API call. The"
+              + " test changes no data source and stores nothing. A placeholder \"********\" has"
+              + " no stored secret to keep here and answers 400. A user runs one test at a time.")
+  @ApiResponse(
+      responseCode = "200",
+      description =
+          "The test ran; success tells whether the source answered as configured, reason why"
+              + " not, preview what it returned",
+      content = @Content(schema = @Schema(implementation = ConnectionTestResultDTO.class)))
+  @ApiResponse(
+      responseCode = "400",
+      description =
+          "The connector cannot be read or does not meet the release rules, apiCall does not fit"
+              + " the connector, or a placeholder has no stored secret",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "429",
+      description = "The user runs a connection test already, or too many tests are running",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "502",
+      description = "The test could not be run",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "504",
+      description = "The test did not answer in time",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  public ResponseEntity<ConnectionTestResultDTO> testConnection(
+      @Valid @RequestBody ConnectionTestInputDTO input) {
+    return ResponseEntity.ok(connectionTestService.test(input));
+  }
+
+  @PostMapping("/{id}/connection-test")
+  @Operation(
+      operationId = "testSavedDataSourceConnection",
+      summary = "Test connector values of a saved data source",
+      description =
+          "Tests whether the source answers with the given connector values, which may differ from"
+              + " the stored ones, for a data source in any status. A placeholder \"********\""
+              + " keeps the stored secret only to test the connector as saved; with changed values,"
+              + " or where no secret is stored, it answers 400. Values for another destination"
+              + " need DATASOURCE_READ for the whole tenant, otherwise it answers 403. The values"
+              + " must meet the rules of a release. The test changes no data source and stores"
+              + " nothing. A user runs one test at a time.")
+  @ApiResponse(
+      responseCode = "200",
+      description =
+          "The test ran; success tells whether the source answered as configured, reason why"
+              + " not, preview what it returned",
+      content = @Content(schema = @Schema(implementation = ConnectionTestResultDTO.class)))
+  @ApiResponse(
+      responseCode = "400",
+      description =
+          "The connector cannot be read or does not meet the release rules, apiCall does not fit"
+              + " the connector, or a placeholder has no stored secret",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "404",
+      description = "DataSource not found",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "429",
+      description = "The user runs a connection test already, or too many tests are running",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "502",
+      description = "The test could not be run",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "504",
+      description = "The test did not answer in time",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  public ResponseEntity<ConnectionTestResultDTO> testSavedConnection(
+      @PathVariable UUID id, @Valid @RequestBody ConnectionTestInputDTO input) {
+    return ResponseEntity.ok(connectionTestService.test(id, input));
   }
 
   /**

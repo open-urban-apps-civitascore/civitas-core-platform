@@ -48,6 +48,10 @@ final class ApiCallParser {
   private static final Set<String> CLIENT_HEADERS =
       Set.of("connection", "content-length", "expect", "host", "upgrade");
 
+  /** The explanation for a header value that {@link #isFieldValue} refuses. */
+  static final String FIELD_VALUE_VIOLATION =
+      "must hold only printable ISO-8859-1 characters, spaces and tabs";
+
   private ApiCallParser() {}
 
   /**
@@ -71,7 +75,7 @@ final class ApiCallParser {
         parameters(call.queryParameters(), "queryParameters", false, violations);
     List<Parameter> headers = parameters(call.headers(), "headers", true, violations);
     Optional<Pagination> pagination =
-        PaginationParser.parse(call.pagination(), queryParameters, violations);
+        PaginationParser.parse(call.pagination(), queryParameters, headers, violations);
 
     if (!violations.isEmpty()) {
       throw new InvalidApiCallException(violations);
@@ -124,29 +128,46 @@ final class ApiCallParser {
       }
       String value = parameter.value() == null ? "" : parameter.value();
       if (notBlank(parameter.name(), path + ".name", violations) && header) {
-        checkHeader(parameter.name(), value, path, violations);
+        checkHeaderName(parameter.name(), path + ".name", violations);
+        if (!isFieldValue(value)) {
+          violations.add(path + ".value " + FIELD_VALUE_VIOLATION);
+        }
       }
       checked.add(new Parameter(parameter.name(), value));
     }
     return checked;
   }
 
-  private static void checkHeader(String name, String value, String path, List<String> violations) {
-    String lowerCase = name.toLowerCase(Locale.ROOT);
-    if (CREDENTIAL_HEADERS.contains(lowerCase)) {
-      violations.add(path + ".name must not be Authorization, Proxy-Authorization or Cookie");
-    } else if (CLIENT_HEADERS.contains(lowerCase)) {
-      violations.add(path + ".name names a header the HTTP client sets itself");
-    } else if (!HEADER_NAME.matcher(name).matches()) {
-      violations.add(path + ".name is not a valid header name");
-    }
-    if (!value.chars().allMatch(ApiCallParser::isFieldValueCharacter)) {
-      violations.add(
-          path + ".value must hold only printable ISO-8859-1 characters, spaces and tabs");
+  /**
+   * @param keyPath the key path of the name, which each violation starts with
+   */
+  static void checkHeaderName(String name, String keyPath, List<String> violations) {
+    if (CREDENTIAL_HEADERS.contains(name.toLowerCase(Locale.ROOT))) {
+      violations.add(keyPath + " must not be Authorization, Proxy-Authorization or Cookie");
+    } else {
+      headerNameViolation(name).ifPresent(violation -> violations.add(keyPath + " " + violation));
     }
   }
 
-  /** The field-value characters of RFC 9110, section 5.5. */
+  /**
+   * Why the JDK HTTP client behind the web client service does not send a header of this name, or
+   * empty when it does.
+   */
+  static Optional<String> headerNameViolation(String name) {
+    if (CLIENT_HEADERS.contains(name.toLowerCase(Locale.ROOT))) {
+      return Optional.of("names a header the HTTP client sets itself");
+    }
+    if (!HEADER_NAME.matcher(name).matches()) {
+      return Optional.of("is not a valid header name");
+    }
+    return Optional.empty();
+  }
+
+  /** Whether the text holds only the field-value characters of RFC 9110, section 5.5. */
+  static boolean isFieldValue(String value) {
+    return value.chars().allMatch(ApiCallParser::isFieldValueCharacter);
+  }
+
   private static boolean isFieldValueCharacter(int c) {
     return c == '\t' || (c >= ' ' && c <= '~') || (c >= 0x80 && c <= 0xFF);
   }

@@ -1,5 +1,6 @@
 package de.civitascore.portal;
 
+import de.civitascore.portal.configuration.ConnectionTestProperties;
 import de.civitascore.portal.configuration.EventProperties;
 import de.civitascore.portal.configuration.KeycloakProperties;
 import de.civitascore.portal.configuration.OpenApiProperties;
@@ -17,7 +18,8 @@ import org.springframework.boot.persistence.autoconfigure.EntityScan;
   OpenApiProperties.class,
   EventProperties.class,
   SagaProperties.class,
-  PipelineClosureValidationProperties.class
+  PipelineClosureValidationProperties.class,
+  ConnectionTestProperties.class
 })
 public class PortalBackendApplication {
 

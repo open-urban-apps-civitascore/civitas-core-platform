@@ -65,6 +65,7 @@ final class PageLoop {
    * session.
    */
   void run(ProcessSession session, Authentication authentication) {
+    authentication.startRun();
     switch (readPages(session, authentication)) {
       case RunResult.Complete complete ->
           session.transfer(complete.pages(), GetHttpApiCall.SUCCESS);
@@ -78,22 +79,28 @@ final class PageLoop {
   private RunResult readPages(ProcessSession session, Authentication authentication) {
     Pagination pagination = apiCall.pagination();
     List<FlowFile> pages = new ArrayList<>();
-    PageBodies bodies = new PageBodies();
     Page page = pagination.first();
+    PageRepeats repeats = new PageRepeats(page);
     for (int read = 1; ; read++) {
       ApiCallOutcome outcome = client.send(apiCall, page, authentication);
-      int records;
-      switch (accept(session, page, outcome, pages, bodies)) {
+      Optional<Page> next;
+      switch (accept(session, page, outcome, pages, repeats)) {
         case PageRead.Failed failed -> {
           return new RunResult.Failed(pages, failed.failure());
         }
-        case PageRead.Records accepted -> {
-          records = accepted.count();
+        case PageRead.Read pageRead -> {
+          next = pageRead.next();
         }
       }
-      Optional<Page> next = pagination.next(page, records);
       if (next.isEmpty()) {
         return new RunResult.Complete(pages);
+      }
+      Optional<Page> earlier = repeats.earlierWithSameRequest(next.get());
+      if (earlier.isPresent()) {
+        return new RunResult.Failed(
+            pages,
+            ApiCallOutcome.Failure.ofRepeatedRequest(
+                apiCall.label(), outcome.status(), title(next.get()), title(earlier.get())));
       }
       if (read == maxPages) {
         return new RunResult.Failed(
@@ -107,13 +114,16 @@ final class PageLoop {
     }
   }
 
-  /** Adds the FlowFile of a page with records, or gives the failure that ends the run. */
+  /**
+   * Adds the FlowFile of a page with records, or gives the failure that ends the run. A page
+   * without a body, or past the last page, ends the run.
+   */
   private PageRead accept(
       ProcessSession session,
       Page page,
       ApiCallOutcome outcome,
       List<FlowFile> pages,
-      PageBodies bodies) {
+      PageRepeats repeats) {
     return switch (outcome) {
       case ApiCallOutcome.Failure failure -> {
         if (apiCall.pagination().isPastTheEnd(page, failure.status())) {
@@ -123,17 +133,17 @@ final class PageLoop {
               apiCall.path(),
               page.title().map(title -> " " + title).orElse(""),
               failure.status());
-          yield new PageRead.Records(0);
+          yield new PageRead.Read(Optional.empty());
         }
         yield new PageRead.Failed(failure);
       }
       case ApiCallOutcome.NoBody noBody -> {
         logNoBody(page, noBody.status());
-        yield new PageRead.Records(0);
+        yield new PageRead.Read(Optional.empty());
       }
       case ApiCallOutcome.Body body -> {
         try (body) {
-          yield acceptBody(session, page, body, pages, bodies);
+          yield acceptBody(session, page, body, pages, repeats);
         }
       }
     };
@@ -145,27 +155,27 @@ final class PageLoop {
       Page page,
       ApiCallOutcome.Body body,
       List<FlowFile> pages,
-      PageBodies bodies) {
+      PageRepeats repeats) {
     FlowFile flowFile = session.create();
     try {
-      flowFile = session.importFrom(bodies.hashing(body.content()), flowFile);
+      flowFile = session.importFrom(repeats.hashing(body.content()), flowFile);
     } catch (FlowFileAccessException e) {
       session.remove(flowFile);
       return new PageRead.Failed(ApiCallOutcome.Failure.ofTransport(apiCall.describe(page), e));
     }
-    Optional<Page> earlier = bodies.earlierWithSameBody(page);
+    Optional<Page> earlier = repeats.earlierWithSameBody(page);
     if (earlier.isPresent()) {
       session.remove(flowFile);
       return new PageRead.Failed(
           ApiCallOutcome.Failure.ofRepeatedPage(
               apiCall.label(), body.status(), title(page), title(earlier.get())));
     }
-    boolean pagesAreArrays = apiCall.pagination().pagesAreArrays();
-    return switch (recordSchema.verdict(session, flowFile, pagesAreArrays)) {
+    Pagination pagination = apiCall.pagination();
+    return switch (recordSchema.verdict(session, flowFile, pagination.shape())) {
       case RecordSchema.Verdict.Blank() -> {
         session.remove(flowFile);
         logNoBody(page, body.status());
-        yield new PageRead.Records(0);
+        yield new PageRead.Read(Optional.empty());
       }
       case RecordSchema.Verdict.Rejected(String reason) -> {
         session.remove(flowFile);
@@ -180,14 +190,23 @@ final class PageLoop {
                 body.status(),
                 wrongType.reason(page.title().orElse("the response"))));
       }
-      case RecordSchema.Verdict.Agrees(int records) -> {
-        if (!pagesAreArrays || records > 0) {
-          pages.add(session.putAllAttributes(flowFile, attributes(page, body.status())));
-        } else {
-          session.remove(flowFile);
-        }
-        yield new PageRead.Records(records);
-      }
+      case RecordSchema.Verdict.Agrees agrees ->
+          switch (pagination.next(page, agrees.content())) {
+            case Pagination.Progress.Rejected(String reason) -> {
+              session.remove(flowFile);
+              yield new PageRead.Failed(
+                  ApiCallOutcome.Failure.ofRejectedBody(
+                      apiCall.label(page), body.status(), reason));
+            }
+            case Pagination.Progress.Accepted(long records, Optional<Page> next) -> {
+              if (records > 0 || pagination.shape() instanceof ResponseShape.ObjectOrArray) {
+                pages.add(session.putAllAttributes(flowFile, attributes(page, body.status())));
+              } else {
+                session.remove(flowFile);
+              }
+              yield new PageRead.Read(next);
+            }
+          };
     };
   }
 
@@ -201,7 +220,9 @@ final class PageLoop {
     attributes.put(CoreAttributes.MIME_TYPE.key(), JSON);
     attributes.put(GetHttpApiCall.STATUS_CODE, Integer.toString(status));
     attributes.put(GetHttpApiCall.REQUEST_PATH, apiCall.path());
-    page.name().ifPresent(name -> attributes.put(GetHttpApiCall.PAGE, name));
+    page.position()
+        .ifPresent(
+            position -> attributes.put(GetHttpApiCall.PAGE, Long.toString(position.number())));
     return attributes;
   }
 
@@ -248,10 +269,13 @@ final class PageLoop {
     }
   }
 
-  /** What one page gave: its record count, or the failure that ends the run. */
+  /** What one page gave: the next page, or the failure that ends the run. */
   private sealed interface PageRead {
 
-    record Records(int count) implements PageRead {}
+    /**
+     * @param next empty when the run ends with the page
+     */
+    record Read(Optional<Page> next) implements PageRead {}
 
     record Failed(ApiCallOutcome.Failure failure) implements PageRead {}
   }

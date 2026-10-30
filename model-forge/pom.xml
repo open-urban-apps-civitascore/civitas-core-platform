@@ -16,7 +16,7 @@
     <artifactId>spring-boot-starter-parent</artifactId>
     <!-- Tracks `portal-backend`, the only consumer. Model Forge has its own parent
          rather than the mono-repo one, so this has to be raised with it. -->
-    <version>4.1.1</version>
+    <version>4.1.2</version>
     <relativePath/>
   </parent>
 
@@ -59,13 +59,13 @@
          job can invoke the short goal `cyclonedx:makeAggregateBom` and have Maven's
          pluginManagement supply this version — which makes the version visible to
          Renovate's maven manager instead of being hidden in an inline CI coordinate. -->
-    <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
+    <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
     <!-- Pin tool versions once; child modules inherit these properties. -->
-    <jacoco.version>0.8.14</jacoco.version>
-    <archunit.version>1.4.2</archunit.version>
-    <testcontainers.version>2.0.4</testcontainers.version>
+    <jacoco.version>0.8.15</jacoco.version>
+    <archunit.version>1.5.1</archunit.version>
+    <testcontainers.version>2.0.5</testcontainers.version>
     <!-- Apache Wicket: Jakarta-based 10.x line (Servlet 6), used only by the admin-ui demo host. -->
-    <wicket.version>10.9.1</wicket.version>
+    <wicket.version>10.11.0</wicket.version>
     <!-- Drop once the Spring Boot parent manages Tomcat >= 11.0.25: Boot 4.1.1 pins 11.0.24,
          affected by GHSA-9xv2-5v5q-p794, GHSA-gcx9-497g-6cp6 and GHSA-h3x4-894j-xpx5. -->
     <tomcat.version>11.0.26</tomcat.version>
@@ -120,7 +120,7 @@
       <plugin>
         <groupId>com.diffplug.spotless</groupId>
         <artifactId>spotless-maven-plugin</artifactId>
-        <version>3.6.0</version>
+        <version>3.10.4</version>
         <configuration>
           <java>
             <includes>
@@ -146,7 +146,7 @@
       <plugin>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>
-        <version>4.10.2.0</version>
+        <version>4.10.5.0</version>
         <configuration>
           <effort>Max</effort>
           <threshold>Medium</threshold>

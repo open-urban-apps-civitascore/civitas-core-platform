@@ -1,8 +1,9 @@
 # Data source connector contract tests
 
 HTTP characterization tests that pin the connector contract of the
-`POST/GET/PUT/PATCH/DELETE /datasources` endpoints and of
-`POST /datasources/{id}/release`.
+`POST/GET/PUT/PATCH/DELETE /datasources` endpoints, of
+`POST /datasources/{id}/release` and of the connection test,
+`POST /datasources/connection-test` and `POST /datasources/{id}/connection-test`.
 
 ## The connector shape
 
@@ -17,7 +18,9 @@ It holds `connectorType` (`MQTT`, `SQL` or `HTTP`) and the fields of that type:
 
 - **Response:** `connector` is null when the Data source has no connector
   type. Otherwise it has every field of the type, null when unset. A
-  stored password reads `"********"`, no password reads `null`. MQTT
+  stored secret reads `"********"`, no secret reads `null`. The secrets
+  are each `password`, and the HTTP `authentication.token`, `.value`,
+  `.clientSecret`, `.certificate` and `.privateKey`. MQTT
   `protocol_version` reads `"3"` when unset, `tls` reads
   `{ "enabled": false }` when unset. HTTP `authentication` reads
   `{ "type": "NONE" }` when unset, `startPage` reads `0` when unset, and
@@ -30,9 +33,12 @@ It holds `connectorType` (`MQTT`, `SQL` or `HTTP`) and the fields of that type:
   connector. The same holds at every depth: a nested object whose `type`
   differs from the stored one is replaced, not merged.
   `"connector": null` removes it; an omitted `connector` keeps it.
-- **Password placeholder:** `"password": "********"` in a write keeps the
-  stored password at the same place. With no stored password there, for
-  example after a change of `authentication.type`, none is stored.
+- **Secret placeholder:** `"********"` for a secret in a write keeps the
+  stored secret at the same place, and so does a PATCH that omits it.
+  This holds only while every destination stays: scheme, host and port of
+  each address, the OAuth2 token URL included, and `sslmode`. With no
+  stored secret there, for example after a change of `authentication.type`,
+  none is stored.
 
 ## Errors
 
@@ -47,6 +53,11 @@ It holds `connectorType` (`MQTT`, `SQL` or `HTTP`) and the fields of that type:
 | Value out of range, invalid pattern or duplicate name on POST/PUT/PATCH | 400 `VALIDATION_FAILED` | `fieldErrors[].field`: `connector.<path>` |
 | Release with missing required fields | 400 `VALIDATION_FAILED` | `fieldErrors[].field`: `connector.<path>` |
 | Release without a stored connector | 400 `INVALID_INPUT` | `detail`: `Configuration is required for releasing` |
+| Connection test with missing required fields | 400 `VALIDATION_FAILED` | `fieldErrors[].field`: `connector.<path>` |
+| Connection test whose `apiCall` is missing for HTTP, names no API call of the connector, or is set for SQL or MQTT | 400 `VALIDATION_FAILED` | `fieldErrors[].field`: `apiCall` |
+| Connection test with `"********"` and no stored secret at its place | 400 `MALFORMED_REQUEST` | `detail`: `No stored secret for ******** at connector.<path>` |
+| Write or connection test of a saved data source that keeps the stored password for another destination (scheme, host, port or `sslmode`) | 400 `MALFORMED_REQUEST` | `detail`: `The stored secret is kept only for the stored destination; …` |
+| Connection test of a released data source with `"********"` and changed values | 400 `MALFORMED_REQUEST` | `detail`: `The stored secret of a released data source is kept only to test its connector as released; …` |
 
 A `detail` echoes no value other than a `connectorType` or a nested `type`, because a value
 can carry a credential.
@@ -90,8 +101,11 @@ Range checks such as MQTT `qos` run on every write
 | Chain | Pins |
 |---|---|
 | `sql-create-and-read-*`, `mqtt-create-and-read-*`, `http-create-and-read-*` | Response shape, defaults, masked password |
+| `http-bearer-token-*`, `http-api-token-*`, `http-oauth2-*`, `http-client-certificate-*` | Each HTTP authentication reads back with its secret masked |
+| `http-pagination-create-and-read-*` | Limit/offset and cursor pagination read back as sent |
 | `sql-update-masked-secret-*`, `http-update-masked-secret-*` | PUT with `"********"` keeps the stored password |
 | `sql-masked-password-without-stored-secret-*` | PUT with `"********"` and no stored password stores none |
+| `sql-patch-other-host-*` | PATCH of another host keeps no stored password and is refused |
 | `sql-patch-partial-*`, `mqtt-patch-partial-*` | PATCH without `connector` keeps it |
 | `sql-patch-clears-field-*` | PATCH with `null` or `""` clears a key, omitted keys stay |
 | `mqtt-patch-changes-connector-type-*` | PATCH with another `connectorType` replaces the connector |
@@ -102,4 +116,7 @@ Range checks such as MQTT `qos` run on every write
 | `sql-sslmode-roundtrip-*` | `sslmode` survives the credential stripping of the DSN |
 | `sql-unknown-fields-rejected`, `mqtt-unknown-nested-key-rejected`, `http-unknown-nested-key-rejected` | Unknown keys are rejected |
 | `sql-validation-*`, `mqtt-validation-*`, `http-validation-*` | Error responses for an unreadable or invalid connector |
-| `http-release-rejects-invalid-configuration-*` | Release names each missing field of an API call by its path |
+| `http-release-rejects-invalid-configuration-*` | Release names each missing field of the authentication and of an API call by its path, and a limit without its parameter |
+| `sql-connection-test-answers`, `mqtt-connection-test-answers`, `http-connection-test-answers` | A connection test of unsaved values with a `.invalid` host answers `SOURCE_ERROR` |
+| `sql-connection-test-rejects-*`, `http-connection-test-rejects-*` | A connection test rejects incomplete values, a placeholder of unsaved values and a missing `apiCall` before it runs |
+| `sql-connection-test-saved-masked-password-*` | A connection test of a saved data source keeps the stored password for `"********"` |

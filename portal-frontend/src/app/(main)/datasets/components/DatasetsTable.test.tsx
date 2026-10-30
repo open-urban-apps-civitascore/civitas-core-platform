@@ -56,7 +56,7 @@ describe('DatasetsTable', () => {
   })
 
   it('renders the header and header content correctly', async () => {
-    ;['Name', 'Datenpool', 'Erstellt von', 'Aktualisiert', 'Status', 'Aktion'].forEach(headerText => {
+    ;['Name', 'Datenpool', 'Erstellt von', 'Aktualisiert', 'Status', 'Pipelines', 'Aktion'].forEach(headerText => {
       expect(screen.getByRole('columnheader', { name: headerText })).toBeDefined()
     })
     expect(screen.queryByRole('columnheader', { name: 'id' })).toBeNull()
@@ -73,6 +73,7 @@ describe('DatasetsTable', () => {
     expect(cells1[2]).toHaveTextContent(mappedDatasets[0].createdBy.name)
     expect(cells1[3]).toHaveTextContent('10.09.2023')
     expect(cells1[4]).toHaveTextContent('Entwurf')
+    expect(cells1[5]).toHaveTextContent('0')
 
     const dataRow2 = rows[2]
     const cells2 = within(dataRow2).getAllByRole('cell')
@@ -81,6 +82,7 @@ describe('DatasetsTable', () => {
     expect(cells2[2]).toHaveTextContent(mappedDatasets[1].createdBy.name)
     expect(cells2[3]).toHaveTextContent('01.01.2023')
     expect(cells2[4]).toHaveTextContent('Verfügbar')
+    expect(cells2[5]).toHaveTextContent('Aktiv')
   })
 })
 

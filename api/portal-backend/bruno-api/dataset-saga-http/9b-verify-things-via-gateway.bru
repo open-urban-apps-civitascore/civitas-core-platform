@@ -1,7 +1,7 @@
 meta {
   name: 9b. Verify the Things in FROST via APISIX
   type: http
-  seq: 21
+  seq: 31
 }
 
 get {
@@ -19,6 +19,12 @@ script:pre-request {
     'http-saga-things-1', 'http-saga-things-2',
     'http-saga-pages-1', 'http-saga-pages-2', 'http-saga-pages-3', 'http-saga-pages-4',
     'http-saga-pages-5',
+    'http-saga-cursor-query-1', 'http-saga-cursor-query-2', 'http-saga-cursor-query-3',
+    'http-saga-cursor-header-1', 'http-saga-cursor-header-2',
+    'http-saga-offset-limit-1', 'http-saga-offset-limit-2', 'http-saga-offset-limit-3',
+    'http-saga-offset-limit-4', 'http-saga-offset-limit-5',
+    'http-saga-offset-1', 'http-saga-offset-2', 'http-saga-offset-3',
+    'http-saga-offset-count-1', 'http-saga-offset-count-2',
   ];
 
   const form = [
@@ -63,6 +69,37 @@ tests {
     expect(references()).to.include.members([
       'http-saga-pages-1', 'http-saga-pages-2', 'http-saga-pages-3', 'http-saga-pages-4',
       'http-saga-pages-5',
+    ]);
+  });
+
+  test("FROST holds the Things of all three requests of the cursor-query API call", function() {
+    expect(references()).to.include.members([
+      'http-saga-cursor-query-1', 'http-saga-cursor-query-2', 'http-saga-cursor-query-3',
+    ]);
+  });
+
+  test("FROST holds the Things of both requests of the cursor-header API call", function() {
+    expect(references()).to.include.members([
+      'http-saga-cursor-header-1', 'http-saga-cursor-header-2',
+    ]);
+  });
+
+  test("FROST holds the Things of all three offsets of the offset-limit API call", function() {
+    expect(references()).to.include.members([
+      'http-saga-offset-limit-1', 'http-saga-offset-limit-2', 'http-saga-offset-limit-3',
+      'http-saga-offset-limit-4', 'http-saga-offset-limit-5',
+    ]);
+  });
+
+  test("FROST holds the Things of the offset API call up to its empty page", function() {
+    expect(references()).to.include.members([
+      'http-saga-offset-1', 'http-saga-offset-2', 'http-saga-offset-3',
+    ]);
+  });
+
+  test("FROST holds the Things of the offset-count API call before its 404", function() {
+    expect(references()).to.include.members([
+      'http-saga-offset-count-1', 'http-saga-offset-count-2',
     ]);
   });
 

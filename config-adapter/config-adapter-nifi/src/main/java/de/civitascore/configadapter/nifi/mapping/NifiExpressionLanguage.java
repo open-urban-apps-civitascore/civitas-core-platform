@@ -9,7 +9,7 @@
  */
 package de.civitascore.configadapter.nifi.mapping;
 
-import java.util.regex.Pattern;
+import de.civitascore.configadapter.connector.ConnectorValues;
 
 /**
  * Keeps tenant text out of NiFi's Expression Language and parameter evaluation.
@@ -23,8 +23,6 @@ import java.util.regex.Pattern;
  */
 public final class NifiExpressionLanguage {
 
-  private static final Pattern REFERENCE_START = Pattern.compile("[$#]\\{");
-
   private NifiExpressionLanguage() {}
 
   /**
@@ -35,7 +33,7 @@ public final class NifiExpressionLanguage {
    *     </code>
    */
   public static String requireLiteral(String property, String value) {
-    if (value != null && REFERENCE_START.matcher(value).find()) {
+    if (ConnectorValues.containsNifiReference(value)) {
       throw new UnsafePropertyValueException(property);
     }
     return value;

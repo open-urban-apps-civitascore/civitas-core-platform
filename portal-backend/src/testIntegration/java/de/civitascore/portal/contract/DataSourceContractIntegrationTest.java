@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Stream;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.junit.jupiter.api.AfterEach;
@@ -26,7 +28,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.skyscreamer.jsonassert.Customization;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.skyscreamer.jsonassert.JSONCompareMode;
@@ -334,6 +338,47 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
     }
 
     @Test
+    @DisplayName("SQL: PATCH of the host alone answers 400 and keeps the stored connector")
+    void sqlPatchOfTheHostAloneIsRefused() throws Exception {
+      String id =
+          createSqlDataSource("contract_sql_patch_host", createAvailableDataStructureVersionId());
+      String stored = readStoredConfiguration(id);
+
+      ResponseEntity<String> response =
+          send(
+              HttpMethod.PATCH,
+              DATASOURCES_ENDPOINT + "/" + id,
+              "{\"connector\": {\"dsn\": \"postgres://other.example:5432/db\"}}");
+
+      assertThat(response.getStatusCode().value()).isEqualTo(400);
+      assertThat((String) JsonPath.read(response.getBody(), "$.detail"))
+          .startsWith("The stored secret is kept only for the stored destination");
+      assertThat(readStoredConfiguration(id)).isEqualTo(stored);
+    }
+
+    @Test
+    @DisplayName("SQL: PATCH of the host with a new password stores the new password")
+    void sqlPatchOfTheHostWithANewPasswordStoresIt() throws Exception {
+      String id =
+          createSqlDataSource(
+              "contract_sql_patch_host_pw", createAvailableDataStructureVersionId());
+      String originalCiphertext = JsonPath.read(readStoredConfiguration(id), "$.password");
+
+      exchange(
+          HttpMethod.PATCH,
+          DATASOURCES_ENDPOINT + "/" + id,
+          "{\"connector\": {\"dsn\": \"postgres://other.example:5432/db\", \"password\": \"n3w\"}}");
+
+      String stored = readStoredConfiguration(id);
+      assertThat((String) JsonPath.read(stored, "$.dsn"))
+          .isEqualTo("postgres://other.example:5432/db");
+      assertThat((String) JsonPath.read(stored, "$.password"))
+          .startsWith("ENC(")
+          .isNotEqualTo(originalCiphertext)
+          .isNotEqualTo("n3w");
+    }
+
+    @Test
     @DisplayName("MQTT: configuration column matches expected JSONB shape after PUT")
     void mqttConfigurationIsPersistedInExpectedShapeAfterPut() throws Exception {
       UUID dsvId = createAvailableDataStructureVersionId();
@@ -564,10 +609,10 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
               HttpMethod.PATCH,
               path + id,
               """
-              { "connector": { "baseUrl": "https://other.example.org" } }
+              { "connector": { "baseUrl": "https://api.example.org/v2" } }
               """));
       assertThat((String) JsonPath.read(readStoredConfiguration(id), "$.baseUrl"))
-          .isEqualTo("https://other.example.org");
+          .isEqualTo("https://api.example.org/v2");
       assertThat(storedPassword(id)).isEqualTo(ciphertext);
 
       responses.add(exchange(HttpMethod.POST, path + id + "/release", null));
@@ -581,12 +626,180 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(responses).noneMatch(response -> response.contains(PASSWORD));
     }
 
+    private static Stream<Arguments> authenticationsWithSecret() throws JSONException {
+      return Stream.of(
+          Arguments.of(new JSONObject().put("type", "BEARER_TOKEN"), List.of("token")),
+          Arguments.of(
+              new JSONObject()
+                  .put("type", "API_TOKEN")
+                  .put("name", "X-API-Key")
+                  .put("in", "HEADER"),
+              List.of("value")),
+          Arguments.of(
+              new JSONObject()
+                  .put("type", "OAUTH2")
+                  .put("tokenUrl", "https://auth.example.org/oauth2/token")
+                  .put("clientId", "civitas-core")
+                  .put("scope", "read"),
+              List.of("clientSecret")),
+          Arguments.of(
+              new JSONObject().put("type", "CLIENT_CERTIFICATE"),
+              List.of("certificate", "privateKey")));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("authenticationsWithSecret")
+    @DisplayName("creates, reads, updates and releases each authentication with its secret masked")
+    void eachAuthenticationKeepsItsSecretMasked(JSONObject authentication, List<String> secrets)
+        throws Exception {
+      UUID dsvId = createAvailableDataStructureVersionId();
+      String path = DATASOURCES_ENDPOINT + "/";
+      JSONObject expected =
+          withSecrets(new JSONObject(authentication.toString()), secrets, "********");
+      List<String> responses = new ArrayList<>();
+
+      responses.add(
+          exchange(
+              HttpMethod.POST,
+              DATASOURCES_ENDPOINT,
+              body(
+                  "contract_http_auth",
+                  withAuthentication(withSecrets(authentication, secrets, PASSWORD)),
+                  dsvId)));
+      String id = JsonPath.read(responses.getFirst(), "$.id");
+      List<String> ciphertexts = storedSecrets(id, secrets);
+      responses.add(exchange(HttpMethod.GET, path + id, null));
+      responses.add(
+          exchange(
+              HttpMethod.PUT,
+              path + id,
+              body(
+                  "contract_http_auth",
+                  withAuthentication(withSecrets(authentication, secrets, "********")),
+                  dsvId)));
+      responses.add(exchange(HttpMethod.POST, path + id + "/release", null));
+
+      for (String response : responses) {
+        JSONAssert.assertEquals(
+            new JSONObject().put("connector", new JSONObject().put("authentication", expected)),
+            new JSONObject(response),
+            JSONCompareMode.LENIENT);
+      }
+      assertThat(ciphertexts)
+          .allSatisfy(
+              ciphertext ->
+                  assertThat(ciphertext)
+                      .isNotBlank()
+                      .isNotEqualTo(PASSWORD)
+                      .isNotEqualTo("********"));
+      assertThat(storedSecrets(id, secrets)).isEqualTo(ciphertexts);
+      assertThat((String) JsonPath.read(responses.getLast(), "$.dataSourceStatus"))
+          .isEqualTo("AVAILABLE");
+      assertThat(responses).noneMatch(response -> response.contains(PASSWORD));
+      exchange(HttpMethod.POST, path + id + "/unrelease", null);
+      exchange(HttpMethod.DELETE, path + id, null);
+    }
+
+    private static JSONObject withSecrets(
+        JSONObject authentication, List<String> secrets, String value) throws JSONException {
+      for (String secret : secrets) {
+        authentication.put(secret, value);
+      }
+      return authentication;
+    }
+
+    private List<String> storedSecrets(String id, List<String> secrets) {
+      String stored = readStoredConfiguration(id);
+      return secrets.stream()
+          .map(secret -> (String) JsonPath.read(stored, "$.authentication." + secret))
+          .toList();
+    }
+
+    private static String withAuthentication(JSONObject authentication) throws JSONException {
+      return new JSONObject(connector("p")).put("authentication", authentication).toString();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(
+        delimiter = '|',
+        quoteCharacter = '"',
+        value = {
+          "{'type':'LIMIT_OFFSET','limitParameter':'limit','offsetParameter':'offset',"
+              + "'limit':20,'offset':40,'countPath':'$.meta.count'}",
+          "{'type':'LIMIT_OFFSET','limitParameter':null,'offsetParameter':'offset',"
+              + "'limit':null,'offset':0,'countPath':'$.items'}",
+          "{'type':'CURSOR','cursorPath':'$.next_cursor','cursorParameter':'X-Cursor',"
+              + "'cursorIn':'HEADER','limitParameter':'limit','limit':20}",
+          "{'type':'CURSOR','cursorPath':'$.next_cursor','cursorParameter':'cursor',"
+              + "'cursorIn':'QUERY','limitParameter':null,'limit':null}"
+        })
+    @DisplayName("creates, reads, updates and releases each pagination")
+    void eachPaginationIsStoredAndReleased(String pagination) throws Exception {
+      JSONObject expected = new JSONObject(pagination.replace('\'', '"'));
+      JSONObject apiCall =
+          new JSONObject().put("name", "items").put("path", "/items").put("pagination", expected);
+      String connector =
+          new JSONObject(connector("p")).put("apiCalls", new JSONArray().put(apiCall)).toString();
+      UUID dsvId = createAvailableDataStructureVersionId();
+      String path = DATASOURCES_ENDPOINT + "/";
+      List<String> responses = new ArrayList<>();
+
+      responses.add(
+          exchange(
+              HttpMethod.POST, DATASOURCES_ENDPOINT, body("contract_http_page", connector, dsvId)));
+      String id = JsonPath.read(responses.getFirst(), "$.id");
+      responses.add(exchange(HttpMethod.GET, path + id, null));
+      responses.add(
+          exchange(HttpMethod.PUT, path + id, body("contract_http_page", connector, dsvId)));
+      responses.add(exchange(HttpMethod.POST, path + id + "/release", null));
+
+      for (String response : responses) {
+        JSONAssert.assertEquals(
+            expected.toString(),
+            new JSONObject(response)
+                .getJSONObject("connector")
+                .getJSONArray("apiCalls")
+                .getJSONObject(0)
+                .getJSONObject("pagination")
+                .toString(),
+            JSONCompareMode.STRICT);
+      }
+      JSONAssert.assertEquals(
+          expected.toString(),
+          new JSONObject(readStoredConfiguration(id))
+              .getJSONArray("apiCalls")
+              .getJSONObject(0)
+              .getJSONObject("pagination")
+              .toString(),
+          JSONCompareMode.STRICT);
+      exchange(HttpMethod.POST, path + id + "/unrelease", null);
+      exchange(HttpMethod.DELETE, path + id, null);
+    }
+
     @ParameterizedTest(name = "{1}")
     @CsvSource(
         delimiter = '|',
         quoteCharacter = '"',
         value = {
           "{'type':'BASIC','username':'a:b'} | [] | connector.authentication.username",
+          "{'type':'OAUTH2','tokenUrl':'http://auth.example.org/token'} | []"
+              + " | connector.authentication.tokenUrl",
+          "{'type':'API_TOKEN','name':'status','in':'QUERY'}"
+              + " | [{'queryParameters':[{'name':'status','value':'a'}]}]"
+              + " | connector.authentication.name",
+          "{'type':'API_TOKEN','name':'Host','in':'HEADER'} | [] | connector.authentication.name",
+          "null | [{'pagination':{'type':'CURSOR','cursorPath':'$..cursor'}}]"
+              + " | connector.apiCalls[0].pagination.cursorPath",
+          "null | [{'pagination':{'type':'CURSOR','cursorParameter':'c','cursorIn':'QUERY',"
+              + "'limitParameter':'c'}}] | connector.apiCalls[0].pagination.limitParameter",
+          "null | [{'headers':[{'name':'X-Cursor','value':'1'}],'pagination':{'type':'CURSOR',"
+              + "'cursorParameter':'x-cursor','cursorIn':'HEADER'}}]"
+              + " | connector.apiCalls[0].pagination.cursorParameter",
+          "null | [{'pagination':{'type':'LIMIT_OFFSET','countPath':'$.items[?(@.id)]'}}]"
+              + " | connector.apiCalls[0].pagination.countPath",
+          "null | [{'queryParameters':[{'name':'offset','value':'1'}],"
+              + "'pagination':{'type':'LIMIT_OFFSET','offsetParameter':'offset'}}]"
+              + " | connector.apiCalls[0].pagination.offsetParameter",
           "null | [{'path':'stations'}] | connector.apiCalls[0].path",
           "null | [{'headers':[{'name':'X Y','value':'v'}]}] | connector.apiCalls[0].headers[0].name",
           "null | [{'headers':[{'name':'X','value':'a\\nb'}]}] | connector.apiCalls[0].headers[0].value",
@@ -647,7 +860,20 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
           "'apiCalls':[{'name':'a','path':'/x','pagination':{'type':'PAGE_NUMBER',"
               + "'pageParameter':'p','pageSize':1}}] | connector.apiCalls[0].pagination.pageSizeParameter",
           "'apiCalls':[{'name':'a','path':'/x','pagination':{'type':'PAGE_NUMBER',"
-              + "'pageParameter':'p','pageSizeParameter':'s'}}] | connector.apiCalls[0].pagination.pageSize"
+              + "'pageParameter':'p','pageSizeParameter':'s'}}] | connector.apiCalls[0].pagination.pageSize",
+          "'authentication':{'type':'BEARER_TOKEN'} | connector.authentication.token",
+          "'authentication':{'type':'API_TOKEN','name':'k','value':'v'} | connector.authentication.in",
+          "'authentication':{'type':'OAUTH2','tokenUrl':'https://auth.example.org/token',"
+              + "'clientSecret':'s'} | connector.authentication.clientId",
+          "'authentication':{'type':'CLIENT_CERTIFICATE','privateKey':'k'}"
+              + " | connector.authentication.certificate",
+          "'apiCalls':[{'name':'a','path':'/x','pagination':{'type':'CURSOR','cursorPath':'$.c',"
+              + "'cursorParameter':'c','cursorIn':'QUERY','limitParameter':'l'}}]"
+              + " | connector.apiCalls[0].pagination.limit",
+          "'apiCalls':[{'name':'a','path':'/x','pagination':{'type':'LIMIT_OFFSET'}}]"
+              + " | connector.apiCalls[0].pagination.offsetParameter",
+          "'apiCalls':[{'name':'a','path':'/x','pagination':{'type':'LIMIT_OFFSET',"
+              + "'offsetParameter':'o','limit':20}}] | connector.apiCalls[0].pagination.limitParameter"
         })
     @DisplayName("rejects a release of an incomplete configuration, with the key path of the field")
     void releaseWithIncompleteConfigurationNamesTheField(String member, String field)

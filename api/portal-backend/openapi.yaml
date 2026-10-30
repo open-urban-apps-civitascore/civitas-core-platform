@@ -241,6 +241,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /assignments
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -608,6 +617,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /datapools
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -877,6 +895,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datapools/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -1032,6 +1059,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datapools/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -1345,6 +1381,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /datasets
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -1574,6 +1619,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/datasinks"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -1709,6 +1763,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -1913,6 +1976,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -2072,6 +2144,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/datasinks/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -2316,6 +2397,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/layers"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -2451,6 +2541,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -2657,6 +2756,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -2816,6 +2924,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/layers/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -3194,6 +3311,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/pipelines"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -3329,6 +3455,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/pipelines/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -3533,6 +3668,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/pipelines/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -3692,6 +3836,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/pipelines/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -3936,6 +4089,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/styles"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -4071,6 +4233,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -4277,6 +4448,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -4436,6 +4616,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{dataSetId}/styles/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -4723,6 +4912,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -4879,6 +5077,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -5131,6 +5338,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{id}/ready/meta"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -5436,6 +5652,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasets/{id}/stage"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -5716,6 +5941,7 @@ paths:
           enum:
           - MQTT
           - SQL
+          - HTTP
       - description: "Filter by DataPool scope. Returns DataSources with scope type\
           \ ALL, or SPECIFIC DataSources that include this DataPool."
         in: query
@@ -5806,6 +6032,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /datasources
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -5881,6 +6116,128 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
       summary: Create a new datasource
+      tags:
+      - DataSources
+  /datasources/connection-test:
+    post:
+      description: "Tests whether the source answers with the given connector values,\
+        \ before a data source holds them. The values must meet the rules of a release.\
+        \ SQL reads up to 5 rows of the table, MQTT subscribes to the topic, HTTP\
+        \ runs the named API call. The test changes no data source and stores nothing.\
+        \ A placeholder \"********\" has no stored secret to keep here and answers\
+        \ 400. A user runs one test at a time."
+      operationId: testDataSourceConnection
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectionTestInputDTO"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionTestResultDTO"
+          description: "The test ran; success tells whether the source answered as\
+            \ configured, reason why not, preview what it returned"
+        "400":
+          content:
+            application/problem+json:
+              examples:
+                dataset_not_editable:
+                  summary: dataset_not_editable
+                  value:
+                    detail: A dataset and its sub-entities can only be changed while
+                      the dataset is DRAFT. Unstage or unrelease the dataset first.
+                    instance: /datasources/connection-test
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:DATASET_NOT_EDITABLE
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    detail: "Validation failed: name must not be blank"
+                    instance: /datasources/connection-test
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:INVALID_INPUT
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    detail: Failed to read request body
+                    instance: /datasources/connection-test
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                model_member_unreachable:
+                  summary: model_member_unreachable
+                  value:
+                    detail: "DataStructureVersion model has members that its root\
+                      \ Element does not reach: Orphan"
+                    instance: /datasources/connection-test
+                    memberNames:
+                    - Orphan
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /datasources/connection-test
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
+                model_root_missing:
+                  summary: model_root_missing
+                  value:
+                    detail: DataStructureVersion model must designate exactly one
+                      root Element before releasing
+                    instance: /datasources/connection-test
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_ROOT_MISSING
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    detail: Request body validation failed
+                    instance: /datasources/connection-test
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:VALIDATION_FAILED
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "The connector cannot be read or does not meet the release\
+            \ rules, apiCall does not fit the connector, or a placeholder has no stored\
+            \ secret"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "The user runs a connection test already, or too many tests\
+            \ are running"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "502":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The test could not be run
+        "504":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The test did not answer in time
+      summary: Test connector values
       tags:
       - DataSources
   /datasources/{id}:
@@ -6074,6 +6431,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasources/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -6229,6 +6595,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasources/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -6363,6 +6738,152 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
       summary: Get assignments
+      tags:
+      - DataSources
+  /datasources/{id}/connection-test:
+    post:
+      description: "Tests whether the source answers with the given connector values,\
+        \ which may differ from the stored ones, for a data source in any status.\
+        \ A placeholder \"********\" keeps the stored secret only to test the connector\
+        \ as saved; with changed values, or where no secret is stored, it answers\
+        \ 400. Values for another destination need DATASOURCE_READ for the whole tenant,\
+        \ otherwise it answers 403. The values must meet the rules of a release. The\
+        \ test changes no data source and stores nothing. A user runs one test at\
+        \ a time."
+      operationId: testSavedDataSourceConnection
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectionTestInputDTO"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionTestResultDTO"
+          description: "The test ran; success tells whether the source answered as\
+            \ configured, reason why not, preview what it returned"
+        "400":
+          content:
+            application/problem+json:
+              examples:
+                dataset_not_editable:
+                  summary: dataset_not_editable
+                  value:
+                    detail: A dataset and its sub-entities can only be changed while
+                      the dataset is DRAFT. Unstage or unrelease the dataset first.
+                    instance: "/datasources/{id}/connection-test"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:DATASET_NOT_EDITABLE
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    detail: "Validation failed: name must not be blank"
+                    instance: "/datasources/{id}/connection-test"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:INVALID_INPUT
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    detail: Failed to read request body
+                    instance: "/datasources/{id}/connection-test"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                model_member_unreachable:
+                  summary: model_member_unreachable
+                  value:
+                    detail: "DataStructureVersion model has members that its root\
+                      \ Element does not reach: Orphan"
+                    instance: "/datasources/{id}/connection-test"
+                    memberNames:
+                    - Orphan
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datasources/{id}/connection-test"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
+                model_root_missing:
+                  summary: model_root_missing
+                  value:
+                    detail: DataStructureVersion model must designate exactly one
+                      root Element before releasing
+                    instance: "/datasources/{id}/connection-test"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_ROOT_MISSING
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    detail: Request body validation failed
+                    instance: "/datasources/{id}/connection-test"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:VALIDATION_FAILED
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "The connector cannot be read or does not meet the release\
+            \ rules, apiCall does not fit the connector, or a placeholder has no stored\
+            \ secret"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          content:
+            application/problem+json:
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datasources/{id}/connection-test"
+                    status: 404
+                    title: Not Found
+                    type: urn:civitas:error:NOT_FOUND
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: DataSource not found
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "The user runs a connection test already, or too many tests\
+            \ are running"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "502":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The test could not be run
+        "504":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The test did not answer in time
+      summary: Test connector values of a saved data source
       tags:
       - DataSources
   /datasources/{id}/release:
@@ -6545,14 +7066,6 @@ paths:
         schema:
           type: string
           example: structure
-      - description: Filter by status (exact match).
-        in: query
-        name: dataStructureStatus
-        schema:
-          type: string
-          enum:
-          - DRAFT
-          - AVAILABLE
       responses:
         "200":
           content:
@@ -6626,6 +7139,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /datastructures
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -6765,6 +7287,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datastructures/{dataStructureId}/versions"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -6955,6 +7486,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datastructures/{dataStructureId}/versions/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -7114,6 +7654,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datastructures/{dataStructureId}/versions/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -7272,6 +7821,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/release"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -7439,6 +7997,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/released/meta"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -7535,8 +8102,6 @@ paths:
   /datastructures/{dataStructureId}/versions/{versionId}/unrelease:
     post:
       description: Unreleases a data structure version by setting status back to DRAFT.
-        Cannot unrelease if this is the only released version of a released DataStructure
-        - unrelease the DataStructure first in that case.
       operationId: unreleaseDataStructureVersion
       parameters:
       - in: path
@@ -7598,6 +8163,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/unrelease"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -7617,7 +8191,7 @@ paths:
                     type: urn:civitas:error:VALIDATION_FAILED
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: Invalid input (e.g. already in DRAFT or only released version)
+          description: Invalid input (e.g. already in DRAFT)
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -7881,6 +8455,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datastructures/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -8036,6 +8619,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datastructures/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -8170,96 +8762,6 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
       summary: Get assignments
-      tags:
-      - Data Structures
-  /datastructures/{id}/release:
-    post:
-      description: Transitions the entity from DRAFT to AVAILABLE status.
-      operationId: releaseDataStructure
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DataStructureOutputDTO"
-          description: OK
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
-      summary: Release
-      tags:
-      - Data Structures
-  /datastructures/{id}/released/meta:
-    patch:
-      description: "Applies a JSON merge patch to the metadata of a released entity.\
-        \ An omitted field keeps its value. A field that is not metadata answers 400,\
-        \ and so does null for assignments or datapoolScope. Only works on entities\
-        \ that are not in DRAFT status."
-      operationId: updateReleasedDataStructureMeta
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PatchDataStructureMetaInputDTO"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DataStructureOutputDTO"
-          description: OK
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
-      summary: Update released metadata
-      tags:
-      - Data Structures
-  /datastructures/{id}/unrelease:
-    post:
-      description: Transitions the entity from AVAILABLE back to DRAFT status.
-      operationId: unreleaseDataStructure
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DataStructureOutputDTO"
-          description: OK
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
-      summary: Unrelease
       tags:
       - Data Structures
   /groups:
@@ -8437,6 +8939,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /groups
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -8741,6 +9252,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/groups/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -8896,6 +9416,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/groups/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -9346,6 +9875,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /roles
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -9614,6 +10152,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/roles/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -9769,6 +10316,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/roles/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -10030,6 +10586,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: /users
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -10319,6 +10884,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/users/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -10474,6 +11048,15 @@ paths:
                     status: 400
                     title: Bad Request
                     type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/users/{id}"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
                 model_root_missing:
                   summary: model_root_missing
                   value:
@@ -10759,17 +11342,80 @@ components:
       required:
       - groupId
       - roleId
+    ConnectionTestInputDTO:
+      type: object
+      description: Connector values to test. The test reads from the source once and
+        changes no Data source; it uses the same rules as the release of a Data source.
+      properties:
+        apiCall:
+          type: string
+          description: "Name of the API call to run. Required for an HTTP connector,\
+            \ where it names one of its apiCalls; absent for any other connector."
+          example: Get all weather stations
+        connector:
+          $ref: "#/components/schemas/Connector"
+      required:
+      - connector
+    ConnectionTestResultDTO:
+      type: object
+      description: "The answer of a connection test. A source that does not answer\
+        \ as configured is a result with success false, not an error response."
+      properties:
+        httpStatus:
+          type: integer
+          format: int32
+          description: "HTTP status code of the call, when the source answered with\
+            \ one."
+          example: 200
+        message:
+          type: string
+          description: "What happened, at most 500 characters."
+          example: "FATAL: password authentication failed for user \"reader\""
+        preview:
+          type: string
+          description: "What the source returned: the first rows as CSV with a header\
+            \ line for SQL, the body of the call for HTTP, for any status; null otherwise."
+          example: |-
+            id,value
+            1,20.5
+            2,21.0
+        previewTruncated:
+          type: boolean
+          description: Whether the preview was cut at its size limit.
+          example: false
+        reason:
+          type: string
+          description: "Why the test failed, null on success: INVALID_CONNECTOR the\
+            \ values do not make a runnable source, SOURCE_ERROR the source answered\
+            \ with an error or could not be reached, TIMEOUT the source did not answer\
+            \ in time."
+          enum:
+          - INVALID_CONNECTOR
+          - SOURCE_ERROR
+          - TIMEOUT
+          example: SOURCE_ERROR
+        rowCount:
+          type: integer
+          format: int32
+          description: "Number of rows read, SQL only; a cut preview shows fewer."
+          example: 2
+        success:
+          type: boolean
+          description: Whether the source answered as configured.
+          example: true
     Connector:
       description: Connector of the Data source. The connectorType selects the remaining
         fields.
       discriminator:
         mapping:
+          HTTP: "#/components/schemas/HttpConnector"
           MQTT: "#/components/schemas/MqttConnector"
           SQL: "#/components/schemas/SqlConnector"
         propertyName: connectorType
       oneOf:
       - $ref: "#/components/schemas/MqttConnector"
       - $ref: "#/components/schemas/SqlConnector"
+      - $ref: "#/components/schemas/HttpConnector"
     DataEntitySummaryDTO:
       type: object
       properties:
@@ -11180,23 +11826,6 @@ components:
       required:
       - description
       - name
-    DataStructureMetaInputDTO:
-      type: object
-      properties:
-        assignments:
-          type: array
-          items:
-            $ref: "#/components/schemas/AssignmentScopedInputDTO"
-          uniqueItems: true
-        description:
-          type: string
-          minLength: 1
-        name:
-          type: string
-          minLength: 1
-      required:
-      - description
-      - name
     DataStructureOutputDTO:
       type: object
       properties:
@@ -11206,12 +11835,6 @@ components:
           description: Timestamp when the resource was created
           example: 2025-06-15T10:30:00
           readOnly: true
-        dataStructureStatus:
-          type: string
-          enum:
-          - DRAFT
-          - AVAILABLE
-          example: ACTIVE
         dataStructureVersions:
           type: array
           items:
@@ -11233,7 +11856,7 @@ components:
         inUseByReleased:
           type: boolean
           description: "Whether a released entity references one of this data structure's\
-            \ versions. While true, it cannot be unreleased"
+            \ versions. While true, those versions cannot be unreleased"
           readOnly: true
         modifiedAt:
           type: string
@@ -11575,6 +12198,406 @@ components:
           readOnly: true
         name:
           type: string
+    HttpConnector:
+      type: object
+      description: Connector of an HTTP/REST Data source.
+      properties:
+        apiCalls:
+          type: array
+          description: "The API calls, in the order the client sent them."
+          items:
+            $ref: "#/components/schemas/HttpConnectorApiCall"
+        authentication:
+          description: Authentication of every API call. Absent or null is NONE.
+          oneOf:
+          - $ref: "#/components/schemas/HttpConnectorNoAuthentication"
+          - $ref: "#/components/schemas/HttpConnectorBasicAuthentication"
+          - $ref: "#/components/schemas/HttpConnectorBearerTokenAuthentication"
+          - $ref: "#/components/schemas/HttpConnectorApiTokenAuthentication"
+          - $ref: "#/components/schemas/HttpConnectorOAuth2Authentication"
+          - $ref: "#/components/schemas/HttpConnectorClientCertificateAuthentication"
+        baseUrl:
+          type: string
+          description: "API host: an http or https URL, which every API call path\
+            \ extends. Embedded credentials and a trailing '/' are removed; a query\
+            \ or fragment is rejected. Use authentication for credentials; any authentication\
+            \ other than NONE needs an https URL."
+          example: https://api.example.org/v1
+        connectorType:
+          type: string
+          enum:
+          - HTTP
+      required:
+      - connectorType
+    HttpConnectorApiCall:
+      type: object
+      description: A GET request against the API host.
+      properties:
+        headers:
+          type: array
+          description: "Request headers, sent as given. A name is a header token and\
+            \ not Authorization, Proxy-Authorization, Cookie, Connection, Content-Length,\
+            \ Expect, Host or Upgrade. A value holds only printable ISO-8859-1 characters,\
+            \ spaces and tabs. Values are stored and returned in clear text, so they\
+            \ must not hold secrets; use authentication for credentials."
+          items:
+            $ref: "#/components/schemas/HttpConnectorParameter"
+        method:
+          type: string
+          description: HTTP method. Always GET; ignored in a request.
+          enum:
+          - GET
+          example: GET
+          readOnly: true
+        name:
+          type: string
+          description: "Name of the API call, unique within the connector. A source\
+            \ node of a pipeline refers to the API call by this name, so a rename\
+            \ breaks that reference."
+          example: Get all weather stations
+        pagination:
+          description: Pagination of the API call. Absent or null is no pagination.
+          oneOf:
+          - $ref: "#/components/schemas/HttpConnectorPageNumberPagination"
+          - $ref: "#/components/schemas/HttpConnectorLimitOffsetPagination"
+          - $ref: "#/components/schemas/HttpConnectorCursorPagination"
+        path:
+          type: string
+          description: "Path of the API call below the API host. Starts with '/' and\
+            \ contains only letters, digits and '-', '_', '.', '~', ':', '/'."
+          example: /stations
+          pattern: "^/[A-Za-z0-9._~:/-]*$"
+        queryParameters:
+          type: array
+          description: "Query parameters. Name and value are plain text, sent as given\
+            \ and percent-encoded by the processor. Values are stored and returned\
+            \ in clear text, so they must not hold secrets."
+          items:
+            $ref: "#/components/schemas/HttpConnectorParameter"
+    HttpConnectorApiTokenAuthentication:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorAuthentication"
+      - type: object
+        properties:
+          in:
+            type: string
+            description: Where each request sends the token. A token in a query parameter
+              appears in the access logs of the API host.
+            enum:
+            - QUERY
+            - HEADER
+            example: HEADER
+          name:
+            type: string
+            description: "Name of the header or query parameter that carries the token.\
+              \ It differs from each header or query parameter at the same place of\
+              \ every API call, pagination included. As a header name, it follows\
+              \ the header name rules of an API call, but Authorization, Proxy-Authorization\
+              \ and Cookie are allowed."
+            example: X-API-Key
+          type:
+            type: string
+            enum:
+            - API_TOKEN
+          value:
+            type: string
+            format: password
+            description: The token. Responses show "********" for a stored token.
+            example: secret
+            writeOnly: true
+      description: An API token in a header or a query parameter of each request.
+      required:
+      - type
+    HttpConnectorAuthentication:
+      type: object
+      discriminator:
+        mapping:
+          API_TOKEN: "#/components/schemas/HttpConnectorApiTokenAuthentication"
+          BASIC: "#/components/schemas/HttpConnectorBasicAuthentication"
+          BEARER_TOKEN: "#/components/schemas/HttpConnectorBearerTokenAuthentication"
+          CLIENT_CERTIFICATE: "#/components/schemas/HttpConnectorClientCertificateAuthentication"
+          NONE: "#/components/schemas/HttpConnectorNoAuthentication"
+          OAUTH2: "#/components/schemas/HttpConnectorOAuth2Authentication"
+        propertyName: type
+      properties:
+        type:
+          type: string
+    HttpConnectorBasicAuthentication:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorAuthentication"
+      - type: object
+        properties:
+          password:
+            type: string
+            format: password
+            description: Basic auth password. Responses show "********" for a stored
+              password; a write keeps it with "********" while the destination stays.
+            example: secret
+            writeOnly: true
+          type:
+            type: string
+            enum:
+            - BASIC
+          username:
+            type: string
+            description: Basic auth username. Must not contain ':'.
+            example: reader
+            pattern: "^[^:]*$"
+      description: HTTP basic authentication.
+      required:
+      - type
+    HttpConnectorBearerTokenAuthentication:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorAuthentication"
+      - type: object
+        properties:
+          token:
+            type: string
+            format: password
+            description: The token. Responses show "********" for a stored token.
+            example: secret
+            writeOnly: true
+          type:
+            type: string
+            enum:
+            - BEARER_TOKEN
+      description: "A bearer token, sent as 'Authorization: Bearer <token>'."
+      required:
+      - type
+    HttpConnectorClientCertificateAuthentication:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorAuthentication"
+      - type: object
+        properties:
+          certificate:
+            type: string
+            format: password
+            description: "The client certificate in PEM, optionally followed by its\
+              \ chain. Responses show \"********\" for a stored certificate."
+            example: |-
+              -----BEGIN CERTIFICATE-----
+              ...
+              -----END CERTIFICATE-----
+            writeOnly: true
+          privateKey:
+            type: string
+            format: password
+            description: "The private key of the certificate in PEM, without a passphrase.\
+              \ Responses show \"********\" for a stored key."
+            example: secret
+            writeOnly: true
+          type:
+            type: string
+            enum:
+            - CLIENT_CERTIFICATE
+      description: A TLS client certificate with its private key.
+      required:
+      - type
+    HttpConnectorCursorPagination:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorPagination"
+      - type: object
+        properties:
+          cursorIn:
+            type: string
+            description: Where each request sends the cursor.
+            enum:
+            - QUERY
+            - HEADER
+            example: QUERY
+          cursorParameter:
+            type: string
+            description: "Name of the query parameter or header that carries the cursor.\
+              \ As a header name, it follows the header name rules of an API call."
+            example: cursor
+          cursorPath:
+            type: string
+            description: JSON path in the response to the cursor of the next request.
+              Only member names and array indexes.
+            example: $.next_cursor
+            pattern: "^\\$(\\.[A-Za-z_][A-Za-z0-9_-]*|\\['[^'\\\\]+'\\]|\\[[0-9]+\\\
+              ])+$"
+          limit:
+            type: integer
+            format: int32
+            description: Number of records per request. At least 1. Required with
+              limitParameter.
+            example: 100
+            minimum: 1
+          limitParameter:
+            type: string
+            description: Query parameter that carries the limit. Required with limit;
+              absent or null sends no limit.
+            example: limit
+          type:
+            type: string
+            enum:
+            - CURSOR
+      description: "Cursor pagination: each request sends the cursor that the previous\
+        \ response holds. Each response is one record, so the Data structure describes\
+        \ the whole response, cursor included."
+      required:
+      - type
+    HttpConnectorLimitOffsetPagination:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorPagination"
+      - type: object
+        properties:
+          countPath:
+            type: string
+            description: "JSON path in the response to the number of records, or to\
+              \ an array whose length is that number. Only member names and array\
+              \ indexes. Absent or null counts the elements of the response, which\
+              \ must then be an array."
+            example: $.meta.count
+            pattern: "^\\$(\\.[A-Za-z_][A-Za-z0-9_-]*|\\['[^'\\\\]+'\\]|\\[[0-9]+\\\
+              ])+$"
+          limit:
+            type: integer
+            format: int32
+            description: Number of records per request. At least 1. Required with
+              limitParameter.
+            example: 100
+            minimum: 1
+          limitParameter:
+            type: string
+            description: Query parameter that carries the limit. Required with limit;
+              absent or null sends no limit.
+            example: limit
+          offset:
+            type: integer
+            format: int32
+            default: 0
+            description: Offset of the first request. At least 0. Absent or null is
+              0.
+            example: 0
+            minimum: 0
+          offsetParameter:
+            type: string
+            description: Query parameter that carries the offset.
+            example: offset
+          type:
+            type: string
+            enum:
+            - LIMIT_OFFSET
+      description: "Limit/offset pagination, with limit and offset as query parameters.\
+        \ Without a limit, the API pages by its default page size, and the offset\
+        \ grows by the number of records of each response."
+      required:
+      - type
+    HttpConnectorNoAuthentication:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorAuthentication"
+      - type: object
+        properties:
+          type:
+            type: string
+            enum:
+            - NONE
+      description: No authentication.
+      required:
+      - type
+    HttpConnectorOAuth2Authentication:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorAuthentication"
+      - type: object
+        properties:
+          clientId:
+            type: string
+            description: Client ID at the authorization server.
+            example: civitas-core
+          clientSecret:
+            type: string
+            format: password
+            description: Client secret at the authorization server. Responses show
+              "********" for a stored secret.
+            example: secret
+            writeOnly: true
+          scope:
+            type: string
+            description: "Scope of the access token, space-separated. Absent or null\
+              \ requests no scope."
+            example: read:stations
+          tokenUrl:
+            type: string
+            description: "Token endpoint of the authorization server: an https URL.\
+              \ Embedded credentials are removed; a query or fragment is rejected."
+            example: https://auth.example.org/oauth2/token
+            pattern: "^[hH][tT][tT][pP][sS]:.*$"
+          type:
+            type: string
+            enum:
+            - OAUTH2
+      description: "OAuth 2.0 with the client credentials grant: an access token from\
+        \ the token endpoint, sent as 'Authorization: Bearer <token>'."
+      required:
+      - type
+    HttpConnectorPageNumberPagination:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorPagination"
+      - type: object
+        properties:
+          endPage:
+            type: integer
+            format: int32
+            description: "Last page number, at least startPage. Absent or null is\
+              \ no end page."
+            example: 10
+            minimum: 0
+          pageParameter:
+            type: string
+            description: Query parameter that carries the page number.
+            example: page
+          pageSize:
+            type: integer
+            format: int32
+            description: "Number of records per page. At least 1. It must not be larger\
+              \ than the maximum page size of the API. With a larger page size, the\
+              \ run stops after the first page without an error."
+            example: 100
+            minimum: 1
+          pageSizeParameter:
+            type: string
+            description: Query parameter that carries the page size.
+            example: size
+          startPage:
+            type: integer
+            format: int32
+            default: 0
+            description: First page number. Absent or null is 0.
+            example: 0
+            minimum: 0
+          type:
+            type: string
+            enum:
+            - PAGE_NUMBER
+      description: "Page-number pagination, with page number and page size as query\
+        \ parameters."
+      required:
+      - type
+    HttpConnectorPagination:
+      type: object
+      discriminator:
+        mapping:
+          CURSOR: "#/components/schemas/HttpConnectorCursorPagination"
+          LIMIT_OFFSET: "#/components/schemas/HttpConnectorLimitOffsetPagination"
+          PAGE_NUMBER: "#/components/schemas/HttpConnectorPageNumberPagination"
+        propertyName: type
+      properties:
+        type:
+          type: string
+    HttpConnectorParameter:
+      type: object
+      description: A query parameter or a header.
+      properties:
+        name:
+          type: string
+          description: "Name, as plain text."
+          example: status
+        value:
+          type: string
+          description: "Value, as plain text. Can be empty."
+          example: active
     LayerInputDTO:
       type: object
       properties:
@@ -11734,7 +12757,8 @@ components:
         password:
           type: string
           format: password
-          description: Broker password. Responses show "********" for a stored password.
+          description: Broker password. Responses show "********" for a stored password;
+            a write keeps it with "********" while the destination stays.
           example: secret
           writeOnly: true
         protocol_version:
@@ -12418,20 +13442,6 @@ components:
         name:
           type: string
           minLength: 1
-    PatchDataStructureMetaInputDTO:
-      description: Partial update — only provided fields are modified.
-      properties:
-        assignments:
-          type: array
-          items:
-            $ref: "#/components/schemas/AssignmentScopedInputDTO"
-          uniqueItems: true
-        description:
-          type: string
-          minLength: 1
-        name:
-          type: string
-          minLength: 1
     PatchDataStructureVersionInputDTO:
       description: Partial update — only provided fields are modified.
       properties:
@@ -12753,9 +13763,15 @@ components:
           - RUNTIME
         state:
           type: string
+          description: "OK: the Pipeline runs. ERROR: the deployment failed, or the\
+            \ Pipeline failed while running and tries again at its next run. STOPPED:\
+            \ the platform stopped the Pipeline after a fatal error, and message holds\
+            \ the cause. To run a stopped Pipeline again, unrelease and release the\
+            \ Dataset."
           enum:
           - OK
           - ERROR
+          - STOPPED
     PipelineSummaryDTO:
       type: object
       properties:
@@ -13024,7 +14040,8 @@ components:
         password:
           type: string
           format: password
-          description: Database password. Responses show "********" for a stored password.
+          description: Database password. Responses show "********" for a stored password;
+            a write keeps it with "********" while the destination stays.
           example: secret
           writeOnly: true
         table:
@@ -13037,8 +14054,10 @@ components:
           example: dbuser
         where:
           type: string
-          description: SQL WHERE clause.
-          example: id > :last_id
+          description: "SQL WHERE clause: one condition of literal SQL, without bind\
+            \ placeholders or ';'."
+          example: id > 100
+          pattern: "^[^;]*$"
       required:
       - connectorType
     StyleInputDTO:

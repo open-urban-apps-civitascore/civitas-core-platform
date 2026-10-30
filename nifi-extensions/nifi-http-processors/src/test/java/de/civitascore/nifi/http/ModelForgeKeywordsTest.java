@@ -41,6 +41,6 @@ class ModelForgeKeywordsTest {
             .collect(toSet());
 
     assertFalse(modelForge.isEmpty(), MODEL_FORGE_FACTORY::toString);
-    assertEquals(modelForge, Set.copyOf(RecordSchema.NON_VALIDATING_KEYWORDS));
+    assertEquals(modelForge, Set.copyOf(ModelForgeSchemaFactory.NON_VALIDATING_KEYWORDS));
   }
 }

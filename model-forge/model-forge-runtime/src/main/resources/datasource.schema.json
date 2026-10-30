@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id":     "https://civitasconnect.digital/core/datasource/v1",
   "title":   "CORE DataSource",
-  "description": "Configuration for a data source that feeds data into a CORE pipeline. The connector-specific fields are chosen by 'connectionType' (mqtt | sql | http); each variant declares exactly the fields the host persists (the connector configuration POJO). Only the fields named 'password', at any depth, are stored ENCRYPTED by the host — every other field is stored as-is. 'element' references the DataStructure describing the payload format by versioned CORE URN.",
+  "description": "Configuration for a data source that feeds data into a CORE pipeline. The connector-specific fields are chosen by 'connectionType' (mqtt | sql | http); each variant declares exactly the fields the host persists (the connector configuration POJO). Only the fields whose description says 'Stored ENCRYPTED' are stored ENCRYPTED by the host — every other field is stored as-is. 'element' references the DataStructure describing the payload format by versioned CORE URN.",
   "oneOf": [
     { "$ref": "#/$defs/MqttDataSource" },
     { "$ref": "#/$defs/SqlDataSource" },
@@ -123,6 +123,10 @@
           "oneOf": [
             { "$ref": "#/$defs/HttpNoAuthentication" },
             { "$ref": "#/$defs/HttpBasicAuthentication" },
+            { "$ref": "#/$defs/HttpBearerTokenAuthentication" },
+            { "$ref": "#/$defs/HttpApiTokenAuthentication" },
+            { "$ref": "#/$defs/HttpOAuth2Authentication" },
+            { "$ref": "#/$defs/HttpClientCertificateAuthentication" },
             { "enum": [null] }
           ],
           "description": "Authentication of every API call, chosen by 'type'."
@@ -152,6 +156,48 @@
         "password": { "type": ["string", "null"], "description": "Basic auth password. Stored ENCRYPTED by the host; null/absent when unset." }
       }
     },
+    "HttpBearerTokenAuthentication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type":  { "const": "BEARER_TOKEN" },
+        "token": { "type": ["string", "null"], "description": "Bearer token, sent as 'Authorization: Bearer <token>'. Stored ENCRYPTED by the host; null/absent when unset." }
+      }
+    },
+    "HttpApiTokenAuthentication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type":  { "const": "API_TOKEN" },
+        "name":  { "type": ["string", "null"], "description": "Name of the header or query parameter that carries the token." },
+        "value": { "type": ["string", "null"], "description": "API token. Stored ENCRYPTED by the host; null/absent when unset." },
+        "in":    { "enum": ["HEADER", "QUERY", null], "description": "Where each request sends the token." }
+      }
+    },
+    "HttpOAuth2Authentication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type":         { "const": "OAUTH2" },
+        "tokenUrl":     { "type": ["string", "null"], "description": "Token endpoint of the client credentials grant: an https URL without user info, query or fragment." },
+        "clientId":     { "type": ["string", "null"], "description": "Client ID." },
+        "clientSecret": { "type": ["string", "null"], "description": "Client secret. Stored ENCRYPTED by the host; null/absent when unset." },
+        "scope":        { "type": ["string", "null"], "description": "Scope of the access token, space-separated; null for none." }
+      }
+    },
+    "HttpClientCertificateAuthentication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type":        { "const": "CLIENT_CERTIFICATE" },
+        "certificate": { "type": ["string", "null"], "description": "Client certificate in PEM, optionally followed by its chain. Stored ENCRYPTED by the host; null/absent when unset." },
+        "privateKey":  { "type": ["string", "null"], "description": "Private key of the certificate in PEM, without a passphrase. Stored ENCRYPTED by the host; null/absent when unset." }
+      }
+    },
     "HttpApiCall": {
       "type": "object",
       "additionalProperties": false,
@@ -164,6 +210,8 @@
         "pagination": {
           "oneOf": [
             { "$ref": "#/$defs/HttpPageNumberPagination" },
+            { "$ref": "#/$defs/HttpLimitOffsetPagination" },
+            { "$ref": "#/$defs/HttpCursorPagination" },
             { "enum": [null] }
           ],
           "description": "Pagination of the API call, chosen by 'type'; null for none."
@@ -189,6 +237,32 @@
         "pageSize":          { "type": ["integer", "null"], "description": "Number of records per page." },
         "startPage":         { "type": ["integer", "null"], "description": "First page number." },
         "endPage":           { "type": ["integer", "null"], "description": "Last page number; null for no end page." }
+      }
+    },
+    "HttpLimitOffsetPagination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type":            { "const": "LIMIT_OFFSET" },
+        "limitParameter":  { "type": ["string", "null"], "description": "Query parameter that carries the limit; set together with 'limit'. Null sends no limit, so the offset grows by the number of records of each response." },
+        "offsetParameter": { "type": ["string", "null"], "description": "Query parameter that carries the offset." },
+        "limit":           { "type": ["integer", "null"], "description": "Number of records per request; set together with 'limitParameter'." },
+        "offset":          { "type": ["integer", "null"], "description": "Offset of the first request; null is 0." },
+        "countPath":       { "type": ["string", "null"], "description": "JSON path in the response to the number of records, or to an array whose length is that number; null counts the elements of the response, which is then an array." }
+      }
+    },
+    "HttpCursorPagination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type":            { "const": "CURSOR" },
+        "cursorPath":      { "type": ["string", "null"], "description": "JSON path in the response to the cursor of the next request." },
+        "cursorParameter": { "type": ["string", "null"], "description": "Name of the query parameter or header that carries the cursor." },
+        "cursorIn":        { "enum": ["QUERY", "HEADER", null], "description": "Where each request sends the cursor." },
+        "limitParameter":  { "type": ["string", "null"], "description": "Query parameter that carries the limit; set together with 'limit'. Null sends no limit." },
+        "limit":           { "type": ["integer", "null"], "description": "Number of records per request; set together with 'limitParameter'." }
       }
     }
   }
