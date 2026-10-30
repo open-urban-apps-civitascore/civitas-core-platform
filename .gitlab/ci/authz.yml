@@ -84,7 +84,7 @@ generate-graph-authz:
   script:
     - cd authz/repository
     # Only generate dependency tree, no compilation needed
-    - mvn -B dependency:tree -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
+    - mvn $MAVEN_CLI_OPTS dependency:tree -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
   artifacts:
     when: always
     expire_in: 1 week
@@ -151,9 +151,9 @@ build-authz:
       artifacts: true
   script:
     - cd authz/repository
-    - mvn -B spotless:check package -DskipTests -Dportal-model.version=$PORTAL_MODEL_VERSION
+    - mvn $MAVEN_CLI_OPTS spotless:check package -DskipTests -Dportal-model.version=$PORTAL_MODEL_VERSION
     # Unused or undeclared dependencies fail the job (this was the job dependency-prune-authz)
-    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Dportal-model.version=$PORTAL_MODEL_VERSION -DfailOnWarning=true -DignoreNonCompile=false
+    - mvn $MAVEN_CLI_OPTS dependency:analyze -Dportal-model.version=$PORTAL_MODEL_VERSION -DfailOnWarning=true -DignoreNonCompile=false
   artifacts:
     when: on_success
     paths:

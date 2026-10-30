@@ -38,7 +38,7 @@ generate-graph-nifi-extensions:
     - !reference [.rules-all, rules]
   script:
     - cd nifi-extensions
-    - mvn -B dependency:tree -Drevision=$NIFI_EXTENSIONS_VERSION -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
+    - mvn $MAVEN_CLI_OPTS dependency:tree -Drevision=$NIFI_EXTENSIONS_VERSION -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
   artifacts:
     when: always
     expire_in: 1 week
@@ -57,7 +57,7 @@ build-nifi-nars:
   stage: build-package
   needs: []
   script:
-    - mvn -B -f nifi-extensions/pom.xml package -DskipTests -DskipITs -Dspotless.check.skip=true -Dpmd.skip=true -Dcpd.skip=true -Dspotbugs.skip=true -Djacoco.skip=true
+    - mvn $MAVEN_CLI_OPTS -f nifi-extensions/pom.xml package -DskipTests -DskipITs -Dspotless.check.skip=true -Dpmd.skip=true -Dcpd.skip=true -Dspotbugs.skip=true -Djacoco.skip=true
   artifacts:
     expire_in: 1 day
     paths:
@@ -76,7 +76,7 @@ static-analysis-nifi-extensions:
       artifacts: true
   script:
     - cd nifi-extensions
-    - mvn -B verify -DskipTests -DskipITs -Drevision=$NIFI_EXTENSIONS_VERSION -Djacoco.skip=true
+    - mvn $MAVEN_CLI_OPTS verify -DskipTests -DskipITs -Drevision=$NIFI_EXTENSIONS_VERSION -Djacoco.skip=true
 
 # The unit tests and the NAR. The integration test needs a Docker daemon, so it has its own job
 # below and is skipped here. The static analysis is in static-analysis-nifi-extensions.
@@ -94,7 +94,7 @@ build-nifi-extensions:
     when: always
   script:
     - cd nifi-extensions
-    - mvn -B verify install:install -DskipITs -Drevision=$NIFI_EXTENSIONS_VERSION -Dspotless.check.skip=true -Dpmd.skip=true -Dcpd.skip=true -Dspotbugs.skip=true
+    - mvn $MAVEN_CLI_OPTS verify install:install -DskipITs -Drevision=$NIFI_EXTENSIONS_VERSION -Dspotless.check.skip=true -Dpmd.skip=true -Dcpd.skip=true -Dspotbugs.skip=true
     - |
       awk -F, \
       'NR>1 {missed+=$4; covered+=$5} \
@@ -136,7 +136,7 @@ integration-test-nifi-extensions:
   script:
     - cd nifi-extensions
     # Explicit goals keep package, spotless and spotbugs out of this job.
-    - mvn -B -pl nifi-frost-processors test-compile failsafe:integration-test failsafe:verify -Drevision=$NIFI_EXTENSIONS_VERSION
+    - mvn $MAVEN_CLI_OPTS -pl nifi-frost-processors test-compile failsafe:integration-test failsafe:verify -Drevision=$NIFI_EXTENSIONS_VERSION
   artifacts:
     when: always
     expire_in: 1 month
@@ -165,7 +165,7 @@ publish-nifi-extensions:
   script:
     - cd nifi-extensions
     - |
-      mvn deploy -DskipTests -DskipITs -Drevision=$NIFI_EXTENSIONS_VERSION \
+      mvn $MAVEN_CLI_OPTS deploy -DskipTests -DskipITs -Drevision=$NIFI_EXTENSIONS_VERSION \
         -Dspotless.check.skip=true -Dpmd.skip=true -Dcpd.skip=true -Dspotbugs.skip=true -Djacoco.skip=true \
         -DaltDeploymentRepository=gitlab-maven::default::${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/maven \
         -s ci_settings.xml

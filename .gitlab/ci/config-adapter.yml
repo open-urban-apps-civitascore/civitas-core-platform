@@ -30,7 +30,7 @@ generate-graph-config-adapter:
   script:
     - cd config-adapter
     # Only generate dependency tree, no compilation needed
-    - mvn -B dependency:tree -Drevision=$CONFIG_ADAPTER_VERSION -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
+    - mvn $MAVEN_CLI_OPTS dependency:tree -Drevision=$CONFIG_ADAPTER_VERSION -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
   artifacts:
     when: always
     expire_in: 1 week
@@ -160,10 +160,10 @@ build-config-adapter:
     # The artifacts must land in the local repo, because the integration shards resolve inter-module
     # dependencies from it with a restricted reactor. install:install is invoked as a goal so the
     # verify-phase checks (pmd, spotbugs, spotless) stay out of this job.
-    - mvn package install:install -DskipTests -Drevision=$CONFIG_ADAPTER_VERSION -Pdist
+    - mvn $MAVEN_CLI_OPTS package install:install -DskipTests -Drevision=$CONFIG_ADAPTER_VERSION -Pdist
     # Unused or undeclared dependencies fail the job (this was the job dependency-prune-config-adapter)
     # (without -Pdist, as that job ran it)
-    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Drevision=$CONFIG_ADAPTER_VERSION -DfailOnWarning=true -DignoreNonCompile=false
+    - mvn $MAVEN_CLI_OPTS dependency:analyze -Drevision=$CONFIG_ADAPTER_VERSION -DfailOnWarning=true -DignoreNonCompile=false
   artifacts:
     when: on_success
     paths:
@@ -222,7 +222,7 @@ publish-config-adapter:
     - cd config-adapter
     # Version suffix (SNAPSHOT) is already applied by setup-version
     - |
-      mvn deploy -DskipTests -DskipITs -Drevision=$CONFIG_ADAPTER_VERSION \
+      mvn $MAVEN_CLI_OPTS deploy -DskipTests -DskipITs -Drevision=$CONFIG_ADAPTER_VERSION \
         -Dspotless.check.skip=true -Dpmd.skip=true -Dcpd.skip=true -Dspotbugs.skip=true -Djacoco.skip=true \
         -DaltDeploymentRepository=gitlab-maven::default::${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/maven \
         -s ci_settings.xml
