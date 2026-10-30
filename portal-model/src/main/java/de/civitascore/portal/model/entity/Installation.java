@@ -8,8 +8,10 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
@@ -22,7 +24,8 @@ import org.hibernate.annotations.BatchSize;
  * record who installed the package and when.
  *
  * <p>A line names its artifact by id and URN, not by a foreign key. When a user deletes an
- * artifact, the record stays.
+ * artifact, the record stays. An uninstall removes the artifacts and sets {@link #uninstalledAt}.
+ * The record and its lines stay.
  */
 @Getter
 @Setter
@@ -48,6 +51,21 @@ public class Installation extends BaseEntity {
   private String packageVersion;
 
   /**
+   * The Data pool of the Data sources and of the Dataset that the install created. Null when the
+   * package has neither. A Data pool can have only one active installation of a package, and an
+   * instance can have only one active installation of a package without a Data pool.
+   */
+  @Column(name = "datapool_id")
+  private UUID datapoolId;
+
+  /**
+   * The time of the uninstall. Null while the installation is active. A package can be installed
+   * again when it has no active installation.
+   */
+  @Column(name = "uninstalled_at")
+  private LocalDateTime uninstalledAt;
+
+  /**
    * The artifact lines in the sequence of the install. A list, not a set: the install only adds
    * lines, and the position keeps the sequence the same for each read. {@code @BatchSize} loads the
    * lines for a page of installations in a few queries. A fetch join would make Hibernate page in
@@ -68,5 +86,10 @@ public class Installation extends BaseEntity {
     artifact.setPosition(artifacts.size());
     artifacts.add(artifact);
     artifact.setInstallation(this);
+  }
+
+  /** Whether an uninstall removed the artifacts of this installation. */
+  public boolean isUninstalled() {
+    return uninstalledAt != null;
   }
 }

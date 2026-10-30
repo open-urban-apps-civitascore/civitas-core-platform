@@ -194,24 +194,29 @@ public class InstallationService {
    *
    * @param input the package to install, and the Data pool for its Data sources and its Dataset
    * @return the record, with one line for each artifact that the install created
-   * @throws UniqueConstraintViolationException if this instance has an installation of the package
+   * @throws UniqueConstraintViolationException if the Data pool has an active installation of the
+   *     package, or, for a package without a Data pool, if this instance has one
    * @throws org.springframework.dao.DataIntegrityViolationException if an install of the same
-   *     package that runs at the same time commits first
+   *     package in the same Data pool that runs at the same time commits first
    * @throws InvalidInputException if the package or one of its members fails a check, or if the
    *     platform refuses a member
    */
   @Transactional
   public Installation install(InstallationInputDTO input) {
     PackageManifestInputDTO manifest = input.getPackageManifest();
-    if (installationRepository.existsByPackageId(manifest.getId())) {
-      throw alreadyInstalled(manifest.getId());
-    }
     UUID datapoolId = input.getDatapoolId();
+    // A package without Data sources and without a Dataset puts nothing into the Data pool, so its
+    // record keeps no Data pool. Such a package has only one active installation on this instance.
+    UUID installationDatapoolId = needsDatapool(manifest.getMembers()) ? datapoolId : null;
+    if (installationRepository.existsActive(manifest.getId(), installationDatapoolId)) {
+      throw alreadyInstalled(manifest.getId(), installationDatapoolId);
+    }
     List<PreparedMember> members = prepare(manifest, datapoolId);
 
     Installation installation = new Installation();
     installation.setPackageId(manifest.getId());
     installation.setPackageVersion(manifest.getVersion());
+    installation.setDatapoolId(installationDatapoolId);
     claim(installation);
 
     Map<String, Copy> copies = new HashMap<>();
@@ -272,18 +277,22 @@ public class InstallationService {
   }
 
   /**
-   * Writes the record before the first artifact. The unique index on the package id allows one
-   * record for each package. A second install of the same package that runs at the same time waits
-   * here until the first install commits. Then the database refuses the record, before the install
-   * changes the registry.
+   * Writes the record before the first artifact. The unique index on the package id and the Data
+   * pool allows one active record for each package in each Data pool. A second install of the same
+   * package in the same Data pool that runs at the same time waits here until the first install
+   * commits. Then the database refuses the record, before the install changes the registry.
    */
   private void claim(Installation installation) {
     installationRepository.saveAndFlush(installation);
   }
 
-  private static UniqueConstraintViolationException alreadyInstalled(String packageId) {
+  private static UniqueConstraintViolationException alreadyInstalled(
+      String packageId, UUID datapoolId) {
     return new UniqueConstraintViolationException(
-        "Package '%s' is already installed on this instance.".formatted(packageId));
+        datapoolId == null
+            ? "Package '%s' is already installed on this instance.".formatted(packageId)
+            : "Package '%s' is already installed in the Data pool '%s'."
+                .formatted(packageId, datapoolId));
   }
 
   /**
@@ -425,13 +434,7 @@ public class InstallationService {
    */
   private void requireDatapoolWhereNecessary(
       List<PackageMemberInputDTO> members, UUID datapoolId, String packageId) {
-    boolean necessary =
-        members.stream()
-            .anyMatch(
-                member ->
-                    member.getKind() == PackageMemberKind.DATASOURCE
-                        || member.getKind() == PackageMemberKind.DATASET);
-    if (!necessary) {
+    if (!needsDatapool(members)) {
       return;
     }
     if (datapoolId == null) {
@@ -446,6 +449,17 @@ public class InstallationService {
       throw new InvalidInputException(
           DATAPOOL_ID, datapoolId, "The Data pool '%s' does not exist.".formatted(datapoolId));
     }
+  }
+
+  /**
+   * Whether the package has a member that exists only in a Data pool: a Data source or a Dataset.
+   */
+  private static boolean needsDatapool(List<PackageMemberInputDTO> members) {
+    return members.stream()
+        .anyMatch(
+            member ->
+                member.getKind() == PackageMemberKind.DATASOURCE
+                    || member.getKind() == PackageMemberKind.DATASET);
   }
 
   /**

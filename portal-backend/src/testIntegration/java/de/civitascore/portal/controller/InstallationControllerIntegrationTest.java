@@ -5,13 +5,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.entity.DataPool;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Installation;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.InstallationRepository;
 import de.civitascore.portal.security.AllowedScopesFilter;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,8 +36,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Integration tests for {@link InstallationController}: the install of a package through the API,
- * with the database, the registry and the record of the install.
+ * Integration tests for {@link InstallationController}: the install and the uninstall of a package
+ * through the API, with the database, the registry and the record of the install.
  */
 @DisplayName("Installations")
 class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest {
@@ -104,6 +108,7 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
   @Autowired private PortalTestDataFactory portalData;
   @Autowired private InstallationRepository installationRepository;
   @Autowired private DataStructureRepository dataStructureRepository;
+  @Autowired private DataSourceRepository dataSourceRepository;
   @Autowired private ModelRegistryGateway registry;
 
   @AfterEach
@@ -175,6 +180,49 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
   }
 
   @Test
+  @DisplayName("POST installs the same package in two Data pools and records the Data pool of each")
+  void install_whenPackageIsInstalledInAnotherDatapool_installsItAgain() {
+    DataPool first = portalData.dataPool();
+    DataPool second = portalData.dataPool();
+
+    ResponseEntity<String> inFirst =
+        post(request(first.getId(), PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
+    ResponseEntity<String> inSecond =
+        post(
+            request(second.getId(), PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
+
+    assertThat(inFirst.getStatusCode()).as("%s", inFirst.getBody()).isEqualTo(HttpStatus.CREATED);
+    assertThat(inSecond.getStatusCode()).as("%s", inSecond.getBody()).isEqualTo(HttpStatus.CREATED);
+    assertThat(json(inFirst.getBody()).get("datapoolId").asString())
+        .isEqualTo(first.getId().toString());
+    assertThat(json(inSecond.getBody()).get("datapoolId").asString())
+        .isEqualTo(second.getId().toString());
+    assertThat(shellIdOf(linesOf(inSecond), SOURCE_URN))
+        .isNotEqualTo(shellIdOf(linesOf(inFirst), SOURCE_URN));
+    assertThat(shellIdOf(linesOf(inSecond), FOREIGN_URN))
+        .isNotEqualTo(shellIdOf(linesOf(inFirst), FOREIGN_URN));
+  }
+
+  @Test
+  @DisplayName("POST refuses a second install of the same package in the same Data pool")
+  void install_whenPackageIsInstalledInTheDatapool_returnsConflict() {
+    DataPool pool = portalData.dataPool();
+    ResponseEntity<String> installed =
+        post(request(pool.getId(), PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
+    assertThat(installed.getStatusCode())
+        .as("%s", installed.getBody())
+        .isEqualTo(HttpStatus.CREATED);
+    long sources = dataSourceRepository.count();
+
+    ResponseEntity<String> again =
+        post(request(pool.getId(), PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
+
+    assertThat(again.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(installationRepository.count()).isEqualTo(1);
+    assertThat(dataSourceRepository.count()).isEqualTo(sources);
+  }
+
+  @Test
   @DisplayName("GET returns the installations, the newest first")
   void getAll_whenTwoPackagesAreInstalled_returnsTheNewestFirst() {
     assertThat(post(request(PACKAGE_ID, member("Tree cadastre", treeModel()))).getStatusCode())
@@ -203,7 +251,7 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
         post(request(PACKAGE_ID, member("Tree cadastre", treeModel()), dashboard));
 
     assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    assertThat(installationRepository.existsByPackageId(PACKAGE_ID)).isFalse();
+    assertThat(installationRepository.count()).isZero();
     assertThat(dataStructureRepository.count()).isEqualTo(structures);
   }
 
@@ -215,6 +263,20 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
     // Two installs that run at the same time both pass the check. Then the index decides.
     assertThatThrownBy(() -> installationRepository.saveAndFlush(installationOf(PACKAGE_ID)))
         .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  @DisplayName("The database keeps one active record of a package in each Data pool")
+  void saveAndFlush_whenPackageIsInTwoDatapools_keepsOneActiveRecordInEach() {
+    // The record has no foreign key to the Data pool, so these Data pools need not exist.
+    UUID first = UUID.randomUUID();
+    UUID second = UUID.randomUUID();
+    installationRepository.saveAndFlush(installationOf(PACKAGE_ID, first));
+    installationRepository.saveAndFlush(installationOf(PACKAGE_ID, second));
+
+    assertThatThrownBy(() -> installationRepository.saveAndFlush(installationOf(PACKAGE_ID, first)))
+        .isInstanceOf(DataIntegrityViolationException.class);
+    assertThat(installationRepository.count()).isEqualTo(2);
   }
 
   @Test
@@ -276,7 +338,7 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
 
     assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(refused.getBody()).contains("datapoolId");
-    assertThat(installationRepository.existsByPackageId(PACKAGE_ID)).isFalse();
+    assertThat(installationRepository.count()).isZero();
     assertThat(dataStructureRepository.count()).isEqualTo(structures);
   }
 
@@ -296,7 +358,7 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
 
     assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(refused.getBody()).contains("connector.client_id");
-    assertThat(installationRepository.existsByPackageId(PACKAGE_ID)).isFalse();
+    assertThat(installationRepository.count()).isZero();
     assertThat(dataStructureRepository.count()).isEqualTo(structures);
   }
 
@@ -305,22 +367,7 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
   void install_whenPackageIsAWholeUseCase_bindsEachReferenceToTheCopies() {
     DataPool pool = portalData.dataPool();
 
-    ResponseEntity<String> installed =
-        post(
-            request(
-                pool.getId(),
-                "tree-map",
-                member("datastructure", ROW_URN, "Cadastre row", "One row", rowModel()),
-                member("datastructure", STREET_TREE_URN, "Street tree", "One tree", treeTarget()),
-                cadastreSource(),
-                dataSet(),
-                treeMap(),
-                cadastreMapping(),
-                treeTable(),
-                cadastreImport(),
-                style(GREEN_URN, "trees-green", "#2E7D32"),
-                style(ORANGE_URN, "trees-orange", "#EF6C00"),
-                treesLayer()));
+    ResponseEntity<String> installed = post(treeMapRequest(pool.getId()));
 
     assertThat(installed.getStatusCode())
         .as("%s", installed.getBody())
@@ -401,6 +448,117 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
         .containsEntry("element", lineFor(lines, STATION_URN).get("versionedUrn").asString());
     assertThat(nodeOfKind(storedContent(lineFor(lines, AIR_IMPORT_URN)), "sink"))
         .containsEntry("sinkRef", lineFor(lines, SENSOR_STORE_URN).get("versionedUrn").asString());
+  }
+
+  @Test
+  @DisplayName("DELETE removes the artifacts of a whole use case and keeps the record")
+  void uninstall_whenUseCaseIsDraft_removesItsArtifactsAndKeepsTheRecord() {
+    DataPool pool = portalData.dataPool();
+    ResponseEntity<String> installed = post(treeMapRequest(pool.getId()));
+    assertThat(installed.getStatusCode())
+        .as("%s", installed.getBody())
+        .isEqualTo(HttpStatus.CREATED);
+    String id = json(installed.getBody()).get("id").asString();
+    List<JsonNode> lines = linesOf(installed);
+
+    ResponseEntity<String> uninstalled = delete("/installations/" + id);
+
+    assertThat(uninstalled.getStatusCode())
+        .as("%s", uninstalled.getBody())
+        .isEqualTo(HttpStatus.NO_CONTENT);
+    assertThat(installationRepository.findById(UUID.fromString(id)).orElseThrow().isUninstalled())
+        .isTrue();
+    assertThat(json(get("/installations/" + id).getBody()).get("artifacts").size())
+        .isEqualTo(lines.size());
+    assertThat(get("/datasets/" + shellIdOf(lines, DATASET_URN)).getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
+    assertThat(get("/datasources/" + shellIdOf(lines, CADASTRE_URN)).getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
+    assertThat(dataStructureRepository.existsById(shellIdOf(lines, ROW_URN))).isFalse();
+    assertThat(dataStructureRepository.existsById(shellIdOf(lines, STREET_TREE_URN))).isFalse();
+    assertThat(registry.fetchStoredModel(lineFor(lines, ROW_URN).get("urn").asString())).isEmpty();
+    assertThat(
+            registry.fetchPayload(
+                lineFor(lines, CADASTRE_MAPPING_URN).get("versionedUrn").asString()))
+        .isEmpty();
+    assertThat(delete("/installations/" + id).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+  }
+
+  @Test
+  @DisplayName("POST installs a package again after its uninstall")
+  void install_whenPackageWasUninstalled_installsItAgain() {
+    ResponseEntity<String> first = post(request(PACKAGE_ID, member("Tree cadastre", treeModel())));
+    assertThat(first.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    assertThat(
+            delete("/installations/" + json(first.getBody()).get("id").asString()).getStatusCode())
+        .isEqualTo(HttpStatus.NO_CONTENT);
+
+    ResponseEntity<String> again = post(request(PACKAGE_ID, member("Tree cadastre", treeModel())));
+
+    assertThat(again.getStatusCode()).as("%s", again.getBody()).isEqualTo(HttpStatus.CREATED);
+    assertThat(installationRepository.count()).isEqualTo(2);
+    assertThat(installationRepository.existsActive(PACKAGE_ID, null)).isTrue();
+  }
+
+  @Test
+  @DisplayName("DELETE refuses an installation with a released Data source and changes nothing")
+  void uninstall_whenDataSourceIsReleased_returnsConflictAndRemovesNothing() {
+    DataPool pool = portalData.dataPool();
+    ResponseEntity<String> installed =
+        post(request(pool.getId(), PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
+    assertThat(installed.getStatusCode())
+        .as("%s", installed.getBody())
+        .isEqualTo(HttpStatus.CREATED);
+    List<JsonNode> lines = linesOf(installed);
+    UUID sourceId = shellIdOf(lines, SOURCE_URN);
+    DataSource source = dataSourceRepository.findById(sourceId).orElseThrow();
+    source.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+    dataSourceRepository.save(source);
+
+    ResponseEntity<String> refused =
+        delete("/installations/" + json(installed.getBody()).get("id").asString());
+
+    assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(dataSourceRepository.existsById(sourceId)).isTrue();
+    assertThat(dataStructureRepository.existsById(shellIdOf(lines, FOREIGN_URN))).isTrue();
+    assertThat(installationRepository.existsActive(PACKAGE_ID, pool.getId())).isTrue();
+  }
+
+  @Test
+  @DisplayName("DELETE returns 404 for an installation that does not exist")
+  void uninstall_whenInstallationIsUnknown_returnsNotFound() {
+    assertThat(delete("/installations/" + UUID.randomUUID()).getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("The database keeps a new record of a package next to an uninstalled one")
+  void saveAndFlush_whenRecordOfThePackageIsUninstalled_keepsBothRecords() {
+    Installation uninstalled = installationOf(PACKAGE_ID);
+    uninstalled.setUninstalledAt(LocalDateTime.now());
+    installationRepository.saveAndFlush(uninstalled);
+
+    installationRepository.saveAndFlush(installationOf(PACKAGE_ID));
+
+    assertThat(installationRepository.count()).isEqualTo(2);
+  }
+
+  /** The tree map package: two Data structures, the data flow into a table, and its map. */
+  private static Map<String, Object> treeMapRequest(UUID datapoolId) {
+    return request(
+        datapoolId,
+        "tree-map",
+        member("datastructure", ROW_URN, "Cadastre row", "One row", rowModel()),
+        member("datastructure", STREET_TREE_URN, "Street tree", "One tree", treeTarget()),
+        cadastreSource(),
+        dataSet(),
+        treeMap(),
+        cadastreMapping(),
+        treeTable(),
+        cadastreImport(),
+        style(GREEN_URN, "trees-green", "#2E7D32"),
+        style(ORANGE_URN, "trees-orange", "#EF6C00"),
+        treesLayer());
   }
 
   /**
@@ -799,9 +957,14 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
   }
 
   private static Installation installationOf(String packageId) {
+    return installationOf(packageId, null);
+  }
+
+  private static Installation installationOf(String packageId, UUID datapoolId) {
     Installation installation = new Installation();
     installation.setPackageId(packageId);
     installation.setPackageVersion("1.0.0");
+    installation.setDatapoolId(datapoolId);
     return installation;
   }
 
@@ -823,6 +986,11 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
         .filter(line -> origin.equals(line.get("origin").asString()))
         .findFirst()
         .orElseThrow();
+  }
+
+  /** The shell id of the artifact that the install created from the member with the identity. */
+  private static UUID shellIdOf(List<JsonNode> lines, String origin) {
+    return UUID.fromString(lineFor(lines, origin).get("shellId").asString());
   }
 
   /** The document that the registry keeps for the version of a line. */
@@ -859,6 +1027,11 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
   private ResponseEntity<String> get(String path) {
     return restTemplate.exchange(
         path, HttpMethod.GET, new HttpEntity<>(authHeaders()), String.class);
+  }
+
+  private ResponseEntity<String> delete(String path) {
+    return restTemplate.exchange(
+        path, HttpMethod.DELETE, new HttpEntity<>(authHeaders()), String.class);
   }
 
   private static JsonNode json(String body) {

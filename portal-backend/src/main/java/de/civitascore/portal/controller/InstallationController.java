@@ -4,6 +4,7 @@ import de.civitascore.portal.model.input.InstallationInputDTO;
 import de.civitascore.portal.model.output.InstallationOutputDTO;
 import de.civitascore.portal.model.output.assembler.InstallationAssembler;
 import de.civitascore.portal.service.InstallationService;
+import de.civitascore.portal.service.UninstallService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -21,6 +22,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,15 +32,19 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * REST controller for installations. A POST installs a package on this instance. A GET returns the
- * record of an install: the package and the artifacts that the install created.
+ * record of an install: the package and the artifacts that the install created. A DELETE removes
+ * these artifacts and keeps the record.
  */
 @RestController
 @RequestMapping(value = "/installations", produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
-@Tag(name = "Installations", description = "Install packages and read the record of each install")
+@Tag(
+    name = "Installations",
+    description = "Install and uninstall packages, and read the record of each install")
 public class InstallationController {
 
   private final InstallationService installationService;
+  private final UninstallService uninstallService;
   private final InstallationAssembler installationAssembler;
 
   /**
@@ -53,7 +59,8 @@ public class InstallationController {
           "Creates a copy of each member of the package on this instance and keeps a record of the"
               + " install. Each copy gets a URN of this instance. The record keeps the identity of"
               + " each member in the package as the origin of the copy. Each Data structure stays"
-              + " DRAFT. If one member fails, the install keeps nothing.")
+              + " DRAFT. If one member fails, the install keeps nothing. The same package can be"
+              + " installed in more than one Data pool.")
   @ApiResponse(responseCode = "201", description = "The package is installed")
   @ApiResponse(
       responseCode = "400",
@@ -61,7 +68,9 @@ public class InstallationController {
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @ApiResponse(
       responseCode = "409",
-      description = "The package is already installed on this instance",
+      description =
+          "The package is already installed in the Data pool, or, for a package without Data"
+              + " sources and without a Dataset, on this instance",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @PostMapping
   public ResponseEntity<InstallationOutputDTO> install(
@@ -107,5 +116,36 @@ public class InstallationController {
   public ResponseEntity<InstallationOutputDTO> getById(@PathVariable UUID id) {
     return ResponseEntity.ok(
         installationAssembler.toOutput(installationService.findByIdOrThrow(id)));
+  }
+
+  /**
+   * Uninstalls an installation: removes the artifacts that the install created and keeps the
+   * record.
+   *
+   * @param id the id of the installation
+   * @return HTTP 204 status
+   */
+  @Operation(
+      summary = "Uninstall an installation",
+      description =
+          "Removes the artifacts that the install created, in the reverse order of the install, and"
+              + " keeps the record with the time of the uninstall. The Dataset goes with all that"
+              + " it contains. The uninstall unreleases nothing: a released Dataset or Data"
+              + " source, a Dataset with infrastructure, and an artifact that something else uses"
+              + " stop it, and then it changes nothing. An artifact that no longer exists is"
+              + " skipped. A second uninstall changes nothing.")
+  @ApiResponse(responseCode = "204", description = "The installation is uninstalled")
+  @ApiResponse(
+      responseCode = "404",
+      description = "Installation not found",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "An artifact of the installation cannot be removed",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @DeleteMapping("/{id}")
+  public ResponseEntity<Void> uninstall(@PathVariable UUID id) {
+    uninstallService.uninstall(id);
+    return ResponseEntity.noContent().build();
   }
 }
