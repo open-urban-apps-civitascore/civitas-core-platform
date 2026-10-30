@@ -19,6 +19,7 @@ import de.civitascore.portal.model.input.DataSetMetaInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DashboardRepository;
+import de.civitascore.portal.repository.DashboardSourceRepository;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
@@ -74,6 +75,7 @@ public class DataSetService
   private final DataSetMapper dataSetMapper;
   private final DataPoolRepository dataPoolRepository;
   private final DashboardRepository dashboardRepository;
+  private final DashboardSourceRepository dashboardSourceRepository;
 
   private final AssignmentFactory assignmentFactory;
   private final AssignmentChangeAuthorizer assignmentChangeAuthorizer;
@@ -97,6 +99,7 @@ public class DataSetService
       DataSetMapper dataSetMapper,
       DataPoolRepository dataPoolRepository,
       DashboardRepository dashboardRepository,
+      DashboardSourceRepository dashboardSourceRepository,
       AssignmentFactory assignmentFactory,
       AssignmentChangeAuthorizer assignmentChangeAuthorizer,
       DataSetSagaPublisher sagaPublisher,
@@ -112,6 +115,7 @@ public class DataSetService
     this.dataSetMapper = dataSetMapper;
     this.dataPoolRepository = dataPoolRepository;
     this.dashboardRepository = dashboardRepository;
+    this.dashboardSourceRepository = dashboardSourceRepository;
     this.assignmentFactory = assignmentFactory;
     this.assignmentChangeAuthorizer = assignmentChangeAuthorizer;
     this.sagaPublisher = sagaPublisher;
@@ -872,6 +876,9 @@ public class DataSetService
           sink.setPipeline(null);
           dataSinkRepository.delete(sink);
         });
+    dashboardRepository.deleteAll(dashboardRepository.findByDataSetId(datasetId));
+    dashboardRepository.flush();
+    dashboardSourceRepository.deleteAll(dashboardSourceRepository.findByMappedDatasetId(datasetId));
     dataSetRepository.delete(dataSet);
     dataSetRepository.flush();
 

@@ -17,6 +17,7 @@ interface VisualizationListProps {
   canCreate: boolean
   isEditing: boolean
   isOpenDataAccess: boolean
+  supersetPublicUrl: string
 }
 
 export const VisualizationList = ({
@@ -26,6 +27,7 @@ export const VisualizationList = ({
   canCreate,
   isEditing,
   isOpenDataAccess,
+  supersetPublicUrl,
 }: VisualizationListProps) => {
   const t = useTranslations('datasets.overview.completion.visualizations')
 
@@ -65,6 +67,7 @@ export const VisualizationList = ({
               canEdit={canEdit}
               isEditing={isEditing}
               isOpenDataAccess={isOpenDataAccess}
+              supersetPublicUrl={supersetPublicUrl}
             />
           ))}
         </div>

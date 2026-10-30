@@ -262,9 +262,11 @@ public class PostgisSagaHandler implements SagaCommandHandler {
                       + tableName);
               // Trino's Postgres connector reader can inspect the alias view without access to the
               // physical UUID schema. CORE OPA policy still checks the caller's dataset permission.
-              String readerRole = dialect().quoteIdent(ddl.trinoReaderRole());
-              statements.add("GRANT USAGE ON SCHEMA " + alias + " TO " + readerRole);
-              statements.add("GRANT SELECT ON " + alias + "." + tableName + " TO " + readerRole);
+              if (ddl.trinoReaderRole() != null && !ddl.trinoReaderRole().isBlank()) {
+                String readerRole = dialect().quoteIdent(ddl.trinoReaderRole());
+                statements.add("GRANT USAGE ON SCHEMA " + alias + " TO " + readerRole);
+                statements.add("GRANT SELECT ON " + alias + "." + tableName + " TO " + readerRole);
+              }
             }
             if (sink.role() != null) {
               String password = ddl.resolvePassword(sink.role().getPassword());

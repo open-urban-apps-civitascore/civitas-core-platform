@@ -181,7 +181,7 @@ default can_view_public_dashboard := false
 can_view_public_dashboard if {
 	dashboard_id := sprintf("%v", [input.externalDashboardId])
 	dataset_id := dashboard_dataset_fetcher.civitas_dataset_id_of(dashboard_id)
-	dataset_pool_fetcher.is_open_data(dataset_id)
+	dataset_pool_fetcher.is_open_and_available(dataset_id)
 	dataset_pool_fetcher.attributes(dataset_id).available == true
 }
 
@@ -295,7 +295,7 @@ can_access_schema if {
 # (civitas_security.py's can_access_schema/can_access_datasource pass civitasDatasetId either way).
 can_access_schema if {
 	input.civitasDatasetId
-	dataset_pool_fetcher.is_open_data(input.civitasDatasetId)
+	dataset_pool_fetcher.is_open_and_available(input.civitasDatasetId)
 }
 
 # =============================================================================
@@ -319,7 +319,7 @@ can_access_datasource if {
 # Open-data bypass — see the matching comment on can_access_schema above.
 can_access_datasource if {
 	input.civitasDatasetId
-	dataset_pool_fetcher.is_open_data(input.civitasDatasetId)
+	dataset_pool_fetcher.is_open_and_available(input.civitasDatasetId)
 }
 
 # =============================================================================
@@ -336,7 +336,7 @@ can_access_dashboard if {
 can_access_dashboard if {
 	count(input.dashboard_dataset_ids) > 0
 	every dataset_id in input.dashboard_dataset_ids {
-		dataset_pool_fetcher.is_open_data(dataset_id)
+		dataset_pool_fetcher.is_open_and_available(dataset_id)
 	}
 }
 

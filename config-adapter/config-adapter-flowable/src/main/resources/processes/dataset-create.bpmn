@@ -214,6 +214,7 @@
     </boundaryEvent>
     <exclusiveGateway id="prune-comp-gateway" name="Compensate Pipelines?" default="flow-prune-comp-geo">
       <incoming>flow-prune-error</incoming>
+      <incoming>flow-superset-comp-pipelines</incoming>
       <outgoing>flow-prune-comp-pipelines</outgoing>
       <outgoing>flow-prune-comp-geo</outgoing>
     </exclusiveGateway>
@@ -294,7 +295,7 @@
     <sequenceFlow id="flow-dashboard-skip" name="no" sourceRef="dashboard-gateway" targetRef="publish-success"/>
     <sequenceFlow id="flow-superset-success" sourceRef="register-superset" targetRef="publish-success"/>
     <sequenceFlow id="flow-superset-error" sourceRef="superset-error" targetRef="compensate-superset"/>
-    <sequenceFlow id="flow-superset-comp-pipelines" sourceRef="compensate-superset" targetRef="compensate-pipelines"/>
+    <sequenceFlow id="flow-superset-comp-pipelines" sourceRef="compensate-superset" targetRef="prune-comp-gateway"/>
     <sequenceFlow id="flow-prune-error" sourceRef="prune-error" targetRef="prune-comp-gateway"/>
     <sequenceFlow id="flow-prune-comp-pipelines" name="yes" sourceRef="prune-comp-gateway" targetRef="compensate-pipelines">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_8">${hasPipelines == true}</conditionExpression>
@@ -834,7 +835,7 @@
         <di:waypoint xsi:type="dc:Point" x="1455.0" y="570.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_SupersetErrorEdge"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SupersetCompensation" bpmnElement="flow-superset-comp-pipelines" sourceElement="BPMNShape_CompensateSuperset" targetElement="BPMNShape_compensate_pipelines">
+      <bpmndi:BPMNEdge id="BPMNEdge_SupersetCompensation" bpmnElement="flow-superset-comp-pipelines" sourceElement="BPMNShape_CompensateSuperset" targetElement="BPMNShape_ExclusiveGateway_8">
         <di:waypoint xsi:type="dc:Point" x="1400.0" y="595.0"/>
         <di:waypoint xsi:type="dc:Point" x="1330.0" y="595.0"/>
         <di:waypoint xsi:type="dc:Point" x="1270.0" y="663.0"/>

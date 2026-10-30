@@ -65,9 +65,10 @@ interface DatasetOverviewProps {
   roleCount: number
   testId?: string
   datapoolOptions: SelectOption[]
+  supersetPublicUrl?: string
 }
 export const DatasetOverview = (props: DatasetOverviewProps) => {
-  const { dataset, groupCount, roleCount, testId, datapoolOptions } = props
+  const { dataset, groupCount, roleCount, testId, datapoolOptions, supersetPublicUrl = '' } = props
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
 
@@ -366,6 +367,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       buttons: [],
       content: (
         <VisualizationList
+          supersetPublicUrl={supersetPublicUrl}
           datasetId={dataset.id}
           visualizations={visualizationList}
           canEdit={canManageVisualizations}

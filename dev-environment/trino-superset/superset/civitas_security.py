@@ -70,7 +70,9 @@ class CivitasSupersetSecurityManager(SupersetSecurityManager):
             try:
                 from flask_jwt_extended import decode_token
 
-                decoded = decode_token(authorization[7:].strip(), allow_expired=True)
+                decoded = decode_token(authorization[7:].strip())
+                if decoded.get("type") != "access":
+                    return None
                 identity = decoded.get("sub") or decoded.get("identity")
                 if identity:
                     try:

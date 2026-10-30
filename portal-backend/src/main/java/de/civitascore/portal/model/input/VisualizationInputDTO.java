@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import de.civitascore.portal.model.embedded.VisualizationType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -29,7 +30,7 @@ import lombok.EqualsAndHashCode;
     discriminatorProperty = "visualizationType")
 public abstract sealed class VisualizationInputDTO extends BaseInputDTO permits DashboardInputDTO {
 
-  @NotBlank @Schema(description = "Human-readable name of the visualization")
+  @NotBlank @Size(max = 255) @Schema(description = "Human-readable name of the visualization")
   private String name;
 
   @Schema(description = "Optional human-readable description")

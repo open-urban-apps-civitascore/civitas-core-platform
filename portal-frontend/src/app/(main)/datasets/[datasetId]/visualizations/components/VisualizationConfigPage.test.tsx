@@ -215,6 +215,22 @@ describe('VisualizationConfigPage', () => {
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
     })
 
+    it('keeps the form read-only when mode=edit is set without permission', () => {
+      mockCanEdit = false
+      mockSearchParams = new URLSearchParams('mode=edit')
+      renderComponent({ existingVisualization: makeVisualization() })
+      expect(screen.getByTestId('nameInput')).toBeDisabled()
+      fireEvent.submit(screen.getByTestId('visualizationConfigForm'))
+      expect(mockUpdateVisualization).not.toHaveBeenCalled()
+    })
+
+    it('disables dashboard creation on an available dataset', () => {
+      renderComponent({ dataset: makeDataset({ dataSetStatus: 'AVAILABLE' }) })
+      expect(screen.getByTestId('nameInput')).toBeDisabled()
+      fireEvent.submit(screen.getByTestId('visualizationConfigForm'))
+      expect(mockCreateVisualization).not.toHaveBeenCalled()
+    })
+
     it('switches to editable mode and updates the URL when Edit is clicked', async () => {
       renderComponent({ existingVisualization: makeVisualization() })
       await userEvent.click(screen.getByTestId('editButton'))

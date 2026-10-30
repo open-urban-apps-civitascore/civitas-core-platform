@@ -21,7 +21,7 @@ import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
-import { Dataset } from '@/types/datasets'
+import { Dataset, DATASET_STATUS_TYPES } from '@/types/datasets'
 import {
   Visualization,
   VisualizationFormData,
@@ -69,6 +69,8 @@ export const VisualizationConfigPage = ({
     dataset.id,
     dataset.datapool?.id,
   )
+  const canModify = canEdit && (!isCreate || dataset.dataSetStatus === DATASET_STATUS_TYPES.DRAFT)
+  const formIsReadOnly = isReadOnly || !canModify
 
   const defaultValues: VisualizationFormData = {
     name: existingVisualization?.name ?? '',
@@ -105,6 +107,7 @@ export const VisualizationConfigPage = ({
   const badgeTitle = dataset.openDataAccess ? t('openDataBadge') : t('protectedBadge')
 
   const updateMode = (isEditing: boolean) => {
+    if (isEditing && !canModify) return
     setIsReadOnly(!isEditing)
     const params = new URLSearchParams(searchParams.toString())
     if (isEditing) {
@@ -140,6 +143,7 @@ export const VisualizationConfigPage = ({
   }
 
   const handleSave = async (): Promise<boolean> => {
+    if (!canModify) return false
     let isSaved = false
     await form.handleSubmit(async data => {
       try {
@@ -180,7 +184,7 @@ export const VisualizationConfigPage = ({
 
   useRegisterUnsavedChanges(hasUnsavedChanges, handleSave)
 
-  const buttonGroup = isReadOnly ? (
+  const buttonGroup = formIsReadOnly ? (
     <Button data-testid="editButton" type="button" onClick={() => updateMode(true)}>
       {tCommon('actions.edit')}
     </Button>
@@ -200,7 +204,7 @@ export const VisualizationConfigPage = ({
       <PageHeader
         title={pageTitle}
         badgeTitle={badgeTitle}
-        customElement={isCreate || canEdit ? buttonGroup : undefined}
+        customElement={canModify ? buttonGroup : undefined}
         segmentedControlBarProps={{
           tabs,
           selectedTab,
@@ -222,9 +226,9 @@ export const VisualizationConfigPage = ({
           >
             <ContentCard>
               {selectedTab === 'basicInfo' && (
-                <VisualizationConfigForm form={form} typeLabel={typeLabel} isReadOnly={isReadOnly} />
+                <VisualizationConfigForm form={form} typeLabel={typeLabel} isReadOnly={formIsReadOnly} />
               )}
-              {selectedTab === 'options' && !isCreate && <DashboardOptionsForm form={form} isReadOnly={isReadOnly} />}
+              {selectedTab === 'options' && !isCreate && <DashboardOptionsForm form={form} isReadOnly={formIsReadOnly} />}
             </ContentCard>
           </form>
         </Form>

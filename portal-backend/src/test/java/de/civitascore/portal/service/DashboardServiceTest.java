@@ -21,6 +21,7 @@ import de.civitascore.portal.modelregistry.ModelRegistryGateway.ModelPin;
 import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DashboardRepository;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.Optional;
@@ -183,6 +184,18 @@ class DashboardServiceTest {
 
     assertThat(dataSet.getPendingSagaType()).isNull();
     verify(sagaPublisher, never()).publishUpdateRequested(dataSet, dataSet.getPipelines());
+  }
+
+  @Test
+  void postSaveRejectsDataSetWithoutManifestAsInvalidInput() {
+    dataSet.setManifestLogicalUrn(null);
+    Dashboard dashboard = new Dashboard();
+    dashboard.setDataSet(dataSet);
+
+    assertThatThrownBy(() -> service.postSave(dashboard, new DashboardInputDTO()))
+        .isInstanceOf(InvalidInputException.class);
+    verify(modelRegistryGateway, never())
+        .storePayload(eq(PayloadKind.DASHBOARD), any(), any(), any(), any(), any(), any());
   }
 
   @Test

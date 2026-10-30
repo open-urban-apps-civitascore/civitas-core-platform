@@ -24,6 +24,7 @@ SQL
 create_database keycloak "$KEYCLOAK_DB_PASSWORD" "$KEYCLOAK_DB_NAME"
 create_database sensorthings "$FROST_DB_PASSWORD" "$FROST_DB_NAME"
 create_database geoserver "$GEOSERVER_DB_PASSWORD" "$GEOSERVER_DB_NAME"
+create_database "$SUPERSET_DB_USER" "$SUPERSET_DB_PASSWORD" "$SUPERSET_DB_NAME"
 create_database "$MODEL_FORGE_DB_USER" "$MODEL_FORGE_DB_PASSWORD" "$MODEL_FORGE_DB_NAME"
 create_database "$NIFI_DEMO_DB_USER" "$NIFI_DEMO_DB_PASSWORD" "$NIFI_DEMO_DB_NAME"
 

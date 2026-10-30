@@ -512,7 +512,34 @@ final class SupersetResourceClient {
       List<String> viewerGroupIds,
       boolean publicAccess,
       boolean released) {
+    return createDashboard(
+        null, title, description, editorGroupIds, viewerGroupIds, publicAccess, released);
+  }
+
+  int createDashboard(
+      String coreDashboardId,
+      String title,
+      String description,
+      List<String> editorGroupIds,
+      List<String> viewerGroupIds,
+      boolean publicAccess,
+      boolean released) {
     Map<String, Object> body = new LinkedHashMap<>();
+    if (coreDashboardId != null) {
+      Integer existingId = findDashboardByUuid(coreDashboardId);
+      if (existingId != null
+          && syncDashboardAccess(
+              existingId,
+              title,
+              description,
+              editorGroupIds,
+              viewerGroupIds,
+              publicAccess,
+              released)) {
+        return existingId;
+      }
+      body.put("uuid", coreDashboardId);
+    }
     body.put("dashboard_title", title);
     body.put("description", description);
     body.put("published", released);
@@ -530,6 +557,27 @@ final class SupersetResourceClient {
       grantDatasetCreationToGroups(editorGroupIds);
       LOG.info("Created Superset dashboard id={} for title={}", dashboardId, Encode.forJava(title));
       return dashboardId;
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  private Integer findDashboardByUuid(String dashboardUuid) {
+    Response response = null;
+    Map<String, String> query =
+        Map.of(
+            "q",
+            "(filters:!((col:uuid,opr:eq,value:"
+                + risonString(dashboardUuid)
+                + ")),page:0,page_size:1)");
+    try {
+      response = getJson("/api/v1/dashboard/", query);
+      if (response.getStatus() == 401) {
+        response = closeAndReauth(response, () -> getJson("/api/v1/dashboard/", query));
+      }
+      checkStatus(response, "find dashboard");
+      JsonNode result = readTree(response).path("result");
+      return result.isEmpty() ? null : result.get(0).path("id").asInt();
     } finally {
       closeQuietly(response);
     }
@@ -977,24 +1025,20 @@ final class SupersetResourceClient {
         return datasetId;
       }
       if (status == 422) {
-        String responseBody = safeReadBody(response);
         closeQuietly(response);
         response = null;
         int existingId = findDatasetMapBySchema(schemaName).getOrDefault(tableName, -1);
         if (existingId < 0) {
           // A 422 with no matching dataset in the schema isn't the idempotent "already exists"
           // case — it's some other validation failure (e.g. Superset couldn't introspect the
-          // table through its underlying connection, which for Trino can mean an authorization
-          // denial masquerading as "table not found"). Throwing here with the real response body
-          // surfaces that cause directly, instead of returning -1 and letting the caller raise a
-          // vaguer "could not resolve dataset id" error with no indication of why.
+          // table through its underlying connection). Keep the response body out of saga errors:
+          // it may contain database details or other sensitive information.
           throw new SagaApiException(
               "create dataset failed: schema="
                   + schemaName
                   + ", table="
                   + tableName
-                  + " — HTTP 422 with no matching existing dataset: "
-                  + responseBody,
+                  + " — HTTP 422 with no matching existing dataset",
               422);
         }
         LOG.info(
@@ -1224,26 +1268,15 @@ final class SupersetResourceClient {
 
   /** Map of table name → Superset dataset ID, for every dataset in {@code schemaName}. */
   Map<String, Integer> findDatasetMapBySchema(String schemaName) {
-    Map<String, String> query = Map.of("q", databaseSchemaQuery(schemaName));
-    Response response = null;
-    try {
-      response = getJson("/api/v1/dataset/", query);
-      if (response.getStatus() == 401) {
-        response = closeAndReauth(response, () -> getJson("/api/v1/dataset/", query));
+    Map<String, Integer> map = new LinkedHashMap<>();
+    for (JsonNode item : listDatasets(databaseSchemaQuery(schemaName))) {
+      String tableName = item.path("table_name").asText("");
+      int id = item.path("id").asInt(-1);
+      if (!tableName.isEmpty() && id != -1) {
+        map.put(tableName, id);
       }
-      checkStatus(response, "list datasets");
-      Map<String, Integer> map = new LinkedHashMap<>();
-      for (JsonNode item : readTree(response).path("result")) {
-        String tableName = item.path("table_name").asText("");
-        int id = item.path("id").asInt(-1);
-        if (!tableName.isEmpty() && id != -1) {
-          map.put(tableName, id);
-        }
-      }
-      return map;
-    } finally {
-      closeQuietly(response);
     }
+    return map;
   }
 
   /**
@@ -1255,24 +1288,13 @@ final class SupersetResourceClient {
    * instance.
    */
   List<Integer> findDatasetIdsByCivitasId(String schemaName, String civitasDatasetId) {
-    Map<String, String> query = Map.of("q", databaseSchemaQuery(schemaName));
-    Response response = null;
-    try {
-      response = getJson("/api/v1/dataset/", query);
-      if (response.getStatus() == 401) {
-        response = closeAndReauth(response, () -> getJson("/api/v1/dataset/", query));
+    List<Integer> ids = new ArrayList<>();
+    for (JsonNode item : listDatasets(databaseSchemaQuery(schemaName))) {
+      if (civitasDatasetId.equals(extractExtraField(item, CIVITAS_DATASET_ID_KEY))) {
+        ids.add(item.path("id").asInt(-1));
       }
-      checkStatus(response, "list datasets");
-      List<Integer> ids = new ArrayList<>();
-      for (JsonNode item : readTree(response).path("result")) {
-        if (civitasDatasetId.equals(extractExtraField(item, CIVITAS_DATASET_ID_KEY))) {
-          ids.add(item.path("id").asInt(-1));
-        }
-      }
-      return ids;
-    } finally {
-      closeQuietly(response);
     }
+    return ids;
   }
 
   /**
@@ -1281,29 +1303,18 @@ final class SupersetResourceClient {
    * query is narrowed client-side. FROST SQL datasets are excluded by their separate marker.
    */
   Map<String, Integer> findPostgisDatasetsByCivitasId(String civitasDatasetId) {
-    Map<String, String> query = Map.of("q", databaseOnlyQuery());
-    Response response = null;
-    try {
-      response = getJson("/api/v1/dataset/", query);
-      if (response.getStatus() == 401) {
-        response = closeAndReauth(response, () -> getJson("/api/v1/dataset/", query));
+    Map<String, Integer> datasets = new LinkedHashMap<>();
+    for (JsonNode item : listDatasets(databaseOnlyQuery())) {
+      String tableName = item.path("table_name").asText("");
+      int id = item.path("id").asInt(-1);
+      if (!tableName.isEmpty()
+          && id != -1
+          && civitasDatasetId.equals(extractExtraField(item, CIVITAS_DATASET_ID_KEY))
+          && extractExtraField(item, FROST_VIEW_KEY) == null) {
+        datasets.put(tableName, id);
       }
-      checkStatus(response, "list datasets");
-      Map<String, Integer> datasets = new LinkedHashMap<>();
-      for (JsonNode item : readTree(response).path("result")) {
-        String tableName = item.path("table_name").asText("");
-        int id = item.path("id").asInt(-1);
-        if (!tableName.isEmpty()
-            && id != -1
-            && civitasDatasetId.equals(extractExtraField(item, CIVITAS_DATASET_ID_KEY))
-            && extractExtraField(item, FROST_VIEW_KEY) == null) {
-          datasets.put(tableName, id);
-        }
-      }
-      return datasets;
-    } finally {
-      closeQuietly(response);
     }
+    return datasets;
   }
 
   /**
@@ -1313,28 +1324,42 @@ final class SupersetResourceClient {
    * the stable matching key is the {@code frostView} marker together with the CORE dataset stamp.
    */
   Map<String, Integer> findFrostDatasetsByCivitasId(String civitasDatasetId) {
-    Map<String, String> query = Map.of("q", databaseOnlyQuery());
-    Response response = null;
-    try {
-      response = getJson("/api/v1/dataset/", query);
-      if (response.getStatus() == 401) {
-        response = closeAndReauth(response, () -> getJson("/api/v1/dataset/", query));
+    Map<String, Integer> byView = new LinkedHashMap<>();
+    for (JsonNode item : listDatasets(databaseOnlyQuery())) {
+      if (!civitasDatasetId.equals(extractExtraField(item, CIVITAS_DATASET_ID_KEY))) {
+        continue;
       }
-      checkStatus(response, "list datasets");
-      Map<String, Integer> byView = new LinkedHashMap<>();
-      for (JsonNode item : readTree(response).path("result")) {
-        if (!civitasDatasetId.equals(extractExtraField(item, CIVITAS_DATASET_ID_KEY))) {
-          continue;
-        }
-        String view = extractExtraField(item, FROST_VIEW_KEY);
-        int id = item.path("id").asInt(-1);
-        if (view != null && id != -1) {
-          byView.put(view, id);
-        }
+      String view = extractExtraField(item, FROST_VIEW_KEY);
+      int id = item.path("id").asInt(-1);
+      if (view != null && id != -1) {
+        byView.put(view, id);
       }
-      return byView;
-    } finally {
-      closeQuietly(response);
+    }
+    return byView;
+  }
+
+  private List<JsonNode> listDatasets(String filterQuery) {
+    List<JsonNode> datasets = new ArrayList<>();
+    for (int page = 0; ; page++) {
+      String pagedQuery =
+          filterQuery.substring(0, filterQuery.length() - 1) + ",page:" + page + ",page_size:1000)";
+      Map<String, String> query = Map.of("q", pagedQuery);
+      Response response = null;
+      try {
+        response = getJson("/api/v1/dataset/", query);
+        if (response.getStatus() == 401) {
+          response = closeAndReauth(response, () -> getJson("/api/v1/dataset/", query));
+        }
+        checkStatus(response, "list datasets");
+        JsonNode body = readTree(response);
+        JsonNode result = body.path("result");
+        result.forEach(datasets::add);
+        if (result.isEmpty() || datasets.size() >= body.path("count").asInt(Integer.MAX_VALUE)) {
+          return datasets;
+        }
+      } finally {
+        closeQuietly(response);
+      }
     }
   }
 
@@ -1366,9 +1391,7 @@ final class SupersetResourceClient {
   }
 
   private String databaseOnlyQuery() {
-    return "(filters:!((col:database,opr:rel_o_m,value:"
-        + trinoDatabaseId
-        + ")),page:0,page_size:1000)";
+    return "(filters:!((col:database,opr:rel_o_m,value:" + trinoDatabaseId + ")))";
   }
 
   /** Rison-quotes a string value: wraps in {@code '...'}, escaping {@code !} and {@code '}. */
@@ -1468,16 +1491,7 @@ final class SupersetResourceClient {
     if (status >= 200 && status < 300) {
       return;
     }
-    throw new SagaApiException(
-        operationDesc + " failed: HTTP " + status + " — " + safeReadBody(response), status);
-  }
-
-  private String safeReadBody(Response response) {
-    try {
-      return response.readEntity(String.class);
-    } catch (Exception e) {
-      return "(unreadable)";
-    }
+    throw new SagaApiException(operationDesc + " failed: HTTP " + status, status);
   }
 
   private static void closeQuietly(Response response) {

@@ -205,14 +205,14 @@ The datastore schema is derived per dataset and is not configurable. Enabling th
 |---|---|
 | `postgis.jdbc.url` | `POSTGIS_JDBC_URL` |
 | `postgis.jdbc.user` | `POSTGIS_JDBC_USER` |
-| `postgis.trino.reader-role` | `POSTGIS_TRINO_READER_ROLE` | Role used by Trino's Postgres connector. The adapter grants this role access to readable dataset views. Keep it equal to `GEODATA_DB_USER`. |
+| `postgis.trino.reader-role` | `POSTGIS_TRINO_READER_ROLE` | Optional existing role used by Trino's Postgres connector. When set, the adapter grants it access to readable dataset views. Keep it equal to `GEODATA_DB_USER`. |
 | `postgis.jdbc.password` | `POSTGIS_JDBC_PASSWORD` |
 | `postgis.jdbc.maxPoolSize` | `POSTGIS_JDBC_MAXPOOLSIZE` |
 | `postgis.jdbc.connectionTimeoutMs` | `POSTGIS_JDBC_CONNECTIONTIMEOUTMS` |
 
 The PostGIS extension must already be installed in the target database; the adapter does not create it. The pool does not fail startup when the database is unreachable — failures surface per event as retryable.
 
-> **Three database identities must resolve to the same owning role.** Grants are emitted only for the optional per-dataset `readRole` carried in the sink payload, and only as schema privileges plus `SELECT` on the table — no write privilege is grantable at all. `postgis.jdbc.user`, `geoserver.postgis.user` and `nifi.postgis.user` never receive a grant, so all three must resolve to the schema-owning role. Splitting them silently breaks reads and writes rather than failing loudly.
+> **Database identities:** The optional per-dataset `readRole` receives schema privileges and `SELECT` on the physical table. When `postgis.trino.reader-role` is set, that existing role receives `USAGE` and `SELECT` on the readable view schema. `postgis.jdbc.user`, `geoserver.postgis.user` and `nifi.postgis.user` must have the privileges required for their own operations.
 
 **Superset**
 

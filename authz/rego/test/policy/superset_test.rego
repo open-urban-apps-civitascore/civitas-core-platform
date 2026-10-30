@@ -244,7 +244,9 @@ mock_send_dashboard_read_wrong_dataset(req) := {"status_code": 200, "body": {"ci
 
 mock_send_dataset_write(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_UPDATE"], "DATASET", "ds-1")}
 
-mock_send_open_dataset(_) := {"status_code": 200, "body": {"poolId": null, "openDataAccess": true}}
+mock_send_open_dataset(_) := {"status_code": 200, "body": {"poolId": null, "openDataAccess": true, "available": true}}
+
+mock_send_open_draft_dataset(_) := {"status_code": 200, "body": {"poolId": null, "openDataAccess": true, "available": false}}
 
 mock_send_closed_dataset(_) := {"status_code": 200, "body": {"poolId": null, "openDataAccess": false}}
 
@@ -252,15 +254,15 @@ mock_send_open_data_no_permissions(req) := {"status_code": 200, "body": mock_htt
 	contains(req.url, "user-context")
 }
 
-mock_send_open_data_no_permissions(req) := {"status_code": 200, "body": {"poolId": null, "openDataAccess": true}} if {
+mock_send_open_data_no_permissions(req) := {"status_code": 200, "body": {"poolId": null, "openDataAccess": true, "available": true}} if {
 	contains(req.url, "dataset-pool")
 }
 
-mock_send_dashboard_all_open(req) := {"status_code": 200, "body": {"poolId": null, "openDataAccess": true}} if {
+mock_send_dashboard_all_open(req) := {"status_code": 200, "body": {"poolId": null, "openDataAccess": true, "available": true}} if {
 	contains(req.url, "dataset-pool")
 }
 
-mock_send_dashboard_mixed(req) := {"status_code": 200, "body": {"poolId": null, "openDataAccess": true}} if {
+mock_send_dashboard_mixed(req) := {"status_code": 200, "body": {"poolId": null, "openDataAccess": true, "available": true}} if {
 	contains(req.url, "ds-open")
 }
 
@@ -361,6 +363,13 @@ test_can_access_datasource_denied_different_pool if {
 test_can_access_schema_granted_for_open_data_anonymous if {
 	superset.can_access_schema with data.backends.superset as _enforced_data
 		with http.send as mock_send_open_dataset
+		with data.config as mock_http.mock_config
+		with input as {"civitasDatasetId": "ds-open"}
+}
+
+test_can_access_schema_denied_for_open_draft_anonymous if {
+	not superset.can_access_schema with data.backends.superset as _enforced_data
+		with http.send as mock_send_open_draft_dataset
 		with data.config as mock_http.mock_config
 		with input as {"civitasDatasetId": "ds-open"}
 }

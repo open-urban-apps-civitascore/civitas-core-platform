@@ -17,6 +17,7 @@ import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.PipelineRuntimeState;
+import de.civitascore.portal.model.entity.Dashboard;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
@@ -340,6 +341,20 @@ class DataSetSagaPublisherTest {
       assertThat(ds.get("type").asString()).isEqualTo("POSTGIS");
       assertThat(ds.get("configuration").get("tableName").asString())
           .isEqualTo("sensor_observations");
+    }
+
+    @Test
+    void publishDeleteRequested_withDashboard_includesExternalDashboardId() {
+      DataSet dataSet = datasetWithPipeline(pipeline(UUID.randomUUID()));
+      Dashboard dashboard = new Dashboard();
+      dashboard.setExternalDashboardId("42");
+      when(dashboardRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(dashboard));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishDeleteRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      assertThat(payload.get("dashboardIds").get(0).asString()).isEqualTo("42");
     }
   }
 

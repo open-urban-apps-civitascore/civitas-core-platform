@@ -24,6 +24,7 @@ interface VisualizationCardProps {
   canEdit: boolean
   isEditing: boolean
   isOpenDataAccess: boolean
+  supersetPublicUrl: string
 }
 
 export const VisualizationCard = ({
@@ -32,6 +33,7 @@ export const VisualizationCard = ({
   canEdit,
   isEditing,
   isOpenDataAccess,
+  supersetPublicUrl,
 }: VisualizationCardProps) => {
   const t = useTranslations('datasets.overview.completion.visualizations')
   const tCard = useTranslations('datasets.overview.completion.visualizations.card')
@@ -54,8 +56,8 @@ export const VisualizationCard = ({
   if (visualization.filterExpansion !== 'DEFAULT') {
     dashboardParams.set('expand_filters', visualization.filterExpansion === 'EXPANDED' ? '1' : '0')
   }
-  const supersetUrl = visualization.externalDashboardId
-    ? `${process.env.NEXT_PUBLIC_SUPERSET_URL}/dashboard/${visualization.externalDashboardId}/?${dashboardParams}`
+  const supersetUrl = visualization.externalDashboardId && supersetPublicUrl
+    ? `${supersetPublicUrl.replace(/\/$/, '')}/dashboard/${visualization.externalDashboardId}/?${dashboardParams}`
     : undefined
 
   const handleConfirmDelete = async () => {
@@ -117,7 +119,9 @@ export const VisualizationCard = ({
                 </Tooltip>
               )}
             </div>
-            <span className="font-medium truncate group-hover:underline">{visualization.name}</span>
+            <button type="button" className="font-medium truncate text-left group-hover:underline">
+              {visualization.name}
+            </button>
             {visualization.description ? (
               <span className="text-sm font-normal text-muted-foreground line-clamp-2">
                 {visualization.description}

@@ -49,6 +49,7 @@ const defaultProps = {
   canCreate: true,
   isEditing: false,
   isOpenDataAccess: false,
+  supersetPublicUrl: 'http://localhost:8092',
 }
 
 const renderComponent = (props: Partial<typeof defaultProps> = {}) =>

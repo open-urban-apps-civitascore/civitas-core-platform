@@ -41,6 +41,7 @@ class DatasetDeleteBpmnTest {
   private SagaCommandHandler apisixHandler;
   private SagaCommandHandler pipelineHandler;
   private SagaCommandHandler geoserverHandler;
+  private SagaCommandHandler supersetHandler;
 
   @BeforeEach
   void setUp() {
@@ -48,16 +49,19 @@ class DatasetDeleteBpmnTest {
     apisixHandler = mock(SagaCommandHandler.class);
     pipelineHandler = mock(SagaCommandHandler.class);
     geoserverHandler = mock(SagaCommandHandler.class);
+    supersetHandler = mock(SagaCommandHandler.class);
     when(frostHandler.adapter()).thenReturn("frost");
     when(apisixHandler.adapter()).thenReturn("apisix");
     when(pipelineHandler.adapter()).thenReturn("nifi");
     when(geoserverHandler.adapter()).thenReturn("geoserver");
+    when(supersetHandler.adapter()).thenReturn("superset");
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);
     registry.register(apisixHandler);
     registry.register(pipelineHandler);
     registry.register(geoserverHandler);
+    registry.register(supersetHandler);
 
     processEngine = FlowableTestSupport.createTestEngine(Map.of("sagaHandlerRegistry", registry));
     runtimeService = processEngine.getRuntimeService();
@@ -109,10 +113,29 @@ class DatasetDeleteBpmnTest {
     assertProcessCompleted(instance.getId());
 
     verify(pipelineHandler, never()).handle(any());
+    verify(supersetHandler, never()).handle(any());
 
     var inOrder = inOrder(apisixHandler, frostHandler);
     inOrder.verify(apisixHandler).handle(any());
     inOrder.verify(frostHandler).handle(any());
+  }
+
+  @Test
+  void deleteWithFrostDashboard_deregistersSupersetWithoutGeoSink() {
+    stubApisixDeleteSuccess();
+    stubFrostDeleteSuccess();
+    when(supersetHandler.handle(any()))
+        .thenReturn(
+            SagaCommandResult.success("saga-test-123", "deregister-superset", Map.of(), Map.of()));
+
+    ProcessInstance instance = startProcess(false, true);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+    var order = inOrder(apisixHandler, supersetHandler, frostHandler);
+    order.verify(apisixHandler).handle(any());
+    order.verify(supersetHandler).handle(any());
+    order.verify(frostHandler).handle(any());
   }
 
   @Test
@@ -156,6 +179,10 @@ class DatasetDeleteBpmnTest {
   // variable) is covered end-to-end through FlowableTriggerConsumer in DatasetDeleteTriggerTest.
 
   private ProcessInstance startProcess(boolean hasPipelines) {
+    return startProcess(hasPipelines, false);
+  }
+
+  private ProcessInstance startProcess(boolean hasPipelines, boolean hasDashboards) {
     Map<String, Object> variables = new HashMap<>();
     variables.put("sagaId", "saga-test-123");
     variables.put("datasetId", "ds-456");
@@ -163,6 +190,10 @@ class DatasetDeleteBpmnTest {
     variables.put("routeId", "r-1");
     variables.put("serviceId", "s-1");
     variables.put("hasPipelines", hasPipelines);
+    variables.put("hasDashboards", hasDashboards);
+    if (hasDashboards) {
+      variables.put("dashboardIds", List.of("42"));
+    }
     if (hasPipelines) {
       variables.put("pipelineIds", List.of("p-1"));
     }

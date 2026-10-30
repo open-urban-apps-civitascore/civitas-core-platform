@@ -282,6 +282,8 @@ public class FlowableTriggerConsumer {
    */
   private static boolean deriveHasDashboards(Map<String, Object> trigger) {
     return (trigger.get("dashboards") instanceof List<?> dashboards && !dashboards.isEmpty())
+        || (trigger.get("dashboardIds") instanceof List<?> dashboardIds
+            && !dashboardIds.isEmpty())
         || (trigger.get("deletedDashboardIds") instanceof List<?> deletedIds
             && !deletedIds.isEmpty());
   }

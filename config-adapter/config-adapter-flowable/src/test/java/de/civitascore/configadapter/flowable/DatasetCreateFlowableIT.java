@@ -54,6 +54,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -183,8 +185,10 @@ class DatasetCreateFlowableIT {
     network.close();
   }
 
-  @Test
-  void datasetCreateSaga_completesWithRealFrostAndMockApisix() throws IOException {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void datasetCreateSaga_completesWithRealFrostAndMockApisix(boolean hasDashboards)
+      throws IOException {
     deployProcesses();
     String datasetId = "ds-flowable-e2e-" + UUID.randomUUID().toString().substring(0, 8);
 
@@ -195,7 +199,7 @@ class DatasetCreateFlowableIT {
     variables.put("description", "Integration test via Flowable");
     variables.put("hasPipelines", false);
     variables.put("hasFrostSink", true);
-    variables.put("hasDashboards", true);
+    variables.put("hasDashboards", hasDashboards);
     variables.put("artifacts", Map.of());
     variables.put("dataPipelines", List.of());
     // Per-NamedApi route model (#1311/#1379): CREATE_ROUTE provisions one route per named-API
@@ -230,9 +234,11 @@ class DatasetCreateFlowableIT {
             .filter(id -> !id.startsWith("compensate-") && !id.startsWith("publish-"))
             .toList();
     assertEquals(
-        List.of("create-project", "create-route", "register-superset"),
+        hasDashboards
+            ? List.of("create-project", "create-route", "register-superset")
+            : List.of("create-project", "create-route"),
         tasks,
-        "Should execute FROST, APISIX, and Superset while skipping absent pipelines");
+        "Superset should run only when the Dataset has a Dashboard");
 
     Object projectId =
         historyService

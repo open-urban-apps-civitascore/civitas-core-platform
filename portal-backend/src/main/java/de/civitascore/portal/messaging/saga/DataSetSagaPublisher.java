@@ -190,7 +190,11 @@ public class DataSetSagaPublisher {
             dataset.getId().toString(),
             dataset.getPipelineIds(),
             buildDatasinks(dataset),
-            buildNamedApis(dataset));
+            buildNamedApis(dataset),
+            dashboardRepository.findByDataSetId(dataset.getId()).stream()
+                .map(entity -> entity.getExternalDashboardId())
+                .filter(Objects::nonNull)
+                .toList());
     sendTrigger(trigger);
   }
 

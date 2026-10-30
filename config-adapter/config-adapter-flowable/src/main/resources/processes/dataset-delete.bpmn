@@ -39,9 +39,16 @@
       <outgoing>flow-apisix-error</outgoing>
       <errorEventDefinition id="ErrorEventDefinition_2" errorRef="stepFailedError"/>
     </boundaryEvent>
-    <exclusiveGateway id="geo-gateway" name="Has Geo Sink?" default="flow-geo-skip">
+    <exclusiveGateway id="superset-gateway" name="Has Dashboards?" default="flow-superset-skip">
       <incoming>flow-apisix-geo</incoming>
       <incoming>flow-apisix-error</incoming>
+      <outgoing>flow-superset-deregister</outgoing>
+      <outgoing>flow-superset-skip</outgoing>
+    </exclusiveGateway>
+    <exclusiveGateway id="geo-gateway" name="Has Geo Sink?" default="flow-geo-skip">
+      <incoming>flow-superset-skip</incoming>
+      <incoming>flow-superset-workspace</incoming>
+      <incoming>flow-superset-error</incoming>
       <outgoing>flow-geo-workspace</outgoing>
       <outgoing>flow-geo-skip</outgoing>
     </exclusiveGateway>
@@ -51,7 +58,7 @@
         <flowable:field xsi:type="xs:anyType" name="operation" stringValue="DEREGISTER_DATASET"/>
         <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="deregister-superset"/>
       </extensionElements>
-      <incoming>flow-geo-workspace</incoming>
+      <incoming>flow-superset-deregister</incoming>
       <outgoing>flow-superset-workspace</outgoing>
     </serviceTask>
     <boundaryEvent id="deregister-superset-error" name="Step Failed" attachedToRef="deregister-superset">
@@ -64,8 +71,7 @@
         <flowable:field xsi:type="xs:anyType" name="operation" stringValue="DELETE_WORKSPACE"/>
         <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="delete-workspace"/>
       </extensionElements>
-      <incoming>flow-superset-workspace</incoming>
-      <incoming>flow-superset-error</incoming>
+      <incoming>flow-geo-workspace</incoming>
       <outgoing>flow-workspace-sink</outgoing>
     </serviceTask>
     <boundaryEvent id="workspace-error" name="Step Failed" attachedToRef="delete-workspace">
@@ -132,13 +138,17 @@
     </sequenceFlow>
     <sequenceFlow id="flow-gateway-skip" name="no" sourceRef="pipeline-gateway" targetRef="delete-route"/>
     <sequenceFlow id="flow-pipeline-apisix" sourceRef="delete-pipelines" targetRef="delete-route"/>
-    <sequenceFlow id="flow-apisix-geo" sourceRef="delete-route" targetRef="geo-gateway"/>
-    <sequenceFlow id="flow-geo-workspace" name="yes" sourceRef="geo-gateway" targetRef="deregister-superset">
+    <sequenceFlow id="flow-apisix-geo" sourceRef="delete-route" targetRef="superset-gateway"/>
+    <sequenceFlow id="flow-superset-deregister" name="yes" sourceRef="superset-gateway" targetRef="deregister-superset">
+      <conditionExpression xsi:type="tFormalExpression">${execution.getVariable('hasDashboards') == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-superset-skip" name="no" sourceRef="superset-gateway" targetRef="geo-gateway"/>
+    <sequenceFlow id="flow-geo-workspace" name="yes" sourceRef="geo-gateway" targetRef="delete-workspace">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_2">${execution.getVariable('hasGeoSink') == true}</conditionExpression>
     </sequenceFlow>
     <sequenceFlow id="flow-geo-skip" name="no" sourceRef="geo-gateway" targetRef="delete-project"/>
-    <sequenceFlow id="flow-superset-workspace" sourceRef="deregister-superset" targetRef="delete-workspace"/>
-    <sequenceFlow id="flow-superset-error" sourceRef="deregister-superset-error" targetRef="delete-workspace"/>
+    <sequenceFlow id="flow-superset-workspace" sourceRef="deregister-superset" targetRef="geo-gateway"/>
+    <sequenceFlow id="flow-superset-error" sourceRef="deregister-superset-error" targetRef="geo-gateway"/>
     <sequenceFlow id="flow-workspace-sink" sourceRef="delete-workspace" targetRef="deprovision-sink"/>
     <sequenceFlow id="flow-sink-frost" sourceRef="deprovision-sink" targetRef="delete-project"/>
     <sequenceFlow id="flow-sink-error" sourceRef="deprovision-sink-error" targetRef="delete-project"/>
@@ -149,7 +159,7 @@
     <sequenceFlow id="flow-publish-success-end" sourceRef="publish-success" targetRef="end"/>
     <sequenceFlow id="flow-publish-failure-end" sourceRef="publish-failure" targetRef="end"/>
     <sequenceFlow id="flow-pipeline-error" sourceRef="pipeline-error" targetRef="delete-route"/>
-    <sequenceFlow id="flow-apisix-error" sourceRef="apisix-error" targetRef="geo-gateway"/>
+    <sequenceFlow id="flow-apisix-error" sourceRef="apisix-error" targetRef="superset-gateway"/>
     <sequenceFlow id="SequenceFlow_3" sourceRef="frost-error" targetRef="result-gateway"/>
     <sequenceFlow id="SequenceFlow_4" sourceRef="delete-project" targetRef="result-gateway"/>
     <sequenceFlow id="SequenceFlow_5" sourceRef="workspace-error" targetRef="deprovision-sink"/>

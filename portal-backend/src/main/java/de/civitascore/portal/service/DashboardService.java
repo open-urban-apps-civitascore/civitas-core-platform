@@ -14,6 +14,7 @@ import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.BaseRepository;
 import de.civitascore.portal.repository.DashboardRepository;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.LinkedHashMap;
@@ -146,7 +147,10 @@ public class DashboardService extends BaseService<Dashboard, DashboardInputDTO> 
     DataSet dataSet = entity.getDataSet();
     String manifestUrn = dataSet == null ? null : dataSet.getManifestLogicalUrn();
     if (manifestUrn == null || manifestUrn.isBlank()) {
-      throw new IllegalStateException("Dashboard DataSet has no Model Forge manifest");
+      throw new InvalidInputException(
+          "DataSet",
+          dataSet == null ? null : dataSet.getId(),
+          "DataSet has no Model Forge manifest");
     }
     Map<String, Object> content = new LinkedHashMap<>();
     content.put("title", entity.getName());

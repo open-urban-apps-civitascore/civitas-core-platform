@@ -139,7 +139,7 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
               getProperty("trino.catalog", "geodata"),
               getProperty("trino.schema", "information_schema"),
               getProperty("trino.http-scheme", "https"),
-              Boolean.parseBoolean(getProperty("trino.tls-verify", "false")));
+              Boolean.parseBoolean(getProperty("trino.tls-verify", "true")));
     }
     supersetClient =
         ClientBuilder.newBuilder()
@@ -389,6 +389,7 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
     Integer existingId = parseSupersetId(entry.externalDashboardId());
     if (existingId == null) {
       return resourceClient.createDashboard(
+          entry.id(),
           entry.title(),
           entry.description(),
           entry.editorGroupIds(),
@@ -411,6 +412,7 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
         existingId,
         Encode.forJava(entry.id()));
     return resourceClient.createDashboard(
+        entry.id(),
         entry.title(),
         entry.description(),
         entry.editorGroupIds(),
@@ -446,12 +448,11 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
       datasetIds.addAll(resourceClient.findFrostDatasetsByCivitasId(civitasDatasetId).values());
     }
 
-    for (int datasetId : datasetIds) {
-      resourceClient.deleteDataset(datasetId);
-    }
-
     for (int dashboardId : intList(payload, "dashboardIds")) {
       resourceClient.deleteDashboardAndUnusedCharts(dashboardId);
+    }
+    for (int datasetId : datasetIds) {
+      resourceClient.deleteDataset(datasetId);
     }
     log.info("Deregistered Superset resources, saga={}", Encode.forJava(command.sagaId()));
     return compensation
@@ -509,6 +510,8 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
     for (Object o : raw) {
       if (o instanceof Number n) {
         ids.add(n.intValue());
+      } else if (o instanceof String id && id.matches("[0-9]+")) {
+        ids.add(Integer.parseInt(id));
       }
     }
     return ids;

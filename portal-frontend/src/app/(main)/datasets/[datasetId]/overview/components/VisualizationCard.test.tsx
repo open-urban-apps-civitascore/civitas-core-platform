@@ -58,6 +58,7 @@ const defaultProps = {
   canEdit: true,
   isEditing: true,
   isOpenDataAccess: false,
+  supersetPublicUrl: 'http://localhost:8092',
 }
 
 const renderComponent = (props: Partial<typeof defaultProps> = {}) =>
@@ -68,11 +69,6 @@ describe('VisualizationCard', () => {
     vi.clearAllMocks()
     mockDeleteVisualization.mockResolvedValue(undefined)
     mockUpdateVisualization.mockResolvedValue(undefined)
-    process.env.NEXT_PUBLIC_SUPERSET_URL = 'http://localhost:8092'
-  })
-
-  afterEach(() => {
-    delete process.env.NEXT_PUBLIC_SUPERSET_URL
   })
 
   describe('Rendering', () => {
@@ -127,6 +123,13 @@ describe('VisualizationCard', () => {
       fireEvent.click(screen.getByTestId('visualizationCard-vis-1'))
       expect(mockPush).toHaveBeenCalledWith('/datasets/dataset-123/visualizations/vis-1')
     })
+
+    it('opens the dashboard detail with the keyboard', async () => {
+      renderComponent()
+      screen.getByText('Sales Dashboard').focus()
+      await userEvent.keyboard('{Enter}')
+      expect(mockPush).toHaveBeenCalledWith('/datasets/dataset-123/visualizations/vis-1')
+    })
   })
 
   describe('Superset deep link', () => {
@@ -150,6 +153,39 @@ describe('VisualizationCard', () => {
       expect(button).toBeDisabled()
       await userEvent.hover(button)
       expect((await screen.findAllByText('notYetProvisionedTooltip')).length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('Release toggle', () => {
+    it('releases a draft dashboard with its existing options', async () => {
+      renderComponent()
+      await userEvent.click(screen.getByTestId('visualizationCardMenu-vis-1'))
+      await userEvent.click(screen.getByTestId('visualizationCardMenuRelease-vis-1'))
+      await waitFor(() =>
+        expect(mockUpdateVisualization).toHaveBeenCalledWith({
+          datasetId: 'dataset-123',
+          visualizationId: 'vis-1',
+          visualization: {
+            name: 'Sales Dashboard',
+            description: undefined,
+            standaloneMode: 1,
+            showFilters: true,
+            filterExpansion: 'DEFAULT',
+            released: true,
+          },
+        }),
+      )
+    })
+
+    it('unreleases a published dashboard', async () => {
+      renderComponent({ visualization: makeVisualization({ released: true }) })
+      await userEvent.click(screen.getByTestId('visualizationCardMenu-vis-1'))
+      await userEvent.click(screen.getByTestId('visualizationCardMenuRelease-vis-1'))
+      await waitFor(() =>
+        expect(mockUpdateVisualization).toHaveBeenCalledWith(
+          expect.objectContaining({ visualization: expect.objectContaining({ released: false }) }),
+        ),
+      )
     })
   })
 

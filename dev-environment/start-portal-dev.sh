@@ -85,6 +85,7 @@ usage() {
     echo "  --no-frost                       Do not start the FROST server"
     echo "  --no-geoserver                   Do not start GeoServer"
     echo "  --no-nifi                        Do not start Apache NiFi"
+    echo "  --no-dashboard                   Do not start Trino and Superset"
     echo "  --no-config-adapter              Do not start the Config Adapter"
     echo "  --no-admin-ui                    Do not start the Model Forge Admin UI (:8094)"
     echo "  --pgadmin                        Also start pgAdmin (optional DB console, :5050)"
@@ -123,13 +124,14 @@ while [ $# -gt 0 ]; do
         --no-frost)     START_FROST=false ;;
         --no-geoserver) START_GEOSERVER=false ;;
         --no-nifi)      START_NIFI=false ;;
+        --no-dashboard) START_DASHBOARD=false ;;
         --no-admin-ui)  START_ADMIN_UI=false ;;
         --pgadmin)      START_PGADMIN=true ;;
         --modeling)
             # Modeling-only: skip the deployment side. Only default the config-adapter to "none"
             # so an explicit --config-adapter=... still wins.
             [ -z "$config_adapter_arg" ] && config_adapter_arg="0"
-            START_FROST=false; START_GEOSERVER=false; START_NIFI=false ;;
+            START_FROST=false; START_GEOSERVER=false; START_NIFI=false; START_DASHBOARD=false ;;
         --backend=*)
             val="${1#*=}"
             case "$val" in
@@ -534,6 +536,7 @@ skipped_infra=""
 [ "$START_FROST" = "true" ]     || skipped_infra="$skipped_infra FROST"
 [ "$START_GEOSERVER" = "true" ] || skipped_infra="$skipped_infra GeoServer"
 [ "$START_NIFI" = "true" ]      || skipped_infra="$skipped_infra NiFi"
+[ "$START_DASHBOARD" = "true" ] || skipped_infra="$skipped_infra Dashboard"
 [ "$START_ADMIN_UI" = "true" ]  || skipped_infra="$skipped_infra Admin-UI"
 [ -n "$skipped_infra" ] && echo "  Skipped infra:  $skipped_infra"
 [ "$START_ADMIN_UI" = "true" ]  && echo "  Model Forge Admin UI: http://localhost:8094"
@@ -829,6 +832,14 @@ else
 fi
 else
     echo "  Skipping Apache NiFi (--no-nifi/--modeling)"
+fi
+
+if [ "$START_DASHBOARD" = "true" ]; then
+    cd "$SCRIPT_DIR/trino-superset"
+    $DOCKER_COMPOSE up -d $COMPOSE_BUILD trino superset
+    echo "  Trino and Superset started"
+else
+    echo "  Skipping Trino and Superset (--no-dashboard)"
 fi
 
 cd "$SCRIPT_DIR"
