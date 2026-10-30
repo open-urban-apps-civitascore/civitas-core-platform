@@ -207,7 +207,43 @@ public class InstallationService {
     UUID datapoolId = input.getDatapoolId();
     // A package without Data sources and without a Dataset puts nothing into the Data pool, so its
     // record keeps no Data pool. Such a package has only one active installation on this instance.
-    UUID installationDatapoolId = needsDatapool(manifest.getMembers()) ? datapoolId : null;
+    return install(manifest, datapoolId, needsDatapool(manifest.getMembers()) ? datapoolId : null);
+  }
+
+  /**
+   * Installs a package in a Data pool and returns the record of the install. The record keeps the
+   * Data pool also for a package without Data sources and without a Dataset. Thus the Data pool
+   * lists the installation, and a user of the Data pool can read and uninstall it.
+   *
+   * @param datapoolId the Data pool from the path of the request
+   * @param input the package to install. If the request names a Data pool, it must be the same.
+   * @return the record, with one line for each artifact that the install created
+   * @throws ResourceNotFoundException if the Data pool does not exist
+   * @throws InvalidInputException if the request names another Data pool, if the package or one
+   *     of its members fails a check, or if the platform refuses a member
+   * @throws UniqueConstraintViolationException if the Data pool has an active installation of the
+   *     package
+   */
+  @Transactional
+  public Installation installInDatapool(UUID datapoolId, InstallationInputDTO input) {
+    if (input.getDatapoolId() != null && !input.getDatapoolId().equals(datapoolId)) {
+      throw new InvalidInputException(
+          DATAPOOL_ID,
+          input.getDatapoolId(),
+          "The request names the Data pool '%s', but the path names the Data pool '%s'."
+              .formatted(input.getDatapoolId(), datapoolId));
+    }
+    requireDatapool(datapoolId);
+    return install(input.getPackageManifest(), datapoolId, datapoolId);
+  }
+
+  /**
+   * Installs a package. The Data pool of the members and the Data pool of the record can be
+   * different: a package without Data sources and without a Dataset can have a record without a
+   * Data pool.
+   */
+  private Installation install(
+      PackageManifestInputDTO manifest, UUID datapoolId, UUID installationDatapoolId) {
     if (installationRepository.existsActive(manifest.getId(), installationDatapoolId)) {
       throw alreadyInstalled(manifest.getId(), installationDatapoolId);
     }
@@ -274,6 +310,42 @@ public class InstallationService {
     return installationRepository
         .findById(id)
         .orElseThrow(() -> new ResourceNotFoundException("Installation", id.toString()));
+  }
+
+  /**
+   * Returns a page of the installations of a Data pool.
+   *
+   * @param datapoolId the Data pool
+   * @param pageable the page and the sort order
+   * @return the installations of the page, each with its lines
+   * @throws ResourceNotFoundException if the Data pool does not exist
+   */
+  @Transactional(readOnly = true)
+  public Page<Installation> findAllInDatapool(UUID datapoolId, Pageable pageable) {
+    requireDatapool(datapoolId);
+    return installationRepository.findByDatapoolId(datapoolId, pageable);
+  }
+
+  /**
+   * Returns one installation of a Data pool. For an installation of another Data pool, the result
+   * is the same as for an installation that does not exist.
+   *
+   * @param datapoolId the Data pool
+   * @param id the id of the installation
+   * @return the installation with its lines
+   * @throws ResourceNotFoundException if the installation does not exist in the Data pool
+   */
+  @Transactional(readOnly = true)
+  public Installation findInDatapoolOrThrow(UUID datapoolId, UUID id) {
+    return installationRepository
+        .findByIdAndDatapoolId(id, datapoolId)
+        .orElseThrow(() -> new ResourceNotFoundException("Installation", id.toString()));
+  }
+
+  private void requireDatapool(UUID datapoolId) {
+    if (!dataPoolRepository.existsById(datapoolId)) {
+      throw new ResourceNotFoundException("DataPool", datapoolId.toString());
+    }
   }
 
   /**
