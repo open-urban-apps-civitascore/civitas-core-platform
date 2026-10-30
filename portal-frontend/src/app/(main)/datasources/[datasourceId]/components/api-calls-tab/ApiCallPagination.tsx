@@ -3,7 +3,6 @@ import { useTranslations } from 'next-intl'
 import { ReactElement } from 'react'
 import { UseFormReturn, useWatch } from 'react-hook-form'
 
-import { DISABLED_CHECKBOX_CLASS_NAME } from '@/components/form/fields/disabledFieldClassNames'
 import { FormSelect } from '@/components/form/fields/FormSelect'
 import { TextField } from '@/components/form/fields/TextField'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -162,7 +161,6 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
           render={({ field }) => (
             <Label className="w-fit">
               <Checkbox
-                className={DISABLED_CHECKBOX_CLASS_NAME}
                 checked={field.value}
                 onCheckedChange={isChecked => handleChangeAndRevalidate(isChecked === true, field.onChange)}
                 disabled={isDisabled}
