@@ -16,7 +16,7 @@
     <artifactId>spring-boot-starter-parent</artifactId>
     <!-- Tracks `portal-backend`, the only consumer. Model Forge has its own parent
          rather than the mono-repo one, so this has to be raised with it. -->
-    <version>4.1.1</version>
+    <version>4.1.2</version>
     <relativePath/>
   </parent>
 
