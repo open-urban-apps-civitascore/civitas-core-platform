@@ -1012,7 +1012,8 @@
       "pageSizeMin": "Die Seitengröße muss mindestens 1 sein.",
       "endPageBeforeStartPage": "Die Endseite darf nicht kleiner als die Startseite sein.",
       "clientHeader": "Connection, Content-Length, Expect, Host und Upgrade sind nicht erlaubt.",
-      "invalidJsonPath": "Beginnen Sie mit $ und verwenden Sie nur Namen und Array-Positionen, z. B. $.next_cursor, $.data[0].id oder $['next cursor'].",
+      "invalidCursorPath": "Beginnen Sie mit $ und verwenden Sie nur Namen und Array-Positionen, z. B. $.next_cursor, $.data[0].id oder $['next cursor'].",
+      "invalidCountPath": "Beginnen Sie mit $ und verwenden Sie nur Namen und Array-Positionen, z. B. $.meta.count, $.data oder $['total count'].",
       "paginationQueryDuplicate": "Ein Query-Parameter hat bereits diesen Namen.",
       "paginationHeaderDuplicate": "Ein Header hat bereits diesen Namen.",
       "paginationParameterDuplicate": "Ein anderer Paginierungsparameter hat bereits diesen Namen.",
@@ -1104,7 +1105,8 @@
         "type": {
           "label": "Art der Paginierung",
           "pageNumber": "Seitennummer",
-          "cursor": "Cursor"
+          "cursor": "Cursor",
+          "limitOffset": "Limit/Offset"
         },
         "pageParameter": {
           "label": "Seitenparameter"

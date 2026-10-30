@@ -2,6 +2,8 @@ import { CONNECTOR_TYPES } from '@/const/connectors'
 import {
   CURSOR_PAGINATION_API,
   CURSOR_PAGINATION_FORM,
+  LIMIT_OFFSET_PAGINATION_API,
+  LIMIT_OFFSET_PAGINATION_FORM,
   PAGINATION_API,
   PAGINATION_FORM,
 } from '@/test-support/paginationFixtures'
@@ -10,9 +12,11 @@ import {
   ConnectorApiToFormSchema,
   ConnectorFormToApiSchema,
   EMPTY_CURSOR_PAGINATION,
+  EMPTY_LIMIT_OFFSET_PAGINATION,
   EMPTY_PAGINATION,
   HttpApiCallForm,
   HttpCursorPaginationForm,
+  HttpLimitOffsetPaginationForm,
   HttpLooseSchema,
   HttpPaginationForm,
   HttpStrictSchema,
@@ -687,7 +691,7 @@ describe('HTTP API call schemas', () => {
 
     it.each(['next_cursor', '$', '$..id', '$[?(@.id)]'])('rejects the cursor path %s', cursorPath => {
       expect(issues(HttpLooseSchema, [withCursor({ cursorPath })])).toContainEqual(
-        issue('cursorPath', 'datasources.errors.invalidJsonPath'),
+        issue('cursorPath', 'datasources.errors.invalidCursorPath'),
       )
     })
 
@@ -890,6 +894,192 @@ describe('HTTP API call schemas', () => {
     ] as const)('in the %s schema', (_name, schema) => {
       it.each(DISABLED_CURSOR_CASES)('ignores invalid values of a disabled pagination with %s', (_case, apiCall) => {
         expect(issues(schema, [apiCall]).filter(({ path }) => path.includes('pagination'))).toEqual([])
+      })
+    })
+  })
+
+  describe('limit/offset pagination', () => {
+    const withLimitOffset = (
+      pagination: Partial<HttpLimitOffsetPaginationForm>,
+      apiCall: Partial<HttpApiCallForm> = {},
+    ) => ({
+      ...API_CALL,
+      ...apiCall,
+      pagination: { ...EMPTY_LIMIT_OFFSET_PAGINATION, isEnabled: true, ...pagination },
+    })
+    const issue = (field: string, error: string) =>
+      expect.objectContaining({ path: [0, 'pagination', field], message: error })
+
+    it('maps a limit/offset pagination from the API to the form', () => {
+      const result = ConnectorApiToFormSchema.parse({
+        connectorType: CONNECTOR_TYPES.HTTP,
+        configuration: { apiCalls: [{ path: '/items', pagination: LIMIT_OFFSET_PAGINATION_API }] },
+      })
+
+      expect(result.configuration).toMatchObject({ apiCalls: [{ pagination: LIMIT_OFFSET_PAGINATION_FORM }] })
+    })
+
+    it('maps empty limit/offset values from the API to the form with offset 0', () => {
+      const pagination = {
+        type: 'LIMIT_OFFSET',
+        offsetParameter: null,
+        offset: null,
+        limitParameter: null,
+        limit: null,
+        countPath: null,
+      }
+      const result = ConnectorApiToFormSchema.parse({
+        connectorType: CONNECTOR_TYPES.HTTP,
+        configuration: { apiCalls: [{ path: '/items', pagination }] },
+      })
+
+      expect(result.configuration).toMatchObject({
+        apiCalls: [{ pagination: { ...EMPTY_LIMIT_OFFSET_PAGINATION, isEnabled: true } }],
+      })
+    })
+
+    it('sends a limit/offset pagination', () => {
+      const result = ConnectorFormToApiSchema.parse({
+        connectorType: CONNECTOR_TYPES.HTTP,
+        configuration: { apiCalls: [{ ...API_CALL, pagination: LIMIT_OFFSET_PAGINATION_FORM }] },
+      })
+
+      expect(result).toMatchObject({ apiCalls: [{ pagination: LIMIT_OFFSET_PAGINATION_API }] })
+    })
+
+    it('sends empty limit/offset values as null and the default offset as 0', () => {
+      const result = ConnectorFormToApiSchema.parse({
+        connectorType: CONNECTOR_TYPES.HTTP,
+        configuration: { apiCalls: [withLimitOffset({})] },
+      })
+
+      expect(result).toMatchObject({
+        apiCalls: [
+          {
+            pagination: {
+              type: 'LIMIT_OFFSET',
+              offsetParameter: null,
+              offset: 0,
+              limitParameter: null,
+              limit: null,
+              countPath: null,
+            },
+          },
+        ],
+      })
+    })
+
+    it('accepts empty fields in a draft', () => {
+      expect(issues(HttpLooseSchema, [withLimitOffset({})])).toEqual([])
+    })
+
+    it('accepts a complete limit/offset pagination for release', () => {
+      expect(issues(HttpStrictSchema, [{ ...API_CALL, pagination: LIMIT_OFFSET_PAGINATION_FORM }])).toEqual([])
+    })
+
+    it('accepts a limit/offset pagination with only the offset parameter for release', () => {
+      expect(issues(HttpStrictSchema, [withLimitOffset({ offsetParameter: 'offset' })])).toEqual([])
+    })
+
+    it('requires the offset parameter for release only', () => {
+      const apiCall = { ...API_CALL, pagination: { ...LIMIT_OFFSET_PAGINATION_FORM, offsetParameter: '' } }
+      expect(issues(HttpStrictSchema, [apiCall])).toContainEqual(issue('offsetParameter', 'common.errors.required'))
+      expect(issues(HttpLooseSchema, [apiCall])).toEqual([])
+    })
+
+    it.each([
+      ['abc', 'pageNumberInteger'],
+      ['-1', 'pageNumberInteger'],
+      ['1.5', 'pageNumberInteger'],
+      ['2147483648', 'pageNumberMax'],
+    ])('rejects the offset %s', (offset, error) => {
+      expect(issues(HttpLooseSchema, [withLimitOffset({ offset })])).toContainEqual(
+        issue('offset', `datasources.errors.${error}`),
+      )
+    })
+
+    it.each(['0', ''])('accepts the offset %j', offset => {
+      expect(issues(HttpLooseSchema, [withLimitOffset({ offset })])).toEqual([])
+    })
+
+    it.each(['abc', '0'])('rejects the limit %s', limit => {
+      expect(issues(HttpLooseSchema, [withLimitOffset({ limit })])).toContainEqual(
+        issue('limit', 'datasources.errors.limitInteger'),
+      )
+    })
+
+    it('accepts the limit 1', () => {
+      expect(issues(HttpLooseSchema, [withLimitOffset({ limit: '1' })])).toEqual([])
+    })
+
+    it.each([
+      [
+        'a limit without a limit parameter',
+        { limitParameter: '', limit: '20' },
+        'limitParameter',
+        'limitParameterRequired',
+      ],
+      ['a limit parameter without a limit', { limitParameter: 'limit', limit: '' }, 'limit', 'limitRequired'],
+    ])('rejects %s for release only', (_name, pagination, field, error) => {
+      const apiCall = { ...API_CALL, pagination: { ...LIMIT_OFFSET_PAGINATION_FORM, ...pagination } }
+      expect(issues(HttpStrictSchema, [apiCall])).toContainEqual(issue(field, `datasources.errors.${error}`))
+      expect(issues(HttpLooseSchema, [apiCall])).toEqual([])
+    })
+
+    it.each(['meta.count', '$', '$..count', '$[?(@.n)]'])('rejects the count path %s', countPath => {
+      expect(issues(HttpLooseSchema, [withLimitOffset({ countPath })])).toContainEqual(
+        issue('countPath', 'datasources.errors.invalidCountPath'),
+      )
+    })
+
+    it.each(['$.meta.count', '$.data', '$.data[0].total', "$['total count']"])(
+      'accepts the count path %s',
+      countPath => {
+        expect(issues(HttpLooseSchema, [withLimitOffset({ countPath })])).toEqual([])
+      },
+    )
+
+    it.each([
+      ['offset parameter', 'offsetParameter', { offsetParameter: 'offset' }, 'offset'],
+      ['limit parameter', 'limitParameter', { limitParameter: 'limit' }, 'limit'],
+    ])('rejects a %s equal to a query parameter', (_name, field, pagination, name) => {
+      const apiCall = withLimitOffset(pagination, { queryParameters: [{ name, value: '5' }] })
+      expect(issues(HttpLooseSchema, [apiCall])).toEqual(
+        expect.arrayContaining([
+          issue(field, 'datasources.errors.paginationQueryDuplicate'),
+          expect.objectContaining({
+            path: [0, 'queryParameters', 0, 'name'],
+            message: 'datasources.errors.parameterPaginationDuplicate',
+          }),
+        ]),
+      )
+    })
+
+    it('rejects an offset parameter equal to the limit parameter at both fields', () => {
+      const apiCall = withLimitOffset({ offsetParameter: 'page', limitParameter: 'page' })
+      expect(issues(HttpLooseSchema, [apiCall])).toEqual(
+        expect.arrayContaining([
+          issue('offsetParameter', 'datasources.errors.paginationParameterDuplicate'),
+          issue('limitParameter', 'datasources.errors.paginationParameterDuplicate'),
+        ]),
+      )
+    })
+
+    it('accepts an offset parameter equal to a header', () => {
+      const apiCall = withLimitOffset({ offsetParameter: 'offset' }, { headers: [{ name: 'offset', value: 'x' }] })
+      expect(issues(HttpLooseSchema, [apiCall])).toEqual([])
+    })
+
+    describe.each([
+      ['loose', HttpLooseSchema],
+      ['strict', HttpStrictSchema],
+    ] as const)('in the %s schema', (_name, schema) => {
+      it('ignores invalid values of a disabled pagination', () => {
+        const apiCall = withLimitOffset(
+          { isEnabled: false, offsetParameter: 'offset', offset: '-1', limitParameter: 'offset', countPath: 'x' },
+          { queryParameters: [{ name: 'offset', value: 'x' }] },
+        )
+        expect(issues(schema, [apiCall])).toEqual([])
       })
     })
   })

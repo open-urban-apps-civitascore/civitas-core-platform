@@ -23,6 +23,7 @@ export const HTTP_METHODS = {
 
 export const HTTP_PAGINATION_TYPES = {
   PAGE_NUMBER: 'PAGE_NUMBER',
+  LIMIT_OFFSET: 'LIMIT_OFFSET',
   CURSOR: 'CURSOR',
 } as const
 
@@ -32,6 +33,8 @@ export const HTTP_PARAMETER_LOCATIONS = {
 } as const
 
 export const DEFAULT_START_PAGE = '0'
+
+export const DEFAULT_OFFSET = '0'
 
 export const MAX_HTTP_API_CALLS = 1
 

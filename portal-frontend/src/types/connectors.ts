@@ -4,6 +4,7 @@ import { z } from 'zod'
 import {
   API_CALL_SECTIONS,
   CONNECTOR_TYPES,
+  DEFAULT_OFFSET,
   DEFAULT_START_PAGE,
   HTTP_AUTHENTICATION_TYPES,
   HTTP_METHODS,
@@ -276,6 +277,15 @@ const HttpPageNumberPaginationApiResponseSchema = z.object({
   endPage: z.number().nullable().optional(),
 })
 
+const HttpLimitOffsetPaginationApiResponseSchema = z.object({
+  type: z.literal(HTTP_PAGINATION_TYPES.LIMIT_OFFSET),
+  offsetParameter: z.string().nullable().optional(),
+  offset: z.number().nullable().optional(),
+  limitParameter: z.string().nullable().optional(),
+  limit: z.number().nullable().optional(),
+  countPath: z.string().nullable().optional(),
+})
+
 const HttpCursorPaginationApiResponseSchema = z.object({
   type: z.literal(HTTP_PAGINATION_TYPES.CURSOR),
   cursorPath: z.string().nullable().optional(),
@@ -286,7 +296,11 @@ const HttpCursorPaginationApiResponseSchema = z.object({
 })
 
 const HttpPaginationApiResponseSchema = z
-  .discriminatedUnion('type', [HttpPageNumberPaginationApiResponseSchema, HttpCursorPaginationApiResponseSchema])
+  .discriminatedUnion('type', [
+    HttpPageNumberPaginationApiResponseSchema,
+    HttpLimitOffsetPaginationApiResponseSchema,
+    HttpCursorPaginationApiResponseSchema,
+  ])
   .transform(pagination => {
     switch (pagination.type) {
       case HTTP_PAGINATION_TYPES.PAGE_NUMBER: {
@@ -299,6 +313,18 @@ const HttpPaginationApiResponseSchema = z
           pageSize: pageSize == null ? '' : String(pageSize),
           startPage: startPage == null ? DEFAULT_START_PAGE : String(startPage),
           endPage: endPage == null ? '' : String(endPage),
+        }
+      }
+      case HTTP_PAGINATION_TYPES.LIMIT_OFFSET: {
+        const { type, offsetParameter, offset, limitParameter, limit, countPath } = pagination
+        return {
+          isEnabled: true,
+          type,
+          offsetParameter: offsetParameter ?? '',
+          offset: offset == null ? DEFAULT_OFFSET : String(offset),
+          limitParameter: limitParameter ?? '',
+          limit: limit == null ? '' : String(limit),
+          countPath: countPath ?? '',
         }
       }
       case HTTP_PAGINATION_TYPES.CURSOR: {
@@ -451,6 +477,18 @@ const HttpPageNumberPaginationFormSchema = z.object({
 
 export type HttpPageNumberPaginationForm = z.input<typeof HttpPageNumberPaginationFormSchema>
 
+const HttpLimitOffsetPaginationFormSchema = z.object({
+  isEnabled: z.boolean(),
+  type: z.literal(HTTP_PAGINATION_TYPES.LIMIT_OFFSET),
+  offsetParameter: z.string().trim(),
+  offset: z.string().trim(),
+  limitParameter: z.string().trim(),
+  limit: z.string().trim(),
+  countPath: z.string().trim(),
+})
+
+export type HttpLimitOffsetPaginationForm = z.input<typeof HttpLimitOffsetPaginationFormSchema>
+
 const HttpCursorPaginationFormSchema = z.object({
   isEnabled: z.boolean(),
   type: z.literal(HTTP_PAGINATION_TYPES.CURSOR),
@@ -465,6 +503,7 @@ export type HttpCursorPaginationForm = z.input<typeof HttpCursorPaginationFormSc
 
 const HttpPaginationFormSchema = z.discriminatedUnion('type', [
   HttpPageNumberPaginationFormSchema,
+  HttpLimitOffsetPaginationFormSchema,
   HttpCursorPaginationFormSchema,
 ])
 
@@ -484,6 +523,16 @@ export const EMPTY_PAGINATION: HttpPaginationForm = {
   endPage: '',
 }
 
+export const EMPTY_LIMIT_OFFSET_PAGINATION: HttpLimitOffsetPaginationForm = {
+  isEnabled: false,
+  type: HTTP_PAGINATION_TYPES.LIMIT_OFFSET,
+  offsetParameter: '',
+  offset: DEFAULT_OFFSET,
+  limitParameter: '',
+  limit: '',
+  countPath: '',
+}
+
 export const EMPTY_CURSOR_PAGINATION: HttpCursorPaginationForm = {
   isEnabled: false,
   type: HTTP_PAGINATION_TYPES.CURSOR,
@@ -496,6 +545,7 @@ export const EMPTY_CURSOR_PAGINATION: HttpCursorPaginationForm = {
 
 export const EMPTY_PAGINATIONS: Record<HttpPaginationType, HttpPaginationForm> = {
   [HTTP_PAGINATION_TYPES.PAGE_NUMBER]: EMPTY_PAGINATION,
+  [HTTP_PAGINATION_TYPES.LIMIT_OFFSET]: EMPTY_LIMIT_OFFSET_PAGINATION,
   [HTTP_PAGINATION_TYPES.CURSOR]: EMPTY_CURSOR_PAGINATION,
 }
 
@@ -507,9 +557,9 @@ const getPageNumberError = (value: string) => {
   return undefined
 }
 
-const validateJsonPath = (value: string, field: string, ctx: z.RefinementCtx) => {
+const validateJsonPath = (value: string, field: string, message: string, ctx: z.RefinementCtx) => {
   if (value && !JSON_PATH.test(value)) {
-    ctx.addIssue({ code: 'custom', path: [field], message: 'datasources.errors.invalidJsonPath' })
+    ctx.addIssue({ code: 'custom', path: [field], message })
   }
 }
 
@@ -546,8 +596,17 @@ const validatePageNumberPagination = (pagination: HttpPageNumberPaginationForm, 
   }
 }
 
+const validateLimitOffsetPagination = (pagination: HttpLimitOffsetPaginationForm, ctx: z.RefinementCtx) => {
+  const offsetError = pagination.offset ? getPageNumberError(pagination.offset) : undefined
+  if (offsetError) {
+    ctx.addIssue({ code: 'custom', path: ['offset'], message: offsetError })
+  }
+  validateLimit(pagination, ctx)
+  validateJsonPath(pagination.countPath, 'countPath', 'datasources.errors.invalidCountPath', ctx)
+}
+
 const validateCursorPagination = (pagination: HttpCursorPaginationForm, ctx: z.RefinementCtx) => {
-  validateJsonPath(pagination.cursorPath, 'cursorPath', ctx)
+  validateJsonPath(pagination.cursorPath, 'cursorPath', 'datasources.errors.invalidCursorPath', ctx)
   validateLimit(pagination, ctx)
 }
 
@@ -557,6 +616,9 @@ const validatePagination = (pagination: HttpPaginationForm, ctx: z.RefinementCtx
     case HTTP_PAGINATION_TYPES.PAGE_NUMBER:
       validatePageNumberPagination(pagination, ctx)
       break
+    case HTTP_PAGINATION_TYPES.LIMIT_OFFSET:
+      validateLimitOffsetPagination(pagination, ctx)
+      break
     case HTTP_PAGINATION_TYPES.CURSOR:
       validateCursorPagination(pagination, ctx)
       break
@@ -564,6 +626,7 @@ const validatePagination = (pagination: HttpPaginationForm, ctx: z.RefinementCtx
 }
 
 const REQUIRED_PAGE_NUMBER_FIELDS = ['pageParameter', 'pageSizeParameter', 'pageSize'] as const
+const REQUIRED_LIMIT_OFFSET_FIELDS = ['offsetParameter'] as const
 const REQUIRED_CURSOR_FIELDS = ['cursorPath', 'cursorParameter'] as const
 
 const requireFields = <K extends string>(pagination: Record<K, string>, fields: readonly K[], ctx: z.RefinementCtx) => {
@@ -579,6 +642,10 @@ const requirePagination = (pagination: HttpPaginationForm, ctx: z.RefinementCtx)
   switch (pagination.type) {
     case HTTP_PAGINATION_TYPES.PAGE_NUMBER:
       requireFields(pagination, REQUIRED_PAGE_NUMBER_FIELDS, ctx)
+      break
+    case HTTP_PAGINATION_TYPES.LIMIT_OFFSET:
+      requireFields(pagination, REQUIRED_LIMIT_OFFSET_FIELDS, ctx)
+      requireLimitPair(pagination, ctx)
       break
     case HTTP_PAGINATION_TYPES.CURSOR:
       requireFields(pagination, REQUIRED_CURSOR_FIELDS, ctx)
@@ -600,6 +667,15 @@ const toPaginationApi = (pagination: HttpPaginationForm) => {
         startPage: toNumber(pagination.startPage),
         endPage: toNumber(pagination.endPage),
       }
+    case HTTP_PAGINATION_TYPES.LIMIT_OFFSET:
+      return {
+        type: pagination.type,
+        offsetParameter: pagination.offsetParameter || null,
+        offset: toNumber(pagination.offset),
+        limitParameter: pagination.limitParameter || null,
+        limit: toNumber(pagination.limit),
+        countPath: pagination.countPath || null,
+      }
     case HTTP_PAGINATION_TYPES.CURSOR:
       return {
         type: pagination.type,
@@ -620,6 +696,13 @@ const getPaginationParameters = (pagination: HttpPaginationForm): PaginationPara
       const paginationParameters: PaginationParameter[] = [
         { field: 'pageParameter', name: pagination.pageParameter, location: HTTP_PARAMETER_LOCATIONS.QUERY },
         { field: 'pageSizeParameter', name: pagination.pageSizeParameter, location: HTTP_PARAMETER_LOCATIONS.QUERY },
+      ]
+      return paginationParameters.filter(parameter => parameter.name)
+    }
+    case HTTP_PAGINATION_TYPES.LIMIT_OFFSET: {
+      const paginationParameters: PaginationParameter[] = [
+        { field: 'limitParameter', name: pagination.limitParameter, location: HTTP_PARAMETER_LOCATIONS.QUERY },
+        { field: 'offsetParameter', name: pagination.offsetParameter, location: HTTP_PARAMETER_LOCATIONS.QUERY },
       ]
       return paginationParameters.filter(parameter => parameter.name)
     }

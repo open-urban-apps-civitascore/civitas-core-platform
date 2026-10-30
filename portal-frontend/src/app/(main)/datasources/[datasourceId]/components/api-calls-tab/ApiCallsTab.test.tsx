@@ -677,7 +677,7 @@ describe('ApiCallsTab', () => {
 
         await user.type(screen.getByRole('textbox', { name: /^cursorPath\.label/ }), 'next')
 
-        expect(await screen.findByText('datasources.errors.invalidJsonPath')).toBeInTheDocument()
+        expect(await screen.findByText('datasources.errors.invalidCursorPath')).toBeInTheDocument()
       })
 
       it('checks the cursor parameter again when the cursor is sent as header', async () => {
@@ -783,13 +783,13 @@ describe('ApiCallsTab', () => {
         const { user } = renderApiCallsTab({ apiCalls: [API_CALL] })
         await openCursorPagination(user)
         await user.type(screen.getByRole('textbox', { name: /^cursorPath\.label/ }), 'next')
-        expect(await screen.findByText('datasources.errors.invalidJsonPath')).toBeInTheDocument()
+        expect(await screen.findByText('datasources.errors.invalidCursorPath')).toBeInTheDocument()
 
         await selectOption(user, 'type.label', 'type.pageNumber')
         await selectOption(user, 'type.label', 'type.cursor')
 
         expect(screen.getByRole('textbox', { name: /^cursorPath\.label/ })).toHaveValue('')
-        expect(screen.queryByText('datasources.errors.invalidJsonPath')).not.toBeInTheDocument()
+        expect(screen.queryByText('datasources.errors.invalidCursorPath')).not.toBeInTheDocument()
       })
 
       it('clears the duplicate error at both fields when the cursor parameter changes', async () => {

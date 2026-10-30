@@ -1094,7 +1094,7 @@ describe('PipelineEditorProviderComponent', () => {
           id: 'http-1',
           connector: {
             connectorType: 'HTTP',
-            apiCalls: [{ name: 'Test Call 1', path: '/items', pagination: { type: 'LIMIT_OFFSET' } }],
+            apiCalls: [{ name: 'Test Call 1', path: '/items', pagination: { type: 'UNKNOWN' } }],
           },
         } as unknown as Datasource,
       ]

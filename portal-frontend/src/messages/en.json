@@ -1020,7 +1020,8 @@
       "pageSizeMin": "The page size must be at least 1.",
       "endPageBeforeStartPage": "The end page must not be lower than the start page.",
       "clientHeader": "Connection, Content-Length, Expect, Host and Upgrade are not allowed.",
-      "invalidJsonPath": "Start with $ and use only names and array positions, e.g. $.next_cursor, $.data[0].id or $['next cursor'].",
+      "invalidCursorPath": "Start with $ and use only names and array positions, e.g. $.next_cursor, $.data[0].id or $['next cursor'].",
+      "invalidCountPath": "Start with $ and use only names and array positions, e.g. $.meta.count, $.data or $['total count'].",
       "paginationQueryDuplicate": "A query parameter already has this name.",
       "paginationHeaderDuplicate": "A header already has this name.",
       "paginationParameterDuplicate": "Another pagination parameter already has this name.",
@@ -1117,7 +1118,8 @@
         "type": {
           "label": "Pagination type",
           "pageNumber": "Page Number",
-          "cursor": "Cursor"
+          "cursor": "Cursor",
+          "limitOffset": "Limit/Offset"
         },
         "pageParameter": {
           "label": "Page parameter"

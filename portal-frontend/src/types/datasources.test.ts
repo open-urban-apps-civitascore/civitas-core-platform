@@ -24,7 +24,7 @@ describe('isConnectorReadable', () => {
 
   it('rejects a connector with an unknown pagination type', () => {
     const connector = httpConnector({
-      apiCalls: [{ name: 'Test Call 1', path: '/items', pagination: { type: 'LIMIT_OFFSET' } }],
+      apiCalls: [{ name: 'Test Call 1', path: '/items', pagination: { type: 'UNKNOWN' } }],
     })
 
     expect(isConnectorReadable(connector)).toBe(false)

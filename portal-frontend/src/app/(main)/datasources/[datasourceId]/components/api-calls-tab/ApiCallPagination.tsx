@@ -49,6 +49,7 @@ const LIMIT_FIELDS: PaginationFieldConfig<CursorField>[] = [
 
 const PAGINATION_TYPE_LABELS: Record<HttpPaginationType, string> = {
   [HTTP_PAGINATION_TYPES.PAGE_NUMBER]: 'type.pageNumber',
+  [HTTP_PAGINATION_TYPES.LIMIT_OFFSET]: 'type.limitOffset',
   [HTTP_PAGINATION_TYPES.CURSOR]: 'type.cursor',
 }
 
@@ -124,6 +125,8 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
     switch (type) {
       case HTTP_PAGINATION_TYPES.PAGE_NUMBER:
         return <>{PAGE_NUMBER_FIELDS.map(renderTextField)}</>
+      case HTTP_PAGINATION_TYPES.LIMIT_OFFSET:
+        return <></>
       case HTTP_PAGINATION_TYPES.CURSOR:
         return (
           <>
