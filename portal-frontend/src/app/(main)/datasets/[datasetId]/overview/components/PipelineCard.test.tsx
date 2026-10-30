@@ -3,10 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { mockApiError } from '@/__mocks__/errors/apiError.mock'
-import { getRemovalImpact } from '@/app/services/api/datasets/removal-impact/clientRequests'
+import { getDatasetResources } from '@/app/services/api/datasets/data-sink-removal/clientRequests'
 import { PipelineBasicInfo } from '@/types/datasets'
-import { DataSinkRemovalImpact } from '@/types/removalImpact'
+import { DataSink } from '@/types/datasinks'
+import { Layer } from '@/types/layers'
+import { DatasetResources } from '@/utils/dataSinkRemoval'
 
 import { PipelineCard } from './PipelineCard'
 
@@ -38,8 +39,8 @@ vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
   useDeletePipeline: () => ({ mutateAsync: mockDeletePipelineMutateAsync, isPending: false }),
 }))
 
-vi.mock('@/app/services/api/datasets/removal-impact/clientRequests', () => ({
-  getRemovalImpact: vi.fn(),
+vi.mock('@/app/services/api/datasets/data-sink-removal/clientRequests', () => ({
+  getDatasetResources: vi.fn(),
 }))
 
 vi.mock('sonner', () => ({
@@ -59,20 +60,19 @@ const defaultProps = {
   canDelete: true,
 }
 
-const NO_IMPACT: DataSinkRemovalImpact = {
-  dataSinks: [],
-  layers: [],
-  apis: [],
-  confirmationIds: [],
-  requiresConfirmation: false,
-}
+const NO_REMOVAL: DatasetResources = { dataSinks: [], layers: [], apis: [] }
 
-const LAYER_IMPACT: DataSinkRemovalImpact = {
-  dataSinks: [{ id: 'sink-1', dataSinkType: 'POSTGIS', provisioned: true }],
-  layers: [{ id: 'layer-1', layerName: 'trees', title: 'Trees' }],
+const POSTGIS_SINK = {
+  id: 'sink-1',
+  pipelineIds: ['pipeline-1'],
+  dataSinkType: 'POSTGIS',
+  provisioned: true,
+} as DataSink
+
+const LAYER_REMOVAL: DatasetResources = {
+  dataSinks: [POSTGIS_SINK],
+  layers: [{ id: 'layer-1', dataSinkId: 'sink-1', layerName: 'trees', title: 'Trees' } as Layer],
   apis: [{ id: 'api-1', slug: 'ows', name: 'Trees API', standard: 'OWS' }],
-  confirmationIds: ['sink-1', 'layer-1', 'api-1'],
-  requiresConfirmation: true,
 }
 
 const renderComponent = (props: Partial<typeof defaultProps> = {}) =>
@@ -83,7 +83,7 @@ describe('PipelineCard', () => {
     vi.clearAllMocks()
     mockHasUnsavedChanges = false
     mockDeletePipelineMutateAsync.mockResolvedValue(undefined)
-    vi.mocked(getRemovalImpact).mockResolvedValue(NO_IMPACT)
+    vi.mocked(getDatasetResources).mockResolvedValue(NO_REMOVAL)
   })
 
   const openMenu = () => userEvent.click(screen.getByTestId('pipelineCardMenu-pipeline-1'))
@@ -189,12 +189,6 @@ describe('PipelineCard', () => {
       await screen.findByTestId('exitWarningModal')
     }
 
-    it('asks the removal impact of the pipeline before it opens the confirmation', async () => {
-      renderComponent()
-      await startDelete()
-      expect(getRemovalImpact).toHaveBeenCalledWith('dataset-123', { deletedPipelineIds: ['pipeline-1'] })
-    })
-
     it('shows no Layers or APIs when the delete takes none', async () => {
       renderComponent()
       await startDelete()
@@ -203,7 +197,7 @@ describe('PipelineCard', () => {
     })
 
     it('lists the Layers and APIs that the delete takes', async () => {
-      vi.mocked(getRemovalImpact).mockResolvedValue(LAYER_IMPACT)
+      vi.mocked(getDatasetResources).mockResolvedValue(LAYER_REMOVAL)
       renderComponent()
       await startDelete()
       expect(screen.getByTestId('removalConfirmLayers')).toHaveTextContent('Trees')
@@ -219,8 +213,8 @@ describe('PipelineCard', () => {
       expect(mockDeletePipelineMutateAsync).not.toHaveBeenCalled()
     })
 
-    it('deletes the pipeline with the confirmed removal ids on confirm', async () => {
-      vi.mocked(getRemovalImpact).mockResolvedValue(LAYER_IMPACT)
+    it('deletes the pipeline with confirmDataLoss when it removes a provisioned data sink', async () => {
+      vi.mocked(getDatasetResources).mockResolvedValue(LAYER_REMOVAL)
       renderComponent()
       await startDelete()
       fireEvent.click(screen.getByTestId('confirmButton'))
@@ -228,29 +222,22 @@ describe('PipelineCard', () => {
       await waitFor(() => {
         expect(mockDeletePipelineMutateAsync).toHaveBeenCalledWith({
           pipelineId: 'pipeline-1',
-          confirmedRemovalIds: ['sink-1', 'layer-1', 'api-1'],
+          isDataLossConfirmed: true,
         })
       })
     })
 
-    it('shows the new impact when the backend asks to confirm a changed impact', async () => {
-      mockDeletePipelineMutateAsync.mockRejectedValueOnce(
-        mockApiError(409, 'Confirm', 'urn:civitas:error:REMOVAL_CONFIRMATION_REQUIRED', { impact: LAYER_IMPACT }),
-      )
+    it('deletes the pipeline without confirmDataLoss when it removes no stored data', async () => {
       renderComponent()
       await startDelete()
       fireEvent.click(screen.getByTestId('confirmButton'))
 
-      expect(await screen.findByTestId('removalConfirmLayers')).toHaveTextContent('Trees')
-      fireEvent.click(screen.getByTestId('confirmButton'))
-
       await waitFor(() => {
-        expect(mockDeletePipelineMutateAsync).toHaveBeenLastCalledWith({
+        expect(mockDeletePipelineMutateAsync).toHaveBeenCalledWith({
           pipelineId: 'pipeline-1',
-          confirmedRemovalIds: ['sink-1', 'layer-1', 'api-1'],
+          isDataLossConfirmed: false,
         })
       })
-      expect(mockDeletePipelineMutateAsync).toHaveBeenCalledTimes(2)
     })
 
     it('shows success toast and refreshes the page after successful delete', async () => {
@@ -275,8 +262,8 @@ describe('PipelineCard', () => {
       })
     })
 
-    it('shows an error toast and no confirmation when the removal impact cannot be loaded', async () => {
-      vi.mocked(getRemovalImpact).mockRejectedValueOnce(new Error('network'))
+    it('shows an error toast and no confirmation when the data sinks cannot be loaded', async () => {
+      vi.mocked(getDatasetResources).mockRejectedValueOnce(new Error('network'))
       renderComponent()
       await openMenu()
       await userEvent.click(screen.getByTestId('pipelineCardMenuDelete-pipeline-1'))

@@ -37,8 +37,6 @@ class DataSinkRemovalPlanTest {
     assertThat(plan.deactivatedDataSinks()).containsExactly(sink);
     assertThat(plan.layers()).containsExactly(layer);
     assertThat(plan.apis()).containsExactly(ows);
-    assertThat(plan.needsConfirmation())
-        .containsExactlyInAnyOrder(sink.getId(), layer.getId(), ows.getId());
   }
 
   @Test
@@ -120,27 +118,6 @@ class DataSinkRemovalPlanTest {
     DataSinkRemovalPlan plan = compute(DataSinkRemovalRequest.deletePipeline(pipeline.getId()));
 
     assertThat(plan.apis()).isEmpty();
-  }
-
-  @Test
-  void needsConfirmation_unprovisionedSinkAlone_isEmpty() {
-    Pipeline pipeline = pipeline();
-    DataSink sink = sink(DataSinkType.FROST, false, pipeline);
-
-    DataSinkRemovalPlan plan = compute(DataSinkRemovalRequest.deletePipeline(pipeline.getId()));
-
-    assertThat(plan.deactivatedDataSinks()).containsExactly(sink);
-    assertThat(plan.needsConfirmation()).isEmpty();
-  }
-
-  @Test
-  void needsConfirmation_provisionedSink_containsIt() {
-    Pipeline pipeline = pipeline();
-    DataSink sink = sink(DataSinkType.FROST, true, pipeline);
-
-    DataSinkRemovalPlan plan = compute(DataSinkRemovalRequest.deletePipeline(pipeline.getId()));
-
-    assertThat(plan.needsConfirmation()).containsExactly(sink.getId());
   }
 
   private DataSinkRemovalPlan compute(DataSinkRemovalRequest request) {

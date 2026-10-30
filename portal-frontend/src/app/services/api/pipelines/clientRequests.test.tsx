@@ -63,25 +63,25 @@ describe('pipeline mutations', () => {
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['layers'] })
   })
 
-  it('sends each confirmed removal id as a repeated query param on delete', async () => {
+  it('sends confirmDataLoss as a query param on delete', async () => {
     const { result } = renderHook(() => useDeletePipeline('dataset-1'), { wrapper })
 
-    await result.current.mutateAsync({ pipelineId: 'pipeline-1', confirmedRemovalIds: ['layer-1', 'api-1'] })
+    await result.current.mutateAsync({ pipelineId: 'pipeline-1', isDataLossConfirmed: true })
 
     const params = vi.mocked(apiRequest).mock.calls[0][0].params
-    expect(params?.getAll('confirmedRemovalIds')).toEqual(['layer-1', 'api-1'])
+    expect(params?.get('confirmDataLoss')).toBe('true')
   })
 
-  it('sends each confirmed removal id as a repeated query param on update', async () => {
+  it('sends confirmDataLoss as a query param on update', async () => {
     const { result } = renderHook(() => useUpdatePipeline('dataset-1'), { wrapper })
 
-    await result.current.mutateAsync({ pipelineId: 'pipeline-1', data: payload, confirmedRemovalIds: ['sink-1'] })
+    await result.current.mutateAsync({ pipelineId: 'pipeline-1', data: payload, isDataLossConfirmed: true })
 
     const params = vi.mocked(apiRequest).mock.calls[0][0].params
-    expect(params?.getAll('confirmedRemovalIds')).toEqual(['sink-1'])
+    expect(params?.get('confirmDataLoss')).toBe('true')
   })
 
-  it('sends no query params without confirmed removal ids', async () => {
+  it('sends no query params without confirmDataLoss', async () => {
     const { result } = renderHook(() => useDeletePipeline('dataset-1'), { wrapper })
 
     await result.current.mutateAsync({ pipelineId: 'pipeline-1' })

@@ -18,7 +18,7 @@ import de.civitascore.portal.service.removal.PreparedDataSinkChange;
 import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.RemovalConfirmationRequiredException;
+import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.Collection;
@@ -139,7 +139,7 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
   protected Pipeline postCreate(Pipeline saved, PipelineInputDTO input) {
     PreparedDataSinkChange dataSinkChange =
         dataSinkRemovalService.prepare(
-            DataSinkChange.linkPipeline(saved, requestedDataSinkIds(input)), Set.of());
+            DataSinkChange.linkPipeline(saved, requestedDataSinkIds(input)), false);
     storeDefinitionInRegistry(saved, input);
     dataSinkRemovalService.apply(dataSinkChange);
     return super.postCreate(saved, input);
@@ -151,7 +151,8 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
    * check runs before the first write.
    *
    * @throws InvalidInputException if a requested DataSink cannot be linked
-   * @throws RemovalConfirmationRequiredException if the update takes something not confirmed
+   * @throws ResourceInUseException if the update removes a provisioned DataSink without {@code
+   *     input.confirmDataLoss}
    */
   @Override
   @Transactional
@@ -161,7 +162,7 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
     PreparedDataSinkChange dataSinkChange =
         dataSinkRemovalService.prepare(
             DataSinkChange.linkPipeline(entity, requestedDataSinkIds(guarded)),
-            guarded.getConfirmedRemovalIds());
+            guarded.isConfirmDataLoss());
     Pipeline saved = saveUpdate(entity, guarded);
     dataSinkRemovalService.apply(dataSinkChange);
     return saved;
@@ -332,14 +333,11 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
             });
   }
 
-  /**
-   * Confirms nothing, so a delete that needs a confirmation answers 409; see {@link
-   * #deleteById(UUID, Set)}.
-   */
+  /** Does not confirm data loss; see {@link #deleteById(UUID, boolean)}. */
   @Override
   @Transactional
   public void deleteById(UUID id) {
-    deleteById(id, Set.of());
+    deleteById(id, false);
   }
 
   /**
@@ -348,15 +346,15 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
    * artifact goes first: Model Forge refuses to delete a Data sink configuration that it still
    * references.
    *
-   * @param confirmedRemovalIds the ids of the DataSinks, Layers and APIs the caller confirmed
-   * @throws RemovalConfirmationRequiredException if the delete takes something not confirmed
+   * @param confirmDataLoss whether the caller accepts that a provisioned DataSink goes
+   * @throws ResourceInUseException if the delete removes a provisioned DataSink without {@code
+   *     confirmDataLoss}
    */
   @Transactional
-  public void deleteById(UUID id, Set<UUID> confirmedRemovalIds) {
+  public void deleteById(UUID id, boolean confirmDataLoss) {
     Pipeline pipeline = preProcessDelete(id);
     PreparedDataSinkChange dataSinkChange =
-        dataSinkRemovalService.prepare(
-            DataSinkChange.deletePipeline(pipeline), confirmedRemovalIds);
+        dataSinkRemovalService.prepare(DataSinkChange.deletePipeline(pipeline), confirmDataLoss);
     pipelineRepository.deleteById(id);
     postDelete(pipeline);
     dataSinkRemovalService.apply(dataSinkChange);

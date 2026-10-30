@@ -9,7 +9,6 @@ import de.civitascore.portal.service.PipelineService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
@@ -88,10 +87,10 @@ public class PipelineController
           "A DataSink that loses its last Pipeline through this update is removed with its Layers,"
               + " and with the APIs it is the last backing DataSink of.")
   @Parameter(
-      name = CONFIRMED_REMOVAL_IDS,
+      name = CONFIRM_DATA_LOSS,
       in = ParameterIn.QUERY,
-      description = CONFIRMED_REMOVAL_IDS_DESCRIPTION,
-      array = @ArraySchema(schema = @Schema(type = "string", format = "uuid")))
+      description = CONFIRM_DATA_LOSS_DESCRIPTION,
+      schema = @Schema(type = "boolean"))
   @ApiResponse(
       responseCode = "409",
       description = REMOVAL_CONFLICT_DESCRIPTION,
@@ -109,10 +108,10 @@ public class PipelineController
           "A DataSink that loses its last Pipeline through this update is removed with its Layers,"
               + " and with the APIs it is the last backing DataSink of.")
   @Parameter(
-      name = CONFIRMED_REMOVAL_IDS,
+      name = CONFIRM_DATA_LOSS,
       in = ParameterIn.QUERY,
-      description = CONFIRMED_REMOVAL_IDS_DESCRIPTION,
-      array = @ArraySchema(schema = @Schema(type = "string", format = "uuid")))
+      description = CONFIRM_DATA_LOSS_DESCRIPTION,
+      schema = @Schema(type = "boolean"))
   @ApiResponse(
       responseCode = "409",
       description = REMOVAL_CONFLICT_DESCRIPTION,
@@ -130,22 +129,22 @@ public class PipelineController
           "A DataSink whose last Pipeline this is is removed with its Layers, and with the APIs it"
               + " is the last backing DataSink of.")
   @Parameter(
-      name = CONFIRMED_REMOVAL_IDS,
+      name = CONFIRM_DATA_LOSS,
       in = ParameterIn.QUERY,
-      description = CONFIRMED_REMOVAL_IDS_DESCRIPTION,
-      array = @ArraySchema(schema = @Schema(type = "string", format = "uuid")))
+      description = CONFIRM_DATA_LOSS_DESCRIPTION,
+      schema = @Schema(type = "boolean"))
   @ApiResponse(
       responseCode = "409",
       description = REMOVAL_CONFLICT_DESCRIPTION,
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public void delete(@PathVariable UUID id) {
     requireOwnedByPathDataSet(id);
-    pipelineService.deleteById(id, extractConfirmedRemovalIds());
+    pipelineService.deleteById(id, isDataLossConfirmed());
   }
 
   @Override
   protected PipelineInputDTO preProcessInput(PipelineInputDTO input) {
-    input.setConfirmedRemovalIds(extractConfirmedRemovalIds());
+    input.setConfirmDataLoss(isDataLossConfirmed());
     return super.preProcessInput(input);
   }
 }

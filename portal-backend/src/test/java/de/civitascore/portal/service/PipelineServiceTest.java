@@ -3,6 +3,7 @@ package de.civitascore.portal.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
@@ -31,7 +32,7 @@ import de.civitascore.portal.service.removal.PreparedDataSinkChange;
 import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.RemovalConfirmationRequiredException;
+import de.civitascore.portal.util.ResourceInUseException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -293,7 +294,7 @@ class PipelineServiceTest {
       String artifactUrn = "urn:core:platform:civitas:pipeline:common:" + pipelineId;
       existing.setModelLogicalUrn(artifactUrn);
       when(pipelineRepository.findById(pipelineId)).thenReturn(Optional.of(existing));
-      when(dataSinkRemovalService.prepare(DataSinkChange.deletePipeline(existing), Set.of()))
+      when(dataSinkRemovalService.prepare(DataSinkChange.deletePipeline(existing), false))
           .thenReturn(prepared);
 
       pipelineService.deleteById(pipelineId);
@@ -301,7 +302,7 @@ class PipelineServiceTest {
       InOrder inOrder = inOrder(dataSinkRemovalService, pipelineRepository, modelRegistryGateway);
       inOrder
           .verify(dataSinkRemovalService)
-          .prepare(DataSinkChange.deletePipeline(existing), Set.of());
+          .prepare(DataSinkChange.deletePipeline(existing), false);
       inOrder.verify(pipelineRepository).deleteById(pipelineId);
       inOrder.verify(modelRegistryGateway).deleteArtifact(artifactUrn, true);
       inOrder.verify(dataSinkRemovalService).apply(prepared);
@@ -314,11 +315,11 @@ class PipelineServiceTest {
       DataSet dataSet = draftDataSet(UUID.randomUUID());
       Pipeline existing = pipeline(pipelineId, dataSet);
       when(pipelineRepository.findById(pipelineId)).thenReturn(Optional.of(existing));
-      when(dataSinkRemovalService.prepare(any(), any()))
-          .thenThrow(new RemovalConfirmationRequiredException(null));
+      when(dataSinkRemovalService.prepare(any(), anyBoolean()))
+          .thenThrow(new ResourceInUseException("DataSink", UUID.randomUUID(), "provisioned"));
 
       assertThatThrownBy(() -> pipelineService.deleteById(pipelineId))
-          .isInstanceOf(RemovalConfirmationRequiredException.class);
+          .isInstanceOf(ResourceInUseException.class);
 
       verify(pipelineRepository, never()).deleteById(any());
       verify(modelRegistryGateway, never()).deleteArtifact(any(), eq(true));
@@ -328,15 +329,12 @@ class PipelineServiceTest {
     @DisplayName("Refuses an update that removes an unconfirmed DataSink link before any write")
     void updateRefusesUnconfirmedRemovalBeforeAnyWrite() {
       UUID pipelineId = UUID.randomUUID();
-      UUID confirmedId = UUID.randomUUID();
       Pipeline existing = updatedPipelineWithoutDataSinks(pipelineId);
-      when(dataSinkRemovalService.prepare(
-              DataSinkChange.linkPipeline(existing, Set.of()), Set.of(confirmedId)))
-          .thenThrow(new RemovalConfirmationRequiredException(null));
+      when(dataSinkRemovalService.prepare(DataSinkChange.linkPipeline(existing, Set.of()), false))
+          .thenThrow(new ResourceInUseException("DataSink", UUID.randomUUID(), "provisioned"));
 
-      assertThatThrownBy(
-              () -> pipelineService.update(pipelineId, updateInput(existing, Set.of(confirmedId))))
-          .isInstanceOf(RemovalConfirmationRequiredException.class);
+      assertThatThrownBy(() -> pipelineService.update(pipelineId, updateInput(existing)))
+          .isInstanceOf(ResourceInUseException.class);
 
       verifyNothingWritten();
     }
@@ -346,10 +344,10 @@ class PipelineServiceTest {
     void updateRefusesUnlinkableDataSinkBeforeAnyWrite() {
       UUID pipelineId = UUID.randomUUID();
       Pipeline existing = updatedPipelineWithoutDataSinks(pipelineId);
-      when(dataSinkRemovalService.prepare(any(), any()))
+      when(dataSinkRemovalService.prepare(any(), anyBoolean()))
           .thenThrow(new InvalidInputException("Pipeline", "dataSinkIds", "not found"));
 
-      assertThatThrownBy(() -> pipelineService.update(pipelineId, updateInput(existing, Set.of())))
+      assertThatThrownBy(() -> pipelineService.update(pipelineId, updateInput(existing)))
           .isInstanceOf(InvalidInputException.class);
 
       verifyNothingWritten();
@@ -376,7 +374,7 @@ class PipelineServiceTest {
                 saved.setId(UUID.randomUUID());
                 return saved;
               });
-      when(dataSinkRemovalService.prepare(any(), any()))
+      when(dataSinkRemovalService.prepare(any(), anyBoolean()))
           .thenThrow(new InvalidInputException("Pipeline", "dataSinkIds", "not found"));
 
       assertThatThrownBy(() -> pipelineService.create(input))
@@ -392,13 +390,12 @@ class PipelineServiceTest {
       return existing;
     }
 
-    private PipelineInputDTO updateInput(Pipeline existing, Set<UUID> confirmedRemovalIds) {
+    private PipelineInputDTO updateInput(Pipeline existing) {
       PipelineInputDTO input = new PipelineInputDTO();
       input.setName("test-pipeline");
       input.setDataSetId(existing.getDataSet().getId());
       input.setModel(Map.of("nodes", List.of(), "edges", List.of()));
       input.setDataSinkIds(Set.of());
-      input.setConfirmedRemovalIds(confirmedRemovalIds);
       return input;
     }
 

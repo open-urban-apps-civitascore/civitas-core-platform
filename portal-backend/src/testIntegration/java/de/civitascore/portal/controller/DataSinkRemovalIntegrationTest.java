@@ -18,13 +18,9 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.security.AllowedScopesFilter;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,8 +39,7 @@ import tools.jackson.databind.JsonNode;
 @DisplayName("Removing Data sinks with their Layers and APIs")
 class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
 
-  private static final String CONFIRMATION_REQUIRED =
-      "urn:civitas:error:REMOVAL_CONFIRMATION_REQUIRED";
+  private static final String CONFIRMED = "?confirmDataLoss=true";
   private static final String RESOURCE_IN_USE = "urn:civitas:error:RESOURCE_IN_USE";
 
   @Autowired private PortalTestDataFactory portalData;
@@ -121,12 +116,6 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
     return restTemplate.exchange(path, method, new HttpEntity<>(body, headers()), JsonNode.class);
   }
 
-  private static String confirming(UUID... ids) {
-    return Arrays.stream(ids)
-        .map(id -> "confirmedRemovalIds=" + id)
-        .collect(Collectors.joining("&", "?", ""));
-  }
-
   private String pipelinePath() {
     return "/datasets/" + dataSet.getId() + "/pipelines/" + pipeline.getId();
   }
@@ -150,27 +139,16 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
     return dataSinkRepository.findById(sink.getId()).orElseThrow().getState();
   }
 
-  private static List<String> ids(JsonNode impact, String field) {
-    return StreamSupport.stream(impact.get(field).spliterator(), false)
+  private static List<String> ids(JsonNode node, String field) {
+    return StreamSupport.stream(node.get(field).spliterator(), false)
         .map(entry -> entry.get("id").asString())
         .toList();
   }
 
-  private static void assertConfirmationRequired(
-      ResponseEntity<JsonNode> response, UUID sink, UUID layer, UUID api) {
+  private static void assertDataLossUnconfirmed(ResponseEntity<JsonNode> response) {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-    assertThat(response.getBody().get("type").asString()).isEqualTo(CONFIRMATION_REQUIRED);
-    JsonNode impact = response.getBody().get("impact");
-    assertThat(impact.get("requiresConfirmation").asBoolean()).isTrue();
-    assertThat(ids(impact, "dataSinks")).containsExactly(sink.toString());
-    assertThat(ids(impact, "layers"))
-        .containsExactlyElementsOf(layer == null ? List.of() : List.of(layer.toString()));
-    assertThat(ids(impact, "apis")).containsExactly(api.toString());
-    assertThat(
-            StreamSupport.stream(impact.get("confirmationIds").spliterator(), false)
-                .map(JsonNode::asString))
-        .containsExactlyInAnyOrderElementsOf(
-            Stream.of(sink, layer, api).filter(Objects::nonNull).map(UUID::toString).toList());
+    assertThat(response.getBody().get("type").asString()).isEqualTo(RESOURCE_IN_USE);
+    assertThat(response.getBody().get("detail").asString()).contains("confirmDataLoss=true");
   }
 
   @Nested
@@ -178,35 +156,15 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
   class PipelineDelete {
 
     @Test
-    @DisplayName("without confirmation answers 409 with the impact and changes nothing")
+    @DisplayName("of a provisioned sink without confirmation answers 409 and changes nothing")
     void unconfirmed_answers409AndChangesNothing() {
       MapSurface surface = mapSurface(true);
 
       ResponseEntity<JsonNode> response = exchange(HttpMethod.DELETE, pipelinePath(), null);
 
-      assertConfirmationRequired(
-          response, surface.sink().getId(), surface.layer().getId(), surface.ows().getId());
+      assertDataLossUnconfirmed(response);
       assertThat(pipelineRepository.existsById(pipeline.getId())).isTrue();
       assertThat(dataSinkRepository.findByPipelinesId(pipeline.getId())).hasSize(1);
-      assertThat(layerRepository.existsById(surface.layer().getId())).isTrue();
-      assertThat(apiStandards()).containsExactly("OWS");
-    }
-
-    @Test
-    @DisplayName("confirming only part of the impact answers 409 and changes nothing")
-    void partlyConfirmed_answers409AndChangesNothing() {
-      MapSurface surface = mapSurface(true);
-
-      ResponseEntity<JsonNode> response =
-          exchange(
-              HttpMethod.DELETE,
-              pipelinePath() + confirming(surface.sink().getId(), surface.layer().getId()),
-              null);
-
-      assertConfirmationRequired(
-          response, surface.sink().getId(), surface.layer().getId(), surface.ows().getId());
-      assertThat(pipelineRepository.existsById(pipeline.getId())).isTrue();
-      assertThat(stateOf(surface.sink())).isEqualTo(DataSinkState.ACTIVE);
       assertThat(layerRepository.existsById(surface.layer().getId())).isTrue();
       assertThat(apiStandards()).containsExactly("OWS");
     }
@@ -217,12 +175,7 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
       MapSurface surface = mapSurface(true);
 
       ResponseEntity<JsonNode> response =
-          exchange(
-              HttpMethod.DELETE,
-              pipelinePath()
-                  + confirming(
-                      surface.sink().getId(), surface.layer().getId(), surface.ows().getId()),
-              null);
+          exchange(HttpMethod.DELETE, pipelinePath() + CONFIRMED, null);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
       assertThat(pipelineRepository.existsById(pipeline.getId())).isFalse();
@@ -237,19 +190,10 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
     }
 
     @Test
-    @DisplayName("deletes an unprovisioned sink without Layers or APIs without confirmation")
-    void unprovisionedSinkWithoutDependents_needsNoConfirmation() {
-      DataSink sink = frostSink(pipeline, false);
-
-      ResponseEntity<JsonNode> response = exchange(HttpMethod.DELETE, pipelinePath(), null);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-      assertThat(dataSinkRepository.existsById(sink.getId())).isFalse();
-    }
-
-    @Test
-    @DisplayName("with confirmation deletes an unprovisioned sink its definition writes into")
-    void confirmed_deletesUnprovisionedSinkTheDefinitionReferences() {
+    @DisplayName(
+        "without confirmation deletes an unprovisioned sink its definition writes into, with its"
+            + " Layer and API")
+    void unconfirmed_deletesUnprovisionedSinkTheDefinitionReferences() {
       MapSurface surface = mapSurface(false);
       DataStructureVersion road =
           portalData.attachModel(
@@ -277,11 +221,7 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
                   List.of()),
               null);
 
-      ResponseEntity<JsonNode> response =
-          exchange(
-              HttpMethod.DELETE,
-              pipelinePath() + confirming(surface.layer().getId(), surface.ows().getId()),
-              null);
+      ResponseEntity<JsonNode> response = exchange(HttpMethod.DELETE, pipelinePath(), null);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
       assertThat(pipelineRepository.existsById(pipeline.getId())).isFalse();
@@ -295,12 +235,12 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
     @Test
     @DisplayName("deletes the STA API with the last active FROST sink")
     void lastFrostSink_takesTheStaApi() {
-      DataSink sink = frostSink(pipeline, true);
-      NamedApi sta = addApi(ApiStandard.STA);
+      frostSink(pipeline, true);
+      addApi(ApiStandard.STA);
       addApi(ApiStandard.CUSTOM);
 
       ResponseEntity<JsonNode> response =
-          exchange(HttpMethod.DELETE, pipelinePath() + confirming(sink.getId(), sta.getId()), null);
+          exchange(HttpMethod.DELETE, pipelinePath() + CONFIRMED, null);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
       assertThat(apiStandards()).containsExactly("CUSTOM");
@@ -314,12 +254,12 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
     @Test
     @DisplayName("PUT removing the last link without confirmation answers 409 and changes nothing")
     void putUnconfirmed_answers409AndChangesNothing() {
-      DataSink sink = frostSink(pipeline, true);
-      NamedApi sta = addApi(ApiStandard.STA);
+      frostSink(pipeline, true);
+      addApi(ApiStandard.STA);
 
       ResponseEntity<JsonNode> response = exchange(HttpMethod.PUT, pipelinePath(), pipelineBody());
 
-      assertConfirmationRequired(response, sink.getId(), null, sta.getId());
+      assertDataLossUnconfirmed(response);
       assertThat(dataSinkRepository.findByPipelinesId(pipeline.getId())).hasSize(1);
       assertThat(pipelineRepository.findById(pipeline.getId()).orElseThrow().getVersion())
           .isEqualTo(pipeline.getVersion());
@@ -329,26 +269,23 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
     @Test
     @DisplayName("PATCH removing the last link without confirmation answers 409")
     void patchUnconfirmed_answers409() {
-      DataSink sink = frostSink(pipeline, true);
-      NamedApi sta = addApi(ApiStandard.STA);
+      frostSink(pipeline, true);
+      addApi(ApiStandard.STA);
 
       ResponseEntity<JsonNode> response =
           exchange(HttpMethod.PATCH, pipelinePath(), Map.of("dataSinkIds", List.of()));
 
-      assertConfirmationRequired(response, sink.getId(), null, sta.getId());
+      assertDataLossUnconfirmed(response);
     }
 
     @Test
     @DisplayName("PUT with confirmation removes the link, pends the sink and deletes the API")
     void putConfirmed_removesTheApi() {
       DataSink sink = frostSink(pipeline, true);
-      NamedApi sta = addApi(ApiStandard.STA);
+      addApi(ApiStandard.STA);
 
       ResponseEntity<JsonNode> response =
-          exchange(
-              HttpMethod.PUT,
-              pipelinePath() + confirming(sink.getId(), sta.getId()),
-              pipelineBody());
+          exchange(HttpMethod.PUT, pipelinePath() + CONFIRMED, pipelineBody());
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(stateOf(sink)).isEqualTo(DataSinkState.PENDING_UNPROVISION);
@@ -360,13 +297,10 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
     @DisplayName("PATCH with confirmation removes the link, pends the sink and deletes the API")
     void patchConfirmed_removesTheApi() {
       DataSink sink = frostSink(pipeline, true);
-      NamedApi sta = addApi(ApiStandard.STA);
+      addApi(ApiStandard.STA);
 
       ResponseEntity<JsonNode> response =
-          exchange(
-              HttpMethod.PATCH,
-              pipelinePath() + confirming(sink.getId(), sta.getId()),
-              Map.of("dataSinkIds", List.of()));
+          exchange(HttpMethod.PATCH, pipelinePath() + CONFIRMED, Map.of("dataSinkIds", List.of()));
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(stateOf(sink)).isEqualTo(DataSinkState.PENDING_UNPROVISION);
@@ -413,10 +347,7 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
       DataSink replacement = postgisSink(null, false);
 
       ResponseEntity<JsonNode> response =
-          exchange(
-              HttpMethod.PUT,
-              pipelinePath() + confirming(surface.sink().getId(), surface.layer().getId()),
-              pipelineBody(replacement.getId()));
+          exchange(HttpMethod.PUT, pipelinePath() + CONFIRMED, pipelineBody(replacement.getId()));
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(apiStandards()).containsExactly("OWS");
@@ -438,12 +369,7 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
       MapSurface surface = mapSurface(false);
 
       ResponseEntity<JsonNode> response =
-          exchange(
-              HttpMethod.DELETE,
-              sinkPath(surface.sink())
-                  + confirming(
-                      surface.sink().getId(), surface.layer().getId(), surface.ows().getId()),
-              null);
+          exchange(HttpMethod.DELETE, sinkPath(surface.sink()) + CONFIRMED, null);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
       assertThat(response.getBody().get("type").asString()).isEqualTo(RESOURCE_IN_USE);
@@ -457,16 +383,17 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
     }
 
     @Test
-    @DisplayName("without confirmation answers 409 and changes nothing")
+    @DisplayName("of a provisioned sink without confirmation answers 409 and changes nothing")
     void unconfirmed_answers409() {
       MapSurface surface = mapSurface(null, true);
 
       ResponseEntity<JsonNode> response =
           exchange(HttpMethod.DELETE, sinkPath(surface.sink()), null);
 
-      assertConfirmationRequired(
-          response, surface.sink().getId(), surface.layer().getId(), surface.ows().getId());
+      assertDataLossUnconfirmed(response);
       assertThat(stateOf(surface.sink())).isEqualTo(DataSinkState.ACTIVE);
+      assertThat(layerRepository.existsById(surface.layer().getId())).isTrue();
+      assertThat(apiStandards()).containsExactly("OWS");
     }
 
     @Test
@@ -475,12 +402,7 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
       MapSurface surface = mapSurface(null, true);
 
       ResponseEntity<JsonNode> response =
-          exchange(
-              HttpMethod.DELETE,
-              sinkPath(surface.sink())
-                  + confirming(
-                      surface.sink().getId(), surface.layer().getId(), surface.ows().getId()),
-              null);
+          exchange(HttpMethod.DELETE, sinkPath(surface.sink()) + CONFIRMED, null);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
       assertThat(stateOf(surface.sink())).isEqualTo(DataSinkState.PENDING_UNPROVISION);
@@ -489,16 +411,15 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
     }
 
     @Test
-    @DisplayName("deletes an unprovisioned sink with its Layer; another sink keeps the API")
+    @DisplayName(
+        "deletes an unprovisioned sink with its Layer without confirmation; another sink keeps the"
+            + " API")
     void unprovisionedSink_isDeleted() {
       MapSurface surface = mapSurface(null, false);
       postgisSink(null, false);
 
       ResponseEntity<JsonNode> response =
-          exchange(
-              HttpMethod.DELETE,
-              sinkPath(surface.sink()) + confirming(surface.layer().getId()),
-              null);
+          exchange(HttpMethod.DELETE, sinkPath(surface.sink()), null);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
       assertThat(dataSinkRepository.existsById(surface.sink().getId())).isFalse();
@@ -525,123 +446,6 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
           exchange(HttpMethod.GET, "/datasets/" + dataSet.getId() + "/datasinks", null).getBody();
 
       assertThat(ids(list, "content")).containsExactly(active.getId().toString());
-    }
-
-    @Test
-    @DisplayName("accepts the confirmed ids comma-separated in one query parameter")
-    void commaSeparatedConfirmation_isAccepted() {
-      MapSurface surface = mapSurface(null, true);
-
-      ResponseEntity<JsonNode> response =
-          exchange(
-              HttpMethod.DELETE,
-              sinkPath(surface.sink())
-                  + "?confirmedRemovalIds="
-                  + surface.sink().getId()
-                  + ","
-                  + surface.layer().getId()
-                  + ","
-                  + surface.ows().getId(),
-              null);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-      assertThat(stateOf(surface.sink())).isEqualTo(DataSinkState.PENDING_UNPROVISION);
-    }
-
-    @Test
-    @DisplayName("a confirmed id that is not a UUID answers 400 and changes nothing")
-    void malformedConfirmation_answers400AndChangesNothing() {
-      MapSurface surface = mapSurface(null, true);
-
-      ResponseEntity<JsonNode> response =
-          exchange(
-              HttpMethod.DELETE,
-              sinkPath(surface.sink()) + "?confirmedRemovalIds=not-a-uuid",
-              null);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(stateOf(surface.sink())).isEqualTo(DataSinkState.ACTIVE);
-      assertThat(layerRepository.existsById(surface.layer().getId())).isTrue();
-      assertThat(apiStandards()).containsExactly("OWS");
-    }
-  }
-
-  @Nested
-  @DisplayName("Removal impact preview")
-  class Preview {
-
-    private String previewPath(String query) {
-      return "/datasets/" + dataSet.getId() + "/removal-impact?" + query;
-    }
-
-    @Test
-    @DisplayName("lists what a Pipeline delete takes with it and changes nothing")
-    void pipelineDelete_listsTheImpact() {
-      MapSurface surface = mapSurface(true);
-
-      ResponseEntity<JsonNode> response =
-          exchange(HttpMethod.GET, previewPath("deletedPipelineIds=" + pipeline.getId()), null);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      JsonNode impact = response.getBody();
-      assertThat(impact.get("requiresConfirmation").asBoolean()).isTrue();
-      assertThat(ids(impact, "dataSinks")).containsExactly(surface.sink().getId().toString());
-      assertThat(impact.get("dataSinks").get(0).get("provisioned").asBoolean()).isTrue();
-      assertThat(impact.get("layers").get(0).get("layerName").asString())
-          .isEqualTo(surface.layer().getLayerName());
-      assertThat(impact.get("apis").get(0).get("slug").asString())
-          .isEqualTo(surface.ows().getSlug());
-      assertThat(pipelineRepository.existsById(pipeline.getId())).isTrue();
-      assertThat(apiStandards()).containsExactly("OWS");
-    }
-
-    @Test
-    @DisplayName("lists what removing a link takes with it")
-    void removedLink_listsTheImpact() {
-      DataSink sink = frostSink(pipeline, false);
-
-      ResponseEntity<JsonNode> response =
-          exchange(
-              HttpMethod.GET,
-              previewPath("removedLinks=" + pipeline.getId() + ":" + sink.getId()),
-              null);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(ids(response.getBody(), "dataSinks")).containsExactly(sink.getId().toString());
-      assertThat(response.getBody().get("requiresConfirmation").asBoolean()).isFalse();
-    }
-
-    @Test
-    @DisplayName("answers 409 for deleting a Data sink a Pipeline links")
-    void linkedDataSink_isInUse() {
-      DataSink sink = frostSink(pipeline, false);
-
-      ResponseEntity<JsonNode> response =
-          exchange(HttpMethod.GET, previewPath("deletedDataSinkIds=" + sink.getId()), null);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-      assertThat(response.getBody().get("type").asString()).isEqualTo(RESOURCE_IN_USE);
-    }
-
-    @Test
-    @DisplayName("answers 404 for a Data sink of another Dataset")
-    void foreignDataSink_isNotFound() {
-      DataSet other = portalData.dataSet();
-      DataSink foreign = portalData.dataSink(other, null);
-
-      assertThat(
-              exchange(HttpMethod.GET, previewPath("deletedDataSinkIds=" + foreign.getId()), null)
-                  .getStatusCode())
-          .isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("answers 400 for a malformed link")
-    void malformedLink_isRejected() {
-      assertThat(
-              exchange(HttpMethod.GET, previewPath("removedLinks=" + pipeline.getId()), null)
-                  .getStatusCode())
-          .isEqualTo(HttpStatus.BAD_REQUEST);
     }
   }
 

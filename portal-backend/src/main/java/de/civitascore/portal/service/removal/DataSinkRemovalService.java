@@ -7,17 +7,11 @@ import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
-import de.civitascore.portal.model.output.DataSinkRemovalImpactDTO;
-import de.civitascore.portal.model.output.DataSinkRemovalImpactDTO.ApiImpact;
-import de.civitascore.portal.model.output.DataSinkRemovalImpactDTO.DataSinkImpact;
-import de.civitascore.portal.model.output.DataSinkRemovalImpactDTO.LayerImpact;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.RemovalConfirmationRequiredException;
 import de.civitascore.portal.util.ResourceInUseException;
-import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -34,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Owns the change of the links between Pipelines and Data sinks and the removal it causes (see
  * {@link DataSinkRemovalPlan}): the Pipeline create, update and delete and the direct Data sink
  * delete {@link #prepare} it before their first write and {@link #apply} it in the same
- * transaction, and the removal-impact preview shows it without a write.
+ * transaction.
  */
 @Slf4j
 @Service
@@ -47,42 +41,27 @@ public class DataSinkRemovalService {
   private final ApiKindRegistry apiKinds;
 
   /**
-   * What the request would take with it, without a write.
+   * Checks the change and computes what it takes with it on the state after the change. Writes
+   * nothing.
    *
-   * @throws ResourceNotFoundException if a Pipeline or an active Data sink of the request is not in
-   *     the Dataset
-   * @throws ResourceInUseException if a Pipeline still links a Data sink the request deletes
-   */
-  @Transactional(readOnly = true)
-  public DataSinkRemovalImpactDTO preview(DataSet dataSet, DataSinkRemovalRequest request) {
-    List<DataSink> activeDataSinks = activeDataSinksOf(dataSet);
-    requireInDataSet(dataSet, activeDataSinks, request);
-    requireUnlinkedWhenDeleted(activeDataSinks, request);
-    return toImpact(plan(dataSet, activeDataSinks, request));
-  }
-
-  /**
-   * Checks the change, computes what it takes with it on the state after the change, and refuses it
-   * unless the caller confirmed that. Writes nothing.
-   *
-   * @param confirmedRemovalIds the ids the caller confirmed; a superset of the needed ones is fine
+   * @param confirmDataLoss whether the caller accepts that a provisioned Data sink goes
    * @throws InvalidInputException if a requested Data sink id is unknown, not active, of another
    *     Dataset or linked to another Pipeline
-   * @throws ResourceInUseException if a Pipeline still links a Data sink the change deletes
-   * @throws RemovalConfirmationRequiredException if an id that needs confirmation is not confirmed
+   * @throws ResourceInUseException if a Pipeline still links a Data sink the change deletes, or if
+   *     the change removes a provisioned Data sink without {@code confirmDataLoss}
    */
   @Transactional(propagation = Propagation.MANDATORY)
-  public PreparedDataSinkChange prepare(DataSinkChange change, Set<UUID> confirmedRemovalIds) {
+  public PreparedDataSinkChange prepare(DataSinkChange change, boolean confirmDataLoss) {
     return switch (change) {
       case DataSinkChange.LinkPipeline(Pipeline pipeline, Set<UUID> dataSinkIds) ->
-          prepareLinks(pipeline, dataSinkIds, confirmedRemovalIds);
+          prepareLinks(pipeline, dataSinkIds, confirmDataLoss);
       case DataSinkChange.DeletePipeline(Pipeline pipeline) -> {
         List<DataSink> linked = dataSinkRepository.findByPipelinesId(pipeline.getId());
         DataSinkRemovalPlan plan =
             planConfirmed(
                 pipeline.getDataSet(),
                 DataSinkRemovalRequest.deletePipeline(pipeline.getId()),
-                confirmedRemovalIds);
+                confirmDataLoss);
         yield new PreparedDataSinkChange(plan, pipeline, List.of(), linked);
       }
       case DataSinkChange.DeleteDataSink(DataSink sink) ->
@@ -90,7 +69,7 @@ public class DataSinkRemovalService {
               planConfirmed(
                   sink.getDataSet(),
                   DataSinkRemovalRequest.deleteDataSink(sink.getId()),
-                  confirmedRemovalIds));
+                  confirmDataLoss));
     };
   }
 
@@ -153,7 +132,7 @@ public class DataSinkRemovalService {
   }
 
   private PreparedDataSinkChange prepareLinks(
-      Pipeline pipeline, Set<UUID> dataSinkIds, Set<UUID> confirmedRemovalIds) {
+      Pipeline pipeline, Set<UUID> dataSinkIds, boolean confirmDataLoss) {
     List<DataSink> requested = requireLinkable(pipeline, dataSinkIds);
     List<DataSink> linked = dataSinkRepository.findByPipelinesId(pipeline.getId());
     List<DataSink> linksToAdd =
@@ -168,7 +147,7 @@ public class DataSinkRemovalService {
         planConfirmed(
             pipeline.getDataSet(),
             DataSinkRemovalRequest.removeLinks(removedLinks),
-            confirmedRemovalIds);
+            confirmDataLoss);
     return new PreparedDataSinkChange(plan, pipeline, linksToAdd, linksToRemove);
   }
 
@@ -205,17 +184,29 @@ public class DataSinkRemovalService {
   }
 
   private DataSinkRemovalPlan planConfirmed(
-      DataSet dataSet, DataSinkRemovalRequest request, Set<UUID> confirmedRemovalIds) {
+      DataSet dataSet, DataSinkRemovalRequest request, boolean confirmDataLoss) {
     if (request.isEmpty()) {
       return DataSinkRemovalPlan.empty(dataSet);
     }
     List<DataSink> activeDataSinks = activeDataSinksOf(dataSet);
     requireUnlinkedWhenDeleted(activeDataSinks, request);
     DataSinkRemovalPlan plan = plan(dataSet, activeDataSinks, request);
-    if (!confirmedRemovalIds.containsAll(plan.needsConfirmation())) {
-      throw new RemovalConfirmationRequiredException(toImpact(plan));
+    if (!confirmDataLoss) {
+      requireNoStoredData(plan);
     }
     return plan;
+  }
+
+  private static void requireNoStoredData(DataSinkRemovalPlan plan) {
+    for (DataSink sink : plan.deactivatedDataSinks()) {
+      if (sink.isProvisioned()) {
+        throw new ResourceInUseException(
+            DataSink.class.getSimpleName(),
+            sink.getId(),
+            "This request removes a provisioned Data sink, whose stored data is deleted at the"
+                + " next release; set confirmDataLoss=true to proceed");
+      }
+    }
   }
 
   private DataSinkRemovalPlan plan(
@@ -229,41 +220,8 @@ public class DataSinkRemovalService {
         apiKinds);
   }
 
-  private static DataSinkRemovalImpactDTO toImpact(DataSinkRemovalPlan plan) {
-    return new DataSinkRemovalImpactDTO(
-        plan.deactivatedDataSinks().stream()
-            .map(
-                sink ->
-                    new DataSinkImpact(sink.getId(), sink.getDataSinkType(), sink.isProvisioned()))
-            .toList(),
-        plan.layers().stream()
-            .map(layer -> new LayerImpact(layer.getId(), layer.getLayerName(), layer.getTitle()))
-            .toList(),
-        plan.apis().stream()
-            .map(api -> new ApiImpact(api.getId(), api.getSlug(), api.getName(), api.getStandard()))
-            .toList(),
-        plan.needsConfirmation().stream().sorted().toList());
-  }
-
   private List<DataSink> activeDataSinksOf(DataSet dataSet) {
     return dataSinkRepository.findByDataSetIdAndState(dataSet.getId(), DataSinkState.ACTIVE);
-  }
-
-  private static void requireInDataSet(
-      DataSet dataSet, List<DataSink> activeDataSinks, DataSinkRemovalRequest request) {
-    Set<UUID> pipelineIds =
-        dataSet.getPipelines().stream().map(Pipeline::getId).collect(Collectors.toSet());
-    Set<UUID> dataSinkIds =
-        activeDataSinks.stream().map(DataSink::getId).collect(Collectors.toSet());
-    request.deletedPipelineIds().forEach(id -> requireIn(pipelineIds, Pipeline.class, id));
-    request
-        .removedLinks()
-        .forEach(
-            link -> {
-              requireIn(pipelineIds, Pipeline.class, link.pipelineId());
-              requireIn(dataSinkIds, DataSink.class, link.dataSinkId());
-            });
-    request.deletedDataSinkIds().forEach(id -> requireIn(dataSinkIds, DataSink.class, id));
   }
 
   /**
@@ -289,12 +247,6 @@ public class DataSinkRemovalService {
             "Cannot delete Data sink " + sink.getId() + ": remove it from its Pipelines first",
             linkingPipelineIds);
       }
-    }
-  }
-
-  private static void requireIn(Set<UUID> ids, Class<?> type, UUID id) {
-    if (!ids.contains(id)) {
-      throw new ResourceNotFoundException(type.getSimpleName(), id);
     }
   }
 

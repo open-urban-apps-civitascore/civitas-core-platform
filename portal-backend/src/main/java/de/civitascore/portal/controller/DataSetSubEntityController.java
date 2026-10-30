@@ -4,17 +4,13 @@ import de.civitascore.portal.model.entity.base.DataSetOwnedEntity;
 import de.civitascore.portal.model.input.DataSetOwnedInputDTO;
 import de.civitascore.portal.model.output.BaseOutputDTO;
 import de.civitascore.portal.repository.specification.base.BaseSpec;
-import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -43,17 +39,16 @@ public abstract class DataSetSubEntityController<
         S extends BaseSpec<E>>
     extends BaseController<I, O, E, S> {
 
-  /** Query parameter that confirms the removal of Data sinks, Layers and APIs. */
-  protected static final String CONFIRMED_REMOVAL_IDS = "confirmedRemovalIds";
+  /** Query parameter that confirms the removal of a provisioned Data sink. */
+  protected static final String CONFIRM_DATA_LOSS = "confirmDataLoss";
 
-  protected static final String CONFIRMED_REMOVAL_IDS_DESCRIPTION =
-      "Ids of the provisioned Data sinks, Layers and APIs the caller confirms for removal, as"
-          + " listed by GET /datasets/{dataSetId}/removal-impact. Repeatable.";
+  protected static final String CONFIRM_DATA_LOSS_DESCRIPTION =
+      "Must be true when the request removes a provisioned Data sink: its stored data is deleted"
+          + " at the next release.";
 
   protected static final String REMOVAL_CONFLICT_DESCRIPTION =
-      "A saga is in flight on the parent dataset, or the request removes Data sinks, Layers or"
-          + " APIs that confirmedRemovalIds does not confirm (code REMOVAL_CONFIRMATION_REQUIRED,"
-          + " property impact). Nothing changed.";
+      "A saga is in flight on the parent dataset, or the request removes a provisioned Data sink"
+          + " without confirmDataLoss=true (code RESOURCE_IN_USE). Nothing changed.";
 
   /**
    * Names this controller's entity in the {@code dataSetId} path-variable error and in the
@@ -146,34 +141,12 @@ public abstract class DataSetSubEntityController<
     return entity;
   }
 
-  /**
-   * The ids of the {@value #CONFIRMED_REMOVAL_IDS} query parameter, repeated or comma-separated.
-   *
-   * @throws InvalidInputException if a value is not a UUID
-   */
-  protected Set<UUID> extractConfirmedRemovalIds() {
+  /** Whether the {@value #CONFIRM_DATA_LOSS} query parameter is {@code true}. */
+  protected boolean isDataLossConfirmed() {
     ServletRequestAttributes attributes =
         (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-    String[] values =
-        attributes == null
-            ? null
-            : attributes.getRequest().getParameterValues(CONFIRMED_REMOVAL_IDS);
-    if (values == null) {
-      return Set.of();
-    }
-    try {
-      return Arrays.stream(values)
-          .flatMap(value -> Arrays.stream(value.split(",")))
-          .map(String::trim)
-          .filter(value -> !value.isEmpty())
-          .map(UUID::fromString)
-          .collect(Collectors.toUnmodifiableSet());
-    } catch (IllegalArgumentException e) {
-      throw new InvalidInputException(
-          getEntityClass().getSimpleName(),
-          CONFIRMED_REMOVAL_IDS,
-          CONFIRMED_REMOVAL_IDS + " must hold UUIDs");
-    }
+    return attributes != null
+        && Boolean.parseBoolean(attributes.getRequest().getParameter(CONFIRM_DATA_LOSS));
   }
 
   private UUID extractDataSetId() {

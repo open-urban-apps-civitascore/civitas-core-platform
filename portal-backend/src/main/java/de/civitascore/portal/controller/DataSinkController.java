@@ -9,7 +9,6 @@ import de.civitascore.portal.service.DataSinkService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -105,16 +104,16 @@ public class DataSinkController
               + " its Pipelines first. A provisioned DataSink is no longer listed; its stored data"
               + " is deleted at the next release.")
   @Parameter(
-      name = CONFIRMED_REMOVAL_IDS,
+      name = CONFIRM_DATA_LOSS,
       in = ParameterIn.QUERY,
-      description = CONFIRMED_REMOVAL_IDS_DESCRIPTION,
-      array = @ArraySchema(schema = @Schema(type = "string", format = "uuid")))
+      description = CONFIRM_DATA_LOSS_DESCRIPTION,
+      schema = @Schema(type = "boolean"))
   @ApiResponse(
       responseCode = "409",
       description = REMOVAL_CONFLICT_DESCRIPTION,
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public void delete(@PathVariable UUID id) {
     requireOwnedByPathDataSet(id);
-    dataSinkService.deleteById(id, extractConfirmedRemovalIds());
+    dataSinkService.deleteById(id, isDataLossConfirmed());
   }
 }

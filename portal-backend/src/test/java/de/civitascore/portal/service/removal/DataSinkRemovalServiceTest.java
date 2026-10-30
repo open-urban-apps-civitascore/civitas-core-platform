@@ -18,14 +18,11 @@ import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
-import de.civitascore.portal.model.output.DataSinkRemovalImpactDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.RemovalConfirmationRequiredException;
 import de.civitascore.portal.util.ResourceInUseException;
-import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -64,62 +61,43 @@ class DataSinkRemovalServiceTest {
   }
 
   @Test
-  void prepare_missingConfirmation_throwsWithTheImpact() {
+  void prepare_provisionedSinkWithoutConfirmDataLoss_isRefused() {
     DataSink sink = activeSink(DataSinkType.FROST, true);
-    NamedApi sta = api(ApiStandard.STA);
 
-    assertThatThrownBy(() -> service.prepare(DataSinkChange.deletePipeline(pipeline), Set.of()))
+    assertThatThrownBy(() -> service.prepare(DataSinkChange.deletePipeline(pipeline), false))
         .isInstanceOfSatisfying(
-            RemovalConfirmationRequiredException.class,
-            e -> {
-              assertThat(e.getImpact().requiresConfirmation()).isTrue();
-              assertThat(e.getImpact().apis()).extracting("id").containsExactly(sta.getId());
-              assertThat(e.getImpact().dataSinks()).extracting("id").containsExactly(sink.getId());
-            });
+            ResourceInUseException.class,
+            e -> assertThat(e.getResourceId()).isEqualTo(sink.getId()))
+        .hasMessageContaining("confirmDataLoss=true");
   }
 
   @Test
-  void prepare_partOfTheNeededIds_throwsWithAllOfThem() {
+  void prepare_provisionedSinkWithConfirmDataLoss_returnsThePlan() {
     DataSink sink = activeSink(DataSinkType.FROST, true);
-    NamedApi sta = api(ApiStandard.STA);
-
-    assertThatThrownBy(
-            () -> service.prepare(DataSinkChange.deletePipeline(pipeline), Set.of(sink.getId())))
-        .isInstanceOfSatisfying(
-            RemovalConfirmationRequiredException.class,
-            e ->
-                assertThat(e.getImpact().confirmationIds())
-                    .containsExactlyInAnyOrder(sink.getId(), sta.getId()));
-  }
-
-  @Test
-  void prepare_supersetOfTheNeededIds_returnsThePlan() {
-    DataSink sink = activeSink(DataSinkType.FROST, true);
-    NamedApi sta = api(ApiStandard.STA);
 
     PreparedDataSinkChange prepared =
-        service.prepare(
-            DataSinkChange.deletePipeline(pipeline),
-            Set.of(sink.getId(), sta.getId(), UUID.randomUUID()));
+        service.prepare(DataSinkChange.deletePipeline(pipeline), true);
 
     assertThat(prepared.plan().deactivatedDataSinks()).containsExactly(sink);
   }
 
   @Test
-  void prepare_unprovisionedSinkWithoutLayersOrApis_needsNoConfirmation() {
+  void prepare_unprovisionedSinkWithApi_needsNoConfirmation() {
     DataSink sink = activeSink(DataSinkType.FROST, false);
+    NamedApi sta = api(ApiStandard.STA);
 
     PreparedDataSinkChange prepared =
-        service.prepare(DataSinkChange.deletePipeline(pipeline), Set.of());
+        service.prepare(DataSinkChange.deletePipeline(pipeline), false);
 
     assertThat(prepared.plan().deactivatedDataSinks()).containsExactly(sink);
+    assertThat(prepared.plan().apis()).containsExactly(sta);
   }
 
   @Test
   void prepare_deletingASinkAPipelineLinks_isRefusedBeforeTheConfirmation() {
     DataSink sink = activeSink(DataSinkType.FROST, true);
 
-    assertThatThrownBy(() -> service.prepare(DataSinkChange.deleteDataSink(sink), Set.of()))
+    assertThatThrownBy(() -> service.prepare(DataSinkChange.deleteDataSink(sink), false))
         .isInstanceOfSatisfying(
             ResourceInUseException.class,
             e -> {
@@ -133,31 +111,9 @@ class DataSinkRemovalServiceTest {
     DataSink sink = activeSink(DataSinkType.FROST, false);
     sink.getPipelines().clear();
 
-    PreparedDataSinkChange prepared =
-        service.prepare(DataSinkChange.deleteDataSink(sink), Set.of());
+    PreparedDataSinkChange prepared = service.prepare(DataSinkChange.deleteDataSink(sink), false);
 
     assertThat(prepared.plan().deactivatedDataSinks()).containsExactly(sink);
-  }
-
-  @Test
-  void preview_deletingASinkAPipelineLinks_isRefused() {
-    DataSink sink = activeSink(DataSinkType.FROST, false);
-
-    assertThatThrownBy(
-            () -> service.preview(dataSet, DataSinkRemovalRequest.deleteDataSink(sink.getId())))
-        .isInstanceOf(ResourceInUseException.class);
-  }
-
-  @Test
-  void preview_deletingASinkTogetherWithItsPipeline_listsTheSink() {
-    DataSink sink = activeSink(DataSinkType.FROST, false);
-
-    DataSinkRemovalImpactDTO impact =
-        service.preview(
-            dataSet,
-            new DataSinkRemovalRequest(Set.of(pipeline.getId()), Set.of(), Set.of(sink.getId())));
-
-    assertThat(impact.dataSinks()).extracting("id").containsExactly(sink.getId());
   }
 
   @Test
@@ -168,7 +124,7 @@ class DataSinkRemovalServiceTest {
     when(dataSinkRepository.findByPipelinesId(pipeline.getId())).thenReturn(List.of(dropped));
 
     PreparedDataSinkChange prepared =
-        service.prepare(DataSinkChange.linkPipeline(pipeline, Set.of(free.getId())), Set.of());
+        service.prepare(DataSinkChange.linkPipeline(pipeline, Set.of(free.getId())), false);
 
     assertThat(prepared.linksToAdd()).containsExactly(free);
     assertThat(prepared.linksToRemove()).containsExactly(dropped);
@@ -180,7 +136,7 @@ class DataSinkRemovalServiceTest {
     UUID unknown = UUID.randomUUID();
 
     assertThatThrownBy(
-            () -> service.prepare(DataSinkChange.linkPipeline(pipeline, Set.of(unknown)), Set.of()))
+            () -> service.prepare(DataSinkChange.linkPipeline(pipeline, Set.of(unknown)), false))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("One or more DataSink IDs not found");
   }
@@ -194,7 +150,7 @@ class DataSinkRemovalServiceTest {
     assertThatThrownBy(
             () ->
                 service.prepare(
-                    DataSinkChange.linkPipeline(pipeline, Set.of(pending.getId())), Set.of()))
+                    DataSinkChange.linkPipeline(pipeline, Set.of(pending.getId())), false))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("One or more DataSink IDs not found");
   }
@@ -209,7 +165,7 @@ class DataSinkRemovalServiceTest {
     assertThatThrownBy(
             () ->
                 service.prepare(
-                    DataSinkChange.linkPipeline(pipeline, Set.of(foreign.getId())), Set.of()))
+                    DataSinkChange.linkPipeline(pipeline, Set.of(foreign.getId())), false))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("different DataSet");
   }
@@ -225,7 +181,7 @@ class DataSinkRemovalServiceTest {
     assertThatThrownBy(
             () ->
                 service.prepare(
-                    DataSinkChange.linkPipeline(pipeline, Set.of(occupied.getId())), Set.of()))
+                    DataSinkChange.linkPipeline(pipeline, Set.of(occupied.getId())), false))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("already attached to another Pipeline");
   }
@@ -242,20 +198,6 @@ class DataSinkRemovalServiceTest {
 
     assertThat(added.getPipelines()).containsExactly(pipeline);
     assertThat(dropped.getPipelines()).isEmpty();
-  }
-
-  @Test
-  void preview_unprovisionedSinkAlone_listsItWithoutConfirmation() {
-    DataSink sink = activeSink(DataSinkType.FROST, false);
-
-    DataSinkRemovalImpactDTO impact =
-        service.preview(dataSet, DataSinkRemovalRequest.deletePipeline(pipeline.getId()));
-
-    assertThat(impact.dataSinks())
-        .containsExactly(
-            new DataSinkRemovalImpactDTO.DataSinkImpact(sink.getId(), DataSinkType.FROST, false));
-    assertThat(impact.confirmationIds()).isEmpty();
-    assertThat(impact.requiresConfirmation()).isFalse();
   }
 
   @Test
@@ -307,28 +249,6 @@ class DataSinkRemovalServiceTest {
     assertThat(dataSet.getLayers()).isEmpty();
     assertThat(dataSet.getNamedApis()).isEmpty();
     verify(layerRepository).delete(layer);
-  }
-
-  @Test
-  void preview_pipelineOfAnotherDataSet_isNotFound() {
-    when(dataSinkRepository.findByDataSetIdAndState(dataSet.getId(), DataSinkState.ACTIVE))
-        .thenReturn(List.of());
-
-    assertThatThrownBy(
-            () ->
-                service.preview(dataSet, DataSinkRemovalRequest.deletePipeline(UUID.randomUUID())))
-        .isInstanceOf(ResourceNotFoundException.class);
-  }
-
-  @Test
-  void preview_dataSinkThatIsNotActive_isNotFound() {
-    when(dataSinkRepository.findByDataSetIdAndState(dataSet.getId(), DataSinkState.ACTIVE))
-        .thenReturn(List.of());
-
-    assertThatThrownBy(
-            () ->
-                service.preview(dataSet, DataSinkRemovalRequest.deleteDataSink(UUID.randomUUID())))
-        .isInstanceOf(ResourceNotFoundException.class);
   }
 
   private static DataSink unlinkedSink(DataSet owner) {

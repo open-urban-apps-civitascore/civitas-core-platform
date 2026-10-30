@@ -2,7 +2,6 @@ package de.civitascore.portal.service;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.awaitility.Awaitility.await;
 
 import de.civitascore.configadapter.model.dataset.WorkspaceNames;
@@ -18,7 +17,6 @@ import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.PipelineRepository;
-import de.civitascore.portal.util.RemovalConfirmationRequiredException;
 import de.civitascore.portal.util.TestContainerImages;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -27,7 +25,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -139,7 +136,7 @@ class DataSinkUnprovisionSagaIntegrationTest extends AbstractSagaIntegrationTest
     String projectId = dataSetRepository.findById(dataSet.getId()).orElseThrow().getProjectId();
     assertThat(tableExists(schema, "removed_observations")).isTrue();
 
-    deleteConfirmed(geoPipeline);
+    pipelineService.deleteById(geoPipeline.getId(), true);
     assertThat(dataSinkRepository.findById(removed.getId()))
         .get()
         .extracting(DataSink::getState)
@@ -166,7 +163,7 @@ class DataSinkUnprovisionSagaIntegrationTest extends AbstractSagaIntegrationTest
     DataSink kept = sinkOf(geoPipeline(dataSet, "kept_observations"));
     String schema = releaseAndReturnToDraft(dataSet);
 
-    deleteConfirmed(removedPipeline);
+    pipelineService.deleteById(removedPipeline.getId(), true);
     release(dataSet);
 
     assertThat(tableExists(schema, "removed_observations")).isFalse();
@@ -191,11 +188,7 @@ class DataSinkUnprovisionSagaIntegrationTest extends AbstractSagaIntegrationTest
             .findFirst()
             .orElseThrow();
 
-    RemovalConfirmationRequiredException refused =
-        catchThrowableOfType(
-            RemovalConfirmationRequiredException.class,
-            () -> dataSinkService.deleteById(frost.getId()));
-    dataSinkService.deleteById(frost.getId(), Set.copyOf(refused.getImpact().confirmationIds()));
+    dataSinkService.deleteById(frost.getId(), true);
     dataSetService.stage(dataSet.getId());
     dataSetService.release(dataSet.getId());
     awaitNoPendingSaga(dataSet);
@@ -215,7 +208,7 @@ class DataSinkUnprovisionSagaIntegrationTest extends AbstractSagaIntegrationTest
     geoPipeline(dataSet, "kept_observations");
     String schema = releaseAndReturnToDraft(dataSet);
 
-    deleteConfirmed(removedPipeline);
+    pipelineService.deleteById(removedPipeline.getId(), true);
     dataSetService.deleteById(dataSet.getId());
 
     await()
@@ -246,14 +239,6 @@ class DataSinkUnprovisionSagaIntegrationTest extends AbstractSagaIntegrationTest
           frost.getPipelines().add(pipelineRepository.getReferenceById(pipeline.getId()));
           return frost;
         });
-  }
-
-  private void deleteConfirmed(Pipeline pipeline) {
-    RemovalConfirmationRequiredException refused =
-        catchThrowableOfType(
-            RemovalConfirmationRequiredException.class,
-            () -> pipelineService.deleteById(pipeline.getId()));
-    pipelineService.deleteById(pipeline.getId(), Set.copyOf(refused.getImpact().confirmationIds()));
   }
 
   /** Releases the Dataset, then unreleases and unstages it so that its sinks can change. */

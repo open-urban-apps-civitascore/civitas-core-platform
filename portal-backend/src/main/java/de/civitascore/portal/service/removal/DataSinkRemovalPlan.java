@@ -96,19 +96,6 @@ record DataSinkRemovalPlan(
     return ids.collect(Collectors.toCollection(HashSet::new));
   }
 
-  /**
-   * The ids a request must confirm: provisioned Data sinks, whose stored data is deleted at the
-   * next release, and every Layer and API. A Data sink that holds no data goes without one.
-   */
-  Set<UUID> needsConfirmation() {
-    return Stream.of(
-            deactivatedDataSinks.stream().filter(DataSink::isProvisioned).map(DataSink::getId),
-            layers.stream().map(Layer::getId),
-            apis.stream().map(NamedApi::getId))
-        .flatMap(ids -> ids)
-        .collect(Collectors.toSet());
-  }
-
   boolean isEmpty() {
     return deactivatedDataSinks.isEmpty() && layers.isEmpty() && apis.isEmpty();
   }

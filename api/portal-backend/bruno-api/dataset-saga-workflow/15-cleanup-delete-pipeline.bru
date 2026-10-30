@@ -1,7 +1,7 @@
 meta {
   name: 15. Cleanup - Delete Pipeline without confirmation
   type: http
-  seq: 38
+  seq: 37
 }
 
 delete {
@@ -15,36 +15,24 @@ params:path {
   id: {{sagaPipelineId}}
 }
 
-script:post-response {
-  const impact = (res.body && res.body.impact) || {};
-  const ids = [].concat(impact.dataSinks || [], impact.layers || [], impact.apis || []).map(e => e.id);
-  bru.setVar('sagaPipelineConfirmation', ids.map(id => 'confirmedRemovalIds=' + id).join('&'));
-}
-
 tests {
   const body = res.body || {};
 
-  test("Delete refused until the removal is confirmed", function() {
+  test("Delete refused until data loss is confirmed", function() {
     expect(res.getStatus()).to.equal(409);
-    expect(body.type).to.equal('urn:civitas:error:REMOVAL_CONFIRMATION_REQUIRED');
-  });
-  test("The 409 carries the impact of step 14c", function() {
-    expect(body.impact.requiresConfirmation).to.equal(true);
-    expect(body.impact.dataSinks.map(s => s.id)).to.include(bru.getVar('sagaDataSinkId'));
-    expect(body.impact.apis.map(a => a.standard)).to.deep.equal(['STA']);
+    expect(body.type).to.equal('urn:civitas:error:RESOURCE_IN_USE');
+    expect(body.detail).to.include('confirmDataLoss=true');
   });
 }
 
 docs {
-  **Saga step 15** — Delete the Pipeline without `confirmedRemovalIds`.
+  **Saga step 15** — Delete the Pipeline without `confirmDataLoss`.
 
-  The delete would remove the provisioned FROST DataSink and the STA API (step 14c), so the backend refuses it with `409` and changes nothing. The problem document carries the impact in `impact`; the post-response script turns its ids into the query of step 15a.
+  The Pipeline links the FROST DataSink of step 4c, which the release in step 8 provisioned. Without the Pipeline the DataSink becomes inactive, and the next release deletes its stored data. So the backend refuses the delete with `409` and changes nothing.
 
-  **Precondition:** step 14c ran.
+  **Precondition:** steps 4 to 12 ran; the dataset is `DRAFT` again.
 
-  **Expected Response:** 409 Conflict, type `urn:civitas:error:REMOVAL_CONFIRMATION_REQUIRED`, property `impact` as in step 14c.
-
-  **Post-condition:** Saves `sagaPipelineConfirmation` (`confirmedRemovalIds=<id>&...`).
+  **Expected Response:** 409 Conflict, type `urn:civitas:error:RESOURCE_IN_USE`, `detail` tells to set `confirmDataLoss=true`.
 
   **System Impact:**
 

@@ -35,12 +35,12 @@ const RemovedItemList = (props: RemovedItemListProps) => {
 
 export const RemovalConfirmModal = (props: RemovalConfirmModalProps) => {
   const { dialog, title, description, confirmButtonTitle } = props
-  const { open, impact, isLoading, onConfirm, onCancel } = dialog
+  const { open, removal, onConfirm, onCancel } = dialog
   const t = useTranslations('common.removalConfirmModal')
 
-  const layers = impact?.layers.map(layer => ({ id: layer.id, name: layer.title || layer.layerName })) ?? []
-  const apis = impact?.apis.map(api => ({ id: api.id, name: api.name })) ?? []
-  const hasStoredData = impact?.dataSinks.some(dataSink => dataSink.provisioned) ?? false
+  const layers = removal?.layers.map(layer => ({ id: layer.id, name: layer.title || layer.layerName })) ?? []
+  const apis = removal?.apis.map(api => ({ id: api.slug, name: api.name })) ?? []
+  const hasStoredData = removal?.hasStoredData ?? false
 
   return (
     <WarningModal
@@ -60,7 +60,6 @@ export const RemovalConfirmModal = (props: RemovalConfirmModalProps) => {
       confirmButtonTitle={confirmButtonTitle}
       onConfirm={onConfirm}
       onDiscard={onCancel}
-      isLoading={isLoading}
     />
   )
 }

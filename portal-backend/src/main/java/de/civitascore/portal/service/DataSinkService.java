@@ -18,7 +18,6 @@ import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.service.removal.DataSinkChange;
 import de.civitascore.portal.service.removal.DataSinkRemovalService;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.RemovalConfirmationRequiredException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
@@ -355,14 +354,11 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
         : "datasink";
   }
 
-  /**
-   * Confirms nothing, so a delete that needs a confirmation answers 409; see {@link
-   * #deleteById(UUID, Set)}.
-   */
+  /** Does not confirm data loss; see {@link #deleteById(UUID, boolean)}. */
   @Override
   @Transactional
   public void deleteById(UUID id) {
-    deleteById(id, Set.of());
+    deleteById(id, false);
   }
 
   /**
@@ -370,16 +366,15 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
    * {@link DataSinkRemovalService}). A provisioned DataSink stays as PENDING_UNPROVISION until the
    * next release removes its storage.
    *
-   * @param confirmedRemovalIds the ids of the provisioned DataSink, Layers and APIs the caller
-   *     confirmed
-   * @throws ResourceInUseException if a Pipeline still links the DataSink
-   * @throws RemovalConfirmationRequiredException if the delete takes something not confirmed
+   * @param confirmDataLoss whether the caller accepts that a provisioned DataSink goes
+   * @throws ResourceInUseException if a Pipeline still links the DataSink, or if it is provisioned
+   *     and {@code confirmDataLoss} is not set
    */
   @Transactional
-  public void deleteById(UUID id, Set<UUID> confirmedRemovalIds) {
+  public void deleteById(UUID id, boolean confirmDataLoss) {
     DataSink sink = preProcessDelete(id);
     dataSinkRemovalService.apply(
-        dataSinkRemovalService.prepare(DataSinkChange.deleteDataSink(sink), confirmedRemovalIds));
+        dataSinkRemovalService.prepare(DataSinkChange.deleteDataSink(sink), confirmDataLoss));
   }
 
   private void validateConfiguration(DataSinkType type, Map<String, Object> config) {

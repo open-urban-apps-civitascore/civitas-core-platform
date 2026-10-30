@@ -1,7 +1,7 @@
 meta {
   name: 12c. Cleanup - Delete POSTGIS DataSink without confirmation
   type: http
-  seq: 41
+  seq: 40
 }
 
 delete {
@@ -15,34 +15,22 @@ params:path {
   id: {{sagaPostgisDataSinkId}}
 }
 
-script:post-response {
-  const impact = (res.body && res.body.impact) || {};
-  const ids = [].concat(impact.dataSinks || [], impact.layers || [], impact.apis || []).map(e => e.id);
-  bru.setVar('sagaPostgisConfirmation', ids.map(id => 'confirmedRemovalIds=' + id).join('&'));
-}
-
 tests {
   const body = res.body || {};
 
-  test("Delete refused until the removal is confirmed", function() {
+  test("Delete refused until data loss is confirmed", function() {
     expect(res.getStatus()).to.equal(409);
-    expect(body.type).to.equal('urn:civitas:error:REMOVAL_CONFIRMATION_REQUIRED');
-  });
-  test("The impact lists the provisioned POSTGIS DataSink and the OWS API", function() {
-    const sink = body.impact.dataSinks.find(s => s.id === bru.getVar('sagaPostgisDataSinkId'));
-    expect(sink.provisioned).to.equal(true);
-    expect(body.impact.apis.map(a => a.standard)).to.deep.equal(['OWS']);
+    expect(body.type).to.equal('urn:civitas:error:RESOURCE_IN_USE');
+    expect(body.detail).to.include('confirmDataLoss=true');
   });
 }
 
 docs {
-  **Saga step 12c** — Delete the POSTGIS DataSink without `confirmedRemovalIds`.
+  **Saga step 12c** — Delete the POSTGIS DataSink without `confirmDataLoss`.
 
-  A direct delete makes a DataSink inactive even though no Pipeline links it. The release in step 8 provisioned this DataSink, and it is the last active POSTGIS DataSink, so the OWS API would go with it. The backend refuses the delete with `409` and changes nothing.
+  A direct delete makes a DataSink inactive even though no Pipeline links it. The release in step 8 provisioned this DataSink, so the next release deletes its stored data. The backend refuses the delete with `409` and changes nothing.
 
-  **Expected Response:** 409 Conflict, type `urn:civitas:error:REMOVAL_CONFIRMATION_REQUIRED`, property `impact` with the POSTGIS DataSink and the OWS API.
-
-  **Post-condition:** Saves `sagaPostgisConfirmation` (`confirmedRemovalIds=<id>&...`).
+  **Expected Response:** 409 Conflict, type `urn:civitas:error:RESOURCE_IN_USE`, `detail` tells to set `confirmDataLoss=true`.
 
   **System Impact:**
 

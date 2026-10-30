@@ -4,13 +4,13 @@ import { toast } from 'sonner'
 
 import { mockApiError } from '@/__mocks__/errors/apiError.mock'
 import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
+import { getDatasetResources } from '@/app/services/api/datasets/data-sink-removal/clientRequests'
 import {
   useCreateDataSink,
   useDeleteDataSink,
   useGetDataSinks,
   useUpdateDataSink,
 } from '@/app/services/api/datasets/datasinks/clientRequests'
-import { getRemovalImpact } from '@/app/services/api/datasets/removal-impact/clientRequests'
 import { useCreateMapping, useDeleteMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
 import {
   useCreatePipeline,
@@ -19,8 +19,10 @@ import {
   useUpdatePipeline,
 } from '@/app/services/api/pipelines/clientRequests'
 import type { RemovalConfirmationDialog } from '@/hooks/use-removal-confirmation'
+import type { DataSink } from '@/types/datasinks'
 import type { Datasource } from '@/types/datasources'
-import type { DataSinkRemovalImpact } from '@/types/removalImpact'
+import type { Layer } from '@/types/layers'
+import type { DatasetResources } from '@/utils/dataSinkRemoval'
 
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
@@ -102,8 +104,8 @@ vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
   useDeleteDataSink: vi.fn(),
 }))
 
-vi.mock('@/app/services/api/datasets/removal-impact/clientRequests', () => ({
-  getRemovalImpact: vi.fn(),
+vi.mock('@/app/services/api/datasets/data-sink-removal/clientRequests', () => ({
+  getDatasetResources: vi.fn(),
 }))
 
 // The latest props of each removal dialog, by title: the pipeline delete and the Save All dialog.
@@ -119,24 +121,23 @@ vi.mock('@/components/modals/removal-confirm-modal/RemovalConfirmModal', () => (
 const deleteDialog = () => removalModals.byTitle['toolbar.deleteConfirmTitle']?.dialog
 const saveDialog = () => removalModals.byTitle['removalConfirm.title']?.dialog
 
-const NO_IMPACT: DataSinkRemovalImpact = {
-  dataSinks: [],
-  layers: [],
-  apis: [],
-  confirmationIds: [],
-  requiresConfirmation: false,
-}
+const NO_REMOVAL: DatasetResources = { dataSinks: [], layers: [], apis: [] }
 
-const LAYER_IMPACT: DataSinkRemovalImpact = {
-  dataSinks: [{ id: 'old-sink-1', dataSinkType: 'POSTGIS', provisioned: true }],
-  layers: [{ id: 'layer-1', layerName: 'roads', title: 'Roads' }],
-  apis: [],
-  confirmationIds: ['old-sink-1', 'layer-1'],
-  requiresConfirmation: true,
-}
+const ROADS_LAYER = { id: 'layer-1', dataSinkId: 'old-sink-1', layerName: 'roads', title: 'Roads' } as Layer
 
-const removalConfirmationError = (impact: DataSinkRemovalImpact) =>
-  mockApiError(409, 'Confirm', 'urn:civitas:error:REMOVAL_CONFIRMATION_REQUIRED', { impact })
+const LAYER_REMOVAL: DatasetResources = {
+  dataSinks: [
+    {
+      id: 'old-sink-1',
+      dataSinkType: 'POSTGIS',
+      pipelineIds: ['pipeline-1', 'pipeline-to-delete'],
+      provisioned: true,
+    } as DataSink,
+    { id: 'other-sink', dataSinkType: 'POSTGIS', pipelineIds: [] } as unknown as DataSink,
+  ],
+  layers: [ROADS_LAYER],
+  apis: [{ slug: 'ows', name: 'OWS', standard: 'OWS' }],
+}
 
 vi.mock('@/app/services/api/mappings/clientRequests', () => ({
   useCreateMapping: vi.fn(),
@@ -335,7 +336,7 @@ beforeEach(() => {
     isPending: false,
   } as unknown as ReturnType<typeof useCreateDataSink>)
 
-  vi.mocked(getRemovalImpact).mockResolvedValue(NO_IMPACT)
+  vi.mocked(getDatasetResources).mockResolvedValue(NO_REMOVAL)
 
   vi.mocked(useDeleteDataSink).mockReturnValue({
     mutate: vi.fn(),
@@ -1655,7 +1656,7 @@ describe('PipelineEditorProviderComponent', () => {
       const savedSession = (id: string, pipelineId: string) =>
         makeSession({ id, name: id, isDirty: true, pipeline: { ...createEmptyPipeline(id), id: pipelineId } })
 
-      it('asks the removal impact once for the removed nodes of all changed pipelines', async () => {
+      it('loads the Dataset resources once for the removed nodes of all changed pipelines', async () => {
         vi.mocked(getRemovedDataSinkIds).mockReturnValueOnce(['sink-a']).mockReturnValueOnce(['sink-b'])
         renderProviderWithSessions([savedSession('session-a', 'pipeline-a'), savedSession('session-b', 'pipeline-b')])
 
@@ -1663,16 +1664,11 @@ describe('PipelineEditorProviderComponent', () => {
           await contextRef.current?.saveAllPipelines()
         })
 
-        expect(getRemovalImpact).toHaveBeenCalledOnce()
-        expect(getRemovalImpact).toHaveBeenCalledWith('dataset-1', {
-          removedLinks: [
-            { pipelineId: 'pipeline-a', dataSinkId: 'sink-a' },
-            { pipelineId: 'pipeline-b', dataSinkId: 'sink-b' },
-          ],
-        })
+        expect(getDatasetResources).toHaveBeenCalledOnce()
+        expect(getDatasetResources).toHaveBeenCalledWith('dataset-1')
       })
 
-      it('asks the removal impact after the new sinks exist and before any pipeline update', async () => {
+      it('loads the Dataset resources after the new sinks exist and before any pipeline update', async () => {
         const callOrder: string[] = []
         vi.mocked(useCreateDataSink).mockReturnValue({
           mutate: vi.fn(),
@@ -1682,9 +1678,9 @@ describe('PipelineEditorProviderComponent', () => {
           }),
           isPending: false,
         } as unknown as ReturnType<typeof useCreateDataSink>)
-        vi.mocked(getRemovalImpact).mockImplementation(async () => {
-          callOrder.push('getRemovalImpact')
-          return NO_IMPACT
+        vi.mocked(getDatasetResources).mockImplementation(async () => {
+          callOrder.push('getDatasetResources')
+          return NO_REMOVAL
         })
         mockUpdatePipelineMutateAsync.mockImplementation(async () => {
           callOrder.push('updatePipeline')
@@ -1709,7 +1705,7 @@ describe('PipelineEditorProviderComponent', () => {
           await contextRef.current?.saveAllPipelines()
         })
 
-        expect(callOrder).toEqual(['createDataSink', 'getRemovalImpact', 'updatePipeline'])
+        expect(callOrder).toEqual(['createDataSink', 'getDatasetResources', 'updatePipeline'])
       })
 
       it('saves without a dialog when the removal takes nothing that needs a confirmation', async () => {
@@ -1724,20 +1720,20 @@ describe('PipelineEditorProviderComponent', () => {
         expect(result).toBe(true)
         expect(saveDialog()?.open).toBe(false)
         expect(mockUpdatePipelineMutateAsync).toHaveBeenCalledWith(
-          expect.objectContaining({ pipelineId: 'pipeline-1', confirmedRemovalIds: [] }),
+          expect.objectContaining({ pipelineId: 'pipeline-1', isDataLossConfirmed: false }),
         )
       })
 
-      it('updates the pipelines with the confirmed removal ids', async () => {
+      it('updates the pipelines with confirmDataLoss after the removal is confirmed', async () => {
         vi.mocked(getRemovedDataSinkIds).mockReturnValue(['old-sink-1'])
-        vi.mocked(getRemovalImpact).mockResolvedValue(LAYER_IMPACT)
+        vi.mocked(getDatasetResources).mockResolvedValue(LAYER_REMOVAL)
         renderProvider(savedSession('session-1', 'pipeline-1'))
 
         let savePromise: Promise<boolean | undefined> | undefined
         await act(async () => {
           savePromise = contextRef.current?.saveAllPipelines()
         })
-        expect(saveDialog()?.open).toBe(true)
+        expect(saveDialog()?.removal).toEqual({ layers: [ROADS_LAYER], apis: [], hasStoredData: true })
         expect(mockUpdatePipelineMutateAsync).not.toHaveBeenCalled()
 
         let result: boolean | undefined
@@ -1748,13 +1744,13 @@ describe('PipelineEditorProviderComponent', () => {
 
         expect(result).toBe(true)
         expect(mockUpdatePipelineMutateAsync).toHaveBeenCalledWith(
-          expect.objectContaining({ pipelineId: 'pipeline-1', confirmedRemovalIds: ['old-sink-1', 'layer-1'] }),
+          expect.objectContaining({ pipelineId: 'pipeline-1', isDataLossConfirmed: true }),
         )
       })
 
       it('updates no pipeline and keeps the session dirty when the removal is cancelled', async () => {
         vi.mocked(getRemovedDataSinkIds).mockReturnValue(['old-sink-1'])
-        vi.mocked(getRemovalImpact).mockResolvedValue(LAYER_IMPACT)
+        vi.mocked(getDatasetResources).mockResolvedValue(LAYER_REMOVAL)
         renderProvider(savedSession('session-1', 'pipeline-1'))
 
         let savePromise: Promise<boolean | undefined> | undefined
@@ -1819,7 +1815,7 @@ describe('PipelineEditorProviderComponent', () => {
         }
 
         it('deletes them and clears their refs when the removal is cancelled', async () => {
-          vi.mocked(getRemovalImpact).mockResolvedValue(LAYER_IMPACT)
+          vi.mocked(getDatasetResources).mockResolvedValue(LAYER_REMOVAL)
           await renderWithNewSinkNode()
 
           expect(await saveAndCancel()).toBe(false)
@@ -1831,19 +1827,6 @@ describe('PipelineEditorProviderComponent', () => {
           })
           expect(nodeData()?.entityId).toBeUndefined()
           expect(nodeData()?.configurationUrn).toBeUndefined()
-        })
-
-        it('deletes them when the changed impact of the pipeline update is cancelled', async () => {
-          mockUpdatePipelineMutateAsync.mockRejectedValueOnce(removalConfirmationError(LAYER_IMPACT))
-          await renderWithNewSinkNode()
-
-          expect(await saveAndCancel()).toBe(false)
-
-          expect(mockDeleteDataSinkMutateAsync).toHaveBeenCalledWith({
-            datasetId: 'dataset-1',
-            dataSinkId: 'new-sink-id',
-          })
-          expect(nodeData()?.entityId).toBeUndefined()
         })
 
         it('deletes them and clears their refs when the pipeline update fails', async () => {
@@ -1889,7 +1872,7 @@ describe('PipelineEditorProviderComponent', () => {
         })
 
         it('keeps the ref of a data sink whose delete fails, so the next save links it', async () => {
-          vi.mocked(getRemovalImpact).mockResolvedValue(LAYER_IMPACT)
+          vi.mocked(getDatasetResources).mockResolvedValue(LAYER_REMOVAL)
           mockDeleteDataSinkMutateAsync.mockRejectedValueOnce(new Error('network'))
           vi.spyOn(console, 'error').mockImplementation(() => {})
           await renderWithNewSinkNode()
@@ -1900,37 +1883,14 @@ describe('PipelineEditorProviderComponent', () => {
         })
       })
 
-      it('shows the new impact and retries when the backend reports a changed impact', async () => {
-        vi.mocked(getRemovedDataSinkIds).mockReturnValue(['old-sink-1'])
-        mockUpdatePipelineMutateAsync.mockRejectedValueOnce(removalConfirmationError(LAYER_IMPACT))
-        renderProvider(savedSession('session-1', 'pipeline-1'))
-
-        let savePromise: Promise<boolean | undefined> | undefined
-        await act(async () => {
-          savePromise = contextRef.current?.saveAllPipelines()
-        })
-        expect(saveDialog()?.impact).toEqual(LAYER_IMPACT)
-
-        let result: boolean | undefined
-        await act(async () => {
-          saveDialog()?.onConfirm()
-          result = await savePromise
-        })
-
-        expect(result).toBe(true)
-        expect(mockUpdatePipelineMutateAsync).toHaveBeenLastCalledWith(
-          expect.objectContaining({ confirmedRemovalIds: ['old-sink-1', 'layer-1'] }),
-        )
-      })
-
-      it('does not ask the removal impact when no node was removed', async () => {
+      it('does not load the Dataset resources when no node was removed', async () => {
         renderProvider(savedSession('session-1', 'pipeline-1'))
 
         await act(async () => {
           await contextRef.current?.saveAllPipelines()
         })
 
-        expect(getRemovalImpact).not.toHaveBeenCalled()
+        expect(getDatasetResources).not.toHaveBeenCalled()
       })
     })
 
@@ -2538,20 +2498,19 @@ describe('PipelineEditorProviderComponent', () => {
       })
     }
 
-    it('asks the removal impact of the pipeline and shows it in the confirmation', async () => {
-      vi.mocked(getRemovalImpact).mockResolvedValue(LAYER_IMPACT)
+    it('shows the Layers, APIs and stored data the delete takes in the confirmation', async () => {
+      vi.mocked(getDatasetResources).mockResolvedValue(LAYER_REMOVAL)
       renderProvider(savedSession())
 
       await startDelete()
 
-      expect(getRemovalImpact).toHaveBeenCalledWith('dataset-1', { deletedPipelineIds: ['pipeline-to-delete'] })
-      expect(deleteDialog()?.open).toBe(true)
-      expect(deleteDialog()?.impact).toEqual(LAYER_IMPACT)
+      expect(getDatasetResources).toHaveBeenCalledWith('dataset-1')
+      expect(deleteDialog()?.removal).toEqual({ layers: [ROADS_LAYER], apis: [], hasStoredData: true })
       expect(mockDeleteMutateAsync).not.toHaveBeenCalled()
     })
 
-    it('deletes the pipeline with the confirmed removal ids and removes its session', async () => {
-      vi.mocked(getRemovalImpact).mockResolvedValue(LAYER_IMPACT)
+    it('deletes the pipeline with confirmDataLoss and removes its session', async () => {
+      vi.mocked(getDatasetResources).mockResolvedValue(LAYER_REMOVAL)
       renderProvider(savedSession())
 
       await startDelete()
@@ -2559,7 +2518,7 @@ describe('PipelineEditorProviderComponent', () => {
 
       expect(mockDeleteMutateAsync).toHaveBeenCalledWith({
         pipelineId: 'pipeline-to-delete',
-        confirmedRemovalIds: ['old-sink-1', 'layer-1'],
+        isDataLossConfirmed: true,
       })
       expect(contextRef.current?.activeSessionId).not.toBe('session-1')
     })
@@ -2576,29 +2535,12 @@ describe('PipelineEditorProviderComponent', () => {
       expect(contextRef.current?.activeSessionId).toBe('session-1')
     })
 
-    it('shows the new impact when the backend reports a changed impact', async () => {
-      mockDeleteMutateAsync.mockRejectedValueOnce(removalConfirmationError(LAYER_IMPACT))
-      renderProvider(savedSession())
-
-      await startDelete()
-      await confirmDelete()
-
-      expect(deleteDialog()?.impact).toEqual(LAYER_IMPACT)
-      await confirmDelete()
-
-      expect(mockDeleteMutateAsync).toHaveBeenCalledTimes(2)
-      expect(mockDeleteMutateAsync).toHaveBeenLastCalledWith({
-        pipelineId: 'pipeline-to-delete',
-        confirmedRemovalIds: ['old-sink-1', 'layer-1'],
-      })
-    })
-
     it('closes the session without a backend call when pipeline has no id', async () => {
       renderProvider(makeSession({ pipeline: { ...createEmptyPipeline('Test'), id: undefined } }))
 
       await startDelete()
 
-      expect(getRemovalImpact).not.toHaveBeenCalled()
+      expect(getDatasetResources).not.toHaveBeenCalled()
       expect(mockDeleteMutateAsync).not.toHaveBeenCalled()
       expect(contextRef.current?.activeSessionId).not.toBe('session-1')
     })
@@ -2618,7 +2560,7 @@ describe('PipelineEditorProviderComponent', () => {
 
       await startDelete()
 
-      expect(getRemovalImpact).not.toHaveBeenCalled()
+      expect(getDatasetResources).not.toHaveBeenCalled()
       expect(contextRef.current?.activeSessionId).toBe('session-1')
     })
 
@@ -2637,8 +2579,8 @@ describe('PipelineEditorProviderComponent', () => {
       expect(contextRef.current?.activeSessionId).toBe('session-1')
     })
 
-    it('shows the delete-failed toast when the removal impact cannot be loaded', async () => {
-      vi.mocked(getRemovalImpact).mockRejectedValueOnce(new Error('Network failure'))
+    it('shows the delete-failed toast when the Dataset resources cannot be loaded', async () => {
+      vi.mocked(getDatasetResources).mockRejectedValueOnce(new Error('Network failure'))
       renderProvider(savedSession())
 
       await startDelete()

@@ -16,12 +16,12 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { toast } from 'sonner'
 
 import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
+import { getDatasetResources } from '@/app/services/api/datasets/data-sink-removal/clientRequests'
 import {
   useCreateDataSink,
   useDeleteDataSink,
   useUpdateDataSink,
 } from '@/app/services/api/datasets/datasinks/clientRequests'
-import { getRemovalImpact } from '@/app/services/api/datasets/removal-impact/clientRequests'
 import { useCreateMapping, useDeleteMapping, useUpdateMapping } from '@/app/services/api/mappings/clientRequests'
 import {
   useCreatePipeline,
@@ -36,6 +36,7 @@ import { useDatasetPermissions } from '@/hooks/use-dataset-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { useRemovalConfirmation } from '@/hooks/use-removal-confirmation'
 import { isConnectorReadable } from '@/types/datasources'
+import { getDataSinkRemoval, getPipelineDataSinkIds, hasRemovalConsequences } from '@/utils/dataSinkRemoval'
 import {
   isDatapoolScopeViolationError,
   isNotDraftError,
@@ -181,12 +182,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   const { getSinkLocks, getSinkLockReason, isLoading: isLoadingSinkLocks } = useDataSinkLocks()
 
-  const { runConfirmed: runConfirmedDelete, dialog: deleteRemovalDialog } = useRemovalConfirmation()
-  const {
-    confirmRemoval: confirmSaveRemoval,
-    runConfirmed: runConfirmedSave,
-    dialog: saveRemovalDialog,
-  } = useRemovalConfirmation()
+  const { confirmRemoval: confirmDeleteRemoval, dialog: deleteRemovalDialog } = useRemovalConfirmation()
+  const { confirmRemoval: confirmSaveRemoval, dialog: saveRemovalDialog } = useRemovalConfirmation()
 
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
@@ -586,12 +583,12 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
     setIsDeleting(true)
     try {
-      const impact = await getRemovalImpact(datasetId, { deletedPipelineIds: [pipelineId] })
-      const isDeleted = await runConfirmedDelete(
-        confirmedRemovalIds => deletePipelineMutation.mutateAsync({ pipelineId, confirmedRemovalIds }),
-        { impact },
-      )
-      if (isDeleted) sessionManager.closeSession(sessionId)
+      const resources = await getDatasetResources(datasetId)
+      const removal = getDataSinkRemoval(getPipelineDataSinkIds(resources.dataSinks, pipelineId), resources)
+      const isConfirmed = await confirmDeleteRemoval(removal)
+      if (!isConfirmed) return
+      await deletePipelineMutation.mutateAsync({ pipelineId, isDataLossConfirmed: removal.hasStoredData })
+      sessionManager.closeSession(sessionId)
     } catch (error) {
       if (isNotDraftError(error)) {
         toast.error(t('header.notDraftError'))
@@ -604,7 +601,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     } finally {
       setIsDeleting(false)
     }
-  }, [activeSession, isReadOnly, sessionManager, canDelete, datasetId, runConfirmedDelete, deletePipelineMutation, t])
+  }, [activeSession, isReadOnly, sessionManager, canDelete, datasetId, confirmDeleteRemoval, deletePipelineMutation, t])
 
   // ===== Loading State =====
   // Without the locks a provisioned node looks editable, so the editor waits for them too.
@@ -733,7 +730,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         if (!isConfirmed) return false
       }
 
-      // Phase 1 saves the data sinks and mappings of every session, so the removal impact below sees the new
+      // Phase 1 saves the data sinks and mappings of every session, so the removal check below sees the new
       // sinks: a node replaced in one save keeps its API.
       const preparedSessions: {
         session: PipelineSession
@@ -816,17 +813,14 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
       // Phase 2 asks once for every removed node. The backend deletes the removed data sinks on the pipeline
       // update, together with their Layers and the APIs that have no data sink left.
-      const removedLinks = preparedSessions.flatMap(({ pipeline: prepared, removedSinkIds }) => {
-        const pipelineId = prepared.id
-        return pipelineId ? removedSinkIds.map(dataSinkId => ({ pipelineId, dataSinkId })) : []
-      })
-      let confirmedRemovalIds: string[] = []
-      if (removedLinks.length > 0) {
+      const removedSinkIds = preparedSessions.flatMap(prepared => prepared.removedSinkIds)
+      let isDataLossConfirmed = false
+      if (removedSinkIds.length > 0) {
         try {
-          const impact = await getRemovalImpact(datasetId, { removedLinks })
-          if (impact.requiresConfirmation) {
-            isAborted = !(await confirmSaveRemoval(impact))
-            confirmedRemovalIds = impact.confirmationIds
+          const removal = getDataSinkRemoval(removedSinkIds, await getDatasetResources(datasetId))
+          if (hasRemovalConsequences(removal)) {
+            isAborted = !(await confirmSaveRemoval(removal))
+            isDataLossConfirmed = removal.hasStoredData
           }
         } catch (error) {
           for (const { session } of preparedSessions) classifySaveError(session.name, error)
@@ -847,19 +841,11 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
           const pipelineId = currentPipeline.id
 
           if (pipelineId) {
-            const isSaved = await runConfirmedSave(
-              ids =>
-                updatePipelineMutation.mutateAsync({ pipelineId, data: pipelinePayload, confirmedRemovalIds: ids }),
-              { confirmedRemovalIds },
-            )
-            if (!isSaved) {
-              sessionManager.updateSessionPipeline(
-                session.id,
-                await withoutCreatedDataSinks(currentPipeline, createdDataSinks),
-              )
-              isAborted = true
-              continue
-            }
+            await updatePipelineMutation.mutateAsync({
+              pipelineId,
+              data: pipelinePayload,
+              isDataLossConfirmed,
+            })
           } else {
             const response = await createPipelineMutation.mutateAsync(pipelinePayload)
             currentPipeline = { ...currentPipeline, id: response.data.id }
@@ -957,7 +943,6 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     datasetQuery.data,
     confirmDataLoss,
     confirmSaveRemoval,
-    runConfirmedSave,
     validationContextFor,
     currentPipelineOf,
     setValidationResultFor,

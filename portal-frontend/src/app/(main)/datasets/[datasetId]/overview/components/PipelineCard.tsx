@@ -6,7 +6,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
-import { getRemovalImpact } from '@/app/services/api/datasets/removal-impact/clientRequests'
+import { getDatasetResources } from '@/app/services/api/datasets/data-sink-removal/clientRequests'
 import { useDeletePipeline } from '@/app/services/api/pipelines/clientRequests'
 import { ActivityBadge } from '@/components/activity-badge/ActivityBadge'
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useRemovalConfirmation } from '@/hooks/use-removal-confirmation'
 import { PipelineBasicInfo } from '@/types/datasets'
+import { getDataSinkRemoval, getPipelineDataSinkIds } from '@/utils/dataSinkRemoval'
 import { formatDate } from '@/utils/formatDate'
 
 interface PipelineCardProps {
@@ -31,7 +32,7 @@ export const PipelineCard = ({ datasetId, pipeline, badges, canDelete }: Pipelin
   const locale = useLocale()
   const router = useRouter()
   const deletePipeline = useDeletePipeline(datasetId)
-  const { runConfirmed, dialog: removalDialog } = useRemovalConfirmation()
+  const { confirmRemoval, dialog: removalDialog } = useRemovalConfirmation()
   const [isDeleteRunning, setIsDeleteRunning] = useState(false)
 
   const hasError = pipeline.runtimeStatus?.state === 'ERROR'
@@ -43,12 +44,11 @@ export const PipelineCard = ({ datasetId, pipeline, badges, canDelete }: Pipelin
   const handleDelete = async () => {
     setIsDeleteRunning(true)
     try {
-      const impact = await getRemovalImpact(datasetId, { deletedPipelineIds: [pipeline.id] })
-      const isDeleted = await runConfirmed(
-        confirmedRemovalIds => deletePipeline.mutateAsync({ pipelineId: pipeline.id, confirmedRemovalIds }),
-        { impact },
-      )
-      if (!isDeleted) return
+      const resources = await getDatasetResources(datasetId)
+      const removal = getDataSinkRemoval(getPipelineDataSinkIds(resources.dataSinks, pipeline.id), resources)
+      const isConfirmed = await confirmRemoval(removal)
+      if (!isConfirmed) return
+      await deletePipeline.mutateAsync({ pipelineId: pipeline.id, isDataLossConfirmed: removal.hasStoredData })
       toast.success(t('messages.deleteSuccess'))
       router.refresh()
     } catch {

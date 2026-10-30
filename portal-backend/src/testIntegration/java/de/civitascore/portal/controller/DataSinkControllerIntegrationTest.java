@@ -899,23 +899,6 @@ class DataSinkControllerIntegrationTest
       assertThat(dataSinkRepository.findById(id)).isEmpty();
     }
 
-    @Test
-    @DisplayName("DELETE without confirmation returns 409 when a Layer references the DataSink")
-    void deleteReturns409WhenLayerReferencesDataSink() {
-      ensureTestData();
-      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
-      DataSink sink = portalData.dataSink(dataSet, null);
-      portalData.layer(dataSet, sink);
-
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              getEndpointPath() + "/" + sink.getId(), HttpMethod.DELETE, createAuthHeaders(), null);
-
-      assertRejected(
-          response, HttpStatus.CONFLICT, "urn:civitas:error:REMOVAL_CONFIRMATION_REQUIRED");
-      assertThat(dataSinkRepository.findById(sink.getId())).isPresent();
-    }
-
     /** A draft dataset holds a provisioned sink after an unrelease. */
     @Test
     @DisplayName("DELETE of a provisioned DataSink needs confirmation and keeps its configuration")
@@ -928,14 +911,13 @@ class DataSinkControllerIntegrationTest
       ResponseEntity<ProblemDetail> unconfirmed =
           exchangeForProblem(
               getEndpointPath() + "/" + id, HttpMethod.DELETE, createAuthHeaders(), null);
-      assertRejected(
-          unconfirmed, HttpStatus.CONFLICT, "urn:civitas:error:REMOVAL_CONFIRMATION_REQUIRED");
+      assertRejected(unconfirmed, HttpStatus.CONFLICT, "urn:civitas:error:RESOURCE_IN_USE");
       assertThat(dataSinkRepository.findById(id).orElseThrow().getState())
           .isEqualTo(DataSinkState.ACTIVE);
 
       ResponseEntity<Void> confirmed =
           restTemplate.exchange(
-              getEndpointPath() + "/" + id + "?confirmedRemovalIds=" + id,
+              getEndpointPath() + "/" + id + "?confirmDataLoss=true",
               HttpMethod.DELETE,
               new HttpEntity<>(createAuthHeaders()),
               Void.class);

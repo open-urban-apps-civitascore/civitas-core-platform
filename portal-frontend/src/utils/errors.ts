@@ -1,7 +1,6 @@
 import { isAxiosError } from 'axios'
 
 import { ConnectionTestProblem } from '@/types/connectionTest'
-import { type DataSinkRemovalImpact, DataSinkRemovalImpactSchema } from '@/types/removalImpact'
 
 type ApiError = {
   type: string
@@ -116,15 +115,6 @@ export const isPipelineClosureInvalidError = (error: unknown) => {
 export const isUnconfirmedDataLossError = (error: unknown) => {
   const problem = problemWithStatus(error, 409)
   return !!problem && hasErrorType(problem, 'RESOURCE_IN_USE') && problem.detail.includes('confirmDataLoss')
-}
-
-/** The impact a refused removal names for confirmation, or null for any other error. */
-export const removalImpactToConfirm = (error: unknown): DataSinkRemovalImpact | null => {
-  const problem = problemWithStatus(error, 409)
-  if (!problem || !hasErrorType(problem, 'REMOVAL_CONFIRMATION_REQUIRED') || !isAxiosError(error)) return null
-  const impact: unknown = (error.response?.data as { impact?: unknown } | undefined)?.impact
-  const parsed = DataSinkRemovalImpactSchema.safeParse(impact)
-  return parsed.success ? parsed.data : null
 }
 
 export const isLayerNameError = (error: unknown) => {

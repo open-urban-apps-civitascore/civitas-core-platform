@@ -2,19 +2,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { PipelinePayload } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types'
 import { PipelineOutputDTO } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types/pipeline'
-import { DATASINKS_QUERY_KEY } from '@/app/services/api/datasets/datasinks/clientRequests'
 import {
-  confirmedRemovalParams,
+  confirmDataLossParams,
   invalidateRemovalQueries,
-} from '@/app/services/api/datasets/removal-impact/clientRequests'
+} from '@/app/services/api/datasets/data-sink-removal/clientRequests'
+import { DATASINKS_QUERY_KEY } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { apiRequest, type ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 
 const API_REQUEST_HEADER = 'x-api-request'
 const PIPELINES_QUERY_KEY = 'pipelines'
 
-type UpdatePipelineInput = { pipelineId: string; data: PipelinePayload; confirmedRemovalIds?: string[] }
+type UpdatePipelineInput = { pipelineId: string; data: PipelinePayload; isDataLossConfirmed?: boolean }
 
-type DeletePipelineInput = { pipelineId: string; confirmedRemovalIds?: string[] }
+type DeletePipelineInput = { pipelineId: string; isDataLossConfirmed?: boolean }
 
 /**
  * Fetches all pipelines for a dataset.
@@ -68,12 +68,12 @@ export const useUpdatePipeline = (datasetId: string) => {
   const queryClient = useQueryClient()
 
   return useMutation<ApiServiceResponse<PipelineOutputDTO>, unknown, UpdatePipelineInput>({
-    mutationFn: ({ pipelineId, data, confirmedRemovalIds }) =>
+    mutationFn: ({ pipelineId, data, isDataLossConfirmed }) =>
       apiRequest<PipelineOutputDTO>({
         method: 'PUT',
         endpoint: `/datasets/${datasetId}/pipelines/${pipelineId}`,
         headers: { [API_REQUEST_HEADER]: 'true' },
-        params: confirmedRemovalParams(confirmedRemovalIds),
+        params: confirmDataLossParams(isDataLossConfirmed),
         data,
         errorMessage: 'An error occurred while updating the pipeline.',
       }),
@@ -95,12 +95,12 @@ export const useDeletePipeline = (datasetId: string) => {
   const queryClient = useQueryClient()
 
   return useMutation<ApiServiceResponse<void>, unknown, DeletePipelineInput>({
-    mutationFn: ({ pipelineId, confirmedRemovalIds }) =>
+    mutationFn: ({ pipelineId, isDataLossConfirmed }) =>
       apiRequest<void>({
         method: 'DELETE',
         endpoint: `/datasets/${datasetId}/pipelines/${pipelineId}`,
         headers: { [API_REQUEST_HEADER]: 'true' },
-        params: confirmedRemovalParams(confirmedRemovalIds),
+        params: confirmDataLossParams(isDataLossConfirmed),
         errorMessage: 'An error occurred while deleting the pipeline.',
       }),
     onSuccess: () => {
