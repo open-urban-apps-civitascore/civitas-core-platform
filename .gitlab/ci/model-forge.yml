@@ -29,16 +29,20 @@
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - model-forge/**/*
-        - portal-backend/**/*
-        - portal-model/**/*
         - .gitlab-ci.yml
         - .gitlab/ci/docker.yml
         - .gitlab/ci/maven.yml
         - .gitlab/ci/rules.yml
         - .gitlab/ci/scripts/api-test-stack.sh
         - .gitlab/ci/model-forge.yml
-        - .gitlab/ci/backend.yml
-        - .gitlab/ci/portal-model.yml
+
+# portal-backend compiles against the artifact of build-model-forge, so that job exists wherever the
+# backend or the API test stack is built. Its tests and checks follow only a change of Model Forge.
+.build-model-forge-changes:
+  rules:
+    - !reference [.only-model-forge-changes, rules]
+    - !reference [.only-backend-changes, rules]
+    - !reference [.api-test-stack-changes, rules]
 
 # Generate the maven dependency graph JSON for license/dependency scanning.
 # Always runs (own rules, no `changes`) so the scanner has the graph even when the
@@ -175,7 +179,7 @@ static-analysis-model-forge:
 # portal-backend compiles against the artifact of this job and not against a copy from the registry.
 build-model-forge:
   extends:
-    - .only-model-forge-changes
+    - .build-model-forge-changes
     - .maven-model-forge
   image: maven:3.9.16-eclipse-temurin-25-alpine
   stage: build-package

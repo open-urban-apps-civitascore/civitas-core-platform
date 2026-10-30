@@ -25,10 +25,10 @@ include:
       stage: qa
   - template: Jobs/Secret-Detection.gitlab-ci.yml
 
-# The api test runs portal-backend, config-adapter and authz as one stack, and a component the
-# pipeline does not build is pulled from the registry instead. The build chains of all three
+# The api test runs portal-backend, config-adapter and authz as one stack, built from the jars of
+# this pipeline: the script of the stack stops when one is missing. The build chains of all three
 # therefore share this trigger, so the stack is built from one commit rather than mixing a fresh
-# backend with previously published components that answer a contract they share at runtime.
+# backend with a component of another commit that answers a contract they share at runtime.
 # The test, publish, scan and deploy jobs of each component keep their own narrower triggers.
 .api-test-stack-changes:
   rules:

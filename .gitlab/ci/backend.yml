@@ -287,8 +287,11 @@ report-test-backend:
 
 build-backend:
   extends:
-    - .only-backend-changes
     - .maven-backend
+  # The API test stack runs the jar of this pipeline, so it is built wherever that stack runs.
+  rules:
+    - !reference [.api-test-stack-changes, rules]
+    - !reference [.only-backend-changes, rules]
   image: maven:3.9.16-eclipse-temurin-25-alpine
   stage: build
   needs: !reference [.backend-dependencies, needs]

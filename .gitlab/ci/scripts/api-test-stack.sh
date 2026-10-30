@@ -1,5 +1,5 @@
 # The API test stack (dev-environment/ci/docker-compose.api-test.yml) for CI jobs. Source this file;
-# it defines functions and runs nothing but a check of the jars it finds. The job needs a Docker
+# it defines functions and runs nothing but a check that the jars are there. The job needs a Docker
 # daemon (.dind) and the docker CLI (.docker-cli).
 #
 #   . .gitlab/ci/scripts/api-test-stack.sh
@@ -8,31 +8,29 @@
 #   api_test_collect_logs       # service logs into *-logs.txt, for the artifacts
 #   api_test_down               # in after_script
 #
-# A component that this pipeline built (its jar is in the working tree) is built from source; any
-# other is pulled from the registry as the image of ${IMAGE_TAG:-develop}.
+# portal-backend, config-adapter and authz are built from the jars of this pipeline; the script
+# stops when one is missing.
 
 API_TEST_PROJECT=api-test
 API_TEST_NETWORK=api-test-net
 API_TEST_COMPOSE_FILES="-f dev-environment/ci/docker-compose.api-test.yml"
 
-if ls portal-backend/target/*.jar >/dev/null 2>&1; then
-  echo "Portal-backend JAR found — building from source"
-  API_TEST_COMPOSE_FILES="$API_TEST_COMPOSE_FILES -f dev-environment/ci/docker-compose.api-test.build-portal.yml"
-else
-  echo "Portal-backend JAR not available — using registry image"
-fi
-if ls config-adapter/config-adapter-application/target/*.jar >/dev/null 2>&1; then
-  echo "Config-adapter JARs found — building from source"
-  API_TEST_COMPOSE_FILES="$API_TEST_COMPOSE_FILES -f dev-environment/ci/docker-compose.api-test.build-ca.yml"
-else
-  echo "Config-adapter JARs not available — using registry image"
-fi
-if ls authz/repository/target/*.jar >/dev/null 2>&1; then
-  echo "AuthZ JARs found — building from source"
-  API_TEST_COMPOSE_FILES="$API_TEST_COMPOSE_FILES -f dev-environment/ci/docker-compose.api-test.build-authz.yml"
-else
-  echo "AuthZ JARs not available — using registry image"
-fi
+API_TEST_COMPOSE_FILES="$API_TEST_COMPOSE_FILES \
+  -f dev-environment/ci/docker-compose.api-test.build-portal.yml \
+  -f dev-environment/ci/docker-compose.api-test.build-ca.yml \
+  -f dev-environment/ci/docker-compose.api-test.build-authz.yml"
+
+# A missing jar is a failure and not a reason to fall back to the develop image: a fallback would
+# let the API test pass against a component of another commit.
+for pattern in portal-backend/target/*.jar \
+               config-adapter/config-adapter-application/target/*.jar \
+               authz/repository/target/*.jar; do
+  # shellcheck disable=SC2086
+  if ! ls $pattern >/dev/null 2>&1; then
+    echo "Missing $pattern: the API test stack runs only the components of this pipeline" >&2
+    exit 1
+  fi
+done
 
 api_test_compose() {
   # shellcheck disable=SC2086
