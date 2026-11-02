@@ -1,0 +1,40 @@
+meta {
+  name: Delete Data Structure Version
+  type: http
+  seq: 17
+}
+
+delete {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+  id: {{duplicatedVersionId}}
+}
+
+tests {
+  test("Status code is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` and `duplicatedVersionId` are set ("Duplicate Data Structure
+  Version" ran). Nothing references the duplicate.
+
+  **Expected Response:** 204 No Content. A version something references answers 409 with type
+  `RESOURCE_IN_USE`; a version of another data structure answers 404.
+
+  **Verification:** Get the version by `duplicatedVersionId` and confirm 404.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Version record removed; its model and every revision of it removed from the model registry |
+  | Config Adapter | -- |
+  | External System | -- |
+}
