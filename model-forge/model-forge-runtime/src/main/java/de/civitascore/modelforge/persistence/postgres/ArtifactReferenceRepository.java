@@ -22,6 +22,12 @@ import java.util.UUID;
  */
 class ArtifactReferenceRepository {
 
+    /** The references by which their holder owns the target; see {@link #ownedMemberUrns}. */
+    private static final String OWNING_REFERENCE = """
+        (r.reference_type = 'datastructure-ref'
+                     or (r.reference_type = 'pipeline-node' and r.reference_name = 'mapping')
+                     or (r.reference_type = 'dataset-ref'   and r.reference_name in ('pipeline', 'mapping')))""";
+
     private final JdbcClient jdbc;
 
     ArtifactReferenceRepository(JdbcClient jdbc) {
@@ -179,9 +185,7 @@ class ArtifactReferenceRepository {
                  where a.logical_urn = :logical
                    and fv.version = coalesce(cast(:ownerVersion as text), a.current_version)
                    and ta.logical_urn <> :logical
-                   and (r.reference_type = 'datastructure-ref'
-                     or (r.reference_type = 'pipeline-node' and r.reference_name = 'mapping')
-                     or (r.reference_type = 'dataset-ref'   and r.reference_name in ('pipeline', 'mapping')))
+                   and """ + OWNING_REFERENCE + """
                  order by r.target_urn
                 """)
             .param("logical", ownerLogicalUrn)
@@ -224,6 +228,29 @@ class ArtifactReferenceRepository {
                 """)
             .param("logical", elementLogicalUrn)
             .query(String.class)
+            .list();
+    }
+
+    /**
+     * Versioned URNs of the versions, of any artifact and current or not, that own exactly the given
+     * version through a reference pinned to it.
+     */
+    List<String> ownersOfVersion(String targetLogicalUrn, String targetVersion) {
+        return jdbc.sql("""
+                select distinct a.logical_urn, fv.version
+                  from model_forge.artifact_reference r
+                  join model_forge.artifact_version fv on fv.id = r.from_version_id
+                  join model_forge.artifact a          on a.id = fv.artifact_id
+                  join model_forge.artifact_version tv on tv.id = r.target_version_id
+                  join model_forge.artifact ta         on ta.id = tv.artifact_id
+                 where ta.logical_urn = :logical
+                   and tv.version = :version
+                   and """ + OWNING_REFERENCE + """
+                 order by a.logical_urn, fv.version
+                """)
+            .param("logical", targetLogicalUrn)
+            .param("version", targetVersion)
+            .query((rs, n) -> UrnParser.withVersion(rs.getString("logical_urn"), rs.getString("version")))
             .list();
     }
 

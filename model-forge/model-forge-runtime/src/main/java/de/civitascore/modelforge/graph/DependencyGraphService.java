@@ -291,12 +291,7 @@ public class DependencyGraphService {
             dependents.keySet().forEach(k -> { if (logical.equals(UrnParser.logicalUrn(k))) nodes.add(k); });
 
             for (String node : nodes) {
-                // Drop the node's forward edges and detach it from its targets' dependents.
-                Set<String> outgoing = dependencies.remove(node);
-                if (outgoing != null) {
-                    outgoing.forEach(dep -> dependents.computeIfPresent(dep,
-                        (k, v) -> { v.remove(node); return v.isEmpty() ? null : v; }));
-                }
+                dropOutgoingLocked(node);
                 // Drop the node from the reverse index and detach it from its dependents' edges.
                 Set<String> incoming = dependents.remove(node);
                 if (incoming != null) {
@@ -311,6 +306,28 @@ public class DependencyGraphService {
             }
         } finally {
             graphLock.unlock();
+        }
+    }
+
+    /**
+     * Removes one version node: the edges it declared. Edges other versions hold onto it stay, as
+     * their reference rows do, so the graph keeps matching what a {@link #rebuild()} reads.
+     */
+    public void removeVersion(String versionedUrn) {
+        graphLock.lock();
+        try {
+            dropOutgoingLocked(versionedUrn);
+        } finally {
+            graphLock.unlock();
+        }
+    }
+
+    /** Drops the node's forward edges and detaches it from its targets' dependents. */
+    private void dropOutgoingLocked(String node) {
+        Set<String> outgoing = dependencies.remove(node);
+        if (outgoing != null) {
+            outgoing.forEach(dep -> dependents.computeIfPresent(dep,
+                (k, v) -> { v.remove(node); return v.isEmpty() ? null : v; }));
         }
     }
 }

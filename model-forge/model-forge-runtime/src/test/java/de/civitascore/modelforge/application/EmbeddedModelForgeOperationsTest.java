@@ -310,6 +310,31 @@ class EmbeddedModelForgeOperationsTest {
         verify(registry, org.mockito.Mockito.never()).deleteArtifact(sharedLogical);
     }
 
+    @Test
+    void deleteVersionLine_refusesAnIdThatPinsNoVersion() {
+        String logical = "urn:core:platform:civitas:datastructure:common:d9d0d267-d8e1-8d73-8b58-4307281607ac";
+
+        for (String unpinned : List.of(logical, logical + ":latest")) {
+            assertThatThrownBy(() -> operations.deleteVersionLine(new ArtifactId(unpinned)))
+                .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> operations.versionLineDeletionBlockers(new ArtifactId(unpinned)))
+                .isInstanceOf(IllegalArgumentException.class);
+        }
+        verify(registry, never()).deleteVersions(anyString(), any());
+        verify(registry, never()).deleteArtifact(anyString());
+    }
+
+    @Test
+    void deleteVersionLine_ofALineTheRegistryDoesNotHoldDeletesNothing() {
+        String pin = "urn:core:platform:civitas:datastructure:common:d9d0d267-d8e1-8d73-8b58-4307281607ac:3.0.0";
+        when(registry.versionsOf(UrnParser.logicalUrn(pin))).thenReturn(List.of("1.0.0", "2.0.0"));
+
+        operations.deleteVersionLine(new ArtifactId(pin));
+
+        verify(registry, never()).deleteVersions(anyString(), any());
+        verify(registry, never()).deleteArtifact(anyString());
+    }
+
     /** A Data Set the caller holds, the Mapping it names, and the Data Set that holds that Mapping. */
     private static final ArtifactId MINE =
         new ArtifactId("urn:core:platform:civitas:dataset:common:53609354-f43b-8d83-8ea5-f0867fb76a09");

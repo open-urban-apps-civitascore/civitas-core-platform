@@ -173,8 +173,17 @@ superseded version states what that version declared and stays readable, but it
 holds nothing back: a Data Sink repointed at a newer Data Structure leaves the
 older one free.
 
-An artifact is removed with its whole history; versions are not deleted one at
-a time.
+A delete removes either the whole artifact with its history or one **version
+line**: the versions that share one major. A line goes as one unit, never one
+minor of it, and under the same rules. Its current version moves to the highest
+version left, and a member version it owns goes with it unless another version
+owns it too. An Element's line also takes the versions of its own grouping that
+hold it. When the line is the last one, the whole artifact goes.
+
+A version number is never assigned twice. After line 3 is deleted the next major
+is 4.0.0, also when the whole artifact was deleted and is stored again under its
+URN: a pinned URN must always name the same content, and other artifacts and
+caches may still hold it.
 
 ## Local Build
 

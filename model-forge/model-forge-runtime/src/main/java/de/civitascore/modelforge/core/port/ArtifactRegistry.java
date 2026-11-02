@@ -154,8 +154,8 @@ public interface ArtifactRegistry {
      * unchanged apart from {@code retargets}, so the byte-identical short-circuit the store methods
      * rely on would otherwise make this a no-op.
      *
-     * <p>The copy is numbered at the next MAJOR version above the artifact's highest version, or
-     * above {@code countAbove} when that is higher. Copies of several artifacts that each pass the
+     * <p>The copy is numbered at the next MAJOR version above the highest version the artifact ever
+     * had, or above {@code countAbove} when that is higher. Copies of several artifacts that each pass the
      * highest version of the others therefore share one number.
      *
      * @param sourcePin the Versioned URN of the version to copy
@@ -170,6 +170,26 @@ public interface ArtifactRegistry {
     String copyVersion(String sourcePin, String countAbove, Map<String, String> retargets);
 
     void deleteArtifact(String urn);
+
+    /** The versions the registry holds of the artifact, lowest first; empty when it holds none. */
+    List<String> versionsOf(String urn);
+
+    /**
+     * The versioned URNs of every version, of any artifact and whether current or not, that owns
+     * exactly this version, as {@link #ownedMemberUrns(String, String)} reads ownership. Empty for a
+     * logical or {@code :latest} URN.
+     */
+    List<String> versionOwners(String pinnedUrn);
+
+    /**
+     * Deletes the given versions of the artifact, with their representations and outgoing
+     * references, and moves its current version to the highest version left. A reference that
+     * pinned a deleted version stays, unresolved. The numbers stay taken.
+     *
+     * @throws IllegalArgumentException when no version would be left; that is
+     *     {@link #deleteArtifact}
+     */
+    void deleteVersions(String urn, Collection<String> versions);
 
     /**
      * Logical URNs of artifacts whose stored references point at the given artifact and therefore

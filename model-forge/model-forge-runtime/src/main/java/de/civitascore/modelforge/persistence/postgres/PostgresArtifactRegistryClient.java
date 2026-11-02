@@ -54,8 +54,9 @@ import java.util.function.Supplier;
  * is therefore a property of its stored representations, read from the DB — never inferred
  * from the URN. Versioning is backend-owned: the first version of a new model_forge.artifact is
  * {@code 1.0.0}; every update bumps by the supplied {@link VersionBump} from the version the caller
- * named as its base, or from {@code model_forge.artifact.current_version} — the highest version —
- * when it named none. Identical authored content in the same format is idempotent
+ * named as its base, or from the highest version ever assigned when it named none or asked for a
+ * major. A number is never assigned twice, also after its version or the whole artifact is deleted
+ * ({@code model_forge.version_high_water}). Identical authored content in the same format is idempotent
  * (matched by {@code content_hash}). The COMPLETE reference graph — including cycles — is persisted.
  *
  * <p>Every write runs in a single transaction (model_forge.artifact upsert → version insert →
@@ -76,6 +77,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
     private final ArtifactRepresentationRepository representations;
     private final ArtifactReferenceRepository      references;
     private final XsdNamespaceRepository           namespaces;
+    private final VersionHighWaterRepository       highWater;
     private final XsdSchemaSupport                 xsd;
 
     public PostgresArtifactRegistryClient(JdbcClient jdbc,
@@ -92,6 +94,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         this.representations = new ArtifactRepresentationRepository(jdbc);
         this.references      = new ArtifactReferenceRepository(jdbc);
         this.namespaces      = new XsdNamespaceRepository(jdbc);
+        this.highWater       = new VersionHighWaterRepository(jdbc);
         this.xsd             = new XsdSchemaSupport(xsdConverter, mapper);
     }
 
@@ -190,10 +193,11 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                 ArtifactVersionRow source = versions.find(artifact.id(), sourceVersion)
                     .orElseThrow(() -> new IllegalArgumentException(
                         "Unknown version " + sourceVersion + " of " + logical));
-                String newVersion = SemVer.next(higher(artifact.currentVersion(), countAbove), VersionBump.MAJOR);
+                String newVersion = SemVer.next(
+                    higher(highestAssigned(logical, artifact.currentVersion()), countAbove), VersionBump.MAJOR);
                 Instant now = Instant.now();
                 UUID versionId = UUID.randomUUID();
-                versions.insert(new ArtifactVersionRow(versionId, artifact.id(), newVersion,
+                insertVersion(logical, new ArtifactVersionRow(versionId, artifact.id(), newVersion,
                     source.primaryFormat(), source.title(), source.description(), now, source.createdBy()));
                 for (String format : representations.listFormats(source.id())) {
                     representations.find(source.id(), format).ifPresent(rep ->
@@ -265,6 +269,59 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
             else log.debug("Artifact {} not present — delete is a no-op", logical);
         } catch (DataAccessException e) {
             throw translate(e, "Could not delete model_forge.artifact " + logical);
+        }
+    }
+
+    @Override
+    public List<String> versionsOf(String urn) {
+        UrnParser.requireNoControlChars(urn);
+        String logical = UrnParser.logicalUrn(urn);
+        return read(() -> artifacts.findByLogicalUrn(logical)
+            .map(artifact -> versions.listVersions(artifact.id()).stream().sorted(SemVer::compare).toList())
+            .orElseGet(List::of));
+    }
+
+    @Override
+    public List<String> versionOwners(String pinnedUrn) {
+        UrnParser.requireNoControlChars(pinnedUrn);
+        String version = pinnedVersion(UrnParser.versionFromUrn(pinnedUrn));
+        if (version == null) {
+            return List.of();
+        }
+        return read(() -> references.ownersOfVersion(UrnParser.logicalUrn(pinnedUrn), version));
+    }
+
+    @Override
+    public void deleteVersions(String urn, Collection<String> deleted) {
+        UrnParser.requireNoControlChars(urn);
+        String logical = UrnParser.logicalUrn(urn);
+        if (deleted.isEmpty()) {
+            return;
+        }
+        try {
+            inTxResult(() -> {
+                lockArtifactWrite(logical);
+                ArtifactRow artifact = artifacts.findByLogicalUrn(logical)
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown artifact: " + logical));
+                String current = versions.listVersions(artifact.id()).stream()
+                    .filter(version -> !deleted.contains(version))
+                    .max(SemVer::compare)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                        "Deleting every version of " + logical + " deletes the artifact"));
+                versions.delete(artifact.id(), deleted);
+                Instant now = Instant.now();
+                artifacts.updateCurrentVersion(artifact.id(), current, now);
+                // The namespace index addresses a version, so it follows the current one as a bump does.
+                ArtifactVersionRow currentRow = versions.find(artifact.id(), current).orElseThrow();
+                if (RegistryMapping.FORMAT_XSD.equals(currentRow.primaryFormat())) {
+                    namespaces.repointVersion(artifact.id(), currentRow.id(), now);
+                }
+                xsd.evict(logical);
+                log.info("Deleted {} v{}; current is v{}", logical, deleted, current);
+                return null;
+            });
+        } catch (DataAccessException e) {
+            throw translate(e, "Could not delete versions of " + logical);
         }
     }
 
@@ -760,7 +817,10 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                 boolean hasExplicitVersion = explicitVersion != null && !explicitVersion.isBlank();
                 if (existing.isEmpty()) {
                     artifactId = UUID.randomUUID();
-                    newVersion = hasExplicitVersion ? explicitVersion : SemVer.INITIAL;
+                    // An artifact recreated under a deleted one's URN continues after its numbers.
+                    newVersion = hasExplicitVersion ? explicitVersion : highWater.find(logical)
+                        .map(highest -> SemVer.next(highest, VersionBump.MAJOR))
+                        .orElse(SemVer.INITIAL);
                     // The URN carries no name; until a title or nameArtifact supplies one, the
                     // UUID stands in, because the column is the sort key of every listing.
                     String name = title != null ? title : UrnParser.idFromUrn(logical).toString();
@@ -792,13 +852,14 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                     // artifact surfaces as the usual integrity-violation error on insert below,
                     // and takes precedence over a named base.
                     // A named base is the version being revised, so an artifact whose versions form
-                    // independent lines keeps the bump inside the revised line.
-                    String base = bumpFromVersion != null && !bumpFromVersion.isBlank()
-                        ? bumpFromVersion : row.currentVersion();
+                    // independent lines keeps the bump inside the revised line. A major opens a new
+                    // line, which no base can place below the highest.
+                    String base = bump != VersionBump.MAJOR && bumpFromVersion != null && !bumpFromVersion.isBlank()
+                        ? bumpFromVersion : highestAssigned(logical, row.currentVersion());
                     newVersion = hasExplicitVersion ? explicitVersion : SemVer.next(base, bump);
                 }
                 UUID versionId = UUID.randomUUID();
-                versions.insert(new ArtifactVersionRow(versionId, artifactId, newVersion, format,
+                insertVersion(logical, new ArtifactVersionRow(versionId, artifactId, newVersion, format,
                     null, null, now, null));
                 representations.insert(new ArtifactRepresentationRow(UUID.randomUUID(), versionId, format,
                     contentType, contentJson, contentText, hash, "stored", now));
@@ -820,6 +881,17 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         }
     }
 
+    /** Inserts the version row and marks its number as taken for good. */
+    private void insertVersion(String logicalUrn, ArtifactVersionRow version) {
+        versions.insert(version);
+        highWater.raise(logicalUrn, version.version());
+    }
+
+    /** The highest version the artifact ever had, deleted ones included. */
+    private String highestAssigned(String logicalUrn, String currentVersion) {
+        return SemVer.higher(currentVersion, highWater.find(logicalUrn).orElse(null));
+    }
+
     /**
      * Takes a transaction-scoped PostgreSQL advisory lock keyed on the logical URN. Serialises
      * concurrent writers for the same artifact (across application instances, unlike a JVM lock)
@@ -835,6 +907,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
 
     @Override
     public void lockForWrite(String logicalUrn) {
+        UrnParser.requireNoControlChars(logicalUrn);
         String logical = UrnParser.logicalUrn(logicalUrn);
         try {
             lockArtifactWrite(logical);

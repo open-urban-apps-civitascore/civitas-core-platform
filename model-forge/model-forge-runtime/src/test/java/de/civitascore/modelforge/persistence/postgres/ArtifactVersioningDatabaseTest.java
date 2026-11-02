@@ -386,6 +386,58 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
             .orElseThrow().contentJson();
     }
 
+    @Test
+    @DisplayName("A deleted version's number is never given out again, by a write or by a bump")
+    void aDeletedNumberIsNeverReassigned() {
+        String logical = UrnParser.logicalUrn(registry.storeElement(schema(null, "temperature"), Set.of()));
+        storeUnder(logical, "humidity", VersionBump.MAJOR);
+        storeUnder(logical, "pressure", VersionBump.MAJOR);
+
+        registry.deleteVersions(logical, List.of("3.0.0"));
+
+        assertThat(currentVersionOf(logical)).isEqualTo("2.0.0");
+        assertThat(UrnParser.versionFromUrn(storeUnder(logical, "wind", VersionBump.MAJOR))).isEqualTo("4.0.0");
+        registry.deleteVersions(logical, List.of("4.0.0"));
+        assertThat(UrnParser.versionFromUrn(registry.copyVersion(UrnParser.withVersion(logical, "1.0.0"), null, Map.of())))
+            .isEqualTo("5.0.0");
+    }
+
+    @Test
+    @DisplayName("A major counts from the highest number even when the write names a base")
+    void aMajorCountsFromTheHighestNumberDespiteABase() {
+        String logical = UrnParser.logicalUrn(registry.storeElement(schema(null, "temperature"), Set.of()));
+        storeUnder(logical, "humidity", VersionBump.MAJOR);
+
+        String major = registry.storeElement(schema(logical, "wind"), Set.of(), Set.of(), null, VersionBump.MAJOR, "1.0.0");
+        String minor = registry.storeElement(schema(logical, "rain"), Set.of(), Set.of(), null, VersionBump.MINOR, "1.0.0");
+
+        assertThat(UrnParser.versionFromUrn(major)).isEqualTo("3.0.0");
+        assertThat(UrnParser.versionFromUrn(minor)).as("a minor stays in its base's line").isEqualTo("1.1.0");
+    }
+
+    @Test
+    @DisplayName("An artifact recreated under a deleted one's URN continues after its numbers")
+    void aRecreatedArtifactContinuesAfterTheDeletedNumbers() {
+        String logical = UrnParser.logicalUrn(registry.storeElement(schema(null, "temperature"), Set.of()));
+        storeUnder(logical, "humidity", VersionBump.MINOR);
+        registry.deleteArtifact(logical);
+
+        String recreated = storeUnder(logical, "temperature", VersionBump.PATCH);
+
+        assertThat(UrnParser.versionFromUrn(recreated)).isEqualTo("2.0.0");
+    }
+
+    @Test
+    @DisplayName("Deleting every version is refused; that deletes the artifact")
+    void deletingEveryVersionIsRefused() {
+        String logical = UrnParser.logicalUrn(registry.storeElement(schema(null, "temperature"), Set.of()));
+        var before = snapshot();
+
+        assertThatThrownBy(() -> registry.deleteVersions(logical, List.of("1.0.0")))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThat(snapshot()).isEqualTo(before);
+    }
+
     /** Writes under an existing logical URN by carrying it as the schema's {@code $id}. */
     private String storeUnder(String logicalUrn, String property, VersionBump bump) {
         return registry.storeElement(schema(logicalUrn, property), Set.of(), Set.of(), null, bump, null);

@@ -77,6 +77,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
     private final XRepositoryService xRepositoryService;
     private final UrnService urns;
     private final ForeignReferenceResolver foreignReferenceResolver;
+    private final VersionLineDeletion versionLineDeletion;
 
     public EmbeddedModelForgeOperations(
         SchemaImportService schemaImportService,
@@ -105,6 +106,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         this.xRepositoryService = xRepositoryService;
         this.urns = urns;
         this.foreignReferenceResolver = new ForeignReferenceResolver(registry, urns);
+        this.versionLineDeletion = new VersionLineDeletion(registry, dependencyGraph, elementCommandService);
     }
 
     @Override
@@ -794,6 +796,16 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         }
         List<String> memberships = registry.dataSetMemberships(root);
         return memberships.size() >= 2 ? memberships : List.of();
+    }
+
+    @Override
+    public void deleteVersionLine(ArtifactId pinnedVersion) {
+        versionLineDeletion.delete(pinnedVersion.value());
+    }
+
+    @Override
+    public List<String> versionLineDeletionBlockers(ArtifactId pinnedVersion) {
+        return versionLineDeletion.blockers(pinnedVersion.value());
     }
 
     /**
