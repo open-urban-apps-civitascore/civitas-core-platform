@@ -61,7 +61,7 @@
          Renovate's maven manager instead of being hidden in an inline CI coordinate. -->
     <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
     <!-- Pin tool versions once; child modules inherit these properties. -->
-    <jacoco.version>0.8.15</jacoco.version>
+    <jacoco.version>0.8.16</jacoco.version>
     <archunit.version>1.5.1</archunit.version>
     <testcontainers.version>2.0.5</testcontainers.version>
     <!-- Apache Wicket: Jakarta-based 10.x line (Servlet 6), used only by the admin-ui demo host. -->
