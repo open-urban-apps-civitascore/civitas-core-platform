@@ -11,6 +11,13 @@ CREATE INDEX idx_pipeline_data_sinks_data_sink ON pipeline_data_sinks (data_sink
 INSERT INTO pipeline_data_sinks (pipeline_id, data_sink_id)
 SELECT pipeline_id, id FROM data_sinks WHERE pipeline_id IS NOT NULL;
 
+-- A Data sink without a Pipeline that was never provisioned holds no data. It goes with its Layers,
+-- as a removal does from now on. A provisioned one stays ACTIVE, because its table can still serve
+-- an API.
+DELETE FROM layers
+WHERE datasink_id IN (SELECT id FROM data_sinks WHERE pipeline_id IS NULL AND NOT provisioned);
+DELETE FROM data_sinks WHERE pipeline_id IS NULL AND NOT provisioned;
+
 -- Drops the foreign key fk_data_sinks_on_pipeline and the index idx_data_sinks_pipeline with it.
 ALTER TABLE data_sinks DROP COLUMN pipeline_id;
 

@@ -28,9 +28,11 @@ class DataSinkRemovalMigrationIntegrationTest {
 
   private static final String ROADS_PIPELINE = "30000000-0000-4000-8000-000000000002";
   private static final String LINKED_SINK = "31000000-0000-4000-8000-000000000001";
-  private static final String UNLINKED_SINK = "31000000-0000-4000-8000-000000000002";
+  private static final String UNLINKED_UNPROVISIONED_SINK = "31000000-0000-4000-8000-000000000002";
+  private static final String UNLINKED_PROVISIONED_SINK = "31000000-0000-4000-8000-000000000003";
   private static final String OWS_API = "32000000-0000-4000-8000-000000000001";
   private static final String LINKED_LAYER = "33000000-0000-4000-8000-000000000001";
+  private static final String UNPROVISIONED_LAYER = "33000000-0000-4000-8000-000000000002";
   private static final String UNSERVED_LAYER = "43000000-0000-4000-8000-000000000001";
 
   private static PostgreSQLContainer postgres;
@@ -70,9 +72,15 @@ class DataSinkRemovalMigrationIntegrationTest {
   }
 
   @Test
-  void migrate_keepsEverySinkActive() {
+  void migrate_keepsEveryProvisionedSinkActive() {
     assertThat(stateOf(LINKED_SINK)).isEqualTo("ACTIVE");
-    assertThat(stateOf(UNLINKED_SINK)).isEqualTo("ACTIVE");
+    assertThat(stateOf(UNLINKED_PROVISIONED_SINK)).isEqualTo("ACTIVE");
+  }
+
+  @Test
+  void migrate_deletesAnUnlinkedSinkThatWasNeverProvisionedWithItsLayers() {
+    assertThat(exists("data_sinks", UNLINKED_UNPROVISIONED_SINK)).isFalse();
+    assertThat(exists("layers", UNPROVISIONED_LAYER)).isFalse();
   }
 
   @Test
@@ -85,8 +93,10 @@ class DataSinkRemovalMigrationIntegrationTest {
   void migrate_rejectsAPendingSinkThatWasNeverProvisioned() {
     assertThatThrownBy(
             () ->
-                jdbc.sql("UPDATE data_sinks SET state = 'PENDING_UNPROVISION' WHERE id = :id::uuid")
-                    .param("id", UNLINKED_SINK)
+                jdbc.sql(
+                        "UPDATE data_sinks SET state = 'PENDING_UNPROVISION', provisioned = false"
+                            + " WHERE id = :id::uuid")
+                    .param("id", LINKED_SINK)
                     .update())
         .isInstanceOf(DataIntegrityViolationException.class);
   }
@@ -100,6 +110,14 @@ class DataSinkRemovalMigrationIntegrationTest {
         .param("id", sinkId)
         .query(String.class)
         .single();
+  }
+
+  private static boolean exists(String table, String id) {
+    return jdbc.sql("SELECT count(*) FROM " + table + " WHERE id = :id::uuid")
+            .param("id", id)
+            .query(Long.class)
+            .single()
+        > 0;
   }
 
   private static String namedApiOf(String layerId) {
