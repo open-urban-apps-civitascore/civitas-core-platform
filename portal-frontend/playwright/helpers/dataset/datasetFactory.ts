@@ -1,21 +1,11 @@
-import { Dataset } from '@/types/datasets'
-
 import { TEST_ENV } from '../../../playwright.config'
 
-export const getMockDatasetData = (overrides: Partial<Dataset> = {}): Dataset => {
+/** Unique name and description for a test dataset. The description is limited to 150 characters. */
+export const getMockDatasetData = (overrides: Partial<{ name: string; description: string }> = {}) => {
   const id = crypto.randomUUID()
-  const name = `E2EDatasetName-${TEST_ENV}-${id}`
   return {
-    id: id,
-    name: name,
+    name: `E2EDatasetName-${TEST_ENV}-${id}`,
     description: 'Dataset Description',
-    createdAt: new Date().toISOString(),
-    createdBy: { id: crypto.randomUUID(), name: 'E2E Test User' },
-    modifiedAt: new Date().toISOString(),
-    dataSetStatus: 'DRAFT',
-    openDataAccess: false,
-    pipelines: [],
-    datapool: null,
     ...overrides,
   }
 }
