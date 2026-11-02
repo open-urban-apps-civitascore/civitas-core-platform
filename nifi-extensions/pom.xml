@@ -56,13 +56,13 @@
 		     JUnit into the test classpath, and two lines in one JVM break test discovery, so both
 		     halves are pinned here rather than left to the nearest declaration. -->
 		<junit.platform.version>1.14.4</junit.platform.version>
-		<mockito.version>5.23.0</mockito.version>
+		<mockito.version>5.24.0</mockito.version>
 		<!-- The integration test brings its own FROST server up, so the build needs no endpoint and
 		     no credential of an installation. -->
 		<testcontainers.version>2.0.5</testcontainers.version>
 		<awaitility.version>4.3.0</awaitility.version>
 		<jacoco.version>0.8.15</jacoco.version>
-		<spotless.version>3.4.0</spotless.version>
+		<spotless.version>3.10.4</spotless.version>
 		<nifi-nar-maven-plugin.version>2.4.0</nifi-nar-maven-plugin.version>
 		<cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
 	</properties>
@@ -204,12 +204,12 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-surefire-plugin</artifactId>
-					<version>3.2.3</version>
+					<version>3.6.1</version>
 				</plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-failsafe-plugin</artifactId>
-					<version>3.2.3</version>
+					<version>3.6.1</version>
 				</plugin>
 				<plugin>
 					<groupId>org.jacoco</groupId>
