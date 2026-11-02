@@ -1213,6 +1213,33 @@
         "password": {
           "label": "Password"
         }
+      },
+      "connectionTest": {
+        "title": "Connection test",
+        "button": "Test connection",
+        "incompleteHint": "Fill in all required fields to test the connection.",
+        "connecting": "Connecting…",
+        "testAgain": "Test again",
+        "success": "Connection established successfully",
+        "failure": "Connection failed",
+        "cause": "Cause:",
+        "details": "Details:",
+        "httpStatus": "HTTP status: {status}",
+        "previewTruncated": "Preview truncated.",
+        "reenterPassword": "The configuration was changed. Enter the password again to test the connection.",
+        "causes": {
+          "INVALID_CONNECTOR": "The configuration is invalid.",
+          "SOURCE_ERROR": "The source could not be reached or answered with an error.",
+          "TIMEOUT": "The source did not answer in time.",
+          "VALIDATION_FAILED": "Not all required fields are filled in correctly.",
+          "MALFORMED_REQUEST": "The request could not be processed.",
+          "FORBIDDEN": "No permission for this connection test.",
+          "NOT_FOUND": "The data source was not found.",
+          "TOO_MANY_REQUESTS": "Connection tests are already running. Please try again later.",
+          "EXTERNAL_SYSTEM_ERROR": "The connection test could not be run.",
+          "EXTERNAL_SYSTEM_TIMEOUT": "The connection test took too long.",
+          "UNKNOWN": "Unknown error."
+        }
       }
     },
     "dataModel": {

@@ -12,17 +12,29 @@ import { SelectOption } from '@/types/common'
 import { CONNECTOR_FIELD_REVALIDATION_RULES, ConnectorType } from '@/types/connectors'
 import { ConnectorFieldLabel, ConnectorFieldOption, DatasourceFormDraft } from '@/types/datasources'
 
+import { ConnectionTest } from './connection-test/ConnectionTest'
 import { CONNECTOR_INPUTS } from './connectorSources'
 import { DynamicFormField } from './DynamicFormField'
 
 interface ConnectorTabProps {
   form: UseFormReturn<DatasourceFormDraft>
+  datasourceId: string
   connectorType?: ConnectorType
+  isConnectorComplete: boolean
+  isConnectorChanged: boolean
   isReadOnly?: boolean
   isDatasourceReleased?: boolean
 }
 export const ConnectorTab = (props: ConnectorTabProps) => {
-  const { form, connectorType, isReadOnly = false, isDatasourceReleased = false } = props
+  const {
+    form,
+    datasourceId,
+    connectorType,
+    isConnectorComplete,
+    isConnectorChanged,
+    isReadOnly = false,
+    isDatasourceReleased = false,
+  } = props
   const isDisabled = isReadOnly || isDatasourceReleased
   const t = useTranslations('datasources.connectorTab')
   const connectorTypeOptions: SelectOption[] = Object.keys(CONNECTOR_INPUTS).map(type => ({
@@ -114,6 +126,12 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
               disabled={isDisabled}
             />
           ))}
+          <ConnectionTest
+            form={form}
+            datasourceId={datasourceId}
+            isConnectorComplete={isConnectorComplete}
+            isConnectorChanged={isConnectorChanged}
+          />
         </ContentCard>
       )}
     </div>

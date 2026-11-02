@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { useForm, UseFormReturn } from 'react-hook-form'
 import { describe, expect, it } from 'vitest'
@@ -52,12 +53,22 @@ const renderConnectorTab = (values?: Partial<DatasourceFormDraft>) => {
 
     return (
       <Form {...form}>
-        <ConnectorTab form={form} connectorType={defaultValues.connectorType} />
+        <ConnectorTab
+          form={form}
+          datasourceId={defaultValues.id}
+          connectorType={defaultValues.connectorType}
+          isConnectorComplete={false}
+          isConnectorChanged={false}
+        />
       </Form>
     )
   }
 
-  const view = render(<Wrapper />)
+  const view = render(
+    <QueryClientProvider client={new QueryClient()}>
+      <Wrapper />
+    </QueryClientProvider>,
+  )
   return { ...view, form: capturedForm! }
 }
 

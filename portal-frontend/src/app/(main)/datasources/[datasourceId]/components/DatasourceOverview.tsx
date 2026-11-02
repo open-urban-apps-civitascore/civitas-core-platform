@@ -140,6 +140,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     areAssignmentsDirty,
     areDatapoolsDirty,
     isFormDirty,
+    isConnectorChanged,
     form: datasourceForm,
     dataSourceStatus,
     selectedConnectorType,
@@ -317,7 +318,10 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
         return (
           <ConnectorTab
             form={datasourceForm}
+            datasourceId={datasource.id}
             connectorType={selectedConnectorType}
+            isConnectorComplete={completedTabs.includes('connector')}
+            isConnectorChanged={isConnectorChanged}
             isReadOnly={isReadOnly}
             isDatasourceReleased={isReleased}
           />
