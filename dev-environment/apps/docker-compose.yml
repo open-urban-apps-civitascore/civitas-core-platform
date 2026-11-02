@@ -244,7 +244,7 @@ services:
   # Off by default; started by start-portal-dev.sh only with --pgadmin. The "CIVITAS Portal DB"
   # server is pre-registered via servers.json (enter password "admin" on first connect).
   pgadmin:
-    image: dpage/pgadmin4:latest
+    image: dpage/pgadmin4:latest@sha256:3591b3d02910dcd817dec6fcaa681c278ba6966945283dd0ea0042731c330c83
     mem_limit: 256m
     container_name: civitas-pgadmin
     restart: unless-stopped

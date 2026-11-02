@@ -5,7 +5,7 @@
 # unreachable. This restores the working pre-568d52bc ("replaces redpanda with nifi") setup.
 services:
   redpanda-connect:
-    image: redpandadata/connect:4
+    image: redpandadata/connect:4@sha256:47ff773082146b6e538c527509af1a736b53063e68f0eb1266253a0832b39396
     command: ["streams"]
     environment:
       FROST_BASE: http://civitas-frost:8080/FROST-Server/v1.1
