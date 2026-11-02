@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NextIntlClientProvider } from 'next-intl'
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
@@ -141,10 +141,7 @@ const sinks = [
 ] as const
 
 const loadPipeline = (sink: ReturnType<typeof frostNode>, build = savablePipeline) => {
-  const saved = build(sink)
-  // Pre-selected: the inspector shows the selected node, and React Flow needs pointer events to select.
-  const loaded = { ...saved, nodes: saved.nodes.map(node => ({ ...node, selected: node.id === 'cron-1' })) }
-  const response = savedAs(loaded)
+  const response = savedAs(build(sink))
   vi.mocked(useGetPipelines).mockReturnValue({
     data: { data: [response] },
     isLoading: false,
@@ -158,9 +155,19 @@ const loadPipeline = (sink: ReturnType<typeof frostNode>, build = savablePipelin
   return response
 }
 
+const selectCronNode = async () => {
+  const cronNode = await waitFor(() => {
+    const node = document.querySelector('[data-id="cron-1"]')
+    expect(node).not.toBeNull()
+    return node!
+  })
+  fireEvent.click(cronNode)
+  return screen.findByDisplayValue('0 0 * * * ?')
+}
+
 const editCronAndSave = async () => {
   const user = userEvent.setup()
-  const cron = await screen.findByDisplayValue('0 0 * * * ?')
+  const cron = await selectCronNode()
   await user.clear(cron)
   await user.type(cron, '0 30 * * * ?')
   await user.click(screen.getByRole('button', { name: 'Alle speichern' }))
@@ -235,7 +242,7 @@ describe('Pipeline editor after a failed request', () => {
 
     loadPipeline(frostNode())
 
-    await screen.findByDisplayValue('0 0 * * * ?')
+    await selectCronNode()
 
     expect(screen.queryByRole('button', { name: 'Alle speichern' })).not.toBeInTheDocument()
     expect(screen.queryByTitle('Neue Pipeline')).not.toBeInTheDocument()

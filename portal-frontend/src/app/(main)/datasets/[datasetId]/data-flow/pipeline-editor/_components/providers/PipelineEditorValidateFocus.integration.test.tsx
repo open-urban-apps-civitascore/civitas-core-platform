@@ -4,7 +4,7 @@
  * unit tests those components have on their own) and drives it with actual DOM clicks, so it
  * exercises the whole Validate -> selection-clear -> re-click path end to end.
  */
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import React from 'react'
 
 import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
@@ -22,6 +22,7 @@ import {
   useUpdatePipeline,
 } from '@/app/services/api/pipelines/clientRequests'
 
+import { useActivePipeline } from '../../_hooks/use-active-pipeline'
 import { usePipelineSession } from '../../_hooks/use-pipeline-session'
 import { createEmptyPipeline } from '../../_services/pipelineService'
 import { validatePipelineWithNodeStatus } from '../../_services/validationService'
@@ -50,7 +51,7 @@ vi.mock('../../_hooks/use-pipeline-read-only', () => ({
   ReadOnlyProvider: ({ children }: { children: React.ReactNode }) => children,
 }))
 
-const mockDatasources = vi.hoisted(() => ({ entities: [] }))
+const mockDatasources = vi.hoisted(() => ({ entities: [], isFetching: false }))
 vi.mock('../../_hooks/use-pipeline-datasources', () => ({
   usePipelineDatasources: () => mockDatasources,
 }))
@@ -105,13 +106,39 @@ const makeSession = (): PipelineSession => ({
   lastModified: new Date(),
 })
 
+const savedPipeline = (id: string, nodes: ReturnType<typeof makeNode>[]) => ({
+  id,
+  name: id,
+  description: '',
+  styles: { nodes, edges: [], nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } },
+  dataSources: [],
+  apis: [],
+  dataSinks: [],
+  model: {},
+  createdAt: '2024-01-01T00:00:00Z',
+  modifiedAt: '2024-01-01T00:00:00Z',
+})
+
+const sessionIdOf = (pipelineId: string) =>
+  String(sessionManagerRef.current?.sessions.find(session => session.pipeline.id === pipelineId)?.id)
+
 // Wrapped in StrictMode: Next.js dev mode renders "use client" trees in StrictMode (double-
 // invoking effects), which a plain RTL render does not do by default.
-const Harness: React.FC = () => {
-  const sessionManager = usePipelineSession(makeSession())
+const sessionManagerRef = { current: null as ReturnType<typeof usePipelineSession> | null }
+const contextRef = { current: null as ReturnType<typeof useActivePipeline> | null }
+
+const ContextCapture: React.FC = () => {
+  contextRef.current = useActivePipeline()
+  return null
+}
+
+const Harness: React.FC<{ session?: PipelineSession }> = ({ session = makeSession() }) => {
+  const sessionManager = usePipelineSession(session)
+  sessionManagerRef.current = sessionManager
   return (
     <React.StrictMode>
       <PipelineEditorProviderComponent sessionManager={sessionManager}>
+        <ContextCapture />
         <PipelineToolbar />
         <PipelineCanvas />
         <PipelineInspector />
@@ -213,5 +240,112 @@ describe('Pipeline editor: Validate focus', () => {
     expect(screen.queryAllByText('inspector.properties').length).toBeGreaterThan(0)
     expect(screen.queryByText('validation.results')).toBeNull()
     expect(screen.queryByText('inspector.noNodeSelected')).toBeNull()
+  })
+})
+
+describe('Pipeline editor: validation on save', () => {
+  it('shows Validation Results only in the changed pipeline, then the node panel on a click', async () => {
+    vi.mocked(useGetPipelines).mockReturnValue({
+      data: {
+        data: [savedPipeline('pipeline-a', [makeNode('node-a')]), savedPipeline('pipeline-b', [makeNode('node-b')])],
+      },
+      isLoading: false,
+    } as unknown as ReturnType<typeof useGetPipelines>)
+    const { container } = render(<Harness />)
+
+    fireEvent.click(container.querySelector('[data-id="node-a"]')!)
+    act(() => {
+      sessionManagerRef.current?.switchToSession(sessionIdOf('pipeline-b'))
+    })
+    fireEvent.click(container.querySelector('[data-id="node-b"]')!)
+    act(() => {
+      sessionManagerRef.current?.markSessionDirty(sessionIdOf('pipeline-b'))
+      sessionManagerRef.current?.switchToSession(sessionIdOf('pipeline-a'))
+    })
+    expect(screen.queryByText('validation.results')).toBeNull()
+
+    await act(async () => {
+      await contextRef.current?.saveAllPipelines()
+    })
+    expect(screen.queryByText('validation.results')).toBeNull()
+
+    act(() => {
+      sessionManagerRef.current?.switchToSession(sessionIdOf('pipeline-b'))
+    })
+    expect(screen.queryAllByText('validation.results').length).toBeGreaterThan(0)
+
+    fireEvent.click(container.querySelector('[data-id="node-b"]')!)
+    expect(screen.queryAllByText('inspector.properties').length).toBeGreaterThan(0)
+    expect(screen.queryByText('validation.results')).toBeNull()
+  })
+})
+
+describe('Pipeline editor: validation on load', () => {
+  const INVALID_RESULT = {
+    isValid: false,
+    errors: [
+      { id: 'error-1', type: 'structure' as const, messageKey: 'validation.testError', severity: 'error' as const },
+    ],
+    warnings: [],
+    nodeStatuses: new Map(),
+  }
+  const VALID_RESULT = { isValid: true, errors: [], warnings: [], nodeStatuses: new Map() }
+
+  it('keeps Validation Results in another pipeline after the user selects a node and switches tabs', () => {
+    vi.mocked(useGetPipelines).mockReturnValue({
+      data: {
+        data: [savedPipeline('pipeline-a', [makeNode('node-a')]), savedPipeline('pipeline-b', [makeNode('node-b')])],
+      },
+      isLoading: false,
+    } as unknown as ReturnType<typeof useGetPipelines>)
+    vi.mocked(validatePipelineWithNodeStatus).mockReturnValue(VALID_RESULT)
+    const { container } = render(<Harness />)
+
+    fireEvent.click(container.querySelector('[data-id="node-a"]')!)
+    expect(screen.queryByText('validation.results')).toBeNull()
+
+    act(() => {
+      sessionManagerRef.current?.switchToSession(sessionIdOf('pipeline-b'))
+    })
+
+    expect(screen.queryAllByText('validation.results').length).toBeGreaterThan(0)
+    expect(screen.getByText('validation.pipelineValid')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['an invalid', INVALID_RESULT, 'validation.testError'],
+    ['a valid', VALID_RESULT, 'validation.pipelineValid'],
+  ])('shows Validation Results for %s pipeline that was saved with a selected node', (_label, result, content) => {
+    vi.mocked(useGetPipelines).mockReturnValue({
+      data: {
+        data: [
+          {
+            id: 'backend-pipeline-1',
+            name: 'Saved Pipeline',
+            description: '',
+            styles: {
+              nodes: [{ ...makeNode('node-a'), selected: true }],
+              edges: [],
+              nodePositions: {},
+              viewport: { x: 0, y: 0, zoom: 1 },
+            },
+            dataSources: [],
+            apis: [],
+            dataSinks: [],
+            model: {},
+            createdAt: '2024-01-01T00:00:00Z',
+            modifiedAt: '2024-01-01T00:00:00Z',
+          },
+        ],
+      },
+      isLoading: false,
+    } as unknown as ReturnType<typeof useGetPipelines>)
+    vi.mocked(validatePipelineWithNodeStatus).mockReturnValue(result)
+
+    render(<Harness />)
+
+    expect(screen.queryAllByText('validation.results').length).toBeGreaterThan(0)
+    expect(screen.getByText(content)).toBeInTheDocument()
+    expect(screen.queryByText('inspector.properties')).toBeNull()
   })
 })

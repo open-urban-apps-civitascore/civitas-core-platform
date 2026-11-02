@@ -29,4 +29,23 @@ describe('createSessionFromBackendDTO', () => {
   it('exports the same CORE model when saved again', () => {
     expect(buildPipelinePayload(reloaded()).model).toEqual(buildPipelinePayload(source).model)
   })
+
+  it('removes a stored selection from nodes and edges', () => {
+    const dto = savedAs(source)
+    const savedWithSelection = {
+      ...dto,
+      styles: {
+        ...dto.styles,
+        nodes: dto.styles.nodes.map(node => ({ ...node, selected: true })),
+        edges: dto.styles.edges.map(edge => ({ ...edge, selected: true })),
+      },
+    }
+
+    const { nodes, edges } = createSessionFromBackendDTO(savedWithSelection).pipeline
+
+    expect(nodes).toEqual(source.nodes)
+    expect(edges).toEqual(source.edges)
+    nodes.forEach(node => expect(node).not.toHaveProperty('selected'))
+    edges.forEach(edge => expect(edge).not.toHaveProperty('selected'))
+  })
 })

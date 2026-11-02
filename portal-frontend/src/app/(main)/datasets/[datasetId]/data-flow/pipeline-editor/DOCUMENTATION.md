@@ -239,7 +239,6 @@ const {
   // Validation
   runValidation,
   validationResult,
-  canSave,
 
   // Save
   savePipeline, // POST to backend API
@@ -358,9 +357,10 @@ Unchecking the selected Data source and confirming clears the selection.
 2. The user clicks "Validate" in the toolbar to validate the active pipeline again (`runValidation()`).
 3. Validation and save use the current connector type from the Data source list, on a copy of the pipeline.
 4. Each pipeline keeps its own result. `validationResult` in the context is the result of the active pipeline.
-5. The inspector shows `ValidationPanel` after "Validate", and after load when the active pipeline has errors.
+5. The inspector shows `ValidationPanel` after "Validate" for the active pipeline, after load for every saved pipeline and after save for every changed pipeline, with or without errors.
 6. Nodes show a red border for errors and an orange border for warnings. Tabs of pipelines with errors show a red dot.
 7. When the active pipeline becomes dirty, or a node or edge is added or removed, its result is cleared. A tab switch keeps the result.
+8. Each pipeline keeps its own panel state. Selecting a node or an edge, or a change, closes the panel only in this pipeline.
 
 ---
 
@@ -542,10 +542,9 @@ for (const node of newNodes) {
 
 ### Validation & Save Behavior
 
-- Save All validates every changed pipeline and every saved pipeline without changes.
+- Save All validates every changed pipeline. Unchanged pipelines are not validated.
 - An error in a changed pipeline blocks the save. Nothing is saved.
-- An error in an unchanged pipeline does not block the save. An extra error toast names these pipelines.
-- Results of the save validation appear as node borders and as a red dot on the tab. The inspector shows them after "Validate".
+- Results of the save validation appear as node borders, as a red dot on the tab and in the inspector.
 
 ---
 
