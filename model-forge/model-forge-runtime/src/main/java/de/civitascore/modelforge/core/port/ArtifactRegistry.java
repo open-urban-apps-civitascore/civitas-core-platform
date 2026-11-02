@@ -102,9 +102,10 @@ public interface ArtifactRegistry {
      * @param refs               {@code $ref} composition edges (schema-ref)
      * @param associationTargets concrete {@code x-core-ref} association (foreign-key) edges
      * @param explicitVersion    when non-blank, stored verbatim instead of Model Forge's usual
-     *     version authority (1.0.0 for a new artifact, otherwise the next SemVer from
-     *     {@code bump}) — the escape hatch for imports (e.g. XÖV) that must preserve an upstream
-     *     version identity. Accepted as given, with no ordering check against the current version.
+     *     version authority (1.0.0 for a new artifact, or the next major after the highest version
+     *     its URN ever had; otherwise the next SemVer from {@code bump}) — the escape hatch for
+     *     imports (e.g. XÖV) that must preserve an upstream version identity. Accepted as given,
+     *     with no ordering check against the current version or the numbers deleted before.
      * @param bumpFromVersion    the existing version {@code bump} counts from; {@code null} counts
      *     from the artifact's newest version. A caller whose versions of this artifact form
      *     independent lines names the version it revises here, so the bump stays inside that line.

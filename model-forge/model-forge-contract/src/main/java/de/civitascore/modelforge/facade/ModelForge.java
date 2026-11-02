@@ -317,8 +317,9 @@ public interface ModelForge {
      * version, the artifact goes as {@link #deleteArtifact(ArtifactId, boolean, boolean)} deletes
      * it with cascade and without force.
      *
-     * <p>No number of a deleted version is assigned again, also after the whole artifact is gone. A
-     * no-op when the registry holds no such artifact or line.
+     * <p>Model Forge does not assign a deleted version's number again, also after the whole artifact
+     * is gone; an import that names an explicit version is stored with it as given. A no-op when
+     * the registry holds no such artifact or line.
      *
      * @throws IllegalArgumentException when the id is logical or {@code :latest}
      * @throws de.civitascore.modelforge.contract.ArtifactInUseException when

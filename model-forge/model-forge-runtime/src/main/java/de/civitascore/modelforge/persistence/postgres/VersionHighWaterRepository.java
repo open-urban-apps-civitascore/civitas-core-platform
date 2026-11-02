@@ -6,7 +6,8 @@ import java.util.Optional;
 
 /**
  * The highest version ever assigned per logical URN ({@code model_forge.version_high_water}). It
- * survives the deletion of versions and of the artifact, so a number is never assigned twice.
+ * survives the deletion of versions and of the artifact, so a number the registry assigns is never
+ * assigned again.
  */
 class VersionHighWaterRepository {
 

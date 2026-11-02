@@ -180,10 +180,11 @@ version left, and a member version it owns goes with it unless another version
 owns it too. An Element's line also takes the versions of its own grouping that
 hold it. When the line is the last one, the whole artifact goes.
 
-A version number is never assigned twice. After line 3 is deleted the next major
-is 4.0.0, also when the whole artifact was deleted and is stored again under its
-URN: a pinned URN must always name the same content, and other artifacts and
-caches may still hold it.
+A version number Model Forge assigns is never assigned again. After line 3 is
+deleted the next major is 4.0.0, also when the whole artifact was deleted and is
+stored again under its URN: a pinned URN must always name the same content, and
+other artifacts and caches may still hold it. An import that preserves an
+upstream version (XÖV) stores that version as given.
 
 ## Local Build
 

@@ -53,10 +53,12 @@ import java.util.function.Supplier;
  * content lives in {@code model_forge.artifact_representation}. Whether an model_forge.artifact is JSON Schema or XSD
  * is therefore a property of its stored representations, read from the DB — never inferred
  * from the URN. Versioning is backend-owned: the first version of a new model_forge.artifact is
- * {@code 1.0.0}; every update bumps by the supplied {@link VersionBump} from the version the caller
- * named as its base, or from the highest version ever assigned when it named none or asked for a
- * major. A number is never assigned twice, also after its version or the whole artifact is deleted
- * ({@code model_forge.version_high_water}). Identical authored content in the same format is idempotent
+ * {@code 1.0.0}, or the next major after the highest version its URN ever had; every update bumps by
+ * the supplied {@link VersionBump} from the version the caller named as its base, or from the highest
+ * version ever assigned when it named none or asked for a major. A number this registry assigns is
+ * never assigned again, also after its version or the whole artifact is deleted
+ * ({@code model_forge.version_high_water}); an explicit version is taken as given. Identical authored
+ * content in the same format is idempotent
  * (matched by {@code content_hash}). The COMPLETE reference graph — including cycles — is persisted.
  *
  * <p>Every write runs in a single transaction (model_forge.artifact upsert → version insert →
@@ -782,7 +784,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
      * and runs an optional post-insert hook (e.g. the XSD namespace upsert).
      *
      * @param explicitVersion when non-blank, stored verbatim instead of MF's usual version
-     *     authority (1.0.0 for a brand-new artifact, otherwise the next SemVer from {@code bump}) —
+     *     authority (see the class documentation) —
      *     the escape hatch for imports (XÖV/XSD) that must preserve an upstream version identity.
      *     Accepted as given, with no ordering check against the current version; a version that
      *     collides with an existing one for this artifact surfaces as the usual integrity-violation

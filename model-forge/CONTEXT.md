@@ -63,8 +63,9 @@ The versioned URN a write resolved to, returned by the write itself so a caller 
 back what it just stored.
 _Avoid_: result id, assigned version
 
-A version number is assigned once. It stays taken after its version, its line or the whole
-artifact is deleted, so a pin never names different content.
+A version number the registry assigns is assigned once. It stays taken after its version, its
+line or the whole artifact is deleted, so a pin never names different content. A version an
+import preserves from upstream is taken as given.
 
 ## References
 
