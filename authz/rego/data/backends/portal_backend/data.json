@@ -200,6 +200,9 @@
     "/v1/datastructures/{id}/versions/{id}/unrelease": {
       "POST": "DATASTRUCTURE_RELEASE"
     },
+    "/v1/datastructures/{id}/versions/{id}/duplicate": {
+      "POST": "DATASTRUCTURE_UPDATE"
+    },
     "/v1/datastructures/{id}/versions/{id}/released/meta": {
       "PATCH": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]
     },
