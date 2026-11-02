@@ -23,6 +23,8 @@ import org.owasp.encoder.Encode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Owns the change of the links between Pipelines and Data sinks and the removal it causes (see
@@ -75,9 +77,9 @@ public class DataSinkRemovalService {
 
   /**
    * Adds and removes the prepared links, then deletes the planned Layers and deactivates the
-   * planned Data sinks: one that was never provisioned is deleted together with its Model Forge
-   * configuration, a provisioned one keeps its row as PENDING_UNPROVISION until the next release
-   * removes its storage. Last the planned APIs go.
+   * planned Data sinks: one that was never provisioned is deleted, and its Model Forge
+   * configuration after the commit; a provisioned one keeps its row as PENDING_UNPROVISION until
+   * the next release removes its storage. Last the planned APIs go.
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void apply(PreparedDataSinkChange prepared) {
@@ -105,11 +107,8 @@ public class DataSinkRemovalService {
   }
 
   /**
-   * Deletes the PENDING_UNPROVISION Data sinks of the Dataset with their Model Forge
-   * configurations, once a release removed their storage.
-   *
-   * <p>A configuration Model Forge does not delete is only logged and stays stranded: the storage
-   * is already gone, and failing here would leave the release in flight.
+   * Deletes the PENDING_UNPROVISION Data sinks of the Dataset once a release removed their storage,
+   * and their Model Forge configurations after the commit.
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void deleteUnprovisioned(DataSet dataSet) {
@@ -118,16 +117,7 @@ public class DataSinkRemovalService {
             dataSet.getId(), DataSinkState.PENDING_UNPROVISION);
     for (DataSink sink : pending) {
       dataSinkRepository.delete(sink);
-      try {
-        deleteConfiguration(sink);
-      } catch (RuntimeException e) {
-        log.error(
-            "Could not remove configuration {} of unprovisioned data sink {}, it is now stranded:"
-                + " {}",
-            Encode.forJava(sink.getConfigurationLogicalUrn()),
-            sink.getId(),
-            Encode.forJava(e.getMessage()));
-      }
+      deleteConfigurationAfterCommit(sink);
     }
   }
 
@@ -268,12 +258,38 @@ public class DataSinkRemovalService {
       return;
     }
     dataSinkRepository.delete(sink);
-    deleteConfiguration(sink);
+    deleteConfigurationAfterCommit(sink);
   }
 
-  private void deleteConfiguration(DataSink sink) {
-    if (sink.getConfigurationLogicalUrn() != null) {
-      modelRegistryGateway.deletePayload(sink.getConfigurationLogicalUrn());
+  /**
+   * Model Forge is outside the transaction, so a delete before the commit survives a rollback and
+   * leaves the restored row without its configuration. After the commit, a configuration Model
+   * Forge does not delete is only logged and stays stranded: no row references it any more.
+   */
+  private void deleteConfigurationAfterCommit(DataSink sink) {
+    UUID sinkId = sink.getId();
+    String urn = sink.getConfigurationLogicalUrn();
+    if (urn == null) {
+      return;
+    }
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCommit() {
+            deleteConfiguration(sinkId, urn);
+          }
+        });
+  }
+
+  private void deleteConfiguration(UUID sinkId, String urn) {
+    try {
+      modelRegistryGateway.deletePayload(urn);
+    } catch (RuntimeException e) {
+      log.error(
+          "Could not remove configuration {} of removed data sink {}, it is now stranded: {}",
+          Encode.forJava(urn),
+          sinkId,
+          Encode.forJava(e.getMessage()));
     }
   }
 

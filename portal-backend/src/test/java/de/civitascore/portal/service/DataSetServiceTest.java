@@ -63,6 +63,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -77,6 +78,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DataSetService Tests")
@@ -1258,6 +1261,21 @@ class DataSetServiceTest {
   @DisplayName("handleSagaCompleted()")
   class HandleSagaCompletedTests {
 
+    @BeforeEach
+    void initSynchronization() {
+      TransactionSynchronizationManager.initSynchronization();
+    }
+
+    @AfterEach
+    void clearSynchronization() {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
+
+    private static void commit() {
+      TransactionSynchronizationUtils.invokeAfterCommit(
+          TransactionSynchronizationManager.getSynchronizations());
+    }
+
     @Test
     @DisplayName("CREATE: persists infrastructure fields and clears pendingSagaType")
     void createPersistsInfrastructure() {
@@ -1900,6 +1918,7 @@ class DataSetServiceTest {
       stubPendingSinks(id, List.of(pending));
 
       createService().handleSagaCompleted(id, emptyResult(id));
+      commit();
 
       verify(dataSinkRepository).delete(pending);
       verify(modelRegistryGateway).deletePayload("urn:core:datasink:pending");
@@ -1922,6 +1941,7 @@ class DataSetServiceTest {
           .deletePayload("urn:core:datasink:pending");
 
       createService().handleSagaCompleted(id, emptyResult(id));
+      commit();
 
       verify(dataSinkRepository).delete(pending);
       assertThat(ds.getPendingSagaType()).isNull();

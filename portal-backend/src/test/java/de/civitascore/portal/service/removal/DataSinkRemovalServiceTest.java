@@ -1,8 +1,10 @@
 package de.civitascore.portal.service.removal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -26,6 +28,7 @@ import de.civitascore.portal.util.ResourceInUseException;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +36,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 @ExtendWith(MockitoExtension.class)
 class DataSinkRemovalServiceTest {
@@ -58,6 +63,17 @@ class DataSinkRemovalServiceTest {
     pipeline.setId(UUID.randomUUID());
     pipeline.setDataSet(dataSet);
     dataSet.getPipelines().add(pipeline);
+    TransactionSynchronizationManager.initSynchronization();
+  }
+
+  @AfterEach
+  void clearSynchronization() {
+    TransactionSynchronizationManager.clearSynchronization();
+  }
+
+  private static void commit() {
+    TransactionSynchronizationUtils.invokeAfterCommit(
+        TransactionSynchronizationManager.getSynchronizations());
   }
 
   @Test
@@ -201,7 +217,7 @@ class DataSinkRemovalServiceTest {
   }
 
   @Test
-  void apply_unprovisionedSink_isDeletedWithItsConfiguration() {
+  void apply_unprovisionedSink_isDeletedAndItsConfigurationOnlyAfterTheCommit() {
     DataSink sink = activeSink(DataSinkType.FROST, false);
     sink.setConfigurationLogicalUrn(CONFIGURATION_URN);
 
@@ -210,7 +226,24 @@ class DataSinkRemovalServiceTest {
             new DataSinkRemovalPlan(dataSet, List.of(sink), List.of(), List.of())));
 
     verify(dataSinkRepository).delete(sink);
+    verify(modelRegistryGateway, never()).deletePayload(any());
+    commit();
     verify(modelRegistryGateway).deletePayload(CONFIGURATION_URN);
+  }
+
+  @Test
+  void apply_configurationDeleteFailsAfterTheCommit_doesNotFailTheRequest() {
+    // A thrown afterCommit reaches the caller as an error for a change that is already committed.
+    DataSink sink = activeSink(DataSinkType.FROST, false);
+    sink.setConfigurationLogicalUrn(CONFIGURATION_URN);
+    doThrow(new IllegalStateException("Model Forge unavailable"))
+        .when(modelRegistryGateway)
+        .deletePayload(CONFIGURATION_URN);
+    service.apply(
+        PreparedDataSinkChange.removalOnly(
+            new DataSinkRemovalPlan(dataSet, List.of(sink), List.of(), List.of())));
+
+    assertThatCode(DataSinkRemovalServiceTest::commit).doesNotThrowAnyException();
   }
 
   @Test
