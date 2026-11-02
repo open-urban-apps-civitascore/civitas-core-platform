@@ -248,9 +248,9 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
         .filter(sibling -> tableName.equalsIgnoreCase(tableNameOf(sibling)))
         .findFirst()
         .ifPresent(
-            _ -> {
+            sibling -> {
               throw new UniqueConstraintViolationException(
-                  duplicateTableNameMessage(created, tableName));
+                  duplicateTableNameMessage(sibling, created, tableName));
             });
   }
 
@@ -259,7 +259,13 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
    * a sink that already collides is rejected by a request that changed nothing about its name. That
    * reads as a bug in the request unless the message points at the stored value.
    */
-  private static String duplicateTableNameMessage(boolean created, String tableName) {
+  private static String duplicateTableNameMessage(
+      DataSink sibling, boolean created, String tableName) {
+    if (sibling.getState() == DataSinkState.PENDING_UNPROVISION) {
+      return "A removed POSTGIS DataSink of this dataset keeps tableName '%s' until the next"
+              .formatted(tableName)
+          + " release drops its table; choose another tableName or release the dataset first";
+    }
     if (created) {
       return "Another POSTGIS DataSink of this dataset already uses tableName '%s';"
               .formatted(tableName)

@@ -671,6 +671,23 @@ class DataSinkServiceTest {
     }
 
     @Test
+    @DisplayName("Should name the next release when a removed sibling still holds the tableName")
+    void shouldExplainATableNameHeldByARemovedSink() {
+      UUID dataSetId = UUID.randomUUID();
+      DataSink removed = postgisSink(UUID.randomUUID(), dataSetId, "messwerte");
+      removed.setState(DataSinkState.PENDING_UNPROVISION);
+
+      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte");
+      stubCreate(dataSetId, input);
+      when(dataSinkRepository.findByDataSetId(dataSetId)).thenReturn(List.of(removed));
+
+      assertThatThrownBy(() -> dataSinkService.create(input))
+          .isInstanceOf(UniqueConstraintViolationException.class)
+          .hasMessageContaining("A removed POSTGIS DataSink")
+          .hasMessageContaining("until the next release");
+    }
+
+    @Test
     @DisplayName("Should reject a tableName differing from a sibling only in case")
     void shouldRejectCaseOnlyDifference() {
       UUID dataSetId = UUID.randomUUID();
