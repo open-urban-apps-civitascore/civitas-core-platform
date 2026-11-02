@@ -2,8 +2,6 @@ package de.civitascore.portal.service.removal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.civitascore.portal.kind.ApiKindRegistry;
-import de.civitascore.portal.kind.TestKinds;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -19,7 +17,6 @@ import org.junit.jupiter.api.Test;
 
 class DataSinkRemovalPlanTest {
 
-  private final ApiKindRegistry apiKinds = TestKinds.apiKindRegistry();
   private final DataSet dataSet = new DataSet();
   private final List<DataSink> sinks = new ArrayList<>();
   private final List<Layer> layers = new ArrayList<>();
@@ -133,7 +130,7 @@ class DataSinkRemovalPlanTest {
   }
 
   private DataSinkRemovalPlan compute(DataSinkRemovalRequest request) {
-    return DataSinkRemovalPlan.compute(dataSet, sinks, layers, apis, request, apiKinds);
+    return DataSinkRemovalPlan.compute(dataSet, sinks, layers, apis, request);
   }
 
   private static Pipeline pipeline() {

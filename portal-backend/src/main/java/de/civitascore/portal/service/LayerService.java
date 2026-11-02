@@ -1,6 +1,5 @@
 package de.civitascore.portal.service;
 
-import de.civitascore.portal.kind.ApiKindRegistry;
 import de.civitascore.portal.mapper.LayerMapper;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
@@ -38,7 +37,6 @@ public class LayerService extends DataSetOwnedService<Layer, LayerInputDTO> {
   private final DataSetRepository dataSetRepository;
   private final DataSinkRepository dataSinkRepository;
   private final StyleRepository styleRepository;
-  private final ApiKindRegistry apiKinds;
 
   public LayerService(
       LayerRepository layerRepository,
@@ -46,15 +44,13 @@ public class LayerService extends DataSetOwnedService<Layer, LayerInputDTO> {
       DataSetRepository dataSetRepository,
       DataSinkRepository dataSinkRepository,
       StyleRepository styleRepository,
-      DataSetMutationGuard dataSetMutationGuard,
-      ApiKindRegistry apiKinds) {
+      DataSetMutationGuard dataSetMutationGuard) {
     super(dataSetMutationGuard);
     this.layerRepository = layerRepository;
     this.layerMapper = layerMapper;
     this.dataSetRepository = dataSetRepository;
     this.dataSinkRepository = dataSinkRepository;
     this.styleRepository = styleRepository;
-    this.apiKinds = apiKinds;
   }
 
   @Override
@@ -176,8 +172,7 @@ public class LayerService extends DataSetOwnedService<Layer, LayerInputDTO> {
   }
 
   private NamedApi publishingApiOf(DataSet dataSet) {
-    return apiKinds
-        .layerPublishingApi(dataSet.getNamedApis())
+    return NamedApiRules.layerPublishingApi(dataSet.getNamedApis())
         .orElseThrow(
             () ->
                 new InvalidInputException(

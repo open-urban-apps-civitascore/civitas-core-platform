@@ -6,8 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import de.civitascore.portal.kind.ApiKindRegistry;
-import de.civitascore.portal.kind.TestKinds;
 import de.civitascore.portal.mapper.LayerMapper;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSinkState;
@@ -38,7 +36,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,7 +48,6 @@ class LayerServiceTest {
   @Mock private StyleRepository styleRepository;
 
   @Mock private DataSetMutationGuard dataSetMutationGuard;
-  @Spy private ApiKindRegistry apiKinds = TestKinds.apiKindRegistry();
 
   @InjectMocks private LayerService layerService;
 

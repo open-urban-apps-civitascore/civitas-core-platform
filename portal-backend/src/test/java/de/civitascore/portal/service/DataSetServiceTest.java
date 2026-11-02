@@ -18,7 +18,6 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import de.civitascore.portal.kind.TestKinds;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.mapper.DataSetMapperImpl;
 import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
@@ -130,12 +129,7 @@ class DataSetServiceTest {
         modelRegistryGateway,
         new DataSetMutationGuard(dataSetRepository),
         pipelineClosureValidator,
-        TestKinds.apiKindRegistry(),
-        new DataSinkRemovalService(
-            dataSinkRepository,
-            layerRepository,
-            modelRegistryGateway,
-            TestKinds.apiKindRegistry()));
+        new DataSinkRemovalService(dataSinkRepository, layerRepository, modelRegistryGateway));
   }
 
   private static AllowedScopes wildcardScopes() {

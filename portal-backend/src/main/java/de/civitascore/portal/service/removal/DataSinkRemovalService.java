@@ -1,6 +1,5 @@
 package de.civitascore.portal.service.removal;
 
-import de.civitascore.portal.kind.ApiKindRegistry;
 import de.civitascore.portal.model.embedded.DataSinkState;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
@@ -40,7 +39,6 @@ public class DataSinkRemovalService {
   private final DataSinkRepository dataSinkRepository;
   private final LayerRepository layerRepository;
   private final ModelRegistryGateway modelRegistryGateway;
-  private final ApiKindRegistry apiKinds;
 
   /**
    * Checks the change and computes what it takes with it on the state after the change. Writes
@@ -207,8 +205,7 @@ public class DataSinkRemovalService {
         activeDataSinks,
         layerRepository.findByDataSetId(dataSet.getId()),
         dataSet.getNamedApis(),
-        request,
-        apiKinds);
+        request);
   }
 
   private List<DataSink> activeDataSinksOf(DataSet dataSet) {

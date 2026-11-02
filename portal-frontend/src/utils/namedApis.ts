@@ -16,13 +16,13 @@ import {
 } from '@/types/namedApis'
 import { Style, StyleFormData, StyleInput } from '@/types/styles'
 
-/** Mirrors the backing kinds of the backend's ApiKindRegistry: the API goes with the last Data sink of its type. */
+/** Mirrors the backend's NamedApiRules.backingDataSinkTypes: the API goes with the last Data sink of its type. */
 export const BACKING_DATASINK_TYPE: Partial<Record<ApiStandard, DataSinkType>> = {
   [API_STANDARDS.OWS]: DATASINK_TYPES.POSTGIS,
   [API_STANDARDS.STA]: DATASINK_TYPES.FROST,
 }
 
-/** Mirrors the backend's ApiKind.publishesLayers: every Layer of a Dataset belongs to its API of this standard. */
+/** Mirrors the backend's NamedApiRules.layerPublishingApi: every Layer of a Dataset belongs to its API of this standard. */
 export const LAYER_PUBLISHING_STANDARD: ApiStandard = API_STANDARDS.OWS
 
 export const hasApiType = (apis: NamedApi[], apiType: ApiStandard): boolean =>

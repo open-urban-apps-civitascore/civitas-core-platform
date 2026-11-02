@@ -1,13 +1,13 @@
 package de.civitascore.portal.service.removal;
 
-import de.civitascore.portal.kind.ApiKind;
-import de.civitascore.portal.kind.ApiKindRegistry;
+import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.service.NamedApiRules;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -21,7 +21,7 @@ import java.util.stream.Stream;
  *
  * <p>A Data sink becomes inactive when the request deletes it, or when it had a Pipeline before and
  * the request removes its last one. Its Layers go with it. An API goes when the request deactivates
- * a Data sink of one of its backing kinds and no active Data sink of a backing kind remains, and
+ * a Data sink of one of its backing types and no active Data sink of a backing type remains, and
  * its Layers go with it.
  *
  * @param dataSet the Dataset the removal happens in
@@ -48,14 +48,13 @@ record DataSinkRemovalPlan(
       Collection<DataSink> activeDataSinks,
       Collection<Layer> layers,
       Collection<NamedApi> apis,
-      DataSinkRemovalRequest request,
-      ApiKindRegistry apiKinds) {
+      DataSinkRemovalRequest request) {
     List<DataSink> deactivated =
         activeDataSinks.stream().filter(sink -> becomesInactive(sink, request)).toList();
     Set<UUID> deactivatedIds = idsOf(deactivated.stream().map(DataSink::getId));
-    Set<DataSinkType> deactivatedKinds =
+    Set<DataSinkType> deactivatedTypes =
         deactivated.stream().map(DataSink::getDataSinkType).collect(Collectors.toSet());
-    Set<DataSinkType> remainingKinds =
+    Set<DataSinkType> remainingTypes =
         activeDataSinks.stream()
             .filter(sink -> !deactivatedIds.contains(sink.getId()))
             .map(DataSink::getDataSinkType)
@@ -63,10 +62,7 @@ record DataSinkRemovalPlan(
 
     List<NamedApi> removedApis =
         apis.stream()
-            .filter(
-                api ->
-                    losesItsBacking(
-                        apiKinds.get(api.getStandard()), deactivatedKinds, remainingKinds))
+            .filter(api -> losesItsBacking(api.getStandard(), deactivatedTypes, remainingTypes))
             .toList();
     Set<UUID> removedApiIds = idsOf(removedApis.stream().map(NamedApi::getId));
 
@@ -83,9 +79,10 @@ record DataSinkRemovalPlan(
   }
 
   private static boolean losesItsBacking(
-      ApiKind kind, Set<DataSinkType> deactivatedKinds, Set<DataSinkType> remainingKinds) {
-    return kind.backingDataSinkKinds().stream().anyMatch(deactivatedKinds::contains)
-        && !kind.isBackedBy(remainingKinds);
+      ApiStandard standard, Set<DataSinkType> deactivatedTypes, Set<DataSinkType> remainingTypes) {
+    return NamedApiRules.backingDataSinkTypes(standard).stream()
+            .anyMatch(deactivatedTypes::contains)
+        && !NamedApiRules.isBackedBy(standard, remainingTypes);
   }
 
   private static boolean becomesInactive(DataSink sink, DataSinkRemovalRequest request) {

@@ -1,7 +1,5 @@
 package de.civitascore.portal.service;
 
-import de.civitascore.portal.kind.ApiKind;
-import de.civitascore.portal.kind.ApiKindRegistry;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
@@ -90,7 +88,6 @@ public class DataSetService
   private final PipelineClosureValidator pipelineClosureValidator;
 
   private final DataSetMutationGuard dataSetMutationGuard;
-  private final ApiKindRegistry apiKinds;
   private final DataSinkRemovalService dataSinkRemovalService;
 
   public DataSetService(
@@ -108,7 +105,6 @@ public class DataSetService
       ModelRegistryGateway modelRegistryGateway,
       DataSetMutationGuard dataSetMutationGuard,
       PipelineClosureValidator pipelineClosureValidator,
-      ApiKindRegistry apiKinds,
       DataSinkRemovalService dataSinkRemovalService) {
     this.dataSetRepository = dataSetRepository;
     this.dataSinkRepository = dataSinkRepository;
@@ -124,7 +120,6 @@ public class DataSetService
     this.modelRegistryGateway = modelRegistryGateway;
     this.dataSetMutationGuard = dataSetMutationGuard;
     this.pipelineClosureValidator = pipelineClosureValidator;
-    this.apiKinds = apiKinds;
     this.dataSinkRemovalService = dataSinkRemovalService;
   }
 
@@ -335,7 +330,8 @@ public class DataSetService
   }
 
   /**
-   * @throws InvalidInputException if the input names more APIs of a kind than a dataset can have
+   * @throws InvalidInputException if the input names more APIs of a standard than a dataset can
+   *     have
    */
   private void requireApiCardinality(DataSet entity, List<NamedApiInputDTO> incoming) {
     Map<ApiStandard, Long> counts =
@@ -343,9 +339,7 @@ public class DataSetService
             .collect(Collectors.groupingBy(NamedApiInputDTO::getStandard, Collectors.counting()));
     counts.forEach(
         (standard, count) ->
-            apiKinds
-                .get(standard)
-                .maxPerDataSet()
+            NamedApiRules.maxPerDataSet(standard)
                 .ifPresent(
                     max -> {
                       if (count > max) {
@@ -359,24 +353,23 @@ public class DataSetService
   }
 
   /**
-   * An API whose kind is backed by DataSinks can be added only while an active DataSink of a
-   * backing kind exists; without one, the release would provision a route to nothing.
+   * An API whose standard is backed by DataSinks can be added only while an active DataSink of a
+   * backing type exists; without one, the release would provision a route to nothing.
    *
    * @throws InvalidInputException if no such DataSink exists
    */
   private void requireBackingDataSink(DataSet entity, ApiStandard standard) {
-    ApiKind kind = apiKinds.get(standard);
-    if (kind.isBackedBy(activeDataSinkKindsOf(entity))) {
+    if (NamedApiRules.isBackedBy(standard, activeDataSinkTypesOf(entity))) {
       return;
     }
     throw new InvalidInputException(
         "namedApis",
         entity.getId(),
         "An %s named API needs an active %s data sink in the dataset; add one first"
-            .formatted(standard, joined(kind.backingDataSinkKinds())));
+            .formatted(standard, joined(NamedApiRules.backingDataSinkTypes(standard))));
   }
 
-  private Set<DataSinkType> activeDataSinkKindsOf(DataSet dataSet) {
+  private Set<DataSinkType> activeDataSinkTypesOf(DataSet dataSet) {
     if (dataSet.getId() == null) {
       return Set.of();
     }
@@ -399,8 +392,7 @@ public class DataSetService
     if (entity.getId() == null) {
       return;
     }
-    apiKinds
-        .layerPublishingApi(
+    NamedApiRules.layerPublishingApi(
             entity.getNamedApis().stream()
                 .filter(api -> incomingSlugs.contains(api.getSlug()))
                 .toList())
@@ -412,14 +404,14 @@ public class DataSetService
   }
 
   /**
-   * Layers are published only through an API whose kind publishes Layers, so once none remains
-   * nothing serves them. This also removes Layers that are linked to no API.
+   * Layers are published only through an API that publishes Layers, so once none remains nothing
+   * serves them. This also removes Layers that are linked to no API.
    */
   private void cleanUpUnservedLayers(DataSet entity) {
     if (entity.getId() == null) {
       return;
     }
-    if (apiKinds.layerPublishingApi(entity.getNamedApis()).isEmpty()) {
+    if (NamedApiRules.layerPublishingApi(entity.getNamedApis()).isEmpty()) {
       int removed = layerRepository.deleteByDataSetId(entity.getId());
       if (removed > 0) {
         // The response is an ordinary 200 on the dataset, so without this the layer rows are gone
@@ -659,7 +651,7 @@ public class DataSetService
    */
   private void verifyPublishedSurfacesAreServable(DataSet dataSet) {
     if (layerRepository.existsByDataSetId(dataSet.getId())
-        && apiKinds.layerPublishingApi(dataSet.getNamedApis()).isEmpty()) {
+        && NamedApiRules.layerPublishingApi(dataSet.getNamedApis()).isEmpty()) {
       throw new InvalidInputException(
           "namedApis",
           dataSet.getId(),
@@ -667,15 +659,16 @@ public class DataSetService
               + " layers.");
     }
 
-    Set<DataSinkType> activeKinds = activeDataSinkKindsOf(dataSet);
+    Set<DataSinkType> activeTypes = activeDataSinkTypesOf(dataSet);
     for (NamedApi api : dataSet.getNamedApis()) {
-      ApiKind kind = apiKinds.get(api.getStandard());
-      if (!kind.isBackedBy(activeKinds)) {
+      if (!NamedApiRules.isBackedBy(api.getStandard(), activeTypes)) {
         throw new InvalidInputException(
             "dataSinks",
             dataSet.getId(),
             "DataSet has an %s named API but no active %s data sink to back it. The route would"
-                    .formatted(api.getStandard(), joined(kind.backingDataSinkKinds()))
+                    .formatted(
+                        api.getStandard(),
+                        joined(NamedApiRules.backingDataSinkTypes(api.getStandard())))
                 + " resolve to storage that is never provisioned.");
       }
     }
