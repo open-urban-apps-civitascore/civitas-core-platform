@@ -598,7 +598,12 @@ describe('ApiCallsTab', () => {
       const cursorIn = screen.getByRole('combobox', { name: 'cursorIn.label' })
       expect(cursorIn).toBeDisabled()
       expect(cursorIn).toHaveClass(...DISABLED_INPUT_CLASSES)
-      expect(screen.getByRole('textbox', { name: /^cursorParameter\.label/ })).toHaveClass(...DISABLED_INPUT_CLASSES)
+      const labels = [/^cursorPath\.label/, /^cursorParameter\.label/, 'limitParameter.label', 'limit.label']
+      labels.forEach(name => {
+        const field = screen.getByRole('textbox', { name })
+        expect(field).toBeDisabled()
+        expect(field).toHaveClass(...DISABLED_INPUT_CLASSES)
+      })
     })
 
     it('offers all pagination types', async () => {
