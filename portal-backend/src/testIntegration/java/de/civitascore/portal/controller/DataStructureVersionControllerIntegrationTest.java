@@ -56,6 +56,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
   private UUID dataStructureId;
   private UUID versionId1;
+  private UUID versionId2;
 
   @BeforeEach
   void initTestData() {
@@ -87,10 +88,12 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
                 b.description("Second version with updated fields")
                     .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
                     .modelName("TestModel2"));
-    portalData.attachModel(
-        version2,
-        portalData.dataStructureVersionModel("Model2"),
-        Map.of("color", "red", "size", 20));
+    version2 =
+        portalData.attachModel(
+            version2,
+            portalData.dataStructureVersionModel("Model2"),
+            Map.of("color", "red", "size", 20));
+    versionId2 = version2.getId();
   }
 
   @AfterEach
@@ -1559,6 +1562,189 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   }
 
   @Nested
+  @DisplayName("Duplicate DataStructureVersion Tests")
+  class DuplicateDataStructureVersionTests {
+
+    private ResponseEntity<DataStructureVersionOutputDTO> duplicate(UUID structureId, UUID id) {
+      return restTemplate.exchange(
+          "/datastructures/" + structureId + "/versions/" + id + "/duplicate",
+          HttpMethod.POST,
+          new HttpEntity<>(createAuthHeaders()),
+          getOutputTypeReference());
+    }
+
+    private DataStructureVersionOutputDTO duplicateCreated(UUID structureId, UUID id) {
+      ResponseEntity<DataStructureVersionOutputDTO> response = duplicate(structureId, id);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      return response.getBody();
+    }
+
+    private DataStructureVersionOutputDTO get(UUID structureId, UUID id) {
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              "/datastructures/" + structureId + "/versions/" + id,
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      return response.getBody();
+    }
+
+    @Test
+    @DisplayName(
+        "Duplicating an older version copies its content to the next major after the highest")
+    void duplicatingAnOlderVersionCopiesItsOwnContent() {
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          duplicate(dataStructureId, versionId1);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      DataStructureVersionOutputDTO copy = response.getBody();
+      assertThat(copy.getVersion()).isEqualTo("3.0.0");
+      assertThat(response.getHeaders().getLocation().getPath())
+          .endsWith("/datastructures/" + dataStructureId + "/versions/" + copy.getId());
+
+      DataStructureVersionOutputDTO stored = get(dataStructureId, copy.getId());
+      assertThat(stored.getModel()).containsEntry("title", "Model1");
+      assertThat(stored.getStyles()).containsEntry("color", "blue");
+      assertThat(stored.getDescription()).isEqualTo("First version of the test data structure");
+      assertThat(stored.getModelName()).isEqualTo("TestModel1");
+      assertThat(stored.getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.DRAFT);
+      assertThat(get(dataStructureId, versionId1).getVersion()).isEqualTo("1.0.0");
+    }
+
+    @Test
+    @DisplayName("Duplicating the latest version gives a new version rather than a conflict")
+    void duplicatingTheLatestVersionGivesANewVersion() {
+      DataStructureVersionOutputDTO copy = duplicateCreated(dataStructureId, versionId2);
+
+      assertThat(copy.getVersion()).isEqualTo("3.0.0");
+      assertThat(get(dataStructureId, copy.getId()).getModel()).containsEntry("title", "Model2");
+    }
+
+    @Test
+    @DisplayName("Duplicating the same version twice gives two versions")
+    void duplicatingTwiceGivesTwoVersions() {
+      DataStructureVersionOutputDTO first = duplicateCreated(dataStructureId, versionId1);
+      DataStructureVersionOutputDTO second = duplicateCreated(dataStructureId, versionId1);
+
+      assertThat(first.getVersion()).isEqualTo("3.0.0");
+      assertThat(second.getVersion()).isEqualTo("4.0.0");
+    }
+
+    @Test
+    @DisplayName("Duplicating an AVAILABLE version gives a DRAFT copy")
+    void duplicatingAnAvailableVersionGivesADraft() {
+      DataStructureVersion source =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      source.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      dataStructureVersionRepository.save(source);
+
+      DataStructureVersionOutputDTO copy = duplicateCreated(dataStructureId, versionId1);
+
+      assertThat(copy.getDataStructureVersionStatus()).isEqualTo(DataStructureVersionStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("Duplicating a version without a model gives a copy without a model")
+    void duplicatingAVersionWithoutAModelGivesACopyWithoutAModel() {
+      DataStructureVersion source =
+          portalData.dataStructureVersion(
+              dataStructureRepository.findById(dataStructureId).orElseThrow(),
+              b -> b.version(null).description("No model yet").modelName("Pending"));
+
+      DataStructureVersionOutputDTO copy = duplicateCreated(dataStructureId, source.getId());
+
+      assertThat(copy.getVersion()).isNull();
+      assertThat(copy.getModelUrn()).isNull();
+      assertThat(copy.getModel()).isNull();
+      assertThat(copy.getDescription()).isEqualTo("No model yet");
+      assertThat(copy.getModelName()).isEqualTo("Pending");
+    }
+
+    @Test
+    @DisplayName(
+        "Editing the copy of a single-root model advances the minor within the copy's major")
+    void editingTheCopyOfASingleRootModelAdvancesItsMinor() {
+      DataStructureVersionOutputDTO copy = duplicateCreated(dataStructureId, versionId1);
+
+      ResponseEntity<DataStructureVersionOutputDTO> edited =
+          restTemplate.exchange(
+              getEndpoint() + "/" + copy.getId(),
+              HttpMethod.PATCH,
+              new HttpEntity<>(
+                  Map.of("model", portalData.dataStructureVersionModel("Model1Edited")),
+                  createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(edited.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(edited.getBody().getVersion()).isEqualTo("3.1.0");
+      assertThat(edited.getBody().getModel()).containsEntry("title", "Model1Edited");
+      assertThat(get(dataStructureId, versionId1).getModel()).containsEntry("title", "Model1");
+    }
+
+    @Test
+    @DisplayName(
+        "Duplicating an older version of a $defs library copies that version's members, and an"
+            + " edit of the copy advances its minor")
+    void duplicatingAnOlderLibraryVersionCopiesItsMembers() {
+      DataStructure structure = portalData.dataStructure(b -> b.name("Library"));
+      DataStructureVersion first =
+          portalData.attachModel(
+              portalData.dataStructureVersion(structure, b -> b.modelName("People")),
+              library(List.of("Person")));
+      portalData.attachModel(
+          portalData.dataStructureVersion(
+              dataStructureRepository.findById(structure.getId()).orElseThrow(),
+              b -> b.modelName("People")),
+          library(List.of("Person", "Address")));
+
+      DataStructureVersionOutputDTO copy = duplicateCreated(structure.getId(), first.getId());
+
+      assertThat(copy.getVersion()).isEqualTo("3.0.0");
+      assertThat(copy.getModelUrn()).contains(":datastructure:");
+      assertThat(membersOf(get(structure.getId(), copy.getId()))).containsOnlyKeys("Person");
+
+      ResponseEntity<DataStructureVersionOutputDTO> edited =
+          restTemplate.exchange(
+              "/datastructures/" + structure.getId() + "/versions/" + copy.getId(),
+              HttpMethod.PATCH,
+              new HttpEntity<>(
+                  Map.of("model", library(List.of("Person", "Phone"))), createAuthHeaders()),
+              getOutputTypeReference());
+      assertThat(edited.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(edited.getBody().getVersion()).isEqualTo("3.1.0");
+      assertThat(membersOf(edited.getBody())).containsOnlyKeys("Person", "Phone");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> membersOf(DataStructureVersionOutputDTO version) {
+      return (Map<String, Object>) version.getModel().get("$defs");
+    }
+
+    private static Map<String, Object> library(List<String> members) {
+      Map<String, Object> defs = new HashMap<>();
+      for (String member : members) {
+        defs.put(
+            member,
+            Map.of("type", "object", "properties", Map.of("name", Map.of("type", "string"))));
+      }
+      return Map.of(
+          "$schema", "https://json-schema.org/draft/2020-12/schema",
+          "title", "People",
+          "$defs", defs,
+          "$ref", "#/$defs/Person");
+    }
+
+    @Test
+    @DisplayName("Duplicating an unknown version answers 404")
+    void duplicatingAnUnknownVersionAnswers404() {
+      assertThat(duplicate(dataStructureId, UUID.randomUUID()).getStatusCode())
+          .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+  }
+
+  @Nested
   @DisplayName("Parent ownership")
   class ParentOwnershipTests {
 
@@ -1649,6 +1835,17 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
       assertThat(getUnderOwnDataStructure().getDataStructureVersionStatus())
           .isEqualTo(DataStructureVersionStatus.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName("Duplicate answers 404 and creates no version")
+    void duplicateAnswers404ForForeignVersion() {
+      long versionsBefore = dataStructureVersionRepository.count();
+
+      assertThat(statusOf(pathUnderForeignDataStructure("/duplicate"), HttpMethod.POST, null))
+          .isEqualTo(HttpStatus.NOT_FOUND);
+
+      assertThat(dataStructureVersionRepository.count()).isEqualTo(versionsBefore);
     }
 
     @Test

@@ -12,16 +12,20 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.modelforge.contract.ArtifactId;
+import de.civitascore.modelforge.contract.ArtifactWriteResult;
+import de.civitascore.modelforge.contract.BumpVersionCommand;
 import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.facade.ModelForge;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ModelMissingException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -210,6 +214,43 @@ class ModelRegistryGatewayTest {
                   new ArtifactId(HOST_DATA_STRUCTURE_URN + ":1.1.0"), List.of(), Map.of()));
 
       assertThat(store(HOST_DATA_STRUCTURE_URN).logicalUrn()).isEqualTo(HOST_DATA_STRUCTURE_URN);
+    }
+  }
+
+  @Nested
+  @DisplayName("copying a model version")
+  class CopyingAModelVersion {
+
+    private static final String SOURCE_PIN =
+        "urn:core:platform:civitas:datastructure:common:6ddf8001-3ba6-83db-8d23-b547419c1ff2:1.0.0";
+    private static final String COPY_PIN =
+        "urn:core:platform:civitas:datastructure:common:6ddf8001-3ba6-83db-8d23-b547419c1ff2:3.0.0";
+
+    @Test
+    @DisplayName("copies the pinned version as a major bump and returns the copy's pin")
+    void copiesThePinnedVersionAsAMajor() {
+      ArtifactId source = new ArtifactId(SOURCE_PIN);
+      when(modelForge.existing(List.of(source))).thenReturn(Set.of(source));
+      when(modelForge.bumpVersion(any()))
+          .thenReturn(new ArtifactWriteResult(new ArtifactId(COPY_PIN), Map.of()));
+
+      ModelRegistryGateway.ModelPin pin = gateway.copyModelVersion(SOURCE_PIN);
+
+      verify(modelForge)
+          .bumpVersion(
+              new BumpVersionCommand(source, de.civitascore.modelforge.contract.VersionBump.MAJOR));
+      assertThat(pin.versionedUrn()).isEqualTo(COPY_PIN);
+      assertThat(pin.version()).isEqualTo("3.0.0");
+    }
+
+    @Test
+    @DisplayName("refuses a version the registry does not hold")
+    void refusesAMissingVersion() {
+      when(modelForge.existing(any())).thenReturn(Set.of());
+
+      assertThatThrownBy(() -> gateway.copyModelVersion(SOURCE_PIN))
+          .isInstanceOf(ModelMissingException.class);
+      verify(modelForge, never()).bumpVersion(any());
     }
   }
 

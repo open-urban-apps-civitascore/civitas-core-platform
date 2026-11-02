@@ -4,6 +4,7 @@ import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
+import de.civitascore.modelforge.contract.BumpVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyQuery;
@@ -159,6 +160,25 @@ public class ModelRegistryGateway {
                 bumpFromVersion)
             : importRoot(withTitle(content, name), bump, bumpFromVersion, dataStructureId);
     return toPin(root);
+  }
+
+  /**
+   * Copies one stored model version, with its styles and reference edges, to a new major version
+   * numbered from the model's highest version.
+   *
+   * @param versionedUrn the CORE URN pinned to the version to copy
+   * @return the pin of the copy
+   * @throws ModelMissingException when the registry holds no such version
+   */
+  public ModelPin copyModelVersion(String versionedUrn) {
+    ArtifactId source = new ArtifactId(versionedUrn);
+    if (modelForge.existing(List.of(source)).isEmpty()) {
+      throw new ModelMissingException();
+    }
+    return toPin(
+        modelForge
+            .bumpVersion(new BumpVersionCommand(source, toModelForgeBump(VersionBump.MAJOR)))
+            .artifactId());
   }
 
   private static void requireNoForeignDataStructureId(JsonNode content, UUID dataStructureId) {

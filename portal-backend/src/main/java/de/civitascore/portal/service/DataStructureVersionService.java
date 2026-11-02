@@ -19,6 +19,7 @@ import de.civitascore.portal.util.ModelReferenceNotAvailableException;
 import de.civitascore.portal.util.ModelRootMissingException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -278,6 +279,45 @@ public class DataStructureVersionService
 
     version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
     return dataStructureVersionRepository.save(version);
+  }
+
+  /**
+   * Duplicates a data structure version into a new DRAFT version of the same data structure. The
+   * copy takes the description, model name and imported structure URNs of the source, and is pinned
+   * to a registry copy of exactly the source's model version. A source without a model gives a copy
+   * without a model.
+   *
+   * @param sourceVersionId the id of the version to duplicate, in DRAFT or AVAILABLE status
+   * @return the new version
+   * @throws ModelMissingException if the model registry no longer holds the source's model
+   * @throws ModelReferenceNotAvailableException if the source's model references a model the caller
+   *     may not use
+   */
+  @Transactional
+  public DataStructureVersion duplicate(UUID sourceVersionId) {
+    DataStructureVersion source = findByIdOrThrow(sourceVersionId);
+    UUID dataStructureId = source.getDataStructure().getId();
+    ModelRegistryGateway.ModelPin pin = null;
+    if (source.getModelUrn() != null) {
+      modelReferenceAuthorizer.authorizeStored(dataStructureId, source.getModelUrn());
+      pin = modelRegistryGateway.copyModelVersion(source.getModelUrn());
+    }
+
+    DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+    input.setDataStructureId(dataStructureId);
+    input.setDescription(source.getDescription());
+    input.setModelName(source.getModelName());
+    input.setImportedStructureUrns(
+        source.getImportedStructureUrns() == null
+            ? null
+            : new ArrayList<>(source.getImportedStructureUrns()));
+    DataStructureVersion copy = create(input);
+    if (pin != null) {
+      copy.setModelUrn(pin.versionedUrn());
+      copy.setVersion(pin.version());
+      copy = save(copy);
+    }
+    return copy;
   }
 
   /**

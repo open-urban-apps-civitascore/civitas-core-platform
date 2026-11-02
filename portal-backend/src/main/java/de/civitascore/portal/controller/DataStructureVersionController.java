@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.io.IOException;
+import java.net.URI;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.MethodNotAllowedException;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -295,6 +297,51 @@ public class DataStructureVersionController
     requireOwnedByDataStructure(dataStructureId, versionId);
     DataStructureVersion unreleased = dataStructureVersionService.unrelease(versionId);
     return ResponseEntity.ok(dataStructureVersionAssembler.toOutput(unreleased));
+  }
+
+  /**
+   * Duplicates a data structure version into a new DRAFT version of the same data structure.
+   *
+   * @param dataStructureId the UUID of the parent data structure
+   * @param versionId the UUID of the version to duplicate
+   * @return the new version output DTO with HTTP 201 status and a Location header
+   */
+  @PostMapping("/{versionId}/duplicate")
+  @Operation(
+      operationId = "duplicateDataStructureVersion",
+      summary = "Duplicate a data structure version",
+      description =
+          "Creates a new DRAFT version with the description, model name and imported structures"
+              + " of the source version. The model registry copies the source's model with its"
+              + " styles and references to the next major version after the highest existing one."
+              + " A source without a model gives a copy without a model. DRAFT and AVAILABLE"
+              + " versions can be duplicated.")
+  @ApiResponse(responseCode = "201", description = "Data structure version duplicated successfully")
+  @ApiResponse(
+      responseCode = "400",
+      description = "The source version's model references a model that is not available",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "404",
+      description = "Data structure version not found",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "The source version's model is missing from the model registry, or the new version"
+              + " number is already taken",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  public ResponseEntity<DataStructureVersionOutputDTO> duplicateDataStructureVersion(
+      @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
+    requireOwnedByDataStructure(dataStructureId, versionId);
+    DataStructureVersion duplicated = dataStructureVersionService.duplicate(versionId);
+    URI location =
+        ServletUriComponentsBuilder.fromCurrentContextPath()
+            .path("/datastructures/{dataStructureId}/versions/{id}")
+            .buildAndExpand(dataStructureId, duplicated.getId())
+            .toUri();
+    return ResponseEntity.created(location)
+        .body(dataStructureVersionAssembler.toOutput(duplicated));
   }
 
   private DataStructureVersion requireOwnedByPathDataStructure(UUID versionId) {
