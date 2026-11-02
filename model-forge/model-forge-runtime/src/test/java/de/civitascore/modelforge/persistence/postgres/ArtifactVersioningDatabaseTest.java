@@ -7,8 +7,10 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * The registry's identity and versioning contract against a real database: one logical artifact per
@@ -99,9 +101,104 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
             .isEqualTo(logical);
     }
 
+    @Test
+    @DisplayName("Bumping a pinned older version copies its content and numbers the copy from the highest version")
+    void bumpOfAPinnedOlderVersionCopiesItsContentAboveTheHighest() {
+        String logical = UrnParser.logicalUrn(registry.storeElement(schema(null, "temperature"), Set.of()));
+        storeUnder(logical, "humidity", VersionBump.MAJOR);
+        String firstBytes = storedContent(logical, "1.0.0");
+        String secondBytes = storedContent(logical, "2.0.0");
+
+        String copyPin = registry.bumpVersion(logical, VersionBump.MAJOR, "1.0.0");
+
+        assertThat(copyPin).isEqualTo(UrnParser.withVersion(logical, "3.0.0"));
+        assertThat(storedContent(logical, "3.0.0")).isEqualTo(firstBytes);
+        assertThat(currentVersionOf(logical)).isEqualTo("3.0.0");
+        assertThat(storedContent(logical, "1.0.0")).isEqualTo(firstBytes);
+        assertThat(storedContent(logical, "2.0.0")).isEqualTo(secondBytes);
+    }
+
+    @Test
+    @DisplayName("A copy of a pinned version carries that version's reference edges, not the current version's")
+    void bumpOfAPinnedVersionCopiesItsOwnReferences() {
+        String stationV1 = registry.storeElement(schema(null, "stationId"), Set.of());
+        String station = UrnParser.logicalUrn(stationV1);
+        String stationV2 = storeUnder(station, "stationCode", VersionBump.MINOR);
+        String structure = urns.urn("datastructure", UUID.randomUUID());
+        String structureV1 = registry.storeDataStructure(structure, structureOf(stationV1), VersionBump.PATCH, null);
+        registry.storeDataStructure(structure, structureOf(stationV2), VersionBump.MAJOR, null);
+
+        String copyPin = registry.bumpVersion(structure, VersionBump.MAJOR, "1.0.0");
+
+        assertThat(registry.fetchArtifactRefUrns(copyPin))
+            .containsExactlyElementsOf(registry.fetchArtifactRefUrns(structureV1))
+            .containsExactly(stationV1);
+    }
+
+    @Test
+    @DisplayName("Bumping the same pinned version twice mints a new highest version each time")
+    void repeatedBumpOfTheSameVersionMintsANewVersionEachTime() {
+        String logical = UrnParser.logicalUrn(registry.storeElement(schema(null, "temperature"), Set.of()));
+        storeUnder(logical, "humidity", VersionBump.MAJOR);
+
+        String firstCopy = registry.bumpVersion(logical, VersionBump.MAJOR, "1.0.0");
+        String secondCopy = registry.bumpVersion(logical, VersionBump.MAJOR, "1.0.0");
+
+        assertThat(UrnParser.versionFromUrn(firstCopy)).isEqualTo("3.0.0");
+        assertThat(UrnParser.versionFromUrn(secondCopy)).isEqualTo("4.0.0");
+    }
+
+    @Test
+    @DisplayName("A major bump counts from the highest version, not from the major line of the source")
+    void majorBumpCountsFromTheHighestVersion() {
+        String logical = UrnParser.logicalUrn(registry.storeElement(schema(null, "temperature"), Set.of()));
+        registry.storeElement(schema(logical, "humidity"), Set.of(), Set.of(), "2.3.0", VersionBump.PATCH, null);
+
+        String copyPin = registry.bumpVersion(logical, VersionBump.MAJOR, "1.0.0");
+
+        assertThat(UrnParser.versionFromUrn(copyPin)).isEqualTo("3.0.0");
+    }
+
+    @Test
+    @DisplayName("A minor bump of an older pinned version lands in the highest line")
+    void minorBumpOfAnOlderPinLandsInTheHighestLine() {
+        String logical = UrnParser.logicalUrn(registry.storeElement(schema(null, "temperature"), Set.of()));
+        registry.storeElement(schema(logical, "humidity"), Set.of(), Set.of(), "2.3.0", VersionBump.PATCH, null);
+
+        String copyPin = registry.bumpVersion(logical, VersionBump.MINOR, "1.0.0");
+
+        assertThat(UrnParser.versionFromUrn(copyPin)).isEqualTo("2.4.0");
+        assertThat(storedContent(logical, "2.4.0")).isEqualTo(storedContent(logical, "1.0.0"));
+    }
+
+    @Test
+    @DisplayName("Bumping a pinned version the artifact does not hold is refused and writes nothing")
+    void bumpOfAnUnknownPinnedVersionIsRefused() {
+        String logical = UrnParser.logicalUrn(registry.storeElement(schema(null, "temperature"), Set.of()));
+        var before = snapshot();
+
+        assertThatThrownBy(() -> registry.bumpVersion(logical, VersionBump.MAJOR, "9.0.0"))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThat(snapshot()).isEqualTo(before);
+    }
+
     /** Writes under an existing logical URN by carrying it as the schema's {@code $id}. */
     private String storeUnder(String logicalUrn, String property, VersionBump bump) {
         return registry.storeElement(schema(logicalUrn, property), Set.of(), Set.of(), null, bump, null);
+    }
+
+    private String currentVersionOf(String logicalUrn) {
+        return jdbc.sql("select current_version from model_forge.artifact where logical_urn = :urn")
+            .param("urn", logicalUrn)
+            .query(String.class)
+            .single();
+    }
+
+    /** A DataStructure grouping a single pinned Element member. */
+    private JsonNode structureOf(String memberPin) {
+        return mapper.readTree("""
+            { "title": "Station structure", "$defs": { "Station": { "$ref": "%s" } } }
+            """.formatted(memberPin));
     }
 
     /** A minimal JSON Schema, optionally claiming an existing logical identity via {@code $id}. */

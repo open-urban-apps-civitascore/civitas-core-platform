@@ -166,7 +166,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
     }
 
     /**
-     * Copies the current version's rows to a new version and advances the artifact to it. Every
+     * Copies the source version's rows to a new version and advances the artifact to it. Every
      * representation is copied, not only the primary one, and the reference edges are copied as rows
      * rather than re-extracted from content — an edge the content does not spell out survives that way
      * by construction.
@@ -175,7 +175,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
      * store methods share would turn every call into a no-op.
      */
     @Override
-    public String bumpVersion(String logicalUrn, VersionBump bump) {
+    public String bumpVersion(String logicalUrn, VersionBump bump, String sourceVersion) {
         // Reject control characters before the URN reaches an exception message a caller may log.
         UrnParser.requireNoControlChars(logicalUrn);
         String logical = UrnParser.logicalUrn(logicalUrn);
@@ -187,13 +187,15 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                 ArtifactRow artifact = artifacts.findByLogicalUrn(logical)
                     .orElseThrow(() -> new IllegalArgumentException("Unknown artifact: " + logical));
                 if (artifact.currentVersion() == null) {
-                    throw new IllegalArgumentException("Artifact has no version to carry forward: " + logical);
+                    throw new IllegalArgumentException("Artifact has no version to copy: " + logical);
                 }
-                ArtifactVersionRow source = versions.find(artifact.id(), artifact.currentVersion())
-                    .orElseThrow(() -> new IllegalStateException(
-                        "Current version " + artifact.currentVersion() + " is missing for " + logical));
+                String copied = sourceVersion != null ? sourceVersion : artifact.currentVersion();
+                ArtifactVersionRow source = versions.find(artifact.id(), copied)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                        "Unknown version " + copied + " of " + logical));
 
                 Instant now = Instant.now();
+                // current_version is the highest version, so the copy becomes the new highest.
                 String newVersion = SemVer.next(artifact.currentVersion(), bump);
                 UUID versionId = UUID.randomUUID();
                 versions.insert(new ArtifactVersionRow(versionId, artifact.id(), newVersion,
@@ -215,7 +217,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                     namespaces.repointVersion(artifact.id(), versionId, now);
                     xsd.evict(logical);
                 }
-                log.info("Bumped {} to v{} ({})", logical, newVersion, bump);
+                log.info("Copied {} v{} to v{} ({})", logical, copied, newVersion, bump);
                 return pin;
             });
         } catch (DataAccessException e) {

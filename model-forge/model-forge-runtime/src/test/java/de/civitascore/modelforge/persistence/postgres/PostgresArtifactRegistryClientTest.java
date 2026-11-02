@@ -134,7 +134,7 @@ class PostgresArtifactRegistryClientTest {
         // the same translation: a transient storage failure inside it must become a 502, not escape raw.
         var client = clientWithFailingDb(new QueryTimeoutException("statement timed out"));
         assertThatThrownBy(() -> client.bumpVersion(
-                "urn:core:platform:civitas:datastructure:common:f51bac76-4d03-87ae-9d36-53de0b058bcc", VersionBump.MINOR))
+                "urn:core:platform:civitas:datastructure:common:f51bac76-4d03-87ae-9d36-53de0b058bcc", VersionBump.MINOR, null))
             .isInstanceOf(RegistryUnavailableException.class);
     }
 
@@ -146,7 +146,7 @@ class PostgresArtifactRegistryClientTest {
         var client = clientWithFailingDb(new DataIntegrityViolationException(rawDbDetail));
 
         assertThatThrownBy(() -> client.bumpVersion(
-                "urn:core:platform:civitas:datastructure:common:b3fc14fa-d95e-82ee-a922-927d2aba50c5", VersionBump.MAJOR))
+                "urn:core:platform:civitas:datastructure:common:b3fc14fa-d95e-82ee-a922-927d2aba50c5", VersionBump.MAJOR, null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("conflicts with existing registry data")
             .hasMessageNotContaining(rawDbDetail);

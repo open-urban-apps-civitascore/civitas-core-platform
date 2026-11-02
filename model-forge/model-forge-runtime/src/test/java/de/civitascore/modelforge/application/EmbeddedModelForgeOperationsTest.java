@@ -889,42 +889,40 @@ class EmbeddedModelForgeOperationsTest {
     @Test
     void bumpVersion_carriesTheCurrentVersionForwardAtTheRequestedClass() {
         String logical = "urn:core:platform:civitas:datastructure:common:4e0604c3-1372-884e-91a3-68ed0ec7aa03";
-        when(registry.bumpVersion(logical, VersionBump.MAJOR)).thenReturn(logical + ":2.0.0");
+        when(registry.bumpVersion(logical, VersionBump.MAJOR, null)).thenReturn(logical + ":2.0.0");
         when(registry.referencesByType(logical + ":2.0.0")).thenReturn(Map.of());
 
         var result = operations.bumpVersion(
             new BumpVersionCommand(new ArtifactId(logical), VersionBump.MAJOR));
 
         assertThat(result.artifactId().value()).isEqualTo(logical + ":2.0.0");
-        verify(registry).bumpVersion(logical, VersionBump.MAJOR);
+        verify(registry).bumpVersion(logical, VersionBump.MAJOR, null);
     }
 
     /** {@code :latest} names the current version, so it is a usable identity for a bump. */
     @Test
     void bumpVersion_acceptsLatest() {
         String logical = "urn:core:platform:civitas:datastructure:common:4e0604c3-1372-884e-91a3-68ed0ec7aa03";
-        when(registry.bumpVersion(logical, VersionBump.MINOR)).thenReturn(logical + ":1.1.0");
+        when(registry.bumpVersion(logical, VersionBump.MINOR, null)).thenReturn(logical + ":1.1.0");
         when(registry.referencesByType(logical + ":1.1.0")).thenReturn(Map.of());
 
         operations.bumpVersion(
             new BumpVersionCommand(new ArtifactId(logical + ":latest"), VersionBump.MINOR));
 
-        verify(registry).bumpVersion(logical, VersionBump.MINOR);
+        verify(registry).bumpVersion(logical, VersionBump.MINOR, null);
     }
 
-    /**
-     * Bumping from a version that is not current has no sound answer, and bumping from the current
-     * one instead would ignore the version the caller named, so a pinned identity is refused.
-     */
     @Test
-    void bumpVersion_refusesAPinnedIdentity() {
-        var command = new BumpVersionCommand(
-            new ArtifactId("urn:core:platform:civitas:datastructure:common:4e0604c3-1372-884e-91a3-68ed0ec7aa03:1.0.0"),
-            VersionBump.MINOR);
+    void bumpVersion_copiesThePinnedVersion() {
+        String logical = "urn:core:platform:civitas:datastructure:common:4e0604c3-1372-884e-91a3-68ed0ec7aa03";
+        when(registry.bumpVersion(logical, VersionBump.MAJOR, "1.0.0")).thenReturn(logical + ":3.0.0");
+        when(registry.referencesByType(logical + ":3.0.0")).thenReturn(Map.of());
 
-        assertThatThrownBy(() -> operations.bumpVersion(command))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("pins a version");
+        var result = operations.bumpVersion(
+            new BumpVersionCommand(new ArtifactId(logical + ":1.0.0"), VersionBump.MAJOR));
+
+        assertThat(result.artifactId().value()).isEqualTo(logical + ":3.0.0");
+        verify(registry).bumpVersion(logical, VersionBump.MAJOR, "1.0.0");
     }
 
     // ── closure / existing ────────────────────────────────────────────────────

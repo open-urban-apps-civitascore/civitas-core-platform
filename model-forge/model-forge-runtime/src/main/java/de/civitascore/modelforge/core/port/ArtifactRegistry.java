@@ -127,14 +127,16 @@ public interface ArtifactRegistry {
     String storeDataStructure(String urn, JsonNode manifest, VersionBump bump, String bumpFromVersion);
 
     /**
-     * Copies the artifact's current version to a new version numbered at {@code bump} — content,
-     * every stored representation and every reference edge — and makes it current. Always writes a
-     * version: the content is unchanged by definition, so the byte-identical short-circuit the store
-     * methods rely on would otherwise make this a no-op.
+     * Copies one version of the artifact to a new version numbered at {@code bump} from the
+     * artifact's highest version — content, every stored representation and every reference edge —
+     * and makes it current. Always writes a version: the content is unchanged by definition, so the
+     * byte-identical short-circuit the store methods rely on would otherwise make this a no-op.
      *
+     * @param sourceVersion the version to copy; {@code null} copies the current version
      * @return the versioned URN the new version was written under
+     * @throws IllegalArgumentException when the artifact or the source version is unknown
      */
-    String bumpVersion(String logicalUrn, VersionBump bump);
+    String bumpVersion(String logicalUrn, VersionBump bump, String sourceVersion);
 
     void deleteArtifact(String urn);
 

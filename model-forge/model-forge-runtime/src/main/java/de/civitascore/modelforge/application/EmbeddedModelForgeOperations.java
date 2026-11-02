@@ -724,16 +724,9 @@ public class EmbeddedModelForgeOperations implements ModelForge {
     @Override
     public ArtifactWriteResult bumpVersion(BumpVersionCommand command) {
         String urn = command.artifactId().value();
-        // A pinned identity is refused rather than reinterpreted: bumping from a version that is not
-        // current has no sound answer, and bumping from the current one instead would quietly ignore
-        // the version the caller named. :latest names the current version and is accepted.
-        if (!UrnParser.isLatest(urn) && UrnParser.versionFromUrn(urn) != null) {
-            throw new IllegalArgumentException(
-                "bumpVersion needs a logical URN; " + urn + " pins a version. "
-                + "Bump the artifact, then store the pin the bump returns.");
-        }
         String logical = UrnParser.logicalUrn(urn);
-        String assigned = registry.bumpVersion(logical, command.bump());
+        String sourceVersion = UrnParser.isLatest(urn) ? null : UrnParser.versionFromUrn(urn);
+        String assigned = registry.bumpVersion(logical, command.bump(), sourceVersion);
         registerWritten(assigned, logical);
         var pin = new ArtifactId(assigned != null && !assigned.isBlank() ? assigned : logical);
         return new ArtifactWriteResult(pin, dependenciesOf(pin));

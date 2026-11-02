@@ -224,16 +224,22 @@ public interface ModelForge {
     ArtifactWriteResult saveArtifact(SaveArtifactCommand command);
 
     /**
-     * Carries an artifact's current version forward as a new version numbered at the requested change
-     * class, with its content, every stored format and its reference edges unchanged, and makes it
-     * current. The new version is built from the stored rows, so a caller never reads content out and
-     * writes it back — a round trip that would drop the edges the content does not spell out.
+     * Copies one version of an artifact to a new version numbered at the requested change class, with
+     * its content, every stored format and its reference edges unchanged, and makes the copy current.
+     * A pinned id names the source version; a logical or {@code :latest} id copies the current one.
+     * The new version is built from the stored rows, so a caller never reads content out and writes
+     * it back — a round trip that would drop the edges the content does not spell out.
+     *
+     * <p>The new number always counts from the artifact's highest version, whichever version is the
+     * source, so the copy is the new highest version. A {@code MINOR} or {@code PATCH} bump of an
+     * older pin therefore lands in the highest line: copying 1.0.0 while 2.0.0 exists gives 2.1.0
+     * with the content of 1.0.0.
      *
      * <p>This <em>always</em> mints a version, unlike every other write, which returns the existing
      * pin when the content is byte-identical. Carrying unchanged content forward is the whole point.
      *
-     * @throws IllegalArgumentException when the command's id pins a version, or the artifact is
-     *     unknown, or it holds no version to carry forward
+     * @throws IllegalArgumentException when the artifact is unknown, holds no version to copy, or
+     *     does not hold the pinned version
      */
     ArtifactWriteResult bumpVersion(BumpVersionCommand command);
 
