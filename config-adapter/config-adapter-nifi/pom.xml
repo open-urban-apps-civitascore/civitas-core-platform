@@ -17,8 +17,8 @@
     <description>Apache NiFi adapter: transforms the engine-neutral pipeline graph into a curated NiFi flow and deploys it via the NiFi REST API</description>
 
     <properties>
-        <wiremock.version>3.9.2</wiremock.version>
-        <archunit.version>1.4.2</archunit.version>
+        <wiremock.version>3.13.2</wiremock.version>
+        <archunit.version>1.5.1</archunit.version>
         <paho.version>1.2.5</paho.version>
         <!-- Must track the NiFi version the flows are deployed to (apache/nifi:2.9.0), so the tests
              parse RecordPath and Expression Language with the same grammar that runs them. -->
@@ -177,7 +177,7 @@
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
-                <version>4.9.8.5</version>
+                <version>4.10.5.0</version>
                 <configuration>
                     <effort>Max</effort>
                     <threshold>Medium</threshold>
