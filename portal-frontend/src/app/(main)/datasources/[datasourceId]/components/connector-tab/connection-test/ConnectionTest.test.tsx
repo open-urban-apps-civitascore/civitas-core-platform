@@ -78,6 +78,7 @@ interface RenderOptions {
   isConnectorComplete?: boolean
   isConnectorChanged?: boolean
   queryClient?: QueryClient
+  datasourceId?: string
 }
 
 const renderConnectionTest = (options: RenderOptions = {}) => {
@@ -86,6 +87,7 @@ const renderConnectionTest = (options: RenderOptions = {}) => {
     isConnectorComplete = true,
     isConnectorChanged = false,
     queryClient = new QueryClient(),
+    datasourceId = DATASOURCE_ID,
   } = options
   const configuration = options.configuration ?? CONFIGURATIONS[connectorType]
   let capturedForm: UseFormReturn<DatasourceFormDraft>
@@ -109,7 +111,7 @@ const renderConnectionTest = (options: RenderOptions = {}) => {
         <span data-testid="isDirty">{String(form.formState.isDirty)}</span>
         <ConnectionTest
           form={form}
-          datasourceId={DATASOURCE_ID}
+          datasourceId={datasourceId}
           isConnectorComplete={isConnectorComplete}
           isConnectorChanged={isConnectorChanged}
         />
@@ -126,6 +128,14 @@ const renderConnectionTest = (options: RenderOptions = {}) => {
 }
 
 const clickTest = (name = 'button') => fireEvent.click(screen.getByRole('button', { name }))
+
+const deferredResult = () => {
+  let resolve: (value: { data: ConnectionTestResult }) => void = () => {}
+  const promise = new Promise<{ data: ConnectionTestResult }>(onResolve => {
+    resolve = onResolve
+  })
+  return { promise, resolve }
+}
 
 describe('ConnectionTest', () => {
   beforeEach(() => {
@@ -370,6 +380,36 @@ describe('ConnectionTest', () => {
       expect(screen.getByText('connecting')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'button' })).toBeDisabled()
     })
+
+    it('shows the result of a test that finishes after the tab is opened again', async () => {
+      const { promise, resolve } = deferredResult()
+      mockApiRequest.mockReturnValue(promise)
+      const queryClient = new QueryClient()
+      const { unmount } = renderConnectionTest({ queryClient })
+
+      clickTest()
+      await screen.findByText('connecting')
+      unmount()
+      renderConnectionTest({ queryClient })
+      act(() => resolve({ data: testResult() }))
+
+      expect(await screen.findByText('success')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'testAgain' })).toBeEnabled()
+    })
+  })
+
+  it('does not show a running test of another data source', async () => {
+    mockApiRequest.mockReturnValue(new Promise(() => {}))
+    const queryClient = new QueryClient()
+    const { unmount } = renderConnectionTest({ queryClient })
+
+    clickTest()
+    await screen.findByText('connecting')
+    unmount()
+    renderConnectionTest({ queryClient, datasourceId: 'ds-2' })
+
+    expect(screen.queryByText('connecting')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'button' })).toBeEnabled()
   })
 
   it('hides the result when a connector field changes', async () => {
@@ -382,6 +422,32 @@ describe('ConnectionTest', () => {
 
     await waitFor(() => expect(screen.queryByText('success')).not.toBeInTheDocument())
     expect(screen.getByRole('button', { name: 'button' })).toBeEnabled()
+  })
+
+  it('does not show the result again when a changed field is changed back', async () => {
+    mockApiRequest.mockResolvedValue({ data: testResult() })
+    const { form } = renderConnectionTest()
+
+    clickTest()
+    await screen.findByText('success')
+    act(() => form.setValue('configuration.table', 'other_table'))
+    await waitFor(() => expect(screen.queryByText('success')).not.toBeInTheDocument())
+    act(() => form.setValue('configuration.table', SQL_CONFIGURATION.table))
+
+    expect(screen.queryByText('success')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'button' })).toBeEnabled()
+  })
+
+  it('keeps a running test when a field changes', async () => {
+    mockApiRequest.mockReturnValue(new Promise(() => {}))
+    const { form } = renderConnectionTest()
+
+    clickTest()
+    await screen.findByText('connecting')
+    act(() => form.setValue('configuration.table', 'other_table'))
+
+    expect(screen.getByText('connecting')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'button' })).toBeDisabled()
   })
 
   describe('masked password', () => {
@@ -403,6 +469,32 @@ describe('ConnectionTest', () => {
       act(() => form.setValue('configuration.password', 'new-secret'))
 
       await waitFor(() => expect(screen.queryByText('reenterPassword')).not.toBeInTheDocument())
+    })
+
+    it('does not show the result of the stored password after a new password is saved', async () => {
+      mockApiRequest.mockResolvedValue({ data: testResult() })
+      const { form } = renderConnectionTest({ configuration: maskedConfiguration })
+
+      clickTest()
+      await screen.findByText('success')
+      act(() => form.setValue('configuration.password', 'new-secret'))
+      await waitFor(() => expect(screen.queryByText('success')).not.toBeInTheDocument())
+      act(() => form.setValue('configuration.password', MASKED_SECRET))
+
+      expect(screen.queryByText('success')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'button' })).toBeEnabled()
+    })
+
+    it('does not show the hint again when the password is changed back', async () => {
+      const { form } = renderConnectionTest({ configuration: maskedConfiguration, isConnectorChanged: true })
+
+      clickTest()
+      expect(screen.getByText('reenterPassword')).toBeInTheDocument()
+      act(() => form.setValue('configuration.password', 'new-secret'))
+      await waitFor(() => expect(screen.queryByText('reenterPassword')).not.toBeInTheDocument())
+      act(() => form.setValue('configuration.password', MASKED_SECRET))
+
+      expect(screen.queryByText('reenterPassword')).not.toBeInTheDocument()
     })
 
     it('sends the request for an unchanged connector', async () => {

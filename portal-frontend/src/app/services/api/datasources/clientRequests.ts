@@ -1,5 +1,6 @@
-import { MutationState, useMutation, useMutationState } from '@tanstack/react-query'
+import { MutationState, useMutation, useMutationState, useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
+import { useCallback } from 'react'
 
 import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { useCreateMutation } from '@/hooks/use-create-mutation'
@@ -93,6 +94,17 @@ export const useLastConnectionTestRun = (id: string): ConnectionTestRun | undefi
     select: mutation => mutation.state as ConnectionTestRun,
   })
   return runs.at(-1)
+}
+
+export const useClearConnectionTestRuns = (id: string) => {
+  const queryClient = useQueryClient()
+  return useCallback(() => {
+    const cache = queryClient.getMutationCache()
+    const runs = cache.findAll({ mutationKey: connectionTestKey(id), exact: true })
+    for (const run of runs) {
+      if (run.state.status !== 'pending') cache.remove(run)
+    }
+  }, [queryClient, id])
 }
 
 export const useDeleteDatasource = () =>

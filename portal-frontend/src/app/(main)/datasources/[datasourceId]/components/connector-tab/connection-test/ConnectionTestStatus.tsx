@@ -3,7 +3,7 @@ import { useTranslations } from 'next-intl'
 import { ReactNode } from 'react'
 
 import { Spinner } from '@/components/ui/spinner'
-import { ConnectionTestProblem, ConnectionTestResult } from '@/types/connectionTest'
+import { CONNECTION_TEST_REASONS, ConnectionTestProblem, ConnectionTestResult } from '@/types/connectionTest'
 import { ConnectorType } from '@/types/connectors'
 import { toPreviewText } from '@/utils/connectionTest'
 
@@ -20,9 +20,7 @@ const PROBLEM_CODES = [
   'EXTERNAL_SYSTEM_TIMEOUT',
 ]
 
-const RESULT_REASONS = ['INVALID_CONNECTOR', 'SOURCE_ERROR', 'TIMEOUT']
-
-const toCause = (code: string | null, knownCodes: string[]) =>
+const toCause = (code: string | null, knownCodes: readonly string[]) =>
   code && knownCodes.includes(code) ? code : UNKNOWN_CAUSE
 
 interface ResultDetailsProps {
@@ -124,7 +122,10 @@ export const ConnectionTestStatus = (props: ConnectionTestStatusProps) => {
   if (result) {
     return (
       <div className="mt-4 text-sm">
-        <Failure cause={toCause(result.reason, RESULT_REASONS)} details={result.message ? [result.message] : []}>
+        <Failure
+          cause={toCause(result.reason, CONNECTION_TEST_REASONS)}
+          details={result.message ? [result.message] : []}
+        >
           <ResultDetails result={result} connectorType={connectorType} />
         </Failure>
       </div>

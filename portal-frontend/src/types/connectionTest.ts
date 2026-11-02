@@ -3,7 +3,9 @@ import { DatasourcePatchData } from './datasources'
 export const MASKED_SECRET = '********'
 export const PREVIEW_TRUNCATED_MARKER = '\n[truncated]'
 
-export type ConnectionTestReason = 'INVALID_CONNECTOR' | 'SOURCE_ERROR' | 'TIMEOUT'
+export const CONNECTION_TEST_REASONS = ['INVALID_CONNECTOR', 'SOURCE_ERROR', 'TIMEOUT'] as const
+
+export type ConnectionTestReason = (typeof CONNECTION_TEST_REASONS)[number]
 
 export type ConnectionTestInput = { connector: DatasourcePatchData['connector']; apiCall?: string }
 

@@ -1,8 +1,12 @@
 import { useTranslations } from 'next-intl'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { UseFormReturn, useWatch } from 'react-hook-form'
 
-import { useLastConnectionTestRun, useTestDatasourceConnection } from '@/app/services/api/datasources/clientRequests'
+import {
+  useClearConnectionTestRuns,
+  useLastConnectionTestRun,
+  useTestDatasourceConnection,
+} from '@/app/services/api/datasources/clientRequests'
 import { Button } from '@/components/ui/button'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
@@ -25,6 +29,7 @@ export const ConnectionTest = (props: ConnectionTestProps) => {
   const isMobile = useIsMobile()
   const mutation = useTestDatasourceConnection(datasourceId)
   const lastRun = useLastConnectionTestRun(datasourceId)
+  const clearRuns = useClearConnectionTestRuns(datasourceId)
   const [passwordRequiredKey, setPasswordRequiredKey] = useState<string | null>(null)
 
   const connectorType = useWatch({ control: form.control, name: 'connectorType' })
@@ -36,9 +41,16 @@ export const ConnectionTest = (props: ConnectionTestProps) => {
   const currentKey = JSON.stringify(currentInput)
   const canTest = isConnectorComplete && currentInput !== null
   const isPending = lastRun?.status === 'pending'
+  const lastRunKey = lastRun ? JSON.stringify(lastRun.variables) : null
   const isPasswordRequired = passwordRequiredKey === currentKey
-  const isTestCurrent = !!lastRun && JSON.stringify(lastRun.variables) === currentKey
+  const isTestCurrent = lastRunKey === currentKey
   const isRunCurrent = isTestCurrent || isPasswordRequired
+
+  useEffect(() => {
+    if (lastRunKey !== null && lastRunKey !== currentKey && !isPending) clearRuns()
+  }, [lastRunKey, currentKey, isPending, clearRuns])
+
+  if (passwordRequiredKey !== null && !isPasswordRequired) setPasswordRequiredKey(null)
 
   const runTest = () => {
     const values = form.getValues()
@@ -73,8 +85,8 @@ export const ConnectionTest = (props: ConnectionTestProps) => {
             connectorType={connectorType}
             isPending={isPending}
             isPasswordRequired={isPasswordRequired}
-            result={isTestCurrent && lastRun.status === 'success' ? lastRun.data?.data : undefined}
-            problem={isTestCurrent && lastRun.status === 'error' ? toConnectionTestProblem(lastRun.error) : undefined}
+            result={isTestCurrent && lastRun?.status === 'success' ? lastRun.data?.data : undefined}
+            problem={isTestCurrent && lastRun?.status === 'error' ? toConnectionTestProblem(lastRun.error) : undefined}
           />
         </div>
       </div>
