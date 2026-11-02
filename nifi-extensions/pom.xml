@@ -61,7 +61,7 @@
 		     no credential of an installation. -->
 		<testcontainers.version>2.0.5</testcontainers.version>
 		<awaitility.version>4.3.0</awaitility.version>
-		<jacoco.version>0.8.15</jacoco.version>
+		<jacoco.version>0.8.16</jacoco.version>
 		<spotless.version>3.10.4</spotless.version>
 		<nifi-nar-maven-plugin.version>2.4.0</nifi-nar-maven-plugin.version>
 		<cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
