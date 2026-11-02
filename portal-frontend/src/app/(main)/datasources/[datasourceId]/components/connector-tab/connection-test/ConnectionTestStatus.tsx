@@ -20,7 +20,10 @@ const PROBLEM_CODES = [
   'EXTERNAL_SYSTEM_TIMEOUT',
 ]
 
-const toProblemCause = (code: string) => (PROBLEM_CODES.includes(code) ? code : UNKNOWN_CAUSE)
+const RESULT_REASONS = ['INVALID_CONNECTOR', 'SOURCE_ERROR', 'TIMEOUT']
+
+const toCause = (code: string | null, knownCodes: string[]) =>
+  code && knownCodes.includes(code) ? code : UNKNOWN_CAUSE
 
 interface ResultDetailsProps {
   result: ConnectionTestResult
@@ -121,7 +124,7 @@ export const ConnectionTestStatus = (props: ConnectionTestStatusProps) => {
   if (result) {
     return (
       <div className="mt-4 text-sm">
-        <Failure cause={result.reason ?? UNKNOWN_CAUSE} details={result.message ? [result.message] : []}>
+        <Failure cause={toCause(result.reason, RESULT_REASONS)} details={result.message ? [result.message] : []}>
           <ResultDetails result={result} connectorType={connectorType} />
         </Failure>
       </div>
@@ -131,7 +134,7 @@ export const ConnectionTestStatus = (props: ConnectionTestStatusProps) => {
   if (problem) {
     return (
       <div className="mt-4 text-sm">
-        <Failure cause={toProblemCause(problem.code)} details={problem.details} />
+        <Failure cause={toCause(problem.code, PROBLEM_CODES)} details={problem.details} />
       </div>
     )
   }

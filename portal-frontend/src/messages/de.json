@@ -1205,6 +1205,7 @@
         "title": "Verbindungstest",
         "button": "Verbindung testen",
         "incompleteHint": "Alle Pflichtfelder ausfüllen, um die Verbindung zu testen.",
+        "invalidHint": "Die Konfiguration enthält ungültige Werte. Prüfen Sie auch die API-Aufrufe.",
         "connecting": "Verbindung wird aufgebaut …",
         "testAgain": "Erneut testen",
         "success": "Verbindung erfolgreich hergestellt",

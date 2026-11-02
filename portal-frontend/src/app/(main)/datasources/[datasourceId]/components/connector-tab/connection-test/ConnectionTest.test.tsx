@@ -77,10 +77,16 @@ interface RenderOptions {
   configuration?: Record<string, unknown>
   isConnectorComplete?: boolean
   isConnectorChanged?: boolean
+  queryClient?: QueryClient
 }
 
 const renderConnectionTest = (options: RenderOptions = {}) => {
-  const { connectorType = 'SQL', isConnectorComplete = true, isConnectorChanged = false } = options
+  const {
+    connectorType = 'SQL',
+    isConnectorComplete = true,
+    isConnectorChanged = false,
+    queryClient = new QueryClient(),
+  } = options
   const configuration = options.configuration ?? CONFIGURATIONS[connectorType]
   let capturedForm: UseFormReturn<DatasourceFormDraft>
 
@@ -112,7 +118,7 @@ const renderConnectionTest = (options: RenderOptions = {}) => {
   }
 
   const view = render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={queryClient}>
       <Wrapper />
     </QueryClientProvider>,
   )
@@ -141,12 +147,13 @@ describe('ConnectionTest', () => {
     expect(screen.queryByText('incompleteHint')).not.toBeInTheDocument()
   })
 
-  it('disables the button and shows a hint when the values give no valid request', () => {
+  it('disables the button and shows the invalid hint when the values give no valid request', () => {
     const apiCalls = [{ ...HTTP_CONFIGURATION.apiCalls[0], path: 'stations' }]
     renderConnectionTest({ connectorType: 'HTTP', configuration: { ...HTTP_CONFIGURATION, apiCalls } })
 
     expect(screen.getByRole('button', { name: 'button' })).toBeDisabled()
-    expect(screen.getByText('incompleteHint')).toBeInTheDocument()
+    expect(screen.getByText('invalidHint')).toBeInTheDocument()
+    expect(screen.queryByText('incompleteHint')).not.toBeInTheDocument()
   })
 
   it('shows a spinner and disables the button while the test runs', async () => {
@@ -248,6 +255,16 @@ describe('ConnectionTest', () => {
       expect(screen.getByText('httpStatus:500')).toBeInTheDocument()
       expect(container.querySelector('pre')?.textContent).toBe('{\n  "error": "down"\n}')
     })
+
+    it('shows the unknown cause for a reason without text', async () => {
+      const result = { ...testResult({ success: false, message: 'Detail' }), reason: 'NEW_REASON' }
+      mockApiRequest.mockResolvedValue({ data: result })
+      renderConnectionTest()
+
+      clickTest()
+
+      expect(await screen.findByText('cause causes.UNKNOWN')).toBeInTheDocument()
+    })
   })
 
   describe('error response', () => {
@@ -294,14 +311,65 @@ describe('ConnectionTest', () => {
 
   it('tests again with the current values', async () => {
     mockApiRequest.mockResolvedValue({ data: testResult() })
+    const { form } = renderConnectionTest()
+
+    clickTest()
+    await screen.findByText('success')
+    act(() => form.setValue('configuration.table', 'other_table'))
+    clickTest()
+
+    await waitFor(() => expect(mockApiRequest).toHaveBeenCalledTimes(2))
+    expect(mockApiRequest.mock.calls[1][0].data).toEqual({
+      connector: ConnectorFormToApiSchema.parse({
+        connectorType: 'SQL',
+        configuration: { ...SQL_CONFIGURATION, table: 'other_table' },
+      }),
+    })
+  })
+
+  it('tests again with the same values and shows the new result', async () => {
+    mockApiRequest
+      .mockResolvedValueOnce({ data: testResult() })
+      .mockResolvedValueOnce({ data: testResult({ success: false, reason: 'TIMEOUT' }) })
     renderConnectionTest()
 
     clickTest()
     await screen.findByText('success')
     clickTest('testAgain')
 
-    await waitFor(() => expect(mockApiRequest).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('failure')).toBeInTheDocument()
+    expect(mockApiRequest).toHaveBeenCalledTimes(2)
     expect(mockApiRequest.mock.calls[1][0].data).toEqual(mockApiRequest.mock.calls[0][0].data)
+  })
+
+  describe('after the connector tab is opened again', () => {
+    it('shows the result of the last test', async () => {
+      mockApiRequest.mockResolvedValue({ data: testResult() })
+      const queryClient = new QueryClient()
+      const { unmount } = renderConnectionTest({ queryClient })
+
+      clickTest()
+      await screen.findByText('success')
+      unmount()
+      renderConnectionTest({ queryClient })
+
+      expect(screen.getByText('success')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'testAgain' })).toBeEnabled()
+    })
+
+    it('shows a running test and disables the button', async () => {
+      mockApiRequest.mockReturnValue(new Promise(() => {}))
+      const queryClient = new QueryClient()
+      const { unmount } = renderConnectionTest({ queryClient })
+
+      clickTest()
+      await screen.findByText('connecting')
+      unmount()
+      renderConnectionTest({ queryClient })
+
+      expect(screen.getByText('connecting')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'button' })).toBeDisabled()
+    })
   })
 
   it('hides the result when a connector field changes', async () => {

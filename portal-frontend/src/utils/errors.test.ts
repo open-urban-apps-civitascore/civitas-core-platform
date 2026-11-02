@@ -392,6 +392,18 @@ describe('toConnectionTestProblem', () => {
     })
   })
 
+  it('drops an empty field error message when there is no detail', () => {
+    const error = mockApiError(400, undefined, 'urn:civitas:error:VALIDATION_FAILED', {
+      fieldErrors: [{ field: 'connector.table', message: '' }],
+    })
+    expect(toConnectionTestProblem(error)).toEqual({ code: 'VALIDATION_FAILED', details: [] })
+  })
+
+  it('returns UNKNOWN for a type without a colon', () => {
+    const error = mockApiError(500, 'Server error', 'INTERNAL_ERROR')
+    expect(toConnectionTestProblem(error)).toEqual({ code: 'UNKNOWN', details: ['Server error'] })
+  })
+
   it('returns UNKNOWN without details for a network error without response', () => {
     const error = new AxiosError('Network Error', AxiosError.ERR_NETWORK)
     expect(toConnectionTestProblem(error)).toEqual({ code: 'UNKNOWN', details: [] })

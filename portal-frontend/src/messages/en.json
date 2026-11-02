@@ -1218,6 +1218,7 @@
         "title": "Connection test",
         "button": "Test connection",
         "incompleteHint": "Fill in all required fields to test the connection.",
+        "invalidHint": "The configuration contains invalid values. Also check the API calls.",
         "connecting": "Connecting…",
         "testAgain": "Test again",
         "success": "Connection established successfully",

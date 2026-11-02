@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query'
+import { MutationState, useMutation, useMutationState } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
 
 import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
@@ -70,9 +70,14 @@ export const useUnreleaseDatasource = () =>
     errorMessage: 'An error occurred while unreleasing datasource',
   })
 
-export const useTestDatasourceConnection = () =>
-  useMutation<ApiServiceResponse<ConnectionTestResult>, AxiosError, ConnectionTestInput & WithId>({
-    mutationFn: ({ id, ...input }) =>
+export type ConnectionTestRun = MutationState<ApiServiceResponse<ConnectionTestResult>, AxiosError, ConnectionTestInput>
+
+const connectionTestKey = (id: string) => [key, id, 'connection-test']
+
+export const useTestDatasourceConnection = (id: string) =>
+  useMutation<ApiServiceResponse<ConnectionTestResult>, AxiosError, ConnectionTestInput>({
+    mutationKey: connectionTestKey(id),
+    mutationFn: input =>
       apiRequest<ConnectionTestResult>({
         method: 'POST',
         endpoint: `/datasources/${id}/connection-test`,
@@ -81,6 +86,14 @@ export const useTestDatasourceConnection = () =>
         errorMessage: 'An error occurred while testing the connection',
       }),
   })
+
+export const useLastConnectionTestRun = (id: string): ConnectionTestRun | undefined => {
+  const runs = useMutationState({
+    filters: { mutationKey: connectionTestKey(id), exact: true },
+    select: mutation => mutation.state as ConnectionTestRun,
+  })
+  return runs.at(-1)
+}
 
 export const useDeleteDatasource = () =>
   useDeleteMutation({
