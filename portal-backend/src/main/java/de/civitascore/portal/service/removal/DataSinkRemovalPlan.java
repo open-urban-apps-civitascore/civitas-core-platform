@@ -1,5 +1,6 @@
 package de.civitascore.portal.service.removal;
 
+import de.civitascore.portal.kind.ApiKind;
 import de.civitascore.portal.kind.ApiKindRegistry;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -19,8 +20,9 @@ import java.util.stream.Stream;
  * What a {@link DataSinkRemovalRequest} takes with it, computed on the state after the request.
  *
  * <p>A Data sink becomes inactive when the request deletes it, or when it had a Pipeline before and
- * the request removes its last one. Its Layers go with it. An API whose kind is backed by Data
- * sinks goes when no active Data sink of a backing kind remains, and its Layers go with it.
+ * the request removes its last one. Its Layers go with it. An API goes when the request deactivates
+ * a Data sink of one of its backing kinds and no active Data sink of a backing kind remains, and
+ * its Layers go with it.
  *
  * @param dataSet the Dataset the removal happens in
  * @param deactivatedDataSinks the Data sinks that become inactive
@@ -51,6 +53,8 @@ record DataSinkRemovalPlan(
     List<DataSink> deactivated =
         activeDataSinks.stream().filter(sink -> becomesInactive(sink, request)).toList();
     Set<UUID> deactivatedIds = idsOf(deactivated.stream().map(DataSink::getId));
+    Set<DataSinkType> deactivatedKinds =
+        deactivated.stream().map(DataSink::getDataSinkType).collect(Collectors.toSet());
     Set<DataSinkType> remainingKinds =
         activeDataSinks.stream()
             .filter(sink -> !deactivatedIds.contains(sink.getId()))
@@ -59,7 +63,10 @@ record DataSinkRemovalPlan(
 
     List<NamedApi> removedApis =
         apis.stream()
-            .filter(api -> !apiKinds.get(api.getStandard()).isBackedBy(remainingKinds))
+            .filter(
+                api ->
+                    losesItsBacking(
+                        apiKinds.get(api.getStandard()), deactivatedKinds, remainingKinds))
             .toList();
     Set<UUID> removedApiIds = idsOf(removedApis.stream().map(NamedApi::getId));
 
@@ -73,6 +80,12 @@ record DataSinkRemovalPlan(
             .toList();
 
     return new DataSinkRemovalPlan(dataSet, deactivated, removedLayers, removedApis);
+  }
+
+  private static boolean losesItsBacking(
+      ApiKind kind, Set<DataSinkType> deactivatedKinds, Set<DataSinkType> remainingKinds) {
+    return kind.backingDataSinkKinds().stream().anyMatch(deactivatedKinds::contains)
+        && !kind.isBackedBy(remainingKinds);
   }
 
   private static boolean becomesInactive(DataSink sink, DataSinkRemovalRequest request) {

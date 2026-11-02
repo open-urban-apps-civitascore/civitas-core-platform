@@ -31,7 +31,11 @@ export const getDataSinkRemoval = (
   const remainingDataSinks = dataSinks.filter(dataSink => !removedIds.has(dataSink.id))
   const losesBackingDataSink = (api: NamedApi) => {
     const backingType = BACKING_DATASINK_TYPE[api.standard]
-    return !!backingType && remainingDataSinks.every(dataSink => dataSink.dataSinkType !== backingType)
+    return (
+      !!backingType &&
+      removedDataSinks.some(dataSink => dataSink.dataSinkType === backingType) &&
+      remainingDataSinks.every(dataSink => dataSink.dataSinkType !== backingType)
+    )
   }
   return {
     layers: layers.filter(layer => removedIds.has(layer.dataSinkId)),

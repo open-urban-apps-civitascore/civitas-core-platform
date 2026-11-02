@@ -32,6 +32,14 @@ describe('getDataSinkRemoval', () => {
     expect(removal.apis).toEqual([])
   })
 
+  it('keeps an API that no removed data sink backs, even without a backing data sink', () => {
+    const dataSinks = [sink('postgis-1', 'POSTGIS')]
+
+    const removal = getDataSinkRemoval(['postgis-1'], { dataSinks, layers: [], apis: APIS })
+
+    expect(removal.apis).toEqual([api('ows', 'OWS')])
+  })
+
   it('removes only the Layers of the removed data sinks', () => {
     const dataSinks = [sink('postgis-1', 'POSTGIS'), sink('postgis-2', 'POSTGIS'), sink('frost-1', 'FROST')]
     const layers = [layer('trees', 'postgis-1'), layer('roads', 'postgis-2')]

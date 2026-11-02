@@ -110,6 +110,18 @@ class DataSinkRemovalPlanTest {
   }
 
   @Test
+  void compute_lastPostgisSinkGoes_keepsAnStaApiThatNoRemainingSinkBacks() {
+    Pipeline pipeline = pipeline();
+    sink(DataSinkType.POSTGIS, true, pipeline);
+    NamedApi ows = api(ApiStandard.OWS);
+    api(ApiStandard.STA);
+
+    DataSinkRemovalPlan plan = compute(DataSinkRemovalRequest.deletePipeline(pipeline.getId()));
+
+    assertThat(plan.apis()).containsExactly(ows);
+  }
+
+  @Test
   void compute_lastSinkGoes_neverTakesACustomApi() {
     Pipeline pipeline = pipeline();
     sink(DataSinkType.FROST, false, pipeline);
