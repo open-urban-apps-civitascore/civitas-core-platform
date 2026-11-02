@@ -1,6 +1,6 @@
 # Use JRE Alpine for small image size and security
 # Pinned: eclipse-temurin:25-jre-alpine (2026-10-29), Alpine 3.24.3. Update digest on base image updates.
-FROM eclipse-temurin:25-jre-alpine@sha256:56f273059de6b13a6b49fe0ded691ed2d0399bbee76156a8f2d385f7524a3d43
+FROM eclipse-temurin:25.0.5_8-jre-alpine-3.24@sha256:56f273059de6b13a6b49fe0ded691ed2d0399bbee76156a8f2d385f7524a3d43
 
 LABEL maintainer="CIVITAS/CORE Team"
 LABEL description="CIVITAS/CORE Portal Backend - IoT Schema Service"
