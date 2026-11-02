@@ -1,9 +1,12 @@
 'use client'
 
 import { Plus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect } from 'react'
+import { toast } from 'sonner'
 
+import { useDuplicateDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
@@ -23,6 +26,9 @@ interface VersionsTabProps {
 export const VersionsTab = (props: VersionsTabProps) => {
   const { datastructureId, versions, rowCount, isReadOnly } = props
   const t = useTranslations('datastructures')
+  const tVersion = useTranslations('datastructureVersions')
+  const router = useRouter()
+  const duplicateVersion = useDuplicateDatastructureVersion()
   const createVersionPath = `/datastructures/${datastructureId}/createVersion?mode=edit`
   const {
     pageIndex,
@@ -37,6 +43,21 @@ export const VersionsTab = (props: VersionsTabProps) => {
   } = useQueryParams()
 
   useEffect(() => setTotalPages(Math.ceil(rowCount / pageSize) || 1), [rowCount, pageSize, setTotalPages])
+
+  const handleDuplicateVersionClick = (versionId: string) => {
+    duplicateVersion.mutate(
+      { data: undefined, endpoint: `/datastructures/${datastructureId}/versions/${versionId}/duplicate` },
+      {
+        onSuccess: () => {
+          toast.success(tVersion('messages.duplicateSuccess'))
+          router.refresh()
+        },
+        onError: () => {
+          toast.error(tVersion('errors.duplicationError'))
+        },
+      },
+    )
+  }
 
   const CustomElement = (
     <Button data-testid="addVersionButton" asChild>
@@ -57,6 +78,7 @@ export const VersionsTab = (props: VersionsTabProps) => {
       <VersionsTable
         datastructureId={datastructureId}
         versions={versions}
+        isReadOnly={isReadOnly}
         rowCount={rowCount}
         pageIndex={pageIndex}
         pageSize={pageSize}
@@ -64,6 +86,7 @@ export const VersionsTab = (props: VersionsTabProps) => {
         totalPages={totalPages}
         onPaginationChange={setPaginationParams}
         onSortingChange={setSortingParams}
+        onDuplicateVersionClick={handleDuplicateVersionClick}
       />
     </TableContainer>
   )

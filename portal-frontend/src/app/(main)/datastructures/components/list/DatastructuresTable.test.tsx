@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -13,7 +14,11 @@ vi.mock('@/app/services/api/users/clientRequests', () => ({
   useGetCurrentUser: vi.fn(),
 }))
 
-const mockCurrentUser = (permissions: PermissionName[]) => {
+const mockCurrentUser = (
+  permissions: PermissionName[],
+  scopeType: 'TENANT' | 'DATASTRUCTURE' = 'TENANT',
+  scopeId: string | null = null,
+) => {
   vi.mocked(useGetCurrentUser).mockReturnValue({
     data: {
       username: 'test',
@@ -21,7 +26,7 @@ const mockCurrentUser = (permissions: PermissionName[]) => {
       title: 'MR' as const,
       firstName: 'Test',
       lastName: 'User',
-      assignments: [{ scopeType: 'TENANT', scopeId: null, permissions }],
+      assignments: [{ scopeType, scopeId, permissions }],
     },
   } as ReturnType<typeof useGetCurrentUser>)
 }
@@ -57,6 +62,7 @@ const defaultProps = {
   onPaginationChange: vi.fn(),
   onSortingChange: vi.fn(),
   onDeleteDatastructureClick: vi.fn(),
+  onDuplicateVersionClick: vi.fn(),
 }
 
 const createVersion = (idSuffix: string, overrides?: Partial<DatastructuresListData>): DatastructuresListData => ({
@@ -316,6 +322,47 @@ describe('DatastructuresTable', () => {
       const [, , subRow] = screen.getAllByRole('row')
       expect(within(topLevelRow).getByRole('button', { name: 'Open menu' })).toBeInTheDocument()
       expect(within(subRow).queryByRole('button', { name: 'Open menu' })).toBeNull()
+    })
+  })
+
+  describe('Version sub-rows', () => {
+    const DATASTRUCTURE_ID = mockDatastructures[0].id
+    const VERSION_ID = '00000000-0000-0000-0000-000000000099'
+
+    const renderWithVersion = () => {
+      renderTable({
+        ...defaultProps,
+        datastructures: [{ ...mockDatastructures[0], versions: [createVersion('99')] }],
+        rowCount: 1,
+      })
+      expandRow(screen.getAllByRole('row')[1])
+    }
+
+    it('offers duplication on a version row when the UPDATE permission is scoped to its parent data structure', () => {
+      mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_UPDATE], 'DATASTRUCTURE', DATASTRUCTURE_ID)
+      renderWithVersion()
+
+      const [, topLevelRow, subRow] = screen.getAllByRole('row')
+      expect(within(topLevelRow).queryByRole('button', { name: 'Open menu' })).toBeNull()
+      expect(within(subRow).getByRole('button', { name: 'Open menu' })).toBeInTheDocument()
+    })
+
+    it('hides the action menu of a version row when the UPDATE permission is scoped to the version itself', () => {
+      mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_UPDATE], 'DATASTRUCTURE', VERSION_ID)
+      renderWithVersion()
+
+      expect(screen.queryByRole('button', { name: 'Open menu' })).toBeNull()
+    })
+
+    it('routes duplication of a version row to onDuplicateVersionClick with the parent data structure id', async () => {
+      const user = userEvent.setup()
+      mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_UPDATE], 'DATASTRUCTURE', DATASTRUCTURE_ID)
+      renderWithVersion()
+
+      await user.click(screen.getByRole('button', { name: 'Open menu' }))
+      await user.click(await screen.findByText('Version duplizieren'))
+
+      expect(defaultProps.onDuplicateVersionClick).toHaveBeenCalledWith(DATASTRUCTURE_ID, VERSION_ID)
     })
   })
 })
