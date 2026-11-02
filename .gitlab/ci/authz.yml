@@ -77,7 +77,7 @@ test-authz-rego:
 # even when the build job is skipped due to no changes
 generate-graph-authz:
   extends: .maven-authz
-  image: maven:3.9.16-eclipse-temurin-25-alpine
+  image: maven:3.9.16-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: lint
   rules:
     - !reference [.rules-all, rules]
@@ -95,7 +95,7 @@ test-authz:
   extends:
     - .only-authz-changes
     - .maven-authz
-  image: maven:3.9.16-eclipse-temurin-25-alpine
+  image: maven:3.9.16-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: test
   needs:
     - job: build-authz
@@ -142,7 +142,7 @@ build-authz:
   extends:
     - .build-authz-changes
     - .maven-authz
-  image: maven:3.9.16-eclipse-temurin-25-alpine
+  image: maven:3.9.16-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: build
   needs:
     - job: setup-version
