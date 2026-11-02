@@ -1,7 +1,7 @@
 
 services:
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.0@sha256:9babd1c0beaf93189982bdbb9fe4bf194a2730298b640c057817746c19838866
+    image: confluentinc/cp-zookeeper:7.9.10@sha256:1a870111c6e861f1e6015094fac902779981edb5cb1d2ad6b7437d2a6b8ba064
     mem_limit: 256m
     hostname: zookeeper
     container_name: civitas-zookeeper
@@ -14,7 +14,7 @@ services:
       - civitas-network
 
   kafka:
-    image: confluentinc/cp-kafka:7.6.0@sha256:24cdd3a7fa89d2bed150560ebea81ff1943badfa61e51d66bb541a6b0d7fb047
+    image: confluentinc/cp-kafka:7.9.10@sha256:07c3d60362e67c296f7f34b690b1240e5ecdcde4a84f5e73cab320fb4041f58c
     mem_limit: 768m
     hostname: kafka
     container_name: civitas-kafka
@@ -60,7 +60,7 @@ services:
 
   # Optional: Kafka Consumer for testing (simple CLI consumer)
   kafka-consumer:
-    image: confluentinc/cp-kafka:7.6.0@sha256:24cdd3a7fa89d2bed150560ebea81ff1943badfa61e51d66bb541a6b0d7fb047
+    image: confluentinc/cp-kafka:7.9.10@sha256:07c3d60362e67c296f7f34b690b1240e5ecdcde4a84f5e73cab320fb4041f58c
     container_name: civitas-kafka-consumer
     depends_on:
       - kafka

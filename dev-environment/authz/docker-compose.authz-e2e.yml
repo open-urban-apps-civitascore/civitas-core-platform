@@ -26,7 +26,7 @@ services:
   # runs in Docker, so we need Docker DNS resolution instead.
 
   etcd:
-    image: quay.io/coreos/etcd:v3.5.16@sha256:d967d98a12dc220a1a290794711dba7eba04b8ce465e12b02383d1bfbb33e159
+    image: quay.io/coreos/etcd:v3.7.3@sha256:8d1b6c24f08e12ed7623d1df421832b3cafabe221aa6b658b97288d07807582f
     container_name: civitas-etcd
     environment:
       - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
@@ -42,7 +42,7 @@ services:
       start_period: 5s
 
   apisix:
-    image: apache/apisix:3.17.0-debian@sha256:0e5377839f4ff5e322a5686ab6ce6797ba768008aca1bfc9b71149c3b326c4df
+    image: apache/apisix:3.19.0-debian@sha256:9a7e45dc943fbf10ec916d1232bae4cda9302ae28a4696cfb83c2da01d261141
     container_name: civitas-apisix
     volumes:
       - ../apisix/apisix_conf/config.yaml:/usr/local/apisix/conf/config.yaml:ro
