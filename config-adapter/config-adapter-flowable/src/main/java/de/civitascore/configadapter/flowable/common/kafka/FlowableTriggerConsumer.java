@@ -46,7 +46,7 @@ public class FlowableTriggerConsumer {
   private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
   private static final String DATASINK_TYPE_POSTGIS = "POSTGIS";
   private static final String DATASINK_TYPE_FROST = "FROST";
-  private static final String ACTIVE_SINKS = "datasinks";
+  private static final String SINKS = "datasinks";
   private static final String PENDING_SINKS = "pendingUnprovisionDatasinks";
 
   private final RuntimeService runtimeService;
@@ -225,8 +225,8 @@ public class FlowableTriggerConsumer {
     // FROST sink gates FROST provisioning. FROST teardown in the delete saga is deliberately
     // ungated: it keys on the recorded project id, so removing the sink first cannot orphan the
     // project.
-    variables.put("hasGeoSink", hasDataSinkOfType(trigger, ACTIVE_SINKS, DATASINK_TYPE_POSTGIS));
-    variables.put("hasFrostSink", hasDataSinkOfType(trigger, ACTIVE_SINKS, DATASINK_TYPE_FROST));
+    variables.put("hasGeoSink", hasDataSinkOfType(trigger, SINKS, DATASINK_TYPE_POSTGIS));
+    variables.put("hasFrostSink", hasDataSinkOfType(trigger, SINKS, DATASINK_TYPE_FROST));
     variables.put(
         "hasPendingGeoSink", hasDataSinkOfType(trigger, PENDING_SINKS, DATASINK_TYPE_POSTGIS));
     variables.put(

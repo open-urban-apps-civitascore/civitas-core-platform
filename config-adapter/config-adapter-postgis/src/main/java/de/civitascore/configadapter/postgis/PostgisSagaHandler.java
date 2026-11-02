@@ -117,7 +117,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   private static final String ADAPTER_NAME = "postgis";
   private static final String COMPENSATE_TYPE = "COMPENSATE_STEP";
   private static final String DATASINK_TYPE_POSTGIS = "POSTGIS";
-  private static final String ACTIVE_SINKS = "datasinks";
+  private static final String SINKS = "datasinks";
   private static final String PENDING_SINKS = "pendingUnprovisionDatasinks";
   private static final String KEY_CREATED_TABLES = "createdTables";
   private static final String KEY_CREATED_SCHEMA = "createdSchema";
@@ -235,7 +235,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   // ─── Dataset-saga sink provisioning ─────────────────────────────────────────
 
   private SagaCommandResult provisionSink(SagaCommandMessage command) throws SQLException {
-    List<SinkSpec> sinks = parseSinks(command, ACTIVE_SINKS, true);
+    List<SinkSpec> sinks = parseSinks(command, SINKS, true);
     List<Map<String, Object>> provisioned = new ArrayList<>();
     String schema = datasetSchemaName(command);
     List<String> createdTables = new ArrayList<>();
@@ -293,7 +293,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
 
   private SagaCommandResult deprovisionSink(SagaCommandMessage command, boolean compensation)
       throws SQLException {
-    List<SinkSpec> sinks = parseSinks(command, ACTIVE_SINKS, false);
+    List<SinkSpec> sinks = parseSinks(command, SINKS, false);
     ProvisionedByThisSaga createdBySaga =
         compensation ? ProvisionedByThisSaga.from(command.payload()) : null;
     List<String> statements = new ArrayList<>();
@@ -322,7 +322,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
     List<SinkSpec> pendingSinks = parseSinks(command, PENDING_SINKS, false);
     Set<String> activeTables =
         new HashSet<>(
-            postgisSinkEntries(command, ACTIVE_SINKS).stream()
+            postgisSinkEntries(command, SINKS).stream()
                 .map(sink -> stringValue(mapValue(sink, "configuration"), "tableName"))
                 .toList());
     boolean activeSinkRemains = !activeTables.isEmpty();
