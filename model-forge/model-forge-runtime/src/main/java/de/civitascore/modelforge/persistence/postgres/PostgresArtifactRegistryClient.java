@@ -353,6 +353,21 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
     }
 
     @Override
+    public List<String> liveNonDataSetBlockingDependents(String pinnedUrn) {
+        UrnParser.requireNoControlChars(pinnedUrn);
+        String logical = UrnParser.logicalUrn(pinnedUrn);
+        String version = pinnedVersion(UrnParser.versionFromUrn(pinnedUrn));
+        if (version == null) {
+            throw new IllegalArgumentException("Not a pinned version: " + pinnedUrn);
+        }
+        try {
+            return references.liveNonDataSetBlockingDependents(logical, version);
+        } catch (DataAccessException e) {
+            throw translate(e, "Could not read dependents of " + logical);
+        }
+    }
+
+    @Override
     public List<String> dataSetMemberships(String urn) {
         UrnParser.requireNoControlChars(urn);
         String logical = UrnParser.logicalUrn(urn);

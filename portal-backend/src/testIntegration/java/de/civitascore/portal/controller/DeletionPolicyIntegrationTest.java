@@ -231,6 +231,33 @@ class DeletionPolicyIntegrationTest extends BaseKeycloakIntegrationTest {
   }
 
   @Test
+  @DisplayName("a version an older version of another model pins is refused")
+  void aVersionAnOlderVersionOfAnotherModelPinsIsRefused() {
+    DataStructureVersion target = structureWithModel("Reading");
+    portalData.attachModel(
+        portalData.dataStructureVersion(dataStructureOf(target.getDataStructure())),
+        portalData.dataStructureVersionModel("Reading v2"));
+    // The other model's first version pins the target; its second version, now current, does not.
+    DataStructure other = portalData.dataStructure();
+    portalData.attachModel(
+        portalData.dataStructureVersion(other),
+        Map.of(
+            "title",
+            "Visit",
+            "type",
+            "object",
+            "properties",
+            Map.of("reading", Map.of("$ref", target.getModelUrn()))));
+    portalData.attachModel(
+        portalData.dataStructureVersion(dataStructureOf(other)),
+        portalData.dataStructureVersionModel("Visit v2"));
+
+    assertThat(versionInUse(target)).isTrue();
+    assertThat(delete(versionPath(target)).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(registry.fetchStoredModel(target.getModelUrn())).isPresent();
+  }
+
+  @Test
   @DisplayName("deleting a version keeps an element another version still holds")
   void deletingAVersionKeepsAnElementAnotherVersionHolds() {
     DataStructure structure = portalData.dataStructure();

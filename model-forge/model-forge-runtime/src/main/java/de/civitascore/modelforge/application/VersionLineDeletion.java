@@ -131,7 +131,7 @@ final class VersionLineDeletion {
             });
         return Stream.of(line.removedPins(), line.freedMembers())
             .flatMap(Collection::stream)
-            .flatMap(pin -> registry.nonDataSetBlockingDependents(pin, UrnParser.versionFromUrn(pin)).stream())
+            .flatMap(pin -> registry.liveNonDataSetBlockingDependents(pin).stream())
             .filter(referrer -> !exempt.contains(UrnParser.logicalUrn(referrer)))
             .distinct()
             .toList();

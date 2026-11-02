@@ -26,6 +26,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -200,6 +201,77 @@ class VersionLineDeletionDatabaseTest extends AbstractRegistryDatabaseTest {
     }
 
     @Test
+    @DisplayName("A pin from a superseded member version of another Data Structure refuses the delete")
+    void aPinFromASupersededMemberVersionOfAnotherStructureRefuses() {
+        String first = library(VersionBump.MAJOR, null, "Station", STATION_V1);
+        library(VersionBump.MAJOR, null, "Station", STATION_V2);
+        // Data Structure B's first line holds a member pinning Station 1.0.0; its second line
+        // revises that member without the pin, so the pinning version is no longer current.
+        UUID otherId = UUID.randomUUID();
+        String other = urns.dataStructure(otherId);
+        String visitV1 = registry.storeElement(memberOf(otherId, "Visit", "\"station\": {\"$ref\": \"%s\"}"
+            .formatted(UrnParser.withVersion(station, "1.0.0"))), Set.of(UrnParser.withVersion(station, "1.0.0")));
+        registry.storeDataStructure(other, defs("Visit", visitV1), VersionBump.PATCH, null);
+        String visitV2 = registry.storeElement(memberOf(otherId, "Visit", "\"note\": {\"type\": \"string\"}"),
+            Set.of(), Set.of(), null, VersionBump.MINOR, null);
+        registry.storeDataStructure(other, defs("Visit", visitV2), VersionBump.MAJOR, null);
+
+        assertThat(modelForge.versionLineDeletionBlockers(new ArtifactId(first))).containsExactly(logical(visitV1));
+        assertThatThrownBy(() -> modelForge.deleteVersionLine(new ArtifactId(first)))
+            .isInstanceOf(ArtifactInUseException.class);
+        assertThat(registry.fetch(UrnParser.withVersion(station, "1.0.0"))).isPresent();
+    }
+
+    @Test
+    @DisplayName("A pin from a root Element version that is neither current nor owned refuses the delete")
+    void aPinFromAnOlderRootElementVersionRefuses() {
+        String first = library(VersionBump.MAJOR, null, "Station", STATION_V1);
+        library(VersionBump.MAJOR, null, "Station", STATION_V2);
+        // The edit of the other model's first line pins Station 1.0.0; its grouping owns only the
+        // imported 1.0.0, and its second line is current.
+        UUID otherId = UUID.randomUUID();
+        String otherRoot = UrnParser.logicalUrn(modelForge.importSchema(new ImportSchemaCommand(
+            rootDocument(STATION_V1), VersionBump.MAJOR, null, false, null, otherId)).rootArtifactId().value());
+        String pinning = saveRoot(otherRoot, VersionBump.MINOR, "1.0.0", """
+            {"type": "object", "properties": {"station": {"$ref": "%s"}}}
+            """.formatted(UrnParser.withVersion(station, "1.0.0")));
+        saveRoot(otherRoot, VersionBump.MAJOR, null, STATION_V2);
+        assertThat(UrnParser.versionFromUrn(pinning)).isEqualTo("1.1.0");
+
+        assertThat(modelForge.versionLineDeletionBlockers(new ArtifactId(first))).containsExactly(otherRoot);
+    }
+
+    @Test
+    @DisplayName("A superseded Data sink version nothing pins any more does not refuse the delete")
+    void aSupersededSinkVersionNothingPinsDoesNotRefuse() {
+        String first = library(VersionBump.MAJOR, null, "Station", STATION_V1);
+        library(VersionBump.MAJOR, null, "Station", STATION_V2);
+        String sink = sinkInto(first);
+        registry.storeDataSink(logical(sink),
+            mapper.readTree("{\"title\": \"Store\", \"element\": \"%s\"}".formatted(UrnParser.withVersion(structure, "2.0.0"))),
+            VersionBump.MINOR);
+
+        assertThat(modelForge.versionLineDeletionBlockers(new ArtifactId(first))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("A superseded Data sink version a Pipeline still pins refuses the delete")
+    void aSupersededSinkVersionAPipelinePinsRefuses() {
+        String first = library(VersionBump.MAJOR, null, "Station", STATION_V1);
+        library(VersionBump.MAJOR, null, "Station", STATION_V2);
+        String sinkV1 = sinkInto(first);
+        registry.storeDataSink(logical(sinkV1),
+            mapper.readTree("{\"title\": \"Store\", \"element\": \"%s\"}".formatted(UrnParser.withVersion(structure, "2.0.0"))),
+            VersionBump.MINOR);
+        registry.storePipeline(urns.urn("pipeline", UUID.randomUUID()), mapper.readTree("""
+            {"$schema": "https://civitasconnect.digital/core/pipeline/v1", "title": "Ingest",
+             "nodes": [{"id": "write", "kind": "sink", "sinkRef": "%s"}], "edges": []}
+            """.formatted(sinkV1)), VersionBump.PATCH);
+
+        assertThat(modelForge.versionLineDeletionBlockers(new ArtifactId(first))).containsExactly(logical(sinkV1));
+    }
+
+    @Test
     @DisplayName("After deleting the highest line the next line takes a number never given out")
     void theNextLineTakesANumberNeverGivenOut() {
         library(VersionBump.MAJOR, null, "Station", STATION_V1);
@@ -313,6 +385,18 @@ class VersionLineDeletionDatabaseTest extends AbstractRegistryDatabaseTest {
             {"title": "Weather", "type": "object", "properties": {"station": {"$ref": "#/$defs/Station"}},
              "$defs": {"Station": %s}}
             """.formatted(stationSchema));
+    }
+
+    private JsonNode memberOf(UUID dataStructureId, String key, String properties) {
+        return mapper.readTree("""
+            {"$id": "%s", "type": "object", "properties": {%s}}
+            """.formatted(urns.member(dataStructureId, key), properties));
+    }
+
+    private JsonNode defs(String key, String memberPin) {
+        return mapper.readTree("""
+            {"title": "Visits", "$defs": {"%s": {"$ref": "%s"}}}
+            """.formatted(key, memberPin));
     }
 
     private String sinkInto(String target) {

@@ -217,6 +217,15 @@ public interface ArtifactRegistry {
      */
     List<String> nonDataSetBlockingDependents(String urn, String targetVersion);
 
+    /**
+     * Like {@link #nonDataSetBlockingDependents(String, String)} for one pinned version, where a
+     * referrer's superseded version counts too while it can still be in use: a version of an
+     * Element or Data Structure, or a version that a reference pins.
+     *
+     * @throws IllegalArgumentException when the URN names no version
+     */
+    List<String> liveNonDataSetBlockingDependents(String pinnedUrn);
+
     /** Logical URNs of the DataSets this artifact is a member of ({@code dataset-ref} in-edges). */
     List<String> dataSetMemberships(String urn);
 
