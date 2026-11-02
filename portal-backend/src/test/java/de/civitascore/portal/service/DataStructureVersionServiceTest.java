@@ -22,7 +22,6 @@ import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionMetaInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.VersionBump;
-import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.security.ModelReferenceAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
@@ -60,7 +59,6 @@ class DataStructureVersionServiceTest {
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @Mock private DataStructureVersionMapper dataStructureVersionMapper;
   @Mock private DataStructureService dataStructureService;
-  @Mock private DataSourceRepository dataSourceRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private ArtifactUsageLookup artifactUsageLookup;
   @Mock private ModelReferenceAuthorizer modelReferenceAuthorizer;
@@ -166,66 +164,69 @@ class DataStructureVersionServiceTest {
   }
 
   @Nested
-  @DisplayName("Delete inUse guard")
-  class DeleteInUseTests {
+  @DisplayName("Delete")
+  class DeleteTests {
 
-    @Test
-    @DisplayName("Should block delete when version is in use by a DataSource")
-    void shouldBlockDeleteWhenInUse() {
-      UUID versionId = UUID.randomUUID();
-      DataStructure ds = new DataStructure();
+    private static final String LOGICAL_URN =
+        "urn:core:platform:civitas:element:common:36b5df47-c3f5-86fd-9428-4597d8cd4d36";
 
-      DataStructureVersion version = new DataStructureVersion();
+    private final UUID versionId = UUID.randomUUID();
+    private final DataStructure parent = new DataStructure();
+    private final DataStructureVersion version = new DataStructureVersion();
+
+    @BeforeEach
+    void storedVersion() {
+      parent.setModelLogicalUrn(LOGICAL_URN);
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setDataStructure(ds);
-
-      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
-      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
-
-      assertThatThrownBy(() -> dataStructureVersionService.deleteById(versionId))
-          .isInstanceOf(ResourceInUseException.class);
-    }
-
-    @Test
-    @DisplayName("Should block delete when the registry still holds a reference")
-    void shouldBlockDeleteWhenStillReferenced() {
-      UUID versionId = UUID.randomUUID();
-      DataStructure ds = new DataStructure();
-
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setDataStructure(ds);
+      version.setDataStructure(parent);
       version.setModelUrn(MODEL_URN);
-
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
-      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(BLOCKER_URN));
-
-      assertThatThrownBy(() -> dataStructureVersionService.deleteById(versionId))
-          .isInstanceOf(ResourceInUseException.class);
     }
 
     @Test
-    @DisplayName("Should allow delete when version is not in use")
-    void shouldAllowDeleteWhenNotInUse() {
-      UUID versionId = UUID.randomUUID();
-      DataStructure ds = new DataStructure();
+    @DisplayName("Should block delete and leave the model when the version is in use")
+    void deleteById_whenInUse_shouldThrowAndDeleteNothing() {
+      when(artifactUsageLookup.of(version)).thenReturn(IN_USE_BY_DRAFTS);
 
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setDataStructure(ds);
+      assertThatThrownBy(() -> dataStructureVersionService.deleteById(versionId))
+          .isInstanceOf(ResourceInUseException.class);
+      verify(dataStructureVersionRepository, never()).deleteById(any());
+      verify(modelRegistryGateway, never()).deleteModelVersion(any());
+    }
 
-      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
-      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
+    @Test
+    @DisplayName("Should delete the row and the model's version line")
+    void deleteById_whenNotInUse_shouldDeleteTheModelVersion() {
+      when(modelRegistryGateway.holds(LOGICAL_URN)).thenReturn(true);
 
       dataStructureVersionService.deleteById(versionId);
 
       verify(dataStructureVersionRepository).deleteById(versionId);
+      verify(modelRegistryGateway).deleteModelVersion(MODEL_URN);
+      assertThat(parent.getModelLogicalUrn()).isEqualTo(LOGICAL_URN);
+    }
+
+    @Test
+    @DisplayName("Should leave the registry alone for a version without a model")
+    void deleteById_withoutModel_shouldSkipTheRegistry() {
+      version.setModelUrn(null);
+
+      dataStructureVersionService.deleteById(versionId);
+
+      verify(dataStructureVersionRepository).deleteById(versionId);
+      verify(modelRegistryGateway, never()).deleteModelVersion(any());
+    }
+
+    @Test
+    @DisplayName("Should forget the logical URN once the registry holds no version of the model")
+    void deleteById_ofTheLastModelVersion_shouldClearTheLogicalUrn() {
+      when(modelRegistryGateway.holds(LOGICAL_URN)).thenReturn(false);
+
+      dataStructureVersionService.deleteById(versionId);
+
+      assertThat(parent.getModelLogicalUrn()).isNull();
     }
   }
 

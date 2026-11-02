@@ -253,6 +253,59 @@ class ModelRegistryGatewayTest {
   }
 
   @Nested
+  @DisplayName("deleting a model version")
+  class DeletingAModelVersion {
+
+    private static final String ROOT_PIN =
+        "urn:core:platform:civitas:element:common:6ddf8001-3ba6-83db-8d23-b547419c1ff2:2.1.0";
+    private static final String ROOT =
+        "urn:core:platform:civitas:element:common:6ddf8001-3ba6-83db-8d23-b547419c1ff2";
+    private static final String GROUPING =
+        "urn:core:platform:civitas:datastructure:common:6ddf8001-3ba6-83db-8d23-b547419c1ff2";
+
+    @Test
+    @DisplayName("deletes the version line the pin names")
+    void deletesTheLineOfThePin() {
+      gateway.deleteModelVersion(ROOT_PIN);
+
+      verify(modelForge).deleteVersionLine(new ArtifactId(ROOT_PIN));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", " "})
+    @DisplayName("does nothing for a version without a model")
+    void doesNothingWithoutAModel(String modelUrn) {
+      gateway.deleteModelVersion(modelUrn);
+      gateway.deleteModelVersion(null);
+
+      assertThat(gateway.versionReferencesTo(modelUrn)).isEmpty();
+      assertThat(gateway.versionReferencesTo(null)).isEmpty();
+      verifyNoInteractions(modelForge);
+    }
+
+    @Test
+    @DisplayName("asks what blocks the version line the pin names")
+    void asksWhatBlocksTheLine() {
+      String sink =
+          "urn:core:platform:civitas:datasink:common:762a05c3-4783-8446-b3cb-8240eee1227a";
+      when(modelForge.versionLineDeletionBlockers(new ArtifactId(ROOT_PIN)))
+          .thenReturn(List.of(sink));
+
+      assertThat(gateway.versionReferencesTo(ROOT_PIN)).containsExactly(sink);
+    }
+
+    /** Without the second delete a root Element whose first line was deleted would outlive it. */
+    @Test
+    @DisplayName("deleting a root Element's model deletes its grouping and the Element itself")
+    void deletingARootModelDeletesTheGroupingAndTheElement() {
+      gateway.deleteModel(ROOT);
+
+      verify(modelForge).deleteArtifact(new ArtifactId(GROUPING), true, false);
+      verify(modelForge).deleteArtifact(new ArtifactId(ROOT), true, false);
+    }
+  }
+
+  @Nested
   @DisplayName("the model id of a URN")
   class ModelIdOf {
 

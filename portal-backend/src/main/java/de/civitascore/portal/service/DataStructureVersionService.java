@@ -9,7 +9,6 @@ import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionMetaInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.VersionBump;
-import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.security.ModelReferenceAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
@@ -43,7 +42,6 @@ public class DataStructureVersionService
   private static final String DATASTRUCTURE_TYPE = "datastructure";
   private static final int URN_TYPE_SEGMENT = 4;
 
-  private final DataSourceRepository dataSourceRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
 
   private final DataStructureService dataStructureService;
@@ -345,40 +343,40 @@ public class DataStructureVersionService
   }
 
   /**
-   * Validates that the version is not in use by any data source or data sink.
+   * Refuses the delete while anything references any version of the version's line in the model
+   * registry, or a Data source is pinned to it.
    *
    * @param id the version ID to delete
    * @return the version entity to be deleted
-   * @throws ResourceInUseException if the version is still referenced
+   * @throws ResourceInUseException if the version is in use
    */
   @Override
   protected DataStructureVersion preProcessDelete(UUID id) {
     DataStructureVersion version = findByIdOrThrow(id);
-    validateNotInUse(id);
+    artifactUsageLookup.of(version).requireNotInUse(getEntityName(), id);
     return version;
   }
 
-  private void validateNotInUse(UUID versionId) {
-    if (dataSourceRepository.existsByDataStructureVersionId(versionId)) {
-      throw new ResourceInUseException(
-          "DataStructureVersion",
-          versionId,
-          "Cannot modify DataStructureVersion because a DataSource is pinned to it.");
+  /**
+   * Deletes the version's model line from Model Forge in the delete's transaction. Once the
+   * registry holds nothing of the data structure's model any more, the data structure forgets its
+   * logical URN, so that its next model starts a new artifact; the registry still numbers that one
+   * above every version it ever gave out.
+   *
+   * @param version the deleted version
+   */
+  @Override
+  protected void postDelete(DataStructureVersion version) {
+    if (version.getModelUrn() == null) {
+      return;
     }
-    List<String> blockers = modelRegistryGateway.referencesTo(modelUrnOf(versionId));
-    if (!blockers.isEmpty()) {
-      throw new ResourceInUseException(
-          "DataStructureVersion",
-          versionId,
-          "Cannot modify DataStructureVersion because it is still referenced.",
-          blockers);
+    modelRegistryGateway.deleteModelVersion(version.getModelUrn());
+    // Loading the parent's versions here would put the deleted row back into the persistence
+    // context, and Hibernate would drop the delete at flush.
+    DataStructure parent = version.getDataStructure();
+    if (parent.getModelLogicalUrn() != null
+        && !modelRegistryGateway.holds(parent.getModelLogicalUrn())) {
+      parent.setModelLogicalUrn(null);
     }
-  }
-
-  private String modelUrnOf(UUID versionId) {
-    return dataStructureVersionRepository
-        .findById(versionId)
-        .map(DataStructureVersion::getModelUrn)
-        .orElse(null);
   }
 }

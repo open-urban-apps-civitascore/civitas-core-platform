@@ -1,21 +1,21 @@
 package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataStructureMapper;
 import de.civitascore.portal.model.entity.DataStructure;
-import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.AssignmentRepository;
-import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.util.ResourceInUseException;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -28,15 +28,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @DisplayName("DataStructureService Unit Tests")
 class DataStructureServiceTest {
 
-  private static final String MODEL_URN =
-      "urn:core:platform:civitas:element:common:e5eaeb37-4c14-8bb9-903b-4f86897bfcea:1.0.0";
-  private static final String BLOCKER_URN =
-      "urn:core:platform:civitas:datasink:common:762a05c3-4783-8446-b3cb-8240eee1227a";
+  private static final String MODEL_LOGICAL_URN =
+      "urn:core:platform:civitas:element:common:e5eaeb37-4c14-8bb9-903b-4f86897bfcea";
 
   @Mock private DataStructureRepository dataStructureRepository;
   @Mock private DataStructureMapper dataStructureMapper;
   @Mock private AssignmentRepository assignmentRepository;
-  @Mock private DataSourceRepository dataSourceRepository;
+  @Mock private ArtifactUsageLookup artifactUsageLookup;
   @Mock private ModelRegistryGateway modelRegistryGateway;
 
   @InjectMocks private DataStructureService dataStructureService;
@@ -45,73 +43,39 @@ class DataStructureServiceTest {
   @DisplayName("Delete inUse guard")
   class DeleteInUseTests {
 
-    @Test
-    @DisplayName("Should block delete when any version is in use")
-    void shouldBlockDeleteWhenVersionInUse() {
-      UUID dsId = UUID.randomUUID();
-      UUID versionId = UUID.randomUUID();
+    private final UUID dsId = UUID.randomUUID();
+    private final DataStructure ds = new DataStructure();
 
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-
-      DataStructure ds = new DataStructure();
+    @BeforeEach
+    void storedStructure() {
       ds.setId(dsId);
-      ds.setDataStructureVersions(Set.of(version));
-
+      ds.setModelLogicalUrn(MODEL_LOGICAL_URN);
       when(dataStructureRepository.existsById(dsId)).thenReturn(true);
       when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
-      when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
-          .thenReturn(true);
-
-      assertThatThrownBy(() -> dataStructureService.deleteById(dsId))
-          .isInstanceOf(ResourceInUseException.class);
     }
 
     @Test
-    @DisplayName("Should block delete when the registry still holds a reference")
-    void shouldBlockDeleteWhenVersionStillReferenced() {
-      UUID dsId = UUID.randomUUID();
-      UUID versionId = UUID.randomUUID();
-
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-      version.setModelUrn(MODEL_URN);
-
-      DataStructure ds = new DataStructure();
-      ds.setId(dsId);
-      ds.setDataStructureVersions(Set.of(version));
-
-      when(dataStructureRepository.existsById(dsId)).thenReturn(true);
-      when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
-      when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
-          .thenReturn(false);
-      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(BLOCKER_URN));
+    @DisplayName("Should block delete and keep the model when the usage lookup reports a use")
+    void deleteById_whenAVersionIsInUse_shouldThrowAndKeepTheModel() {
+      when(artifactUsageLookup.of(ds))
+          .thenReturn(new ArtifactUsageLookup.ArtifactUsage(true, List.of()));
 
       assertThatThrownBy(() -> dataStructureService.deleteById(dsId))
           .isInstanceOf(ResourceInUseException.class);
+      verify(dataStructureRepository, never()).deleteById(any());
+      verify(modelRegistryGateway, never()).deleteModel(any());
     }
 
     @Test
-    @DisplayName("Should allow delete when no version is in use")
-    void shouldAllowDeleteWhenNoVersionInUse() {
-      UUID dsId = UUID.randomUUID();
-      UUID versionId = UUID.randomUUID();
-
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-
-      DataStructure ds = new DataStructure();
-      ds.setId(dsId);
-      ds.setDataStructureVersions(Set.of(version));
-
-      when(dataStructureRepository.existsById(dsId)).thenReturn(true);
-      when(dataStructureRepository.findById(dsId)).thenReturn(Optional.of(ds));
-      when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(versionId)))
-          .thenReturn(false);
+    @DisplayName("Should delete the structure and its model when nothing uses it")
+    void deleteById_whenNothingIsInUse_shouldDeleteTheModel() {
+      when(artifactUsageLookup.of(ds))
+          .thenReturn(new ArtifactUsageLookup.ArtifactUsage(false, List.of()));
 
       dataStructureService.deleteById(dsId);
 
       verify(dataStructureRepository).deleteById(dsId);
+      verify(modelRegistryGateway).deleteModel(MODEL_LOGICAL_URN);
     }
   }
 }

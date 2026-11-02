@@ -663,20 +663,100 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   @DisplayName("Delete DataStructureVersion Tests")
   class DeleteDataStructureVersionTests {
 
-    @Test
-    @DisplayName("Should return 405 for delete (endpoint disabled) and keep the version")
-    void shouldRejectDelete() {
-      ResponseEntity<String> response =
-          restTemplate.exchange(
-              getEndpoint() + "/" + versionId1,
-              HttpMethod.DELETE,
-              new HttpEntity<>(createAuthHeaders()),
-              String.class);
+    private ResponseEntity<String> delete(UUID id) {
+      return restTemplate.exchange(
+          getEndpoint() + "/" + id,
+          HttpMethod.DELETE,
+          new HttpEntity<>(createAuthHeaders()),
+          String.class);
+    }
 
-      assertThat(response.getStatusCode())
-          .as("Should return METHOD_NOT_ALLOWED status")
-          .isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+    private ResponseEntity<DataStructureVersionOutputDTO> duplicate(UUID id) {
+      return restTemplate.exchange(
+          getEndpoint() + "/" + id + "/duplicate",
+          HttpMethod.POST,
+          new HttpEntity<>(createAuthHeaders()),
+          getOutputTypeReference());
+    }
+
+    private ResponseEntity<DataStructureVersionOutputDTO> createWithModel(String title) {
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setModelName(title);
+      input.setModel(portalData.dataStructureVersionModel(title));
+      return restTemplate.exchange(
+          getEndpoint(),
+          HttpMethod.POST,
+          new HttpEntity<>(input, createAuthHeaders()),
+          getOutputTypeReference());
+    }
+
+    @Test
+    @DisplayName("Should delete the version and its model, and keep the other version")
+    void shouldDeleteTheVersionAndItsModel() {
+      String deletedModel =
+          dataStructureVersionRepository.findById(versionId2).orElseThrow().getModelUrn();
+      String keptModel =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow().getModelUrn();
+
+      assertThat(delete(versionId2).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+      assertThat(dataStructureVersionRepository.existsById(versionId2)).isFalse();
+      assertThat(modelRegistryGateway.fetchStoredModel(deletedModel)).isEmpty();
+      assertThat(modelRegistryGateway.fetchStoredModel(keptModel)).isPresent();
       assertThat(dataStructureVersionRepository.existsById(versionId1)).isTrue();
+    }
+
+    @Test
+    @DisplayName("Should return 409 RESOURCE_IN_USE and keep the version a Data source pins")
+    void shouldRefuseAVersionADataSourcePins() {
+      DataSource dataSource = new DataSource();
+      dataSource.setName("ds_pinning_" + UUID.randomUUID().toString().substring(0, 8));
+      dataSource.setDataSourceStatus(DataSourceStatus.DRAFT);
+      dataSource.setDataStructureVersion(
+          dataStructureVersionRepository.findById(versionId1).orElseThrow());
+      dataSourceRepository.save(dataSource);
+
+      ResponseEntity<String> response = delete(versionId1);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody()).contains("RESOURCE_IN_USE");
+      assertThat(dataStructureVersionRepository.existsById(versionId1)).isTrue();
+    }
+
+    @Test
+    @DisplayName("Deleting the last version leaves the data structure without versions or model")
+    void deletingTheLastVersionLeavesTheDataStructureEmpty() {
+      assertThat(delete(versionId1).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+      assertThat(delete(versionId2).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+      DataStructure structure = dataStructureRepository.findById(dataStructureId).orElseThrow();
+      assertThat(dataStructureVersionRepository.findAll())
+          .noneMatch(version -> version.getDataStructure().getId().equals(dataStructureId));
+      assertThat(structure.getModelLogicalUrn()).isNull();
+
+      ResponseEntity<DataStructureVersionOutputDTO> next = createWithModel("Fresh");
+      assertThat(next.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(next.getBody().getVersion()).as("1.0.0 and 2.0.0 stay taken").isEqualTo("3.0.0");
+    }
+
+    @Test
+    @DisplayName("After the highest version is deleted, neither a new version nor a copy reuses it")
+    void aDeletedVersionNumberIsNotGivenOutAgain() {
+      DataStructureVersionOutputDTO third = duplicate(versionId1).getBody();
+      assertThat(third.getVersion()).isEqualTo("3.0.0");
+      assertThat(delete(third.getId()).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+      DataStructureVersionOutputDTO created = createWithModel("Fourth").getBody();
+      assertThat(created.getVersion()).isEqualTo("4.0.0");
+      assertThat(delete(created.getId()).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+      assertThat(duplicate(versionId1).getBody().getVersion()).isEqualTo("5.0.0");
+    }
+
+    @Test
+    @DisplayName("Should return 404 for an unknown version")
+    void shouldReturn404ForAnUnknownVersion() {
+      assertThat(delete(UUID.randomUUID()).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
   }
 
@@ -1988,6 +2068,15 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .isEqualTo(HttpStatus.NOT_FOUND);
 
       assertThat(dataStructureVersionRepository.count()).isEqualTo(versionsBefore);
+    }
+
+    @Test
+    @DisplayName("DELETE answers 404 and keeps the version")
+    void deleteAnswers404AndKeepsTheVersion() {
+      assertThat(statusOf(pathUnderForeignDataStructure(""), HttpMethod.DELETE, null))
+          .isEqualTo(HttpStatus.NOT_FOUND);
+
+      assertThat(dataStructureVersionRepository.existsById(versionId1)).isTrue();
     }
 
     @Test

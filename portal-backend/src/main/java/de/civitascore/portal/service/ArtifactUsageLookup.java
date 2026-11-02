@@ -91,6 +91,18 @@ public class ArtifactUsageLookup {
     }
 
     /**
+     * Refuses the delete of the artifact while anything references it.
+     *
+     * @throws ResourceInUseException if anything references the artifact
+     */
+    public void requireNotInUse(String resourceType, UUID resourceId) {
+      if (inUse) {
+        throw new ResourceInUseException(
+            resourceType, resourceId, "Cannot delete " + resourceType + " because it is in use.");
+      }
+    }
+
+    /**
      * Refuses the unrelease of the artifact while a released entity references it.
      *
      * @throws ResourceInUseException if there is a released referrer; its message names what the
@@ -168,14 +180,19 @@ public class ArtifactUsageLookup {
     return usageByVersion;
   }
 
-  /** How one Data structure version is used. */
+  /**
+   * How one Data structure version is used: by anything that references any version of its line in
+   * the model registry, which is what deleting the version would remove.
+   */
   public ArtifactUsage of(DataStructureVersion version) {
     if (version.getDataStructureVersionStatus() != DataStructureVersionStatus.AVAILABLE) {
       return new ArtifactUsage(isReferenced(version), List.of());
     }
 
     List<String> registryReferrers =
-        modelRegistryGateway.referencesTo(version.getModelUrn()).stream().distinct().toList();
+        modelRegistryGateway.versionReferencesTo(version.getModelUrn()).stream()
+            .distinct()
+            .toList();
     List<ReleasedReferrer> releasedReferrers = new ArrayList<>();
     dataSourceRepository
         .findIdsByDataStructureVersionIdInAndStatus(
@@ -195,7 +212,7 @@ public class ArtifactUsageLookup {
   /** A Data source pins a version by a portal column, which the model registry does not see. */
   private boolean isReferenced(DataStructureVersion version) {
     return dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(version.getId()))
-        || modelRegistryGateway.isReferenced(version.getModelUrn());
+        || !modelRegistryGateway.versionReferencesTo(version.getModelUrn()).isEmpty();
   }
 
   /**

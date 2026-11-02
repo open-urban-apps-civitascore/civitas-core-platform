@@ -11,7 +11,9 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.security.AllowedScopesFilter;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -26,6 +28,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -39,6 +42,7 @@ class DeletionPolicyIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private PortalTestDataFactory portalData;
   @Autowired private ModelRegistryGateway registry;
   @Autowired private DataSetRepository dataSetRepository;
+  @Autowired private DataStructureRepository dataStructureRepository;
 
   @AfterEach
   void cleanup() {
@@ -128,7 +132,7 @@ class DeletionPolicyIntegrationTest extends BaseKeycloakIntegrationTest {
 
     // The refusal and the flag have to agree: reporting the structure free and then refusing the
     // delete leaves the user with an error and no way to act on it.
-    assertThat(registry.isReferenced(source.getModelUrn())).isTrue();
+    assertThat(registry.versionReferencesTo(source.getModelUrn())).isNotEmpty();
     assertThat(delete("/datastructures/" + source.getDataStructure().getId()).getStatusCode())
         .isEqualTo(HttpStatus.CONFLICT);
     assertThat(registry.fetchPayload(source.getModelUrn())).isPresent();
@@ -189,8 +193,106 @@ class DeletionPolicyIntegrationTest extends BaseKeycloakIntegrationTest {
 
     // Left behind, the mapping would refuse both structures it joined, and no route reaches it.
     assertThat(registry.fetchPayload(mappingUrn)).isEmpty();
-    assertThat(registry.isReferenced(source.getModelUrn())).isFalse();
-    assertThat(registry.isReferenced(target.getModelUrn())).isFalse();
+    assertThat(registry.versionReferencesTo(source.getModelUrn())).isEmpty();
+    assertThat(registry.versionReferencesTo(target.getModelUrn())).isEmpty();
+  }
+
+  @Test
+  @DisplayName("a version a mapping uses is refused, and the list flag says so")
+  void aVersionAMappingUsesIsRefused() {
+    DataStructureVersion source = structureWithModel("Source");
+    DataStructureVersion target = structureWithModel("Target");
+    createMapping(dataSetWithManifest(), source, target);
+
+    assertThat(versionInUse(source)).isTrue();
+    assertThat(delete(versionPath(source)).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(registry.fetchStoredModel(source.getModelUrn())).isPresent();
+  }
+
+  @Test
+  @DisplayName("a version is refused while a sink writes into an earlier minor of it")
+  void aVersionASinkPinsAtAnEarlierMinorIsRefused() {
+    DataStructureVersion first = structureWithModel("Reading");
+    String earlierMinor = first.getModelUrn();
+    first.setDataStructure(dataStructureOf(first.getDataStructure()));
+    DataStructureVersion edited =
+        portalData.attachModel(first, portalData.dataStructureVersionModel("Reading edited"));
+    assertThat(edited.getModelUrn()).isNotEqualTo(earlierMinor);
+    DataSet dataSet = dataSetWithManifest();
+    DataSink sink = portalData.dataSink(dataSet, portalData.pipeline(dataSet));
+    portalData.attachSinkConfiguration(sink, Map.of("element", earlierMinor));
+
+    assertThat(versionInUse(edited)).isTrue();
+    ResponseEntity<String> refused = delete(versionPath(edited));
+
+    assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(refused.getBody()).contains("RESOURCE_IN_USE");
+    assertThat(registry.fetchStoredModel(earlierMinor)).isPresent();
+  }
+
+  @Test
+  @DisplayName("deleting a version keeps an element another version still holds")
+  void deletingAVersionKeepsAnElementAnotherVersionHolds() {
+    DataStructure structure = portalData.dataStructure();
+    portalData.attachModel(portalData.dataStructureVersion(structure), library("Person"));
+    DataStructureVersion second =
+        portalData.attachModel(
+            portalData.dataStructureVersion(dataStructureOf(structure)),
+            library("Person", "Address"));
+    Map<String, Object> members = membersOf(second.getModelUrn());
+
+    assertThat(versionInUse(second)).isFalse();
+    assertThat(delete(versionPath(second)).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+    assertThat(registry.fetchStoredModel(memberUrn(members, "Person"))).isPresent();
+    assertThat(registry.fetchStoredModel(memberUrn(members, "Address"))).isEmpty();
+    assertThat(registry.fetchStoredModel(second.getModelUrn())).isEmpty();
+  }
+
+  private DataStructure dataStructureOf(DataStructure structure) {
+    return dataStructureRepository.findById(structure.getId()).orElseThrow();
+  }
+
+  private static String versionPath(DataStructureVersion version) {
+    return "/datastructures/" + version.getDataStructure().getId() + "/versions/" + version.getId();
+  }
+
+  /** The flag the Data structure list shows for the version. */
+  private boolean versionInUse(DataStructureVersion version) {
+    ResponseEntity<String> structure =
+        restTemplate.exchange(
+            "/datastructures/" + version.getDataStructure().getId(),
+            HttpMethod.GET,
+            new HttpEntity<>(authHeaders()),
+            String.class);
+    assertThat(structure.getStatusCode()).isEqualTo(HttpStatus.OK);
+    for (JsonNode row :
+        new ObjectMapper().readTree(structure.getBody()).get("dataStructureVersions")) {
+      if (row.get("id").asText().equals(version.getId().toString())) {
+        return row.get("inUse").asBoolean();
+      }
+    }
+    throw new AssertionError("version " + version.getId() + " is not listed");
+  }
+
+  private static Map<String, Object> library(String... members) {
+    Map<String, Object> defs = new HashMap<>();
+    for (String member : members) {
+      defs.put(
+          member, Map.of("type", "object", "properties", Map.of("name", Map.of("type", "string"))));
+    }
+    return Map.of("title", "People", "$defs", defs, "$ref", "#/$defs/Person");
+  }
+
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> membersOf(String modelUrn) {
+    return (Map<String, Object>)
+        registry.fetchStoredModel(modelUrn).orElseThrow().content().get("$defs");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static String memberUrn(Map<String, Object> members, String key) {
+    return (String) ((Map<String, Object>) members.get(key)).get("$ref");
   }
 
   /** Reads one top-level field, so an added field cannot shift what a regex would have matched. */

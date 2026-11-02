@@ -184,7 +184,7 @@ class ArtifactUsageLookupTest {
     void pinnedByAvailableDataSource_isInUseByReleased() {
       DataStructureVersion version = releasedVersion();
       UUID dataSourceId = UUID.randomUUID();
-      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of());
+      when(modelRegistryGateway.versionReferencesTo(MODEL_URN)).thenReturn(List.of());
       when(dataSourceRepository.findIdsByDataStructureVersionIdInAndStatus(
               Set.of(version.getId()), DataSourceStatus.AVAILABLE))
           .thenReturn(List.of(dataSourceId));
@@ -199,7 +199,7 @@ class ArtifactUsageLookupTest {
     @DisplayName("A version only a DRAFT data source pins is in use but not released-used")
     void pinnedByDraftDataSourceOnly_isNotInUseByReleased() {
       DataStructureVersion version = releasedVersion();
-      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of());
+      when(modelRegistryGateway.versionReferencesTo(MODEL_URN)).thenReturn(List.of());
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(version.getId())))
           .thenReturn(true);
 
@@ -213,7 +213,7 @@ class ArtifactUsageLookupTest {
     @DisplayName("A version a sink of a READY dataset references is not released-used")
     void referencedBySinkOfReadyDataset_isNotInUseByReleased() {
       DataStructureVersion version = releasedVersion();
-      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(SINK_URN));
+      when(modelRegistryGateway.versionReferencesTo(MODEL_URN)).thenReturn(List.of(SINK_URN));
       when(dataSinkRepository.findReleaseStatesByConfigurationLogicalUrnIn(Set.of(SINK_URN)))
           .thenReturn(List.of(new ReferrerReleaseState(SINK_URN, false)));
 
@@ -227,7 +227,7 @@ class ArtifactUsageLookupTest {
     @DisplayName("A version a sink of an AVAILABLE dataset references is released-used")
     void referencedBySinkOfAvailableDataset_isInUseByReleased() {
       DataStructureVersion version = releasedVersion();
-      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(SINK_URN));
+      when(modelRegistryGateway.versionReferencesTo(MODEL_URN)).thenReturn(List.of(SINK_URN));
       when(dataSinkRepository.findReleaseStatesByConfigurationLogicalUrnIn(Set.of(SINK_URN)))
           .thenReturn(List.of(new ReferrerReleaseState(SINK_URN, true)));
 
@@ -241,7 +241,7 @@ class ArtifactUsageLookupTest {
     @DisplayName("A mapping counts as released when a pipeline of an AVAILABLE dataset uses it")
     void mappingUsedByReleasedPipeline_isInUseByReleased() {
       DataStructureVersion version = releasedVersion();
-      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(MAPPING_URN));
+      when(modelRegistryGateway.versionReferencesTo(MODEL_URN)).thenReturn(List.of(MAPPING_URN));
       when(modelRegistryGateway.referencesTo(MAPPING_URN)).thenReturn(List.of(PIPELINE_URN));
       when(pipelineRepository.findReleaseStatesByModelLogicalUrnIn(Set.of(PIPELINE_URN)))
           .thenReturn(List.of(new ReferrerReleaseState(PIPELINE_URN, true)));
@@ -256,7 +256,7 @@ class ArtifactUsageLookupTest {
     @DisplayName("A mapping counts as released when a released dataset references it")
     void mappingUsedByReleasedDataSet_isInUseByReleased() {
       DataStructureVersion version = releasedVersion();
-      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(MAPPING_URN));
+      when(modelRegistryGateway.versionReferencesTo(MODEL_URN)).thenReturn(List.of(MAPPING_URN));
       when(modelRegistryGateway.referencesTo(MAPPING_URN)).thenReturn(List.of(DATA_SET_URN));
       when(dataSetRepository.findReleaseStatesByManifestLogicalUrnIn(Set.of(DATA_SET_URN)))
           .thenReturn(List.of(new ReferrerReleaseState(DATA_SET_URN, true)));
@@ -271,7 +271,7 @@ class ArtifactUsageLookupTest {
     @DisplayName("A mapping only a pipeline of a DRAFT dataset uses is not released")
     void mappingUsedByDraftPipeline_isNotInUseByReleased() {
       DataStructureVersion version = releasedVersion();
-      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(MAPPING_URN));
+      when(modelRegistryGateway.versionReferencesTo(MODEL_URN)).thenReturn(List.of(MAPPING_URN));
       when(modelRegistryGateway.referencesTo(MAPPING_URN)).thenReturn(List.of(PIPELINE_URN));
       when(pipelineRepository.findReleaseStatesByModelLogicalUrnIn(Set.of(PIPELINE_URN)))
           .thenReturn(List.of(new ReferrerReleaseState(PIPELINE_URN, false)));
@@ -286,7 +286,7 @@ class ArtifactUsageLookupTest {
     @DisplayName("An element of a structure with a released version counts as released through it")
     void elementOfReleasedStructure_isInUseByReleased() {
       DataStructureVersion version = releasedVersion();
-      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(ELEMENT_URN));
+      when(modelRegistryGateway.versionReferencesTo(MODEL_URN)).thenReturn(List.of(ELEMENT_URN));
       when(modelRegistryGateway.hostModelUrnsOf(ELEMENT_URN))
           .thenReturn(Set.of(ELEMENT_URN, STRUCTURE_URN));
       when(dataStructureRepository.findReleaseStatesByModelLogicalUrnIn(
@@ -304,7 +304,7 @@ class ArtifactUsageLookupTest {
     @DisplayName("An element whose only host row has no released version is not released")
     void elementOfUnreleasedStructure_isNotReleased() {
       DataStructureVersion version = releasedVersion();
-      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(ELEMENT_URN));
+      when(modelRegistryGateway.versionReferencesTo(MODEL_URN)).thenReturn(List.of(ELEMENT_URN));
       when(modelRegistryGateway.hostModelUrnsOf(ELEMENT_URN))
           .thenReturn(Set.of(ELEMENT_URN, STRUCTURE_URN));
       when(dataStructureRepository.findReleaseStatesByModelLogicalUrnIn(
@@ -322,7 +322,7 @@ class ArtifactUsageLookupTest {
     @DisplayName("A referrer with no platform record counts as released")
     void referrerWithoutRow_countsAsReleased() {
       DataStructureVersion version = releasedVersion();
-      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(PIPELINE_URN));
+      when(modelRegistryGateway.versionReferencesTo(MODEL_URN)).thenReturn(List.of(PIPELINE_URN));
       when(pipelineRepository.findReleaseStatesByModelLogicalUrnIn(Set.of(PIPELINE_URN)))
           .thenReturn(List.of());
 
@@ -336,7 +336,7 @@ class ArtifactUsageLookupTest {
     @DisplayName("Referrers of one kind are judged in one database query")
     void referrersOfOneKind_useOneQuery() {
       DataStructureVersion version = releasedVersion();
-      when(modelRegistryGateway.referencesTo(MODEL_URN))
+      when(modelRegistryGateway.versionReferencesTo(MODEL_URN))
           .thenReturn(List.of(PIPELINE_URN, OTHER_PIPELINE_URN));
       when(pipelineRepository.findReleaseStatesByModelLogicalUrnIn(any()))
           .thenReturn(
@@ -361,13 +361,13 @@ class ArtifactUsageLookupTest {
         "A structure without a released version is answered without classifying a referrer")
     void structureWithoutReleasedVersion_classifiesNoReferrer() {
       DataStructureVersion version = version(DataStructureVersionStatus.DRAFT);
-      when(modelRegistryGateway.isReferenced(MODEL_URN)).thenReturn(true);
+      when(modelRegistryGateway.versionReferencesTo(MODEL_URN)).thenReturn(List.of(SINK_URN));
 
       ArtifactUsage usage = lookup.of(version.getDataStructure());
 
       assertThat(usage.inUse()).isTrue();
       assertThat(usage.inUseByReleased()).isFalse();
-      verify(modelRegistryGateway, never()).referencesTo(any());
+      verifyNoInteractions(dataSinkRepository);
     }
 
     @Test
@@ -387,14 +387,14 @@ class ArtifactUsageLookupTest {
       draft.setDataStructure(structure);
       structure.setDataStructureVersions(Set.of(released, draft));
 
-      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(SINK_URN));
+      when(modelRegistryGateway.versionReferencesTo(MODEL_URN)).thenReturn(List.of(SINK_URN));
+      when(modelRegistryGateway.versionReferencesTo(draft.getModelUrn())).thenReturn(List.of());
       when(dataSinkRepository.findReleaseStatesByConfigurationLogicalUrnIn(Set.of(SINK_URN)))
           .thenReturn(List.of(new ReferrerReleaseState(SINK_URN, true)));
 
       ArtifactUsage usage = lookup.of(structure);
 
       assertThat(usage.inUseByReleased()).isTrue();
-      verify(modelRegistryGateway, never()).referencesTo(draft.getModelUrn());
     }
 
     @Test
@@ -420,7 +420,8 @@ class ArtifactUsageLookupTest {
       unused.setDataStructure(structure);
       structure.setDataStructureVersions(Set.of(released, draft, unused));
 
-      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(SINK_URN));
+      when(modelRegistryGateway.versionReferencesTo(MODEL_URN)).thenReturn(List.of(SINK_URN));
+      when(modelRegistryGateway.versionReferencesTo(unused.getModelUrn())).thenReturn(List.of());
       when(dataSinkRepository.findReleaseStatesByConfigurationLogicalUrnIn(Set.of(SINK_URN)))
           .thenReturn(List.of(new ReferrerReleaseState(SINK_URN, true)));
       when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(draft.getId())))
@@ -472,6 +473,31 @@ class ArtifactUsageLookupTest {
           .hasMessage(
               "Cannot unrelease DataStructure because it is referenced by a Data sink of a"
                   + " released Dataset.");
+    }
+  }
+
+  @Nested
+  @DisplayName("Delete guard")
+  class DeleteGuard {
+
+    @Test
+    @DisplayName("An artifact anything uses refuses its delete")
+    void requireNotInUse_whenInUse_shouldThrow() {
+      ArtifactUsage usage = new ArtifactUsage(true, List.of());
+      UUID id = UUID.randomUUID();
+
+      assertThatThrownBy(() -> usage.requireNotInUse("DataStructureVersion", id))
+          .isInstanceOf(ResourceInUseException.class)
+          .hasMessageContaining("DataStructureVersion");
+    }
+
+    @Test
+    @DisplayName("An artifact nothing uses may be deleted")
+    void requireNotInUse_whenUnused_shouldPass() {
+      ArtifactUsage usage = new ArtifactUsage(false, List.of());
+
+      assertThatCode(() -> usage.requireNotInUse("DataStructureVersion", UUID.randomUUID()))
+          .doesNotThrowAnyException();
     }
   }
 }
