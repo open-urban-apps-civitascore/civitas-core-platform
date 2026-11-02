@@ -20,7 +20,7 @@
 # even when the build job is skipped due to no changes
 generate-graph-config-adapter:
   extends: .maven-config-adapter
-  image: maven:3.9.16-eclipse-temurin-25-alpine
+  image: maven:3.9.16-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: lint
   needs:
     - job: setup-version
@@ -43,7 +43,7 @@ test-config-adapter:
   extends:
     - .only-config-adapter-changes
     - .maven-config-adapter
-  image: maven:3.9.16-eclipse-temurin-25
+  image: maven:3.9.16-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: build-package
   needs:
     - job: setup-version
@@ -96,7 +96,7 @@ integration-test-config-adapter:
     - .only-config-adapter-changes
     - .dind
     - .maven-config-adapter
-  image: maven:3.9.16-eclipse-temurin-25
+  image: maven:3.9.16-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: build-package
   timeout: 1h
   needs:
@@ -142,7 +142,7 @@ build-config-adapter:
   extends:
     - .build-config-adapter-changes
     - .maven-config-adapter
-  image: maven:3.9.16-eclipse-temurin-25-alpine
+  image: maven:3.9.16-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: build-package
   needs:
     - job: setup-version
@@ -186,7 +186,7 @@ static-analysis-config-adapter:
   extends:
     - .only-config-adapter-changes
     - .maven-config-adapter
-  image: maven:3.9.16-eclipse-temurin-25
+  image: maven:3.9.16-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: build-package
   needs:
     - job: setup-version
@@ -204,7 +204,7 @@ publish-config-adapter:
   extends:
     - .rules-protected
     - .maven-config-adapter
-  image: maven:3.9.16-eclipse-temurin-25-alpine
+  image: maven:3.9.16-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: deploy-package
   interruptible: false
   needs:

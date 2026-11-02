@@ -24,7 +24,7 @@
 
 .nifi-extensions-maven:
   extends: .maven-nifi-extensions
-  image: maven:3.9.16-eclipse-temurin-25-alpine
+  image: maven:3.9.16-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
 
 # Runs on every MR pipeline so that dependency scanning has the graph even where the build is
 # skipped for want of changes.
@@ -53,7 +53,7 @@ build-nifi-nars:
   extends:
     - .api-test-stack-changes
     - .nifi-extensions-maven
-  image: maven:3.9.16-eclipse-temurin-25
+  image: maven:3.9.16-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: build-package
   needs: []
   script:
@@ -69,7 +69,7 @@ static-analysis-nifi-extensions:
   extends:
     - .only-nifi-extensions-changes
     - .nifi-extensions-maven
-  image: maven:3.9.16-eclipse-temurin-25
+  image: maven:3.9.16-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: build-package
   needs:
     - job: setup-version
@@ -84,7 +84,7 @@ build-nifi-extensions:
   extends:
     - .only-nifi-extensions-changes
     - .nifi-extensions-maven
-  image: maven:3.9.16-eclipse-temurin-25
+  image: maven:3.9.16-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: build-package
   needs:
     - job: setup-version
@@ -126,7 +126,7 @@ integration-test-nifi-extensions:
     - .only-nifi-extensions-changes
     - .nifi-extensions-maven
     - .dind
-  image: maven:3.9.16-eclipse-temurin-25
+  image: maven:3.9.16-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: test
   timeout: 1h
   needs:

@@ -45,7 +45,7 @@
 # even when the build job is skipped due to no changes
 generate-graph-backend:
   extends: .maven-backend
-  image: maven:3.9.16-eclipse-temurin-25-alpine
+  image: maven:3.9.16-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: lint
   needs: []
   rules:
@@ -84,7 +84,7 @@ test-backend:
   extends:
     - .only-backend-changes
     - .maven-backend
-  image: maven:3.9.16-eclipse-temurin-25-alpine
+  image: maven:3.9.16-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: test
   needs:
     - !reference [.backend-dependencies, needs]
@@ -121,7 +121,7 @@ integration-test-backend:
     - .only-backend-changes
     - .dind
     - .maven-backend
-  image: maven:3.9.16-eclipse-temurin-25
+  image: maven:3.9.16-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: test
   timeout: 1h
   needs:
@@ -150,7 +150,7 @@ saga-e2e-test-backend:
   extends:
     - .dind
     - .maven-backend
-  image: maven:3.9.16-eclipse-temurin-25
+  image: maven:3.9.16-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: test
   timeout: 1h
   needs:
@@ -274,7 +274,7 @@ report-test-backend:
   extends:
     - .only-backend-changes
     - .maven-backend
-  image: maven:3.9.16-eclipse-temurin-25
+  image: maven:3.9.16-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: test
   # The execution data and target/classes of the test jobs are all that the merge and the report need.
   # The saga job is optional because its rules are narrower than the rules of this job.
@@ -306,7 +306,7 @@ build-backend:
   rules:
     - !reference [.api-test-stack-changes, rules]
     - !reference [.only-backend-changes, rules]
-  image: maven:3.9.16-eclipse-temurin-25-alpine
+  image: maven:3.9.16-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: build
   needs: !reference [.backend-dependencies, needs]
   before_script:
