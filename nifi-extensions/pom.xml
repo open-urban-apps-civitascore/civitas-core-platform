@@ -46,7 +46,7 @@
 		     compiled against this API and is installed into that image. -->
 		<nifi.version>2.9.0</nifi.version>
 
-		<jackson.version>2.21.6</jackson.version>
+		<jackson.version>2.21.7</jackson.version>
 		<!-- The version of model-forge-runtime: GetHttpApiCall validates a response against a Data
 		     structure as Model Forge validates data against it, so the two must not disagree. -->
 		<networknt.version>1.5.8</networknt.version>
