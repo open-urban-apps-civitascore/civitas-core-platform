@@ -650,7 +650,7 @@ Phase 2, once for all sessions:
 
 Phase 3, per session:
 
-5. **Save the pipeline** – `POST` for a new pipeline, `PUT` for an existing one, with the ids and URNs from the steps above, and `confirmDataLoss=true` when a confirmed removal deletes stored data. The backend deletes or deactivates the removed sinks, their Layers and the APIs without a sink in the same request. It refuses to remove a provisioned sink without `confirmDataLoss` (`409 RESOURCE_IN_USE`), which the save reports as `unconfirmedDataLossError`.
+5. **Save the pipeline** – `POST` for a new pipeline, `PUT` for an existing one, with the ids and URNs from the steps above, and `confirmDataLoss=true` when the user confirmed a removal that deletes stored data, a Layer or an API. The backend deletes or deactivates the removed sinks, their Layers and the APIs without a sink in the same request. It refuses to remove a provisioned sink, a Layer or an API without `confirmDataLoss` (`409 RESOURCE_IN_USE`), which the save reports as `unconfirmedDataLossError`.
 6. **Delete the removed mappings** – `getRemovedMappingUrns()` collects the logical URNs of mapping nodes that were removed since the last save. A node that was never saved has no URN and is skipped. A failed delete gives an error toast (`mappingStillInUse` or `mappingCleanupFailed`) but keeps the save successful.
 7. **Clean the session** – mark it clean, write the new data sink and mapping snapshots, show the success toast.
 
@@ -662,7 +662,7 @@ If the removal is cancelled in phase 2, every session whose pipeline was not sav
 
 ### Pipeline Delete
 
-`deletePipeline()` finds the data sinks of the pipeline in `getDatasetResources()` and shows the `RemovalConfirmModal` with what goes with them, or only the delete question when nothing goes. The `DELETE` carries `confirmDataLoss=true` when a removed sink is provisioned. The Dataset overview (`PipelineCard`) works the same way.
+`deletePipeline()` finds the data sinks of the pipeline in `getDatasetResources()` and shows the `RemovalConfirmModal` with what goes with them, or only the delete question when nothing goes. The `DELETE` carries `confirmDataLoss=true` when the dialog lists stored data, a Layer or an API. The Dataset overview (`PipelineCard`) works the same way.
 
 ### Locked Data Sinks
 

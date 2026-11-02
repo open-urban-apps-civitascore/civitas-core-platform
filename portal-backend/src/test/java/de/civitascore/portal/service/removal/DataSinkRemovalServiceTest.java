@@ -78,12 +78,12 @@ class DataSinkRemovalServiceTest {
 
   @Test
   void prepare_provisionedSinkWithoutConfirmDataLoss_isRefused() {
-    DataSink sink = activeSink(DataSinkType.FROST, true);
+    activeSink(DataSinkType.FROST, true);
 
     assertThatThrownBy(() -> service.prepare(DataSinkChange.deletePipeline(pipeline), false))
         .isInstanceOfSatisfying(
             ResourceInUseException.class,
-            e -> assertThat(e.getResourceId()).isEqualTo(sink.getId()))
+            e -> assertThat(e.getResourceId()).isEqualTo(dataSet.getId()))
         .hasMessageContaining("confirmDataLoss=true");
   }
 
@@ -98,15 +98,49 @@ class DataSinkRemovalServiceTest {
   }
 
   @Test
-  void prepare_unprovisionedSinkWithApi_needsNoConfirmation() {
+  void prepare_unprovisionedSinkWithApiWithoutConfirmDataLoss_isRefused() {
+    activeSink(DataSinkType.FROST, false);
+    api(ApiStandard.STA);
+
+    assertThatThrownBy(() -> service.prepare(DataSinkChange.deletePipeline(pipeline), false))
+        .isInstanceOf(ResourceInUseException.class)
+        .hasMessageContaining("confirmDataLoss=true");
+  }
+
+  @Test
+  void prepare_unprovisionedSinkWithLayerWithoutConfirmDataLoss_isRefused() {
+    DataSink sink = activeSink(DataSinkType.POSTGIS, false);
+    Layer layer = new Layer();
+    layer.setId(UUID.randomUUID());
+    layer.setDataSet(dataSet);
+    layer.setDataSink(sink);
+    when(layerRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(layer));
+
+    assertThatThrownBy(() -> service.prepare(DataSinkChange.deletePipeline(pipeline), false))
+        .isInstanceOf(ResourceInUseException.class)
+        .hasMessageContaining("confirmDataLoss=true");
+  }
+
+  @Test
+  void prepare_unprovisionedSinkWithApiWithConfirmDataLoss_returnsThePlan() {
     DataSink sink = activeSink(DataSinkType.FROST, false);
     NamedApi sta = api(ApiStandard.STA);
+
+    PreparedDataSinkChange prepared =
+        service.prepare(DataSinkChange.deletePipeline(pipeline), true);
+
+    assertThat(prepared.plan().deactivatedDataSinks()).containsExactly(sink);
+    assertThat(prepared.plan().apis()).containsExactly(sta);
+  }
+
+  @Test
+  void prepare_unprovisionedSinkWithoutLayersAndApis_needsNoConfirmation() {
+    DataSink sink = activeSink(DataSinkType.FROST, false);
 
     PreparedDataSinkChange prepared =
         service.prepare(DataSinkChange.deletePipeline(pipeline), false);
 
     assertThat(prepared.plan().deactivatedDataSinks()).containsExactly(sink);
-    assertThat(prepared.plan().apis()).containsExactly(sta);
   }
 
   @Test

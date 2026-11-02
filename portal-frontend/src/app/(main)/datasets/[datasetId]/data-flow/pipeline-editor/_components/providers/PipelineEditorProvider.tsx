@@ -588,7 +588,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       const removal = getDataSinkRemoval(getPipelineDataSinkIds(resources.dataSinks, pipelineId), resources)
       const isConfirmed = await confirmDeleteRemoval(removal)
       if (!isConfirmed) return
-      await deletePipelineMutation.mutateAsync({ pipelineId, isDataLossConfirmed: removal.hasStoredData })
+      await deletePipelineMutation.mutateAsync({ pipelineId, isDataLossConfirmed: hasRemovalConsequences(removal) })
       sessionManager.closeSession(sessionId)
     } catch (error) {
       if (isNotDraftError(error)) {
@@ -845,8 +845,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         try {
           const removal = getDataSinkRemoval(removedSinkIds, await getDatasetResources(datasetId))
           if (hasRemovalConsequences(removal)) {
-            isAborted = !(await confirmSaveRemoval(removal))
-            isDataLossConfirmed = removal.hasStoredData
+            isDataLossConfirmed = await confirmSaveRemoval(removal)
+            isAborted = !isDataLossConfirmed
           }
         } catch (error) {
           for (const { session } of preparedSessions) classifySaveError(session.name, error)

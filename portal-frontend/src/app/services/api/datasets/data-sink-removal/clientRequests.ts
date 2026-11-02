@@ -43,7 +43,7 @@ export const getDatasetResources = async (datasetId: string): Promise<DatasetRes
   return { dataSinks: dataSinks.data, layers: layers.data, apis: dataset.data.namedApis ?? [] }
 }
 
-/** Query params that confirm the removal of a provisioned Data sink; undefined when not confirmed. */
+/** Query params that confirm the removal of stored data, Layers and APIs; undefined when not confirmed. */
 export const confirmDataLossParams = (isDataLossConfirmed = false): URLSearchParams | undefined =>
   isDataLossConfirmed ? new URLSearchParams({ confirmDataLoss: 'true' }) : undefined
 

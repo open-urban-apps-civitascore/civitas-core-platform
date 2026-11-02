@@ -46,11 +46,12 @@ public class DataSinkRemovalService {
    * Checks the change and computes what it takes with it on the state after the change. Writes
    * nothing.
    *
-   * @param confirmDataLoss whether the caller accepts that a provisioned Data sink goes
+   * @param confirmDataLoss whether the caller accepts that stored data, Layers and APIs go
    * @throws InvalidInputException if a requested Data sink id is unknown, not active, of another
    *     Dataset or linked to another Pipeline
    * @throws ResourceInUseException if a Pipeline still links a Data sink the change deletes, or if
-   *     the change removes a provisioned Data sink without {@code confirmDataLoss}
+   *     the change removes a provisioned Data sink, a Layer or an API without {@code
+   *     confirmDataLoss}
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public PreparedDataSinkChange prepare(DataSinkChange change, boolean confirmDataLoss) {
@@ -182,20 +183,20 @@ public class DataSinkRemovalService {
     requireUnlinkedWhenDeleted(activeDataSinks, request);
     DataSinkRemovalPlan plan = plan(dataSet, activeDataSinks, request);
     if (!confirmDataLoss) {
-      requireNoStoredData(plan);
+      requireNoDataLoss(plan);
     }
     return plan;
   }
 
-  private static void requireNoStoredData(DataSinkRemovalPlan plan) {
-    for (DataSink sink : plan.deactivatedDataSinks()) {
-      if (sink.isProvisioned()) {
-        throw new ResourceInUseException(
-            DataSink.class.getSimpleName(),
-            sink.getId(),
-            "This request removes a provisioned Data sink, whose stored data is deleted at the"
-                + " next release; set confirmDataLoss=true to proceed");
-      }
+  private static void requireNoDataLoss(DataSinkRemovalPlan plan) {
+    boolean deletesStoredData =
+        plan.deactivatedDataSinks().stream().anyMatch(DataSink::isProvisioned);
+    if (deletesStoredData || !plan.layers().isEmpty() || !plan.apis().isEmpty()) {
+      throw new ResourceInUseException(
+          DataSet.class.getSimpleName(),
+          plan.dataSet().getId(),
+          "This request removes stored data, Layers or APIs of the Dataset; set"
+              + " confirmDataLoss=true to proceed");
     }
   }
 

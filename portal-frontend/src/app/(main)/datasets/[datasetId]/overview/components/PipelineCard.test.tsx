@@ -75,6 +75,12 @@ const LAYER_REMOVAL: DatasetResources = {
   apis: [{ id: 'api-1', slug: 'ows', name: 'Trees API', standard: 'OWS' }],
 }
 
+const API_ONLY_REMOVAL: DatasetResources = {
+  dataSinks: [{ ...POSTGIS_SINK, provisioned: false }],
+  layers: [],
+  apis: [{ id: 'api-1', slug: 'ows', name: 'Trees API', standard: 'OWS' }],
+}
+
 const renderComponent = (props: Partial<typeof defaultProps> = {}) =>
   render(<PipelineCard {...defaultProps} {...props} />)
 
@@ -227,7 +233,22 @@ describe('PipelineCard', () => {
       })
     })
 
-    it('deletes the pipeline without confirmDataLoss when it removes no stored data', async () => {
+    it('deletes the pipeline with confirmDataLoss when it removes only an API', async () => {
+      vi.mocked(getDatasetResources).mockResolvedValue(API_ONLY_REMOVAL)
+      renderComponent()
+      await startDelete()
+      expect(screen.queryByTestId('removalConfirmStoredData')).not.toBeInTheDocument()
+      fireEvent.click(screen.getByTestId('confirmButton'))
+
+      await waitFor(() => {
+        expect(mockDeletePipelineMutateAsync).toHaveBeenCalledWith({
+          pipelineId: 'pipeline-1',
+          isDataLossConfirmed: true,
+        })
+      })
+    })
+
+    it('deletes the pipeline without confirmDataLoss when it removes nothing that needs it', async () => {
       renderComponent()
       await startDelete()
       fireEvent.click(screen.getByTestId('confirmButton'))

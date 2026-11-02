@@ -139,6 +139,25 @@ const LAYER_REMOVAL: DatasetResources = {
   apis: [{ slug: 'ows', name: 'OWS', standard: 'OWS' }],
 }
 
+const STA_API = { slug: 'sta', name: 'STA', standard: 'STA' } as const
+
+const unprovisionedFrostSink = (apis: DatasetResources['apis']): DatasetResources => ({
+  dataSinks: [
+    {
+      id: 'old-sink-1',
+      dataSinkType: 'FROST',
+      pipelineIds: ['pipeline-1', 'pipeline-to-delete'],
+      provisioned: false,
+    } as DataSink,
+  ],
+  layers: [],
+  apis,
+})
+
+const UNPROVISIONED_SINK_REMOVAL = unprovisionedFrostSink([])
+
+const API_ONLY_REMOVAL = unprovisionedFrostSink([STA_API])
+
 vi.mock('@/app/services/api/mappings/clientRequests', () => ({
   useCreateMapping: vi.fn(),
   useUpdateMapping: vi.fn(),
@@ -1710,6 +1729,7 @@ describe('PipelineEditorProviderComponent', () => {
 
       it('saves without a dialog when the removal takes nothing that needs a confirmation', async () => {
         vi.mocked(getRemovedDataSinkIds).mockReturnValue(['old-sink-1'])
+        vi.mocked(getDatasetResources).mockResolvedValue(UNPROVISIONED_SINK_REMOVAL)
         renderProvider(savedSession('session-1', 'pipeline-1'))
 
         let result: boolean | undefined
@@ -1743,6 +1763,27 @@ describe('PipelineEditorProviderComponent', () => {
         })
 
         expect(result).toBe(true)
+        expect(mockUpdatePipelineMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({ pipelineId: 'pipeline-1', isDataLossConfirmed: true }),
+        )
+      })
+
+      it('updates the pipelines with confirmDataLoss after a confirmed removal that takes only an API', async () => {
+        vi.mocked(getRemovedDataSinkIds).mockReturnValue(['old-sink-1'])
+        vi.mocked(getDatasetResources).mockResolvedValue(API_ONLY_REMOVAL)
+        renderProvider(savedSession('session-1', 'pipeline-1'))
+
+        let savePromise: Promise<boolean | undefined> | undefined
+        await act(async () => {
+          savePromise = contextRef.current?.saveAllPipelines()
+        })
+        expect(saveDialog()?.removal).toEqual({ layers: [], apis: [STA_API], hasStoredData: false })
+
+        await act(async () => {
+          saveDialog()?.onConfirm()
+          await savePromise
+        })
+
         expect(mockUpdatePipelineMutateAsync).toHaveBeenCalledWith(
           expect.objectContaining({ pipelineId: 'pipeline-1', isDataLossConfirmed: true }),
         )
@@ -2580,6 +2621,32 @@ describe('PipelineEditorProviderComponent', () => {
         isDataLossConfirmed: true,
       })
       expect(contextRef.current?.activeSessionId).not.toBe('session-1')
+    })
+
+    it('deletes the pipeline with confirmDataLoss when the delete takes only an API', async () => {
+      vi.mocked(getDatasetResources).mockResolvedValue(API_ONLY_REMOVAL)
+      renderProvider(savedSession())
+
+      await startDelete()
+      await confirmDelete()
+
+      expect(mockDeleteMutateAsync).toHaveBeenCalledWith({
+        pipelineId: 'pipeline-to-delete',
+        isDataLossConfirmed: true,
+      })
+    })
+
+    it('deletes the pipeline without confirmDataLoss when the delete takes nothing that needs it', async () => {
+      vi.mocked(getDatasetResources).mockResolvedValue(UNPROVISIONED_SINK_REMOVAL)
+      renderProvider(savedSession())
+
+      await startDelete()
+      await confirmDelete()
+
+      expect(mockDeleteMutateAsync).toHaveBeenCalledWith({
+        pipelineId: 'pipeline-to-delete',
+        isDataLossConfirmed: false,
+      })
     })
 
     it('deletes nothing and keeps the session when the confirmation is cancelled', async () => {

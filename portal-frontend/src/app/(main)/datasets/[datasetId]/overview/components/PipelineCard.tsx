@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useRemovalConfirmation } from '@/hooks/use-removal-confirmation'
 import { PipelineBasicInfo } from '@/types/datasets'
-import { getDataSinkRemoval, getPipelineDataSinkIds } from '@/utils/dataSinkRemoval'
+import { getDataSinkRemoval, getPipelineDataSinkIds, hasRemovalConsequences } from '@/utils/dataSinkRemoval'
 import { formatDate } from '@/utils/formatDate'
 
 interface PipelineCardProps {
@@ -48,7 +48,10 @@ export const PipelineCard = ({ datasetId, pipeline, badges, canDelete }: Pipelin
       const removal = getDataSinkRemoval(getPipelineDataSinkIds(resources.dataSinks, pipeline.id), resources)
       const isConfirmed = await confirmRemoval(removal)
       if (!isConfirmed) return
-      await deletePipeline.mutateAsync({ pipelineId: pipeline.id, isDataLossConfirmed: removal.hasStoredData })
+      await deletePipeline.mutateAsync({
+        pipelineId: pipeline.id,
+        isDataLossConfirmed: hasRemovalConsequences(removal),
+      })
       toast.success(t('messages.deleteSuccess'))
       router.refresh()
     } catch {
