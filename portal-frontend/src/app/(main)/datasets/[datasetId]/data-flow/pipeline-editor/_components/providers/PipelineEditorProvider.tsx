@@ -278,8 +278,6 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     const sessionIds = Object.keys(validationResults)
     return new Set(sessionIds.filter(sessionId => validationResults[sessionId].errors.length > 0))
   }, [validationResults])
-  /** True when pipeline changed since last validation - requires validation before save */
-  const [isValidationRequired, setIsValidationRequired] = useState(true)
   const [sessionIdsWithValidationPanel, setSessionIdsWithValidationPanel] = useState<Set<string>>(new Set())
   const shouldShowValidationPanel = activeSessionId ? sessionIdsWithValidationPanel.has(activeSessionId) : false
 
@@ -287,35 +285,24 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     setSessionIdsWithValidationPanel(previous => new Set([...previous, ...sessionIds]))
   }, [])
 
-  const hideValidationPanelFor = useCallback((sessionId: string) => {
+  const hideValidationPanel = useCallback(() => {
+    if (!activeSessionId) return
     setSessionIdsWithValidationPanel(previous => {
       const next = new Set(previous)
-      next.delete(sessionId)
+      next.delete(activeSessionId)
       return next
     })
-  }, [])
-
-  // ===== Computed: Can Save =====
-  // Pipeline can be saved when: isDirty && validation passed (no errors) && validation has been run
-  const canSave = useMemo(() => {
-    const isDirty = activeSession?.isDirty || false
-    const hasErrors = (validationResult?.errors?.length ?? 0) > 0
-    return isDirty && !isValidationRequired && !hasErrors
-  }, [activeSession?.isDirty, validationResult?.errors?.length, isValidationRequired])
+  }, [activeSessionId])
 
   // ===== Track pipeline changes to invalidate validation =====
   const previousActiveSessionIdRef = useRef(activeSessionId)
   useEffect(() => {
     const isSameSession = previousActiveSessionIdRef.current === activeSessionId
     previousActiveSessionIdRef.current = activeSessionId
-    // When pipeline changes (and is dirty), mark validation as required
-    if (activeSessionId && activeSession?.isDirty) {
-      setIsValidationRequired(true)
-      // A tab switch keeps the result and the panel state of the new active pipeline.
-      if (isSameSession) {
-        setValidationResultFor(activeSessionId, null)
-        hideValidationPanelFor(activeSessionId)
-      }
+    // A tab switch keeps the result and the panel state of the new active pipeline.
+    if (activeSessionId && activeSession?.isDirty && isSameSession) {
+      setValidationResultFor(activeSessionId, null)
+      hideValidationPanel()
     }
   }, [
     activeSession?.isDirty,
@@ -323,7 +310,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     pipeline.nodes.length,
     pipeline.edges.length,
     setValidationResultFor,
-    hideValidationPanelFor,
+    hideValidationPanel,
   ])
 
   // ===== Memoized Values =====
@@ -397,7 +384,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const selectNode = useCallback(
     (nodeId: string, isMultiSelect = false) => {
       // Reset validation panel when selecting a node (latest action wins)
-      if (activeSessionId) hideValidationPanelFor(activeSessionId)
+      hideValidationPanel()
 
       updatePipeline(p => ({
         ...p,
@@ -408,7 +395,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         edges: isMultiSelect ? p.edges : p.edges.map(edge => ({ ...edge, selected: false })),
       }))
     },
-    [activeSessionId, updatePipeline, hideValidationPanelFor],
+    [updatePipeline, hideValidationPanel],
   )
 
   // ===== Edge Operations =====
@@ -441,7 +428,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const selectEdge = useCallback(
     (edgeId: string, isMultiSelect = false) => {
       // Reset validation panel when selecting an edge (latest action wins)
-      if (activeSessionId) hideValidationPanelFor(activeSessionId)
+      hideValidationPanel()
 
       updatePipeline(p => ({
         ...p,
@@ -452,7 +439,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         nodes: isMultiSelect ? p.nodes : p.nodes.map(node => ({ ...node, selected: false })),
       }))
     },
-    [activeSessionId, updatePipeline, hideValidationPanelFor],
+    [updatePipeline, hideValidationPanel],
   )
 
   // ===== Selection Operations =====
@@ -515,8 +502,6 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       activeSessionId ? validationContextFor(activeSessionId) : {},
     )
     if (activeSessionId) setValidationResultFor(activeSessionId, result)
-    // Mark validation as no longer required (it was just run)
-    setIsValidationRequired(false)
     // Show validation panel in inspector
     if (activeSessionId) showValidationPanelFor([activeSessionId])
     updatePipeline(withoutSelection)
@@ -542,10 +527,6 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     [validationResult],
   )
 
-  const hideValidationPanel = useCallback(() => {
-    if (activeSessionId) hideValidationPanelFor(activeSessionId)
-  }, [activeSessionId, hideValidationPanelFor])
-
   // ===== Validate all saved pipelines once after load =====
   const hasValidatedOnLoadRef = useRef(false)
   useEffect(() => {
@@ -565,15 +546,11 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     )
     setValidationResults(previous => ({ ...previous, ...Object.fromEntries(results) }))
     showValidationPanelFor(savedSessions.map(session => session.id))
-
-    const hasActiveResult = results.some(([sessionId]) => sessionId === activeSessionId)
-    if (hasActiveResult) setIsValidationRequired(false)
   }, [
     isFetchingDatasources,
     isReadOnly,
     sessionManager,
     sessionManager.sessions,
-    activeSessionId,
     currentPipelineOf,
     validationContextFor,
     showValidationPanelFor,
@@ -968,8 +945,6 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       runValidation,
       clearValidation,
       pipelineUsingTableName,
-      isValidationRequired,
-      canSave,
       shouldShowValidationPanel,
       hideValidationPanel,
       sessionIdsWithErrors,
@@ -1018,8 +993,6 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       runValidation,
       clearValidation,
       pipelineUsingTableName,
-      isValidationRequired,
-      canSave,
       shouldShowValidationPanel,
       hideValidationPanel,
       sessionIdsWithErrors,

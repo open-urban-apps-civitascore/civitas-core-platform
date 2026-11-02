@@ -239,7 +239,6 @@ const {
   // Validation
   runValidation,
   validationResult,
-  canSave,
 
   // Save
   savePipeline, // POST to backend API

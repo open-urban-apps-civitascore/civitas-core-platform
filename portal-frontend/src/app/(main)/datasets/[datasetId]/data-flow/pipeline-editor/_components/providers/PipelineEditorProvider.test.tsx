@@ -957,33 +957,6 @@ describe('PipelineEditorProviderComponent', () => {
   })
 
   describe('validation lifecycle', () => {
-    it('clears isValidationRequired after runValidation', () => {
-      renderProvider()
-
-      expect(contextRef.current?.isValidationRequired).toBe(true)
-
-      act(() => {
-        contextRef.current?.runValidation()
-      })
-
-      expect(contextRef.current?.isValidationRequired).toBe(false)
-    })
-
-    it('resets isValidationRequired to true when pipeline changes after validation', () => {
-      renderProvider()
-
-      act(() => {
-        contextRef.current?.runValidation()
-      })
-      expect(contextRef.current?.isValidationRequired).toBe(false)
-
-      act(() => {
-        contextRef.current?.addNode({ nodeType: PIPELINE_NODE_TYPES.Start, position: { x: 0, y: 0 } })
-      })
-
-      expect(contextRef.current?.isValidationRequired).toBe(true)
-    })
-
     it('clears validationResult when pipeline changes after validation', () => {
       renderProvider()
 
@@ -1025,45 +998,6 @@ describe('PipelineEditorProviderComponent', () => {
       expect(contextRef.current?.validationResult).not.toBeNull()
       expect(contextRef.current?.selectedNode).toBeNull()
       expect(contextRef.current?.selectedEdge).toBeNull()
-    })
-  })
-
-  describe('canSave', () => {
-    it('is false when session is not dirty', () => {
-      renderProvider()
-      expect(contextRef.current?.canSave).toBe(false)
-    })
-
-    it('is false when dirty but validation has not been run', () => {
-      renderProvider(makeSession({ isDirty: true }))
-      expect(contextRef.current?.canSave).toBe(false)
-    })
-
-    it('is true when dirty, validation run, and no errors', () => {
-      renderProvider(makeSession({ isDirty: true }))
-
-      act(() => {
-        contextRef.current?.runValidation()
-      })
-
-      expect(contextRef.current?.canSave).toBe(true)
-    })
-
-    it('is false when dirty, validation run, but has errors', () => {
-      vi.mocked(validatePipelineWithNodeStatus).mockReturnValue({
-        isValid: false,
-        errors: [{ id: 'err-1', type: 'structure', messageKey: 'test.error', severity: 'error' }],
-        warnings: [],
-        nodeStatuses: new Map(),
-      })
-
-      renderProvider(makeSession({ isDirty: true }))
-
-      act(() => {
-        contextRef.current?.runValidation()
-      })
-
-      expect(contextRef.current?.canSave).toBe(false)
     })
   })
 

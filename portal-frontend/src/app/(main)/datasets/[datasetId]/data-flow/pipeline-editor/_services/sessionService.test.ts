@@ -48,17 +48,4 @@ describe('createSessionFromBackendDTO', () => {
     nodes.forEach(node => expect(node).not.toHaveProperty('selected'))
     edges.forEach(edge => expect(edge).not.toHaveProperty('selected'))
   })
-
-  it('removes the selection after a save and reload', () => {
-    const selected = {
-      ...source,
-      nodes: source.nodes.map(node => ({ ...node, selected: true })),
-      edges: source.edges.map(edge => ({ ...edge, selected: true })),
-    }
-
-    const { nodes, edges } = createSessionFromBackendDTO(savedAs(selected)).pipeline
-
-    nodes.forEach(node => expect(node).not.toHaveProperty('selected'))
-    edges.forEach(edge => expect(edge).not.toHaveProperty('selected'))
-  })
 })
