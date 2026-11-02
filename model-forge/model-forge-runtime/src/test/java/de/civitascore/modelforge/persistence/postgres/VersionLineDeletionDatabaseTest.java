@@ -272,6 +272,24 @@ class VersionLineDeletionDatabaseTest extends AbstractRegistryDatabaseTest {
     }
 
     @Test
+    @DisplayName("A rolled-back delete of the only line leaves the graph as it was")
+    void aRolledBackLastLineDeleteKeepsTheGraph() {
+        String only = library(VersionBump.MAJOR, null, "Station", STATION_V1);
+        String dataSet = registry.storeDataSet(urns.urn("dataset", UUID.randomUUID()),
+            mapper.readTree("{\"title\": \"Weather\", \"datastructureRefs\": [\"%s\"]}".formatted(structure)),
+            VersionBump.PATCH);
+        graph.registerFromRegistry(dataSet);
+
+        assertThatThrownBy(() -> registry.<Void>inTransaction(() -> {
+            modelForge.deleteVersionLine(new ArtifactId(only));
+            throw new IllegalStateException("the caller fails after the delete");
+        })).isInstanceOf(IllegalStateException.class);
+
+        assertThat(graph.getDependencies(only)).isNotEmpty();
+        assertThat(graph.getDependencies(logical(dataSet))).anyMatch(urn -> logical(urn).equals(structure));
+    }
+
+    @Test
     @DisplayName("After deleting the highest line the next line takes a number never given out")
     void theNextLineTakesANumberNeverGivenOut() {
         library(VersionBump.MAJOR, null, "Station", STATION_V1);
