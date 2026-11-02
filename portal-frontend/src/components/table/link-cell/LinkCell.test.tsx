@@ -1,12 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import React from 'react'
+import React, { RefObject } from 'react'
 import { vi } from 'vitest'
 
-const mockUseIsTruncated = vi.fn().mockReturnValue(false)
+const mockUseIsTruncated = vi.fn<(ref: RefObject<HTMLElement | null>) => boolean>().mockReturnValue(false)
 const TooltipContext = React.createContext(false)
 
 vi.mock('@/hooks/use-is-truncated', () => ({
-  useIsTruncated: () => mockUseIsTruncated(),
+  useIsTruncated: (ref: RefObject<HTMLElement | null>) => mockUseIsTruncated(ref),
 }))
 vi.mock('../../ui/tooltip', () => ({
   // eslint-disable-next-line react/boolean-prop-naming
@@ -72,6 +72,71 @@ describe('LinkCell', () => {
       </LinkCell>,
     )
     expect(screen.getByRole('link', { name: /Enabled Link/ })).toHaveAttribute('href', '/test')
+  })
+
+  it('renders the suffix inside the link', () => {
+    render(
+      <LinkCell href="/test-link" suffix={<span data-testid="suffix">3</span>}>
+        Test Link
+      </LinkCell>,
+    )
+    expect(screen.getByRole('link')).toContainElement(screen.getByTestId('suffix'))
+  })
+
+  it('keeps only the text in the truncated element when a suffix is set', () => {
+    render(
+      <LinkCell href="/test-link" suffix={<span data-testid="suffix">3</span>}>
+        Test Link
+      </LinkCell>,
+    )
+    const truncatedElement = screen.getByRole('link').querySelector('.truncate')
+    expect(truncatedElement).toHaveTextContent(/^Test Link$/)
+    expect(truncatedElement).not.toContainElement(screen.getByTestId('suffix'))
+  })
+
+  it.each([
+    ['with', <span key="suffix">3</span>],
+    ['without', undefined],
+  ])('measures the truncated element %s a suffix', (_, suffix) => {
+    render(
+      <LinkCell href="/test-link" suffix={suffix}>
+        Test Link
+      </LinkCell>,
+    )
+    const truncatedElement = screen.getByRole('link').querySelector('.truncate')
+    expect(truncatedElement).not.toBeNull()
+    expect(mockUseIsTruncated.mock.lastCall?.[0].current).toBe(truncatedElement)
+  })
+
+  it('renders no extra wrapper without a suffix', () => {
+    render(<LinkCell href="/test-link">Test Link</LinkCell>)
+    const link = screen.getByRole('link')
+    expect(link.children).toHaveLength(2)
+    expect(link.children[0]).toHaveClass('flex-1', 'truncate')
+    expect(link.children[0]).toHaveTextContent(/^Test Link$/)
+  })
+
+  it('renders the suffix next to the text when isDisabled is true', () => {
+    render(
+      <LinkCell href="/test-link" isDisabled suffix={<span data-testid="suffix">3</span>}>
+        Disabled Link
+      </LinkCell>,
+    )
+    expect(screen.getByTestId('suffix')).toBeInTheDocument()
+  })
+
+  it('shows only the text in the tooltip when a suffix is set', async () => {
+    vi.useFakeTimers()
+    mockUseIsTruncated.mockReturnValue(true)
+    render(
+      <LinkCell href="/test-link" suffix={<span data-testid="suffix">3</span>}>
+        Test Link
+      </LinkCell>,
+    )
+    fireEvent.mouseOver(screen.getByRole('link'))
+    await vi.advanceTimersByTimeAsync(500)
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/^Test Link$/)
+    vi.useRealTimers()
   })
 
   it('does not show tooltip when text is not truncated', async () => {

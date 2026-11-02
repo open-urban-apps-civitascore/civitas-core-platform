@@ -126,6 +126,8 @@ describe('mapDatastructuresApiToListData', () => {
       source: expectedVersions[0].dataStructureVersionSource,
       status: null,
       versionNumber: expectedVersions[0].version,
+      versionCountByStatus: { AVAILABLE: 0, DRAFT: 1 },
+      inUseByReleasedVersionCount: 0,
       versions: [
         {
           id: expectedVersions[0].id,
@@ -155,6 +157,46 @@ describe('mapDatastructuresApiToListData', () => {
     expect(result[0].inUseByReleased).toBe(true)
     expect(result[0].versions[0].inUseByReleased).toBe(true)
     expect(result[0].versions[1].inUseByReleased).toBeUndefined()
+  })
+
+  it('counts the versions of each status on the structure row', () => {
+    const datastructure: Datastructure = createDatastructure(['1.0', '2.0', '3.0'])
+    datastructure.dataStructureVersions[0].dataStructureVersionStatus = DATASTRUCTURE_STATUS_TYPES.AVAILABLE
+    datastructure.dataStructureVersions[1].dataStructureVersionStatus = DATASTRUCTURE_STATUS_TYPES.AVAILABLE
+
+    const result = mapDatastructuresApiToListData([datastructure])
+
+    expect(result[0].versionCountByStatus).toEqual({ AVAILABLE: 2, DRAFT: 1 })
+  })
+
+  it('counts only the versions that a released entity uses', () => {
+    const datastructure: Datastructure = createDatastructure(['1.0', '2.0', '3.0'])
+    datastructure.dataStructureVersions[0].inUse = true
+    datastructure.dataStructureVersions[0].inUseByReleased = true
+    datastructure.dataStructureVersions[1].inUse = true
+    datastructure.dataStructureVersions[1].inUseByReleased = false
+
+    const result = mapDatastructuresApiToListData([datastructure])
+
+    expect(result[0].inUseByReleasedVersionCount).toBe(1)
+  })
+
+  it('sets zero counts on a structure without versions', () => {
+    const datastructure: Datastructure = createDatastructure([])
+
+    const result = mapDatastructuresApiToListData([datastructure])
+
+    expect(result[0].versionCountByStatus).toEqual({ AVAILABLE: 0, DRAFT: 0 })
+    expect(result[0].inUseByReleasedVersionCount).toBe(0)
+  })
+
+  it('sets no counts on the version rows', () => {
+    const datastructure: Datastructure = createDatastructure(['1.0'])
+
+    const result = mapDatastructuresApiToListData([datastructure])
+
+    expect(result[0].versions[0].versionCountByStatus).toBeUndefined()
+    expect(result[0].versions[0].inUseByReleasedVersionCount).toBeUndefined()
   })
 
   it('selects the highest numeric version', () => {

@@ -202,8 +202,15 @@ describe('DatastructureOverview', () => {
     })
 
     describe('Status', () => {
-      it('renders no status dropdown', () => {
+      it('renders no status badge in read mode', () => {
         render(<DatastructureOverview {...defaultProps} />)
+        expect(screen.queryByTestId('statusBadge')).not.toBeInTheDocument()
+      })
+
+      it('renders no status dropdown in edit mode', () => {
+        mockSearchParams = new URLSearchParams('mode=edit')
+        render(<DatastructureOverview {...defaultProps} />)
+        expect(screen.getByTestId('cancelButton')).toBeInTheDocument()
         expect(screen.queryByTestId('statusDropdown')).not.toBeInTheDocument()
       })
 

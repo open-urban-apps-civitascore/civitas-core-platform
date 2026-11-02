@@ -130,6 +130,11 @@
       "AVAILABLE": "Available",
       "READY": "Ready"
     },
+    "statusCount": {
+      "DRAFT": "{count, plural, one {# Draft} other {# Drafts}}",
+      "AVAILABLE": "{count, plural, other {# Available}}",
+      "READY": "{count, plural, other {# Ready}}"
+    },
     "inUse": {
       "columnHeader": "Usage",
       "tooltip": "Currently in use. Editing is restricted and deletion is not possible."
@@ -255,9 +260,6 @@
     },
     "anonymousDatapool": "Anonymous",
     "tableValues": {
-      "draft": "Draft",
-      "available": "Available",
-      "ready": "Ready",
       "yesterday": "Yesterday"
     },
     "pipelineStatus": {
@@ -989,10 +991,6 @@
       "lastActive": "Last active",
       "status": "Status",
       "action": "Action"
-    },
-    "status": {
-      "DRAFT": "Draft",
-      "AVAILABLE": "Available"
     },
     "deleteModal": {
       "title": "Really delete Data source?",
@@ -1890,10 +1888,6 @@
           "connector": "Connector",
           "lastActive": "Last updated",
           "status": "Status"
-        },
-        "status": {
-          "DRAFT": "Draft",
-          "AVAILABLE": "Available"
         }
       },
       "datasetsTab": {

@@ -88,7 +88,7 @@ describe('DatasetTable', () => {
 
     it('renders the dataset status', () => {
       renderComponent({ datasets: [makeRow({ dataSetStatus: 'AVAILABLE' })] })
-      expect(screen.getByText('AVAILABLE')).toBeInTheDocument()
+      expect(screen.getByTestId('statusBadge')).toHaveTextContent('status.AVAILABLE')
     })
 
     it('renders multiple rows', () => {

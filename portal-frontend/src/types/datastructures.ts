@@ -214,4 +214,6 @@ export type DatastructuresListData = {
   versions: DatastructuresListData[]
   inUse?: boolean
   inUseByReleased?: boolean
+  versionCountByStatus?: Record<DatastructureStatusType, number>
+  inUseByReleasedVersionCount?: number
 }

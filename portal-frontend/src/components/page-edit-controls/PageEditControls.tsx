@@ -8,7 +8,7 @@ import { StatusTypes } from '@/types/common'
 
 import { ActionButtons, ActionButtonsProps } from '../action-buttons/ActionButtons'
 import { InUseIndicator } from '../in-use-indicator/InUseIndicator'
-import { StatusDropdown } from '../status-dropdown/StatusDropdown'
+import { StatusDropdown } from '../status/status-dropdown/StatusDropdown'
 import { Button } from '../ui/button'
 
 type PageEditControlsProps<T extends StatusTypes> = ActionButtonsProps & {

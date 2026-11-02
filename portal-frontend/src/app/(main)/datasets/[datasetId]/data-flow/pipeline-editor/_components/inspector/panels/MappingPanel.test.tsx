@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -50,6 +50,7 @@ const SOURCE = {
   versionId: 'version-1',
   name: 'Sensor Reading',
   versionNumber: '1.0.0',
+  status: 'DRAFT',
   field: 'reading',
   urn: 'urn:core:platform:civitas:datastructure:common:3f2504e0-4f89-11d3-9a0c-0305e82c3301:1.0.0',
 }
@@ -59,6 +60,7 @@ const TARGET = {
   versionId: 'version-2',
   name: 'Observation',
   versionNumber: '2.1.0',
+  status: 'AVAILABLE',
   field: 'result',
   urn: 'urn:core:platform:civitas:datastructure:common:7c9e6679-7425-40de-944b-e07fc1f90ae7:2.1.0',
 }
@@ -67,6 +69,7 @@ const versionOf = (structure: typeof SOURCE) =>
   ({
     id: structure.versionId,
     version: structure.versionNumber,
+    dataStructureVersionStatus: structure.status,
     modelUrn: structure.urn,
     dataStructure: { id: structure.datastructureId, name: structure.name },
     model: {
@@ -143,5 +146,22 @@ describe('Data structure selection of the Mapping node', () => {
 
     expect(screen.getByRole('button', { name: /Sensor Reading/ })).toHaveTextContent(SOURCE.versionNumber)
     expect(screen.getByRole('button', { name: /Observation/ })).toHaveTextContent(TARGET.versionNumber)
+  })
+
+  it('shows the version status as text in the selection button', () => {
+    render(<MappingPanel data={mappingNode(emptyMappingConfig())} onUpdate={vi.fn()} isLocked={false} />)
+
+    const sourceButton = screen.getByRole('button', { name: /Sensor Reading/ })
+    expect(sourceButton).toHaveTextContent('1.0.0 · DRAFT')
+    expect(within(sourceButton).queryByTestId('statusBadge')).not.toBeInTheDocument()
+  })
+
+  it('shows the version status of source and target as badges in the details', () => {
+    render(<MappingPanel data={mappingNode(emptyMappingConfig())} onUpdate={vi.fn()} isLocked={false} />)
+
+    const statusBadgeOf = (label: string) =>
+      within(screen.getByText(label).parentElement as HTMLElement).getByTestId('statusBadge')
+    expect(statusBadgeOf('inputStatus')).toHaveTextContent('status.DRAFT')
+    expect(statusBadgeOf('outputStatus')).toHaveTextContent('status.AVAILABLE')
   })
 })
