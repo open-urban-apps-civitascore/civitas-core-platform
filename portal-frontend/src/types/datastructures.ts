@@ -128,6 +128,7 @@ export type DatastructureVersionsListData = {
   status: DatastructureStatusType
   source: DatastructureVersionSource
   versionNumber: string | null
+  inUse?: boolean
   inUseByReleased?: boolean
 }
 

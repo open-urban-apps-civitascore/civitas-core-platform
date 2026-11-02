@@ -96,6 +96,12 @@ export const useUnreleaseDatastructureVersion = () =>
     errorMessage: 'An error occurred while unreleasing datastructure version',
   })
 
+export const useDeleteDatastructureVersion = () =>
+  useDatastructureVersionMutation<void, undefined>({
+    method: 'DELETE',
+    errorMessage: 'An error occurred while deleting datastructure version',
+  })
+
 export const useDuplicateDatastructureVersion = () =>
   useDatastructureVersionMutation<DatastructureVersion, undefined>({
     method: 'POST',

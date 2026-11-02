@@ -1488,10 +1488,19 @@
     "errors": {
       "creationError": "An error occurred while creating the Data structure version.",
       "duplicationError": "An error occurred while duplicating the Data structure version.",
+      "deletionError": "An error occurred while deleting the Data structure version.",
       "inUseError": "This version is still used by a Data source or data storage.",
       "saveInvalidModel": "The version cannot be saved: {reason}",
       "modelRootMissingError": "The version cannot be set to \"Available\" because its saved model has no root class. Mark the root class in the diagram, save the version, then set it to \"Available\".",
       "modelMemberUnreachableError": "The version cannot be set to \"Available\" because these classes are not connected to the root class: {names}. Connect them to the root class or remove them, save the version, then set it to \"Available\"."
+    },
+    "infoModal": {
+      "title": "Version cannot be deleted",
+      "description": "This version is currently used by other entities and cannot be deleted."
+    },
+    "deleteConfirm": {
+      "title": "Delete version?",
+      "description": "Do you really want to delete this version? This action will permanently delete the version and cannot be undone."
     }
   },
   "pipelineEditor": {

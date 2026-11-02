@@ -7,7 +7,10 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { useDeleteDatastructure } from '@/app/services/api/datastructures/clientRequests'
-import { useDuplicateDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
+import {
+  useDeleteDatastructureVersion,
+  useDuplicateDatastructureVersion,
+} from '@/app/services/api/datastructures/versions/clientRequests'
 import { InfoModal } from '@/components/modals/info-modal/InfoModal'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -39,9 +42,12 @@ export const DatastructuresList = (props: DatastructuresListProps) => {
   const [datastructureToDelete, setDatastructureToDelete] = useState<string | null>(null)
   const [isDeletionInfoModalOpen, setIsDeletionInfoModalOpen] = useState(false)
   const [isDeletionWarningModalOpen, setIsDeletionWarningModalOpen] = useState(false)
+  const [versionToDelete, setVersionToDelete] = useState<{ datastructureId: string; versionId: string } | null>(null)
+  const [isVersionInfoModalOpen, setIsVersionInfoModalOpen] = useState(false)
   const deleteDatastructure = useDeleteDatastructure()
+  const deleteVersion = useDeleteDatastructureVersion()
   const duplicateVersion = useDuplicateDatastructureVersion()
-  const isLoading = deleteDatastructure.isPending
+  const isLoading = deleteDatastructure.isPending || deleteVersion.isPending
   const { hasPermissionInScope } = usePermissions()
   const {
     pageIndex,
@@ -83,6 +89,35 @@ export const DatastructuresList = (props: DatastructuresListProps) => {
       setDatastructureToDelete(id)
       setIsDeletionWarningModalOpen(true)
     }
+  }
+
+  const handleDeleteVersion = () => {
+    if (!versionToDelete) return
+    deleteVersion.mutate(
+      {
+        data: undefined,
+        endpoint: `/datastructures/${versionToDelete.datastructureId}/versions/${versionToDelete.versionId}`,
+      },
+      {
+        onSuccess: () => {
+          toast.success(tCommon('success.deletionSuccess', { item: tCommon('items.datastructureVersion') }))
+          router.refresh()
+        },
+        onError: error => {
+          if (isResourceInUseError(error)) setIsVersionInfoModalOpen(true)
+          else toast.error(tVersion('errors.deletionError'))
+        },
+        onSettled: () => setVersionToDelete(null),
+      },
+    )
+  }
+
+  const handleDeleteVersionClick = (datastructureId: string, versionId: string) => {
+    const datastructure = datastructures.find(datastructure => datastructure.id === datastructureId)
+    const version = datastructure?.versions.find(version => version.id === versionId)
+    if (!version) return
+    if (version.inUse) setIsVersionInfoModalOpen(true)
+    else setVersionToDelete({ datastructureId, versionId })
   }
 
   const handleDuplicateVersionClick = (datastructureId: string, versionId: string) => {
@@ -128,6 +163,7 @@ export const DatastructuresList = (props: DatastructuresListProps) => {
             onPaginationChange={setPaginationParams}
             onSortingChange={setSortingParams}
             onDeleteDatastructureClick={handleDeleteDatastructureClick}
+            onDeleteVersionClick={handleDeleteVersionClick}
             onDuplicateVersionClick={handleDuplicateVersionClick}
             isDuplicating={duplicateVersion.isPending}
           />
@@ -146,6 +182,21 @@ export const DatastructuresList = (props: DatastructuresListProps) => {
         onDiscard={handleDiscardDeletion}
         confirmButtonTitle={tCommon('actions.delete')}
         onConfirm={handleDeleteDatastructure}
+        isLoading={isLoading}
+      />
+      <InfoModal
+        open={isVersionInfoModalOpen}
+        title={tVersion('infoModal.title')}
+        description={tVersion('infoModal.description')}
+        onClose={() => setIsVersionInfoModalOpen(false)}
+      />
+      <WarningModal
+        open={!!versionToDelete}
+        title={tVersion('deleteConfirm.title')}
+        description={tVersion('deleteConfirm.description')}
+        onDiscard={() => setVersionToDelete(null)}
+        confirmButtonTitle={tCommon('actions.delete')}
+        onConfirm={handleDeleteVersion}
         isLoading={isLoading}
       />
     </PageContainer>
