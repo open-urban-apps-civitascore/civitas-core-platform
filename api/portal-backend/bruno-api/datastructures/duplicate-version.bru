@@ -1,0 +1,56 @@
+meta {
+  name: Duplicate Data Structure Version
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/duplicate
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+  versionId: {{dataStructureVersionId}}
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('duplicatedVersionId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("Response has a Location header", function() {
+    expect(res.getHeader("location")).to.exist;
+  });
+
+  test("Duplicated version is a new DRAFT, distinct from the source", function() {
+    expect(res.body.id).to.not.equal(bru.getVar("dataStructureVersionId"));
+    expect(res.body.dataStructureVersionStatus).to.equal("DRAFT");
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` and `dataStructureVersionId` (the source version) are set.
+  The source version is in draft or released state.
+
+  **Expected Response:** 201 Created, Location header pointing at the new version. The body is a
+  new DRAFT with the description, model name and imported structures of the source. The model
+  registry copies the stored model of exactly the source version, with its styles and
+  references, to the next major version after the highest existing version. A source without a
+  model gives a copy without a model.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | New version record created, pinned to the registry's copy of the source model |
+  | Config Adapter | -- |
+  | External System | -- |
+}

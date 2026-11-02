@@ -215,3 +215,57 @@ Content-Type: application/json
 | Backend | Released version metadata updated in `portal_backend` DB | ☐ |
 | Config Adapter | — | ☐ |
 | External System | — | ☐ |
+
+---
+
+## TC-DSTV-10 – Duplicate DataStructure Version
+
+**Precondition:** `dataStructureId` and `dataStructureVersionId` (the source version) are set. The
+source version is in draft or released state.
+
+**Request**
+```
+POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/duplicate
+```
+
+**Expected Response**
+- Status: `201 Created`
+- `Location` header pointing at the new version
+- Body is a new version with a fresh `id`, `dataStructureVersionStatus: "DRAFT"`, and the
+  `description`, `modelName` and `importedStructureUrns` of the source
+- `model` and `styles` are those of the source version, also when a later version exists
+- `version` is the next major after the highest existing version, for example `3.0.0` for a
+  copy of `1.0.0` while `2.0.0` exists
+- A source without a model gives a copy without a model and without a `version`
+- A version of another data structure: `404 Not Found`
+
+**System Impact**
+
+| System | Expected Change | Verified |
+|---|---|---|
+| Backend | New version record in `portal_backend` DB, pinned to the registry's copy of the source model | ☐ |
+| Config Adapter | — | ☐ |
+| External System | — | ☐ |
+
+---
+
+## TC-DSTV-11 – Duplicate DataStructure Version Twice
+
+**Precondition:** TC-DSTV-10 ran once against the same `dataStructureVersionId`.
+
+**Request**
+```
+POST {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/duplicate
+```
+
+**Expected Response**
+- Status: `201 Created`
+- Body is a version distinct from the first duplicate, with the next major number again
+
+**System Impact**
+
+| System | Expected Change | Verified |
+|---|---|---|
+| Backend | Second new version record in `portal_backend` DB, with its own registry pin | ☐ |
+| Config Adapter | — | ☐ |
+| External System | — | ☐ |
