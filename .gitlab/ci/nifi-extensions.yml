@@ -46,9 +46,9 @@ generate-graph-nifi-extensions:
       - nifi-extensions/maven.graph.json
 
 # Every NAR (FROST, HTTP) and JDBC driver of the extensions for the NiFi of the API test and the
-# config-adapter NiFi ITs: the saga collections and the ITs deploy Pipelines that use PutFrostRecord and GetHttpApiCall.
-# It runs on the rules of the API test stack, not of this lane, so those consumers never miss a NAR.
-# No tests or static analysis.
+# config-adapter NiFi ITs: the saga collections and the ITs deploy Pipelines that use
+# PutFrostRecord and GetHttpApiCall. It runs on the rules of the API test stack, not of this lane, so
+# those consumers never miss a NAR. No tests or static analysis.
 build-nifi-nars:
   extends:
     - .api-test-stack-changes
