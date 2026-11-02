@@ -6,7 +6,10 @@ import { useForm, UseFormReturn, useFormState } from 'react-hook-form'
 import { toast } from 'sonner'
 import { describe, expect, it, vi } from 'vitest'
 
-import { DISABLED_INPUT_CLASS_NAME } from '@/components/form/fields/disabledFieldClassNames'
+import {
+  DISABLED_CHECKBOX_CLASS_NAME,
+  DISABLED_INPUT_CLASS_NAME,
+} from '@/components/form/fields/disabledFieldClassNames'
 import { Form } from '@/components/ui/form'
 import {
   CURSOR_PAGINATION_FORM,
@@ -103,6 +106,7 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
 }
 
 const DISABLED_INPUT_CLASSES = DISABLED_INPUT_CLASS_NAME.split(' ')
+const DISABLED_CHECKBOX_CLASSES = DISABLED_CHECKBOX_CLASS_NAME.split(' ')
 const DISABLED_INPUT_CLASSES_WITHOUT_HEIGHT = DISABLED_INPUT_CLASSES.filter(className => className !== 'disabled:h-9')
 
 const openApiCall = async (user: ReturnType<typeof userEvent.setup>) => {
@@ -571,7 +575,9 @@ describe('ApiCallsTab', () => {
       expect(screen.getByRole('combobox', { name: 'type.label' })).toBeDisabled()
       expect(screen.getByRole('textbox', { name: /^pageParameter\.label/ })).toBeDisabled()
       expect(screen.getByRole('textbox', { name: 'endPage.label' })).toBeDisabled()
-      expect(screen.getByRole('checkbox', { name: 'enable' })).not.toHaveClass('disabled:border-hidden')
+      const checkbox = screen.getByRole('checkbox', { name: 'enable' })
+      expect(checkbox).toHaveClass('border-input', 'disabled:opacity-50')
+      DISABLED_CHECKBOX_CLASSES.forEach(className => expect(checkbox).not.toHaveClass(className))
       const fields = [...screen.getAllByRole('combobox'), ...screen.getAllByRole('textbox')]
       const requestFields = [
         screen.getByRole('combobox', { name: 'method.label' }),
@@ -913,7 +919,11 @@ describe('ApiCallsTab', () => {
           'limit.label',
           'countPath.label',
         ]
-        labels.forEach(name => expect(screen.getByRole('textbox', { name })).toHaveClass(...DISABLED_INPUT_CLASSES))
+        labels.forEach(name => {
+          const field = screen.getByRole('textbox', { name })
+          expect(field).toBeDisabled()
+          expect(field).toHaveClass(...DISABLED_INPUT_CLASSES)
+        })
       })
     })
 

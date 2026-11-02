@@ -1055,12 +1055,17 @@ describe('HTTP API call schemas', () => {
       )
     })
 
-    it('rejects an offset parameter equal to the limit parameter at both fields', () => {
-      const apiCall = withLimitOffset({ offsetParameter: 'page', limitParameter: 'page' })
-      expect(issues(HttpLooseSchema, [apiCall])).toEqual(
+    it('rejects an offset parameter equal to the limit parameter once at each field', () => {
+      const result = issues(HttpLooseSchema, [withLimitOffset({ offsetParameter: 'page', limitParameter: 'page' })])
+      const duplicates = result.filter(
+        resultIssue => resultIssue.message === 'datasources.errors.paginationParameterDuplicate',
+      )
+      const paths = duplicates.map(resultIssue => resultIssue.path)
+      expect(paths).toHaveLength(2)
+      expect(paths).toEqual(
         expect.arrayContaining([
-          issue('offsetParameter', 'datasources.errors.paginationParameterDuplicate'),
-          issue('limitParameter', 'datasources.errors.paginationParameterDuplicate'),
+          [0, 'pagination', 'offsetParameter'],
+          [0, 'pagination', 'limitParameter'],
         ]),
       )
     })
