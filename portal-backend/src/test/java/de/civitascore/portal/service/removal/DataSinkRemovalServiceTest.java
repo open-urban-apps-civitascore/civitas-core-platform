@@ -148,6 +148,20 @@ class DataSinkRemovalServiceTest {
   }
 
   @Test
+  void prepare_linkPipeline_sinkThePipelineAlreadyLinks_changesNothing() {
+    DataSink kept = activeSink(DataSinkType.FROST, false);
+    when(dataSinkRepository.findAllById(Set.of(kept.getId()))).thenReturn(List.of(kept));
+    when(dataSinkRepository.findByPipelinesId(pipeline.getId())).thenReturn(List.of(kept));
+
+    PreparedDataSinkChange prepared =
+        service.prepare(DataSinkChange.linkPipeline(pipeline, Set.of(kept.getId())), false);
+
+    assertThat(prepared.linksToAdd()).isEmpty();
+    assertThat(prepared.linksToRemove()).isEmpty();
+    assertThat(prepared.plan().isEmpty()).isTrue();
+  }
+
+  @Test
   void prepare_linkPipeline_unknownDataSinkId_isRejected() {
     UUID unknown = UUID.randomUUID();
 

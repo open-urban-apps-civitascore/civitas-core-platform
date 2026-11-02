@@ -225,11 +225,7 @@ public class DataSinkRemovalService {
         continue;
       }
       List<String> linkingPipelineIds =
-          sink.getPipelines().stream()
-              .map(Pipeline::getId)
-              .filter(pipelineId -> !request.detaches(pipelineId, sink.getId()))
-              .map(UUID::toString)
-              .toList();
+          sink.getPipelines().stream().map(Pipeline::getId).map(UUID::toString).toList();
       if (!linkingPipelineIds.isEmpty()) {
         throw new ResourceInUseException(
             DataSink.class.getSimpleName(),
