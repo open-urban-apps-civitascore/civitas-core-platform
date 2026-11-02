@@ -50,6 +50,15 @@ describe('getDataSinkRemoval', () => {
     expect(removal.apis).toEqual([])
   })
 
+  it('removes every Layer with the OWS API, also one on a data sink that stays', () => {
+    const dataSinks = [sink('postgis-1', 'POSTGIS'), sink('frost-1', 'FROST')]
+    const layers = [layer('trees', 'postgis-1'), layer('sensors', 'frost-1')]
+
+    const removal = getDataSinkRemoval(['postgis-1'], { dataSinks, layers, apis: APIS })
+
+    expect(removal.layers).toEqual(layers)
+  })
+
   it('reports stored data only for a provisioned data sink', () => {
     const dataSinks = [sink('frost-1', 'FROST'), sink('frost-2', 'FROST', { provisioned: true })]
     const context = { dataSinks, layers: [], apis: [] }

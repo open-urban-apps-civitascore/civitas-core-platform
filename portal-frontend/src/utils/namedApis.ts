@@ -22,6 +22,9 @@ export const BACKING_DATASINK_TYPE: Partial<Record<ApiStandard, DataSinkType>> =
   [API_STANDARDS.STA]: DATASINK_TYPES.FROST,
 }
 
+/** Mirrors the backend's ApiKind.publishesLayers: every Layer of a Dataset belongs to its API of this standard. */
+export const LAYER_PUBLISHING_STANDARD: ApiStandard = API_STANDARDS.OWS
+
 export const hasApiType = (apis: NamedApi[], apiType: ApiStandard): boolean =>
   apis.some(api => api.standard === apiType)
 

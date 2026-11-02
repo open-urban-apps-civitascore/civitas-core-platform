@@ -1,7 +1,7 @@
 import { DataSink } from '@/types/datasinks'
 import { Layer } from '@/types/layers'
 import { NamedApi } from '@/types/namedApis'
-import { BACKING_DATASINK_TYPE } from '@/utils/namedApis'
+import { BACKING_DATASINK_TYPE, LAYER_PUBLISHING_STANDARD } from '@/utils/namedApis'
 
 export interface DatasetResources {
   dataSinks: DataSink[]
@@ -37,9 +37,11 @@ export const getDataSinkRemoval = (
       remainingDataSinks.every(dataSink => dataSink.dataSinkType !== backingType)
     )
   }
+  const removedApis = apis.filter(losesBackingDataSink)
+  const isLayerApiRemoved = removedApis.some(api => api.standard === LAYER_PUBLISHING_STANDARD)
   return {
-    layers: layers.filter(layer => removedIds.has(layer.dataSinkId)),
-    apis: apis.filter(losesBackingDataSink),
+    layers: isLayerApiRemoved ? layers : layers.filter(layer => removedIds.has(layer.dataSinkId)),
+    apis: removedApis,
     hasStoredData: removedDataSinks.some(dataSink => dataSink.provisioned === true),
   }
 }
