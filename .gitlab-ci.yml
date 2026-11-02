@@ -8,12 +8,14 @@
 # Change to retrigger all pipeline for a new commit
 
 include:
+  - .gitlab/ci/docker.yml
+  - .gitlab/ci/rules.yml
+  - .gitlab/ci/maven.yml
   - .gitlab/ci/frontend.yml
   - .gitlab/ci/backend.yml
   - .gitlab/ci/config-adapter.yml
   - .gitlab/ci/nifi-extensions.yml
   - .gitlab/ci/portal-model.yml
-  - .gitlab/ci/renovate.yml
   - .gitlab/ci/authz.yml
   - .gitlab/ci/model-forge.yml
   - .gitlab/ci/openapi.yml
@@ -23,18 +25,14 @@ include:
       stage: qa
   - template: Jobs/Secret-Detection.gitlab-ci.yml
 
-# The api test runs portal-backend, config-adapter and authz as one stack, and a component the
-# pipeline does not build is pulled from the registry instead. The build chains of all three
+# The api test runs portal-backend, config-adapter and authz as one stack, built from the jars of
+# this pipeline: the script of the stack stops when one is missing. The build chains of all three
 # therefore share this trigger, so the stack is built from one commit rather than mixing a fresh
-# backend with previously published components that answer a contract they share at runtime.
+# backend with a component of another commit that answers a contract they share at runtime.
 # The test, publish, scan and deploy jobs of each component keep their own narrower triggers.
 .api-test-stack-changes:
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
-    - if: $CI_COMMIT_TAG
-    - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_COMMIT_BRANCH == "staging"
-    - if: $CI_COMMIT_BRANCH == "develop"
+    - !reference [.rules-protected, rules]
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - portal-backend/**/*
@@ -45,6 +43,10 @@ include:
         - dev-environment/ci/**/*
         - dev-environment/apisix/**/*
         - .gitlab-ci.yml
+        - .gitlab/ci/docker.yml
+        - .gitlab/ci/maven.yml
+        - .gitlab/ci/rules.yml
+        - .gitlab/ci/scripts/api-test-stack.sh
         - .gitlab/ci/backend.yml
         - .gitlab/ci/config-adapter.yml
         - .gitlab/ci/authz.yml
@@ -61,6 +63,8 @@ setup-version:
     - REVISION=$(git describe --tags --always)
     - echo "REVISION=$REVISION" > version.env
     - echo "Setting REVISION=$REVISION"
+    # TODO: the nightly tag below is only made in the scheduled pipeline (IS_NIGHTLY=true), so no
+    # merge request pipeline runs it. Trigger the schedule once to check it.
     # Nightly builds (triggered by a scheduled pipeline with IS_NIGHTLY=true) get a
     # dedicated, date-stamped image tag: <branch>-nightly-<YYYYMMDD>
     # (e.g. develop-nightly-20260617).
@@ -70,6 +74,30 @@ setup-version:
         echo "NIGHTLY_IMAGE_TAG=$NIGHTLY_IMAGE_TAG" >> version.env
         echo "Setting NIGHTLY_IMAGE_TAG=$NIGHTLY_IMAGE_TAG"
       fi
+    # Version of each Maven component: <revision> of its pom.xml plus a branch-based suffix
+    - |
+      component_version() {
+        base=$(sed -n 's:.*<revision>\(.*\)</revision>.*:\1:p' "$1/pom.xml" | head -n 1)
+        if [ -z "$base" ]; then
+          echo "No <revision> found in $1/pom.xml" >&2
+          return 1
+        fi
+        if [ "$CI_COMMIT_BRANCH" = "main" ] || [ -n "$CI_COMMIT_TAG" ]; then
+          echo "$base"
+        elif [ "$CI_COMMIT_BRANCH" = "develop" ]; then
+          echo "${base}-SNAPSHOT"
+        elif [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
+          echo "${base}-MR-${CI_MERGE_REQUEST_IID}-SNAPSHOT"
+        else
+          echo "${base}-${CI_COMMIT_SHORT_SHA}"
+        fi
+      }
+      for entry in PORTAL_MODEL:portal-model CONFIG_ADAPTER:config-adapter MODEL_FORGE:model-forge NIFI_EXTENSIONS:nifi-extensions; do
+        name="${entry%%:*}"
+        version=$(component_version "${entry#*:}") || exit 1
+        echo "${name}_VERSION=$version" >> version.env
+        echo "Setting ${name}_VERSION=$version"
+      done
   artifacts:
     reports:
       # Pass to other jobs
@@ -77,16 +105,34 @@ setup-version:
       dotenv: version.env
 
 
+default:
+  interruptible: true # Jobs that publish set false
+  timeout: 45m # Container and multi-arch jobs set 1h
+  retry: # No stuck_or_timeout_failure: it also matches a job timeout
+    max: 2
+    when:
+      - runner_system_failure
+      - scheduler_failure
+      - api_failure
+
 workflow:
   rules:
     # Run on the nightly scheduled pipeline (schedule must set IS_NIGHTLY=true)
     - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
-    # Always run on main, staging and develop branch
+    # Always run on main, staging and develop branch (never auto-cancelled)
     - if: $CI_COMMIT_BRANCH == "main"
+      auto_cancel:
+        on_new_commit: none
     - if: $CI_COMMIT_BRANCH == "staging"
+      auto_cancel:
+        on_new_commit: none
     - if: $CI_COMMIT_BRANCH == "develop"
+      auto_cancel:
+        on_new_commit: none
     # Run on merge request branches
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      auto_cancel:
+        on_new_commit: conservative
     # Run on tag events
     - if: $CI_COMMIT_TAG
 
@@ -105,6 +151,11 @@ stages: [
   ]
 
 variables:
+  BRUNO_CLI_VERSION: '4.3.0' # api-test-backend; was installed unpinned on every run
+  CHECK_JSONSCHEMA_VERSION: '0.38.2' # validate-schemas-model-forge
+  DEPCHECK_VERSION: '1.4.7' # lint-frontend
+  PLAYWRIGHT_VERSION: '1.58.2' # e2e-test-frontend; keep equal to @playwright/test in portal-frontend/package.json
+  TRIVY_GATE_SEVERITY: 'CRITICAL' # Container scan fails on fixable findings of these severities. Stricter: 'HIGH,CRITICAL'
   GITLAB_ADVANCED_SAST_ENABLED: 'true'
   AST_ENABLE_MR_PIPELINES: 'true' # Enable secret detection in MR pipelines
   SAST_EXCLUDED_ANALYZERS: 'semgrep' # Disable fall bock sast scanner (only use advanced sast)
@@ -123,6 +174,11 @@ secret_detection:
   variables:
     SECRET_DETECTION_EXCLUDED_PATHS: "**/src/test/**,**/src/**/__tests__/**,**/*.test.*"
 
+# The analyzer uses all cores it finds (multi-core since analyzer 1.1.10); the default runner has 2.
+# It is the longest job of the pipeline, so it gets a runner with 4 cores. Scope is unchanged.
 gitlab-advanced-sast:
   stage: qa
   needs: []
+  timeout: 1h
+  tags:
+    - saas-linux-medium-amd64

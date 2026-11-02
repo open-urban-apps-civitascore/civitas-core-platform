@@ -1,0 +1,128 @@
+# Docker for CI jobs. The CLI and the daemon image are pinned by digest, in the lines below.
+
+# Docker CLI only. Enough for jobs that talk to a registry (imagetools, syft): no daemon needed.
+.docker-cli:
+  image: docker:27.5.1@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
+
+# A daemon (dind service) without TLS, for jobs that run containers: Testcontainers, docker compose.
+.dind:
+  services:
+    - name: docker:27.5.1-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
+      alias: docker
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ''
+    DOCKER_DRIVER: overlay2
+    TESTCONTAINERS_HOST_OVERRIDE: docker
+
+# A daemon with TLS, for jobs that build and push multi-arch images (linux/amd64 and linux/arm64)
+# with buildx, through the Docker Hub mirror.
+.docker-build:
+  extends: .docker-cli
+  services:
+    - name: docker:27.5.1-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
+      alias: docker
+  variables:
+    DOCKER_TLS_CERTDIR: '/certs'
+    DOCKER_DRIVER: overlay2
+  before_script:
+    - docker info
+    # Register QEMU emulators so the linux/arm64 cross-build runs on the amd64 runner.
+    # The runner host's binfmt registration is not dependable: when arm64 drops off it,
+    # buildx silently loses the platform and an emulated `apk add` dies with
+    # "Invalid ELF image for this architecture". Image is pinned (tag + digest) so the privileged run is auditable.
+    - docker run --privileged --rm tonistiigi/binfmt:qemu-v10.2.3@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0 --install all
+    - |
+      cat > /tmp/buildkitd.toml <<'EOF'
+      [registry."docker.io"]
+        mirrors = ["docker-mirror01.extern.frachtwerk.de"]
+      EOF
+    - docker context create buildx-context
+    - docker buildx create --use --driver docker-container --name multiarch --config /tmp/buildkitd.toml buildx-context
+    - docker buildx inspect --bootstrap
+    - printf '%s' "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  after_script:
+    - docker buildx rm multiarch || true
+
+# The jobs after an image build are the same for every image. A job sets IMAGE_NAME (the repository
+# name in the registry), its rules, and its needs.
+
+# Scan and SBOM of the image of this pipeline, in one job. The image is read from the registry
+# once for Trivy and once for Syft. A job sets IMAGE_NAME and SBOM_PATH (the output file, relative
+# to the repository root).
+#
+# Trivy scans once and writes JSON. The GitLab report is converted from that JSON (the template is
+# part of the Trivy image), and the gate reads the same JSON: it fails for fixable findings of
+# TRIVY_GATE_SEVERITY, which is what `--severity ... --ignore-unfixed` did in a second scan.
+# Report and SBOM are written before the gate, so both are uploaded when the gate fails.
+# The SBOM is made from the `-scan` tag. The release tags that deploy-* sets point to the same
+# image (same digest).
+.container-scan:
+  image:
+    name: aquasec/trivy:0.55.2@sha256:addfb8fd6b9e520c25b22c61d8aa5d58ecd7879177aa959f952bf4734f4e3f60
+    entrypoint: ['']
+  stage: container-qa
+  variables:
+    TRIVY_USERNAME: $CI_REGISTRY_USER
+    TRIVY_PASSWORD: $CI_REGISTRY_PASSWORD
+  before_script:
+    - apk add --no-cache bash curl jq >/dev/null
+    - curl -sSfL https://raw.githubusercontent.com/anchore/syft/v1.54.1/install.sh | sh -s -- -b /usr/local/bin v1.54.1 >/dev/null
+    # Syft reads the registry login from the Docker config
+    - mkdir -p ~/.docker
+    - printf '{"auths":{"%s":{"auth":"%s"}}}' "$CI_REGISTRY" "$(printf '%s:%s' "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')" > ~/.docker/config.json
+  script:
+    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/$IMAGE_NAME:${CI_COMMIT_REF_SLUG}-${CI_PIPELINE_ID}-scan
+    - trivy image --scanners vuln --format json --output trivy-report.json $SCAN_IMAGE_TAG
+    - trivy convert --format template --template "@/contrib/gitlab.tpl" --output gl-container-scanning-report.json trivy-report.json
+    - mkdir -p "$(dirname "$SBOM_PATH")"
+    - syft registry:$SCAN_IMAGE_TAG -o cyclonedx-json > "$SBOM_PATH"
+    - |
+      jq -r --arg sev "$TRIVY_GATE_SEVERITY" '
+        ($sev | split(",")) as $sevs
+        | .Results[]?.Vulnerabilities[]?
+        | select((.Severity as $v | $sevs | index($v)) != null and (.Status // "fixed") == "fixed" and (.FixedVersion // "") != "")
+        | "\(.VulnerabilityID) \(.Severity) \(.PkgName) \(.InstalledVersion) -> \(.FixedVersion)"' trivy-report.json > gate-findings.txt
+      if [ -s gate-findings.txt ]; then
+        echo "Fixable findings of severity $TRIVY_GATE_SEVERITY in $SCAN_IMAGE_TAG:"
+        cat gate-findings.txt
+        exit 1
+      fi
+  artifacts:
+    when: always
+    expire_in: 1 month
+    paths:
+      - $SBOM_PATH
+    reports:
+      container_scanning: gl-container-scanning-report.json
+    # TODO: https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/issues/728
+    # Fix license name resolution
+    # reports:
+    #   cyclonedx: $SBOM_PATH
+
+# Gives the scanned image its tags: the version, the branch, and for a nightly build the date.
+# The image of a pipeline is built and scanned under its `-scan` tag while api-test-backend runs. The deploy
+# jobs of the images that the API test covers wait for it (optional, the job is not in every pipeline),
+# so no release tag exists before the API test has passed.
+.deploy-image:
+  extends: .docker-cli
+  stage: deploy
+  interruptible: false
+  before_script:
+    - printf '%s' "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/$IMAGE_NAME:${CI_COMMIT_REF_SLUG}-${CI_PIPELINE_ID}-scan
+    - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/$IMAGE_NAME:$REVISION
+    # TODO: this step runs only on main, staging and develop (by design, the deployment repository
+    # follows these tags), so no merge request pipeline tests it. Check it on the first develop run.
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "staging" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/$IMAGE_NAME:$REVISION --tag $CI_REGISTRY_IMAGE/$IMAGE_NAME:$CI_COMMIT_BRANCH
+      fi
+    # Nightly build: additionally tag with <branch>-nightly-<YYYYMMDD>
+    # TODO: only the scheduled pipeline (IS_NIGHTLY=true) runs this step. The nightly tag is what
+    # the deployment repository's nightly pipeline deploys; check it after the first nightly run.
+    - |
+      if [ "$IS_NIGHTLY" = "true" ] && [ -n "$NIGHTLY_IMAGE_TAG" ]; then
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/$IMAGE_NAME:$REVISION --tag $CI_REGISTRY_IMAGE/$IMAGE_NAME:$NIGHTLY_IMAGE_TAG
+      fi

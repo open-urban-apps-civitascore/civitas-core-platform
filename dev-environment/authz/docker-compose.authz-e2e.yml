@@ -3,7 +3,7 @@
 # Self-contained stack for running authz integration tests.
 # Reuses existing service definitions where possible; only redefines
 # services that need e2e-specific overrides (APISIX without extra_hosts,
-# portal-backend with e2e user env vars, config-adapter keycloak-only).
+# portal-backend with e2e user env vars, config-adapter with the keycloak adapter and the saga handlers it needs).
 #
 # Requires: docker network create civitas-network
 #
@@ -69,7 +69,11 @@ services:
     environment:
       HEALTHCHECK_PORT: 8088
       PORT: 8088
-      ADAPTERS: keycloak
+      # The adapter refuses to start without the saga handlers "apisix" and "frost" (the Flowable
+      # saga orchestrator is mandatory), so they are configured here as in
+      # ../ci/docker-compose.api-test.yml. Nothing in this stack publishes a dataset: FROST and
+      # the GeoServer upstream are not part of it and are never called.
+      ADAPTERS: keycloak,apisix,frost
       EVENTHANDLER_NAME: kafka
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_GROUP_ID: config-adapter-group
@@ -83,7 +87,28 @@ services:
       KEYCLOAK_CLIENT_ID: admin-cli
       KEYCLOAK_TARGET_REALM: civitas-core
       KEYCLOAK_TOPICS: de.civitascore.idm.user.created,de.civitascore.idm.user.updated,de.civitascore.idm.user.deleted
+      APISIX_ADMIN_URL: http://apisix:9180
+      APISIX_ADMIN_KEY: edd1c9f034335f136f87ad84b625c8f1
+      APISIX_API_HOST: api.localhost
+      APISIX_API_PUBLIC_URL: http://api.localhost:9080
+      APISIX_PLUGIN_CONFIG_ID: "1"
+      APISIX_SERVICE_ID: svc-frost-server
+      APISIX_GEOSERVER_URL: http://geoserver-mock:8080/geoserver
+      APISIX_PROXY_REWRITE_HEADERS_REMOVE: X-Allowed-Scope-Ids,X-Allowed-Pool-Ids
+      APISIX_FROST_API_KEY: dev-frost-api-key
+      APISIX_FROST_API_KEY_HEADER: X-API-Key
+      APISIX_TOPICS: de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted
+      FROST_URL: http://civitas-frost:8080/FROST-Server/v1.1
+      FROST_PUBLIC_URL: http://civitas-frost:8080/FROST-Server/v1.1
+      FROST_API_KEY: dev-frost-api-key
+      FROST_API_KEY_HEADER: X-API-Key
+      FROST_TOPICS: de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted
+      FLOWABLE_JDBC_URL: jdbc:postgresql://postgis-dev-env:5432/flowable
+      FLOWABLE_JDBC_USERNAME: admin
+      FLOWABLE_JDBC_PASSWORD: admin
     depends_on:
+      postgis-dev-env:
+        condition: service_healthy
       kafka:
         condition: service_healthy
       keycloak:
@@ -115,6 +140,10 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgis-dev-env:5432/portal_backend?sslmode=disable
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: admin
+      # integration-test.sh migrates the SQL files with the Flyway CLI before the backend starts, so
+      # that the roles can be seeded first. The CLI cannot run the Java migrations (V1_2_26 to
+      # V1_2_28, in src/main/java/db/migration), so the backend applies them itself, out of order.
+      SPRING_FLYWAY_OUT_OF_ORDER: "true"
       # Kafka
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS: kafka:29092
