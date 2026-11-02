@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { UseFormReturn, useWatch } from 'react-hook-form'
 
 import {
-  useClearConnectionTestRuns,
+  useDiscardConnectionTestRuns,
   useLastConnectionTestRun,
   useTestDatasourceConnection,
 } from '@/app/services/api/datasources/clientRequests'
@@ -29,7 +29,7 @@ export const ConnectionTest = (props: ConnectionTestProps) => {
   const isMobile = useIsMobile()
   const mutation = useTestDatasourceConnection(datasourceId)
   const lastRun = useLastConnectionTestRun(datasourceId)
-  const clearRuns = useClearConnectionTestRuns(datasourceId)
+  const discardRuns = useDiscardConnectionTestRuns(datasourceId)
   const [passwordRequiredKey, setPasswordRequiredKey] = useState<string | null>(null)
 
   const connectorType = useWatch({ control: form.control, name: 'connectorType' })
@@ -41,14 +41,17 @@ export const ConnectionTest = (props: ConnectionTestProps) => {
   const currentKey = JSON.stringify(currentInput)
   const canTest = isConnectorComplete && currentInput !== null
   const isPending = lastRun?.status === 'pending'
-  const lastRunKey = lastRun ? JSON.stringify(lastRun.variables) : null
+  const lastRunVariables = lastRun?.variables
+  const lastRunKey = lastRunVariables ? JSON.stringify(lastRunVariables.input) : null
+  const isOutdated = !!lastRunVariables?.marker.isOutdated
+  const isRunOutdated = isOutdated || lastRunKey !== currentKey
   const isPasswordRequired = passwordRequiredKey === currentKey
-  const isTestCurrent = lastRunKey === currentKey
+  const isTestCurrent = lastRunKey === currentKey && !isOutdated
   const isRunCurrent = isTestCurrent || isPasswordRequired
 
   useEffect(() => {
-    if (lastRunKey !== null && lastRunKey !== currentKey && !isPending) clearRuns()
-  }, [lastRunKey, currentKey, isPending, clearRuns])
+    if (lastRunKey !== null && (lastRunKey !== currentKey || isOutdated)) discardRuns()
+  }, [lastRunKey, currentKey, isOutdated, isPending, discardRuns])
 
   if (passwordRequiredKey !== null && !isPasswordRequired) setPasswordRequiredKey(null)
 
@@ -61,7 +64,7 @@ export const ConnectionTest = (props: ConnectionTestProps) => {
     const input = toConnectionTestInput(values)
     if (!input) return
     setPasswordRequiredKey(null)
-    mutation.mutate(input)
+    mutation.mutate({ input, marker: { isOutdated: false } })
   }
 
   if (!connectorType) return null
@@ -83,7 +86,8 @@ export const ConnectionTest = (props: ConnectionTestProps) => {
           </div>
           <ConnectionTestStatus
             connectorType={connectorType}
-            isPending={isPending}
+            isPending={isPending && !isRunOutdated}
+            isOutdatedPending={isPending && isRunOutdated}
             isPasswordRequired={isPasswordRequired}
             result={isTestCurrent && lastRun?.status === 'success' ? lastRun.data?.data : undefined}
             problem={isTestCurrent && lastRun?.status === 'error' ? toConnectionTestProblem(lastRun.error) : undefined}

@@ -438,16 +438,103 @@ describe('ConnectionTest', () => {
     expect(screen.getByRole('button', { name: 'button' })).toBeEnabled()
   })
 
-  it('keeps a running test when a field changes', async () => {
-    mockApiRequest.mockReturnValue(new Promise(() => {}))
-    const { form } = renderConnectionTest()
+  describe('field change while a test runs', () => {
+    it('discards the running test and enables the button when it settles', async () => {
+      const { promise, resolve } = deferredResult()
+      mockApiRequest.mockReturnValue(promise)
+      const queryClient = new QueryClient()
+      const { form } = renderConnectionTest({ queryClient })
 
-    clickTest()
-    await screen.findByText('connecting')
-    act(() => form.setValue('configuration.table', 'other_table'))
+      clickTest()
+      await screen.findByText('connecting')
+      act(() => form.setValue('configuration.table', 'other_table'))
 
-    expect(screen.getByText('connecting')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'button' })).toBeDisabled()
+      expect(screen.getByText('outdatedPending')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'button' })).toBeDisabled()
+
+      act(() => resolve({ data: testResult() }))
+
+      await waitFor(() => expect(screen.queryByText('outdatedPending')).not.toBeInTheDocument())
+      expect(screen.queryByText('success')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'button' })).toBeEnabled()
+      expect(queryClient.getMutationCache().getAll()).toHaveLength(0)
+    })
+
+    it('shows no result when the field is changed back before the test settles', async () => {
+      const { promise, resolve } = deferredResult()
+      mockApiRequest.mockReturnValue(promise)
+      const queryClient = new QueryClient()
+      const { form } = renderConnectionTest({ queryClient })
+
+      clickTest()
+      await screen.findByText('connecting')
+      act(() => form.setValue('configuration.table', 'other_table'))
+      act(() => form.setValue('configuration.table', SQL_CONFIGURATION.table))
+      act(() => resolve({ data: testResult() }))
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'button' })).toBeEnabled())
+      expect(screen.queryByText('success')).not.toBeInTheDocument()
+      expect(queryClient.getMutationCache().getAll()).toHaveLength(0)
+    })
+
+    it('shows no result of a repeated test after the earlier test was removed from the cache', async () => {
+      const { promise, resolve } = deferredResult()
+      mockApiRequest.mockResolvedValueOnce({ data: testResult() }).mockReturnValueOnce(promise)
+      const queryClient = new QueryClient()
+      const { form } = renderConnectionTest({ queryClient })
+
+      clickTest()
+      await screen.findByText('success')
+      clickTest('testAgain')
+      await screen.findByText('connecting')
+      const cache = queryClient.getMutationCache()
+      act(() => cache.remove(cache.getAll()[0]))
+      act(() => form.setValue('configuration.table', 'other_table'))
+      act(() => form.setValue('configuration.table', SQL_CONFIGURATION.table))
+
+      expect(screen.getByText('outdatedPending')).toBeInTheDocument()
+
+      act(() => resolve({ data: testResult() }))
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'button' })).toBeEnabled())
+      expect(screen.queryByText('success')).not.toBeInTheDocument()
+    })
+
+    it('shows the outdated text when the field changed while the tab was closed', async () => {
+      mockApiRequest.mockReturnValue(new Promise(() => {}))
+      const queryClient = new QueryClient()
+      const { unmount } = renderConnectionTest({ queryClient })
+
+      clickTest()
+      await screen.findByText('connecting')
+      unmount()
+      renderConnectionTest({ queryClient, configuration: { ...SQL_CONFIGURATION, table: 'other_table' } })
+
+      expect(screen.getByText('outdatedPending')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'button' })).toBeDisabled()
+    })
+
+    it('sends a new request with the new values after the outdated test settled', async () => {
+      const { promise, resolve } = deferredResult()
+      mockApiRequest.mockReturnValueOnce(promise).mockResolvedValueOnce({ data: testResult() })
+      const { form } = renderConnectionTest()
+
+      clickTest()
+      await screen.findByText('connecting')
+      act(() => form.setValue('configuration.table', 'other_table'))
+      act(() => resolve({ data: testResult() }))
+      await waitFor(() => expect(screen.getByRole('button', { name: 'button' })).toBeEnabled())
+      clickTest()
+
+      expect(await screen.findByText('success')).toBeInTheDocument()
+      expect(mockApiRequest).toHaveBeenCalledTimes(2)
+      expect(mockApiRequest.mock.calls[1][0].data).toEqual({
+        connector: ConnectorFormToApiSchema.parse({
+          connectorType: 'SQL',
+          configuration: { ...SQL_CONFIGURATION, table: 'other_table' },
+        }),
+      })
+    })
   })
 
   describe('masked password', () => {
@@ -495,6 +582,39 @@ describe('ConnectionTest', () => {
       act(() => form.setValue('configuration.password', MASKED_SECRET))
 
       expect(screen.queryByText('reenterPassword')).not.toBeInTheDocument()
+    })
+
+    it('shows no result when the password is changed and set back to the masked value during the test', async () => {
+      const { promise, resolve } = deferredResult()
+      mockApiRequest.mockReturnValue(promise)
+      const { form } = renderConnectionTest({ configuration: maskedConfiguration })
+
+      clickTest()
+      await screen.findByText('connecting')
+      act(() => form.setValue('configuration.password', 'new-secret'))
+      act(() => form.setValue('configuration.password', MASKED_SECRET))
+      act(() => resolve({ data: testResult() }))
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'button' })).toBeEnabled())
+      expect(screen.queryByText('success')).not.toBeInTheDocument()
+    })
+
+    it('shows no result after a new password is saved during the test', async () => {
+      const { promise, resolve } = deferredResult()
+      mockApiRequest.mockReturnValue(promise)
+      const queryClient = new QueryClient()
+      const { form, unmount } = renderConnectionTest({ queryClient, configuration: maskedConfiguration })
+
+      clickTest()
+      await screen.findByText('connecting')
+      act(() => form.setValue('configuration.password', 'new-secret'))
+      await screen.findByText('outdatedPending')
+      unmount()
+      renderConnectionTest({ queryClient, configuration: maskedConfiguration })
+      act(() => resolve({ data: testResult() }))
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'button' })).toBeEnabled())
+      expect(screen.queryByText('success')).not.toBeInTheDocument()
     })
 
     it('sends the request for an unchanged connector', async () => {

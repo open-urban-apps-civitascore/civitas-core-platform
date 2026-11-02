@@ -1220,6 +1220,7 @@
         "incompleteHint": "Fill in all required fields to test the connection.",
         "invalidHint": "The configuration contains invalid values. Also check the API calls.",
         "connecting": "Connecting…",
+        "outdatedPending": "The configuration was changed. The running connection test will be discarded. You can test again afterwards.",
         "testAgain": "Test again",
         "success": "Connection established successfully",
         "failure": "Connection failed",

@@ -1207,6 +1207,7 @@
         "incompleteHint": "Alle Pflichtfelder ausfüllen, um die Verbindung zu testen.",
         "invalidHint": "Die Konfiguration enthält ungültige Werte. Prüfen Sie auch die API-Aufrufe.",
         "connecting": "Verbindung wird aufgebaut …",
+        "outdatedPending": "Die Konfiguration wurde geändert. Der laufende Verbindungstest wird verworfen. Danach können Sie erneut testen.",
         "testAgain": "Erneut testen",
         "success": "Verbindung erfolgreich hergestellt",
         "failure": "Verbindung fehlgeschlagen",

@@ -80,20 +80,21 @@ const Failure = (props: FailureProps) => {
 interface ConnectionTestStatusProps {
   connectorType: ConnectorType
   isPending: boolean
+  isOutdatedPending: boolean
   isPasswordRequired: boolean
   result?: ConnectionTestResult
   problem?: ConnectionTestProblem
 }
 
 export const ConnectionTestStatus = (props: ConnectionTestStatusProps) => {
-  const { connectorType, isPending, isPasswordRequired, result, problem } = props
+  const { connectorType, isPending, isOutdatedPending, isPasswordRequired, result, problem } = props
   const t = useTranslations('datasources.connectorTab.connectionTest')
 
-  if (isPending) {
+  if (isPending || isOutdatedPending) {
     return (
       <div className="mt-4 flex items-center gap-2 text-sm">
         <Spinner className="size-6" />
-        <span>{t('connecting')}</span>
+        <span>{isOutdatedPending ? t('outdatedPending') : t('connecting')}</span>
       </div>
     )
   }

@@ -9,6 +9,11 @@ export type ConnectionTestReason = (typeof CONNECTION_TEST_REASONS)[number]
 
 export type ConnectionTestInput = { connector: DatasourcePatchData['connector']; apiCall?: string }
 
+export type ConnectionTestRunVariables = {
+  input: ConnectionTestInput
+  marker: { isOutdated: boolean }
+}
+
 export type ConnectionTestResult = {
   success: boolean
   reason: ConnectionTestReason | null
