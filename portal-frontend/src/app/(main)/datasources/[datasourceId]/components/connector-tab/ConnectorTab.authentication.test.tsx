@@ -65,7 +65,8 @@ const renderConnectorTab = (
     )
   }
   render(<Wrapper />)
-  return { getError: (path: string) => form?.getFieldState(path as Path<DatasourceFormDraft>).error?.message }
+  const getFieldError = (path: string) => form?.getFieldState(path as Path<DatasourceFormDraft>).error
+  return { getError: (path: string) => getFieldError(path)?.message, getFieldError }
 }
 
 const selectAuthenticationType = async (labelKey: string) => {
@@ -75,13 +76,13 @@ const selectAuthenticationType = async (labelKey: string) => {
 }
 
 describe('ConnectorTab with the authentication of the Data source form', () => {
-  it('shows no error at the token location after the user selects API token', async () => {
-    const { getError } = renderConnectorTab({ type: 'BASIC', username: 'reader', password: '********' })
+  it('shows no error at the authentication after the user selects API token', async () => {
+    const { getFieldError } = renderConnectorTab({ type: 'BASIC', username: 'reader', password: '********' })
 
     await selectAuthenticationType('http.authentication.apiToken')
 
     expect(await screen.findByLabelText(/http\.apiTokenIn\.label/)).toBeInTheDocument()
-    expect(getError('configuration.authentication.in')).toBeUndefined()
+    expect(getFieldError('configuration.authentication')).toBeUndefined()
   })
 
   it('shows and clears the https error at an http API host when the authentication changes', async () => {
