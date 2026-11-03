@@ -1,8 +1,12 @@
 package de.civitascore.portal.model.input;
 
+import de.civitascore.portal.model.input.validation.CqlFilterSyntax;
+import de.civitascore.portal.model.input.validation.CqlFilterSyntaxValidator;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -29,7 +33,19 @@ public class LayerInputDTO extends DataSetOwnedInputDTO {
   private String description;
   private List<String> attribute;
   private String geometryColumnRef;
+
+  @CqlFilterSyntax
+  @Size(
+      max = CqlFilterSyntaxValidator.MAX_LENGTH,
+      message = "CQL filter must be at most {max} characters")
+  @Schema(
+      description =
+          "Optional ECQL condition restricting the rows the layer publishes, e.g. status = 'frei'"
+              + " AND kapazitaet > 50. Rejected on save when its syntax is invalid; column and"
+              + " function names are not checked. Max 500 characters.",
+      example = "status = 'frei'")
   private String cqlFilter;
+
   private UUID defaultStyleId;
   private List<UUID> alternativeStyleIds;
   private String crs;
