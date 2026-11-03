@@ -21,9 +21,12 @@ import de.civitascore.modelforge.graph.SchemaRefExtractor;
 import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.modelforge.validation.CoreSchemaValidator;
 import de.civitascore.modelforge.validation.ModelValidator;
+import de.civitascore.modelforge.xsd.XsdToJsonSchemaConverter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.transaction.PlatformTransactionManager;
 import tools.jackson.databind.JsonNode;
 
 import java.util.Set;
@@ -31,7 +34,10 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockingDetails;
+import static org.mockito.Mockito.spy;
 
 /**
  * Deleting one version line, driven through the facade the way the portal stores its models: a
@@ -367,6 +373,98 @@ class VersionLineDeletionDatabaseTest extends AbstractRegistryDatabaseTest {
         assertThat(registry.fetch(logical(first))).isEmpty();
         assertThat(registry.fetch(structure)).isEmpty();
         assertThat(registry.fetch(station)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("A surviving member that pins a member of the deleted line refuses the delete")
+    void aSurvivingSiblingPinRefusesDeletion() {
+        String first = library(VersionBump.MAJOR, null, "Station", STATION_V1);
+        String oldStation = UrnParser.withVersion(station, "1.0.0");
+        String visitSchema = """
+            {"type": "object", "properties": {"station": {"$ref": "%s"}}}
+            """.formatted(oldStation);
+        library(VersionBump.MAJOR, null, "Station", STATION_V2, "Visit", visitSchema);
+        String visit = logical(urns.member(dataStructureId, "Visit"));
+        var before = snapshot();
+
+        assertThat(modelForge.versionLineDeletionBlockers(new ArtifactId(first))).containsExactly(visit);
+        assertThatThrownBy(() -> modelForge.deleteVersionLine(new ArtifactId(first)))
+            .isInstanceOf(ArtifactInUseException.class);
+        assertThat(snapshot()).isEqualTo(before);
+        assertThat(registry.fetch(oldStation)).isPresent();
+    }
+
+    @Test
+    @DisplayName("A pin held only by a removed member does not block deleting its line")
+    void aRemovedSiblingPinDoesNotBlockDeletion() {
+        String oldStation = UrnParser.withVersion(station, "1.0.0");
+        String visitSchema = """
+            {"type": "object", "properties": {"station": {"$ref": "%s"}}}
+            """.formatted(oldStation);
+        String first = library(VersionBump.MAJOR, null, "Station", STATION_V1, "Visit", visitSchema);
+        library(VersionBump.MAJOR, null, "Station", STATION_V2);
+
+        assertThat(modelForge.versionLineDeletionBlockers(new ArtifactId(first))).isEmpty();
+        modelForge.deleteVersionLine(new ArtifactId(first));
+
+        assertThat(registry.fetch(oldStation)).isEmpty();
+        assertThat(registry.fetch(urns.member(dataStructureId, "Visit"))).isEmpty();
+        assertThat(versionsOf(structure)).containsExactly("2.0.0");
+    }
+
+    @Test
+    @DisplayName("An unpinned sibling reference still resolves after an older target version is deleted")
+    void anUnpinnedSiblingReferenceKeepsResolving() {
+        String visitSchema = """
+            {"type": "object", "properties": {"station": {"$ref": "#/$defs/Station"}}}
+            """;
+        String first = library(VersionBump.MAJOR, null, "Station", STATION_V1, "Visit", visitSchema);
+        library(VersionBump.MAJOR, null, "Station", STATION_V2, "Visit", visitSchema);
+
+        assertThat(modelForge.versionLineDeletionBlockers(new ArtifactId(first))).isEmpty();
+        modelForge.deleteVersionLine(new ArtifactId(first));
+
+        assertThat(registry.fetch(UrnParser.withVersion(station, "1.0.0"))).isEmpty();
+        assertThat(registry.fetch(urns.member(dataStructureId, "Visit"))).isPresent();
+        assertThat(registry.resolveReference(station)).contains(UrnParser.withVersion(station, "2.0.0"));
+    }
+
+    @Test
+    @DisplayName("Usage query count does not grow with the number of member versions or minors")
+    void usageQueryCountDoesNotGrowWithHistory() {
+        String first = library(VersionBump.MAJOR, null, "Station", STATION_V1);
+        PostgresArtifactRegistryClient writeRegistry = registry;
+        ModelForge writes = modelForge;
+        JdbcClient countedJdbc = spy(jdbc);
+        registry = new PostgresArtifactRegistryClient(countedJdbc, mock(PlatformTransactionManager.class),
+            mapper, urns, new XsdToJsonSchemaConverter(mapper));
+        wireTheFacade();
+        ModelForge reads = modelForge;
+        assertThat(reads.versionLineDeletionBlockers(new ArtifactId(first))).isEmpty();
+        long initialQueries = mockingDetails(countedJdbc).getInvocations().stream()
+            .filter(invocation -> invocation.getMethod().getName().equals("sql")).count();
+        assertThat(initialQueries).isPositive();
+        registry = writeRegistry;
+        modelForge = writes;
+
+        for (int minor = 1; minor <= 20; minor++) {
+            String[] members = new String[20];
+            for (int member = 0; member < 10; member++) {
+                members[member * 2] = member == 0 ? "Station" : "Member" + member;
+                members[member * 2 + 1] = """
+                    {"type": "object", "properties": {"field%d": {"type": "string"}}}
+                    """.formatted(minor);
+            }
+            library(VersionBump.MINOR, "1." + (minor - 1) + ".0", members);
+        }
+        clearInvocations(countedJdbc);
+
+        assertThat(reads.versionLineDeletionBlockers(new ArtifactId(first))).isEmpty();
+        long queriesWithHistory = mockingDetails(countedJdbc).getInvocations().stream()
+            .filter(invocation -> invocation.getMethod().getName().equals("sql")).count();
+        assertThat(queriesWithHistory).isEqualTo(initialQueries).isLessThanOrEqualTo(8);
+        String sink = sinkInto(first);
+        assertThat(reads.versionLineDeletionBlockers(new ArtifactId(first))).containsExactly(logical(sink));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

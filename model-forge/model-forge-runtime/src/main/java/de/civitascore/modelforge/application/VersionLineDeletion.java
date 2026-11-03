@@ -115,26 +115,19 @@ final class VersionLineDeletion {
         versions.forEach(version -> graphUpdates.add(() -> graph.removeVersion(UrnParser.withVersion(logical, version))));
     }
 
-    /**
-     * Asked of every version the delete removes. A reference held from inside the removed set does
-     * not count, and neither does one from an Element of any version of the same Data Structure:
-     * its {@code $ref} names no version, so it holds this line's member as much as its own.
-     */
+    /** References from removed versions are harmless; surviving explicit pins must stay valid. */
     private List<String> blockersOf(Line line) {
-        Set<String> exempt = new HashSet<>();
-        exempt.add(line.logical());
+        Set<String> siblings = new HashSet<>();
+        siblings.add(line.logical());
         Stream.of(line.logical(), line.grouping())
             .filter(urn -> urn != null && DATA_STRUCTURE.equals(UrnParser.artifactTypeFromUrn(urn)))
             .forEach(dataStructure -> {
-                exempt.add(dataStructure);
-                exempt.addAll(registry.dataStructureMembersOfAnyVersion(dataStructure));
+                siblings.add(dataStructure);
+                siblings.addAll(registry.dataStructureMembersOfAnyVersion(dataStructure));
             });
-        return Stream.of(line.removedPins(), line.freedMembers())
-            .flatMap(Collection::stream)
-            .flatMap(pin -> registry.liveNonDataSetBlockingDependents(pin).stream())
-            .filter(referrer -> !exempt.contains(UrnParser.logicalUrn(referrer)))
-            .distinct()
-            .toList();
+        Set<String> removed = new LinkedHashSet<>(line.removedPins());
+        removed.addAll(line.freedMembers());
+        return registry.versionDeletionBlockers(removed, siblings);
     }
 
     private Line lineOf(String pin) {
@@ -146,8 +139,8 @@ final class VersionLineDeletion {
             return Line.EMPTY;
         }
         String grouping = groupingOf(logical).orElse(null);
-        List<String> groupingVersions = grouping == null ? List.of() : versions.stream()
-            .flatMap(version -> registry.versionOwners(UrnParser.withVersion(logical, version)).stream())
+        List<String> groupingVersions = grouping == null ? List.of() : registry.versionOwners(versions.stream()
+            .map(version -> UrnParser.withVersion(logical, version)).toList()).stream()
             .filter(holder -> grouping.equals(UrnParser.logicalUrn(holder)))
             .map(UrnParser::versionFromUrn)
             .distinct()
@@ -169,12 +162,8 @@ final class VersionLineDeletion {
      * without a version is held by whatever is current, so it is not one version to remove.
      */
     private List<String> freedMembers(Set<String> removed, Set<String> lineArtifacts) {
-        return removed.stream()
-            .flatMap(owner -> registry.ownedMemberUrns(owner, UrnParser.versionFromUrn(owner)).stream())
-            .filter(VersionLineDeletion::isPinned)
+        return registry.exclusivelyOwnedMemberVersions(removed).stream()
             .filter(member -> !lineArtifacts.contains(UrnParser.logicalUrn(member)))
-            .distinct()
-            .filter(member -> removed.containsAll(registry.versionOwners(member)))
             .toList();
     }
 

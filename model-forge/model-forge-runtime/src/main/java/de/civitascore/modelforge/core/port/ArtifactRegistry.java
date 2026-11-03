@@ -177,10 +177,9 @@ public interface ArtifactRegistry {
 
     /**
      * The versioned URNs of every version, of any artifact and whether current or not, that owns
-     * exactly this version, as {@link #ownedMemberUrns(String, String)} reads ownership. Empty for a
-     * logical or {@code :latest} URN.
+     * any of these pinned versions, as {@link #ownedMemberUrns(String, String)} reads ownership.
      */
-    List<String> versionOwners(String pinnedUrn);
+    List<String> versionOwners(Collection<String> pinnedUrns);
 
     /**
      * Deletes the given versions of the artifact, with their representations and outgoing
@@ -219,13 +218,15 @@ public interface ArtifactRegistry {
     List<String> nonDataSetBlockingDependents(String urn, String targetVersion);
 
     /**
-     * Like {@link #nonDataSetBlockingDependents(String, String)} for one pinned version, where a
-     * referrer's superseded version counts too while it can still be in use: a version of an
-     * Element or Data Structure, or a version that a reference pins.
-     *
-     * @throws IllegalArgumentException when the URN names no version
+     * Live non-DataSet referrers of versions selected for deletion. References from versions in
+     * {@code removedPins} do not block. An unpinned reference from {@code siblingUrns} does not block
+     * while another version of its target survives; explicit pins from surviving versions do.
+     * A referrer is live when current, an Element or Data Structure version, or pinned by a reference.
      */
-    List<String> liveNonDataSetBlockingDependents(String pinnedUrn);
+    List<String> versionDeletionBlockers(Collection<String> removedPins, Collection<String> siblingUrns);
+
+    /** Pinned member versions owned by the given versions and by no version outside that set. */
+    List<String> exclusivelyOwnedMemberVersions(Collection<String> ownerPins);
 
     /** Logical URNs of the DataSets this artifact is a member of ({@code dataset-ref} in-edges). */
     List<String> dataSetMemberships(String urn);

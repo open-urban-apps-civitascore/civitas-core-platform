@@ -284,13 +284,15 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
     }
 
     @Override
-    public List<String> versionOwners(String pinnedUrn) {
-        UrnParser.requireNoControlChars(pinnedUrn);
-        String version = pinnedVersion(UrnParser.versionFromUrn(pinnedUrn));
-        if (version == null) {
-            return List.of();
-        }
-        return read(() -> references.ownersOfVersion(UrnParser.logicalUrn(pinnedUrn), version));
+    public List<String> versionOwners(Collection<String> pinnedUrns) {
+        pinnedUrns.forEach(UrnParser::requireNoControlChars);
+        return pinnedUrns.isEmpty() ? List.of() : read(() -> references.ownersOfVersions(pinnedUrns));
+    }
+
+    @Override
+    public List<String> exclusivelyOwnedMemberVersions(Collection<String> ownerPins) {
+        ownerPins.forEach(UrnParser::requireNoControlChars);
+        return ownerPins.isEmpty() ? List.of() : read(() -> references.exclusivelyOwnedMemberVersions(ownerPins));
     }
 
     @Override
@@ -355,18 +357,11 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
     }
 
     @Override
-    public List<String> liveNonDataSetBlockingDependents(String pinnedUrn) {
-        UrnParser.requireNoControlChars(pinnedUrn);
-        String logical = UrnParser.logicalUrn(pinnedUrn);
-        String version = pinnedVersion(UrnParser.versionFromUrn(pinnedUrn));
-        if (version == null) {
-            throw new IllegalArgumentException("Not a pinned version: " + pinnedUrn);
-        }
-        try {
-            return references.liveNonDataSetBlockingDependents(logical, version);
-        } catch (DataAccessException e) {
-            throw translate(e, "Could not read dependents of " + logical);
-        }
+    public List<String> versionDeletionBlockers(Collection<String> removedPins, Collection<String> siblingUrns) {
+        removedPins.forEach(UrnParser::requireNoControlChars);
+        siblingUrns.forEach(UrnParser::requireNoControlChars);
+        return removedPins.isEmpty() ? List.of()
+            : read(() -> references.versionDeletionBlockers(removedPins, siblingUrns));
     }
 
     @Override
