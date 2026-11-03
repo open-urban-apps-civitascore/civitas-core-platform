@@ -14,9 +14,8 @@ import org.geotools.filter.text.cql2.CQLException;
 import org.geotools.filter.text.ecql.ECQL;
 
 /**
- * Validator backing {@link CqlFilterSyntax}. Parses the filter with the GeoTools ECQL parser that
- * GeoServer applies to a layer, so a filter is rejected when GeoServer would reject its syntax. The
- * message names the parser's position but not its wording, which lists internal grammar tokens.
+ * Validator backing {@link CqlFilterSyntax}. The message names the parser's position but not its
+ * wording, which lists internal grammar tokens.
  */
 public class CqlFilterSyntaxValidator implements ConstraintValidator<CqlFilterSyntax, String> {
 

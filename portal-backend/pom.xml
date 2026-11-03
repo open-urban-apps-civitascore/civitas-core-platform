@@ -161,11 +161,17 @@
             <artifactId>encoder</artifactId>
             <version>${owasp.encoder.version}</version>
         </dependency>
-        <!-- The GeoTools ECQL parser GeoServer runs, for checking a layer's CQL filter on save -->
+        <!-- GeoTools ECQL parser, and the EPSG database it needs for a CRS in a filter -->
         <dependency>
             <groupId>org.geotools</groupId>
             <artifactId>gt-cql</artifactId>
             <version>${geotools.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-epsg-hsql</artifactId>
+            <version>${geotools.version}</version>
+            <scope>runtime</scope>
         </dependency>
         <!-- Kafka -->
         <dependency>
@@ -404,6 +410,8 @@
                              test engine is on the classpath; the boundary tests import only the
                              core + junit5-api classes it pulls transitively -->
                         <ignoredUnusedDeclaredDependency>com.tngtech.archunit:archunit-junit5</ignoredUnusedDeclaredDependency>
+                        <!-- EPSG database: found by the CRS factory lookup at runtime -->
+                        <ignoredUnusedDeclaredDependency>org.geotools:gt-epsg-hsql</ignoredUnusedDeclaredDependency>
                     </ignoredUnusedDeclaredDependencies>
                     <!-- Compile scope is required for application boot; direct imports happen
                          only in tests, so the analyzer wants them narrowed to test scope. -->

@@ -25,8 +25,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Unit tests for {@link CqlFilterSyntax} / {@link CqlFilterSyntaxValidator}, exercised against
- * {@link LayerInputDTO#getCqlFilter()} via the Jakarta Validation API. Asserts only on violations
- * of the annotation under test, so {@code @CqlFilterSyntax} and {@code @Size} are pinned apart.
+ * {@link LayerInputDTO#getCqlFilter()} via the Jakarta Validation API.
  */
 @DisplayName("CqlFilterSyntaxValidator")
 class CqlFilterSyntaxValidatorTest {
@@ -63,6 +62,8 @@ class CqlFilterSyntaxValidatorTest {
         "name = 'it''s'",
         "status = 'frei'\nAND kapazitaet > 50",
         "INTERSECTS(geom, POINT(1 2))",
+        "INTERSECTS(geom, SRID=4326;POINT(1 2))",
+        "BBOX(geom, 1, 2, 3, 4, 'EPSG:25832')",
         "strToUpperCase(name) = 'PARK'",
       })
   @DisplayName("valid ECQL raises no violation")
@@ -73,14 +74,12 @@ class CqlFilterSyntaxValidatorTest {
   @Test
   @DisplayName("a bare word compares two columns, so it is valid syntax")
   void acceptsBareWordAsColumn() {
-    // `status = frei` reads frei as a column name; whether that column exists is not checked.
     assertThat(violationsOf("status = frei", CqlFilterSyntax.class)).isEmpty();
   }
 
   @Test
   @DisplayName("an unknown function raises no violation")
   void acceptsUnknownFunction() {
-    // GeoServer registers functions GeoTools alone does not know.
     assertThat(violationsOf("noSuchFunction(name) = 1", CqlFilterSyntax.class)).isEmpty();
   }
 
@@ -150,10 +149,7 @@ class CqlFilterSyntaxValidatorTest {
         .isEqualTo("CQL filter must be at most 500 characters");
   }
 
-  /**
-   * Returns only the violations raised by {@code annotationType} on {@code LayerInputDTO.cqlFilter}
-   * for {@code value}, filtering out violations from the sibling constraint.
-   */
+  /** Keeps {@code @CqlFilterSyntax} and {@code @Size} apart, so each test pins one of them. */
   private static Set<ConstraintViolation<LayerInputDTO>> violationsOf(
       String value, Class<? extends Annotation> annotationType) {
     return validator.validateValue(LayerInputDTO.class, "cqlFilter", value).stream()
