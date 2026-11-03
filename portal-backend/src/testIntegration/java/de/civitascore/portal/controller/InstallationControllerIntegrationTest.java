@@ -228,7 +228,8 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
     DataPool pool = portalData.dataPool();
 
     ResponseEntity<String> installed =
-        postIn(pool.getId(), request(PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
+        postIn(
+            pool.getId(), request(PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
 
     assertThat(installed.getStatusCode())
         .as("%s", installed.getBody())
@@ -296,7 +297,8 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
     DataPool pool = portalData.dataPool();
     DataPool other = portalData.dataPool();
     ResponseEntity<String> installed =
-        postIn(pool.getId(), request(PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
+        postIn(
+            pool.getId(), request(PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
     assertThat(installed.getStatusCode())
         .as("%s", installed.getBody())
         .isEqualTo(HttpStatus.CREATED);
@@ -308,8 +310,7 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
         .isEqualTo(HttpStatus.NOT_FOUND);
     assertThat(json(get(inDatapool(other.getId())).getBody()).get("content").size()).isZero();
     assertThat(installationRepository.existsActive(PACKAGE_ID, pool.getId())).isTrue();
-    assertThat(dataSourceRepository.existsById(shellIdOf(linesOf(installed), SOURCE_URN)))
-        .isTrue();
+    assertThat(dataSourceRepository.existsById(shellIdOf(linesOf(installed), SOURCE_URN))).isTrue();
   }
 
   @Test
@@ -317,7 +318,8 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
   void uninstallInDatapool_whenInstallationIsInTheDatapool_removesItsArtifacts() {
     DataPool pool = portalData.dataPool();
     ResponseEntity<String> installed =
-        postIn(pool.getId(), request(PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
+        postIn(
+            pool.getId(), request(PACKAGE_ID, member("Tree cadastre", treeModel()), sqlSource()));
     assertThat(installed.getStatusCode())
         .as("%s", installed.getBody())
         .isEqualTo(HttpStatus.CREATED);
