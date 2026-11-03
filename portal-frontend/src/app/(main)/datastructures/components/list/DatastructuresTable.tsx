@@ -27,6 +27,7 @@ import { resolveUpdater } from '@/utils/table'
 
 interface DatastructuresTableProps extends TableProps<DatastructuresListData> {
   datastructures: DatastructuresListData[]
+  isDuplicating: boolean
   onDeleteDatastructureClick: (id: string) => void
   onDuplicateVersionClick: (datastructureId: string, versionId: string) => void
 }
@@ -34,6 +35,7 @@ interface DatastructuresTableProps extends TableProps<DatastructuresListData> {
 export const DatastructuresTable = (props: DatastructuresTableProps) => {
   const {
     datastructures,
+    isDuplicating,
     rowCount,
     pageIndex,
     totalPages,
@@ -164,6 +166,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
                 {
                   label: tCommon('actions.duplicateItem', { item: tCommon('items.datastructureVersion') }),
                   onClick: () => onDuplicateVersionClick(datastructureId, row.original.id),
+                  disabled: isDuplicating,
                 },
               ]}
             />

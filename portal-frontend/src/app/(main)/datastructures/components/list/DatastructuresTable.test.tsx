@@ -54,6 +54,7 @@ const mockDatastructures: DatastructuresListData[] = [
 
 const defaultProps = {
   datastructures: mockDatastructures,
+  isDuplicating: false,
   rowCount: 2,
   pageIndex: 0,
   pageSize: 10,
@@ -329,9 +330,10 @@ describe('DatastructuresTable', () => {
     const DATASTRUCTURE_ID = mockDatastructures[0].id
     const VERSION_ID = '00000000-0000-0000-0000-000000000099'
 
-    const renderWithVersion = () => {
+    const renderWithVersion = (isDuplicating = false) => {
       renderTable({
         ...defaultProps,
+        isDuplicating,
         datastructures: [{ ...mockDatastructures[0], versions: [createVersion('99')] }],
         rowCount: 1,
       })
@@ -363,6 +365,19 @@ describe('DatastructuresTable', () => {
       await user.click(await screen.findByText('Version duplizieren'))
 
       expect(defaultProps.onDuplicateVersionClick).toHaveBeenCalledWith(DATASTRUCTURE_ID, VERSION_ID)
+    })
+
+    it('disables duplication of a version row while a copy is being made', async () => {
+      const user = userEvent.setup()
+      mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_UPDATE], 'DATASTRUCTURE', DATASTRUCTURE_ID)
+      renderWithVersion(true)
+
+      await user.click(screen.getByRole('button', { name: 'Open menu' }))
+      const duplicateItem = await screen.findByRole('menuitem', { name: 'Version duplizieren' })
+      expect(duplicateItem).toHaveAttribute('aria-disabled', 'true')
+      await user.click(duplicateItem)
+
+      expect(defaultProps.onDuplicateVersionClick).not.toHaveBeenCalled()
     })
   })
 })

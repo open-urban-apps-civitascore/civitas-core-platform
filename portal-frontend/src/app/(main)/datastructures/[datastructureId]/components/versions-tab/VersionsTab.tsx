@@ -79,6 +79,7 @@ export const VersionsTab = (props: VersionsTabProps) => {
         datastructureId={datastructureId}
         versions={versions}
         isReadOnly={isReadOnly}
+        isDuplicating={duplicateVersion.isPending}
         rowCount={rowCount}
         pageIndex={pageIndex}
         pageSize={pageSize}

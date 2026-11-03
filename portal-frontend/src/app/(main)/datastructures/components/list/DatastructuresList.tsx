@@ -41,7 +41,7 @@ export const DatastructuresList = (props: DatastructuresListProps) => {
   const [isDeletionWarningModalOpen, setIsDeletionWarningModalOpen] = useState(false)
   const deleteDatastructure = useDeleteDatastructure()
   const duplicateVersion = useDuplicateDatastructureVersion()
-  const isLoading = deleteDatastructure.isPending || duplicateVersion.isPending
+  const isLoading = deleteDatastructure.isPending
   const { hasPermissionInScope } = usePermissions()
   const {
     pageIndex,
@@ -129,6 +129,7 @@ export const DatastructuresList = (props: DatastructuresListProps) => {
             onSortingChange={setSortingParams}
             onDeleteDatastructureClick={handleDeleteDatastructureClick}
             onDuplicateVersionClick={handleDuplicateVersionClick}
+            isDuplicating={duplicateVersion.isPending}
           />
         </TableContainer>
       </PageBackground>

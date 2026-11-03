@@ -33,6 +33,7 @@ const defaultProps = {
   datastructureId: 'ds-1',
   versions,
   isReadOnly: false,
+  isDuplicating: false,
   rowCount: 2,
   pageIndex: 0,
   pageSize: 10,
@@ -82,6 +83,19 @@ describe('VersionsTable', () => {
     await user.click(await screen.findByText('Version duplizieren'))
 
     expect(defaultProps.onDuplicateVersionClick).toHaveBeenCalledWith('v-2')
+  })
+
+  it('disables duplication while a copy is being made', async () => {
+    const user = userEvent.setup()
+    const onDuplicateVersionClick = vi.fn()
+    renderTable({ ...defaultProps, isDuplicating: true, onDuplicateVersionClick })
+
+    await user.click(screen.getAllByRole('button', { name: 'Open menu' })[1])
+    const duplicateItem = await screen.findByRole('menuitem', { name: 'Version duplizieren' })
+    expect(duplicateItem).toHaveAttribute('aria-disabled', 'true')
+    await user.click(duplicateItem)
+
+    expect(onDuplicateVersionClick).not.toHaveBeenCalled()
   })
 
   it('offers no action menu in read-only mode', () => {

@@ -15,6 +15,7 @@ interface VersionsTableProps extends TableProps<DatastructureVersionsListData> {
   datastructureId: string
   versions: DatastructureVersionsListData[]
   isReadOnly: boolean
+  isDuplicating: boolean
   onDuplicateVersionClick: (versionId: string) => void
 }
 
@@ -23,6 +24,7 @@ export const VersionsTable = (props: VersionsTableProps) => {
     datastructureId,
     versions,
     isReadOnly,
+    isDuplicating,
     rowCount,
     pageIndex,
     totalPages,
@@ -113,6 +115,7 @@ export const VersionsTable = (props: VersionsTableProps) => {
               {
                 label: tCommon('actions.duplicateItem', { item: tCommon('items.datastructureVersion') }),
                 onClick: () => onDuplicateVersionClick(row.original.id),
+                disabled: isDuplicating,
               },
             ]}
           />
