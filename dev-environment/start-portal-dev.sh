@@ -1388,10 +1388,8 @@ if [ "$backend_option" = "1" ] && [ "$BACKEND_READY" = true ]; then
     }
 
     # Get a token from Keycloak using resource owner password grant.
-    # MUST use civitas-keycloak:8080 (not localhost:8080) so the JWT issuer claim
-    # matches what APISIX expects from its OIDC discovery URL.
-    # Requires /etc/hosts: 127.0.0.1 civitas-keycloak
-    TOKEN_RESPONSE=$(curl -s -X POST "http://civitas-keycloak:8080/realms/civitas-core/protocol/openid-connect/token" \
+    # Keycloak fixes its issuer through KC_HOSTNAME, as used by browser logins.
+    TOKEN_RESPONSE=$(curl -s -X POST "http://localhost:8080/realms/civitas-core/protocol/openid-connect/token" \
         -H "Content-Type: application/x-www-form-urlencoded" \
         -d "grant_type=password" \
         -d "client_id=portal-frontend" \
@@ -1407,19 +1405,19 @@ if [ "$backend_option" = "1" ] && [ "$BACKEND_READY" = true ]; then
         SMOKE_SKIP=3
     else
         # Test 1: Unauthenticated request should be rejected
-        STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:9080/v1/users/me" 2>/dev/null) || true
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://api.localhost:9080/v1/users/me" 2>/dev/null) || true
         smoke_test "Unauthenticated /v1/users/me -> 401" "401" "$STATUS"
 
         # Test 2: Authenticated /users/me should succeed
         STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
-            "http://localhost:9080/v1/users/me" 2>/dev/null) || true
+            "http://api.localhost:9080/v1/users/me" 2>/dev/null) || true
         smoke_test "Authenticated /v1/users/me -> 200" "200" "$STATUS"
 
         # Test 3: Authenticated /users list should succeed
         STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
-            "http://localhost:9080/v1/users" 2>/dev/null) || true
+            "http://api.localhost:9080/v1/users" 2>/dev/null) || true
         smoke_test "Authenticated /v1/users -> 200" "200" "$STATUS"
     fi
 
