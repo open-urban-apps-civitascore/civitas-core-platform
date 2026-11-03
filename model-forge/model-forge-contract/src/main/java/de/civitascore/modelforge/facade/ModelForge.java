@@ -331,9 +331,11 @@ public interface ModelForge {
      * What stands in the way of {@link #deleteVersionLine}: whatever references any version the
      * delete removes. A referrer counts with its current version and with every version that can
      * still be in use: any version of an Element or Data Structure, and a version a reference pins.
-     * A reference that names no version holds every version and so blocks. A referrer the same delete removes does not count, nor
-     * does an Element of any version of the same Data Structure. Data Set memberships do not
-     * count. Empty when nothing stands in the way or the registry holds no such line.
+     * A reference that names no version holds every version and so blocks. A referrer the same
+     * delete removes does not count. An unpinned reference from an Element of any version of the
+     * same Data Structure does not block while another version of its target survives; explicit
+     * pins from surviving versions do. Data Set memberships do not count. Empty when nothing stands
+     * in the way or the registry holds no such line.
      *
      * @throws IllegalArgumentException when the id is logical or {@code :latest}
      */

@@ -175,10 +175,17 @@ older one free.
 
 A delete removes either the whole artifact with its history or one **version
 line**: the versions that share one major. A line goes as one unit, never one
-minor of it, and under the same rules. Its current version moves to the highest
-version left, and a member version it owns goes with it unless another version
-owns it too. An Element's line also takes the versions of its own grouping that
-hold it. When the line is the last one, the whole artifact goes.
+minor of it. A line has its own rule for what uses it, because an older version
+of the line can still be in use: besides an artifact's current version, every
+version of an Element or Data Structure and every version a reference pins
+counts, so a superseded Data Sink version a Pipeline still pins refuses the
+delete. A reference that names no version holds every line; from an Element of
+the same Data Structure it does not count while another version of its target
+stays. Data Set membership does not count for a line. The current version moves
+to the highest version left, and a member version the line owns goes with it
+unless another version owns it too. An Element's line also takes the versions of
+its own grouping that hold it. When the line is the last one, the whole artifact
+goes and leaves every Data Set it belonged to.
 
 A version number Model Forge assigns is never assigned again. After line 3 is
 deleted the next major is 4.0.0, also when the whole artifact was deleted and is
