@@ -905,9 +905,8 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
 
     /** The highest version in the major of {@code base}, or null when that line holds none. */
     private String latestInLine(UUID artifactId, String base) {
-        String nextLine = SemVer.next(base, VersionBump.MAJOR);
         return versions.listVersions(artifactId).stream()
-            .filter(version -> SemVer.next(version, VersionBump.MAJOR).equals(nextLine))
+            .filter(version -> UrnParser.sameMajor(version, base))
             .max(SemVer::compare)
             .orElse(null);
     }

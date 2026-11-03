@@ -132,7 +132,7 @@ final class VersionLineDeletion {
         String logical = UrnParser.logicalUrn(pin);
         String major = UrnParser.versionFromUrn(pin);
         List<String> all = registry.versionsOf(logical);
-        List<String> versions = all.stream().filter(version -> sameMajor(version, major)).toList();
+        List<String> versions = all.stream().filter(version -> UrnParser.sameMajor(version, major)).toList();
         if (versions.isEmpty()) {
             return Line.EMPTY;
         }
@@ -172,15 +172,6 @@ final class VersionLineDeletion {
         }
         String grouping = UrnParser.withArtifactType(logical, DATA_STRUCTURE);
         return registry.versionsOf(grouping).isEmpty() ? Optional.empty() : Optional.of(grouping);
-    }
-
-    private static boolean sameMajor(String version, String other) {
-        return majorOf(version).equals(majorOf(other));
-    }
-
-    private static String majorOf(String version) {
-        int dot = version.indexOf('.');
-        return dot < 0 ? version : version.substring(0, dot);
     }
 
     private static boolean isPinned(String urn) {
