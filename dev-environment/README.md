@@ -34,6 +34,9 @@ dev-environment/
 > The default Docker (`auto`) mode builds JARs inside a containerized Maven + JDK 25
 > image, so no local Java or Maven installation is needed for the Quick Start path.
 
+Startup builds skip unit and integration tests. Run tests separately on the host or in CI;
+the Maven build container has no Docker socket for Testcontainers.
+
 **Optional:**
 * jq (for dev-mode scripts)
 * `/etc/hosts` entry for the API gateway virtual host (issue #1368):

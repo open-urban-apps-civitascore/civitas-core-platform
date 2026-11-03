@@ -172,7 +172,8 @@ mvn_build() {
         echo "  (--skip-build) reusing existing artifacts, skipping build of ${1##*/}"
         return 0
     fi
-    mvn_in_container "$@"
+    # Startup builds package artifacts; integration tests need a separate Docker-enabled runner.
+    mvn_in_container "$@" -DskipITs
 }
 
 echo "======================================================"
