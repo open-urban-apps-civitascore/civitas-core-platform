@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 
 import { Form } from '@/components/ui/form'
+import { emptyHttpAuthentication, HttpAuthenticationType } from '@/types/connectors'
 import type { DatasourceFormDraft } from '@/types/datasources'
 import { DatasourceFormDraftSchema } from '@/types/datasources'
 
@@ -354,6 +355,83 @@ describe('ConnectorTab (integration)', () => {
       fireEvent.click(await screen.findByText('http.authentication.basic'))
 
       expect(await screen.findByText('datasources.errors.usernameColon')).toBeInTheDocument()
+    })
+
+    describe('authentication types', () => {
+      const FIELD_LABELS: Record<HttpAuthenticationType, RegExp[]> = {
+        NONE: [],
+        BASIC: [/http\.username\.label/, /http\.password\.label/],
+        BEARER_TOKEN: [/http\.token\.label/],
+        API_TOKEN: [/http\.apiTokenName\.label/, /http\.apiTokenValue\.label/, /http\.apiTokenIn\.label/],
+        OAUTH2: [/http\.tokenUrl\.label/, /http\.clientId\.label/, /http\.clientSecret\.label/, /http\.scope\.label/],
+        CLIENT_CERTIFICATE: [],
+      }
+      const SECRET_LABELS = [
+        ['BASIC', /http\.password\.label/],
+        ['BEARER_TOKEN', /http\.token\.label/],
+        ['API_TOKEN', /http\.apiTokenValue\.label/],
+        ['OAUTH2', /http\.clientSecret\.label/],
+      ] as const
+      const ALL_LABELS = Object.values(FIELD_LABELS).flat()
+
+      const renderWithAuthentication = (type: HttpAuthenticationType, baseUrl = '') =>
+        renderConnectorTab({
+          connectorType: 'HTTP',
+          configuration: { baseUrl, authentication: emptyHttpAuthentication(type) },
+        })
+
+      it('offers None, Basic, Bearer token, API token and OAuth2', async () => {
+        renderWithAuthentication('NONE')
+
+        fireEvent.click(screen.getByLabelText(/http\.authentication\.label/))
+
+        const options = await screen.findAllByRole('option')
+        expect(options.map(option => option.textContent)).toEqual([
+          'http.authentication.none',
+          'http.authentication.basic',
+          'http.authentication.bearerToken',
+          'http.authentication.apiToken',
+          'http.authentication.oauth2',
+        ])
+      })
+
+      it.each(['BEARER_TOKEN', 'API_TOKEN', 'OAUTH2'] as const)('shows only the fields of %s', type => {
+        renderWithAuthentication(type)
+
+        const ownLabels = FIELD_LABELS[type]
+        for (const label of ownLabels) {
+          expect(screen.getByLabelText(label)).toBeInTheDocument()
+        }
+        for (const label of ALL_LABELS.filter(other => !ownLabels.includes(other))) {
+          expect(screen.queryByLabelText(label)).not.toBeInTheDocument()
+        }
+      })
+
+      it.each(SECRET_LABELS)('masks the secret of %s and turns off autocomplete', (type, label) => {
+        renderWithAuthentication(type)
+
+        const secret = screen.getByLabelText(label)
+        expect(secret).toHaveAttribute('type', 'password')
+        expect(secret).toHaveAttribute('autocomplete', 'new-password')
+      })
+
+      it.each([
+        ['API_TOKEN', /http\.apiTokenName\.label/],
+        ['OAUTH2', /http\.clientId\.label/],
+      ] as const)('turns off autocomplete for the visible fields of %s', (type, label) => {
+        renderWithAuthentication(type)
+
+        expect(screen.getByLabelText(label)).toHaveAttribute('autocomplete', 'off')
+      })
+
+      it('shows the https error at the API host after the user selects an authentication', async () => {
+        renderWithAuthentication('NONE', 'http://api.example.org')
+
+        fireEvent.click(screen.getByLabelText(/http\.authentication\.label/))
+        fireEvent.click(await screen.findByText('http.authentication.bearerToken'))
+
+        expect(await screen.findByText('datasources.errors.baseUrlHttpsRequired')).toBeInTheDocument()
+      })
     })
 
     it('disables the HTTP fields in read-only mode', () => {

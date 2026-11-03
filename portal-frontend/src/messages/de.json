@@ -1240,13 +1240,43 @@
         "authentication": {
           "label": "Authentifizierung",
           "none": "Keine",
-          "basic": "Basic"
+          "basic": "Basic",
+          "bearerToken": "Bearer-Token",
+          "apiToken": "API-Token",
+          "oauth2": "OAuth2"
         },
         "username": {
           "label": "Benutzername"
         },
         "password": {
           "label": "Passwort"
+        },
+        "token": {
+          "label": "Token"
+        },
+        "apiTokenName": {
+          "label": "Name"
+        },
+        "apiTokenValue": {
+          "label": "Wert"
+        },
+        "apiTokenIn": {
+          "label": "Senden als",
+          "header": "Header",
+          "query": "Query-Parameter"
+        },
+        "tokenUrl": {
+          "label": "Token-URL"
+        },
+        "clientId": {
+          "label": "Client-ID"
+        },
+        "clientSecret": {
+          "label": "Client-Secret"
+        },
+        "scope": {
+          "label": "Scope",
+          "hint": "optional, durch Leerzeichen getrennt"
         }
       },
       "connectionTest": {

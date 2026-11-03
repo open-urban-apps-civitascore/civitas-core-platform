@@ -231,8 +231,8 @@ describe('useDatasourceForm with an HTTP connector', () => {
 
   const submitAfter = async (
     edit: (form: ReturnType<typeof renderDatasourceForm>['result']['current']['form']) => void,
+    datasource = createHttpDatasource(),
   ) => {
-    const datasource = createHttpDatasource()
     mockUpdateDatasource.mockResolvedValue({ data: datasource })
     const { result } = renderDatasourceForm(datasource)
     act(() => edit(result.current.form))
@@ -468,6 +468,79 @@ describe('useDatasourceForm with an HTTP connector', () => {
       })
       expect(result.current.isFormDirty).toBe(false)
     })
+  })
+
+  describe.each([
+    ['BEARER_TOKEN', { type: 'BEARER_TOKEN', token: '********' }, { type: 'BEARER_TOKEN', token: 'new-token' }],
+    [
+      'API_TOKEN',
+      { type: 'API_TOKEN', name: 'X-API-Key', value: '********', in: 'HEADER' },
+      { type: 'API_TOKEN', name: 'X-API-Key', value: 'new-key', in: 'HEADER' },
+    ],
+    [
+      'OAUTH2',
+      {
+        type: 'OAUTH2',
+        tokenUrl: 'https://auth.example.org/token',
+        clientId: 'client-1',
+        clientSecret: '********',
+        scope: 'read',
+      },
+      {
+        type: 'OAUTH2',
+        tokenUrl: 'https://auth.example.org/token',
+        clientId: 'client-1',
+        clientSecret: 'new-secret',
+        scope: 'read',
+      },
+    ],
+  ] as const)('with the authentication %s', (_type, loaded, changed) => {
+    const datasource = createHttpDatasource()
+    const datasourceWithAuthentication = {
+      ...datasource,
+      connector: { ...datasource.connector!, authentication: loaded },
+    }
+
+    it('sends the masked secret back when it did not change', async () => {
+      const connector = await submitAfter(
+        form => form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true }),
+        datasourceWithAuthentication,
+      )
+
+      expect(connector.authentication).toEqual(loaded)
+    })
+
+    it('sends a new secret', async () => {
+      const connector = await submitAfter(
+        form => form.setValue('configuration.authentication', changed, { shouldDirty: true }),
+        datasourceWithAuthentication,
+      )
+
+      expect(connector.authentication).toEqual(changed)
+    })
+  })
+
+  it('sends nothing when the API token name collides with a header of an API call', async () => {
+    const datasource = createHttpDatasource()
+    const { result } = renderDatasourceForm({
+      ...datasource,
+      connector: {
+        ...datasource.connector!,
+        authentication: { type: 'API_TOKEN', name: 'X-API-Key', value: '********', in: 'HEADER' },
+        apiCalls: [{ name: 'Get all stations', path: '/stations', headers: [{ name: 'x-api-key', value: 'x' }] }],
+      },
+    })
+    act(() =>
+      result.current.form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true }),
+    )
+
+    let isSaved = true
+    await act(async () => {
+      isSaved = await result.current.submitDatasource()
+    })
+
+    expect(isSaved).toBe(false)
+    expect(mockUpdateDatasource).not.toHaveBeenCalled()
   })
 
   it('sends only the type when the authentication changes to None', async () => {

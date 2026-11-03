@@ -33,6 +33,8 @@ const EMPTY_API_CALL: HttpApiCallForm = {
 
 type ArrayError = { message?: string; root?: { message?: string } }
 
+const API_TOKEN_NAME_PATH = 'configuration.authentication.name'
+
 const NO_COLLAPSED_SECTIONS: ReadonlySet<ApiCallSection> = new Set()
 
 const shiftIndex = (index: number, removedIndex: number) => (index > removedIndex ? index - 1 : index)
@@ -103,6 +105,7 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
     onCollapsedSectionsChange(removeEntryAndShift(collapsedSections, index))
     onApiCallRemove(index)
     remove(index)
+    void apiCallsForm.trigger(API_TOKEN_NAME_PATH)
   }
 
   // getValues returns the live form objects, which change on input.
@@ -118,7 +121,7 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
       return
     }
     update(index, snapshot)
-    void apiCallsForm.trigger(`configuration.apiCalls.${index}`)
+    void apiCallsForm.trigger([`configuration.apiCalls.${index}`, API_TOKEN_NAME_PATH])
     handleClose(index)
   }
 

@@ -23,6 +23,7 @@ import {
   EMPTY_LIMIT_OFFSET_PAGINATION,
   EMPTY_PAGINATION,
   HttpApiCallForm,
+  HttpAuthenticationForm,
 } from '@/types/connectors'
 import { DatasourceFormDraft, DatasourceFormDraftSchema } from '@/types/datasources'
 
@@ -50,10 +51,18 @@ interface RenderOptions {
   isDatasourceReleased?: boolean
   dataStructureName?: string
   baseUrl?: string
+  authentication?: HttpAuthenticationForm
 }
 
 const renderApiCallsTab = (options: RenderOptions = {}) => {
-  const { apiCalls = [], isReadOnly = false, isDatasourceReleased = false, dataStructureName, baseUrl = '' } = options
+  const {
+    apiCalls = [],
+    isReadOnly = false,
+    isDatasourceReleased = false,
+    dataStructureName,
+    baseUrl = '',
+    authentication = { type: 'NONE' },
+  } = options
   const defaultValues: DatasourceFormDraft = {
     id: '1',
     name: 'Test Data source',
@@ -61,7 +70,7 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
     dataSourceStatus: 'DRAFT',
     dataStructureVersionId: null,
     connectorType: 'HTTP',
-    configuration: { baseUrl, authentication: { type: 'NONE', username: '', password: '' }, apiCalls },
+    configuration: { baseUrl, authentication, apiCalls },
   }
   let form: UseFormReturn<DatasourceFormDraft> | undefined
   let isFormDirty = false
@@ -102,7 +111,8 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
   const isDirty = () => isFormDirty
   const resetForm = () => act(() => form?.reset(defaultValues))
   const remount = () => act(() => remountTab?.())
-  return { user: userEvent.setup(), getApiCalls, isDirty, resetForm, remount }
+  const getApiTokenNameError = () => form?.getFieldState('configuration.authentication.name').error?.message
+  return { user: userEvent.setup(), getApiCalls, isDirty, resetForm, remount, getApiTokenNameError }
 }
 
 const DISABLED_INPUT_CLASSES = DISABLED_INPUT_CLASS_NAME.split(' ')
@@ -401,6 +411,53 @@ describe('ApiCallsTab', () => {
         { name: 'limit', value: '' },
       ],
       headers: [{ name: '', value: '' }],
+    })
+  })
+
+  describe('API token name', () => {
+    const API_TOKEN: HttpAuthenticationForm = { type: 'API_TOKEN', name: 'X-API-Key', value: 'key-1', in: 'HEADER' }
+    const COLLISION = 'datasources.errors.apiTokenNameCollision'
+
+    it('shows and clears the error when a header gets and loses the API token name', async () => {
+      const { user, getApiTokenNameError } = renderApiCallsTab({ apiCalls: [API_CALL], authentication: API_TOKEN })
+      await openApiCall(user)
+      const headerName = screen.getByRole('textbox', { name: 'parameters.header name' })
+
+      await user.clear(headerName)
+      await user.type(headerName, 'x-api-key')
+      await waitFor(() => expect(getApiTokenNameError()).toBe(COLLISION))
+
+      await user.type(headerName, '-2')
+      await waitFor(() => expect(getApiTokenNameError()).toBeUndefined())
+    })
+
+    it('clears the error when the API call with the API token name is deleted', async () => {
+      const { user, getApiTokenNameError } = renderApiCallsTab({ apiCalls: [API_CALL], authentication: API_TOKEN })
+      await openApiCall(user)
+      const headerName = screen.getByRole('textbox', { name: 'parameters.header name' })
+      await user.clear(headerName)
+      await user.type(headerName, 'X-API-Key')
+      await user.click(screen.getByRole('button', { name: 'apply' }))
+      await waitFor(() => expect(getApiTokenNameError()).toBe(COLLISION))
+
+      await user.click(screen.getByRole('button', { name: 'Open menu' }))
+      await user.click(await screen.findByText('delete'))
+      await user.click(screen.getByTestId('confirmButton'))
+
+      await waitFor(() => expect(getApiTokenNameError()).toBeUndefined())
+    })
+
+    it('clears the error when the change of the header is cancelled', async () => {
+      const { user, getApiTokenNameError } = renderApiCallsTab({ apiCalls: [API_CALL], authentication: API_TOKEN })
+      await openApiCall(user)
+      const headerName = screen.getByRole('textbox', { name: 'parameters.header name' })
+      await user.clear(headerName)
+      await user.type(headerName, 'X-API-Key')
+      await waitFor(() => expect(getApiTokenNameError()).toBe(COLLISION))
+
+      await user.click(screen.getByRole('button', { name: 'cancel' }))
+
+      await waitFor(() => expect(getApiTokenNameError()).toBeUndefined())
     })
   })
 

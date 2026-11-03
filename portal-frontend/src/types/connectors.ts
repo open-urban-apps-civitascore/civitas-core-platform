@@ -971,7 +971,9 @@ const HttpApiCallFormSchema =
 
 export type HttpApiCallForm = z.input<typeof HttpApiCallFormSchema>
 
-export type HttpApiCallsForm = { configuration: { baseUrl: string; apiCalls: HttpApiCallForm[] } }
+export type HttpApiCallsForm = {
+  configuration: { baseUrl: string; authentication?: HttpAuthenticationForm; apiCalls: HttpApiCallForm[] }
+}
 
 // Key: index of the API call. Value: its values when the edit view opened, null for a new API call.
 export type ApiCallSnapshots = ReadonlyMap<number, HttpApiCallForm | null>
@@ -989,6 +991,7 @@ export const getParameterNameCollisionPaths = (index: number) =>
     `configuration.apiCalls.${index}.pagination`,
     `configuration.apiCalls.${index}.queryParameters`,
     `configuration.apiCalls.${index}.headers`,
+    'configuration.authentication.name',
   ] as const
 
 const HttpApiCallStrictFormSchema = HttpApiCallBaseFormSchema.extend({
