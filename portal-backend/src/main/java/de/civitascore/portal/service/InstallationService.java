@@ -219,8 +219,8 @@ public class InstallationService {
    * @param input the package to install. If the request names a Data pool, it must be the same.
    * @return the record, with one line for each artifact that the install created
    * @throws ResourceNotFoundException if the Data pool does not exist
-   * @throws InvalidInputException if the request names another Data pool, if the package or one
-   *     of its members fails a check, or if the platform refuses a member
+   * @throws InvalidInputException if the request names another Data pool, if the package or one of
+   *     its members fails a check, or if the platform refuses a member
    * @throws UniqueConstraintViolationException if the Data pool has an active installation of the
    *     package
    */
