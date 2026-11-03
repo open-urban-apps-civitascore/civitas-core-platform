@@ -2,7 +2,6 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.civitascore.modelforge.graph.DependencyGraphService;
 import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
@@ -61,8 +60,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
 
   @Autowired private DataSetRepository dataSetRepository;
-
-  @Autowired private DependencyGraphService dependencyGraph;
 
   @Autowired private DataSourceRepository dataSourceRepository;
 
@@ -1753,7 +1750,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     void sinkUsingACopiedRootMarksUsageAndBlocksUnrelease() {
       DataStructureVersionOutputDTO copy = duplicateCreated(dataStructureId, versionId1);
       String grouping = UrnParser.withArtifactType(copy.getModelUrn(), "datastructure");
-      assertThat(dependencyGraph.getDependencies(grouping)).contains(copy.getModelUrn());
+      assertThat(modelRegistryGateway.dependencyUrns(grouping)).contains(copy.getModelUrn());
       DataSet dataSet = portalData.dataSet();
       DataSinkInputDTO input = new DataSinkInputDTO();
       input.setDataSinkType(DataSinkType.POSTGIS);
