@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { AxiosError } from 'axios'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { get, useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import {
@@ -19,7 +19,9 @@ import {
   ConnectorFormToApiSchema,
   ConnectorTabCompleteSchema,
   ConnectorType,
+  emptyHttpAuthentication,
   HttpApiCallsStrictSchema,
+  HttpAuthenticationType,
 } from '@/types/connectors'
 import { Datapool } from '@/types/datapools'
 import {
@@ -129,6 +131,27 @@ export const useDatasourceForm = (
     setSelectedConnectorType(connectorTypeWatch)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectorTypeWatch])
+
+  const authenticationTypeWatch = useWatch({
+    control: form.control,
+    name: 'configuration.authentication.type',
+  }) as HttpAuthenticationType | undefined
+
+  useEffect(() => {
+    if (connectorTypeWatch !== CONNECTOR_TYPES.HTTP || !authenticationTypeWatch) return
+    const isLoadedHttpConnector = initialFormValues?.connectorType === CONNECTOR_TYPES.HTTP
+    if (
+      isLoadedHttpConnector &&
+      get(initialFormValues, 'configuration.authentication.type') === authenticationTypeWatch
+    ) {
+      form.resetField('configuration.authentication')
+    } else {
+      form.setValue('configuration.authentication', emptyHttpAuthentication(authenticationTypeWatch), {
+        shouldDirty: true,
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authenticationTypeWatch])
 
   const isDraftMode = dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
   const hasStatusChanged = dataSourceStatus !== datasource.dataSourceStatus

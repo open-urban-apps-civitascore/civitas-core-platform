@@ -128,19 +128,19 @@ const validateMqttSchemes = (configuration: { urls?: unknown; tls?: boolean }, c
   }
 }
 
-export type FieldRevalidationRule = { watch: string; revalidate: string }
+export type FieldRevalidationRule = { watch: string; revalidate: string[] }
 
 /**
  * For each connector type, declares a configuration field whose change should re-trigger
- * validation of another field (e.g. toggling MQTT's `tls` must re-validate `urls`, since
+ * validation of other fields (e.g. toggling MQTT's `tls` must re-validate `urls`, since
  * `validateMqttSchemes` above reads `configuration.tls` when validating `configuration.urls`).
  * Colocating this with the schema that owns the cross-field relationship keeps it a single
  * source of truth. `null` means the connector type has no such rule.
  */
 export const CONNECTOR_FIELD_REVALIDATION_RULES: Record<ConnectorType, FieldRevalidationRule | null> = {
-  [CONNECTOR_TYPES.MQTT]: { watch: 'tls', revalidate: 'urls' },
+  [CONNECTOR_TYPES.MQTT]: { watch: 'tls', revalidate: ['urls'] },
   [CONNECTOR_TYPES.SQL]: null,
-  [CONNECTOR_TYPES.HTTP]: { watch: 'authentication.type', revalidate: 'authentication' },
+  [CONNECTOR_TYPES.HTTP]: { watch: 'authentication.type', revalidate: ['authentication', 'baseUrl'] },
 }
 
 export const MqttLooseSchema = MqttBaseSchema.partial()
@@ -266,7 +266,31 @@ const HttpAuthenticationApiResponseSchema = z.discriminatedUnion('type', [
     username: z.string().nullable().optional(),
     password: z.string().nullable().optional(),
   }),
+  z.object({
+    type: z.literal(HTTP_AUTHENTICATION_TYPES.BEARER_TOKEN),
+    token: z.string().nullable().optional(),
+  }),
+  z.object({
+    type: z.literal(HTTP_AUTHENTICATION_TYPES.API_TOKEN),
+    name: z.string().nullable().optional(),
+    value: z.string().nullable().optional(),
+    in: z.enum(HTTP_PARAMETER_LOCATIONS).nullable().optional(),
+  }),
+  z.object({
+    type: z.literal(HTTP_AUTHENTICATION_TYPES.OAUTH2),
+    tokenUrl: z.string().nullable().optional(),
+    clientId: z.string().nullable().optional(),
+    clientSecret: z.string().nullable().optional(),
+    scope: z.string().nullable().optional(),
+  }),
+  z.object({
+    type: z.literal(HTTP_AUTHENTICATION_TYPES.CLIENT_CERTIFICATE),
+    certificate: z.string().nullable().optional(),
+    privateKey: z.string().nullable().optional(),
+  }),
 ])
+
+type HttpAuthenticationApiResponse = z.infer<typeof HttpAuthenticationApiResponseSchema>
 
 const HttpPageNumberPaginationApiResponseSchema = z.object({
   type: z.literal(HTTP_PAGINATION_TYPES.PAGE_NUMBER),
@@ -370,42 +394,185 @@ export const HttpApiResponseSchema = z.object({
   apiCalls: z.array(HttpApiCallApiResponseSchema).nullable().optional(),
 })
 
-export const HttpApiToFormSchema = HttpApiResponseSchema.transform(({ baseUrl, authentication, apiCalls }) => {
-  const isBasic = authentication?.type === HTTP_AUTHENTICATION_TYPES.BASIC
-  return {
-    baseUrl: baseUrl ?? undefined,
-    authentication: {
-      type: authentication?.type ?? HTTP_AUTHENTICATION_TYPES.NONE,
-      username: isBasic ? (authentication.username ?? '') : '',
-      password: isBasic ? (authentication.password ?? '') : '',
-    },
-    apiCalls: apiCalls ?? [],
-  }
-})
+const HttpAuthenticationFormSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal(HTTP_AUTHENTICATION_TYPES.NONE) }),
+  z.object({
+    type: z.literal(HTTP_AUTHENTICATION_TYPES.BASIC),
+    username: z.string().trim().optional(),
+    password: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal(HTTP_AUTHENTICATION_TYPES.BEARER_TOKEN),
+    token: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal(HTTP_AUTHENTICATION_TYPES.API_TOKEN),
+    name: z.string().trim().optional(),
+    value: z.string().optional(),
+    in: z.enum(HTTP_PARAMETER_LOCATIONS),
+  }),
+  z.object({
+    type: z.literal(HTTP_AUTHENTICATION_TYPES.OAUTH2),
+    tokenUrl: z.string().trim().optional(),
+    clientId: z.string().trim().optional(),
+    clientSecret: z.string().optional(),
+    scope: z.string().trim().optional(),
+  }),
+  z.object({
+    type: z.literal(HTTP_AUTHENTICATION_TYPES.CLIENT_CERTIFICATE),
+    certificate: z.string().trim().optional(),
+    privateKey: z.string().trim().optional(),
+  }),
+])
 
-const HttpAuthenticationFormSchema = z.object({
-  type: z.enum(HTTP_AUTHENTICATION_TYPES),
-  username: z.string().trim().optional(),
-  password: z.string().optional(),
-})
+export type HttpAuthenticationForm = z.infer<typeof HttpAuthenticationFormSchema>
 
-type HttpAuthenticationForm = z.infer<typeof HttpAuthenticationFormSchema>
+export type HttpAuthenticationType = (typeof HTTP_AUTHENTICATION_TYPES)[keyof typeof HTTP_AUTHENTICATION_TYPES]
 
-const validateBasicUsername = (authentication: HttpAuthenticationForm, ctx: z.RefinementCtx) => {
-  if (authentication.type !== HTTP_AUTHENTICATION_TYPES.BASIC) return
-  if (authentication.username?.includes(':')) {
-    ctx.addIssue({ code: 'custom', path: ['username'], message: 'datasources.errors.usernameColon' })
+export const emptyHttpAuthentication = (type: HttpAuthenticationType): HttpAuthenticationForm => {
+  switch (type) {
+    case HTTP_AUTHENTICATION_TYPES.NONE:
+      return { type }
+    case HTTP_AUTHENTICATION_TYPES.BASIC:
+      return { type, username: '', password: '' }
+    case HTTP_AUTHENTICATION_TYPES.BEARER_TOKEN:
+      return { type, token: '' }
+    case HTTP_AUTHENTICATION_TYPES.API_TOKEN:
+      return { type, name: '', value: '', in: HTTP_PARAMETER_LOCATIONS.HEADER }
+    case HTTP_AUTHENTICATION_TYPES.OAUTH2:
+      return { type, tokenUrl: '', clientId: '', clientSecret: '', scope: '' }
+    case HTTP_AUTHENTICATION_TYPES.CLIENT_CERTIFICATE:
+      return { type, certificate: '', privateKey: '' }
   }
 }
 
-const requireBasicCredentials = (authentication: HttpAuthenticationForm, ctx: z.RefinementCtx) => {
-  if (authentication.type !== HTTP_AUTHENTICATION_TYPES.BASIC) return
-  validateBasicUsername(authentication, ctx)
-  if (!authentication.username) {
-    ctx.addIssue({ code: 'custom', path: ['username'], message: 'common.errors.required' })
+const toAuthenticationForm = (
+  authentication: HttpAuthenticationApiResponse | null | undefined,
+): HttpAuthenticationForm => {
+  if (!authentication) return { type: HTTP_AUTHENTICATION_TYPES.NONE }
+  switch (authentication.type) {
+    case HTTP_AUTHENTICATION_TYPES.NONE:
+      return { type: authentication.type }
+    case HTTP_AUTHENTICATION_TYPES.BASIC:
+      return {
+        type: authentication.type,
+        username: authentication.username ?? '',
+        password: authentication.password ?? '',
+      }
+    case HTTP_AUTHENTICATION_TYPES.BEARER_TOKEN:
+      return { type: authentication.type, token: authentication.token ?? '' }
+    case HTTP_AUTHENTICATION_TYPES.API_TOKEN:
+      return {
+        type: authentication.type,
+        name: authentication.name ?? '',
+        value: authentication.value ?? '',
+        in: authentication.in ?? HTTP_PARAMETER_LOCATIONS.HEADER,
+      }
+    case HTTP_AUTHENTICATION_TYPES.OAUTH2:
+      return {
+        type: authentication.type,
+        tokenUrl: authentication.tokenUrl ?? '',
+        clientId: authentication.clientId ?? '',
+        clientSecret: authentication.clientSecret ?? '',
+        scope: authentication.scope ?? '',
+      }
+    case HTTP_AUTHENTICATION_TYPES.CLIENT_CERTIFICATE:
+      return {
+        type: authentication.type,
+        certificate: authentication.certificate ?? '',
+        privateKey: authentication.privateKey ?? '',
+      }
   }
-  if (!authentication.password) {
-    ctx.addIssue({ code: 'custom', path: ['password'], message: 'common.errors.required' })
+}
+
+export const HttpApiToFormSchema = HttpApiResponseSchema.transform(({ baseUrl, authentication, apiCalls }) => ({
+  baseUrl: baseUrl ?? undefined,
+  authentication: toAuthenticationForm(authentication),
+  apiCalls: apiCalls ?? [],
+}))
+
+const SECRET_PLACEHOLDER = '********'
+const PEM_CERTIFICATES =
+  /^-----BEGIN CERTIFICATE-----[^-]+-----END CERTIFICATE-----(?:\s+-----BEGIN CERTIFICATE-----[^-]+-----END CERTIFICATE-----)*$/
+const ENCRYPTED_PRIVATE_KEY = '-----BEGIN ENCRYPTED PRIVATE KEY-----'
+const ENCRYPTED_PEM_HEADER = 'Proc-Type: 4,ENCRYPTED'
+const PRIVATE_KEYS = ['-----BEGIN PRIVATE KEY-----', '-----BEGIN RSA PRIVATE KEY-----']
+const HTTP_SCHEME = /^http:/i
+const HTTPS_SCHEME = /^https:/i
+const QUERY_OR_FRAGMENT = /[?#]/
+
+const getTokenUrlError = (tokenUrl: string) => {
+  if (QUERY_OR_FRAGMENT.test(tokenUrl)) return 'datasources.errors.tokenUrlQueryOrFragment'
+  if (!isValidHttpBaseUrl(tokenUrl)) return 'datasources.errors.invalidTokenUrl'
+  if (!HTTPS_SCHEME.test(tokenUrl)) return 'datasources.errors.tokenUrlHttps'
+  if (hasUrlCredentials(tokenUrl)) return 'datasources.errors.tokenUrlCredentials'
+  return undefined
+}
+
+const getPrivateKeyError = (privateKey: string) => {
+  const isEncrypted = privateKey.startsWith(ENCRYPTED_PRIVATE_KEY) || privateKey.includes(ENCRYPTED_PEM_HEADER)
+  if (isEncrypted) return 'datasources.errors.encryptedPrivateKey'
+  if (!PRIVATE_KEYS.some(header => privateKey.startsWith(header))) return 'datasources.errors.invalidPrivateKey'
+  return undefined
+}
+
+const validateAuthentication = (authentication: HttpAuthenticationForm, ctx: z.RefinementCtx) => {
+  const addIssue = (field: string, message: string) => ctx.addIssue({ code: 'custom', path: [field], message })
+  switch (authentication.type) {
+    case HTTP_AUTHENTICATION_TYPES.BASIC:
+      if (authentication.username?.includes(':')) {
+        addIssue('username', 'datasources.errors.usernameColon')
+      }
+      break
+    case HTTP_AUTHENTICATION_TYPES.API_TOKEN: {
+      const { name } = authentication
+      const nameError =
+        name && authentication.in === HTTP_PARAMETER_LOCATIONS.HEADER ? getHeaderNameError(name, true) : undefined
+      if (nameError) {
+        addIssue('name', nameError)
+      }
+      break
+    }
+    case HTTP_AUTHENTICATION_TYPES.OAUTH2: {
+      const tokenUrlError = authentication.tokenUrl ? getTokenUrlError(authentication.tokenUrl) : undefined
+      if (tokenUrlError) {
+        addIssue('tokenUrl', tokenUrlError)
+      }
+      break
+    }
+    case HTTP_AUTHENTICATION_TYPES.CLIENT_CERTIFICATE: {
+      const { certificate, privateKey } = authentication
+      if (certificate && certificate !== SECRET_PLACEHOLDER && !PEM_CERTIFICATES.test(certificate)) {
+        addIssue('certificate', 'datasources.errors.invalidCertificate')
+      }
+      const privateKeyError =
+        privateKey && privateKey !== SECRET_PLACEHOLDER ? getPrivateKeyError(privateKey) : undefined
+      if (privateKeyError) {
+        addIssue('privateKey', privateKeyError)
+      }
+      break
+    }
+  }
+}
+
+const requireAuthentication = (authentication: HttpAuthenticationForm, ctx: z.RefinementCtx) => {
+  validateAuthentication(authentication, ctx)
+  switch (authentication.type) {
+    case HTTP_AUTHENTICATION_TYPES.BASIC:
+      requireFields(authentication, ['username', 'password'], ctx)
+      break
+    case HTTP_AUTHENTICATION_TYPES.BEARER_TOKEN:
+      requireFields(authentication, ['token'], ctx)
+      break
+    case HTTP_AUTHENTICATION_TYPES.API_TOKEN:
+      requireFields(authentication, ['name', 'value', 'in'], ctx)
+      break
+    case HTTP_AUTHENTICATION_TYPES.OAUTH2:
+      requireFields(authentication, ['tokenUrl', 'clientId', 'clientSecret'], ctx)
+      break
+    case HTTP_AUTHENTICATION_TYPES.CLIENT_CERTIFICATE:
+      requireFields(authentication, ['certificate', 'privateKey'], ctx)
+      break
   }
 }
 
@@ -447,10 +614,10 @@ const requireParameterName = (parameter: HttpParameterForm, ctx: z.RefinementCtx
   }
 }
 
-const getHeaderNameError = (name: string) => {
+const getHeaderNameError = (name: string, isCredentialHeaderAllowed = false) => {
   if (!HTTP_HEADER_NAME.test(name)) return 'datasources.errors.invalidHeaderName'
   const lowerCaseName = name.toLowerCase()
-  if (CREDENTIAL_HEADERS.has(lowerCaseName)) return 'datasources.errors.credentialHeader'
+  if (!isCredentialHeaderAllowed && CREDENTIAL_HEADERS.has(lowerCaseName)) return 'datasources.errors.credentialHeader'
   if (CLIENT_HEADERS.has(lowerCaseName)) return 'datasources.errors.clientHeader'
   return undefined
 }
@@ -629,9 +796,13 @@ const REQUIRED_PAGE_NUMBER_FIELDS = ['pageParameter', 'pageSizeParameter', 'page
 const REQUIRED_LIMIT_OFFSET_FIELDS = ['offsetParameter'] as const
 const REQUIRED_CURSOR_FIELDS = ['cursorPath', 'cursorParameter'] as const
 
-const requireFields = <K extends string>(pagination: Record<K, string>, fields: readonly K[], ctx: z.RefinementCtx) => {
+const requireFields = <K extends string>(
+  values: Partial<Record<K, string>>,
+  fields: readonly K[],
+  ctx: z.RefinementCtx,
+) => {
   for (const field of fields) {
-    if (!pagination[field]) {
+    if (!values[field]) {
       ctx.addIssue({ code: 'custom', path: [field], message: 'common.errors.required' })
     }
   }
@@ -837,25 +1008,65 @@ export const HttpApiCallsStrictSchema = z
   .min(1, 'common.errors.required')
   .max(MAX_HTTP_API_CALLS, 'datasources.errors.apiCallsMax')
 
-export const HttpLooseSchema = z.object({
+const HttpLooseBaseSchema = z.object({
   baseUrl: HttpBaseUrlSchema.optional(),
-  authentication: HttpAuthenticationFormSchema.superRefine(validateBasicUsername).optional(),
+  authentication: HttpAuthenticationFormSchema.superRefine(validateAuthentication).optional(),
   apiCalls: HttpApiCallsLooseSchema.optional(),
 })
 
-export const HttpStrictSchema = z.object({
+type HttpConfigurationOutput = z.output<typeof HttpLooseBaseSchema>
+
+const collidesWithApiCall = (token: RequestParameter, apiCall: z.output<typeof HttpApiCallFormSchema>) => {
+  const sentParameters: RequestParameter[] = [
+    ...apiCall.queryParameters.map(({ name }) => ({ name, location: HTTP_PARAMETER_LOCATIONS.QUERY })),
+    ...apiCall.headers.map(({ name }) => ({ name, location: HTTP_PARAMETER_LOCATIONS.HEADER })),
+    ...(apiCall.pagination.isEnabled ? getPaginationParameters(apiCall.pagination) : []),
+  ]
+  return sentParameters.some(parameter => isSameName(token, parameter))
+}
+
+const validateHttpAuthenticationContext = (configuration: HttpConfigurationOutput, ctx: z.RefinementCtx) => {
+  const { baseUrl, authentication, apiCalls } = configuration
+  if (!authentication) return
+  if (authentication.type !== HTTP_AUTHENTICATION_TYPES.NONE && baseUrl && HTTP_SCHEME.test(baseUrl)) {
+    ctx.addIssue({ code: 'custom', path: ['baseUrl'], message: 'datasources.errors.baseUrlHttpsRequired' })
+  }
+  if (authentication.type !== HTTP_AUTHENTICATION_TYPES.API_TOKEN || !authentication.name) return
+  const token = { name: authentication.name, location: authentication.in }
+  if (apiCalls?.some(apiCall => collidesWithApiCall(token, apiCall))) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['authentication', 'name'],
+      message: 'datasources.errors.apiTokenNameCollision',
+    })
+  }
+}
+
+export const HttpLooseSchema = HttpLooseBaseSchema.superRefine(validateHttpAuthenticationContext)
+
+const HttpStrictConnectionSchema = z.object({
   baseUrl: z.string().trim().min(1, 'common.errors.required').pipe(HttpBaseUrlSchema),
-  authentication: HttpAuthenticationFormSchema.superRefine(requireBasicCredentials),
-  apiCalls: HttpApiCallsStrictSchema,
+  authentication: HttpAuthenticationFormSchema.superRefine(requireAuthentication),
 })
 
-const HttpFormToApiSchema = HttpLooseSchema.transform(({ authentication, apiCalls, ...rest }) => {
-  const apiCallsApi = apiCalls?.map(apiCall => ({ ...apiCall, pagination: toPaginationApi(apiCall.pagination) }))
-  if (authentication?.type === HTTP_AUTHENTICATION_TYPES.BASIC) {
-    return { ...rest, apiCalls: apiCallsApi, authentication }
+export const HttpStrictSchema = HttpStrictConnectionSchema.extend({ apiCalls: HttpApiCallsStrictSchema }).superRefine(
+  validateHttpAuthenticationContext,
+)
+
+const toAuthenticationApi = (authentication: HttpAuthenticationForm | undefined) => {
+  if (!authentication) return { type: HTTP_AUTHENTICATION_TYPES.NONE }
+  if (authentication.type === HTTP_AUTHENTICATION_TYPES.OAUTH2 && !authentication.scope) {
+    const { scope: _scope, ...withoutScope } = authentication
+    return withoutScope
   }
-  return { ...rest, apiCalls: apiCallsApi, authentication: { type: HTTP_AUTHENTICATION_TYPES.NONE } }
-})
+  return authentication
+}
+
+const HttpFormToApiSchema = HttpLooseSchema.transform(({ authentication, apiCalls, ...rest }) => ({
+  ...rest,
+  apiCalls: apiCalls?.map(apiCall => ({ ...apiCall, pagination: toPaginationApi(apiCall.pagination) })),
+  authentication: toAuthenticationApi(authentication),
+}))
 
 const MqttFormToApiSchema = MqttLooseSchema.transform(({ tls, ...rest }) => ({
   ...rest,
@@ -894,7 +1105,7 @@ export const ConnectorStrictSchema = connectorUnion({
 export const ConnectorTabCompleteSchema = connectorUnion({
   MQTT: MqttStrictSchema,
   SQL: SqlStrictSchema,
-  HTTP: HttpStrictSchema.omit({ apiCalls: true }),
+  HTTP: HttpStrictConnectionSchema.superRefine(validateHttpAuthenticationContext),
 })
 export const ConnectorApiToFormSchema = connectorUnion({
   MQTT: MqttApiToFormSchema,

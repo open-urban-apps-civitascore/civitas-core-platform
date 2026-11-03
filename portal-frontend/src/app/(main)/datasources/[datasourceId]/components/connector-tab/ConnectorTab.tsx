@@ -68,7 +68,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
       return
     }
     if (revalidationRule) {
-      void form.trigger(`configuration.${revalidationRule.revalidate}` as Path<DatasourceFormDraft>)
+      void form.trigger(revalidationRule.revalidate.map(path => `configuration.${path}` as Path<DatasourceFormDraft>))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedFieldValue])

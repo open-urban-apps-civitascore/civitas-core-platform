@@ -1,4 +1,5 @@
 import { CONNECTOR_TYPES } from '@/const/connectors'
+import { DataSourceDraftSchema } from '@/generated/core'
 import {
   CURSOR_PAGINATION_API,
   CURSOR_PAGINATION_FORM,
@@ -14,11 +15,14 @@ import {
   EMPTY_CURSOR_PAGINATION,
   EMPTY_LIMIT_OFFSET_PAGINATION,
   EMPTY_PAGINATION,
+  emptyHttpAuthentication,
   HttpApiCallForm,
+  HttpApiToFormSchema,
   HttpCursorPaginationForm,
   HttpLimitOffsetPaginationForm,
   HttpLooseSchema,
   HttpPaginationForm,
+  HttpParameterLocation,
   HttpStrictSchema,
   MqttLooseSchema,
   MqttStrictSchema,
@@ -248,7 +252,7 @@ describe('HTTP connector schemas', () => {
     expect(result.error?.issues).toContainEqual(expect.objectContaining({ path }))
   })
 
-  it('maps a missing authentication from the API to None with empty credentials', () => {
+  it('maps a missing authentication from the API to None', () => {
     const result = ConnectorApiToFormSchema.parse({
       connectorType: CONNECTOR_TYPES.HTTP,
       configuration: { baseUrl: 'https://api.example.org/v1', authentication: null, apiCalls: null },
@@ -256,7 +260,7 @@ describe('HTTP connector schemas', () => {
 
     expect(result.configuration).toEqual({
       baseUrl: 'https://api.example.org/v1',
-      authentication: NONE,
+      authentication: { type: 'NONE' },
       apiCalls: [],
     })
   })
@@ -290,6 +294,320 @@ describe('HTTP connector schemas', () => {
     })
 
     expect(result).toMatchObject({ authentication: BASIC })
+  })
+
+  describe('authentication', () => {
+    const BASE_URL = 'https://api.example.org/v1'
+    const CERTIFICATE = '-----BEGIN CERTIFICATE-----\nMIIBtest1\n-----END CERTIFICATE-----'
+    const SECOND_CERTIFICATE = '-----BEGIN CERTIFICATE-----\nMIIBtest2\n-----END CERTIFICATE-----'
+    const PRIVATE_KEY = '-----BEGIN PRIVATE KEY-----\nMIIEtest\n-----END PRIVATE KEY-----'
+    const RSA_PRIVATE_KEY = '-----BEGIN RSA PRIVATE KEY-----\nMIIEtest\n-----END RSA PRIVATE KEY-----'
+    const ENCRYPTED_PRIVATE_KEY = '-----BEGIN ENCRYPTED PRIVATE KEY-----\nMIIEtest\n-----END ENCRYPTED PRIVATE KEY-----'
+    const ENCRYPTED_RSA_PRIVATE_KEY =
+      '-----BEGIN RSA PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-256-CBC,0011\n\nMIIEtest\n-----END RSA PRIVATE KEY-----'
+    const AUTHENTICATIONS = {
+      BASIC,
+      BEARER_TOKEN: { type: 'BEARER_TOKEN' as const, token: 'token-1' },
+      API_TOKEN: {
+        type: 'API_TOKEN' as const,
+        name: 'X-API-Key',
+        value: 'key-1',
+        in: 'HEADER' as HttpParameterLocation,
+      },
+      OAUTH2: {
+        type: 'OAUTH2' as const,
+        tokenUrl: 'https://auth.example.org/oauth2/token',
+        clientId: 'client-1',
+        clientSecret: 'secret-1',
+        scope: 'read write',
+      },
+      CLIENT_CERTIFICATE: { type: 'CLIENT_CERTIFICATE' as const, certificate: CERTIFICATE, privateKey: PRIVATE_KEY },
+    }
+    const API_TOKEN = AUTHENTICATIONS.API_TOKEN
+    const OAUTH2 = AUTHENTICATIONS.OAUTH2
+    const CLIENT_CERTIFICATE = AUTHENTICATIONS.CLIENT_CERTIFICATE
+
+    const loadAuthentication = (authentication: Record<string, unknown>) =>
+      HttpApiToFormSchema.parse({ baseUrl: BASE_URL, authentication, apiCalls: null }).authentication
+
+    const sendAuthentication = (authentication: Record<string, unknown>) =>
+      ConnectorFormToApiSchema.parse({
+        connectorType: CONNECTOR_TYPES.HTTP,
+        configuration: { baseUrl: BASE_URL, authentication, apiCalls: [API_CALL] },
+      }) as { connectorType: string; authentication: Record<string, unknown> }
+
+    const strictIssues = (authentication: Record<string, unknown>, configuration: Record<string, unknown> = {}) => {
+      const result = HttpStrictSchema.safeParse({
+        baseUrl: BASE_URL,
+        authentication,
+        apiCalls: [API_CALL],
+        ...configuration,
+      })
+      return result.success ? [] : result.error.issues
+    }
+
+    const issue = (path: (string | number)[], message: string) => expect.objectContaining({ path, message })
+
+    it.each(Object.values(AUTHENTICATIONS))('loads the authentication $type', authentication => {
+      expect(loadAuthentication(authentication)).toEqual(authentication)
+    })
+
+    it('loads None', () => {
+      expect(loadAuthentication({ type: 'NONE' })).toEqual({ type: 'NONE' })
+    })
+
+    it.each([
+      ['BASIC', { username: 'reader', password: '********' }],
+      ['BEARER_TOKEN', { token: '********' }],
+      ['API_TOKEN', { name: 'X-API-Key', value: '********', in: 'QUERY' }],
+      ['OAUTH2', { tokenUrl: OAUTH2.tokenUrl, clientId: 'client-1', clientSecret: '********', scope: '' }],
+      ['CLIENT_CERTIFICATE', { certificate: '********', privateKey: '********' }],
+    ])('keeps the masked secrets of %s', (type, fields) => {
+      expect(loadAuthentication({ type, ...fields })).toEqual({ type, ...fields })
+    })
+
+    it.each([
+      ['BASIC', { username: null, password: null }, { username: '', password: '' }],
+      ['BEARER_TOKEN', { token: null }, { token: '' }],
+      ['API_TOKEN', { name: null, value: null, in: null }, { name: '', value: '', in: 'HEADER' }],
+      [
+        'OAUTH2',
+        { tokenUrl: null, clientId: null, clientSecret: null, scope: null },
+        { tokenUrl: '', clientId: '', clientSecret: '', scope: '' },
+      ],
+      ['CLIENT_CERTIFICATE', { certificate: null, privateKey: null }, { certificate: '', privateKey: '' }],
+    ])('loads the empty values of %s as empty fields', (type, apiFields, formFields) => {
+      expect(loadAuthentication({ type, ...apiFields })).toEqual({ type, ...formFields })
+    })
+
+    it.each([
+      ['NONE', { type: 'NONE' }],
+      ['BASIC', { type: 'BASIC', username: '', password: '' }],
+      ['BEARER_TOKEN', { type: 'BEARER_TOKEN', token: '' }],
+      ['API_TOKEN', { type: 'API_TOKEN', name: '', value: '', in: 'HEADER' }],
+      ['OAUTH2', { type: 'OAUTH2', tokenUrl: '', clientId: '', clientSecret: '', scope: '' }],
+      ['CLIENT_CERTIFICATE', { type: 'CLIENT_CERTIFICATE', certificate: '', privateKey: '' }],
+    ] as const)('creates the empty fields of %s', (type, expected) => {
+      expect(emptyHttpAuthentication(type)).toEqual(expected)
+    })
+
+    it.each(Object.values(AUTHENTICATIONS))('sends only the fields of $type', authentication => {
+      const result = sendAuthentication({ username: 'other', token: 'other', scope: 'other', ...authentication })
+
+      expect(result).toMatchObject({ authentication })
+      expect(Object.keys(result.authentication)).toEqual(Object.keys(authentication))
+    })
+
+    it.each([{ type: 'NONE' }, ...Object.values(AUTHENTICATIONS)])(
+      'sends a payload for $type that the CORE schema accepts',
+      authentication => {
+        const { connectorType, ...connectorFields } = sendAuthentication(authentication)
+        const coreDoc = { connectionType: connectorType.toLowerCase(), ...connectorFields }
+
+        expect(DataSourceDraftSchema.safeParse(coreDoc).success).toBe(true)
+      },
+    )
+
+    it('sends the certificate and the private key without surrounding whitespace', () => {
+      const result = sendAuthentication({
+        ...CLIENT_CERTIFICATE,
+        certificate: `\n${CERTIFICATE}\n`,
+        privateKey: `\n${PRIVATE_KEY}\n`,
+      })
+
+      expect(result.authentication).toEqual(CLIENT_CERTIFICATE)
+    })
+
+    it('sends OAuth2 without an empty scope', () => {
+      const result = sendAuthentication({ ...OAUTH2, scope: ' ' })
+
+      const { scope: _scope, ...withoutScope } = OAUTH2
+      expect(result.authentication).toEqual(withoutScope)
+    })
+
+    it('sends None for a missing authentication', () => {
+      const result = ConnectorFormToApiSchema.parse({
+        connectorType: CONNECTOR_TYPES.HTTP,
+        configuration: { baseUrl: BASE_URL },
+      })
+
+      expect(result).toMatchObject({ authentication: { type: 'NONE' } })
+    })
+
+    it.each(Object.values(AUTHENTICATIONS))('accepts a complete $type for release', authentication => {
+      expect(strictIssues(authentication)).toEqual([])
+    })
+
+    it.each([
+      ['BEARER_TOKEN', 'token'],
+      ['API_TOKEN', 'name'],
+      ['API_TOKEN', 'value'],
+      ['OAUTH2', 'tokenUrl'],
+      ['OAUTH2', 'clientId'],
+      ['OAUTH2', 'clientSecret'],
+      ['CLIENT_CERTIFICATE', 'certificate'],
+      ['CLIENT_CERTIFICATE', 'privateKey'],
+    ] as const)('requires %s %s for release', (type, field) => {
+      expect(strictIssues({ ...AUTHENTICATIONS[type], [field]: '' })).toContainEqual(
+        issue(['authentication', field], 'common.errors.required'),
+      )
+    })
+
+    it('does not require the OAuth2 scope for release', () => {
+      expect(strictIssues({ ...OAUTH2, scope: '' })).toEqual([])
+    })
+
+    it.each(Object.values(AUTHENTICATIONS))('accepts an empty $type in a draft', ({ type }) => {
+      expect(looseIssues({ baseUrl: BASE_URL, authentication: emptyHttpAuthentication(type) })).toEqual([])
+    })
+
+    it.each(Object.values(AUTHENTICATIONS))('rejects an http API host for $type', authentication => {
+      expect(looseIssues({ baseUrl: 'HTTP://api.example.org', authentication })).toContainEqual(
+        issue(['baseUrl'], 'datasources.errors.baseUrlHttpsRequired'),
+      )
+    })
+
+    it('accepts an http API host for None', () => {
+      expect(looseIssues({ baseUrl: 'http://api.example.org', authentication: { type: 'NONE' } })).toEqual([])
+    })
+
+    it.each([
+      ['http://auth.example.org/token', 'datasources.errors.tokenUrlHttps'],
+      ['https://auth.example.org/token?scope=read', 'datasources.errors.tokenUrlQueryOrFragment'],
+      ['https://auth.example.org/token#part', 'datasources.errors.tokenUrlQueryOrFragment'],
+      ['https://client:secret@auth.example.org/token', 'datasources.errors.tokenUrlCredentials'],
+      ['auth.example.org/token', 'datasources.errors.invalidTokenUrl'],
+      ['ftp://auth.example.org/token', 'datasources.errors.invalidTokenUrl'],
+    ])('rejects the token URL %s', (tokenUrl, message) => {
+      expect(looseIssues({ authentication: { ...OAUTH2, tokenUrl } })).toContainEqual(
+        issue(['authentication', 'tokenUrl'], message),
+      )
+    })
+
+    it('accepts an https token URL in any case', () => {
+      expect(looseIssues({ authentication: { ...OAUTH2, tokenUrl: 'HTTPS://auth.example.org/token' } })).toEqual([])
+    })
+
+    it.each([
+      ['an invalid header name', 'Bad Name', 'datasources.errors.invalidHeaderName'],
+      ['a header the HTTP client sets', 'Host', 'datasources.errors.clientHeader'],
+    ])('rejects %s as API token header', (_name, name, message) => {
+      expect(looseIssues({ authentication: { ...API_TOKEN, name } })).toContainEqual(
+        issue(['authentication', 'name'], message),
+      )
+    })
+
+    it.each(['Authorization', 'Proxy-Authorization', 'Cookie'])('accepts %s as API token header', name => {
+      expect(looseIssues({ authentication: { ...API_TOKEN, name } })).toEqual([])
+    })
+
+    it('accepts as API token query parameter what is not allowed in a header', () => {
+      expect(looseIssues({ authentication: { ...API_TOKEN, name: 'Bad Name', in: 'QUERY' } })).toEqual([])
+    })
+
+    describe('API token name collision', () => {
+      const collisionIssues = (token: Partial<typeof API_TOKEN>, apiCall: Partial<HttpApiCallForm>) =>
+        looseIssues({
+          baseUrl: BASE_URL,
+          authentication: { ...API_TOKEN, ...token },
+          apiCalls: [{ ...API_CALL, ...apiCall }],
+        })
+      const collision = issue(['authentication', 'name'], 'datasources.errors.apiTokenNameCollision')
+
+      it.each<[string, Partial<typeof API_TOKEN>, Partial<HttpApiCallForm>]>([
+        ['a header in another case', { name: 'X-API-Key' }, { headers: [{ name: 'x-api-key', value: 'x' }] }],
+        ['a query parameter', { name: 'key', in: 'QUERY' }, { queryParameters: [{ name: 'key', value: 'x' }] }],
+        ['the page parameter', { name: 'page', in: 'QUERY' }, { pagination: PAGINATION_FORM }],
+        [
+          'the offset parameter',
+          { name: 'offset', in: 'QUERY' },
+          { pagination: { ...EMPTY_LIMIT_OFFSET_PAGINATION, isEnabled: true, offsetParameter: 'offset' } },
+        ],
+        [
+          'the limit parameter',
+          { name: 'limit', in: 'QUERY' },
+          {
+            pagination: {
+              ...EMPTY_LIMIT_OFFSET_PAGINATION,
+              isEnabled: true,
+              offsetParameter: 'o',
+              limitParameter: 'limit',
+              limit: '5',
+            },
+          },
+        ],
+        [
+          'a cursor query parameter',
+          { name: 'cursor', in: 'QUERY' },
+          { pagination: { ...EMPTY_CURSOR_PAGINATION, isEnabled: true, cursorParameter: 'cursor' } },
+        ],
+        [
+          'a cursor header',
+          { name: 'X-Cursor' },
+          {
+            pagination: {
+              ...EMPTY_CURSOR_PAGINATION,
+              isEnabled: true,
+              cursorParameter: 'x-cursor',
+              cursorIn: 'HEADER',
+            },
+          },
+        ],
+      ])('rejects a name equal to %s', (_name, token, apiCall) => {
+        expect(collisionIssues(token, apiCall)).toContainEqual(collision)
+      })
+
+      it.each<[string, Partial<typeof API_TOKEN>, Partial<HttpApiCallForm>]>([
+        [
+          'a query parameter in another case',
+          { name: 'key', in: 'QUERY' },
+          { queryParameters: [{ name: 'Key', value: 'x' }] },
+        ],
+        ['a query parameter for a header', { name: 'key' }, { queryParameters: [{ name: 'key', value: 'x' }] }],
+        ['a header for a query parameter', { name: 'key', in: 'QUERY' }, { headers: [{ name: 'key', value: 'x' }] }],
+        [
+          'a disabled pagination',
+          { name: 'page', in: 'QUERY' },
+          { pagination: { ...PAGINATION_FORM, isEnabled: false } },
+        ],
+      ])('accepts a name equal to %s', (_name, token, apiCall) => {
+        expect(collisionIssues(token, apiCall)).not.toContainEqual(collision)
+      })
+
+      it('rejects a collision for release', () => {
+        const apiCall = { ...API_CALL, headers: [{ name: 'X-API-Key', value: 'x' }] }
+        expect(strictIssues(API_TOKEN, { apiCalls: [apiCall] })).toContainEqual(collision)
+      })
+    })
+
+    it.each([
+      ['a certificate chain', { certificate: `${CERTIFICATE}\n\n${SECOND_CERTIFICATE}\n` }],
+      ['a PKCS#8 key', { privateKey: PRIVATE_KEY }],
+      ['a PKCS#1 key', { privateKey: RSA_PRIVATE_KEY }],
+      ['a key after an empty line', { privateKey: `\n${PRIVATE_KEY}` }],
+      ['masked values', { certificate: '********', privateKey: '********' }],
+    ])('accepts %s', (_name, fields) => {
+      expect(looseIssues({ authentication: { ...CLIENT_CERTIFICATE, ...fields } })).toEqual([])
+    })
+
+    it.each([
+      [
+        'text before the certificate',
+        { certificate: `subject=Test\n${CERTIFICATE}` },
+        'certificate',
+        'invalidCertificate',
+      ],
+      ['text after the certificate', { certificate: `${CERTIFICATE}\nend` }, 'certificate', 'invalidCertificate'],
+      ['a private key as certificate', { certificate: PRIVATE_KEY }, 'certificate', 'invalidCertificate'],
+      ['an encrypted key', { privateKey: ENCRYPTED_PRIVATE_KEY }, 'privateKey', 'encryptedPrivateKey'],
+      ['an encrypted RSA key', { privateKey: ENCRYPTED_RSA_PRIVATE_KEY }, 'privateKey', 'encryptedPrivateKey'],
+      ['a certificate as key', { privateKey: CERTIFICATE }, 'privateKey', 'invalidPrivateKey'],
+      ['other text as key', { privateKey: 'secret' }, 'privateKey', 'invalidPrivateKey'],
+    ])('rejects %s', (_name, fields, field, message) => {
+      expect(looseIssues({ authentication: { ...CLIENT_CERTIFICATE, ...fields } })).toContainEqual(
+        issue(['authentication', field], `datasources.errors.${message}`),
+      )
+    })
   })
 })
 

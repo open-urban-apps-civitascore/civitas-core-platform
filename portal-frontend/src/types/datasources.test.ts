@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { CONNECTOR_TYPES } from '@/const/connectors'
 
-import { Datasource, isConnectorReadable } from './datasources'
+import { Datasource, getConnectorIssues, isConnectorReadable } from './datasources'
 
 const httpConnector = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -31,6 +31,18 @@ describe('isConnectorReadable', () => {
   })
 
   it('rejects a connector with an unknown authentication', () => {
-    expect(isConnectorReadable(httpConnector({ authentication: { type: 'BEARER_TOKEN' } }))).toBe(false)
+    expect(isConnectorReadable(httpConnector({ authentication: { type: 'UNKNOWN' } }))).toBe(false)
+  })
+
+  it.each([
+    { type: 'BEARER_TOKEN', token: '********' },
+    { type: 'API_TOKEN', name: 'X-API-Key', value: '********', in: 'HEADER' },
+    { type: 'OAUTH2', tokenUrl: 'https://auth.example.org/token', clientId: 'client-1', clientSecret: '********' },
+    { type: 'CLIENT_CERTIFICATE', certificate: '********', privateKey: '********' },
+  ])('reads a connector with the authentication $type', authentication => {
+    const connector = httpConnector({ authentication })
+
+    expect(getConnectorIssues(connector)).toEqual([])
+    expect(isConnectorReadable(connector)).toBe(true)
   })
 })

@@ -1,8 +1,9 @@
 import { act, renderHook } from '@testing-library/react'
+import { Path } from 'react-hook-form'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { EMPTY_PAGINATION } from '@/types/connectors'
-import { DATAPOOL_SCOPE_TYPES, Datasource, DatasourceStatusType } from '@/types/datasources'
+import { EMPTY_PAGINATION, HttpAuthenticationType } from '@/types/connectors'
+import { DATAPOOL_SCOPE_TYPES, Datasource, DatasourceFormDraft, DatasourceStatusType } from '@/types/datasources'
 
 import { useDatasourceForm } from './useDatasourceForm'
 
@@ -405,6 +406,68 @@ describe('useDatasourceForm with an HTTP connector', () => {
     )
 
     expect(connector.authentication).toEqual({ type: 'BASIC', username: 'reader', password: 'new-secret' })
+  })
+
+  describe('change of the authentication type', () => {
+    const AUTHENTICATION_TYPE_PATH = 'configuration.authentication.type' as Path<DatasourceFormDraft>
+
+    const renderHttpDatasourceForm = (datasource: Datasource) => {
+      const rendered = renderDatasourceForm(datasource)
+      // The connector tab registers the select.
+      act(() => {
+        rendered.result.current.form.register(AUTHENTICATION_TYPE_PATH)
+      })
+      return rendered
+    }
+
+    const selectAuthenticationType = (
+      result: ReturnType<typeof renderDatasourceForm>['result'],
+      type: HttpAuthenticationType,
+    ) => act(() => result.current.form.setValue(AUTHENTICATION_TYPE_PATH, type, { shouldDirty: true }))
+
+    it.each([
+      ['BEARER_TOKEN', { type: 'BEARER_TOKEN', token: '' }],
+      ['API_TOKEN', { type: 'API_TOKEN', name: '', value: '', in: 'HEADER' }],
+      ['OAUTH2', { type: 'OAUTH2', tokenUrl: '', clientId: '', clientSecret: '', scope: '' }],
+      ['CLIENT_CERTIFICATE', { type: 'CLIENT_CERTIFICATE', certificate: '', privateKey: '' }],
+      ['NONE', { type: 'NONE' }],
+    ] as const)('keeps only the empty fields of %s', (type, expected) => {
+      const { result } = renderHttpDatasourceForm(createHttpDatasource())
+
+      selectAuthenticationType(result, type)
+
+      expect(result.current.form.getValues('configuration.authentication')).toEqual(expected)
+    })
+
+    it('creates the empty Basic fields for a loaded None', () => {
+      const datasource = createHttpDatasource()
+      const { result } = renderHttpDatasourceForm({
+        ...datasource,
+        connector: { ...datasource.connector!, authentication: { type: 'NONE' } },
+      })
+
+      selectAuthenticationType(result, 'BASIC')
+
+      expect(result.current.form.getValues('configuration.authentication')).toEqual({
+        type: 'BASIC',
+        username: '',
+        password: '',
+      })
+    })
+
+    it('restores the loaded values when the loaded type is selected again', () => {
+      const { result } = renderHttpDatasourceForm(createHttpDatasource())
+
+      selectAuthenticationType(result, 'BEARER_TOKEN')
+      selectAuthenticationType(result, 'BASIC')
+
+      expect(result.current.form.getValues('configuration.authentication')).toEqual({
+        type: 'BASIC',
+        username: 'reader',
+        password: '********',
+      })
+      expect(result.current.isFormDirty).toBe(false)
+    })
   })
 
   it('sends only the type when the authentication changes to None', async () => {
