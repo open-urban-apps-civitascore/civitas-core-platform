@@ -67,11 +67,15 @@ public class GoverningVersionLookup {
           if (candidates == null) {
             return;
           }
-          String major = majorOf(pin, modelRegistryGateway.logicalUrn(pin));
+          String pinnedVersion = ModelRegistryGateway.versionOf(pin);
           List<DataStructureVersion> owning =
-              major == null
+              pinnedVersion == null
                   ? candidates
-                  : candidates.stream().filter(version -> major.equals(majorOf(version))).toList();
+                  : candidates.stream()
+                      .filter(
+                          version ->
+                              ModelRegistryGateway.sameMajor(pinnedVersion, version.getVersion()))
+                      .toList();
           if (!owning.isEmpty()) {
             governing.put(pin, owning);
           }
@@ -90,25 +94,5 @@ public class GoverningVersionLookup {
               structureIds.subList(from, Math.min(from + BATCH_SIZE, structureIds.size()))));
     }
     return records;
-  }
-
-  /** The major a pin names, or null when it names no version. */
-  static String majorOf(String pinnedUrn, String logicalUrn) {
-    if (logicalUrn == null || pinnedUrn.length() <= logicalUrn.length() + 1) {
-      return null;
-    }
-    return majorOf(pinnedUrn.substring(logicalUrn.length() + 1));
-  }
-
-  private static String majorOf(DataStructureVersion version) {
-    return majorOf(version.getVersion());
-  }
-
-  private static String majorOf(String version) {
-    if (version == null || version.isBlank()) {
-      return null;
-    }
-    int dot = version.indexOf('.');
-    return dot < 0 ? version : version.substring(0, dot);
   }
 }

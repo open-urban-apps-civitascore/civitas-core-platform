@@ -66,12 +66,13 @@ class DataStructureVersionServiceTest {
   private static final ArtifactUsageLookup.ArtifactUsage IN_USE_BY_RELEASED =
       new ArtifactUsageLookup.ArtifactUsage(
           true,
+          List.of(),
           List.of(
               new ArtifactUsageLookup.ReleasedReferrer(
                   ArtifactUsageLookup.ReferrerKind.MAPPING,
                   "urn:core:platform:civitas:mapping:common:b2ecab01-2f5a-8963-ac6a-2f86b3c8205a")));
   private static final ArtifactUsageLookup.ArtifactUsage IN_USE_BY_DRAFTS =
-      new ArtifactUsageLookup.ArtifactUsage(true, List.of());
+      new ArtifactUsageLookup.ArtifactUsage(true, List.of(), List.of());
 
   @InjectMocks private DataStructureVersionService dataStructureVersionService;
 
@@ -88,7 +89,7 @@ class DataStructureVersionServiceTest {
                 "1.0.0"));
     lenient()
         .when(artifactUsageLookup.of(any(DataStructureVersion.class)))
-        .thenReturn(new ArtifactUsageLookup.ArtifactUsage(false, List.of()));
+        .thenReturn(new ArtifactUsageLookup.ArtifactUsage(false, List.of(), List.of()));
   }
 
   @Nested
@@ -188,7 +189,9 @@ class DataStructureVersionServiceTest {
     @Test
     @DisplayName("Should block delete and leave the model when the version is in use")
     void deleteById_whenInUse_shouldThrowAndDeleteNothing() {
-      when(artifactUsageLookup.of(version)).thenReturn(IN_USE_BY_DRAFTS);
+      doThrow(new ResourceInUseException("DataStructureVersion", versionId, "in use"))
+          .when(artifactUsageLookup)
+          .requireNotInUse(version, "DataStructureVersion");
 
       assertThatThrownBy(() -> dataStructureVersionService.deleteById(versionId))
           .isInstanceOf(ResourceInUseException.class);
@@ -217,42 +220,6 @@ class DataStructureVersionServiceTest {
 
       verify(dataStructureVersionRepository).deleteById(versionId);
       verify(modelRegistryGateway, never()).deleteModelVersion(any());
-    }
-
-    @Test
-    @DisplayName("Should block delete when another version has its model in the same major")
-    void deleteById_whenAnotherVersionSharesTheMajor_shouldThrowAndDeleteNothing() {
-      siblingPinnedTo(LOGICAL_URN + ":1.1.0");
-
-      assertThatThrownBy(() -> dataStructureVersionService.deleteById(versionId))
-          .isInstanceOfSatisfying(
-              ResourceInUseException.class,
-              refusal ->
-                  assertThat(refusal.getBlockedBy()).containsExactly(LOGICAL_URN + ":1.1.0"));
-      verify(dataStructureVersionRepository, never()).deleteById(any());
-      verify(modelRegistryGateway, never()).deleteModelVersion(any());
-    }
-
-    @Test
-    @DisplayName("Should delete when the other versions have their models in other majors")
-    void deleteById_whenOtherVersionsUseOtherMajors_shouldDeleteTheModelVersion() {
-      siblingPinnedTo(LOGICAL_URN + ":2.0.0");
-      when(modelRegistryGateway.holds(LOGICAL_URN)).thenReturn(true);
-
-      dataStructureVersionService.deleteById(versionId);
-
-      verify(modelRegistryGateway).deleteModelVersion(MODEL_URN);
-    }
-
-    private void siblingPinnedTo(String pin) {
-      parent.setId(UUID.randomUUID());
-      DataStructureVersion sibling = new DataStructureVersion();
-      sibling.setId(UUID.randomUUID());
-      sibling.setDataStructure(parent);
-      sibling.setModelUrn(pin);
-      when(modelRegistryGateway.logicalUrn(any())).thenReturn(LOGICAL_URN);
-      when(dataStructureVersionRepository.findAllByDataStructure_IdIn(List.of(parent.getId())))
-          .thenReturn(List.of(version, sibling));
     }
 
     @Test

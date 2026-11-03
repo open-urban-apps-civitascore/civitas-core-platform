@@ -89,12 +89,13 @@ class DataSourceServiceTest {
   @InjectMocks private DataSourceService dataSourceService;
 
   private static final ArtifactUsageLookup.ArtifactUsage NOT_IN_USE =
-      new ArtifactUsageLookup.ArtifactUsage(false, List.of());
+      new ArtifactUsageLookup.ArtifactUsage(false, List.of(), List.of());
   private static final ArtifactUsageLookup.ArtifactUsage IN_USE_BY_DRAFTS =
-      new ArtifactUsageLookup.ArtifactUsage(true, List.of());
+      new ArtifactUsageLookup.ArtifactUsage(true, List.of(), List.of());
   private static final ArtifactUsageLookup.ArtifactUsage IN_USE_BY_RELEASED =
       new ArtifactUsageLookup.ArtifactUsage(
           true,
+          List.of(),
           List.of(
               new ArtifactUsageLookup.ReleasedReferrer(
                   ArtifactUsageLookup.ReferrerKind.PIPELINE, UUID.randomUUID().toString())));

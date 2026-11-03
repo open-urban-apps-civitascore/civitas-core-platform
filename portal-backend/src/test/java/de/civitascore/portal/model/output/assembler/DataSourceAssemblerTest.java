@@ -44,7 +44,7 @@ class DataSourceAssemblerTest {
       entity.setDatapoolScopeType(DatapoolScopeType.ALL);
 
       when(artifactUsageLookup.of(entity))
-          .thenReturn(new ArtifactUsageLookup.ArtifactUsage(false, List.of()));
+          .thenReturn(new ArtifactUsageLookup.ArtifactUsage(false, List.of(), List.of()));
 
       DataSourceOutputDTO result = assembler().enrichDto(new DataSourceOutputDTO(), entity);
 
@@ -61,7 +61,7 @@ class DataSourceAssemblerTest {
       entity.setDatapoolScopeType(DatapoolScopeType.NONE);
 
       when(artifactUsageLookup.of(entity))
-          .thenReturn(new ArtifactUsageLookup.ArtifactUsage(false, List.of()));
+          .thenReturn(new ArtifactUsageLookup.ArtifactUsage(false, List.of(), List.of()));
 
       DataSourceOutputDTO result = assembler().enrichDto(new DataSourceOutputDTO(), entity);
 
@@ -87,7 +87,7 @@ class DataSourceAssemblerTest {
       entity.getScopedDataPools().add(pool2);
 
       when(artifactUsageLookup.of(entity))
-          .thenReturn(new ArtifactUsageLookup.ArtifactUsage(false, List.of()));
+          .thenReturn(new ArtifactUsageLookup.ArtifactUsage(false, List.of(), List.of()));
 
       DataSourceOutputDTO result = assembler().enrichDto(new DataSourceOutputDTO(), entity);
 
@@ -108,6 +108,7 @@ class DataSourceAssemblerTest {
           .thenReturn(
               new ArtifactUsageLookup.ArtifactUsage(
                   true,
+                  List.of(),
                   List.of(
                       new ArtifactUsageLookup.ReleasedReferrer(
                           ArtifactUsageLookup.ReferrerKind.PIPELINE, "pipeline-id"))));

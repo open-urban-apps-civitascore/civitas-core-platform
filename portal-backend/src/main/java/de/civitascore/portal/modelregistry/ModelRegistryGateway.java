@@ -389,6 +389,37 @@ public class ModelRegistryGateway {
   }
 
   /**
+   * The version a CORE URN names.
+   *
+   * @return the version or {@code latest}, or null when the URN names none
+   */
+  public static String versionOf(String urn) {
+    return UrnParser.versionFromUrn(urn);
+  }
+
+  /**
+   * Whether two versions are in one Model Forge version line.
+   *
+   * @return false when either version is null
+   */
+  public static boolean sameMajor(String version, String otherVersion) {
+    return version != null && otherVersion != null && UrnParser.sameMajor(version, otherVersion);
+  }
+
+  /**
+   * Whether two pins name versions in one version line of one model, so that deleting the line of
+   * one deletes the other.
+   *
+   * @return false when either pin is null or names no version
+   */
+  public static boolean sameLine(String pin, String otherPin) {
+    return pin != null
+        && otherPin != null
+        && UrnParser.logicalUrn(pin).equals(UrnParser.logicalUrn(otherPin))
+        && sameMajor(versionOf(pin), versionOf(otherPin));
+  }
+
+  /**
    * The CORE artifact-type segment of a URN, such as {@code "pipeline"} or {@code "element"}.
    *
    * @return the segment, or null when {@code urn} is not a CORE URN

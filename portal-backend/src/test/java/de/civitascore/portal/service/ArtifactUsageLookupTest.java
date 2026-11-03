@@ -22,9 +22,11 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
+import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.repository.ReferrerReleaseState;
 import de.civitascore.portal.service.ArtifactUsageLookup.ArtifactUsage;
+import de.civitascore.portal.service.ArtifactUsageLookup.DataStructureUsage;
 import de.civitascore.portal.service.ArtifactUsageLookup.ReferrerKind;
 import de.civitascore.portal.service.ArtifactUsageLookup.ReleasedReferrer;
 import de.civitascore.portal.util.ResourceInUseException;
@@ -68,6 +70,7 @@ class ArtifactUsageLookupTest {
   @Mock private DataSinkRepository dataSinkRepository;
   @Mock private DataSetRepository dataSetRepository;
   @Mock private DataStructureRepository dataStructureRepository;
+  @Mock private DataStructureVersionRepository dataStructureVersionRepository;
 
   @InjectMocks private ArtifactUsageLookup lookup;
 
@@ -166,17 +169,19 @@ class ArtifactUsageLookupTest {
   class VersionUsage {
 
     @Test
-    @DisplayName("A DRAFT version a data source pins is in use and asks the registry nothing")
-    void draftPinned_asksNoRegistry() {
+    @DisplayName("A DRAFT version a data source pins blocks on the data source and the registry")
+    void draftPinned_blocksOnDataSourceAndRegistryReferrers() {
       DataStructureVersion version = version(DataStructureVersionStatus.DRAFT);
-      when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(version.getId())))
-          .thenReturn(true);
+      UUID dataSourceId = UUID.randomUUID();
+      when(dataSourceRepository.findIdsByDataStructureVersionId(version.getId()))
+          .thenReturn(List.of(dataSourceId));
+      when(modelRegistryGateway.versionReferencesTo(MODEL_URN)).thenReturn(List.of(SINK_URN));
 
       ArtifactUsage usage = lookup.of(version);
 
       assertThat(usage.inUse()).isTrue();
       assertThat(usage.inUseByReleased()).isFalse();
-      verifyNoInteractions(modelRegistryGateway);
+      assertThat(usage.referrers()).containsExactly(SINK_URN, "DataSource " + dataSourceId);
     }
 
     @Test
@@ -199,14 +204,16 @@ class ArtifactUsageLookupTest {
     @DisplayName("A version only a DRAFT data source pins is in use but not released-used")
     void pinnedByDraftDataSourceOnly_isNotInUseByReleased() {
       DataStructureVersion version = releasedVersion();
+      UUID dataSourceId = UUID.randomUUID();
       when(modelRegistryGateway.versionReferencesTo(MODEL_URN)).thenReturn(List.of());
-      when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(version.getId())))
-          .thenReturn(true);
+      when(dataSourceRepository.findIdsByDataStructureVersionId(version.getId()))
+          .thenReturn(List.of(dataSourceId));
 
       ArtifactUsage usage = lookup.of(version);
 
       assertThat(usage.inUse()).isTrue();
       assertThat(usage.inUseByReleased()).isFalse();
+      assertThat(usage.referrers()).containsExactly("DataSource " + dataSourceId);
     }
 
     @Test
@@ -401,7 +408,7 @@ class ArtifactUsageLookupTest {
 
     @Test
     @DisplayName("Each version is answered by its own referrers")
-    void ofEachVersion_answersEachVersionSeparately() {
+    void ofStructureAndVersions_answersEachVersionSeparately() {
       DataStructure structure = new DataStructure();
       DataStructureVersion released = new DataStructureVersion();
       released.setId(UUID.randomUUID());
@@ -423,20 +430,114 @@ class ArtifactUsageLookupTest {
       structure.setDataStructureVersions(Set.of(released, draft, unused));
 
       when(modelRegistryGateway.versionReferencesTo(MODEL_URN)).thenReturn(List.of(SINK_URN));
+      when(modelRegistryGateway.versionReferencesTo(draft.getModelUrn())).thenReturn(List.of());
       when(modelRegistryGateway.versionReferencesTo(unused.getModelUrn())).thenReturn(List.of());
       when(dataSinkRepository.findReleaseStatesByConfigurationLogicalUrnIn(Set.of(SINK_URN)))
           .thenReturn(List.of(new ReferrerReleaseState(SINK_URN, true)));
-      when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(draft.getId())))
-          .thenReturn(true);
-      when(dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(unused.getId())))
-          .thenReturn(false);
+      when(dataSourceRepository.findIdsByDataStructureVersionId(draft.getId()))
+          .thenReturn(List.of(UUID.randomUUID()));
+      when(dataSourceRepository.findIdsByDataStructureVersionId(released.getId()))
+          .thenReturn(List.of());
+      when(dataSourceRepository.findIdsByDataStructureVersionId(unused.getId()))
+          .thenReturn(List.of());
 
-      Map<UUID, ArtifactUsage> usageByVersion = lookup.ofEachVersion(structure);
+      Map<UUID, ArtifactUsage> usageByVersion = lookup.ofStructureAndVersions(structure).versions();
 
       assertThat(usageByVersion.get(released.getId()).inUseByReleased()).isTrue();
       assertThat(usageByVersion.get(draft.getId()).inUse()).isTrue();
       assertThat(usageByVersion.get(draft.getId()).inUseByReleased()).isFalse();
       assertThat(usageByVersion.get(unused.getId()).inUse()).isFalse();
+    }
+  }
+
+  @Nested
+  @DisplayName("Model line shared with another version")
+  class SharedModelLine {
+
+    private static final String MODEL_LOGICAL_URN =
+        "urn:core:platform:civitas:element:common:e5eaeb37-4c14-8bb9-903b-4f86897bfcea";
+
+    private final DataStructureVersion version = version(DataStructureVersionStatus.DRAFT);
+
+    private DataStructureVersion siblingPinnedTo(String pin) {
+      DataStructureVersion sibling = new DataStructureVersion();
+      sibling.setId(UUID.randomUUID());
+      sibling.setModelUrn(pin);
+      sibling.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      sibling.setDataStructure(version.getDataStructure());
+      version.getDataStructure().setDataStructureVersions(Set.of(version, sibling));
+      lenient()
+          .when(
+              dataStructureVersionRepository.findAllByDataStructure_IdIn(
+                  List.of(version.getDataStructure().getId())))
+          .thenReturn(List.of(version, sibling));
+      return sibling;
+    }
+
+    @Test
+    @DisplayName("A version whose major another version also holds is in use by that version")
+    void anotherVersionInTheSameMajor_holdsTheVersion() {
+      siblingPinnedTo(MODEL_LOGICAL_URN + ":1.1.0");
+
+      ArtifactUsage usage = lookup.of(version);
+
+      assertThat(usage.inUse()).isTrue();
+      assertThat(usage.inUseByReleased()).isFalse();
+      assertThat(usage.referrers()).containsExactly(MODEL_LOGICAL_URN + ":1.1.0");
+    }
+
+    @Test
+    @DisplayName("A version in another major does not hold the version")
+    void anotherVersionInAnotherMajor_doesNotHoldTheVersion() {
+      siblingPinnedTo(MODEL_LOGICAL_URN + ":2.0.0");
+
+      assertThat(lookup.of(version).inUse()).isFalse();
+    }
+
+    @Test
+    @DisplayName("The delete refusal says that only the data structure delete removes the versions")
+    void requireNotInUse_whenOnlyTheLineIsShared_namesTheDataStructureDelete() {
+      siblingPinnedTo(MODEL_LOGICAL_URN + ":1.1.0");
+
+      assertThatThrownBy(() -> lookup.requireNotInUse(version, "DataStructureVersion"))
+          .isInstanceOfSatisfying(
+              ResourceInUseException.class,
+              refusal ->
+                  assertThat(refusal.getBlockedBy()).containsExactly(MODEL_LOGICAL_URN + ":1.1.0"))
+          .hasMessage(
+              "Cannot delete DataStructureVersion because another version of its data structure"
+                  + " shares its model; only deleting the whole data structure deletes such"
+                  + " versions.");
+    }
+
+    @Test
+    @DisplayName("The delete refusal of a version used from outside blocks on everything")
+    void requireNotInUse_whenAlsoReferenced_blocksOnAllReferrers() {
+      siblingPinnedTo(MODEL_LOGICAL_URN + ":1.1.0");
+      when(modelRegistryGateway.versionReferencesTo(MODEL_URN)).thenReturn(List.of(SINK_URN));
+
+      assertThatThrownBy(() -> lookup.requireNotInUse(version, "DataStructureVersion"))
+          .isInstanceOfSatisfying(
+              ResourceInUseException.class,
+              refusal ->
+                  assertThat(refusal.getBlockedBy())
+                      .containsExactly(SINK_URN, MODEL_LOGICAL_URN + ":1.1.0"))
+          .hasMessage("Cannot delete DataStructureVersion because it is in use.");
+    }
+
+    @Test
+    @DisplayName("Versions that share a line hold each other but not their data structure")
+    void versionsSharingALine_holdEachOtherButNotTheirDataStructure() {
+      DataStructureVersion sibling = siblingPinnedTo(MODEL_LOGICAL_URN + ":1.1.0");
+
+      DataStructureUsage usage = lookup.ofStructureAndVersions(version.getDataStructure());
+
+      assertThat(usage.structure().inUse()).isFalse();
+      assertThat(usage.versions().get(version.getId()).referrers())
+          .containsExactly(MODEL_LOGICAL_URN + ":1.1.0");
+      assertThat(usage.versions().get(sibling.getId()).referrers()).containsExactly(MODEL_URN);
+      assertThat(lookup.of(version.getDataStructure()).inUse()).isFalse();
+      verify(dataStructureVersionRepository, never()).findAllByDataStructure_IdIn(any());
     }
   }
 
@@ -447,7 +548,7 @@ class ArtifactUsageLookupTest {
     @Test
     @DisplayName("Passes when only drafts reference the artifact")
     void noReleasedReferrer_passes() {
-      ArtifactUsage usage = new ArtifactUsage(true, List.of());
+      ArtifactUsage usage = new ArtifactUsage(true, List.of(), List.of());
 
       assertThatCode(() -> usage.requireNoReleasedReferrer("DataStructure", UUID.randomUUID()))
           .doesNotThrowAnyException();
@@ -460,6 +561,7 @@ class ArtifactUsageLookupTest {
       ArtifactUsage usage =
           new ArtifactUsage(
               true,
+              List.of(),
               List.of(
                   new ReleasedReferrer(ReferrerKind.DATA_SINK, SINK_URN),
                   new ReleasedReferrer(ReferrerKind.PIPELINE, PIPELINE_URN)));
@@ -498,7 +600,7 @@ class ArtifactUsageLookupTest {
     @Test
     @DisplayName("An artifact nothing uses may be deleted")
     void requireNotInUse_whenUnused_shouldPass() {
-      ArtifactUsage usage = new ArtifactUsage(false, List.of());
+      ArtifactUsage usage = new ArtifactUsage(false, List.of(), List.of());
 
       assertThatCode(() -> usage.requireNotInUse("DataStructureVersion", UUID.randomUUID()))
           .doesNotThrowAnyException();

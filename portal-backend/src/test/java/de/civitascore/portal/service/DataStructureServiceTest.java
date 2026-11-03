@@ -58,7 +58,7 @@ class DataStructureServiceTest {
     @DisplayName("Should block delete and keep the model when the usage lookup reports a use")
     void deleteById_whenAVersionIsInUse_shouldThrowAndKeepTheModel() {
       when(artifactUsageLookup.of(ds))
-          .thenReturn(new ArtifactUsageLookup.ArtifactUsage(true, List.of()));
+          .thenReturn(new ArtifactUsageLookup.ArtifactUsage(true, List.of(), List.of()));
 
       assertThatThrownBy(() -> dataStructureService.deleteById(dsId))
           .isInstanceOf(ResourceInUseException.class);
@@ -70,7 +70,7 @@ class DataStructureServiceTest {
     @DisplayName("Should delete the structure and its model when nothing uses it")
     void deleteById_whenNothingIsInUse_shouldDeleteTheModel() {
       when(artifactUsageLookup.of(ds))
-          .thenReturn(new ArtifactUsageLookup.ArtifactUsage(false, List.of()));
+          .thenReturn(new ArtifactUsageLookup.ArtifactUsage(false, List.of(), List.of()));
 
       dataStructureService.deleteById(dsId);
 

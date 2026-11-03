@@ -354,46 +354,9 @@ public class DataStructureVersionService
   @Override
   protected DataStructureVersion preProcessDelete(UUID id) {
     DataStructureVersion version = findByIdOrThrow(id);
-    artifactUsageLookup.of(version).requireNotInUse(getEntityName(), id);
-    requireOwnModelLine(version);
+    artifactUsageLookup.requireNotInUse(version, getEntityName());
     return version;
   }
-
-  private void requireOwnModelLine(DataStructureVersion version) {
-    ModelLine line = modelLineOf(version);
-    if (line == null) {
-      return;
-    }
-    List<String> sharingModelUrns =
-        dataStructureVersionRepository
-            .findAllByDataStructure_IdIn(List.of(version.getDataStructure().getId()))
-            .stream()
-            .filter(other -> !other.getId().equals(version.getId()))
-            .filter(other -> line.equals(modelLineOf(other)))
-            .map(DataStructureVersion::getModelUrn)
-            .toList();
-    if (!sharingModelUrns.isEmpty()) {
-      throw new ResourceInUseException(
-          getEntityName(),
-          version.getId(),
-          "Cannot delete "
-              + getEntityName()
-              + " because another version of its data structure shares its model.",
-          sharingModelUrns);
-    }
-  }
-
-  private ModelLine modelLineOf(DataStructureVersion version) {
-    String pin = version.getModelUrn();
-    if (pin == null) {
-      return null;
-    }
-    String logicalUrn = modelRegistryGateway.logicalUrn(pin);
-    String major = GoverningVersionLookup.majorOf(pin, logicalUrn);
-    return major == null ? null : new ModelLine(logicalUrn, major);
-  }
-
-  private record ModelLine(String logicalUrn, String major) {}
 
   /**
    * Deletes the version's model line from Model Forge in the delete's transaction. Once the
