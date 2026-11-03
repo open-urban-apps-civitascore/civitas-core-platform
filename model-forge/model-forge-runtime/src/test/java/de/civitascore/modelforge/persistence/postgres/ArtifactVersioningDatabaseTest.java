@@ -5,7 +5,11 @@ import de.civitascore.modelforge.urn.UrnParser;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -180,6 +184,92 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
         assertThatThrownBy(() -> registry.bumpVersion(logical, VersionBump.MAJOR, "9.0.0"))
             .isInstanceOf(IllegalArgumentException.class);
         assertThat(snapshot()).isEqualTo(before);
+    }
+
+    @Test
+    void copyingAnOlderRootCopiesItsGroupingAndRepinsOnlyThatRoot() {
+        String member = registry.storeElement(schema(null, "child"), Set.of());
+        String original = registry.storeElement(schema(null, "temperature"), Set.of(member));
+        String logical = UrnParser.logicalUrn(original);
+        String grouping = UrnParser.withArtifactType(logical, "datastructure");
+        JsonNode manifest = structureOf(original);
+        ((ObjectNode) manifest).put("$ref", original);
+        ((ObjectNode) manifest.path("$defs"))
+            .putObject("Child").put("$ref", member);
+        String originalGrouping = registry.storeDataStructure(grouping, manifest);
+        ArtifactVersionRepository versionRows = new ArtifactVersionRepository(jdbc);
+        UUID rootId = versionRows.find(new ArtifactRepository(jdbc).findByLogicalUrn(logical)
+            .orElseThrow().id(), "1.0.0").orElseThrow().id();
+        // A secondary format and an edge not written in the schema must survive the copy.
+        new ArtifactRepresentationRepository(jdbc).insert(new ArtifactRepresentationRow(
+            UUID.randomUUID(), rootId, "example", "text/plain", null, "original bytes",
+            "example-hash", "stored", Instant.now()));
+        UUID groupId = versionRows.find(new ArtifactRepository(jdbc).findByLogicalUrn(grouping)
+            .orElseThrow().id(), "1.0.0").orElseThrow().id();
+        ArtifactReferenceRepository edges = new ArtifactReferenceRepository(jdbc);
+        List<ReferenceRow> originalEdges = new ArrayList<>(edges.rowsForVersion(groupId));
+        originalEdges.add(new ReferenceRow(member, "schema-ref", "extra", 7));
+        edges.replaceForVersion(groupId, originalEdges);
+        String rootBytes = storedJson(logical, "1.0.0");
+        String groupBytes = storedContent(grouping, "1.0.0");
+        String later = storeUnder(logical, "humidity", VersionBump.MAJOR);
+        registry.storeDataStructure(grouping, structureOf(later), VersionBump.MAJOR);
+
+        String first = registry.bumpVersion(logical, VersionBump.MAJOR, "1.0.0");
+        String second = registry.bumpVersion(logical, VersionBump.MAJOR, "1.0.0");
+        String third = registry.bumpVersion(logical, VersionBump.MAJOR, "3.0.0");
+
+        assertThat(first).endsWith(":3.0.0");
+        assertThat(second).endsWith(":4.0.0");
+        assertThat(third).endsWith(":5.0.0");
+        for (String copy : List.of(first, second, third)) {
+            String version = UrnParser.versionFromUrn(copy);
+            String groupCopy = UrnParser.withVersion(grouping, version);
+            assertThat(storedJson(logical, version)).isEqualTo(rootBytes);
+            assertThat(registry.fetchArtifactRefUrns(copy)).containsExactly(member);
+            assertThat(registry.fetch(groupCopy).orElseThrow().path("$ref").asText()).isEqualTo(copy);
+            assertThat(registry.fetch(groupCopy).orElseThrow().path("$defs").path("Station")
+                .path("$ref").asText()).isEqualTo(copy);
+            assertThat(registry.fetch(groupCopy).orElseThrow().path("$defs").path("Child")
+                .path("$ref").asText()).isEqualTo(member);
+            UUID copyId = versionRows.find(new ArtifactRepository(jdbc).findByLogicalUrn(logical)
+                .orElseThrow().id(), version).orElseThrow().id();
+            assertThat(new ArtifactRepresentationRepository(jdbc).find(copyId, "example")
+                .orElseThrow().contentText()).isEqualTo("original bytes");
+            UUID groupingId = versionRows.find(new ArtifactRepository(jdbc).findByLogicalUrn(grouping)
+                .orElseThrow().id(), version).orElseThrow().id();
+            assertThat(edges.rowsForVersion(groupingId)).containsExactlyElementsOf(originalEdges.stream()
+                .map(r -> original.equals(r.targetUrn())
+                    ? new ReferenceRow(copy, r.referenceType(), r.referenceName(), r.sortOrder()) : r)
+                .toList());
+        }
+        assertThat(storedJson(logical, "1.0.0")).isEqualTo(rootBytes);
+        assertThat(storedContent(grouping, "1.0.0")).isEqualTo(groupBytes);
+        assertThat(registry.fetchArtifactRefUrns(originalGrouping)).contains(original, member);
+        assertThat(currentVersionOf(grouping)).isEqualTo("5.0.0");
+    }
+
+    @Test
+    void groupingConflictRollsBackTheRootCopyAndAllItsEdges() {
+        String root = registry.storeElement(schema(null, "temperature"), Set.of());
+        String logical = UrnParser.logicalUrn(root);
+        String grouping = UrnParser.withArtifactType(logical, "datastructure");
+        registry.storeDataStructure(grouping, structureOf(root));
+        registry.storeDataStructure(grouping, structureOf("%s:latest".formatted(logical)), VersionBump.MAJOR);
+        var before = snapshot();
+
+        assertThatThrownBy(() -> registry.bumpVersion(logical, VersionBump.MAJOR, "1.0.0"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("conflicts");
+
+        assertThat(snapshot()).isEqualTo(before);
+    }
+
+    private String storedJson(String logical, String version) {
+        UUID artifact = new ArtifactRepository(jdbc).findByLogicalUrn(logical).orElseThrow().id();
+        UUID id = new ArtifactVersionRepository(jdbc).find(artifact, version).orElseThrow().id();
+        return new ArtifactRepresentationRepository(jdbc).find(id, RegistryMapping.FORMAT_JSONSCHEMA)
+            .orElseThrow().contentJson();
     }
 
     /** Writes under an existing logical URN by carrying it as the schema's {@code $id}. */

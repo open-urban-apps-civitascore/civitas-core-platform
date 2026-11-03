@@ -132,6 +132,11 @@ public interface ArtifactRegistry {
      * and makes it current. Always writes a version: the content is unchanged by definition, so the
      * byte-identical short-circuit the store methods rely on would otherwise make this a no-op.
      *
+     * <p>An Element imported with a matching same-version DataStructure grouping copies that
+     * grouping atomically to the same new version. Its root references point to the new Element
+     * pin; other member pins and stored edges stay unchanged. An Element without such a grouping
+     * is copied on its own. A conflicting grouping version fails the whole copy.
+     *
      * @param sourceVersion the version to copy; {@code null} copies the current version
      * @return the versioned URN the new version was written under
      * @throws IllegalArgumentException when the artifact or the source version is unknown

@@ -2,22 +2,30 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.modelforge.graph.DependencyGraphService;
+import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
+import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionMetaInputDTO;
 import de.civitascore.portal.model.output.DataStructureVersionOutputDTO;
 import de.civitascore.portal.model.output.summary.DataStructureSummaryDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.security.AllowedScopesFilter;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -51,6 +59,10 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   @Autowired private ModelRegistryGateway modelRegistryGateway;
 
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
+
+  @Autowired private DataSetRepository dataSetRepository;
+
+  @Autowired private DependencyGraphService dependencyGraph;
 
   @Autowired private DataSourceRepository dataSourceRepository;
 
@@ -1734,6 +1746,56 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           "title", "People",
           "$defs", defs,
           "$ref", "#/$defs/Person");
+    }
+
+    @Test
+    @DisplayName("A sink using a copied root marks the copy in use and blocks its unrelease")
+    void sinkUsingACopiedRootMarksUsageAndBlocksUnrelease() {
+      DataStructureVersionOutputDTO copy = duplicateCreated(dataStructureId, versionId1);
+      String grouping = UrnParser.withArtifactType(copy.getModelUrn(), "datastructure");
+      assertThat(dependencyGraph.getDependencies(grouping)).contains(copy.getModelUrn());
+      DataSet dataSet = portalData.dataSet();
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSinkType(DataSinkType.POSTGIS);
+      input.setConfiguration(Map.of("tableName", "copied_readings", "element", copy.getModelUrn()));
+      HttpHeaders sinkHeaders = createAuthHeaders();
+      sinkHeaders.set(AllowedScopesFilter.HEADER_NAME, "*");
+      ResponseEntity<String> created =
+          restTemplate.exchange(
+              "/datasets/" + dataSet.getId() + "/datasinks",
+              HttpMethod.POST,
+              new HttpEntity<>(input, sinkHeaders),
+              String.class);
+      assertThat(created.getStatusCode()).as("%s", created.getBody()).isEqualTo(HttpStatus.CREATED);
+
+      DataStructureVersionOutputDTO used = get(dataStructureId, copy.getId());
+      assertThat(used.isInUse()).isTrue();
+      assertThat(used.isInUseByReleased()).isFalse();
+      assertThat(get(dataStructureId, versionId1).isInUse()).isFalse();
+
+      ResponseEntity<String> released =
+          restTemplate.exchange(
+              getEndpoint() + "/" + copy.getId() + "/release",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+      assertThat(released.getStatusCode()).as("%s", released.getBody()).isEqualTo(HttpStatus.OK);
+      // The Dataset release saga is outside this regression. Set its completed state.
+      dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+      dataSetRepository.save(dataSet);
+
+      assertThat(get(dataStructureId, copy.getId()).isInUseByReleased()).isTrue();
+      ResponseEntity<String> refused =
+          restTemplate.exchange(
+              getEndpoint() + "/" + copy.getId() + "/unrelease",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+      assertThat(refused.getStatusCode())
+          .as("%s", refused.getBody())
+          .isEqualTo(HttpStatus.CONFLICT);
+      assertThat(get(dataStructureId, copy.getId()).getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
     }
 
     @Test

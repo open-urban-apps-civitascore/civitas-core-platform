@@ -56,6 +56,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 public class EmbeddedModelForgeOperations implements ModelForge {
 
@@ -727,7 +729,23 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         String logical = UrnParser.logicalUrn(urn);
         String sourceVersion = UrnParser.isLatest(urn) ? null : UrnParser.versionFromUrn(urn);
         String assigned = registry.bumpVersion(logical, command.bump(), sourceVersion);
-        registerWritten(assigned, logical);
+        Runnable publish = () -> {
+            registerWritten(assigned, logical);
+            if ("element".equals(UrnParser.artifactTypeFromUrn(logical)) && assigned != null) {
+                String grouping = UrnParser.withArtifactType(assigned, "datastructure");
+                registry.resolveReference(grouping).ifPresent(p -> registerWritten(p, grouping));
+            }
+        };
+        // The registry joins the host's transaction. A later host failure must not leave either
+        // copied version in the in-memory graph after the durable rows have rolled back.
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() { publish.run(); }
+            });
+        } else {
+            publish.run();
+        }
         var pin = new ArtifactId(assigned != null && !assigned.isBlank() ? assigned : logical);
         return new ArtifactWriteResult(pin, dependenciesOf(pin));
     }

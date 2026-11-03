@@ -197,25 +197,9 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                 Instant now = Instant.now();
                 // current_version is the highest version, so the copy becomes the new highest.
                 String newVersion = SemVer.next(artifact.currentVersion(), bump);
-                UUID versionId = UUID.randomUUID();
-                versions.insert(new ArtifactVersionRow(versionId, artifact.id(), newVersion,
-                    source.primaryFormat(), source.title(), source.description(), now, source.createdBy()));
-                for (String format : representations.listFormats(source.id())) {
-                    representations.find(source.id(), format).ifPresent(rep ->
-                        representations.insert(new ArtifactRepresentationRow(UUID.randomUUID(), versionId,
-                            rep.format(), rep.contentType(), rep.contentJson(), rep.contentText(),
-                            rep.contentHash(), rep.generation(), now)));
-                }
-                references.replaceForVersion(versionId, references.rowsForVersion(source.id()));
-                artifacts.updateCurrentVersion(artifact.id(), newVersion, now);
-                // Back-fill pinned references that named this exact (logical, version) before it existed.
-                String pin = UrnParser.withVersion(logical, newVersion);
-                references.linkDanglingVersions(pin, versionId);
-                // The namespace index addresses a version, so leaving it on the superseded one would
-                // make a namespace lookup resolve to a stale version of the artifact.
-                if (RegistryMapping.FORMAT_XSD.equals(source.primaryFormat())) {
-                    namespaces.repointVersion(artifact.id(), versionId, now);
-                    xsd.evict(logical);
+                String pin = copyVersion(artifact, source, newVersion, now, null, null);
+                if (RegistryMapping.TYPE_ELEMENT.equals(artifact.artifactType())) {
+                    copyMatchingGrouping(logical, copied, newVersion, now);
                 }
                 log.info("Copied {} v{} to v{} ({})", logical, copied, newVersion, bump);
                 return pin;
@@ -223,6 +207,74 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         } catch (DataAccessException e) {
             throw translate(e, "Registry version bump failed for " + logical);
         }
+    }
+
+    /** Copies the matching import grouping in the same transaction as its root Element. */
+    private void copyMatchingGrouping(String element, String sourceVersion, String newVersion, Instant now) {
+        String grouping = UrnParser.withArtifactType(element, "datastructure");
+        // Imports write the root before the grouping. Keep the same lock order, including when
+        // the grouping does not exist yet, and use the locks shared with ordinary saves.
+        lockArtifactWrite(grouping);
+        Optional<ArtifactRow> artifact = artifacts.findByLogicalUrn(grouping);
+        if (artifact.isEmpty()) return; // Standalone Elements have no import grouping.
+        Optional<ArtifactVersionRow> source = versions.find(artifact.get().id(), sourceVersion);
+        if (source.isEmpty()) return;
+        String oldPin = UrnParser.withVersion(element, sourceVersion);
+        List<ReferenceRow> rows = references.rowsForVersion(source.get().id());
+        if (rows.stream().noneMatch(r -> "datastructure-ref".equals(r.referenceType())
+                && oldPin.equals(r.targetUrn()))) return;
+        String newPin = UrnParser.withVersion(element, newVersion);
+        copyVersion(artifact.get(), source.get(), newVersion, now, oldPin, newPin);
+    }
+
+    /** Copies stored rows without deduplication. Only the grouping's root references change. */
+    private String copyVersion(ArtifactRow artifact, ArtifactVersionRow source, String newVersion,
+                               Instant now, String oldRoot, String newRoot) {
+        UUID versionId = UUID.randomUUID();
+        versions.insert(new ArtifactVersionRow(versionId, artifact.id(), newVersion,
+            source.primaryFormat(), source.title(), source.description(), now, source.createdBy()));
+        for (String format : representations.listFormats(source.id())) {
+            representations.find(source.id(), format).ifPresent(rep -> {
+                String json = rep.contentJson();
+                String hash = rep.contentHash();
+                if (oldRoot != null && json != null) {
+                    JsonNode content = mapper.readTree(json);
+                    if (repinRootRefs(content, oldRoot, newRoot)) {
+                        json = writeJson(content);
+                        hash = sha256(json);
+                    }
+                }
+                representations.insert(new ArtifactRepresentationRow(UUID.randomUUID(), versionId,
+                    rep.format(), rep.contentType(), json, rep.contentText(), hash, rep.generation(), now));
+            });
+        }
+        List<ReferenceRow> rows = references.rowsForVersion(source.id()).stream()
+            .map(r -> oldRoot != null && oldRoot.equals(r.targetUrn())
+                ? new ReferenceRow(newRoot, r.referenceType(), r.referenceName(), r.sortOrder()) : r)
+            .toList();
+        references.replaceForVersion(versionId, rows);
+        if (SemVer.compare(newVersion, artifact.currentVersion()) > 0) {
+            artifacts.updateCurrentVersion(artifact.id(), newVersion, now);
+        }
+        String pin = UrnParser.withVersion(artifact.logicalUrn(), newVersion);
+        references.linkDanglingVersions(pin, versionId);
+        if (RegistryMapping.FORMAT_XSD.equals(source.primaryFormat())) {
+            namespaces.repointVersion(artifact.id(), versionId, now);
+            xsd.evict(artifact.logicalUrn());
+        }
+        return pin;
+    }
+
+    private static boolean repinRootRefs(JsonNode node, String oldRoot, String newRoot) {
+        boolean changed = false;
+        if (node instanceof ObjectNode object && oldRoot.equals(object.path("$ref").asText(null))) {
+            object.put("$ref", newRoot);
+            changed = true;
+        }
+        if (node.isObject() || node.isArray()) {
+            for (JsonNode child : node) changed |= repinRootRefs(child, oldRoot, newRoot);
+        }
+        return changed;
     }
 
     @Override

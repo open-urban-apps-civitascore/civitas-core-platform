@@ -31,6 +31,10 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -923,6 +927,34 @@ class EmbeddedModelForgeOperationsTest {
 
         assertThat(result.artifactId().value()).isEqualTo(logical + ":3.0.0");
         verify(registry).bumpVersion(logical, VersionBump.MAJOR, "1.0.0");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void bumpVersionPublishesBothCopiedNodesOnlyAfterHostCommit(boolean commit) {
+        String logical = "urn:core:platform:civitas:element:common:4e0604c3-1372-884e-91a3-68ed0ec7aa03";
+        String copied = logical + ":3.0.0";
+        String grouping = UrnParser.withArtifactType(copied, "datastructure");
+        when(registry.bumpVersion(logical, VersionBump.MAJOR, "1.0.0")).thenReturn(copied);
+        when(registry.resolveReference(grouping)).thenReturn(Optional.of(grouping));
+        when(registry.referencesByType(copied)).thenReturn(Map.of());
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            operations.bumpVersion(new BumpVersionCommand(new ArtifactId(logical + ":1.0.0"), VersionBump.MAJOR));
+            verifyNoInteractions(graph);
+            List<TransactionSynchronization> callbacks = TransactionSynchronizationManager.getSynchronizations();
+            if (commit) callbacks.forEach(TransactionSynchronization::afterCommit);
+            callbacks.forEach(c -> c.afterCompletion(commit
+                ? TransactionSynchronization.STATUS_COMMITTED : TransactionSynchronization.STATUS_ROLLED_BACK));
+            if (commit) {
+                verify(graph).registerFromRegistry(copied);
+                verify(graph).registerFromRegistry(grouping);
+            } else {
+                verifyNoInteractions(graph);
+            }
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     // ── closure / existing ────────────────────────────────────────────────────

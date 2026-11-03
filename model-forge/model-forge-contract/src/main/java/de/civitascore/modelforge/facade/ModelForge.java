@@ -238,6 +238,11 @@ public interface ModelForge {
      * <p>This <em>always</em> mints a version, unlike every other write, which returns the existing
      * pin when the content is byte-identical. Carrying unchanged content forward is the whole point.
      *
+     * <p>An Element imported with a matching same-version DataStructure grouping copies that
+     * grouping atomically to the same new version. Its root references point to the new Element
+     * pin; other member pins and stored edges stay unchanged. An Element without such a grouping
+     * is copied on its own. A conflicting grouping version fails the whole copy.
+     *
      * @throws IllegalArgumentException when the artifact is unknown, holds no version to copy, or
      *     does not hold the pinned version
      */
