@@ -9,13 +9,17 @@ import { VersionsTab } from './VersionsTab'
 
 const mockRefresh = vi.fn()
 const mockDuplicateMutate = vi.fn()
+const mockDuplicateState = { isPending: false }
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
 
 vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
-  useDuplicateDatastructureVersion: vi.fn(() => ({ mutate: mockDuplicateMutate, isPending: false })),
+  useDuplicateDatastructureVersion: vi.fn(() => ({
+    mutate: mockDuplicateMutate,
+    isPending: mockDuplicateState.isPending,
+  })),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -53,9 +57,11 @@ vi.mock('@/contexts/unsaved-changes/UnsavedChangesContext', () => ({
 vi.mock('./VersionsTable', () => ({
   VersionsTable: ({
     versions,
+    isDuplicating,
     onDuplicateVersionClick,
   }: {
     versions: { id: string }[]
+    isDuplicating: boolean
     onDuplicateVersionClick: (id: string) => void
   }) => (
     <div>
@@ -63,6 +69,7 @@ vi.mock('./VersionsTable', () => ({
         <button
           key={version.id}
           data-testid={`duplicate-${version.id}`}
+          disabled={isDuplicating}
           onClick={() => onDuplicateVersionClick(version.id)}
         />
       ))}
@@ -85,6 +92,14 @@ const renderComponent = () =>
 describe('VersionsTab duplication', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockDuplicateState.isPending = false
+  })
+
+  it('disables duplication in the table while a copy is being made', () => {
+    mockDuplicateState.isPending = true
+    renderComponent()
+
+    expect(screen.getByTestId('duplicate-v1')).toBeDisabled()
   })
 
   it('duplicates the version and shows a success toast', async () => {
