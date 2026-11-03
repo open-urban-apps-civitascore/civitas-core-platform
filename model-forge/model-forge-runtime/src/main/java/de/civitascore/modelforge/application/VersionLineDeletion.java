@@ -46,7 +46,6 @@ final class VersionLineDeletion {
     void delete(String pin) {
         requirePinned(pin);
         String logical = UrnParser.logicalUrn(pin);
-        List<Runnable> graphUpdates = new ArrayList<>();
         registry.inTransaction(() -> {
             registry.lockForWrite(logical);
             groupingOf(logical).ifPresent(registry::lockForWrite);
@@ -59,27 +58,26 @@ final class VersionLineDeletion {
                 throw new ArtifactInUseException(pin, blockers);
             }
             if (line.coversArtifact()) {
-                deleteWholeArtifact(line, graphUpdates);
+                deleteWholeArtifact(line);
             } else {
-                deleteVersions(logical, line.versions(), graphUpdates);
-                deleteOwned(line, graphUpdates);
+                deleteVersions(logical, line.versions());
+                deleteOwned(line);
             }
             return null;
         });
-        registry.afterCommit(() -> graphUpdates.forEach(Runnable::run));
     }
 
     /**
      * The existing whole-artifact delete, so cascade and Data Set unlinking follow its rules. A
      * grouping holding the Element goes first, or it would refuse the Element's delete.
      */
-    private void deleteWholeArtifact(Line line, List<Runnable> graphUpdates) {
+    private void deleteWholeArtifact(Line line) {
         if (line.grouping() != null && !line.groupingVersions().isEmpty()) {
             if (line.groupingVersions().containsAll(registry.versionsOf(line.grouping()))) {
                 artifacts.delete(line.grouping(), true, false);
             } else {
-                deleteVersions(line.grouping(), line.groupingVersions(), graphUpdates);
-                deleteMembers(line.freedMembers(), graphUpdates);
+                deleteVersions(line.grouping(), line.groupingVersions());
+                deleteMembers(line.freedMembers());
             }
         }
         if (!registry.versionsOf(line.logical()).isEmpty()) {
@@ -87,32 +85,32 @@ final class VersionLineDeletion {
         }
     }
 
-    private void deleteOwned(Line line, List<Runnable> graphUpdates) {
+    private void deleteOwned(Line line) {
         if (line.grouping() != null && !line.groupingVersions().isEmpty()) {
-            deleteVersions(line.grouping(), line.groupingVersions(), graphUpdates);
+            deleteVersions(line.grouping(), line.groupingVersions());
         }
-        deleteMembers(line.freedMembers(), graphUpdates);
+        deleteMembers(line.freedMembers());
     }
 
-    private void deleteMembers(Collection<String> memberPins, List<Runnable> graphUpdates) {
+    private void deleteMembers(Collection<String> memberPins) {
         Map<String, List<String>> versionsByMember = new LinkedHashMap<>();
         memberPins.forEach(pin -> versionsByMember
             .computeIfAbsent(UrnParser.logicalUrn(pin), member -> new ArrayList<>())
             .add(UrnParser.versionFromUrn(pin)));
-        versionsByMember.forEach((member, versions) -> deleteVersions(member, versions, graphUpdates));
+        versionsByMember.forEach(this::deleteVersions);
     }
 
-    /** Deletes the versions, or the artifact when they are all it has. */
-    private void deleteVersions(String logical, Collection<String> versions, List<Runnable> graphUpdates) {
+    /**
+     * Deletes the versions, or the artifact when they are all it has. That delete is forced because
+     * {@link #blockersOf} already decided under the line's rules, which ignore Data Set membership.
+     */
+    private void deleteVersions(String logical, Collection<String> versions) {
         if (versions.containsAll(registry.versionsOf(logical))) {
-            List<String> memberships = registry.dataSetMemberships(logical);
-            registry.deleteArtifact(logical);
-            memberships.forEach(dataSet -> artifacts.unlinkFromDataSet(dataSet, logical));
-            graphUpdates.add(() -> graph.remove(logical));
+            artifacts.delete(logical, false, true);
             return;
         }
         registry.deleteVersions(logical, versions);
-        versions.forEach(version -> graphUpdates.add(() -> graph.removeVersion(UrnParser.withVersion(logical, version))));
+        versions.forEach(version -> registry.afterCommit(() -> graph.removeVersion(UrnParser.withVersion(logical, version))));
     }
 
     /** References from removed versions are harmless; surviving explicit pins must stay valid. */

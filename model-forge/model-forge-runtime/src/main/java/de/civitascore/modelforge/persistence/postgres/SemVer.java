@@ -59,11 +59,6 @@ final class SemVer {
         return compare(a, b) >= 0 ? a : b;
     }
 
-    /** Whether both versions share the major segment, read as {@link #compare} reads it. */
-    static boolean sameMajor(String a, String b) {
-        return parse(a)[0] == parse(b)[0];
-    }
-
     /** {@code [major, minor, patch]}; absent/non-numeric segments become {@code 0}. */
     private static int[] parse(String version) {
         int[] out = new int[3];

@@ -29,6 +29,15 @@ class ArtifactReferenceRepository {
                      or (r.reference_type = 'pipeline-node' and r.reference_name = 'mapping')
                      or (r.reference_type = 'dataset-ref'   and r.reference_name in ('pipeline', 'mapping')))""";
 
+    /** The common table expression {@code removed}: the versions {@code :removedPins} names. */
+    private static final String REMOVED_VERSIONS = """
+        removed as (
+                    select v.id, v.artifact_id
+                      from model_forge.artifact_version v
+                      join model_forge.artifact a on a.id = v.artifact_id
+                     where a.logical_urn || ':' || v.version in (:removedPins)
+                )""";
+
     private final JdbcClient jdbc;
 
     ArtifactReferenceRepository(JdbcClient jdbc) {
@@ -145,13 +154,7 @@ class ArtifactReferenceRepository {
 
     /** Checks the complete removed set, retaining the source version and whether the edge pins it. */
     List<String> versionDeletionBlockers(Collection<String> removedPins, Collection<String> siblingUrns) {
-        return jdbc.sql("""
-                with removed as (
-                    select v.id, v.artifact_id
-                      from model_forge.artifact_version v
-                      join model_forge.artifact a on a.id = v.artifact_id
-                     where a.logical_urn || ':' || v.version in (:removedPins)
-                )
+        return jdbc.sql("with " + REMOVED_VERSIONS + """
                 select distinct a.logical_urn
                   from model_forge.artifact_reference r
                   join model_forge.artifact ta on ta.id = r.target_artifact_id
@@ -181,13 +184,8 @@ class ArtifactReferenceRepository {
 
     /** Resolves ownership for all removed versions in one query, including superseded owners. */
     List<String> exclusivelyOwnedMemberVersions(Collection<String> ownerPins) {
-        return jdbc.sql("""
-                with removed as (
-                    select v.id
-                      from model_forge.artifact_version v
-                      join model_forge.artifact a on a.id = v.artifact_id
-                     where a.logical_urn || ':' || v.version in (:ownerPins)
-                ), owners as (
+        return jdbc.sql("with " + REMOVED_VERSIONS + """
+                , owners as (
                     select r.from_version_id, r.target_version_id
                       from model_forge.artifact_reference r
                      where """ + OWNING_REFERENCE + """
@@ -203,7 +201,7 @@ class ArtifactReferenceRepository {
                        and other.from_version_id not in (select id from removed))
                  order by pin
                 """)
-            .param("ownerPins", ownerPins)
+            .param("removedPins", ownerPins)
             .query(String.class)
             .list();
     }
