@@ -418,11 +418,10 @@ describe('HTTP connector schemas', () => {
       expect(result.authentication).toEqual(CLIENT_CERTIFICATE)
     })
 
-    it('sends OAuth2 without an empty scope', () => {
+    it('sends an empty OAuth2 scope as null, so the backend removes a stored scope', () => {
       const result = sendAuthentication({ ...OAUTH2, scope: ' ' })
 
-      const { scope: _scope, ...withoutScope } = OAUTH2
-      expect(result.authentication).toEqual(withoutScope)
+      expect(result.authentication).toEqual({ ...OAUTH2, scope: null })
     })
 
     it('sends None for a missing authentication', () => {
@@ -451,6 +450,23 @@ describe('HTTP connector schemas', () => {
       expect(strictIssues({ ...AUTHENTICATIONS[type], [field]: '' })).toContainEqual(
         issue(['authentication', field], 'common.errors.required'),
       )
+    })
+
+    it.each([
+      ['BASIC', 'password'],
+      ['BEARER_TOKEN', 'token'],
+      ['API_TOKEN', 'value'],
+      ['OAUTH2', 'clientSecret'],
+    ] as const)('requires a %s %s with more than spaces for release', (type, field) => {
+      expect(strictIssues({ ...AUTHENTICATIONS[type], [field]: '   ' })).toContainEqual(
+        issue(['authentication', field], 'common.errors.required'),
+      )
+    })
+
+    it('sends a secret with spaces as entered', () => {
+      const result = sendAuthentication({ ...AUTHENTICATIONS.BEARER_TOKEN, token: ' token-1 ' })
+
+      expect(result.authentication).toEqual({ type: 'BEARER_TOKEN', token: ' token-1 ' })
     })
 
     it('does not require the OAuth2 scope for release', () => {

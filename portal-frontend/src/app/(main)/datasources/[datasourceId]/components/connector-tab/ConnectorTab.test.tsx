@@ -2,11 +2,12 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useForm } from 'react-hook-form'
+import { useState } from 'react'
+import { useForm, UseFormReturn } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 
 import { Form } from '@/components/ui/form'
-import { emptyHttpAuthentication, HttpAuthenticationType } from '@/types/connectors'
+import { ConnectorType, emptyHttpAuthentication, HttpAuthenticationType } from '@/types/connectors'
 import type { DatasourceFormDraft } from '@/types/datasources'
 import { DatasourceFormDraftSchema } from '@/types/datasources'
 
@@ -452,6 +453,35 @@ describe('ConnectorTab (integration)', () => {
       expect(screen.getByLabelText(/http\.authentication\.label/)).toBeDisabled()
       expect(screen.getByLabelText(/http\.username\.label/)).toBeDisabled()
       expect(screen.getByLabelText(/http\.password\.label/)).toBeDisabled()
+    })
+  })
+
+  describe('change of the connector type', () => {
+    it('validates no field of the new connector type', () => {
+      let form: UseFormReturn<DatasourceFormDraft> | undefined
+      let setConnectorType: ((connectorType: ConnectorType) => void) | undefined
+      const Wrapper = () => {
+        const [connectorType, setType] = useState<ConnectorType>('MQTT')
+        setConnectorType = setType
+        form = useForm<DatasourceFormDraft>({
+          resolver: zodResolver(DatasourceFormDraftSchema),
+          defaultValues,
+        })
+        return (
+          <Form {...form}>
+            <ConnectorTab form={form} connectorType={connectorType} />
+          </Form>
+        )
+      }
+      render(<Wrapper />)
+      const trigger = vi.spyOn(form!, 'trigger')
+
+      act(() => {
+        form!.setValue('configuration', { baseUrl: '', authentication: { type: 'NONE' } })
+        setConnectorType!('HTTP')
+      })
+
+      expect(trigger).not.toHaveBeenCalled()
     })
   })
 

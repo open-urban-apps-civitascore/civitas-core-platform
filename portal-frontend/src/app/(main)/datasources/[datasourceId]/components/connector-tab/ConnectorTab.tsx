@@ -56,18 +56,21 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
   )
 
   const watchedFieldValues: unknown[] = revalidationRules.map(rule => get(configuration, rule.watch))
-  const previousWatchedFieldValues = useRef(watchedFieldValues)
+  const previousWatchedFields = useRef({ connectorType, values: watchedFieldValues })
 
   useEffect(() => {
-    const previousValues = previousWatchedFieldValues.current
-    previousWatchedFieldValues.current = watchedFieldValues
-    const changedRules = revalidationRules.filter((_rule, index) => previousValues[index] !== watchedFieldValues[index])
+    const previous = previousWatchedFields.current
+    previousWatchedFields.current = { connectorType, values: watchedFieldValues }
+    if (previous.connectorType !== connectorType) return
+    const changedRules = revalidationRules.filter(
+      (_rule, index) => previous.values[index] !== watchedFieldValues[index],
+    )
     const paths = changedRules.flatMap(rule => rule.revalidate)
     if (paths.length) {
       void form.trigger(paths.map(path => `configuration.${path}` as Path<DatasourceFormDraft>))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(watchedFieldValues)])
+  }, [connectorType, JSON.stringify(watchedFieldValues)])
 
   const getLabel = (label: ConnectorFieldLabel) => {
     const hint = label.hintKey ? `(${t(label.hintKey)})` : ''

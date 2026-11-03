@@ -805,7 +805,7 @@ const requireFields = <K extends string>(
   ctx: z.RefinementCtx,
 ) => {
   for (const field of fields) {
-    if (!values[field]) {
+    if (!values[field]?.trim()) {
       ctx.addIssue({ code: 'custom', path: [field], message: 'common.errors.required' })
     }
   }
@@ -1065,8 +1065,7 @@ export const HttpStrictSchema = HttpStrictConnectionSchema.extend({ apiCalls: Ht
 const toAuthenticationApi = (authentication: HttpAuthenticationForm | undefined) => {
   if (!authentication) return { type: HTTP_AUTHENTICATION_TYPES.NONE }
   if (authentication.type === HTTP_AUTHENTICATION_TYPES.OAUTH2 && !authentication.scope) {
-    const { scope: _scope, ...withoutScope } = authentication
-    return withoutScope
+    return { ...authentication, scope: null }
   }
   return authentication
 }
