@@ -13,6 +13,8 @@ import java.net.URI;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
@@ -30,6 +32,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  */
 @Slf4j
 @RestControllerAdvice
+// Spring also matches handlers against an exception's cause, so without precedence the global
+// handler claims a registry exception through the database exception it carries.
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class ModelRegistryExceptionHandler {
 
   private static final String ERROR_URN_PREFIX = "urn:civitas:error:";

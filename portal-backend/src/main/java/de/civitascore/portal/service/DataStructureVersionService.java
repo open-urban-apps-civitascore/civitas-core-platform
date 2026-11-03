@@ -287,7 +287,7 @@ public class DataStructureVersionService
    * to a registry copy of exactly the source's model version. A source without a model gives a copy
    * without a model.
    *
-   * @param sourceVersionId the id of the version to duplicate, in DRAFT or AVAILABLE status
+   * @param sourceVersionId the id of the version to duplicate
    * @return the new version
    * @throws ModelMissingException if the model registry no longer holds the source's model
    * @throws ModelReferenceNotAvailableException if the source's model references a model the caller

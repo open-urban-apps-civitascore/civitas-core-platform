@@ -47,6 +47,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.simple.JdbcClient;
 
 @DisplayName("DataStructureVersion Controller Integration Tests")
 class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrationTest {
@@ -62,6 +63,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   @Autowired private DataSetRepository dataSetRepository;
 
   @Autowired private DataSourceRepository dataSourceRepository;
+  @Autowired private javax.sql.DataSource dataSource;
 
   private UUID dataStructureId;
   private UUID versionId1;
@@ -1839,6 +1841,38 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
       assertThat(response.getBody().getType()).hasToString("urn:civitas:error:MODEL_MISSING");
+      assertThat(
+              dataStructureVersionRepository.findAllByDataStructure_IdIn(List.of(dataStructureId)))
+          .hasSize(2);
+    }
+
+    @Test
+    @DisplayName("Duplicating into a version number the registry holds already answers 409")
+    void duplicatingIntoATakenRegistryVersionAnswers409() {
+      String sourceModel =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow().getModelUrn();
+      String grouping =
+          UrnParser.withArtifactType(UrnParser.logicalUrn(sourceModel), "datastructure");
+      // No write path leaves a version above current_version, so the conflict is planted directly.
+      JdbcClient.create(dataSource)
+          .sql(
+              """
+              INSERT INTO model_forge.artifact_version
+                  (id, artifact_id, version, primary_format, created_at)
+              SELECT gen_random_uuid(), id, '3.0.0', 'core-json', now()
+              FROM model_forge.artifact WHERE logical_urn = :urn
+              """)
+          .param("urn", grouping)
+          .update();
+
+      ResponseEntity<ProblemDetail> response =
+          restTemplate.exchange(
+              "/datastructures/" + dataStructureId + "/versions/" + versionId1 + "/duplicate",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<ProblemDetail>() {});
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
       assertThat(
               dataStructureVersionRepository.findAllByDataStructure_IdIn(List.of(dataStructureId)))
           .hasSize(2);
