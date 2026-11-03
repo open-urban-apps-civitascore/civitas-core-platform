@@ -276,6 +276,24 @@ class DeletionPolicyIntegrationTest extends BaseKeycloakIntegrationTest {
     assertThat(registry.fetchStoredModel(second.getModelUrn())).isEmpty();
   }
 
+  @Test
+  @DisplayName("deleting a structure removes its root element after its first version is gone")
+  void deletingAStructureRemovesItsRootElement() {
+    DataStructureVersion first = structureWithModel("Reading");
+    DataStructureVersion second =
+        portalData.attachModel(
+            portalData.dataStructureVersion(dataStructureOf(first.getDataStructure())),
+            portalData.dataStructureVersionModel("Reading v2"));
+    String rootElement = dataStructureOf(first.getDataStructure()).getModelLogicalUrn();
+    assertThat(delete(versionPath(first)).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+    assertThat(delete("/datastructures/" + first.getDataStructure().getId()).getStatusCode())
+        .isEqualTo(HttpStatus.NO_CONTENT);
+
+    assertThat(registry.holds(rootElement)).isFalse();
+    assertThat(registry.fetchStoredModel(second.getModelUrn())).isEmpty();
+  }
+
   private DataStructure dataStructureOf(DataStructure structure) {
     return dataStructureRepository.findById(structure.getId()).orElseThrow();
   }

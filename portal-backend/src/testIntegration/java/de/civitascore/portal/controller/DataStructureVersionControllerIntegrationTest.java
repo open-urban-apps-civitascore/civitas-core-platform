@@ -65,6 +65,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   @Autowired private DataSourceRepository dataSourceRepository;
   @Autowired private javax.sql.DataSource dataSource;
 
+  @Autowired private JdbcClient jdbcClient;
+
   private UUID dataStructureId;
   private UUID versionId1;
   private UUID versionId2;
@@ -704,6 +706,49 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(modelRegistryGateway.fetchStoredModel(deletedModel)).isEmpty();
       assertThat(modelRegistryGateway.fetchStoredModel(keptModel)).isPresent();
       assertThat(dataStructureVersionRepository.existsById(versionId1)).isTrue();
+    }
+
+    @Test
+    @DisplayName("Should delete a released version and its model")
+    void shouldDeleteAReleasedVersionAndItsModel() {
+      String model =
+          dataStructureVersionRepository.findById(versionId2).orElseThrow().getModelUrn();
+      assertThat(
+              restTemplate
+                  .exchange(
+                      getEndpoint() + "/" + versionId2 + "/release",
+                      HttpMethod.POST,
+                      new HttpEntity<>(createAuthHeaders()),
+                      getOutputTypeReference())
+                  .getStatusCode())
+          .isEqualTo(HttpStatus.OK);
+
+      assertThat(delete(versionId2).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+      assertThat(dataStructureVersionRepository.existsById(versionId2)).isFalse();
+      assertThat(modelRegistryGateway.fetchStoredModel(model)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("A row delete that fails at commit keeps the version's model in the registry")
+    void aFailingRowDeleteKeepsTheModel() {
+      String model =
+          dataStructureVersionRepository.findById(versionId2).orElseThrow().getModelUrn();
+      jdbcClient
+          .sql(
+              "CREATE TABLE version_delete_blocker"
+                  + " (version_id uuid REFERENCES data_structure_versions (id))")
+          .update();
+      try {
+        jdbcClient.sql("INSERT INTO version_delete_blocker VALUES (?)").param(versionId2).update();
+
+        assertThat(delete(versionId2).getStatusCode().isError()).isTrue();
+      } finally {
+        jdbcClient.sql("DROP TABLE version_delete_blocker").update();
+      }
+
+      assertThat(dataStructureVersionRepository.existsById(versionId2)).isTrue();
+      assertThat(modelRegistryGateway.fetchStoredModel(model)).isPresent();
     }
 
     @Test
