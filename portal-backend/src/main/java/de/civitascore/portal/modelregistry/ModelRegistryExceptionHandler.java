@@ -5,6 +5,7 @@ package de.civitascore.portal.modelregistry;
 
 import de.civitascore.modelforge.contract.ArtifactInUseException;
 import de.civitascore.modelforge.contract.Diagnostic;
+import de.civitascore.modelforge.contract.RegistryConflictException;
 import de.civitascore.modelforge.contract.RegistryUnavailableException;
 import de.civitascore.modelforge.contract.ValidationFailedException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -47,6 +48,14 @@ public class ModelRegistryExceptionHandler {
   public ProblemDetail handleArtifactInUse(ArtifactInUseException ex, HttpServletRequest request) {
     log.warn("Registry refused a delete: {}", Encode.forJava(ex.getMessage()));
     return problem(HttpStatus.CONFLICT, "RESOURCE_IN_USE", ex.getMessage(), request);
+  }
+
+  /** A write that collides with data the registry already holds, such as a taken version. */
+  @ExceptionHandler(RegistryConflictException.class)
+  public ProblemDetail handleRegistryConflict(
+      RegistryConflictException ex, HttpServletRequest request) {
+    log.warn("Registry refused a conflicting write", ex);
+    return problem(HttpStatus.CONFLICT, "UNIQUE_CONSTRAINT_VIOLATION", ex.getMessage(), request);
   }
 
   /** The registry cannot be reached; the caller may retry. */

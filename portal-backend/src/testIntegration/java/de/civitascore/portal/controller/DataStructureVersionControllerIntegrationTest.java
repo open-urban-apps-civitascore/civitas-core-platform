@@ -1796,6 +1796,55 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
+    @DisplayName(
+        "Duplicating a single-root version after a later version stored the model under the data"
+            + " structure's own id numbers the copy above both")
+    void duplicatingASingleRootVersionCountsAboveALaterGrouping() {
+      DataStructure structure = portalData.dataStructure(b -> b.name("OwnId"));
+      DataStructureVersion first =
+          portalData.attachModel(
+              portalData.dataStructureVersion(structure, b -> b.modelName("Person")),
+              portalData.dataStructureVersionModel("Person"));
+      Map<String, Object> ownId = new HashMap<>(library(List.of("Person", "Address")));
+      ownId.put("$id", "urn:core:platform:civitas:datastructure:common:" + structure.getId());
+      portalData.attachModel(
+          portalData.dataStructureVersion(
+              dataStructureRepository.findById(structure.getId()).orElseThrow(),
+              b -> b.modelName("People")),
+          ownId);
+
+      DataStructureVersionOutputDTO copy = duplicateCreated(structure.getId(), first.getId());
+
+      assertThat(copy.getVersion()).isEqualTo("3.0.0");
+      assertThat(get(structure.getId(), copy.getId()).getModel()).containsEntry("title", "Person");
+    }
+
+    @Test
+    @DisplayName("Duplicating a version whose model is gone answers 409 and adds no version")
+    void duplicatingAVersionWhoseModelIsGoneAnswers409() {
+      DataStructureVersion source =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      source.setModelUrn(
+          "urn:core:platform:civitas:element:common:"
+              + UUID.randomUUID().toString().replace("-", "").substring(0, 10)
+              + ":1.0.0");
+      dataStructureVersionRepository.save(source);
+
+      ResponseEntity<ProblemDetail> response =
+          restTemplate.exchange(
+              "/datastructures/" + dataStructureId + "/versions/" + versionId1 + "/duplicate",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<ProblemDetail>() {});
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:MODEL_MISSING");
+      assertThat(
+              dataStructureVersionRepository.findAllByDataStructure_IdIn(List.of(dataStructureId)))
+          .hasSize(2);
+    }
+
+    @Test
     @DisplayName("Duplicating an unknown version answers 404")
     void duplicatingAnUnknownVersionAnswers404() {
       assertThat(duplicate(dataStructureId, UUID.randomUUID()).getStatusCode())

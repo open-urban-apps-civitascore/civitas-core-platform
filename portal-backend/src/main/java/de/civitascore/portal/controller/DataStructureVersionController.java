@@ -314,8 +314,8 @@ public class DataStructureVersionController
           "Creates a new DRAFT version with the description, model name and imported structures"
               + " of the source version. The model registry copies the source's model with its"
               + " styles and references to the next major version after the highest existing one."
-              + " A source without a model gives a copy without a model. DRAFT and AVAILABLE"
-              + " versions can be duplicated.")
+              + " A source without a model gives a copy without a model. Any version can be"
+              + " duplicated.")
   @ApiResponse(responseCode = "201", description = "Data structure version duplicated successfully")
   @ApiResponse(
       responseCode = "400",
