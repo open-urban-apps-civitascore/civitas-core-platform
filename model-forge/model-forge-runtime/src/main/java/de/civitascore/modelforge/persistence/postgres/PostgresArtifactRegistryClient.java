@@ -1043,7 +1043,13 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                action.run();
+                // Spring rethrows from the first failing callback and skips the rest.
+                try {
+                    action.run();
+                } catch (RuntimeException e) {
+                    log.error("An after-commit action failed; the committed change stands and the "
+                        + "dependency graph may lag until its next rebuild", e);
+                }
             }
         });
     }

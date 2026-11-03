@@ -45,7 +45,8 @@ public interface ArtifactRegistry {
      * back. The surrounding transaction may be a host's own one that {@link #inTransaction} joined,
      * so the action waits for that commit, not for {@code inTransaction} to return. Without a
      * surrounding transaction, the action runs at once; an implementation that has no transactions
-     * keeps that default.
+     * keeps that default. An action that fails after the commit is logged; it neither fails the
+     * committed change nor stops the actions registered after it.
      */
     default void afterCommit(Runnable action) {
         action.run();
