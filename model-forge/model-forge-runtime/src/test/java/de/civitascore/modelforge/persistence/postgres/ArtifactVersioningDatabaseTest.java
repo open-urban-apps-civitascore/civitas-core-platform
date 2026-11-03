@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -314,42 +313,49 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
     }
 
     @Test
-    @DisplayName("An after-commit action does not run when the transaction rolls back, and the copy is gone")
-    void afterCommitActionDoesNotRunOnRollback() {
-        String pin = registry.storeElement(schema(null, "temperature"), Set.of());
+    @DisplayName("A copy rolled back by its host transaction leaves no rows and no graph nodes")
+    void rolledBackCopyLeavesNoRowsAndNoGraphNodes() {
+        String root = registry.storeElement(schema(null, "temperature"), Set.of());
+        String grouping = groupingOf(UrnParser.logicalUrn(root));
+        registry.storeDataStructure(grouping, structureOf(root));
         var before = snapshot();
-        AtomicBoolean ran = new AtomicBoolean();
+        DependencyGraphService graph = new DependencyGraphService(registry);
+        ModelForge modelForge = modelForge(graph);
 
         assertThatThrownBy(() -> registry.inTransaction(() -> {
-            registry.copyVersion(pin, null, Map.of());
-            registry.afterCommit(() -> ran.set(true));
+            copy(modelForge, root);
             throw new IllegalStateException("host failure after the copy");
         })).isInstanceOf(IllegalStateException.class);
 
-        assertThat(ran).isFalse();
         assertThat(snapshot()).isEqualTo(before);
+        assertThat(graph.getDependencies(UrnParser.withVersion(grouping, "2.0.0"))).isEmpty();
     }
 
     @Test
-    @DisplayName("An after-commit action runs once the transaction commits, not before")
-    void afterCommitActionRunsOnCommit() {
-        String pin = registry.storeElement(schema(null, "temperature"), Set.of());
-        AtomicBoolean ran = new AtomicBoolean();
-        AtomicBoolean ranBeforeCommit = new AtomicBoolean();
+    @DisplayName("A copy publishes its graph nodes once the host transaction commits, not before")
+    void committedCopyPublishesGraphNodesAfterCommit() {
+        String root = registry.storeElement(schema(null, "temperature"), Set.of());
+        String grouping = groupingOf(UrnParser.logicalUrn(root));
+        registry.storeDataStructure(grouping, structureOf(root));
+        DependencyGraphService graph = new DependencyGraphService(registry);
+        ModelForge modelForge = modelForge(graph);
+        String groupingCopy = UrnParser.withVersion(grouping, "2.0.0");
+        String rootCopy = UrnParser.withVersion(UrnParser.logicalUrn(root), "2.0.0");
 
-        registry.inTransaction(() -> {
-            registry.copyVersion(pin, null, Map.of());
-            registry.afterCommit(() -> ran.set(true));
-            ranBeforeCommit.set(ran.get());
-            return null;
+        Set<String> beforeCommit = registry.inTransaction(() -> {
+            copy(modelForge, root);
+            return graph.getDependencies(groupingCopy);
         });
 
-        assertThat(ranBeforeCommit).isFalse();
-        assertThat(ran).isTrue();
-        assertThat(versionsOf(UrnParser.logicalUrn(pin))).containsExactly("1.0.0", "2.0.0");
+        assertThat(beforeCommit).isEmpty();
+        assertThat(graph.getDependencies(groupingCopy)).containsExactly(rootCopy);
     }
 
     private ModelForge modelForge() {
+        return modelForge(new DependencyGraphService(registry));
+    }
+
+    private ModelForge modelForge(DependencyGraphService graph) {
         return new EmbeddedModelForgeOperations(
             mock(SchemaImportService.class),
             new ElementQueryService(registry),
@@ -358,7 +364,7 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
             mock(ModelValidator.class),
             mock(CoreSchemaValidator.class),
             new ReferenceExistenceValidator(registry, new SchemaRefExtractor()),
-            new DependencyGraphService(registry),
+            graph,
             registry,
             mock(SmartDataModelsService.class),
             mock(XRepositoryService.class),

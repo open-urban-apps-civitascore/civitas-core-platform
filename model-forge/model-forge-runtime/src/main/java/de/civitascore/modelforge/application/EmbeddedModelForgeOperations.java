@@ -728,15 +728,15 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         String logical = UrnParser.logicalUrn(urn);
         String requestedVersion = UrnParser.isLatest(urn) ? null : UrnParser.versionFromUrn(urn);
         List<String> copies = registry.inTransaction(() -> copyWithGrouping(logical, requestedVersion));
-        registry.afterCommit(() -> copies.forEach(copy -> registerWritten(copy, logical)));
+        registry.afterCommit(() -> copies.forEach(dependencyGraph::registerFromRegistry));
         var pin = new ArtifactId(copies.getFirst());
         return new ArtifactWriteResult(pin, dependenciesOf(pin));
     }
 
     /**
-     * Copies the requested version of the artifact and, for an Element, the version of its import
-     * grouping that holds it as a member. Returns the Pin of the copied artifact first, then the
-     * Pin of the grouping copy if there is one.
+     * Copies the requested version of the artifact and, for an Element, the grouping version with
+     * the same number when that version holds the Element as a member. Returns the Pin of the
+     * copied artifact first, then the Pin of the grouping copy if there is one.
      */
     private List<String> copyWithGrouping(String logical, String requestedVersion) {
         registry.lockForWrite(logical);
@@ -754,7 +754,6 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             return List.of(registry.copyVersion(source, null, Map.of()));
         }
         String groupingCurrent = registry.resolveReference(grouping).map(UrnParser::versionFromUrn).orElseThrow();
-        // Each copy counts above the other artifact's highest version, so both get the same number.
         String copy = registry.copyVersion(source, groupingCurrent, Map.of());
         String groupingCopy = registry.copyVersion(
             UrnParser.withVersion(grouping, sourceVersion), current, Map.of(source, copy));

@@ -237,11 +237,12 @@ public interface ModelForge {
      * <p>This <em>always</em> mints a version, unlike every other write, which returns the existing
      * pin when the content is byte-identical. Carrying unchanged content forward is the whole point.
      *
-     * <p>An Element whose import grouping holds the source version as a member is copied together
-     * with that grouping version, atomically and to the same new version, which then counts above
-     * the highest version of either artifact. The grouping copy is the grouping's current version;
-     * its References to the source Element point to the copied Element, all other References stay
-     * unchanged. An Element without such a grouping is copied on its own.
+     * <p>When the grouping version with the same number as the source Element holds that Element as
+     * a member, the grouping version is copied together with it, atomically and to the same new
+     * version, which then counts above the highest version of either artifact. The grouping copy
+     * becomes the grouping's current version; its References to the source Element point to the
+     * copied Element, all other References stay unchanged. Otherwise the Element is copied on its
+     * own, also when a grouping version with another number holds it.
      *
      * @throws IllegalArgumentException when the artifact is unknown, holds no version to copy, or
      *     does not hold the requested version
