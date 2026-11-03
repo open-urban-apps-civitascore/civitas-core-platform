@@ -1059,8 +1059,10 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                 try {
                     action.run();
                 } catch (RuntimeException e) {
-                    log.error("An after-commit action failed; the committed change stands and the "
-                        + "dependency graph may lag until its next rebuild", e);
+                    log.error("An after-commit action failed; the committed change stands, but this "
+                        + "application's in-memory dependency graph is stale until it is rebuilt. Restart "
+                        + "the application to rebuild it; in the Model Forge admin UI, opening the Graph "
+                        + "page also rebuilds it", e);
                 }
             }
         });
