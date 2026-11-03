@@ -432,6 +432,20 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
     }
 
     @Test
+    @DisplayName("Revising a version to its line's latest content returns that latest pin and adds no version")
+    void revisingToTheLinesLatestContentIsAbsorbedInThatLine() {
+        String logical = UrnParser.logicalUrn(registry.storeElement(schema(null, "temperature"), Set.of()));
+        String lineLatest = storeUnder(logical, "humidity", VersionBump.MINOR);
+        storeUnder(logical, "pressure", VersionBump.MAJOR);
+
+        String revised = registry.storeElement(
+            schema(logical, "humidity"), Set.of(), Set.of(), null, VersionBump.MINOR, "1.0.0");
+
+        assertThat(revised).isEqualTo(lineLatest);
+        assertThat(versionsOf(logical)).containsExactly("1.0.0", "1.1.0", "2.0.0");
+    }
+
+    @Test
     @DisplayName("An artifact recreated under a deleted one's URN continues after its numbers")
     void aRecreatedArtifactContinuesAfterTheDeletedNumbers() {
         String logical = UrnParser.logicalUrn(registry.storeElement(schema(null, "temperature"), Set.of()));
