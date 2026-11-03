@@ -1,6 +1,7 @@
 package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
 
 import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
@@ -17,9 +18,12 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionMetaInputDTO;
+import de.civitascore.portal.model.output.DataStructureOutputDTO;
 import de.civitascore.portal.model.output.DataStructureVersionOutputDTO;
 import de.civitascore.portal.model.output.summary.DataStructureSummaryDTO;
+import de.civitascore.portal.model.output.summary.DataStructureVersionUsageSummaryDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.VersionBump;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
@@ -742,7 +746,10 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       try {
         jdbcClient.sql("INSERT INTO version_delete_blocker VALUES (?)").param(versionId2).update();
 
-        assertThat(delete(versionId2).getStatusCode().isError()).isTrue();
+        ResponseEntity<String> response = delete(versionId2);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody()).contains("FOREIGN_KEY_VIOLATION");
       } finally {
         jdbcClient.sql("DROP TABLE version_delete_blocker").update();
       }
@@ -766,6 +773,88 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
       assertThat(response.getBody()).contains("RESOURCE_IN_USE");
       assertThat(dataStructureVersionRepository.existsById(versionId1)).isTrue();
+    }
+
+    private DataStructureVersion versionInTheModelLineOf(UUID versionId) {
+      DataStructureVersion owner = dataStructureVersionRepository.findById(versionId).orElseThrow();
+      DataStructure structure = dataStructureRepository.findById(dataStructureId).orElseThrow();
+      ModelRegistryGateway.ModelPin pin =
+          modelRegistryGateway.storeModel(
+              Optional.of(structure.getModelLogicalUrn()),
+              structure.getId(),
+              structure.getName(),
+              portalData.dataStructureVersionModel("Sharing"),
+              null,
+              VersionBump.MINOR,
+              owner.getVersion());
+      assertThat(pin.version()).startsWith("1.").isNotEqualTo(owner.getVersion());
+      return portalData.dataStructureVersion(
+          structure, b -> b.modelUrn(pin.versionedUrn()).version(pin.version()));
+    }
+
+    private boolean inUse(UUID versionId) {
+      return restTemplate
+          .exchange(
+              getEndpoint() + "/" + versionId,
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference())
+          .getBody()
+          .isInUse();
+    }
+
+    @Test
+    @DisplayName(
+        "Two versions whose models share a major refuse their deletes and keep both models")
+    void versionsSharingAModelLineRefuseTheirDeletes() {
+      String ownerModel =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow().getModelUrn();
+      DataStructureVersion sharing = versionInTheModelLineOf(versionId1);
+
+      ResponseEntity<String> response = delete(versionId1);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody())
+          .contains("RESOURCE_IN_USE")
+          .contains("only deleting the whole data structure");
+      assertThat(delete(sharing.getId()).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(modelRegistryGateway.fetchStoredModel(ownerModel)).isPresent();
+      assertThat(modelRegistryGateway.fetchStoredModel(sharing.getModelUrn())).isPresent();
+      assertThat(inUse(versionId1)).isTrue();
+      assertThat(inUse(sharing.getId())).isTrue();
+      assertThat(inUse(versionId2)).isFalse();
+
+      DataStructureOutputDTO structure =
+          restTemplate
+              .exchange(
+                  "/datastructures/" + dataStructureId,
+                  HttpMethod.GET,
+                  new HttpEntity<>(createAuthHeaders()),
+                  DataStructureOutputDTO.class)
+              .getBody();
+      assertThat(structure.getDataStructureVersions())
+          .extracting(
+              DataStructureVersionUsageSummaryDTO::getId,
+              DataStructureVersionUsageSummaryDTO::isInUse)
+          .containsExactlyInAnyOrder(
+              tuple(versionId1, true), tuple(sharing.getId(), true), tuple(versionId2, false));
+      assertThat(structure.isInUse()).isFalse();
+    }
+
+    @Test
+    @DisplayName("A data structure whose versions share a model line can be deleted")
+    void aDataStructureWhoseVersionsShareAModelLineCanBeDeleted() {
+      versionInTheModelLineOf(versionId1);
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              "/datastructures/" + dataStructureId,
+              HttpMethod.DELETE,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+      assertThat(dataStructureRepository.existsById(dataStructureId)).isFalse();
     }
 
     @Test
