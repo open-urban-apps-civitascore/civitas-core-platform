@@ -773,10 +773,11 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
 
     /**
      * The single transactional write path. Upserts the model_forge.artifact, inserts a new version
-     * (unless the incoming authored content is byte-identical to the current version's
-     * representation in the same format — idempotent), stores the version's authored
-     * representation, replaces its reference edges, advances the current-version pointer,
-     * and runs an optional post-insert hook (e.g. the XSD namespace upsert).
+     * (unless the incoming authored content is byte-identical to the compared version's
+     * representation in the same format — idempotent; the compared version is the latest one in
+     * the named base's major for a non-MAJOR bump with a base, otherwise the current version),
+     * stores the version's authored representation, replaces its reference edges, advances the
+     * current-version pointer, and runs an optional post-insert hook (e.g. the XSD namespace upsert).
      *
      * @param explicitVersion when non-blank, stored verbatim instead of MF's usual version
      *     authority (see the class documentation) —
@@ -785,8 +786,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
      *     collides with an existing one for this artifact surfaces as the usual integrity-violation
      *     error rather than being silently coerced.
      * @return the concrete versioned URN (pin) the write resolved to: the newly assigned version,
-     *     or, on a content-identical idempotent write, the existing latest version of the named
-     *     base's major, or the current version when no base applies. The version is
+     *     or the compared version on an idempotent write. The version is
      *     assigned inside this write, so the pin needs no read-back — it is correct even when the
      *     surrounding host transaction has not committed yet.
      */
