@@ -93,7 +93,7 @@ public class GoverningVersionLookup {
   }
 
   /** The major a pin names, or null when it names no version. */
-  private static String majorOf(String pinnedUrn, String logicalUrn) {
+  static String majorOf(String pinnedUrn, String logicalUrn) {
     if (logicalUrn == null || pinnedUrn.length() <= logicalUrn.length() + 1) {
       return null;
     }

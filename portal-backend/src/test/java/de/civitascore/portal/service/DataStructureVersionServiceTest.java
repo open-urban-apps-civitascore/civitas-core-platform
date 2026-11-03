@@ -220,6 +220,39 @@ class DataStructureVersionServiceTest {
     }
 
     @Test
+    @DisplayName("Should block delete when another version has its model in the same major")
+    void deleteById_whenAnotherVersionSharesTheMajor_shouldThrowAndDeleteNothing() {
+      siblingPinnedTo(LOGICAL_URN + ":1.1.0");
+
+      assertThatThrownBy(() -> dataStructureVersionService.deleteById(versionId))
+          .isInstanceOf(ResourceInUseException.class);
+      verify(dataStructureVersionRepository, never()).deleteById(any());
+      verify(modelRegistryGateway, never()).deleteModelVersion(any());
+    }
+
+    @Test
+    @DisplayName("Should delete when the other versions have their models in other majors")
+    void deleteById_whenOtherVersionsUseOtherMajors_shouldDeleteTheModelVersion() {
+      siblingPinnedTo(LOGICAL_URN + ":2.0.0");
+      when(modelRegistryGateway.holds(LOGICAL_URN)).thenReturn(true);
+
+      dataStructureVersionService.deleteById(versionId);
+
+      verify(modelRegistryGateway).deleteModelVersion(MODEL_URN);
+    }
+
+    private void siblingPinnedTo(String pin) {
+      parent.setId(UUID.randomUUID());
+      DataStructureVersion sibling = new DataStructureVersion();
+      sibling.setId(UUID.randomUUID());
+      sibling.setDataStructure(parent);
+      sibling.setModelUrn(pin);
+      when(modelRegistryGateway.logicalUrn(any())).thenReturn(LOGICAL_URN);
+      when(dataStructureVersionRepository.findAllByDataStructure_IdIn(List.of(parent.getId())))
+          .thenReturn(List.of(version, sibling));
+    }
+
+    @Test
     @DisplayName("Should forget the logical URN once the registry holds no version of the model")
     void deleteById_ofTheLastModelVersion_shouldClearTheLogicalUrn() {
       when(modelRegistryGateway.holds(LOGICAL_URN)).thenReturn(false);

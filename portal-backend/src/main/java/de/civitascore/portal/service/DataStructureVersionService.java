@@ -344,7 +344,8 @@ public class DataStructureVersionService
 
   /**
    * Refuses the delete while anything references any version of the version's line in the model
-   * registry, or a Data source is pinned to it.
+   * registry, a Data source is pinned to it, or another version of the data structure has its model
+   * in the same line, since deleting the line deletes that version's model too.
    *
    * @param id the version ID to delete
    * @return the version entity to be deleted
@@ -354,8 +355,42 @@ public class DataStructureVersionService
   protected DataStructureVersion preProcessDelete(UUID id) {
     DataStructureVersion version = findByIdOrThrow(id);
     artifactUsageLookup.of(version).requireNotInUse(getEntityName(), id);
+    requireOwnModelLine(version);
     return version;
   }
+
+  private void requireOwnModelLine(DataStructureVersion version) {
+    ModelLine line = modelLineOf(version);
+    if (line == null) {
+      return;
+    }
+    boolean shared =
+        dataStructureVersionRepository
+            .findAllByDataStructure_IdIn(List.of(version.getDataStructure().getId()))
+            .stream()
+            .filter(other -> !other.getId().equals(version.getId()))
+            .anyMatch(other -> line.equals(modelLineOf(other)));
+    if (shared) {
+      throw new ResourceInUseException(
+          getEntityName(),
+          version.getId(),
+          "Cannot delete "
+              + getEntityName()
+              + " because another version of its data structure shares its model.");
+    }
+  }
+
+  private ModelLine modelLineOf(DataStructureVersion version) {
+    String pin = version.getModelUrn();
+    if (pin == null) {
+      return null;
+    }
+    String logicalUrn = modelRegistryGateway.logicalUrn(pin);
+    String major = GoverningVersionLookup.majorOf(pin, logicalUrn);
+    return major == null ? null : new ModelLine(logicalUrn, major);
+  }
+
+  private record ModelLine(String logicalUrn, String major) {}
 
   /**
    * Deletes the version's model line from Model Forge in the delete's transaction. Once the
