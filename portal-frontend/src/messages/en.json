@@ -39,6 +39,7 @@
       "deleteItem": "Delete {item}",
       "remove": "Remove",
       "removeItem": "Remove {item}",
+      "duplicateItem": "Duplicate {item}",
       "add": "Add",
       "edit": "Edit",
       "editBase": "Edit base",
@@ -1356,10 +1357,12 @@
     "messages": {
       "createSuccess": "The version of the Data structure has been successfully created.",
       "updateSuccess": "The version of the data has been successfully updated.",
+      "duplicateSuccess": "The version has been successfully duplicated.",
       "isAvailableModelHint": "The version information and the structure definition can not be edited since this version already has the status 'Available'."
     },
     "errors": {
       "creationError": "An error occurred while creating the Data structure version.",
+      "duplicationError": "An error occurred while duplicating the Data structure version.",
       "inUseError": "This version is still used by a Data source or data storage.",
       "saveInvalidModel": "The version cannot be saved: {reason}",
       "modelRootMissingError": "The version cannot be set to \"Available\" because its saved model has no root class. Mark the root class in the diagram, save the version, then set it to \"Available\".",

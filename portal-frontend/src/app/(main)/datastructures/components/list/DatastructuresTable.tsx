@@ -27,12 +27,15 @@ import { resolveUpdater } from '@/utils/table'
 
 interface DatastructuresTableProps extends TableProps<DatastructuresListData> {
   datastructures: DatastructuresListData[]
+  isDuplicating: boolean
   onDeleteDatastructureClick: (id: string) => void
+  onDuplicateVersionClick: (datastructureId: string, versionId: string) => void
 }
 
 export const DatastructuresTable = (props: DatastructuresTableProps) => {
   const {
     datastructures,
+    isDuplicating,
     rowCount,
     pageIndex,
     totalPages,
@@ -42,6 +45,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     onPaginationChange,
     onSortingChange,
     onDeleteDatastructureClick,
+    onDuplicateVersionClick,
   } = props
   const { hasScopedPermission } = usePermissions()
   const t = useTranslations('datastructures')
@@ -148,7 +152,26 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     {
       id: 'actions',
       cell: ({ row }: { row: Row<DatastructuresListData> }) => {
-        if (row.depth !== 0) return null
+        if (row.depth !== 0) {
+          const datastructureId = row.parentId as string
+          const canDuplicate = hasScopedPermission(
+            PERMISSION_NAMES.DATASTRUCTURE_UPDATE,
+            ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
+            datastructureId,
+          )
+          return canDuplicate ? (
+            <TableDropdownMenu
+              classNameDropdownContent="w-50"
+              menuItems={[
+                {
+                  label: tCommon('actions.duplicateItem', { item: tCommon('items.datastructureVersion') }),
+                  onClick: () => onDuplicateVersionClick(datastructureId, row.original.id),
+                  disabled: isDuplicating,
+                },
+              ]}
+            />
+          ) : null
+        }
         const canDelete = hasScopedPermission(
           PERMISSION_NAMES.DATASTRUCTURE_DELETE,
           ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,

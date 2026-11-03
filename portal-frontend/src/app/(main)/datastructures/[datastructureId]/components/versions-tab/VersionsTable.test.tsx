@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -31,6 +32,8 @@ const versions: DatastructureVersionsListData[] = [
 const defaultProps = {
   datastructureId: 'ds-1',
   versions,
+  isReadOnly: false,
+  isDuplicating: false,
   rowCount: 2,
   pageIndex: 0,
   pageSize: 10,
@@ -38,6 +41,7 @@ const defaultProps = {
   totalPages: 1,
   onPaginationChange: vi.fn(),
   onSortingChange: vi.fn(),
+  onDuplicateVersionClick: vi.fn(),
 }
 
 const renderTable = (props = defaultProps) =>
@@ -67,5 +71,35 @@ describe('VersionsTable', () => {
 
     expect(within(rows[1]).getByTestId('inUseIndicator')).toBeInTheDocument()
     expect(within(rows[2]).queryByTestId('inUseIndicator')).toBeNull()
+  })
+
+  it('offers duplication of each version in edit mode', async () => {
+    const user = userEvent.setup()
+    renderTable()
+
+    const menuButtons = screen.getAllByRole('button', { name: 'Open menu' })
+    expect(menuButtons).toHaveLength(versions.length)
+    await user.click(menuButtons[1])
+    await user.click(await screen.findByText('Version duplizieren'))
+
+    expect(defaultProps.onDuplicateVersionClick).toHaveBeenCalledWith('v-2')
+  })
+
+  it('disables duplication while a copy is being made', async () => {
+    const user = userEvent.setup()
+    const onDuplicateVersionClick = vi.fn()
+    renderTable({ ...defaultProps, isDuplicating: true, onDuplicateVersionClick })
+
+    await user.click(screen.getAllByRole('button', { name: 'Open menu' })[1])
+    const duplicateItem = await screen.findByRole('menuitem', { name: 'Version duplizieren' })
+    expect(duplicateItem).toHaveAttribute('aria-disabled', 'true')
+    await user.click(duplicateItem)
+
+    expect(onDuplicateVersionClick).not.toHaveBeenCalled()
+  })
+
+  it('offers no action menu in read-only mode', () => {
+    renderTable({ ...defaultProps, isReadOnly: true })
+    expect(screen.queryByRole('button', { name: 'Open menu' })).toBeNull()
   })
 })

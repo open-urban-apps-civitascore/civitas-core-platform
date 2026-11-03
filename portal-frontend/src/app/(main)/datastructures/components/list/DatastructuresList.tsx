@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { useDeleteDatastructure } from '@/app/services/api/datastructures/clientRequests'
+import { useDuplicateDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
 import { InfoModal } from '@/components/modals/info-modal/InfoModal'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -32,12 +33,14 @@ interface DatastructuresListProps {
 export const DatastructuresList = (props: DatastructuresListProps) => {
   const { datastructures, rowCount } = props
   const t = useTranslations('datastructures')
+  const tVersion = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
   const router = useRouter()
   const [datastructureToDelete, setDatastructureToDelete] = useState<string | null>(null)
   const [isDeletionInfoModalOpen, setIsDeletionInfoModalOpen] = useState(false)
   const [isDeletionWarningModalOpen, setIsDeletionWarningModalOpen] = useState(false)
   const deleteDatastructure = useDeleteDatastructure()
+  const duplicateVersion = useDuplicateDatastructureVersion()
   const isLoading = deleteDatastructure.isPending
   const { hasPermissionInScope } = usePermissions()
   const {
@@ -82,6 +85,21 @@ export const DatastructuresList = (props: DatastructuresListProps) => {
     }
   }
 
+  const handleDuplicateVersionClick = (datastructureId: string, versionId: string) => {
+    duplicateVersion.mutate(
+      { data: undefined, endpoint: `/datastructures/${datastructureId}/versions/${versionId}/duplicate` },
+      {
+        onSuccess: () => {
+          toast.success(tVersion('messages.duplicateSuccess'))
+          router.refresh()
+        },
+        onError: () => {
+          toast.error(tVersion('errors.duplicationError'))
+        },
+      },
+    )
+  }
+
   const handleDiscardDeletion = () => {
     setDatastructureToDelete(null)
     setIsDeletionWarningModalOpen(false)
@@ -110,6 +128,8 @@ export const DatastructuresList = (props: DatastructuresListProps) => {
             onPaginationChange={setPaginationParams}
             onSortingChange={setSortingParams}
             onDeleteDatastructureClick={handleDeleteDatastructureClick}
+            onDuplicateVersionClick={handleDuplicateVersionClick}
+            isDuplicating={duplicateVersion.isPending}
           />
         </TableContainer>
       </PageBackground>
