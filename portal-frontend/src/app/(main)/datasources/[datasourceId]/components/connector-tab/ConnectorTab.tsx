@@ -48,30 +48,26 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
   // connector type in CONNECTOR_FIELD_REVALIDATION_RULES, colocated with the schema that owns the
   // relationship (see `validateMqttSchemes` in types/connectors.ts). This component stays generic
   // over connector type: adding a new connector's rule never requires touching this file.
-  const revalidationRule = connectorType ? CONNECTOR_FIELD_REVALIDATION_RULES[connectorType] : null
-
-  const watchedFieldValue = useWatch({
-    control: form.control,
-    name: `configuration.${revalidationRule?.watch}` as Path<DatasourceFormDraft>,
-    disabled: !revalidationRule,
-  })
-  const isFirstRevalidationRender = useRef(true)
+  const revalidationRules = connectorType ? CONNECTOR_FIELD_REVALIDATION_RULES[connectorType] : []
 
   const configuration = useWatch({ control: form.control, name: 'configuration' })
   const visibleFields = connectorConfig.filter(
     field => !field.visibleWhen || get(configuration, field.visibleWhen.key) === field.visibleWhen.value,
   )
 
+  const watchedFieldValues: unknown[] = revalidationRules.map(rule => get(configuration, rule.watch))
+  const previousWatchedFieldValues = useRef(watchedFieldValues)
+
   useEffect(() => {
-    if (isFirstRevalidationRender.current) {
-      isFirstRevalidationRender.current = false
-      return
-    }
-    if (revalidationRule) {
-      void form.trigger(revalidationRule.revalidate.map(path => `configuration.${path}` as Path<DatasourceFormDraft>))
+    const previousValues = previousWatchedFieldValues.current
+    previousWatchedFieldValues.current = watchedFieldValues
+    const changedRules = revalidationRules.filter((_rule, index) => previousValues[index] !== watchedFieldValues[index])
+    const paths = changedRules.flatMap(rule => rule.revalidate)
+    if (paths.length) {
+      void form.trigger(paths.map(path => `configuration.${path}` as Path<DatasourceFormDraft>))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedFieldValue])
+  }, [JSON.stringify(watchedFieldValues)])
 
   const getLabel = (label: ConnectorFieldLabel) => {
     const hint = label.hintKey ? `(${t(label.hintKey)})` : ''

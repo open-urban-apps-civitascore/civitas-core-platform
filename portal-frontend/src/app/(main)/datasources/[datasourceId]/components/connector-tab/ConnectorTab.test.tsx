@@ -346,18 +346,6 @@ describe('ConnectorTab (integration)', () => {
       expect(screen.getByLabelText(/http\.password\.label/)).toBeInTheDocument()
     })
 
-    it('validates the credentials when the user selects Basic', async () => {
-      renderConnectorTab({
-        connectorType: 'HTTP',
-        configuration: { baseUrl: '', authentication: { type: 'NONE', username: 'a:b', password: '' } },
-      })
-
-      fireEvent.click(screen.getByLabelText(/http\.authentication\.label/))
-      fireEvent.click(await screen.findByText('http.authentication.basic'))
-
-      expect(await screen.findByText('datasources.errors.usernameColon')).toBeInTheDocument()
-    })
-
     describe('authentication types', () => {
       const FIELD_LABELS: Record<HttpAuthenticationType, RegExp[]> = {
         NONE: [],
@@ -454,15 +442,6 @@ describe('ConnectorTab (integration)', () => {
         )
 
         expect(await screen.findByText(message)).toBeInTheDocument()
-      })
-
-      it('shows the https error at the API host after the user selects an authentication', async () => {
-        renderWithAuthentication('NONE', 'http://api.example.org')
-
-        fireEvent.click(screen.getByLabelText(/http\.authentication\.label/))
-        fireEvent.click(await screen.findByText('http.authentication.bearerToken'))
-
-        expect(await screen.findByText('datasources.errors.baseUrlHttpsRequired')).toBeInTheDocument()
       })
     })
 

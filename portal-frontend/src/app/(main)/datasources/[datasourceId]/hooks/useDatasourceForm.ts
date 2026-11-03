@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AxiosError } from 'axios'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { get, useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -45,6 +45,17 @@ import { isDatastructureNotAvailableError, isResourceInUseError, isStoredSecretR
 import { hasDirtyField, pickDirtyValues } from '@/utils/form'
 
 const REENTER_SECRET_MESSAGE = 'datasources.errors.reenterSecret'
+
+const AUTHENTICATION_TYPE_PATH = 'configuration.authentication.type'
+
+type ConnectorValues = { connectorType?: ConnectorType; configuration?: Record<string, unknown> }
+
+const getSecretsToReenter = (values: ConnectorValues, loadedValues: ConnectorValues | undefined) => {
+  if (values.connectorType !== CONNECTOR_TYPES.HTTP || !values.configuration) return []
+  const isLoadedHttp = loadedValues?.connectorType === CONNECTOR_TYPES.HTTP
+  const loaded = isLoadedHttp ? (loadedValues.configuration as HttpConnectionForm | undefined) : undefined
+  return findSecretsToReenter(values.configuration as HttpConnectionForm, loaded)
+}
 
 const toConnectorPayloadKey = (values: unknown) => {
   const parsed = ConnectorFormToApiSchema.safeParse(values)
@@ -135,42 +146,46 @@ export const useDatasourceForm = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectorTypeWatch])
 
+  const setReenterSecretErrors = () => {
+    for (const path of getSecretsToReenter(form.getValues(), form.formState.defaultValues)) {
+      form.setError(`configuration.${path}`, { type: 'custom', message: REENTER_SECRET_MESSAGE })
+    }
+  }
+
   const authenticationTypeWatch = useWatch({
     control: form.control,
-    name: 'configuration.authentication.type',
+    name: AUTHENTICATION_TYPE_PATH,
   }) as HttpAuthenticationType | undefined
+  const isFirstAuthenticationTypeRender = useRef(true)
 
   useEffect(() => {
     if (connectorTypeWatch !== CONNECTOR_TYPES.HTTP || !authenticationTypeWatch) return
     const isLoadedHttpConnector = initialFormValues?.connectorType === CONNECTOR_TYPES.HTTP
-    if (
-      isLoadedHttpConnector &&
-      get(initialFormValues, 'configuration.authentication.type') === authenticationTypeWatch
-    ) {
+    if (isLoadedHttpConnector && get(initialFormValues, AUTHENTICATION_TYPE_PATH) === authenticationTypeWatch) {
       form.resetField('configuration.authentication')
     } else {
       form.setValue('configuration.authentication', emptyHttpAuthentication(authenticationTypeWatch), {
         shouldDirty: true,
       })
     }
+    if (isFirstAuthenticationTypeRender.current) {
+      isFirstAuthenticationTypeRender.current = false
+      return
+    }
+    const revalidate = async () => {
+      await form.trigger(['configuration.authentication', 'configuration.baseUrl'])
+      setReenterSecretErrors()
+    }
+    void revalidate()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authenticationTypeWatch])
 
-  const secretsToReenter = useMemo(() => {
-    const isHttp = formValues.connectorType === CONNECTOR_TYPES.HTTP
-    if (!isHttp || !formValues.configuration) return []
-    const isLoadedHttp = initialFormValues?.connectorType === CONNECTOR_TYPES.HTTP
-    const loaded = isLoadedHttp ? (initialFormValues.configuration as HttpConnectionForm | undefined) : undefined
-    return findSecretsToReenter(formValues.configuration as HttpConnectionForm, loaded)
-  }, [formValues, initialFormValues])
+  const secretsToReenter = useMemo(
+    () => getSecretsToReenter(formValues, initialFormValues),
+    [formValues, initialFormValues],
+  )
 
   const secretsToReenterKey = secretsToReenter.join(',')
-
-  const setReenterSecretErrors = () => {
-    for (const path of secretsToReenter) {
-      form.setError(`configuration.${path}`, { type: 'custom', message: REENTER_SECRET_MESSAGE })
-    }
-  }
 
   useEffect(() => {
     setReenterSecretErrors()
@@ -212,8 +227,13 @@ export const useDatasourceForm = (
       if (nameError) {
         form.setError('name', nameError)
       }
+      setReenterSecretErrors()
     } else {
-      void form.trigger()
+      const revalidate = async () => {
+        await form.trigger()
+        setReenterSecretErrors()
+      }
+      void revalidate()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectorTypeWatch, isDraftMode])

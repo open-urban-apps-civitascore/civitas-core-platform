@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { Path } from 'react-hook-form'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -425,7 +425,11 @@ describe('useDatasourceForm with an HTTP connector', () => {
     const selectAuthenticationType = (
       result: ReturnType<typeof renderDatasourceForm>['result'],
       type: HttpAuthenticationType,
-    ) => act(() => result.current.form.setValue(AUTHENTICATION_TYPE_PATH, type, { shouldDirty: true }))
+    ) =>
+      act(async () => {
+        const { onChange } = result.current.form.register(AUTHENTICATION_TYPE_PATH)
+        await onChange({ target: { name: AUTHENTICATION_TYPE_PATH, value: type }, type: 'change' })
+      })
 
     it.each([
       ['BEARER_TOKEN', { type: 'BEARER_TOKEN', token: '' }],
@@ -433,22 +437,22 @@ describe('useDatasourceForm with an HTTP connector', () => {
       ['OAUTH2', { type: 'OAUTH2', tokenUrl: '', clientId: '', clientSecret: '', scope: '' }],
       ['CLIENT_CERTIFICATE', { type: 'CLIENT_CERTIFICATE', certificate: '', privateKey: '' }],
       ['NONE', { type: 'NONE' }],
-    ] as const)('keeps only the empty fields of %s', (type, expected) => {
+    ] as const)('keeps only the empty fields of %s', async (type, expected) => {
       const { result } = renderHttpDatasourceForm(createHttpDatasource())
 
-      selectAuthenticationType(result, type)
+      await selectAuthenticationType(result, type)
 
       expect(result.current.form.getValues('configuration.authentication')).toEqual(expected)
     })
 
-    it('creates the empty Basic fields for a loaded None', () => {
+    it('creates the empty Basic fields for a loaded None', async () => {
       const datasource = createHttpDatasource()
       const { result } = renderHttpDatasourceForm({
         ...datasource,
         connector: { ...datasource.connector!, authentication: { type: 'NONE' } },
       })
 
-      selectAuthenticationType(result, 'BASIC')
+      await selectAuthenticationType(result, 'BASIC')
 
       expect(result.current.form.getValues('configuration.authentication')).toEqual({
         type: 'BASIC',
@@ -457,11 +461,11 @@ describe('useDatasourceForm with an HTTP connector', () => {
       })
     })
 
-    it('restores the loaded values when the loaded type is selected again', () => {
+    it('restores the loaded values when the loaded type is selected again', async () => {
       const { result } = renderHttpDatasourceForm(createHttpDatasource())
 
-      selectAuthenticationType(result, 'BEARER_TOKEN')
-      selectAuthenticationType(result, 'BASIC')
+      await selectAuthenticationType(result, 'BEARER_TOKEN')
+      await selectAuthenticationType(result, 'BASIC')
 
       expect(result.current.form.getValues('configuration.authentication')).toEqual({
         type: 'BASIC',
@@ -469,6 +473,19 @@ describe('useDatasourceForm with an HTTP connector', () => {
         password: '********',
       })
       expect(result.current.isFormDirty).toBe(false)
+    })
+
+    it('restores the loaded values when the user exits after a change of the type', async () => {
+      const { result } = renderHttpDatasourceForm(createHttpDatasource())
+
+      await selectAuthenticationType(result, 'API_TOKEN')
+      act(() => result.current.resetToInitialState())
+
+      expect(result.current.form.getValues('configuration.authentication')).toEqual({
+        type: 'BASIC',
+        username: 'reader',
+        password: '********',
+      })
     })
   })
 
@@ -592,6 +609,36 @@ describe('useDatasourceForm with an HTTP connector', () => {
       )
 
       expect(getPasswordError(result)).toBeUndefined()
+    })
+
+    it('keeps the hint at the password when the status changes to Available and back to Draft', async () => {
+      const { result } = renderWithChangedHost()
+      const setStatus = (dataSourceStatus: DatasourceStatusType) =>
+        act(async () => {
+          result.current.form.setValue('dataSourceStatus', dataSourceStatus, { shouldDirty: true })
+        })
+
+      await setStatus('AVAILABLE')
+      await waitFor(() => expect(getPasswordError(result)).toBe('datasources.errors.reenterSecret'))
+
+      await setStatus('DRAFT')
+      expect(getPasswordError(result)).toBe('datasources.errors.reenterSecret')
+    })
+
+    it('shows the hint at the password after the user selects the loaded type again', async () => {
+      const { result } = renderWithChangedHost()
+      act(() => {
+        result.current.form.register('configuration.authentication.type' as Path<DatasourceFormDraft>)
+      })
+
+      await act(async () => {
+        result.current.form.setValue('configuration.authentication.type' as Path<DatasourceFormDraft>, 'BEARER_TOKEN')
+      })
+      await act(async () => {
+        result.current.form.setValue('configuration.authentication.type' as Path<DatasourceFormDraft>, 'BASIC')
+      })
+
+      await waitFor(() => expect(getPasswordError(result)).toBe('datasources.errors.reenterSecret'))
     })
 
     it('shows its own message when the backend refuses the stored secret', async () => {

@@ -426,9 +426,11 @@ describe('ApiCallsTab', () => {
       await user.clear(headerName)
       await user.type(headerName, 'x-api-key')
       await waitFor(() => expect(getApiTokenNameError()).toBe(COLLISION))
+      expect(screen.getByText('datasources.errors.parameterApiTokenDuplicate')).toBeInTheDocument()
 
       await user.type(headerName, '-2')
       await waitFor(() => expect(getApiTokenNameError()).toBeUndefined())
+      expect(screen.queryByText('datasources.errors.parameterApiTokenDuplicate')).not.toBeInTheDocument()
     })
 
     it('clears the error when the API call with the API token name is deleted', async () => {

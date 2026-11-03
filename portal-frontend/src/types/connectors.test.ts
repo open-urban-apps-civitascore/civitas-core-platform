@@ -513,6 +513,36 @@ describe('HTTP connector schemas', () => {
           apiCalls: [{ ...API_CALL, ...apiCall }],
         })
       const collision = issue(['authentication', 'name'], 'datasources.errors.apiTokenNameCollision')
+      const parameterIssue = (path: (string | number)[]) =>
+        issue(['apiCalls', 0, ...path], 'datasources.errors.parameterApiTokenDuplicate')
+
+      it.each<[string, Partial<typeof API_TOKEN>, Partial<HttpApiCallForm>, (string | number)[]]>([
+        [
+          'the header after an empty row',
+          { name: 'X-API-Key' },
+          {
+            headers: [
+              { name: '', value: '' },
+              { name: 'x-api-key', value: 'x' },
+            ],
+          },
+          ['headers', 1, 'name'],
+        ],
+        [
+          'the query parameter',
+          { name: 'key', in: 'QUERY' },
+          { queryParameters: [{ name: 'key', value: 'x' }] },
+          ['queryParameters', 0, 'name'],
+        ],
+        [
+          'the page parameter',
+          { name: 'page', in: 'QUERY' },
+          { pagination: PAGINATION_FORM },
+          ['pagination', 'pageParameter'],
+        ],
+      ])('shows the collision also at %s', (_name, token, apiCall, path) => {
+        expect(collisionIssues(token, apiCall)).toContainEqual(parameterIssue(path))
+      })
 
       it.each<[string, Partial<typeof API_TOKEN>, Partial<HttpApiCallForm>]>([
         ['a header in another case', { name: 'X-API-Key' }, { headers: [{ name: 'x-api-key', value: 'x' }] }],

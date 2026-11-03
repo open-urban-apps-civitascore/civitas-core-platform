@@ -1051,7 +1051,8 @@
       "datastructureNotAvailableError": "The Data source could not be set to \"Available\". Set the Data structure version to \"Available\" first.",
       "groupsWithoutRoles": "Groups with no assigned Roles have not been saved.",
       "reenterSecret": "The URL changed. Enter this value again.",
-      "storedSecretRefused": "The URL changed. Enter the secrets of the authentication again."
+      "storedSecretRefused": "The URL changed. Enter the secrets of the authentication again.",
+      "parameterApiTokenDuplicate": "The API token already has this name."
     },
     "connection": {
       "active": "active",

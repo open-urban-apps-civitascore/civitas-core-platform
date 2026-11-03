@@ -131,16 +131,19 @@ const validateMqttSchemes = (configuration: { urls?: unknown; tls?: boolean }, c
 export type FieldRevalidationRule = { watch: string; revalidate: string[] }
 
 /**
- * For each connector type, declares a configuration field whose change should re-trigger
+ * For each connector type, declares configuration fields whose change should re-trigger
  * validation of other fields (e.g. toggling MQTT's `tls` must re-validate `urls`, since
  * `validateMqttSchemes` above reads `configuration.tls` when validating `configuration.urls`).
  * Colocating this with the schema that owns the cross-field relationship keeps it a single
- * source of truth. `null` means the connector type has no such rule.
+ * source of truth. An empty list means the connector type has no such rule.
  */
-export const CONNECTOR_FIELD_REVALIDATION_RULES: Record<ConnectorType, FieldRevalidationRule | null> = {
-  [CONNECTOR_TYPES.MQTT]: { watch: 'tls', revalidate: ['urls'] },
-  [CONNECTOR_TYPES.SQL]: null,
-  [CONNECTOR_TYPES.HTTP]: { watch: 'authentication.type', revalidate: ['authentication', 'baseUrl'] },
+export const CONNECTOR_FIELD_REVALIDATION_RULES: Record<ConnectorType, FieldRevalidationRule[]> = {
+  [CONNECTOR_TYPES.MQTT]: [{ watch: 'tls', revalidate: ['urls'] }],
+  [CONNECTOR_TYPES.SQL]: [],
+  [CONNECTOR_TYPES.HTTP]: [
+    { watch: 'authentication.in', revalidate: ['authentication.name', 'apiCalls'] },
+    { watch: 'authentication.name', revalidate: ['apiCalls'] },
+  ],
 }
 
 export const MqttLooseSchema = MqttBaseSchema.partial()
@@ -966,8 +969,7 @@ const HttpApiCallBaseFormSchema = z.object({
 
 type HttpApiCallBaseFormOutput = z.output<typeof HttpApiCallBaseFormSchema>
 
-const HttpApiCallFormSchema =
-  HttpApiCallBaseFormSchema.superRefine(validatePaginationNames).transform(removeEmptyParameters)
+const HttpApiCallFormSchema = HttpApiCallBaseFormSchema.superRefine(validatePaginationNames)
 
 export type HttpApiCallForm = z.input<typeof HttpApiCallFormSchema>
 
@@ -1000,9 +1002,7 @@ const HttpApiCallStrictFormSchema = HttpApiCallBaseFormSchema.extend({
   queryParameters: z.array(HttpParameterFormSchema.superRefine(requireParameterName)),
   headers: z.array(HttpParameterFormSchema.superRefine(validateHeader).superRefine(requireParameterName)),
   pagination: HttpPaginationFormSchema.superRefine(validatePagination).superRefine(requirePagination),
-})
-  .superRefine(validatePaginationNames)
-  .transform(removeEmptyParameters)
+}).superRefine(validatePaginationNames)
 
 const HttpApiCallsLooseSchema = z.array(HttpApiCallFormSchema).max(MAX_HTTP_API_CALLS, 'datasources.errors.apiCallsMax')
 
@@ -1019,13 +1019,14 @@ const HttpLooseBaseSchema = z.object({
 
 type HttpConfigurationOutput = z.output<typeof HttpLooseBaseSchema>
 
-const collidesWithApiCall = (token: RequestParameter, apiCall: z.output<typeof HttpApiCallFormSchema>) => {
-  const sentParameters: RequestParameter[] = [
-    ...apiCall.queryParameters.map(({ name }) => ({ name, location: HTTP_PARAMETER_LOCATIONS.QUERY })),
-    ...apiCall.headers.map(({ name }) => ({ name, location: HTTP_PARAMETER_LOCATIONS.HEADER })),
-    ...(apiCall.pagination.isEnabled ? getPaginationParameters(apiCall.pagination) : []),
-  ]
-  return sentParameters.some(parameter => isSameName(token, parameter))
+const getApiTokenCollisionPaths = (token: RequestParameter, apiCall: z.output<typeof HttpApiCallFormSchema>) => {
+  const parameterPaths = PARAMETER_LISTS.flatMap(({ list, location }) =>
+    getParameterIndexes(apiCall[list], location, token).map(index => [list, index, 'name']),
+  )
+  const paginationParameters = apiCall.pagination.isEnabled ? getPaginationParameters(apiCall.pagination) : []
+  const collidingPaginationParameters = paginationParameters.filter(parameter => isSameName(token, parameter))
+  const paginationPaths = collidingPaginationParameters.map(({ field }) => ['pagination', field])
+  return [...parameterPaths, ...paginationPaths]
 }
 
 const validateHttpAuthenticationContext = (configuration: HttpConfigurationOutput, ctx: z.RefinementCtx) => {
@@ -1036,12 +1037,17 @@ const validateHttpAuthenticationContext = (configuration: HttpConfigurationOutpu
   }
   if (authentication.type !== HTTP_AUTHENTICATION_TYPES.API_TOKEN || !authentication.name) return
   const token = { name: authentication.name, location: authentication.in }
-  if (apiCalls?.some(apiCall => collidesWithApiCall(token, apiCall))) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['authentication', 'name'],
-      message: 'datasources.errors.apiTokenNameCollision',
-    })
+  const collisionPaths = (apiCalls ?? []).flatMap((apiCall, index) =>
+    getApiTokenCollisionPaths(token, apiCall).map(path => ['apiCalls', index, ...path]),
+  )
+  if (!collisionPaths.length) return
+  ctx.addIssue({
+    code: 'custom',
+    path: ['authentication', 'name'],
+    message: 'datasources.errors.apiTokenNameCollision',
+  })
+  for (const path of collisionPaths) {
+    ctx.addIssue({ code: 'custom', path, message: 'datasources.errors.parameterApiTokenDuplicate' })
   }
 }
 
@@ -1069,7 +1075,10 @@ export type HttpConnectionForm = { baseUrl?: string; authentication?: HttpAuthen
 
 const HttpFormToApiSchema = HttpLooseSchema.transform(({ authentication, apiCalls, ...rest }) => ({
   ...rest,
-  apiCalls: apiCalls?.map(apiCall => ({ ...apiCall, pagination: toPaginationApi(apiCall.pagination) })),
+  apiCalls: apiCalls?.map(apiCall => ({
+    ...removeEmptyParameters(apiCall),
+    pagination: toPaginationApi(apiCall.pagination),
+  })),
   authentication: toAuthenticationApi(authentication),
 }))
 
