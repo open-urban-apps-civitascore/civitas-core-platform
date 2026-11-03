@@ -71,12 +71,20 @@ public class ArtifactUsageLookup {
    * How an artifact is used.
    *
    * @param inUse whether anything references the artifact
+   * @param referrers the CORE URNs that reference the artifact in the model registry, as far as the
+   *     answer needed to look them up; what a refused delete logs
    * @param releasedReferrers the released entities among the referrers; empty when none is
    */
-  public record ArtifactUsage(boolean inUse, List<ReleasedReferrer> releasedReferrers) {
+  public record ArtifactUsage(
+      boolean inUse, List<String> referrers, List<ReleasedReferrer> releasedReferrers) {
 
     public ArtifactUsage {
+      referrers = List.copyOf(referrers);
       releasedReferrers = List.copyOf(releasedReferrers);
+    }
+
+    public ArtifactUsage(boolean inUse, List<ReleasedReferrer> releasedReferrers) {
+      this(inUse, List.of(), releasedReferrers);
     }
 
     public boolean inUseByReleased() {
@@ -87,6 +95,7 @@ public class ArtifactUsageLookup {
     public static ArtifactUsage anyOf(Collection<ArtifactUsage> usages) {
       return new ArtifactUsage(
           usages.stream().anyMatch(ArtifactUsage::inUse),
+          usages.stream().flatMap(usage -> usage.referrers().stream()).distinct().toList(),
           usages.stream().flatMap(usage -> usage.releasedReferrers().stream()).distinct().toList());
     }
 
@@ -98,7 +107,10 @@ public class ArtifactUsageLookup {
     public void requireNotInUse(String resourceType, UUID resourceId) {
       if (inUse) {
         throw new ResourceInUseException(
-            resourceType, resourceId, "Cannot delete " + resourceType + " because it is in use.");
+            resourceType,
+            resourceId,
+            "Cannot delete " + resourceType + " because it is in use.",
+            referrers);
       }
     }
 
@@ -186,7 +198,7 @@ public class ArtifactUsageLookup {
    */
   public ArtifactUsage of(DataStructureVersion version) {
     if (version.getDataStructureVersionStatus() != DataStructureVersionStatus.AVAILABLE) {
-      return new ArtifactUsage(isReferenced(version), List.of());
+      return ofUnreleased(version);
     }
 
     List<String> registryReferrers =
@@ -206,13 +218,19 @@ public class ArtifactUsageLookup {
     boolean inUse =
         !registryReferrers.isEmpty()
             || dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(version.getId()));
-    return new ArtifactUsage(inUse, releasedReferrers);
+    return new ArtifactUsage(inUse, registryReferrers, releasedReferrers);
   }
 
   /** A Data source pins a version by a portal column, which the model registry does not see. */
-  private boolean isReferenced(DataStructureVersion version) {
-    return dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(version.getId()))
-        || !modelRegistryGateway.versionReferencesTo(version.getModelUrn()).isEmpty();
+  private ArtifactUsage ofUnreleased(DataStructureVersion version) {
+    if (dataSourceRepository.existsByDataStructureVersionIdIn(Set.of(version.getId()))) {
+      return new ArtifactUsage(true, List.of());
+    }
+    List<String> registryReferrers =
+        modelRegistryGateway.versionReferencesTo(version.getModelUrn()).stream()
+            .distinct()
+            .toList();
+    return new ArtifactUsage(!registryReferrers.isEmpty(), registryReferrers, List.of());
   }
 
   /**

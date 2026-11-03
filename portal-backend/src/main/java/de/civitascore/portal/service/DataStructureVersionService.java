@@ -364,19 +364,22 @@ public class DataStructureVersionService
     if (line == null) {
       return;
     }
-    boolean shared =
+    List<String> sharingModelUrns =
         dataStructureVersionRepository
             .findAllByDataStructure_IdIn(List.of(version.getDataStructure().getId()))
             .stream()
             .filter(other -> !other.getId().equals(version.getId()))
-            .anyMatch(other -> line.equals(modelLineOf(other)));
-    if (shared) {
+            .filter(other -> line.equals(modelLineOf(other)))
+            .map(DataStructureVersion::getModelUrn)
+            .toList();
+    if (!sharingModelUrns.isEmpty()) {
       throw new ResourceInUseException(
           getEntityName(),
           version.getId(),
           "Cannot delete "
               + getEntityName()
-              + " because another version of its data structure shares its model.");
+              + " because another version of its data structure shares its model.",
+          sharingModelUrns);
     }
   }
 

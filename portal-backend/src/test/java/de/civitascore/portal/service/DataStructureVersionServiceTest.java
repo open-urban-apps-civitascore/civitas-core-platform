@@ -225,7 +225,10 @@ class DataStructureVersionServiceTest {
       siblingPinnedTo(LOGICAL_URN + ":1.1.0");
 
       assertThatThrownBy(() -> dataStructureVersionService.deleteById(versionId))
-          .isInstanceOf(ResourceInUseException.class);
+          .isInstanceOfSatisfying(
+              ResourceInUseException.class,
+              refusal ->
+                  assertThat(refusal.getBlockedBy()).containsExactly(LOGICAL_URN + ":1.1.0"));
       verify(dataStructureVersionRepository, never()).deleteById(any());
       verify(modelRegistryGateway, never()).deleteModelVersion(any());
     }

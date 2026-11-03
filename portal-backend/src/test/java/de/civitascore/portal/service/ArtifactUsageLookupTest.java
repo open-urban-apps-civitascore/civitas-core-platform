@@ -221,6 +221,7 @@ class ArtifactUsageLookupTest {
 
       assertThat(usage.inUse()).isTrue();
       assertThat(usage.inUseByReleased()).isFalse();
+      assertThat(usage.referrers()).containsExactly(SINK_URN);
     }
 
     @Test
@@ -367,6 +368,7 @@ class ArtifactUsageLookupTest {
 
       assertThat(usage.inUse()).isTrue();
       assertThat(usage.inUseByReleased()).isFalse();
+      assertThat(usage.referrers()).containsExactly(SINK_URN);
       verifyNoInteractions(dataSinkRepository);
     }
 
@@ -481,13 +483,15 @@ class ArtifactUsageLookupTest {
   class DeleteGuard {
 
     @Test
-    @DisplayName("An artifact anything uses refuses its delete")
+    @DisplayName("An artifact anything uses refuses its delete and blocks on its referrers")
     void requireNotInUse_whenInUse_shouldThrow() {
-      ArtifactUsage usage = new ArtifactUsage(true, List.of());
+      ArtifactUsage usage = new ArtifactUsage(true, List.of(SINK_URN, MAPPING_URN), List.of());
       UUID id = UUID.randomUUID();
 
       assertThatThrownBy(() -> usage.requireNotInUse("DataStructureVersion", id))
-          .isInstanceOf(ResourceInUseException.class)
+          .isInstanceOfSatisfying(
+              ResourceInUseException.class,
+              refusal -> assertThat(refusal.getBlockedBy()).containsExactly(SINK_URN, MAPPING_URN))
           .hasMessageContaining("DataStructureVersion");
     }
 
