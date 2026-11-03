@@ -494,6 +494,15 @@ describe('useDatasourceForm with an HTTP connector', () => {
         scope: 'read',
       },
     ],
+    [
+      'CLIENT_CERTIFICATE',
+      { type: 'CLIENT_CERTIFICATE', certificate: '********', privateKey: '********' },
+      {
+        type: 'CLIENT_CERTIFICATE',
+        certificate: '-----BEGIN CERTIFICATE-----\nMIIBtest1\n-----END CERTIFICATE-----',
+        privateKey: '-----BEGIN PRIVATE KEY-----\nMIIEtest\n-----END PRIVATE KEY-----',
+      },
+    ],
   ] as const)('with the authentication %s', (_type, loaded, changed) => {
     const datasource = createHttpDatasource()
     const datasourceWithAuthentication = {

@@ -151,6 +151,11 @@
     "deletionWarningModal": {
       "title": "{item} wirklich löschen?",
       "description": "Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "fileField": {
+      "select": "Datei auswählen",
+      "noFile": "Keine Datei ausgewählt",
+      "unreadable": "Die Datei kann nicht gelesen werden. Wählen Sie sie erneut aus."
     }
   },
   "languages": {
@@ -1243,7 +1248,8 @@
           "basic": "Basic",
           "bearerToken": "Bearer-Token",
           "apiToken": "API-Token",
-          "oauth2": "OAuth2"
+          "oauth2": "OAuth2",
+          "clientCertificate": "Client-Zertifikat"
         },
         "username": {
           "label": "Benutzername"
@@ -1277,6 +1283,12 @@
         "scope": {
           "label": "Scope",
           "hint": "optional, durch Leerzeichen getrennt"
+        },
+        "certificate": {
+          "label": "Zertifikat"
+        },
+        "privateKey": {
+          "label": "Privater Schlüssel"
         }
       },
       "connectionTest": {

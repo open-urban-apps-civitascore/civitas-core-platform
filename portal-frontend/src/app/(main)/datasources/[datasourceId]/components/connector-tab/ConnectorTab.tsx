@@ -119,6 +119,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
               inputType={property.inputType}
               autoComplete={property.autoComplete}
               normalize={property.normalize}
+              accept={property.accept}
               options={property.options?.map(toSelectOption)}
               shouldShowErrors
               required={property.required}

@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useForm } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -364,7 +365,7 @@ describe('ConnectorTab (integration)', () => {
         BEARER_TOKEN: [/http\.token\.label/],
         API_TOKEN: [/http\.apiTokenName\.label/, /http\.apiTokenValue\.label/, /http\.apiTokenIn\.label/],
         OAUTH2: [/http\.tokenUrl\.label/, /http\.clientId\.label/, /http\.clientSecret\.label/, /http\.scope\.label/],
-        CLIENT_CERTIFICATE: [],
+        CLIENT_CERTIFICATE: [/http\.certificate\.label/, /http\.privateKey\.label/],
       }
       const SECRET_LABELS = [
         ['BASIC', /http\.password\.label/],
@@ -380,7 +381,7 @@ describe('ConnectorTab (integration)', () => {
           configuration: { baseUrl, authentication: emptyHttpAuthentication(type) },
         })
 
-      it('offers None, Basic, Bearer token, API token and OAuth2', async () => {
+      it('offers None, Basic, Bearer token, API token, OAuth2 and client certificate', async () => {
         renderWithAuthentication('NONE')
 
         fireEvent.click(screen.getByLabelText(/http\.authentication\.label/))
@@ -392,20 +393,24 @@ describe('ConnectorTab (integration)', () => {
           'http.authentication.bearerToken',
           'http.authentication.apiToken',
           'http.authentication.oauth2',
+          'http.authentication.clientCertificate',
         ])
       })
 
-      it.each(['BEARER_TOKEN', 'API_TOKEN', 'OAUTH2'] as const)('shows only the fields of %s', type => {
-        renderWithAuthentication(type)
+      it.each(['BEARER_TOKEN', 'API_TOKEN', 'OAUTH2', 'CLIENT_CERTIFICATE'] as const)(
+        'shows only the fields of %s',
+        type => {
+          renderWithAuthentication(type)
 
-        const ownLabels = FIELD_LABELS[type]
-        for (const label of ownLabels) {
-          expect(screen.getByLabelText(label)).toBeInTheDocument()
-        }
-        for (const label of ALL_LABELS.filter(other => !ownLabels.includes(other))) {
-          expect(screen.queryByLabelText(label)).not.toBeInTheDocument()
-        }
-      })
+          const ownLabels = FIELD_LABELS[type]
+          for (const label of ownLabels) {
+            expect(screen.getByLabelText(label)).toBeInTheDocument()
+          }
+          for (const label of ALL_LABELS.filter(other => !ownLabels.includes(other))) {
+            expect(screen.queryByLabelText(label)).not.toBeInTheDocument()
+          }
+        },
+      )
 
       it.each(SECRET_LABELS)('masks the secret of %s and turns off autocomplete', (type, label) => {
         renderWithAuthentication(type)
@@ -422,6 +427,33 @@ describe('ConnectorTab (integration)', () => {
         renderWithAuthentication(type)
 
         expect(screen.getByLabelText(label)).toHaveAttribute('autocomplete', 'off')
+      })
+
+      it.each([
+        ['certificate', /http\.certificate\.label/],
+        ['privateKey', /http\.privateKey\.label/],
+      ])('selects the %s as a PEM file', (field, label) => {
+        renderWithAuthentication('CLIENT_CERTIFICATE')
+
+        expect(screen.getByLabelText(label)).toHaveValue('noFile')
+        expect(screen.getByTestId(`configuration.authentication.${field}FileInput`)).toHaveAttribute(
+          'accept',
+          '.pem,.crt,.cer,.key',
+        )
+      })
+
+      it.each([
+        ['certificate', 'datasources.errors.invalidCertificate'],
+        ['privateKey', 'datasources.errors.invalidPrivateKey'],
+      ])('shows the PEM error right after the user selects an invalid %s file', async (field, message) => {
+        renderWithAuthentication('CLIENT_CERTIFICATE')
+
+        await userEvent.upload(
+          screen.getByTestId(`configuration.authentication.${field}FileInput`),
+          new File(['not a PEM file'], 'invalid.pem'),
+        )
+
+        expect(await screen.findByText(message)).toBeInTheDocument()
       })
 
       it('shows the https error at the API host after the user selects an authentication', async () => {

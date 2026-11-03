@@ -152,6 +152,11 @@
     "deletionWarningModal": {
       "title": "Delete {item}?",
       "description": "This action can not be undone."
+    },
+    "fileField": {
+      "select": "Select file",
+      "noFile": "No file selected",
+      "unreadable": "The file cannot be read. Select it again."
     }
   },
   "languages": {
@@ -1256,7 +1261,8 @@
           "basic": "Basic",
           "bearerToken": "Bearer token",
           "apiToken": "API token",
-          "oauth2": "OAuth2"
+          "oauth2": "OAuth2",
+          "clientCertificate": "Client certificate"
         },
         "username": {
           "label": "Username"
@@ -1290,6 +1296,12 @@
         "scope": {
           "label": "Scope",
           "hint": "optional, separated by spaces"
+        },
+        "certificate": {
+          "label": "Certificate"
+        },
+        "privateKey": {
+          "label": "Private key"
         }
       },
       "connectionTest": {
