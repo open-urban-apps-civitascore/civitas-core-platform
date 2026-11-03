@@ -785,7 +785,8 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
      *     collides with an existing one for this artifact surfaces as the usual integrity-violation
      *     error rather than being silently coerced.
      * @return the concrete versioned URN (pin) the write resolved to: the newly assigned version,
-     *     or the existing current version on a content-identical idempotent write. The version is
+     *     or, on a content-identical idempotent write, the existing latest version of the named
+     *     base's major, or the current version when no base applies. The version is
      *     assigned inside this write, so the pin needs no read-back — it is correct even when the
      *     surrounding host transaction has not committed yet.
      */
@@ -847,16 +848,20 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                     if (title != null && !title.equals(row.name())) {
                         artifacts.updateName(logical, title);
                     }
-                    Optional<ArtifactVersionRow> current = row.currentVersion() == null
-                        ? Optional.empty() : versions.find(artifactId, row.currentVersion());
-                    // Idempotent only when the authored content of the current version, in the
+                    boolean revisesBase = bump != VersionBump.MAJOR
+                        && bumpFromVersion != null && !bumpFromVersion.isBlank();
+                    String latest = revisesBase
+                        ? latestInLine(artifactId, bumpFromVersion) : row.currentVersion();
+                    Optional<ArtifactVersionRow> current = latest == null
+                        ? Optional.empty() : versions.find(artifactId, latest);
+                    // Idempotent only when the authored content of the latest version, in the
                     // SAME format, is byte-identical. A different format is always a new version.
                     if (current.isPresent() && format.equals(current.get().primaryFormat())) {
                         Optional<ArtifactRepresentationRow> rep =
                             representations.find(current.get().id(), format);
                         if (rep.isPresent() && hash.equals(rep.get().contentHash())) {
                             // Identical authored content — no new version; the pin is the existing one.
-                            return UrnParser.withVersion(logical, row.currentVersion());
+                            return UrnParser.withVersion(logical, latest);
                         }
                     }
                     // An explicit version is adopted verbatim, with no ordering check against the
@@ -866,8 +871,7 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                     // A named base is the version being revised, so an artifact whose versions form
                     // independent lines keeps the bump inside the revised line. A major opens a new
                     // line, which no base can place below the highest.
-                    String base = bump != VersionBump.MAJOR && bumpFromVersion != null && !bumpFromVersion.isBlank()
-                        ? bumpFromVersion : highestAssigned(logical, row.currentVersion());
+                    String base = revisesBase ? bumpFromVersion : highestAssigned(logical, row.currentVersion());
                     newVersion = hasExplicitVersion ? explicitVersion : SemVer.next(base, bump);
                 }
                 UUID versionId = UUID.randomUUID();
@@ -897,6 +901,15 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
     private void insertVersion(String logicalUrn, ArtifactVersionRow version) {
         versions.insert(version);
         highWater.raise(logicalUrn, version.version());
+    }
+
+    /** The highest version in the major of {@code base}, or null when that line holds none. */
+    private String latestInLine(UUID artifactId, String base) {
+        String nextLine = SemVer.next(base, VersionBump.MAJOR);
+        return versions.listVersions(artifactId).stream()
+            .filter(version -> SemVer.next(version, VersionBump.MAJOR).equals(nextLine))
+            .max(SemVer::compare)
+            .orElse(null);
     }
 
     /** The highest version the artifact ever had, deleted ones included. */
