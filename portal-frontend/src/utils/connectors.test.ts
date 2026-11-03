@@ -1,6 +1,12 @@
 import { CONNECTOR_TYPES } from '@/const/connectors'
 
-import { buildApiCallUrl, formatPathWithQuery, getConnectorDefaults, getConnectorFormData } from './connectors'
+import {
+  buildApiCallUrl,
+  findSecretsToReenter,
+  formatPathWithQuery,
+  getConnectorDefaults,
+  getConnectorFormData,
+} from './connectors'
 
 vi.mock('@/app/(main)/datasources/[datasourceId]/components/connector-tab/connectorSources', () => ({
   CONNECTOR_INPUTS: {
@@ -122,5 +128,71 @@ describe('buildApiCallUrl', () => {
 
   it('returns the path with query parameters without a host', () => {
     expect(buildApiCallUrl('', '/stations', queryParameters)).toBe('/stations?status=active')
+  })
+})
+
+describe('findSecretsToReenter', () => {
+  const BASE_URL = 'https://api.example.org/v1'
+  const TOKEN_URL = 'https://auth.example.org/oauth2/token'
+  const BASIC = { type: 'BASIC' as const, username: 'reader', password: '********' }
+  const OAUTH2 = {
+    type: 'OAUTH2' as const,
+    tokenUrl: TOKEN_URL,
+    clientId: 'client-1',
+    clientSecret: '********',
+    scope: '',
+  }
+  const CLIENT_CERTIFICATE = { type: 'CLIENT_CERTIFICATE' as const, certificate: '********', privateKey: '********' }
+  const LOADED = { baseUrl: BASE_URL, authentication: BASIC }
+
+  it.each([
+    ['the same host with another path', 'https://api.example.org/v2/'],
+    ['credentials in the URL', 'https://reader@api.example.org/v1'],
+    ['a leading space', ' https://api.example.org/v1'],
+    ['no API host', ''],
+  ])('asks for no secret for %s', (_name, baseUrl) => {
+    expect(findSecretsToReenter({ baseUrl, authentication: BASIC }, LOADED)).toEqual([])
+  })
+
+  it.each([
+    ['another host', 'https://other.example.org/v1'],
+    ['another port', 'https://api.example.org:8443/v1'],
+    ['another scheme', 'http://api.example.org/v1'],
+    ['the default port', 'https://api.example.org:443/v1'],
+    ['another case of the host', 'https://API.example.org/v1'],
+  ])('asks for the secret again for %s', (_name, baseUrl) => {
+    expect(findSecretsToReenter({ baseUrl, authentication: BASIC }, LOADED)).toEqual(['authentication.password'])
+  })
+
+  it('asks for all secrets of the client certificate', () => {
+    const loaded = { baseUrl: BASE_URL, authentication: CLIENT_CERTIFICATE }
+
+    expect(
+      findSecretsToReenter({ baseUrl: 'https://other.example.org', authentication: CLIENT_CERTIFICATE }, loaded),
+    ).toEqual(['authentication.certificate', 'authentication.privateKey'])
+  })
+
+  it('asks for the client secret when the token URL changes', () => {
+    const loaded = { baseUrl: BASE_URL, authentication: OAUTH2 }
+    const current = { baseUrl: BASE_URL, authentication: { ...OAUTH2, tokenUrl: 'https://login.example.org/token' } }
+
+    expect(findSecretsToReenter(current, loaded)).toEqual(['authentication.clientSecret'])
+  })
+
+  it('asks for no secret when only the path of the token URL changes', () => {
+    const loaded = { baseUrl: BASE_URL, authentication: OAUTH2 }
+    const current = { baseUrl: BASE_URL, authentication: { ...OAUTH2, tokenUrl: 'https://auth.example.org/token' } }
+
+    expect(findSecretsToReenter(current, loaded)).toEqual([])
+  })
+
+  it('asks for no secret that the user entered again', () => {
+    const current = { baseUrl: 'https://other.example.org', authentication: { ...BASIC, password: 'new-secret' } }
+
+    expect(findSecretsToReenter(current, LOADED)).toEqual([])
+  })
+
+  it('asks for no secret when the loaded connector type is not HTTP', () => {
+    expect(findSecretsToReenter({ baseUrl: 'https://other.example.org', authentication: BASIC }, undefined)).toEqual([])
   })
 })

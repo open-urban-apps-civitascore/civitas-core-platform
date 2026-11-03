@@ -22,6 +22,7 @@ import {
   emptyHttpAuthentication,
   HttpApiCallsStrictSchema,
   HttpAuthenticationType,
+  HttpConnectionForm,
 } from '@/types/connectors'
 import { Datapool } from '@/types/datapools'
 import {
@@ -39,9 +40,11 @@ import {
   DatasourceTab,
 } from '@/types/datasources'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
-import { getConnectorDefaults } from '@/utils/connectors'
-import { isDatastructureNotAvailableError, isResourceInUseError } from '@/utils/errors'
+import { findSecretsToReenter, getConnectorDefaults, HTTP_SECRET_PATHS } from '@/utils/connectors'
+import { isDatastructureNotAvailableError, isResourceInUseError, isStoredSecretRefusedError } from '@/utils/errors'
 import { hasDirtyField, pickDirtyValues } from '@/utils/form'
+
+const REENTER_SECRET_MESSAGE = 'datasources.errors.reenterSecret'
 
 const toConnectorPayloadKey = (values: unknown) => {
   const parsed = ConnectorFormToApiSchema.safeParse(values)
@@ -152,6 +155,34 @@ export const useDatasourceForm = (
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authenticationTypeWatch])
+
+  const secretsToReenter = useMemo(() => {
+    const isHttp = formValues.connectorType === CONNECTOR_TYPES.HTTP
+    if (!isHttp || !formValues.configuration) return []
+    const isLoadedHttp = initialFormValues?.connectorType === CONNECTOR_TYPES.HTTP
+    const loaded = isLoadedHttp ? (initialFormValues.configuration as HttpConnectionForm | undefined) : undefined
+    return findSecretsToReenter(formValues.configuration as HttpConnectionForm, loaded)
+  }, [formValues, initialFormValues])
+
+  const secretsToReenterKey = secretsToReenter.join(',')
+
+  const setReenterSecretErrors = () => {
+    for (const path of secretsToReenter) {
+      form.setError(`configuration.${path}`, { type: 'custom', message: REENTER_SECRET_MESSAGE })
+    }
+  }
+
+  useEffect(() => {
+    setReenterSecretErrors()
+    const resolvedPaths = HTTP_SECRET_PATHS.filter(path => !secretsToReenter.includes(path))
+    for (const path of resolvedPaths) {
+      const fieldPath = `configuration.${path}` as const
+      if (form.getFieldState(fieldPath).error?.message === REENTER_SECRET_MESSAGE) {
+        form.clearErrors(fieldPath)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secretsToReenterKey])
 
   const isDraftMode = dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
   const hasStatusChanged = dataSourceStatus !== datasource.dataSourceStatus
@@ -264,7 +295,7 @@ export const useDatasourceForm = (
       }
       return response.data
     } catch (error) {
-      toast.error(t('errors.updateError'))
+      toast.error(t(isStoredSecretRefusedError(error) ? 'errors.storedSecretRefused' : 'errors.updateError'))
       throw error
     }
   }
@@ -276,6 +307,11 @@ export const useDatasourceForm = (
       : DatasourceFormAvailableSchema.safeParse(values)
     if (!parsed.success) {
       handleFormValidationError(parsed.error)
+      return false
+    }
+    if (secretsToReenter.length) {
+      setReenterSecretErrors()
+      handleFormValidationError()
       return false
     }
 

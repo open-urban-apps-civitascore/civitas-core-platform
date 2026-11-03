@@ -491,7 +491,7 @@ export const HttpApiToFormSchema = HttpApiResponseSchema.transform(({ baseUrl, a
   apiCalls: apiCalls ?? [],
 }))
 
-const SECRET_PLACEHOLDER = '********'
+export const SECRET_PLACEHOLDER = '********'
 const PEM_CERTIFICATES =
   /^-----BEGIN CERTIFICATE-----[^-]+-----END CERTIFICATE-----(?:\s+-----BEGIN CERTIFICATE-----[^-]+-----END CERTIFICATE-----)*$/
 const ENCRYPTED_PRIVATE_KEY = '-----BEGIN ENCRYPTED PRIVATE KEY-----'
@@ -1064,6 +1064,8 @@ const toAuthenticationApi = (authentication: HttpAuthenticationForm | undefined)
   }
   return authentication
 }
+
+export type HttpConnectionForm = { baseUrl?: string; authentication?: HttpAuthenticationForm }
 
 const HttpFormToApiSchema = HttpLooseSchema.transform(({ authentication, apiCalls, ...rest }) => ({
   ...rest,

@@ -13,6 +13,7 @@ import {
   isPipelineClosureInvalidError,
   isResourceInUseError,
   isSagaInFlightError,
+  isStoredSecretRefusedError,
   isTableNameConflictError,
   isUnconfirmedDataLossError,
   toConnectionTestProblem,
@@ -137,6 +138,24 @@ describe('isTableNameConflictError', () => {
 
   it('returns false for non-axios errors', () => {
     expect(isTableNameConflictError(new Error('plain error'))).toBe(false)
+  })
+})
+
+describe('isStoredSecretRefusedError', () => {
+  const DETAIL = 'The stored secret is kept only for the stored destination; enter it again for another one'
+  const TYPE = 'urn:civitas:error:MALFORMED_REQUEST'
+
+  it('returns true for a 400 malformed request that refuses the stored secret', () => {
+    expect(isStoredSecretRefusedError(mockApiError(400, DETAIL, TYPE))).toBe(true)
+  })
+
+  it.each([
+    ['another status', mockApiError(409, DETAIL, TYPE)],
+    ['another type', mockApiError(400, DETAIL, 'urn:civitas:error:INVALID_INPUT')],
+    ['a missing stored secret', mockApiError(400, 'No stored secret for ******** at authentication.token', TYPE)],
+    ['another detail', mockApiError(400, 'Failed to read request body', TYPE)],
+  ])('returns false for %s', (_name, error) => {
+    expect(isStoredSecretRefusedError(error)).toBe(false)
   })
 })
 

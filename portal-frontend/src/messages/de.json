@@ -1041,7 +1041,9 @@
       "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten",
       "inUseError": "Diese Datenquelle wird noch von einer Pipeline verwendet.",
       "datastructureNotAvailableError": "Die Datenquelle konnte nicht auf \"Verfügbar\" gesetzt werden. Bitte setzen Sie zuerst die Version der Datenstruktur auf \"Verfügbar\".",
-      "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
+      "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert.",
+      "reenterSecret": "Die URL hat sich geändert. Bitte geben Sie diesen Wert erneut ein.",
+      "storedSecretRefused": "Die URL hat sich geändert. Bitte geben Sie die Secrets der Authentifizierung erneut ein."
     },
     "connection": {
       "active": "aktiv",

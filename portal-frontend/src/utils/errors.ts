@@ -72,6 +72,15 @@ export const isDatastructureNotAvailableError = (error: unknown) => {
   )
 }
 
+export const isStoredSecretRefusedError = (error: unknown) => {
+  const problem = problemWithStatus(error, 400)
+  return (
+    !!problem &&
+    hasErrorType(problem, 'MALFORMED_REQUEST') &&
+    problem.detail.includes('stored secret is kept only for the stored destination')
+  )
+}
+
 export const isSagaInFlightError = (error: unknown) => {
   const problem = problemWithStatus(error, 409)
   return !!problem && hasErrorType(problem, 'SAGA_IN_FLIGHT')
