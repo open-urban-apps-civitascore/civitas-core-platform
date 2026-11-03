@@ -1,7 +1,23 @@
 package de.civitascore.modelforge.persistence.postgres;
 
+import de.civitascore.modelforge.application.ElementCommandService;
+import de.civitascore.modelforge.application.ElementQueryService;
+import de.civitascore.modelforge.application.EmbeddedModelForgeOperations;
+import de.civitascore.modelforge.application.ReferenceExistenceValidator;
+import de.civitascore.modelforge.application.SchemaImportService;
+import de.civitascore.modelforge.application.SmartDataModelsService;
+import de.civitascore.modelforge.application.ViewService;
+import de.civitascore.modelforge.application.XRepositoryService;
+import de.civitascore.modelforge.contract.ArtifactId;
+import de.civitascore.modelforge.contract.CopyVersionCommand;
+import de.civitascore.modelforge.contract.RegistryConflictException;
 import de.civitascore.modelforge.contract.VersionBump;
+import de.civitascore.modelforge.facade.ModelForge;
+import de.civitascore.modelforge.graph.DependencyGraphService;
+import de.civitascore.modelforge.graph.SchemaRefExtractor;
 import de.civitascore.modelforge.urn.UrnParser;
+import de.civitascore.modelforge.validation.CoreSchemaValidator;
+import de.civitascore.modelforge.validation.ModelValidator;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -10,11 +26,14 @@ import tools.jackson.databind.node.ObjectNode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 /**
  * The registry's identity and versioning contract against a real database: one logical artifact per
@@ -106,14 +125,14 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
     }
 
     @Test
-    @DisplayName("Bumping a pinned older version copies its content and numbers the copy from the highest version")
-    void bumpOfAPinnedOlderVersionCopiesItsContentAboveTheHighest() {
+    @DisplayName("Copying an older version copies its content and numbers the copy above the highest version")
+    void copyOfAnOlderVersionCopiesItsContentAboveTheHighest() {
         String logical = UrnParser.logicalUrn(registry.storeElement(schema(null, "temperature"), Set.of()));
         storeUnder(logical, "humidity", VersionBump.MAJOR);
         String firstBytes = storedContent(logical, "1.0.0");
         String secondBytes = storedContent(logical, "2.0.0");
 
-        String copyPin = registry.bumpVersion(logical, VersionBump.MAJOR, "1.0.0");
+        String copyPin = registry.copyVersion(UrnParser.withVersion(logical, "1.0.0"), null, Map.of());
 
         assertThat(copyPin).isEqualTo(UrnParser.withVersion(logical, "3.0.0"));
         assertThat(storedContent(logical, "3.0.0")).isEqualTo(firstBytes);
@@ -123,8 +142,8 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
     }
 
     @Test
-    @DisplayName("A copy of a pinned version carries that version's reference edges, not the current version's")
-    void bumpOfAPinnedVersionCopiesItsOwnReferences() {
+    @DisplayName("A copy of a version carries that version's References, not the current version's")
+    void copyOfAVersionCopiesItsOwnReferences() {
         String stationV1 = registry.storeElement(schema(null, "stationId"), Set.of());
         String station = UrnParser.logicalUrn(stationV1);
         String stationV2 = storeUnder(station, "stationCode", VersionBump.MINOR);
@@ -132,7 +151,7 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
         String structureV1 = registry.storeDataStructure(structure, structureOf(stationV1), VersionBump.PATCH, null);
         registry.storeDataStructure(structure, structureOf(stationV2), VersionBump.MAJOR, null);
 
-        String copyPin = registry.bumpVersion(structure, VersionBump.MAJOR, "1.0.0");
+        String copyPin = registry.copyVersion(structureV1, null, Map.of());
 
         assertThat(registry.fetchArtifactRefUrns(copyPin))
             .containsExactlyElementsOf(registry.fetchArtifactRefUrns(structureV1))
@@ -140,58 +159,58 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
     }
 
     @Test
-    @DisplayName("Bumping the same pinned version twice mints a new highest version each time")
-    void repeatedBumpOfTheSameVersionMintsANewVersionEachTime() {
+    @DisplayName("Copying the same version twice mints a new highest version each time")
+    void repeatedCopyOfTheSameVersionMintsANewVersionEachTime() {
         String logical = UrnParser.logicalUrn(registry.storeElement(schema(null, "temperature"), Set.of()));
         storeUnder(logical, "humidity", VersionBump.MAJOR);
 
-        String firstCopy = registry.bumpVersion(logical, VersionBump.MAJOR, "1.0.0");
-        String secondCopy = registry.bumpVersion(logical, VersionBump.MAJOR, "1.0.0");
+        String firstCopy = registry.copyVersion(UrnParser.withVersion(logical, "1.0.0"), null, Map.of());
+        String secondCopy = registry.copyVersion(UrnParser.withVersion(logical, "1.0.0"), null, Map.of());
 
         assertThat(UrnParser.versionFromUrn(firstCopy)).isEqualTo("3.0.0");
         assertThat(UrnParser.versionFromUrn(secondCopy)).isEqualTo("4.0.0");
     }
 
     @Test
-    @DisplayName("A major bump counts from the highest version, not from the major line of the source")
-    void majorBumpCountsFromTheHighestVersion() {
+    @DisplayName("A copy counts from the highest version, not from the major line of the source")
+    void copyCountsFromTheHighestVersion() {
         String logical = UrnParser.logicalUrn(registry.storeElement(schema(null, "temperature"), Set.of()));
         registry.storeElement(schema(logical, "humidity"), Set.of(), Set.of(), "2.3.0", VersionBump.PATCH, null);
 
-        String copyPin = registry.bumpVersion(logical, VersionBump.MAJOR, "1.0.0");
+        String copyPin = registry.copyVersion(UrnParser.withVersion(logical, "1.0.0"), null, Map.of());
 
         assertThat(UrnParser.versionFromUrn(copyPin)).isEqualTo("3.0.0");
     }
 
     @Test
-    @DisplayName("A minor bump of an older pinned version lands in the highest line")
-    void minorBumpOfAnOlderPinLandsInTheHighestLine() {
-        String logical = UrnParser.logicalUrn(registry.storeElement(schema(null, "temperature"), Set.of()));
-        registry.storeElement(schema(logical, "humidity"), Set.of(), Set.of(), "2.3.0", VersionBump.PATCH, null);
+    @DisplayName("A copy counts above the given version when that is higher than the artifact's highest")
+    void copyCountsAboveTheGivenVersionWhenItIsHigher() {
+        String pin = registry.storeElement(schema(null, "temperature"), Set.of());
 
-        String copyPin = registry.bumpVersion(logical, VersionBump.MINOR, "1.0.0");
+        String copyPin = registry.copyVersion(pin, "4.2.0", Map.of());
 
-        assertThat(UrnParser.versionFromUrn(copyPin)).isEqualTo("2.4.0");
-        assertThat(storedContent(logical, "2.4.0")).isEqualTo(storedContent(logical, "1.0.0"));
+        assertThat(UrnParser.versionFromUrn(copyPin)).isEqualTo("5.0.0");
+        assertThat(currentVersionOf(UrnParser.logicalUrn(pin))).isEqualTo("5.0.0");
     }
 
     @Test
-    @DisplayName("Bumping a pinned version the artifact does not hold is refused and writes nothing")
-    void bumpOfAnUnknownPinnedVersionIsRefused() {
+    @DisplayName("Copying a version the artifact does not hold is refused and writes nothing")
+    void copyOfAnUnknownVersionIsRefused() {
         String logical = UrnParser.logicalUrn(registry.storeElement(schema(null, "temperature"), Set.of()));
         var before = snapshot();
 
-        assertThatThrownBy(() -> registry.bumpVersion(logical, VersionBump.MAJOR, "9.0.0"))
+        assertThatThrownBy(() -> registry.copyVersion(UrnParser.withVersion(logical, "9.0.0"), null, Map.of()))
             .isInstanceOf(IllegalArgumentException.class);
         assertThat(snapshot()).isEqualTo(before);
     }
 
     @Test
-    void copyingAnOlderRootCopiesItsGroupingAndRepinsOnlyThatRoot() {
+    @DisplayName("Copying an older root Element copies the grouping version that holds it and retargets only that root")
+    void copyingAnOlderRootCopiesItsGroupingAndRetargetsOnlyThatRoot() {
         String member = registry.storeElement(schema(null, "child"), Set.of());
         String original = registry.storeElement(schema(null, "temperature"), Set.of(member));
         String logical = UrnParser.logicalUrn(original);
-        String grouping = UrnParser.withArtifactType(logical, "datastructure");
+        String grouping = groupingOf(logical);
         JsonNode manifest = structureOf(original);
         ((ObjectNode) manifest).put("$ref", original);
         ((ObjectNode) manifest.path("$defs"))
@@ -200,24 +219,25 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
         ArtifactVersionRepository versionRows = new ArtifactVersionRepository(jdbc);
         UUID rootId = versionRows.find(new ArtifactRepository(jdbc).findByLogicalUrn(logical)
             .orElseThrow().id(), "1.0.0").orElseThrow().id();
-        // A secondary format and an edge not written in the schema must survive the copy.
+        // A secondary format and a Reference not written in the schema must survive the copy.
         new ArtifactRepresentationRepository(jdbc).insert(new ArtifactRepresentationRow(
             UUID.randomUUID(), rootId, "example", "text/plain", null, "original bytes",
             "example-hash", "stored", Instant.now()));
         UUID groupId = versionRows.find(new ArtifactRepository(jdbc).findByLogicalUrn(grouping)
             .orElseThrow().id(), "1.0.0").orElseThrow().id();
-        ArtifactReferenceRepository edges = new ArtifactReferenceRepository(jdbc);
-        List<ReferenceRow> originalEdges = new ArrayList<>(edges.rowsForVersion(groupId));
-        originalEdges.add(new ReferenceRow(member, "schema-ref", "extra", 7));
-        edges.replaceForVersion(groupId, originalEdges);
+        ArtifactReferenceRepository references = new ArtifactReferenceRepository(jdbc);
+        List<ReferenceRow> originalReferences = new ArrayList<>(references.rowsForVersion(groupId));
+        originalReferences.add(new ReferenceRow(member, "schema-ref", "extra", 7));
+        references.replaceForVersion(groupId, originalReferences);
         String rootBytes = storedJson(logical, "1.0.0");
         String groupBytes = storedContent(grouping, "1.0.0");
         String later = storeUnder(logical, "humidity", VersionBump.MAJOR);
         registry.storeDataStructure(grouping, structureOf(later), VersionBump.MAJOR);
+        ModelForge modelForge = modelForge();
 
-        String first = registry.bumpVersion(logical, VersionBump.MAJOR, "1.0.0");
-        String second = registry.bumpVersion(logical, VersionBump.MAJOR, "1.0.0");
-        String third = registry.bumpVersion(logical, VersionBump.MAJOR, "3.0.0");
+        String first = copy(modelForge, UrnParser.withVersion(logical, "1.0.0"));
+        String second = copy(modelForge, UrnParser.withVersion(logical, "1.0.0"));
+        String third = copy(modelForge, UrnParser.withVersion(logical, "3.0.0"));
 
         assertThat(first).endsWith(":3.0.0");
         assertThat(second).endsWith(":4.0.0");
@@ -238,7 +258,7 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
                 .orElseThrow().contentText()).isEqualTo("original bytes");
             UUID groupingId = versionRows.find(new ArtifactRepository(jdbc).findByLogicalUrn(grouping)
                 .orElseThrow().id(), version).orElseThrow().id();
-            assertThat(edges.rowsForVersion(groupingId)).containsExactlyElementsOf(originalEdges.stream()
+            assertThat(references.rowsForVersion(groupingId)).containsExactlyElementsOf(originalReferences.stream()
                 .map(r -> original.equals(r.targetUrn())
                     ? new ReferenceRow(copy, r.referenceType(), r.referenceName(), r.sortOrder()) : r)
                 .toList());
@@ -246,23 +266,111 @@ class ArtifactVersioningDatabaseTest extends AbstractRegistryDatabaseTest {
         assertThat(storedJson(logical, "1.0.0")).isEqualTo(rootBytes);
         assertThat(storedContent(grouping, "1.0.0")).isEqualTo(groupBytes);
         assertThat(registry.fetchArtifactRefUrns(originalGrouping)).contains(original, member);
+        assertThat(currentVersionOf(logical)).isEqualTo("5.0.0");
         assertThat(currentVersionOf(grouping)).isEqualTo("5.0.0");
     }
 
     @Test
-    void groupingConflictRollsBackTheRootCopyAndAllItsEdges() {
+    @DisplayName("A root whose grouping has a higher version is copied with the grouping above that version")
+    void rootCopyCountsAboveAGroupingThatIsAhead() {
         String root = registry.storeElement(schema(null, "temperature"), Set.of());
         String logical = UrnParser.logicalUrn(root);
-        String grouping = UrnParser.withArtifactType(logical, "datastructure");
-        registry.storeDataStructure(grouping, structureOf(root));
-        registry.storeDataStructure(grouping, structureOf("%s:latest".formatted(logical)), VersionBump.MAJOR);
-        var before = snapshot();
+        String grouping = groupingOf(logical);
+        JsonNode imported = structureOf(root);
+        ((ObjectNode) imported).put("$ref", root);
+        registry.storeDataStructure(grouping, imported);
+        JsonNode folded = structureOf(root);
+        ((ObjectNode) folded).put("title", "Station structure, edited");
+        registry.storeDataStructure(grouping, folded, VersionBump.MAJOR);
 
-        assertThatThrownBy(() -> registry.bumpVersion(logical, VersionBump.MAJOR, "1.0.0"))
-            .isInstanceOf(IllegalArgumentException.class)
+        String copy = copy(modelForge(), root);
+
+        String copiedGrouping = UrnParser.withVersion(grouping, "3.0.0");
+        assertThat(copy).isEqualTo(UrnParser.withVersion(logical, "3.0.0"));
+        assertThat(registry.fetch(copiedGrouping).orElseThrow().path("$ref").asText()).isEqualTo(copy);
+        assertThat(currentVersionOf(logical)).isEqualTo("3.0.0");
+        assertThat(currentVersionOf(grouping)).isEqualTo("3.0.0");
+    }
+
+    @Test
+    @DisplayName("A conflicting grouping version fails the whole copy and writes nothing")
+    void groupingConflictRollsBackTheRootCopyAndAllItsReferences() {
+        String root = registry.storeElement(schema(null, "temperature"), Set.of());
+        String logical = UrnParser.logicalUrn(root);
+        String grouping = groupingOf(logical);
+        registry.storeDataStructure(grouping, structureOf(root));
+        // No write path leaves a version above current_version, so the conflict is planted directly.
+        new ArtifactVersionRepository(jdbc).insert(new ArtifactVersionRow(UUID.randomUUID(),
+            new ArtifactRepository(jdbc).findByLogicalUrn(grouping).orElseThrow().id(), "2.0.0",
+            RegistryMapping.FORMAT_CORE_JSON, null, null, Instant.now(), null));
+        var before = snapshot();
+        ModelForge modelForge = modelForge();
+
+        assertThatThrownBy(() -> copy(modelForge, root))
+            .isInstanceOf(RegistryConflictException.class)
             .hasMessageContaining("conflicts");
 
         assertThat(snapshot()).isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("An after-commit action does not run when the transaction rolls back, and the copy is gone")
+    void afterCommitActionDoesNotRunOnRollback() {
+        String pin = registry.storeElement(schema(null, "temperature"), Set.of());
+        var before = snapshot();
+        AtomicBoolean ran = new AtomicBoolean();
+
+        assertThatThrownBy(() -> registry.inTransaction(() -> {
+            registry.copyVersion(pin, null, Map.of());
+            registry.afterCommit(() -> ran.set(true));
+            throw new IllegalStateException("host failure after the copy");
+        })).isInstanceOf(IllegalStateException.class);
+
+        assertThat(ran).isFalse();
+        assertThat(snapshot()).isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("An after-commit action runs once the transaction commits, not before")
+    void afterCommitActionRunsOnCommit() {
+        String pin = registry.storeElement(schema(null, "temperature"), Set.of());
+        AtomicBoolean ran = new AtomicBoolean();
+        AtomicBoolean ranBeforeCommit = new AtomicBoolean();
+
+        registry.inTransaction(() -> {
+            registry.copyVersion(pin, null, Map.of());
+            registry.afterCommit(() -> ran.set(true));
+            ranBeforeCommit.set(ran.get());
+            return null;
+        });
+
+        assertThat(ranBeforeCommit).isFalse();
+        assertThat(ran).isTrue();
+        assertThat(versionsOf(UrnParser.logicalUrn(pin))).containsExactly("1.0.0", "2.0.0");
+    }
+
+    private ModelForge modelForge() {
+        return new EmbeddedModelForgeOperations(
+            mock(SchemaImportService.class),
+            new ElementQueryService(registry),
+            mock(ElementCommandService.class),
+            mock(ViewService.class),
+            mock(ModelValidator.class),
+            mock(CoreSchemaValidator.class),
+            new ReferenceExistenceValidator(registry, new SchemaRefExtractor()),
+            new DependencyGraphService(registry),
+            registry,
+            mock(SmartDataModelsService.class),
+            mock(XRepositoryService.class),
+            urns);
+    }
+
+    private static String copy(ModelForge modelForge, String urn) {
+        return modelForge.copyVersion(new CopyVersionCommand(new ArtifactId(urn))).artifactId().value();
+    }
+
+    private String groupingOf(String elementLogicalUrn) {
+        return UrnParser.logicalUrn(urns.dataStructure(UrnParser.idFromUrn(elementLogicalUrn)));
     }
 
     private String storedJson(String logical, String version) {

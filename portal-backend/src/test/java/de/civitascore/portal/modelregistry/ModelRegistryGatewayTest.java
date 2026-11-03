@@ -13,7 +13,7 @@ import static org.mockito.Mockito.when;
 
 import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
-import de.civitascore.modelforge.contract.BumpVersionCommand;
+import de.civitascore.modelforge.contract.CopyVersionCommand;
 import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
@@ -227,18 +227,16 @@ class ModelRegistryGatewayTest {
         "urn:core:platform:civitas:datastructure:common:6ddf8001-3ba6-83db-8d23-b547419c1ff2:3.0.0";
 
     @Test
-    @DisplayName("copies the pinned version as a major bump and returns the copy's pin")
-    void copiesThePinnedVersionAsAMajor() {
+    @DisplayName("copies the pinned version and returns the copy's pin")
+    void copiesThePinnedVersion() {
       ArtifactId source = new ArtifactId(SOURCE_PIN);
       when(modelForge.existing(List.of(source))).thenReturn(Set.of(source));
-      when(modelForge.bumpVersion(any()))
+      when(modelForge.copyVersion(any()))
           .thenReturn(new ArtifactWriteResult(new ArtifactId(COPY_PIN), Map.of()));
 
       ModelRegistryGateway.ModelPin pin = gateway.copyModelVersion(SOURCE_PIN);
 
-      verify(modelForge)
-          .bumpVersion(
-              new BumpVersionCommand(source, de.civitascore.modelforge.contract.VersionBump.MAJOR));
+      verify(modelForge).copyVersion(new CopyVersionCommand(source));
       assertThat(pin.versionedUrn()).isEqualTo(COPY_PIN);
       assertThat(pin.version()).isEqualTo("3.0.0");
     }
@@ -250,7 +248,7 @@ class ModelRegistryGatewayTest {
 
       assertThatThrownBy(() -> gateway.copyModelVersion(SOURCE_PIN))
           .isInstanceOf(ModelMissingException.class);
-      verify(modelForge, never()).bumpVersion(any());
+      verify(modelForge, never()).copyVersion(any());
     }
   }
 

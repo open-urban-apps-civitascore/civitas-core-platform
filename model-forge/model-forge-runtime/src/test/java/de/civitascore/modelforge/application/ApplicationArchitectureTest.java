@@ -26,9 +26,7 @@ class ApplicationArchitectureTest {
             .resideInAnyPackage(
                 "de.civitascore.modelforge.persistence..",
                 "de.civitascore.modelforge.spring.boot..",
-                "org.springframework.http..",
-                "org.springframework.web..",
-                "org.springframework.security..",
+                "org.springframework..",
                 "jakarta.servlet..",
                 "java.sql..",
                 "javax.sql..",

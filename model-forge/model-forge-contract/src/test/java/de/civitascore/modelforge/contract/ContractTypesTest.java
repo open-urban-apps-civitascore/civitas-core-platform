@@ -51,13 +51,9 @@ class ContractTypesTest {
     }
 
     @Test
-    void bumpVersionCommandDefaultsToPatchAndRequiresAnIdentity() {
-        var artifactId = new ArtifactId("urn:core:platform:civitas:datastructure:common:4e0604c3-1372-884e-91a3-68ed0ec7aa03");
-
-        assertThat(new BumpVersionCommand(artifactId, null).bump()).isEqualTo(VersionBump.PATCH);
-        assertThat(new BumpVersionCommand(artifactId).bump()).isEqualTo(VersionBump.PATCH);
+    void copyVersionCommandRequiresAnIdentity() {
         assertThatExceptionOfType(NullPointerException.class)
-            .isThrownBy(() -> new BumpVersionCommand(null, VersionBump.MAJOR));
+            .isThrownBy(() -> new CopyVersionCommand(null));
     }
 
     @Test

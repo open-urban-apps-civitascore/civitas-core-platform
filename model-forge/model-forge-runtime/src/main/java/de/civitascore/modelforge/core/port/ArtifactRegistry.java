@@ -33,10 +33,32 @@ public interface ArtifactRegistry {
      * nesting is safe.
      *
      * <p>Only durable state is covered. An in-memory projection such as the dependency graph is not
-     * rolled back, so publish to it <em>after</em> this method returns, never inside {@code work}.
+     * rolled back, so publish to it through {@link #afterCommit(Runnable)}, never inside
+     * {@code work}.
      */
     default <T> T inTransaction(Supplier<T> work) {
         return work.get();
+    }
+
+    /**
+     * Runs {@code action} once the surrounding transaction has committed, and never when it rolls
+     * back. The surrounding transaction may be a host's own one that {@link #inTransaction} joined,
+     * so the action waits for that commit, not for {@code inTransaction} to return. Without a
+     * surrounding transaction, the action runs at once; an implementation that has no transactions
+     * keeps that default.
+     */
+    default void afterCommit(Runnable action) {
+        action.run();
+    }
+
+    /**
+     * Holds the write lock of the artifact until the surrounding transaction ends, also when the
+     * registry does not hold the artifact yet. The store methods take the same lock, so a caller
+     * that reads an artifact before it writes it sees no concurrent write in between. Callers that
+     * lock several artifacts take the locks in one fixed order to prevent deadlocks. An
+     * implementation that has no transactions has no concurrent writers and keeps the default.
+     */
+    default void lockForWrite(String logicalUrn) {
     }
 
     /**
@@ -127,21 +149,25 @@ public interface ArtifactRegistry {
     String storeDataStructure(String urn, JsonNode manifest, VersionBump bump, String bumpFromVersion);
 
     /**
-     * Copies one version of the artifact to a new version numbered at {@code bump} from the
-     * artifact's highest version — content, every stored representation and every reference edge —
-     * and makes it current. Always writes a version: the content is unchanged by definition, so the
-     * byte-identical short-circuit the store methods rely on would otherwise make this a no-op.
+     * Copies one stored version of an artifact to a new version — every stored representation and
+     * every Reference — and makes the copy current. Always writes a version: the content is
+     * unchanged apart from {@code retargets}, so the byte-identical short-circuit the store methods
+     * rely on would otherwise make this a no-op.
      *
-     * <p>An Element imported with a matching same-version DataStructure grouping copies that
-     * grouping atomically to the same new version. Its root references point to the new Element
-     * pin; other member pins and stored edges stay unchanged. An Element without such a grouping
-     * is copied on its own. A conflicting grouping version fails the whole copy.
+     * <p>The copy is numbered at the next MAJOR version above the artifact's highest version, or
+     * above {@code countAbove} when that is higher. Copies of several artifacts that each pass the
+     * highest version of the others therefore share one number.
      *
-     * @param sourceVersion the version to copy; {@code null} copies the current version
-     * @return the versioned URN the new version was written under
+     * @param sourcePin the Versioned URN of the version to copy
+     * @param countAbove a version the new number must exceed; {@code null} for none
+     * @param retargets Versioned URNs to replace in the copy, old to new: in the targets of its
+     *     References and in every {@code $ref} value of its JSON content
+     * @return the Pin of the copy
      * @throws IllegalArgumentException when the artifact or the source version is unknown
+     * @throws de.civitascore.modelforge.contract.RegistryConflictException when the new version
+     *     exists already
      */
-    String bumpVersion(String logicalUrn, VersionBump bump, String sourceVersion);
+    String copyVersion(String sourcePin, String countAbove, Map<String, String> retargets);
 
     void deleteArtifact(String urn);
 

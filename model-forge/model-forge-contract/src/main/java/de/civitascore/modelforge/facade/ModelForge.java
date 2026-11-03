@@ -6,7 +6,7 @@ import de.civitascore.modelforge.contract.ArtifactSearchQuery;
 import de.civitascore.modelforge.contract.ArtifactSummary;
 import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
-import de.civitascore.modelforge.contract.BumpVersionCommand;
+import de.civitascore.modelforge.contract.CopyVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
@@ -224,29 +224,31 @@ public interface ModelForge {
     ArtifactWriteResult saveArtifact(SaveArtifactCommand command);
 
     /**
-     * Copies one version of an artifact to a new version numbered at the requested change class, with
-     * its content, every stored format and its reference edges unchanged, and makes the copy current.
-     * A pinned id names the source version; a logical or {@code :latest} id copies the current one.
-     * The new version is built from the stored rows, so a caller never reads content out and writes
-     * it back — a round trip that would drop the edges the content does not spell out.
+     * Copies one version of an artifact to a new version, with its content, every stored format and
+     * its References unchanged, and makes the copy current. A Versioned URN names the source
+     * version; a logical URN or {@code :latest} copies the current one. The new version is built
+     * from the stored rows, so a caller never reads content out and writes it back — a round trip
+     * that would drop the References the content does not spell out.
      *
-     * <p>The new number always counts from the artifact's highest version, whichever version is the
-     * source, so the copy is the new highest version. A {@code MINOR} or {@code PATCH} bump of an
-     * older pin therefore lands in the highest line: copying 1.0.0 while 2.0.0 exists gives 2.1.0
-     * with the content of 1.0.0.
+     * <p>The copy is numbered at the next MAJOR version above the artifact's highest version,
+     * whichever version is the source: copying 1.0.0 while 2.0.0 exists gives 3.0.0 with the
+     * content of 1.0.0.
      *
      * <p>This <em>always</em> mints a version, unlike every other write, which returns the existing
      * pin when the content is byte-identical. Carrying unchanged content forward is the whole point.
      *
-     * <p>An Element imported with a matching same-version DataStructure grouping copies that
-     * grouping atomically to the same new version. Its root references point to the new Element
-     * pin; other member pins and stored edges stay unchanged. An Element without such a grouping
-     * is copied on its own. A conflicting grouping version fails the whole copy.
+     * <p>An Element whose import grouping holds the source version as a member is copied together
+     * with that grouping version, atomically and to the same new version, which then counts above
+     * the highest version of either artifact. The grouping copy is the grouping's current version;
+     * its References to the source Element point to the copied Element, all other References stay
+     * unchanged. An Element without such a grouping is copied on its own.
      *
      * @throws IllegalArgumentException when the artifact is unknown, holds no version to copy, or
-     *     does not hold the pinned version
+     *     does not hold the requested version
+     * @throws de.civitascore.modelforge.contract.RegistryConflictException when a version the copy
+     *     needs exists already; nothing is written
      */
-    ArtifactWriteResult bumpVersion(BumpVersionCommand command);
+    ArtifactWriteResult copyVersion(CopyVersionCommand command);
 
     // ── Delete ───────────────────────────────────────────────────────────────
 

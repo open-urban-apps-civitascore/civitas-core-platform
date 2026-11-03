@@ -151,7 +151,7 @@ public class SchemaImportService {
         });
         // The dependency graph is in-memory and is not rolled back, so it is published only once the
         // durable write has committed — otherwise a rolled-back import leaves phantom nodes behind.
-        pendingNodes.forEach(node -> node.publish(graph));
+        registry.afterCommit(() -> pendingNodes.forEach(node -> node.publish(graph)));
 
         // For a folded datastructure-root the DataStructure IS the model, so its pin is the root
         // (→ version.model_urn); otherwise the root Element's pin (first entry) is the root, as before.
@@ -640,7 +640,7 @@ public class SchemaImportService {
         if (members.isEmpty()) return null;
         ObjectNode manifest = mapper.createObjectNode();
         manifest.put("$schema", "https://json-schema.org/draft/2020-12/schema");
-        manifest.put("$id", UrnParser.logicalUrn(dataStructureUrnForMembers(members)));
+        manifest.put("$id", groupingUrnOf(urns, members.getFirst()));
         manifest.put("title", schemaTitle != null ? schemaTitle : safeTitle);
         ObjectNode defs = manifest.putObject("$defs");
         int[] i = {0};
@@ -701,13 +701,12 @@ public class SchemaImportService {
     }
 
     /**
-     * The grouping DataStructure's URN: the root Element's UUID (first member) with the
-     * {@code datastructure} type, so a re-imported document versions its existing DataStructure
-     * instead of minting a new one. Used by {@link #buildDataStructureManifest} so the URN a
-     * grouping is validated and stored under is one and the same.
+     * The Logical URN of the DataStructure grouping an import creates for its root Element: the
+     * root's UUID with the {@code datastructure} type, so a re-imported document versions its
+     * existing DataStructure instead of minting a new one.
      */
-    private String dataStructureUrnForMembers(List<String> members) {
-        return urns.dataStructure(UrnParser.idFromUrn(members.getFirst()));
+    static String groupingUrnOf(UrnService urns, String rootElementUrn) {
+        return UrnParser.logicalUrn(urns.dataStructure(UrnParser.idFromUrn(rootElementUrn)));
     }
 
     private static List<String> elementUrns(ObjectNode elements) {

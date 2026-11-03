@@ -120,8 +120,8 @@ class EmbeddedModelForgeTest {
                 }
 
                 @Override
-                public de.civitascore.modelforge.contract.ArtifactWriteResult bumpVersion(
-                        de.civitascore.modelforge.contract.BumpVersionCommand command) {
+                public de.civitascore.modelforge.contract.ArtifactWriteResult copyVersion(
+                        de.civitascore.modelforge.contract.CopyVersionCommand command) {
                     return new de.civitascore.modelforge.contract.ArtifactWriteResult(
                         command.artifactId(), java.util.Map.of());
                 }
