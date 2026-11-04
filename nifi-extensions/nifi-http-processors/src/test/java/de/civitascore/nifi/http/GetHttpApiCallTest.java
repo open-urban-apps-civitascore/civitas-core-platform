@@ -1396,11 +1396,20 @@ class GetHttpApiCallTest {
 
   @Test
   void onTrigger_withNextLinksAndMaxPages_stopsWithoutEarlierPages() throws Exception {
-    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, "{\"next\":\"?page=2\"}")) {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json("{\"next\":\"?page=2\"}"),
+            Response.json("{\"next\":\"?page=3\"}"),
+            Response.json("{\"next\":\"?page=4\"}"))) {
       TestRunner runner = nextLinkRunner(endpoint, "$.next", ",\"maxLinks\":10");
-      runner.setProperty(GetHttpApiCall.MAX_PAGES, "1");
+      runner.setProperty(GetHttpApiCall.MAX_PAGES, "2");
       runner.run();
-      runner.assertAllFlowFilesTransferred(GetHttpApiCall.STOP, 1);
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": no stop condition after 2 pages (Max Pages)");
+      assertEquals(2, endpoint.requests().size());
     }
   }
 
