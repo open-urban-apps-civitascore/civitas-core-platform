@@ -10,7 +10,7 @@ rules:
 
   # Crashes on this spec in ruleset version 2.0.1
   owasp:api2:2023-no-credentials-in-url: off
-  # Rate limits and CORS are set by the gateway in front of the backend, not by the backend
+  # The backend neither limits request rates nor sets CORS headers, so its spec cannot declare them
   owasp:api4:2023-rate-limit: off
   owasp:api4:2023-rate-limit-responses-429: off
   owasp:api4:2023-rate-limit-retry-after: off
