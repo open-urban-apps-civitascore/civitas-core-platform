@@ -7,6 +7,8 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/comp
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 
+import { DISABLED_CHECKBOX_CLASS_NAME } from './disabledFieldClassNames'
+
 interface FormCheckboxProps<T extends FieldValues> {
   form: UseFormReturn<T>
   name: Path<T>
@@ -40,10 +42,7 @@ export const FormCheckbox = <T extends FieldValues>(props: FormCheckboxProps<T>)
               <Checkbox
                 data-testid={`${name}Checkbox`}
                 data-test-element="formField"
-                className={cn(
-                  'disabled:opacity-100 disabled:text-muted-foreground disabled:border-hidden disabled:shadow-none disabled:h-4 disabled:py-0',
-                  className,
-                )}
+                className={cn(DISABLED_CHECKBOX_CLASS_NAME, className)}
                 checked={!!field.value}
                 onCheckedChange={checked => field.onChange(checked)}
                 disabled={disabled}

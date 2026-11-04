@@ -118,6 +118,7 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
       return
     }
     update(index, snapshot)
+    void apiCallsForm.trigger(`configuration.apiCalls.${index}`)
     handleClose(index)
   }
 

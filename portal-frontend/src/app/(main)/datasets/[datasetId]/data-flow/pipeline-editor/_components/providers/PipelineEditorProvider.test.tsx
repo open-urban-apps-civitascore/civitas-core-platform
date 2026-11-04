@@ -1087,6 +1087,29 @@ describe('PipelineEditorProviderComponent', () => {
       )
     })
 
+    it('passes no API call names for an HTTP data source the frontend cannot read', () => {
+      const { rerender } = renderProvider(sessionWithGeoNode('session-1', 'persist-1', 'roads'))
+      mockDatasources.entities = [
+        {
+          id: 'http-1',
+          connector: {
+            connectorType: 'HTTP',
+            apiCalls: [{ name: 'Test Call 1', path: '/items', pagination: { type: 'UNKNOWN' } }],
+          },
+        } as unknown as Datasource,
+      ]
+      rerender()
+
+      act(() => {
+        contextRef.current?.runValidation()
+      })
+
+      expect(vi.mocked(validatePipelineWithNodeStatus)).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.objectContaining({ apiCallNamesByDatasourceId: new Map() }),
+      )
+    })
+
     it('passes node names in the UI language to the validation service', () => {
       renderProviderWithSessions([sessionWithGeoNode('session-1', 'persist-1', 'roads')])
 

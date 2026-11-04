@@ -3,15 +3,16 @@ import { useTranslations } from 'next-intl'
 import { useFieldArray, UseFormReturn, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
+import { TextField } from '@/components/form/fields/TextField'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
+import { FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form'
 import { InputGroup, InputGroupInput } from '@/components/ui/input-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { HTTP_METHODS } from '@/const/connectors'
-import { HttpApiCallsForm } from '@/types/connectors'
+import { cn } from '@/lib/utils'
+import { getParameterNameCollisionPaths, HttpApiCallsForm } from '@/types/connectors'
 import { buildApiCallUrl, formatPathWithQuery } from '@/utils/connectors'
 
 import { ApiCallParameterRows } from './ApiCallParameterRows'
@@ -38,6 +39,18 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
 
   const pathWithQuery = formatPathWithQuery(apiCall?.path ?? '', apiCall?.queryParameters ?? [])
   const hasParameters = queryParameters.fields.length > 0 || headers.fields.length > 0
+
+  const revalidateParameterNameCollisions = () => void form.trigger([...getParameterNameCollisionPaths(index)])
+
+  const handleQueryParameterRemove = (parameterIndex: number) => {
+    queryParameters.remove(parameterIndex)
+    revalidateParameterNameCollisions()
+  }
+
+  const handleHeaderRemove = (parameterIndex: number) => {
+    headers.remove(parameterIndex)
+    revalidateParameterNameCollisions()
+  }
 
   const handleCopyUrl = async () => {
     try {
@@ -97,10 +110,11 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
           name={`${apiCallPath}.path`}
           render={({ field }) => (
             <FormItem>
-              <InputGroup className="h-12">
+              <InputGroup className={cn('h-12', isDisabled && 'border-transparent shadow-none')}>
                 <Select value={HTTP_METHODS.GET} disabled>
                   <SelectTrigger
                     aria-label={t('method.label')}
+                    disabled={isDisabled}
                     className="w-28 rounded-r-none border-0 bg-muted text-primary shadow-none disabled:opacity-100 data-[size=default]:h-full"
                   >
                     <SelectValue>{HTTP_METHODS.GET}</SelectValue>
@@ -113,7 +127,7 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
                   <InputGroupInput
                     {...field}
                     aria-label={t('path.label')}
-                    className="h-full font-mono"
+                    className="h-full font-mono disabled:opacity-100"
                     placeholder={isDisabled ? undefined : '/stations'}
                     disabled={isDisabled}
                   />
@@ -124,26 +138,15 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
           )}
         />
 
-        <FormField
-          control={form.control}
+        <TextField
+          form={form}
           name={`${apiCallPath}.name`}
-          render={({ field }) => (
-            <FormItem className="flex flex-col gap-2">
-              <FormLabel>
-                {t('name.label')}
-                <span className="text-red-500 ml-1">*</span>
-              </FormLabel>
-              <FormControl>
-                <Input
-                  {...field}
-                  className="h-12"
-                  placeholder={isDisabled ? undefined : t('name.placeholder')}
-                  disabled={isDisabled}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+          label={t('name.label')}
+          placeholder={t('name.placeholder')}
+          required
+          disabled={isDisabled}
+          formItemProps={{ className: 'flex flex-col gap-2 pt-2' }}
+          inputClassName="h-12 disabled:h-12"
         />
 
         {hasParameters && (
@@ -154,7 +157,8 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
               fields={queryParameters.fields}
               typeLabel={t('parameters.query')}
               isDisabled={isDisabled}
-              onRemove={queryParameters.remove}
+              onRemove={handleQueryParameterRemove}
+              onNameChange={revalidateParameterNameCollisions}
             />
             <ApiCallParameterRows
               form={form}
@@ -162,7 +166,8 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
               fields={headers.fields}
               typeLabel={t('parameters.header')}
               isDisabled={isDisabled}
-              onRemove={headers.remove}
+              onRemove={handleHeaderRemove}
+              onNameChange={revalidateParameterNameCollisions}
             />
           </div>
         )}

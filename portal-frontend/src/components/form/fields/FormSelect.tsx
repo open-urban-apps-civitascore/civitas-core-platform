@@ -10,6 +10,8 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 
+import { DISABLED_INPUT_CLASS_NAME } from './disabledFieldClassNames'
+
 export interface AccessibleSelectProps<T extends FieldValues> {
   id: string
   label: string
@@ -75,7 +77,9 @@ export const FormSelect = <T extends FieldValues>(props: AccessibleSelectProps<T
                 data-test-element="formField"
                 aria-label={label}
                 className={cn(
-                  'w-full disabled:opacity-100 disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0 disabled:pointer-events-none',
+                  'w-full',
+                  DISABLED_INPUT_CLASS_NAME,
+                  'disabled:pointer-events-none',
                   selectTriggerProps?.className,
                 )}
                 disabled={disabled}

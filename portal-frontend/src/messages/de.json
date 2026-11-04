@@ -1011,6 +1011,17 @@
       "pageNumberMax": "Geben Sie eine Zahl bis 2147483647 ein.",
       "pageSizeMin": "Die Seitengröße muss mindestens 1 sein.",
       "endPageBeforeStartPage": "Die Endseite darf nicht kleiner als die Startseite sein.",
+      "clientHeader": "Connection, Content-Length, Expect, Host und Upgrade sind nicht erlaubt.",
+      "invalidCursorPath": "Beginnen Sie mit $ und verwenden Sie nur Namen und Array-Positionen, z. B. $.next_cursor, $.data[0].id oder $['next cursor'].",
+      "invalidCountPath": "Beginnen Sie mit $ und verwenden Sie nur Namen und Array-Positionen, z. B. $.meta.count, $.data oder $['total count'].",
+      "paginationQueryDuplicate": "Ein Query-Parameter hat bereits diesen Namen.",
+      "paginationHeaderDuplicate": "Ein Header hat bereits diesen Namen.",
+      "paginationParameterDuplicate": "Ein anderer Paginierungsparameter hat bereits diesen Namen.",
+      "parameterPaginationDuplicate": "Ein Paginierungsparameter hat bereits diesen Namen.",
+      "unreadableDatasource": "Datenquelle kann nicht geladen werden.",
+      "limitRequired": "Geben Sie ein Limit für den Limit-Parameter ein.",
+      "limitParameterRequired": "Geben Sie einen Limit-Parameter für das Limit ein.",
+      "limitInteger": "Geben Sie eine ganze Zahl ab 1 ein.",
       "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten",
       "inUseError": "Diese Datenquelle wird noch von einer Pipeline verwendet.",
@@ -1093,7 +1104,9 @@
         "enable": "Paginierung verwenden",
         "type": {
           "label": "Art der Paginierung",
-          "pageNumber": "Seitennummer"
+          "pageNumber": "Seitennummer",
+          "cursor": "Cursor",
+          "limitOffset": "Limit/Offset"
         },
         "pageParameter": {
           "label": "Seitenparameter"
@@ -1109,6 +1122,33 @@
         },
         "endPage": {
           "label": "Endseite"
+        },
+        "cursorHint": "Die Datenstruktur beschreibt die ganze Antwort, einschließlich Cursor.",
+        "cursorPath": {
+          "label": "Cursor-Pfad"
+        },
+        "cursorParameter": {
+          "label": "Cursor-Parameter"
+        },
+        "cursorIn": {
+          "label": "Cursor senden als",
+          "query": "Query-Parameter",
+          "header": "Header"
+        },
+        "offsetParameter": {
+          "label": "Offset-Parameter"
+        },
+        "offset": {
+          "label": "Offset"
+        },
+        "limitParameter": {
+          "label": "Limit-Parameter"
+        },
+        "limit": {
+          "label": "Limit"
+        },
+        "countPath": {
+          "label": "Pfad zur Anzahl"
         }
       }
     },

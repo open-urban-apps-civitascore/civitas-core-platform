@@ -32,6 +32,7 @@ import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { CONNECTOR_TYPES } from '@/const/connectors'
 import { useDatasetPermissions } from '@/hooks/use-dataset-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
+import { isConnectorReadable } from '@/types/datasources'
 import {
   isDatapoolScopeViolationError,
   isNotDraftError,
@@ -477,7 +478,8 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   const validationContextFor = useCallback(
     (sessionId: string): PipelineValidationContext => {
       const httpDatasources = datasources.filter(
-        datasource => datasource.connector?.connectorType === CONNECTOR_TYPES.HTTP,
+        datasource =>
+          datasource.connector?.connectorType === CONNECTOR_TYPES.HTTP && isConnectorReadable(datasource.connector),
       )
       return {
         tableNameOwners: tableNameOwnersOutsideSession(sessionManager.sessions, sessionId),
