@@ -1,13 +1,13 @@
 import { render, screen } from '@testing-library/react'
 
-import { WorkflowStepCard } from './WorkflowStepCard'
+import { WorkflowStepCard, WorkflowStepCardProps } from './WorkflowStepCard'
 
 vi.mock('next/image', () => ({
   // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
   default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => <img {...props} />,
 }))
 
-const defaultProps = {
+const defaultProps: WorkflowStepCardProps = {
   stepNumber: 1,
   title: 'Create a Data structure',
   subtitle: 'Describes the Data',
@@ -16,7 +16,7 @@ const defaultProps = {
   illustrationHeight: 40,
 }
 
-const renderComponent = (props: Partial<typeof defaultProps> = {}) =>
+const renderComponent = (props: Partial<WorkflowStepCardProps> = {}) =>
   render(<WorkflowStepCard {...defaultProps} {...props} />)
 
 describe('WorkflowStepCard', () => {

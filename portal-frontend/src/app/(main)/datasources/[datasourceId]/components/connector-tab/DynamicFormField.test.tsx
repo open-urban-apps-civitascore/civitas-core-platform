@@ -56,6 +56,7 @@ describe('DynamicFormField (integration)', () => {
   it('renders input for type=input', () => {
     renderWithForm({
       type: 'input',
+      id: 'name',
       name: 'name',
       label: 'Input',
       placeholder: 'Max Mustermann',
@@ -67,6 +68,7 @@ describe('DynamicFormField (integration)', () => {
   it('renders textarea for type=textArea', () => {
     renderWithForm({
       type: 'textArea',
+      id: 'description',
       name: 'description',
       label: 'Textarea',
       placeholder: 'text',
@@ -79,6 +81,7 @@ describe('DynamicFormField (integration)', () => {
   it('renders checkbox for type=checkbox', () => {
     renderWithForm({
       type: 'checkbox',
+      id: 'isActive',
       name: 'isActive',
       label: 'Checkbox',
       placeholder: 'text',
@@ -92,6 +95,7 @@ describe('DynamicFormField (integration)', () => {
     renderWithForm({
       type: 'input',
       inputType: 'password',
+      id: 'name',
       name: 'name',
       label: 'Password',
       placeholder: 'secret',
@@ -105,6 +109,7 @@ describe('DynamicFormField (integration)', () => {
   it('renders a plain input without password masking or autocomplete for type=input', () => {
     renderWithForm({
       type: 'input',
+      id: 'name',
       name: 'name',
       label: 'Input',
       placeholder: 'Max Mustermann',
@@ -118,6 +123,7 @@ describe('DynamicFormField (integration)', () => {
   it('renders select for type=select', () => {
     renderWithForm({
       type: 'select',
+      id: 'category',
       name: 'category',
       label: 'Select',
       placeholder: 'select',
@@ -135,6 +141,7 @@ describe('DynamicFormField (integration)', () => {
     it('renders disabled input for type=input', () => {
       renderWithForm({
         type: 'input',
+        id: 'name',
         name: 'name',
         label: 'Input',
         placeholder: 'Max Mustermann',
@@ -147,6 +154,7 @@ describe('DynamicFormField (integration)', () => {
     it('renders disabled textarea for type=textArea', () => {
       renderWithForm({
         type: 'textArea',
+        id: 'description',
         name: 'description',
         label: 'Textarea',
         placeholder: 'text',
@@ -159,6 +167,7 @@ describe('DynamicFormField (integration)', () => {
     it('renders disabled checkbox for type=checkbox', () => {
       renderWithForm({
         type: 'checkbox',
+        id: 'isActive',
         name: 'isActive',
         label: 'Checkbox',
         placeholder: 'text',
@@ -171,6 +180,7 @@ describe('DynamicFormField (integration)', () => {
     it('renders disabled select for type=select', () => {
       renderWithForm({
         type: 'select',
+        id: 'category',
         name: 'category',
         label: 'Select',
         placeholder: 'select',
