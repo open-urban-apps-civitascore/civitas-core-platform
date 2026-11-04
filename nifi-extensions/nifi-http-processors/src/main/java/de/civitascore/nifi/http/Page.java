@@ -43,10 +43,6 @@ record Page(
     this(index, position, queryParameters, headers, Optional.empty());
   }
 
-  Page withUrl(URI requestUrl) {
-    return new Page(index, position, queryParameters, headers, Optional.of(requestUrl));
-  }
-
   Optional<String> title() {
     return position.map(Position::title);
   }

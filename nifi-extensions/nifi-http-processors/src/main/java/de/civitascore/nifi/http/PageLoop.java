@@ -78,12 +78,12 @@ final class PageLoop {
 
   private RunResult readPages(ProcessSession session, Authentication authentication) {
     List<FlowFile> pages = new ArrayList<>();
-    Page page = withRequestUrl(apiCall.pagination().first(), new NoAuthentication());
+    Page page = apiCall.pagination().first();
     PageRepeats repeats = new PageRepeats(page);
     for (int read = 1; ; read++) {
       ApiCallOutcome outcome = client.send(apiCall, page, authentication);
       Optional<Page> next;
-      switch (accept(session, withRequestUrl(page, authentication), outcome, pages, repeats)) {
+      switch (accept(session, page, outcome, pages, repeats)) {
         case PageRead.Failed failed -> {
           return new RunResult.Failed(pages, failed.failure());
         }
@@ -111,12 +111,6 @@ final class PageLoop {
             pages, ApiCallOutcome.Failure.ofStopped(apiCall.describe(page)));
       }
     }
-  }
-
-  private Page withRequestUrl(Page page, Authentication authentication) {
-    return apiCall.pagination() instanceof NextLinkPagination
-        ? page.withUrl(client.uri(apiCall, page, authentication))
-        : page;
   }
 
   /**
@@ -196,7 +190,8 @@ final class PageLoop {
                 wrongType.reason(page.title().orElse("the response"))));
       }
       case RecordSchema.Verdict.Agrees agrees ->
-          switch (pagination.next(page, agrees.content())) {
+          switch (pagination.next(
+              page, agrees.content().withRequestUrl(client.target(apiCall, page)))) {
             case Pagination.Progress.Rejected(String reason) -> {
               session.remove(flowFile);
               yield new PageRead.Failed(

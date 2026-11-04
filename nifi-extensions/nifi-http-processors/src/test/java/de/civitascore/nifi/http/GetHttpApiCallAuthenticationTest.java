@@ -109,6 +109,29 @@ class GetHttpApiCallAuthenticationTest {
   }
 
   @Test
+  void nextLinksResolveWithoutCopyingAuthenticationQueryParameters() throws Exception {
+    try (ApiEndpoint api =
+        ApiEndpoint.answeringInTurnOverTls(
+            tls.server(), Response.json("{\"next\":\"#next\"}"), Response.json("{}"))) {
+      TestRunner runner = runner(api.baseUrl());
+      apiToken(runner, "api-key", "secret", ParameterLocation.QUERY);
+      runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, "{\"type\":\"object\"}");
+      runner.setProperty(
+          GetHttpApiCall.API_CALL,
+          """
+          {"name":"Stations","path":"/stations",
+           "queryParameters":[{"name":"filter","value":"active"}],
+           "pagination":{"type":"NEXT_LINK","nextLinkPath":"$.next"}}
+          """);
+      runner.run();
+      runner.assertAllFlowFilesTransferred(GetHttpApiCall.SUCCESS, 2);
+      assertEquals(
+          List.of("filter=active&api-key=secret", "filter=active&api-key=secret"),
+          api.requests().stream().map(ApiEndpoint.Request::rawQuery).toList());
+    }
+  }
+
+  @Test
   void sendsABearerToken() throws InitializationException {
     try (ApiEndpoint api = ApiEndpoint.answeringOverTls(tls.server(), 200, EMPTY)) {
       TestRunner runner = runner(api.baseUrl());

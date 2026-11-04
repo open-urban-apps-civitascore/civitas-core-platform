@@ -55,7 +55,7 @@ record NextLinkPagination(JsonPath nextLinkPath, OptionalInt maxLinks) implement
   private Progress follow(Page page, PageContent content, String value) {
     URI link;
     try {
-      link = NextLinkUrl.resolve(page.url().orElseThrow(), URI.create(value));
+      link = NextLinkUrl.resolve(content.requestUrl().orElseThrow(), URI.create(value));
     } catch (IllegalArgumentException e) {
       return new Progress.Rejected("the next link is not a valid URI");
     }
