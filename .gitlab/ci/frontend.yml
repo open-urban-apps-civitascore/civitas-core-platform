@@ -69,13 +69,14 @@ lint-frontend:
     - pnpm config set store-dir $PNPM_STORE_DIR
     - pnpm install --frozen-lockfile --prefer-offline
 
-    # ESLint, then unused or undeclared dependencies (this was the job dependency-prune-frontend).
-    # Both run, so one pipeline shows both results; the job fails if either failed.
+    # ESLint, the TypeScript check, then unused or undeclared dependencies (this was the job
+    # dependency-prune-frontend). All run, so one pipeline shows all results; the job fails if any failed.
     - |
       status=0
       pnpm eslint . \
         --max-warnings=0 \
         --format gitlab || status=$?
+      pnpm run typecheck || status=$?
       pnpm dlx depcheck@$DEPCHECK_VERSION --json --ignore-dev > depcheck-report.json || true
       node scripts/check-dependencies.cjs depcheck-report.json || status=$?
       exit $status
