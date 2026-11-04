@@ -1323,7 +1323,7 @@
         "details": "Details:",
         "httpStatus": "HTTP status: {status}",
         "previewTruncated": "Preview truncated.",
-        "reenterPassword": "The configuration was changed. Enter the password again to test the connection.",
+        "reenterSecrets": "The configuration was changed. Enter the secrets again to test the connection.",
         "causes": {
           "INVALID_CONNECTOR": "The configuration is invalid.",
           "SOURCE_ERROR": "The source could not be reached or answered with an error.",

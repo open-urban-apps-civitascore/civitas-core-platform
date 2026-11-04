@@ -1310,7 +1310,7 @@
         "details": "Details:",
         "httpStatus": "HTTP-Status: {status}",
         "previewTruncated": "Vorschau gekürzt.",
-        "reenterPassword": "Die Konfiguration wurde geändert. Geben Sie das Passwort erneut ein, um die Verbindung zu testen.",
+        "reenterSecrets": "Die Konfiguration wurde geändert. Geben Sie die Secrets erneut ein, um die Verbindung zu testen.",
         "causes": {
           "INVALID_CONNECTOR": "Die Konfiguration ist ungültig.",
           "SOURCE_ERROR": "Die Quelle ist nicht erreichbar oder hat mit einem Fehler geantwortet.",

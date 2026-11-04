@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { ConnectionTestResult, MASKED_SECRET } from '@/types/connectionTest'
-import { ConnectorFormToApiSchema, EMPTY_PAGINATION } from '@/types/connectors'
+import { ConnectionTestResult } from '@/types/connectionTest'
+import { ConnectorFormToApiSchema, EMPTY_PAGINATION, SECRET_PLACEHOLDER } from '@/types/connectors'
 
 import { hasMaskedSecret, isApiCallIncomplete, toConnectionTestInput, toPreviewText } from './connectionTest'
 
@@ -134,17 +134,37 @@ describe('hasMaskedSecret', () => {
     ['MQTT', MQTT_CONFIGURATION],
     ['SQL', SQL_CONFIGURATION],
   ] as const)('returns true for a masked %s password', (connectorType, configuration) => {
-    expect(hasMaskedSecret({ connectorType, configuration: { ...configuration, password: MASKED_SECRET } })).toBe(true)
+    expect(hasMaskedSecret({ connectorType, configuration: { ...configuration, password: SECRET_PLACEHOLDER } })).toBe(
+      true,
+    )
   })
 
   it('returns true for a masked HTTP password with Basic authentication', () => {
-    const authentication = { type: 'BASIC', username: 'test.user1', password: MASKED_SECRET }
+    const authentication = { type: 'BASIC', username: 'test.user1', password: SECRET_PLACEHOLDER }
 
     expect(hasMaskedSecret({ connectorType: 'HTTP', configuration: httpConfiguration({ authentication }) })).toBe(true)
   })
 
+  it.each([
+    ['Bearer token', { type: 'BEARER_TOKEN', token: SECRET_PLACEHOLDER }],
+    ['API token', { type: 'API_TOKEN', name: 'X-API-Key', value: SECRET_PLACEHOLDER, in: 'HEADER' }],
+    [
+      'OAuth2',
+      {
+        type: 'OAUTH2',
+        tokenUrl: 'https://auth.example.org/token',
+        clientId: 'client-1',
+        clientSecret: SECRET_PLACEHOLDER,
+        scope: '',
+      },
+    ],
+    ['client certificate', { type: 'CLIENT_CERTIFICATE', certificate: 'certificate', privateKey: SECRET_PLACEHOLDER }],
+  ])('returns true for a masked secret of %s', (_name, authentication) => {
+    expect(hasMaskedSecret({ connectorType: 'HTTP', configuration: httpConfiguration({ authentication }) })).toBe(true)
+  })
+
   it('returns false for a masked HTTP password without authentication', () => {
-    const authentication = { type: 'NONE', username: '', password: MASKED_SECRET }
+    const authentication = { type: 'NONE', username: '', password: SECRET_PLACEHOLDER }
 
     expect(hasMaskedSecret({ connectorType: 'HTTP', configuration: httpConfiguration({ authentication }) })).toBe(false)
   })

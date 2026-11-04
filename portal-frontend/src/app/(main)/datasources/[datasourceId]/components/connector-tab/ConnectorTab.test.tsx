@@ -465,11 +465,21 @@ describe('ConnectorTab (integration)', () => {
         })
         return (
           <Form {...form}>
-            <ConnectorTab form={form} connectorType={connectorType} />
+            <ConnectorTab
+              form={form}
+              datasourceId={defaultValues.id}
+              connectorType={connectorType}
+              isConnectorComplete={false}
+              isConnectorChanged={false}
+            />
           </Form>
         )
       }
-      render(<Wrapper />)
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <Wrapper />
+        </QueryClientProvider>,
+      )
       const trigger = vi.spyOn(form!, 'trigger')
 
       act(() => {

@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Path, UseFormReturn } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
@@ -8,7 +9,8 @@ import { DATAPOOL_SCOPE_TYPES, Datasource, DatasourceFormDraft } from '@/types/d
 import { useDatasourceForm } from '../../hooks/useDatasourceForm'
 import { ConnectorTab } from './ConnectorTab'
 
-vi.mock('@/app/services/api/datasources/clientRequests', () => ({
+vi.mock('@/app/services/api/datasources/clientRequests', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/app/services/api/datasources/clientRequests')>()),
   useUpdateDatasource: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateDatasourceReleased: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useReleaseDatasource: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -60,11 +62,21 @@ const renderConnectorTab = (
     form = datasourceForm.form
     return (
       <Form {...datasourceForm.form}>
-        <ConnectorTab form={datasourceForm.form} connectorType="HTTP" />
+        <ConnectorTab
+          form={datasourceForm.form}
+          datasourceId={datasource.id}
+          connectorType="HTTP"
+          isConnectorComplete={false}
+          isConnectorChanged={false}
+        />
       </Form>
     )
   }
-  render(<Wrapper />)
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <Wrapper />
+    </QueryClientProvider>,
+  )
   const getFieldError = (path: string) => form?.getFieldState(path as Path<DatasourceFormDraft>).error
   const setServerError = (path: string) =>
     act(() =>

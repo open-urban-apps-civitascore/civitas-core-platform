@@ -1,24 +1,19 @@
 import { get } from 'react-hook-form'
 
-import { CONNECTOR_TYPES, HTTP_AUTHENTICATION_TYPES } from '@/const/connectors'
+import { CONNECTOR_TYPES } from '@/const/connectors'
+import { ConnectionTestInput, ConnectionTestResult, PREVIEW_TRUNCATED_MARKER } from '@/types/connectionTest'
 import {
-  ConnectionTestInput,
-  ConnectionTestResult,
-  MASKED_SECRET,
-  PREVIEW_TRUNCATED_MARKER,
-} from '@/types/connectionTest'
-import { ConnectorFormToApiSchema, ConnectorType, HttpApiCallsStrictSchema } from '@/types/connectors'
+  ConnectorFormToApiSchema,
+  ConnectorType,
+  HttpApiCallsStrictSchema,
+  SECRET_PLACEHOLDER,
+} from '@/types/connectors'
 import { DatasourceFormDraft } from '@/types/datasources'
+import { getSecretPaths } from '@/utils/connectors'
 
 type ConnectorValues = Pick<DatasourceFormDraft, 'connectorType' | 'configuration'>
 
 const JSON_INDENT = 2
-
-const SECRET_PATHS: Record<ConnectorType, string> = {
-  MQTT: 'password',
-  SQL: 'password',
-  HTTP: 'authentication.password',
-}
 
 const toFirstApiCallName = (configuration: ConnectorValues['configuration']) => {
   const name: unknown = get(configuration, 'apiCalls.0.name')
@@ -54,12 +49,9 @@ export const toConnectionTestInput = (values: ConnectorValues): ConnectionTestIn
 
 export const hasMaskedSecret = (values: ConnectorValues) => {
   const { connectorType, configuration } = values
-  if (!connectorType) return false
-  const isHttpWithoutBasic =
-    connectorType === CONNECTOR_TYPES.HTTP &&
-    get(configuration, 'authentication.type') !== HTTP_AUTHENTICATION_TYPES.BASIC
-  if (isHttpWithoutBasic) return false
-  return get(configuration, SECRET_PATHS[connectorType]) === MASKED_SECRET
+  if (!connectorType || !configuration) return false
+  const secretPaths = getSecretPaths(connectorType, configuration)
+  return secretPaths.some(path => get(configuration, path) === SECRET_PLACEHOLDER)
 }
 
 export const toPreviewText = (result: ConnectionTestResult, connectorType: ConnectorType): string | null => {
