@@ -225,6 +225,16 @@ export const HttpCursorPaginationSchema = z
   })
   .strict()
 
+export const HttpNextLinkPaginationSchema = z
+  .object({
+    type: z.literal('NEXT_LINK'),
+    /** Restricted JSON path in the response to the next link, a string or an object with a string href. */
+    nextLinkPath: z.union([z.string(), z.null()]).optional(),
+    /** Maximum number of links to follow; null follows all links, subject to Max Pages. */
+    maxLinks: z.union([z.number().int(), z.null()]).optional(),
+  })
+  .strict()
+
 export const HttpApiCallSchema = z
   .object({
     /** Name of the API call, unique within the DataSource. */
@@ -239,7 +249,13 @@ export const HttpApiCallSchema = z
     headers: z.union([z.array(HttpParameterSchema), z.null()]).optional(),
     /** Pagination of the API call, chosen by 'type'; null for none. */
     pagination: z
-      .union([HttpPageNumberPaginationSchema, HttpLimitOffsetPaginationSchema, HttpCursorPaginationSchema, z.null()])
+      .union([
+        HttpPageNumberPaginationSchema,
+        HttpLimitOffsetPaginationSchema,
+        HttpCursorPaginationSchema,
+        HttpNextLinkPaginationSchema,
+        z.null(),
+      ])
       .optional(),
   })
   .strict()
@@ -316,6 +332,7 @@ export type HttpParameter = z.infer<typeof HttpParameterSchema>
 export type HttpPageNumberPagination = z.infer<typeof HttpPageNumberPaginationSchema>
 export type HttpLimitOffsetPagination = z.infer<typeof HttpLimitOffsetPaginationSchema>
 export type HttpCursorPagination = z.infer<typeof HttpCursorPaginationSchema>
+export type HttpNextLinkPagination = z.infer<typeof HttpNextLinkPaginationSchema>
 export type HttpApiCall = z.infer<typeof HttpApiCallSchema>
 export type HttpDataSource = z.infer<typeof HttpDataSourceSchema>
 export type DataSource = z.infer<typeof DataSourceSchema>

@@ -10,9 +10,7 @@
 package de.civitascore.nifi.http;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.net.URI;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * What a page whose records agree with the Record Schema gave.
@@ -22,22 +20,10 @@ import java.util.Optional;
  *     where the response has none; empty for any other shape
  * @param numberTexts the JSON text of each number in {@code values}, as the response writes it
  */
-record PageContent(
-    int records,
-    Map<JsonPath, JsonNode> values,
-    Map<JsonPath, String> numberTexts,
-    Optional<URI> requestUrl) {
+record PageContent(int records, Map<JsonPath, JsonNode> values, Map<JsonPath, String> numberTexts) {
 
   PageContent {
     values = Map.copyOf(values);
     numberTexts = Map.copyOf(numberTexts);
-  }
-
-  PageContent(int records, Map<JsonPath, JsonNode> values, Map<JsonPath, String> numberTexts) {
-    this(records, values, numberTexts, Optional.empty());
-  }
-
-  PageContent withRequestUrl(URI url) {
-    return new PageContent(records, values, numberTexts, Optional.of(url));
   }
 }
