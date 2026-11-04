@@ -713,4 +713,104 @@ class DataStructureVersionServiceTest {
       assertThat(result.getModelUrn()).isEqualTo(STORED_PIN);
     }
   }
+
+  @Nested
+  @DisplayName("Duplicate")
+  class DuplicateTests {
+
+    private static final String SOURCE_PIN =
+        "urn:core:platform:civitas:datastructure:common:6f1c2a3e-8d4b-4c5a-9e7f-1a2b3c4d5e6f:1.0.0";
+    private static final ModelRegistryGateway.ModelPin COPY_PIN =
+        new ModelRegistryGateway.ModelPin(
+            "urn:core:platform:civitas:datastructure:common:6f1c2a3e-8d4b-4c5a-9e7f-1a2b3c4d5e6f",
+            "urn:core:platform:civitas:datastructure:common:6f1c2a3e-8d4b-4c5a-9e7f-1a2b3c4d5e6f:3.0.0",
+            "3.0.0");
+    private static final String IMPORTED_STRUCTURE =
+        "urn:core:platform:civitas:datastructure:frost:09846bf2-00d1-8ef2-bede-0e5936586b89:1.0.0";
+
+    private final DataStructure dataStructure = new DataStructure();
+
+    @BeforeEach
+    void mapInputToEntity() {
+      dataStructure.setId(UUID.randomUUID());
+      lenient()
+          .when(dataStructureVersionMapper.toEntity(any()))
+          .thenAnswer(
+              invocation -> {
+                DataStructureVersionInputDTO input = invocation.getArgument(0);
+                DataStructureVersion entity = new DataStructureVersion();
+                entity.setDescription(input.getDescription());
+                entity.setModelName(input.getModelName());
+                entity.setImportedStructureUrns(input.getImportedStructureUrns());
+                entity.setDataStructureVersionStatus(input.getDataStructureVersionStatus());
+                return entity;
+              });
+      lenient()
+          .when(dataStructureService.findByIdOrThrow(dataStructure.getId()))
+          .thenReturn(dataStructure);
+      lenient()
+          .when(dataStructureVersionRepository.save(any()))
+          .thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    @Test
+    @DisplayName("A copy takes the source's metadata, starts as DRAFT and pins the copied model")
+    void duplicateCopiesMetadataAndPinsTheCopiedModel() {
+      DataStructureVersion source = source(SOURCE_PIN);
+      when(modelRegistryGateway.copyModelVersion(SOURCE_PIN)).thenReturn(COPY_PIN);
+
+      DataStructureVersion copy = dataStructureVersionService.duplicate(source.getId());
+
+      assertThat(copy.getDataStructureVersionStatus()).isEqualTo(DataStructureVersionStatus.DRAFT);
+      assertThat(copy.getDescription()).isEqualTo("Weather stations");
+      assertThat(copy.getModelName()).isEqualTo("Station");
+      assertThat(copy.getImportedStructureUrns()).containsExactly(IMPORTED_STRUCTURE);
+      assertThat(copy.getDataStructure()).isSameAs(dataStructure);
+      assertThat(copy.getModelUrn()).isEqualTo(COPY_PIN.versionedUrn());
+      assertThat(copy.getVersion()).isEqualTo("3.0.0");
+      verify(modelRegistryGateway, never())
+          .storeModel(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("A source without a model gives a copy without a model and no registry call")
+    void duplicateWithoutModelSkipsRegistry() {
+      DataStructureVersion source = source(null);
+
+      DataStructureVersion copy = dataStructureVersionService.duplicate(source.getId());
+
+      assertThat(copy.getModelUrn()).isNull();
+      assertThat(copy.getVersion()).isNull();
+      assertThat(copy.getDescription()).isEqualTo("Weather stations");
+      verifyNoInteractions(modelRegistryGateway, modelReferenceAuthorizer);
+    }
+
+    @Test
+    @DisplayName("A refused model reference copies nothing")
+    void duplicateChecksReferencesBeforeTheCopy() {
+      DataStructureVersion source = source(SOURCE_PIN);
+      doThrow(new ModelReferenceNotAvailableException())
+          .when(modelReferenceAuthorizer)
+          .authorizeStored(dataStructure.getId(), SOURCE_PIN);
+
+      assertThatThrownBy(() -> dataStructureVersionService.duplicate(source.getId()))
+          .isInstanceOf(ModelReferenceNotAvailableException.class);
+      verify(modelRegistryGateway, never()).copyModelVersion(any());
+      verify(dataStructureVersionRepository, never()).save(any());
+    }
+
+    private DataStructureVersion source(String modelUrn) {
+      DataStructureVersion source = new DataStructureVersion();
+      source.setId(UUID.randomUUID());
+      source.setDataStructure(dataStructure);
+      source.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      source.setDescription("Weather stations");
+      source.setModelName("Station");
+      source.setModelUrn(modelUrn);
+      source.setVersion(modelUrn == null ? null : "1.0.0");
+      source.setImportedStructureUrns(List.of(IMPORTED_STRUCTURE));
+      when(dataStructureVersionRepository.findById(source.getId())).thenReturn(Optional.of(source));
+      return source;
+    }
+  }
 }

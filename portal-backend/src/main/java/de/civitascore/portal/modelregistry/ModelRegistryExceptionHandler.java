@@ -5,6 +5,7 @@ package de.civitascore.portal.modelregistry;
 
 import de.civitascore.modelforge.contract.ArtifactInUseException;
 import de.civitascore.modelforge.contract.Diagnostic;
+import de.civitascore.modelforge.contract.RegistryConflictException;
 import de.civitascore.modelforge.contract.RegistryUnavailableException;
 import de.civitascore.modelforge.contract.ValidationFailedException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,6 +13,8 @@ import java.net.URI;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
@@ -29,6 +32,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  */
 @Slf4j
 @RestControllerAdvice
+// Spring also matches handlers against an exception's cause, so without precedence the global
+// handler claims a registry exception through the database exception it carries.
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class ModelRegistryExceptionHandler {
 
   private static final String ERROR_URN_PREFIX = "urn:civitas:error:";
@@ -47,6 +53,14 @@ public class ModelRegistryExceptionHandler {
   public ProblemDetail handleArtifactInUse(ArtifactInUseException ex, HttpServletRequest request) {
     log.warn("Registry refused a delete: {}", Encode.forJava(ex.getMessage()));
     return problem(HttpStatus.CONFLICT, "RESOURCE_IN_USE", ex.getMessage(), request);
+  }
+
+  /** A write that collides with data the registry already holds, such as a taken version. */
+  @ExceptionHandler(RegistryConflictException.class)
+  public ProblemDetail handleRegistryConflict(
+      RegistryConflictException ex, HttpServletRequest request) {
+    log.warn("Registry refused a conflicting write", ex);
+    return problem(HttpStatus.CONFLICT, "UNIQUE_CONSTRAINT_VIOLATION", ex.getMessage(), request);
   }
 
   /** The registry cannot be reached; the caller may retry. */

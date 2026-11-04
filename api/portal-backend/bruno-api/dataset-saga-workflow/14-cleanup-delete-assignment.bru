@@ -25,7 +25,7 @@ tests {
 docs {
   **Saga step 14 of 18** — Delete the scoped assignment (cleanup).
 
-  Removes the DATASET-scoped assignment created in step 6. This should be done before deleting the dataset to avoid dangling references.
+  Removes the DATASET-scoped assignment created in step 6. Run this before the Dataset delete, which starts an asynchronous saga that also removes its Assignments. The two deletes must not run at the same time.
 
   **Expected Response:** 204 No Content. 404 if already deleted. 400 if the ID is invalid (not set on first run).
 

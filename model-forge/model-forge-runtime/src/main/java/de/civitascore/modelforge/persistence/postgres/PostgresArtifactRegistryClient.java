@@ -3,6 +3,7 @@ package de.civitascore.modelforge.persistence.postgres;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
+import de.civitascore.modelforge.contract.RegistryConflictException;
 import de.civitascore.modelforge.contract.RegistryUnavailableException;
 import de.civitascore.modelforge.core.port.ArtifactRegistry;
 import de.civitascore.modelforge.core.port.ArtifactSearchCriteria;
@@ -21,6 +22,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
@@ -166,19 +169,17 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
     }
 
     /**
-     * Copies the current version's rows to a new version and advances the artifact to it. Every
-     * representation is copied, not only the primary one, and the reference edges are copied as rows
-     * rather than re-extracted from content — an edge the content does not spell out survives that way
-     * by construction.
-     *
-     * <p>No content-identical short-circuit: the content is unchanged by definition, so the check the
-     * store methods share would turn every call into a no-op.
+     * Copies the source version's rows to a new version and advances the artifact to it. Every
+     * representation is copied, not only the primary one, and the References are copied as rows
+     * rather than re-extracted from content — a Reference the content does not spell out survives
+     * that way by construction.
      */
     @Override
-    public String bumpVersion(String logicalUrn, VersionBump bump) {
+    public String copyVersion(String sourcePin, String countAbove, Map<String, String> retargets) {
         // Reject control characters before the URN reaches an exception message a caller may log.
-        UrnParser.requireNoControlChars(logicalUrn);
-        String logical = UrnParser.logicalUrn(logicalUrn);
+        UrnParser.requireNoControlChars(sourcePin);
+        String logical = UrnParser.logicalUrn(sourcePin);
+        String sourceVersion = UrnParser.versionFromUrn(sourcePin);
         try {
             return inTxResult(() -> {
                 // Same lock the store methods take, so a concurrent save cannot read this current_version
@@ -186,28 +187,26 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                 lockArtifactWrite(logical);
                 ArtifactRow artifact = artifacts.findByLogicalUrn(logical)
                     .orElseThrow(() -> new IllegalArgumentException("Unknown artifact: " + logical));
-                if (artifact.currentVersion() == null) {
-                    throw new IllegalArgumentException("Artifact has no version to carry forward: " + logical);
-                }
-                ArtifactVersionRow source = versions.find(artifact.id(), artifact.currentVersion())
-                    .orElseThrow(() -> new IllegalStateException(
-                        "Current version " + artifact.currentVersion() + " is missing for " + logical));
-
+                ArtifactVersionRow source = versions.find(artifact.id(), sourceVersion)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                        "Unknown version " + sourceVersion + " of " + logical));
+                String newVersion = SemVer.next(higher(artifact.currentVersion(), countAbove), VersionBump.MAJOR);
                 Instant now = Instant.now();
-                String newVersion = SemVer.next(artifact.currentVersion(), bump);
                 UUID versionId = UUID.randomUUID();
                 versions.insert(new ArtifactVersionRow(versionId, artifact.id(), newVersion,
                     source.primaryFormat(), source.title(), source.description(), now, source.createdBy()));
                 for (String format : representations.listFormats(source.id())) {
                     representations.find(source.id(), format).ifPresent(rep ->
-                        representations.insert(new ArtifactRepresentationRow(UUID.randomUUID(), versionId,
-                            rep.format(), rep.contentType(), rep.contentJson(), rep.contentText(),
-                            rep.contentHash(), rep.generation(), now)));
+                        representations.insert(retargeted(rep, versionId, retargets, now)));
                 }
-                references.replaceForVersion(versionId, references.rowsForVersion(source.id()));
+                references.replaceForVersion(versionId, references.rowsForVersion(source.id()).stream()
+                    .map(r -> retargets.containsKey(r.targetUrn())
+                        ? new ReferenceRow(retargets.get(r.targetUrn()), r.referenceType(), r.referenceName(), r.sortOrder())
+                        : r)
+                    .toList());
                 artifacts.updateCurrentVersion(artifact.id(), newVersion, now);
-                // Back-fill pinned references that named this exact (logical, version) before it existed.
                 String pin = UrnParser.withVersion(logical, newVersion);
+                // Back-fill pinned references that named this exact (logical, version) before it existed.
                 references.linkDanglingVersions(pin, versionId);
                 // The namespace index addresses a version, so leaving it on the superseded one would
                 // make a namespace lookup resolve to a stale version of the artifact.
@@ -215,12 +214,45 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
                     namespaces.repointVersion(artifact.id(), versionId, now);
                     xsd.evict(logical);
                 }
-                log.info("Bumped {} to v{} ({})", logical, newVersion, bump);
+                log.info("Copied {} v{} to v{}", logical, sourceVersion, newVersion);
                 return pin;
             });
         } catch (DataAccessException e) {
-            throw translate(e, "Registry version bump failed for " + logical);
+            throw translate(e, "Registry version copy failed for " + logical);
         }
+    }
+
+    private static String higher(String version, String other) {
+        return other != null && SemVer.compare(other, version) > 0 ? other : version;
+    }
+
+    /** The representation for the copy, its JSON content's {@code $ref} values retargeted. */
+    private ArtifactRepresentationRow retargeted(ArtifactRepresentationRow rep, UUID versionId,
+                                                 Map<String, String> retargets, Instant now) {
+        String json = rep.contentJson();
+        String hash = rep.contentHash();
+        if (json != null && !retargets.isEmpty()) {
+            JsonNode content = readJson(json);
+            if (retargetRefs(content, retargets)) {
+                json = writeJson(content);
+                hash = sha256(json);
+            }
+        }
+        return new ArtifactRepresentationRow(UUID.randomUUID(), versionId, rep.format(), rep.contentType(),
+            json, rep.contentText(), hash, rep.generation(), now);
+    }
+
+    private static boolean retargetRefs(JsonNode node, Map<String, String> retargets) {
+        boolean changed = false;
+        String ref = node.path("$ref").asText(null);
+        if (node instanceof ObjectNode object && ref != null && retargets.containsKey(ref)) {
+            object.put("$ref", retargets.get(ref));
+            changed = true;
+        }
+        if (node.isObject() || node.isArray()) {
+            for (JsonNode child : node) changed |= retargetRefs(child, retargets);
+        }
+        return changed;
     }
 
     @Override
@@ -801,6 +833,16 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
             .optional();
     }
 
+    @Override
+    public void lockForWrite(String logicalUrn) {
+        String logical = UrnParser.logicalUrn(logicalUrn);
+        try {
+            lockArtifactWrite(logical);
+        } catch (DataAccessException e) {
+            throw translate(e, "Could not lock " + logical);
+        }
+    }
+
     private record ResolvedXsd(UUID artifactId, UUID versionId, String content) {}
 
     /**
@@ -907,17 +949,32 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
         return inTxResult(work);
     }
 
+    @Override
+    public void afterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
+    }
+
     /**
      * Translates a Spring {@link DataAccessException} into the application exception that yields a
-     * faithful HTTP status: a data-integrity violation (e.g. a unique/constraint breach) is the
-     * caller's fault → {@link IllegalArgumentException} (400); a SQL grammar/programming error is a
-     * server defect → {@link IllegalStateException} (logged 500); everything else (connectivity,
-     * timeouts, pool exhaustion) is a transient outage -> {@link RegistryUnavailableException}. The 400
-     * carries a safe, generic message — never the raw DB text — so registry internals are not leaked.
+     * faithful HTTP status: a data-integrity violation (e.g. a unique/constraint breach) conflicts
+     * with stored data → {@link RegistryConflictException} (409); a SQL grammar/programming error is
+     * a server defect → {@link IllegalStateException} (logged 500); everything else (connectivity,
+     * timeouts, pool exhaustion) is a transient outage -> {@link RegistryUnavailableException}. The
+     * conflict message is safe and generic — never the raw DB text — so registry internals are not
+     * leaked through it; the raw text stays in the cause for the server log.
      */
     private static RuntimeException translate(DataAccessException e, String context) {
         if (e instanceof DataIntegrityViolationException) {
-            return new IllegalArgumentException("The request conflicts with existing registry data");
+            return new RegistryConflictException("The request conflicts with existing registry data", e);
         }
         if (e instanceof BadSqlGrammarException) {
             return new IllegalStateException(context, e);

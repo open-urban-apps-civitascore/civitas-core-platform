@@ -4,6 +4,7 @@ import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
+import de.civitascore.modelforge.contract.CopyVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyQuery;
@@ -161,6 +162,19 @@ public class ModelRegistryGateway {
     return toPin(root);
   }
 
+  /**
+   * Copies one stored model version, with its styles and references, to a new major version
+   * numbered from the model's highest version.
+   *
+   * @param versionedUrn the CORE URN pinned to the version to copy
+   * @return the pin of the copy
+   * @throws ModelMissingException when the registry holds no such version
+   */
+  public ModelPin copyModelVersion(String versionedUrn) {
+    ArtifactId source = requireExisting(versionedUrn);
+    return toPin(modelForge.copyVersion(new CopyVersionCommand(source)).artifactId());
+  }
+
   private static void requireNoForeignDataStructureId(JsonNode content, UUID dataStructureId) {
     String id = content.path("$id").asText(null);
     if (isDataStructureUrn(id) && !dataStructureId.equals(UrnParser.idFromUrn(id))) {
@@ -256,10 +270,7 @@ public class ModelRegistryGateway {
    * @throws ModelMemberUnreachableException when members are not reachable from the root
    */
   public void requireSingleRoot(String modelUrn) {
-    ArtifactId model = new ArtifactId(modelUrn);
-    if (modelForge.existing(List.of(model)).isEmpty()) {
-      throw new ModelMissingException();
-    }
+    ArtifactId model = requireExisting(modelUrn);
     switch (modelForge.checkRoot(model)) {
       case RootCheck.Rooted _ -> {}
       case RootCheck.NoRoot _ -> throw new ModelRootMissingException();
@@ -294,11 +305,20 @@ public class ModelRegistryGateway {
    *
    * @param dataStructureId the id of the Data structure the model belongs to
    * @param modelUrn CORE URN of the stored model
+   * @throws ModelMissingException when the registry holds no such model
    */
   public List<ModelReference> foreignReferencesOf(UUID dataStructureId, String modelUrn) {
     return toModelReferences(
         modelForge.foreignReferences(
-            new ForeignReferencesQuery(dataStructureId, null, new ArtifactId(modelUrn))));
+            new ForeignReferencesQuery(dataStructureId, null, requireExisting(modelUrn))));
+  }
+
+  private ArtifactId requireExisting(String modelUrn) {
+    ArtifactId model = new ArtifactId(modelUrn);
+    if (modelForge.existing(List.of(model)).isEmpty()) {
+      throw new ModelMissingException();
+    }
+    return model;
   }
 
   private static List<ModelReference> toModelReferences(List<ForeignReference> references) {

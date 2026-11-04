@@ -10,7 +10,7 @@ import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.ArtifactSearchQuery;
-import de.civitascore.modelforge.contract.BumpVersionCommand;
+import de.civitascore.modelforge.contract.CopyVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.ImportSchemaCommand;
 import de.civitascore.modelforge.contract.SaveArtifactCommand;
@@ -41,6 +41,7 @@ import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -882,49 +883,99 @@ class EmbeddedModelForgeOperationsTest {
         assertThat(request.getValue().preserveVersion()).isFalse();
     }
 
-    /**
-     * A release carries the current version forward at the class the caller chose, and the pin it
-     * returns is the one the registry assigned.
-     */
+    private static final String STRUCTURE_TO_COPY =
+        "urn:core:platform:civitas:datastructure:common:4e0604c3-1372-884e-91a3-68ed0ec7aa03";
+    private static final String ELEMENT_TO_COPY =
+        "urn:core:platform:civitas:element:common:4e0604c3-1372-884e-91a3-68ed0ec7aa03";
+    private static final String GROUPING_OF_ELEMENT = STRUCTURE_TO_COPY;
+
     @Test
-    void bumpVersion_carriesTheCurrentVersionForwardAtTheRequestedClass() {
-        String logical = "urn:core:platform:civitas:datastructure:common:4e0604c3-1372-884e-91a3-68ed0ec7aa03";
-        when(registry.bumpVersion(logical, VersionBump.MAJOR)).thenReturn(logical + ":2.0.0");
-        when(registry.referencesByType(logical + ":2.0.0")).thenReturn(Map.of());
+    void copyVersion_logicalId_copiesTheCurrentVersion() {
+        when(registry.resolveReference(STRUCTURE_TO_COPY)).thenReturn(Optional.of(STRUCTURE_TO_COPY + ":2.0.0"));
+        when(registry.copyVersion(STRUCTURE_TO_COPY + ":2.0.0", null, Map.of())).thenReturn(STRUCTURE_TO_COPY + ":3.0.0");
 
-        var result = operations.bumpVersion(
-            new BumpVersionCommand(new ArtifactId(logical), VersionBump.MAJOR));
+        var result = operations.copyVersion(new CopyVersionCommand(new ArtifactId(STRUCTURE_TO_COPY)));
 
-        assertThat(result.artifactId().value()).isEqualTo(logical + ":2.0.0");
-        verify(registry).bumpVersion(logical, VersionBump.MAJOR);
+        assertThat(result.artifactId().value()).isEqualTo(STRUCTURE_TO_COPY + ":3.0.0");
     }
 
-    /** {@code :latest} names the current version, so it is a usable identity for a bump. */
     @Test
-    void bumpVersion_acceptsLatest() {
-        String logical = "urn:core:platform:civitas:datastructure:common:4e0604c3-1372-884e-91a3-68ed0ec7aa03";
-        when(registry.bumpVersion(logical, VersionBump.MINOR)).thenReturn(logical + ":1.1.0");
-        when(registry.referencesByType(logical + ":1.1.0")).thenReturn(Map.of());
+    void copyVersion_latest_copiesTheCurrentVersion() {
+        when(registry.resolveReference(STRUCTURE_TO_COPY)).thenReturn(Optional.of(STRUCTURE_TO_COPY + ":2.0.0"));
+        when(registry.copyVersion(STRUCTURE_TO_COPY + ":2.0.0", null, Map.of())).thenReturn(STRUCTURE_TO_COPY + ":3.0.0");
 
-        operations.bumpVersion(
-            new BumpVersionCommand(new ArtifactId(logical + ":latest"), VersionBump.MINOR));
+        var result = operations.copyVersion(new CopyVersionCommand(new ArtifactId(STRUCTURE_TO_COPY + ":latest")));
 
-        verify(registry).bumpVersion(logical, VersionBump.MINOR);
+        assertThat(result.artifactId().value()).isEqualTo(STRUCTURE_TO_COPY + ":3.0.0");
     }
 
-    /**
-     * Bumping from a version that is not current has no sound answer, and bumping from the current
-     * one instead would ignore the version the caller named, so a pinned identity is refused.
-     */
     @Test
-    void bumpVersion_refusesAPinnedIdentity() {
-        var command = new BumpVersionCommand(
-            new ArtifactId("urn:core:platform:civitas:datastructure:common:4e0604c3-1372-884e-91a3-68ed0ec7aa03:1.0.0"),
-            VersionBump.MINOR);
+    void copyVersion_versionedUrn_copiesThatVersion() {
+        when(registry.resolveReference(STRUCTURE_TO_COPY)).thenReturn(Optional.of(STRUCTURE_TO_COPY + ":2.0.0"));
+        when(registry.copyVersion(STRUCTURE_TO_COPY + ":1.0.0", null, Map.of())).thenReturn(STRUCTURE_TO_COPY + ":3.0.0");
 
-        assertThatThrownBy(() -> operations.bumpVersion(command))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("pins a version");
+        var result = operations.copyVersion(new CopyVersionCommand(new ArtifactId(STRUCTURE_TO_COPY + ":1.0.0")));
+
+        assertThat(result.artifactId().value()).isEqualTo(STRUCTURE_TO_COPY + ":3.0.0");
+    }
+
+    @Test
+    void copyVersion_unknownArtifact_isRefused() {
+        when(registry.resolveReference(STRUCTURE_TO_COPY)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> operations.copyVersion(new CopyVersionCommand(new ArtifactId(STRUCTURE_TO_COPY))))
+            .isInstanceOf(IllegalArgumentException.class);
+        verify(registry, never()).copyVersion(any(), any(), any());
+    }
+
+    @Test
+    void copyVersion_elementWithoutMatchingGrouping_copiesTheElementAlone() {
+        when(registry.resolveReference(ELEMENT_TO_COPY)).thenReturn(Optional.of(ELEMENT_TO_COPY + ":1.0.0"));
+        when(registry.ownedMemberUrns(GROUPING_OF_ELEMENT, "1.0.0")).thenReturn(List.of());
+        when(registry.copyVersion(ELEMENT_TO_COPY + ":1.0.0", null, Map.of())).thenReturn(ELEMENT_TO_COPY + ":2.0.0");
+
+        operations.copyVersion(new CopyVersionCommand(new ArtifactId(ELEMENT_TO_COPY)));
+
+        verify(registry, times(1)).copyVersion(any(), any(), any());
+    }
+
+    @Test
+    void copyVersion_elementHeldByItsGrouping_copiesBothAboveTheHigherVersionAndRetargetsTheGrouping() {
+        stubElementWithGroupingAhead();
+
+        var result = operations.copyVersion(new CopyVersionCommand(new ArtifactId(ELEMENT_TO_COPY + ":1.0.0")));
+
+        assertThat(result.artifactId().value()).isEqualTo(ELEMENT_TO_COPY + ":3.0.0");
+        var order = inOrder(registry);
+        order.verify(registry).lockForWrite(ELEMENT_TO_COPY);
+        order.verify(registry).lockForWrite(GROUPING_OF_ELEMENT);
+        order.verify(registry).copyVersion(ELEMENT_TO_COPY + ":1.0.0", "2.0.0", Map.of());
+        order.verify(registry).copyVersion(GROUPING_OF_ELEMENT + ":1.0.0", "1.0.0",
+            Map.of(ELEMENT_TO_COPY + ":1.0.0", ELEMENT_TO_COPY + ":3.0.0"));
+    }
+
+    @Test
+    void copyVersion_publishesBothCopiesOnlyThroughTheAfterCommitHook() {
+        stubElementWithGroupingAhead();
+
+        operations.copyVersion(new CopyVersionCommand(new ArtifactId(ELEMENT_TO_COPY + ":1.0.0")));
+
+        ArgumentCaptor<Runnable> publish = ArgumentCaptor.forClass(Runnable.class);
+        verify(registry).afterCommit(publish.capture());
+        verifyNoInteractions(graph);
+        publish.getValue().run();
+        verify(graph).registerFromRegistry(ELEMENT_TO_COPY + ":3.0.0");
+        verify(graph).registerFromRegistry(GROUPING_OF_ELEMENT + ":3.0.0");
+    }
+
+    /** Element 1.0.0 held by grouping 1.0.0, while the grouping's current version is 2.0.0. */
+    private void stubElementWithGroupingAhead() {
+        when(registry.resolveReference(ELEMENT_TO_COPY)).thenReturn(Optional.of(ELEMENT_TO_COPY + ":1.0.0"));
+        when(registry.ownedMemberUrns(GROUPING_OF_ELEMENT, "1.0.0")).thenReturn(List.of(ELEMENT_TO_COPY + ":1.0.0"));
+        when(registry.resolveReference(GROUPING_OF_ELEMENT)).thenReturn(Optional.of(GROUPING_OF_ELEMENT + ":2.0.0"));
+        when(registry.copyVersion(ELEMENT_TO_COPY + ":1.0.0", "2.0.0", Map.of())).thenReturn(ELEMENT_TO_COPY + ":3.0.0");
+        when(registry.copyVersion(GROUPING_OF_ELEMENT + ":1.0.0", "1.0.0",
+            Map.of(ELEMENT_TO_COPY + ":1.0.0", ELEMENT_TO_COPY + ":3.0.0"))).thenReturn(GROUPING_OF_ELEMENT + ":3.0.0");
     }
 
     // ── closure / existing ────────────────────────────────────────────────────

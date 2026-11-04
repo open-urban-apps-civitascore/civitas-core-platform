@@ -135,6 +135,11 @@ test_path_pattern_6_segment_versions_unrelease if {
 	result == "/v1/datastructures/{id}/versions/{id}/unrelease"
 }
 
+test_path_pattern_6_segment_versions_duplicate if {
+	result := portal_backend.path_pattern with input as portal_request("POST", "/v1/datastructures/dstr-123/versions/v-456/duplicate")
+	result == "/v1/datastructures/{id}/versions/{id}/duplicate"
+}
+
 test_path_pattern_7_segment_versions_released_meta if {
 	result := portal_backend.path_pattern with input as portal_request("PATCH", "/v1/datastructures/dstr-123/versions/v-456/released/meta")
 	result == "/v1/datastructures/{id}/versions/{id}/released/meta"
