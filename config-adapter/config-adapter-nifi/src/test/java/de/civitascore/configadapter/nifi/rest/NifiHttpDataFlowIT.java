@@ -112,6 +112,14 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
           "properties": { "id": { "type": "string" }, "name": { "type": "string" } } } }
       """;
 
+  /** Each entry is one record; a response that wraps its entries has no {@code id} of its own. */
+  private static final String ENTRY_RECORDS =
+      """
+      { "map-1": { "fields": { "$.id": "$.id", "$.name": "$.name" } },
+        "el-1": { "type": "object", "required": ["id"],
+          "properties": { "id": { "type": "string" }, "name": { "type": "string" } } } }
+      """;
+
   /**
    * A response is one record that holds the records under {@code data}, beside a cursor or a count;
    * the Mapping makes one row of each element of {@code data}.
@@ -377,6 +385,34 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
         .ignoreExceptions()
         .until(() -> names("http_next_link").equals(List.of("A", "B", "C")));
     assertEquals(0, wireMock.find(getRequestedFor(urlPathEqualTo("/must-not-follow"))).size());
+  }
+
+  @Test
+  void entriesPathDeliversOnlyTheEntriesOfEachResponse() throws Exception {
+    wireMock.register(
+        get(urlPathEqualTo("/entries"))
+            .willReturn(
+                okJson(
+                    "{\"links\":{\"next\":\"/entries-end\"},"
+                        + "\"data\":[{\"id\":\"s1\",\"name\":\"A\"},{\"id\":\"s2\",\"name\":\"B\"}]}")));
+    wireMock.register(
+        get(urlPathEqualTo("/entries-end"))
+            .willReturn(
+                okJson("{\"links\":{\"next\":null},\"data\":{\"id\":\"s3\",\"name\":\"C\"}}")));
+    deploy(
+        "http-entries",
+        map(
+            """
+        {"name":"readings","path":"/entries","entriesPath":"$.data",
+         "pagination":{"type":"NEXT_LINK","nextLinkPath":"$.links.next"}}
+        """),
+        ENTRY_RECORDS,
+        "http_entries");
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(2))
+        .ignoreExceptions()
+        .until(() -> names("http_entries").equals(List.of("A", "B", "C")));
   }
 
   @Test
@@ -1085,6 +1121,7 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
               "http_end_page",
               "http_next_link",
               "http_next_link_failed",
+              "http_entries",
               "http_cursor_query",
               "http_cursor_header",
               "http_offset_limit",

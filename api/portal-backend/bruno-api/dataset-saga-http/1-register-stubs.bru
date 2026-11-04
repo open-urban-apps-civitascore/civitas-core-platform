@@ -464,6 +464,81 @@ body:json {
             }
           }
         }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000073",
+        "metadata": {
+          "suite": "dataset-saga-http"
+        },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/entries",
+          "queryParameters": {
+            "page": {
+              "absent": true
+            }
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "jsonBody": {
+            "links": {
+              "next": "/dataset-saga-http/entries?page=2"
+            },
+            "data": [
+              {
+                "name": "HTTP saga entries station 1",
+                "description": "Delivered by the entries API call",
+                "properties": {
+                  "reference": "http-saga-entries-1"
+                }
+              },
+              {
+                "name": "HTTP saga entries station 2",
+                "description": "Delivered by the entries API call",
+                "properties": {
+                  "reference": "http-saga-entries-2"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "5a9a3c1e-2498-4000-8000-000000000074",
+        "metadata": {
+          "suite": "dataset-saga-http"
+        },
+        "request": {
+          "method": "GET",
+          "urlPath": "/dataset-saga-http/entries",
+          "queryParameters": {
+            "page": {
+              "equalTo": "2"
+            }
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "jsonBody": {
+            "links": {
+              "next": null
+            },
+            "data": {
+              "name": "HTTP saga entries station 3",
+              "description": "Delivered by the entries API call",
+              "properties": {
+                "reference": "http-saga-entries-3"
+              }
+            }
+          }
+        }
       }
     ]
   }
@@ -489,6 +564,7 @@ docs {
   | `pages` | `size` 2, `page` 0, 1, 2 | 200: two, two and one Thing |
   | `cursor-query` | `limit` 1, no `cursor`, `cursor` `abc123`, `def456` | 200: one Thing each |
   | `next-link` | no `page`, then `page` 2 | 200: one Thing each; the first holds a relative link object |
+  | `entries` | no `page`, then `page` 2 | 200: two Things in `data`, then one Thing in `data`; the first holds a link in `links.next` |
   | `cursor-header` | no `limit`, no `X-Cursor`, header `X-Cursor` `abc123` | 200: one Thing each |
   | `offset-limit` | `limit` 2, `offset` 80, 82, 84 | 200: two, two and one Thing |
   | `offset` | no `limit`, `offset` 0, 2, 3 | 200: two Things, one Thing, `[]` |
@@ -498,5 +574,7 @@ docs {
   Data source has one Data structure for all its API calls, and no Mapping comes between the
   source and the sink. A Thing holds the next cursor in `properties.next_cursor`: `abc123` and
   `def456` for `cursor-query`, then none; `abc123` for `cursor-header`, then an empty one. An
-  `offset-count` Thing holds the count 1 in `properties.count`.
+  `offset-count` Thing holds the count 1 in `properties.count`. The `entries` API call has the
+  path to entries `$.data`, so each element of `data`, or the object in `data`, is one Thing, and
+  `links` reaches no Data sink.
 }

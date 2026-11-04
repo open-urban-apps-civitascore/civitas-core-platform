@@ -1,7 +1,7 @@
 meta {
   name: 9b. Verify the Things in FROST via APISIX
   type: http
-  seq: 34
+  seq: 36
 }
 
 get {
@@ -17,6 +17,7 @@ script:pre-request {
   const url = `${bru.getVar('httpSagaPublicUrl')}/things/Things`;
   const expected = [
     'http-saga-next-link-1', 'http-saga-next-link-2',
+    'http-saga-entries-1', 'http-saga-entries-2', 'http-saga-entries-3',
     'http-saga-things-1', 'http-saga-things-2',
     'http-saga-pages-1', 'http-saga-pages-2', 'http-saga-pages-3', 'http-saga-pages-4',
     'http-saga-pages-5',
@@ -64,6 +65,12 @@ tests {
 
   test("FROST holds the Things of both responses of the next-link API call", function() {
     expect(references()).to.include.members(['http-saga-next-link-1', 'http-saga-next-link-2']);
+  });
+
+  test("FROST holds each entry of both responses of the entries API call", function() {
+    expect(references()).to.include.members([
+      'http-saga-entries-1', 'http-saga-entries-2', 'http-saga-entries-3'
+    ]);
   });
 
   test("FROST holds the Things of the things API call", function() {
