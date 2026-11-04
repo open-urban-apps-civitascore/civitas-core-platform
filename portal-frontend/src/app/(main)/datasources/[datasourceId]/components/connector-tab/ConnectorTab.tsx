@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 import { CONNECTOR_FIELD_REVALIDATION_RULES, ConnectorType } from '@/types/connectors'
 import { ConnectorFieldLabel, ConnectorFieldOption, DatasourceFormDraft } from '@/types/datasources'
+import { triggerKeepingServerErrors } from '@/utils/form'
 
 import { ConnectionTest } from './connection-test/ConnectionTest'
 import { CONNECTOR_INPUTS } from './connectorSources'
@@ -67,7 +68,10 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
     )
     const paths = changedRules.flatMap(rule => rule.revalidate)
     if (paths.length) {
-      void form.trigger(paths.map(path => `configuration.${path}` as Path<DatasourceFormDraft>))
+      void triggerKeepingServerErrors(
+        form,
+        paths.map(path => `configuration.${path}` as Path<DatasourceFormDraft>),
+      )
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectorType, JSON.stringify(watchedFieldValues)])

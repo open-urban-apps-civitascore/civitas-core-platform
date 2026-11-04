@@ -20,6 +20,7 @@ import {
   HttpApiCallsForm,
 } from '@/types/connectors'
 import { DatasourceFormDraft } from '@/types/datasources'
+import { triggerKeepingServerErrors } from '@/utils/form'
 
 import { ApiCallItem } from './ApiCallItem'
 
@@ -105,7 +106,7 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
     onCollapsedSectionsChange(removeEntryAndShift(collapsedSections, index))
     onApiCallRemove(index)
     remove(index)
-    void apiCallsForm.trigger(API_TOKEN_NAME_PATH)
+    void triggerKeepingServerErrors(apiCallsForm, API_TOKEN_NAME_PATH)
   }
 
   // getValues returns the live form objects, which change on input.
@@ -121,7 +122,7 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
       return
     }
     update(index, snapshot)
-    void apiCallsForm.trigger([`configuration.apiCalls.${index}`, API_TOKEN_NAME_PATH])
+    void triggerKeepingServerErrors(apiCallsForm, [`configuration.apiCalls.${index}`, API_TOKEN_NAME_PATH])
     handleClose(index)
   }
 

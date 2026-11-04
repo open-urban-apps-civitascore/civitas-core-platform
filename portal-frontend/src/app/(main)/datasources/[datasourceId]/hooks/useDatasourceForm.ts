@@ -48,7 +48,15 @@ import {
   isResourceInUseError,
   isStoredSecretRefusedError,
 } from '@/utils/errors'
-import { hasDirtyField, pickDirtyValues } from '@/utils/form'
+import {
+  clearServerErrors,
+  getServerErrors,
+  hasDirtyField,
+  pickDirtyValues,
+  restoreServerErrors,
+  SERVER_ERROR_TYPE,
+  triggerKeepingServerErrors,
+} from '@/utils/form'
 
 const REENTER_SECRET_MESSAGE = 'datasources.errors.reenterSecret'
 
@@ -143,6 +151,7 @@ export const useDatasourceForm = (
       form.resetField('connectorType')
       form.resetField('configuration')
     } else {
+      clearServerErrors(form)
       form.setValue('connectorType', connectorTypeWatch, {
         shouldDirty: true,
       })
@@ -181,7 +190,7 @@ export const useDatasourceForm = (
       return
     }
     const revalidate = async () => {
-      await form.trigger(['configuration.authentication', 'configuration.baseUrl'])
+      await triggerKeepingServerErrors(form, ['configuration.authentication', 'configuration.baseUrl'])
       setReenterSecretErrors()
     }
     void revalidate()
@@ -231,14 +240,16 @@ export const useDatasourceForm = (
   useEffect(() => {
     if (isDraftMode) {
       const nameError = form.formState.errors.name
+      const serverErrors = getServerErrors(form)
       form.clearErrors()
       if (nameError) {
         form.setError('name', nameError)
       }
+      restoreServerErrors(form, serverErrors)
       setReenterSecretErrors()
     } else {
       const revalidate = async () => {
-        await form.trigger()
+        await triggerKeepingServerErrors(form)
         setReenterSecretErrors()
       }
       void revalidate()
@@ -308,18 +319,6 @@ export const useDatasourceForm = (
     return { id, name: nameWatch, description, datapoolScope, assignments }
   }
 
-  const serverErrorPaths = useRef<string[]>([])
-
-  const clearServerErrors = () => {
-    for (const path of serverErrorPaths.current) {
-      const fieldPath = `configuration.${path}` as const
-      if (form.getFieldState(fieldPath).error?.message === REJECTED_BY_SERVER_MESSAGE) {
-        form.clearErrors(fieldPath)
-      }
-    }
-    serverErrorPaths.current = []
-  }
-
   const setMaskedSecretErrors = () => {
     const configuration = form.getValues('configuration')
     const maskedSecretPaths = HTTP_SECRET_PATHS.filter(path => get(configuration, path) === SECRET_PLACEHOLDER)
@@ -349,9 +348,9 @@ export const useDatasourceForm = (
       }
       const configuration = form.getValues('configuration')
       const formPaths = (getConnectorFieldErrorPaths(error) ?? []).map(path => toFormConnectorPath(path, configuration))
-      serverErrorPaths.current = formPaths.filter((path): path is string => !!path)
-      for (const path of serverErrorPaths.current) {
-        form.setError(`configuration.${path}`, { type: 'server', message: REJECTED_BY_SERVER_MESSAGE })
+      const serverErrorPaths = formPaths.filter((path): path is string => !!path)
+      for (const path of serverErrorPaths) {
+        form.setError(`configuration.${path}`, { type: SERVER_ERROR_TYPE, message: REJECTED_BY_SERVER_MESSAGE })
       }
       toast.error(t(isStoredSecretRefused ? 'errors.storedSecretRefused' : 'errors.updateError'))
       throw error
@@ -359,7 +358,7 @@ export const useDatasourceForm = (
   }
 
   const submitDatasource = async (onSuccess?: () => void): Promise<boolean> => {
-    clearServerErrors()
+    clearServerErrors(form)
     const values = form.getValues()
     const parsed = isDraftMode
       ? DatasourceFormDraftSchema.safeParse(values)

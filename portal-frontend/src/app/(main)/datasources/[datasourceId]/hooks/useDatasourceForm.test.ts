@@ -445,6 +445,23 @@ describe('useDatasourceForm with an HTTP connector', () => {
       expect(result.current.form.getValues('configuration.authentication')).toEqual(expected)
     })
 
+    it('keeps an error of the backend at the API host', async () => {
+      const { result } = renderHttpDatasourceForm(createHttpDatasource())
+      act(() =>
+        result.current.form.setError('configuration.baseUrl', {
+          type: 'server',
+          message: 'datasources.errors.rejectedByServer',
+        }),
+      )
+
+      await selectAuthenticationType(result, 'NONE')
+      await act(async () => {})
+
+      expect(result.current.form.getFieldState('configuration.baseUrl').error?.message).toBe(
+        'datasources.errors.rejectedByServer',
+      )
+    })
+
     it('creates the empty Basic fields for a loaded None', async () => {
       const datasource = createHttpDatasource()
       const { result } = renderHttpDatasourceForm({
@@ -720,6 +737,54 @@ describe('useDatasourceForm with an HTTP connector', () => {
       await submit(result)
 
       expect(result.current.form.getFieldState(pathField).error).toBeUndefined()
+    })
+
+    it('clears an error of the backend that moved to another row when the user saves again', async () => {
+      const { result } = renderDatasourceForm(createHttpDatasource())
+      const movedField = 'configuration.apiCalls.0.name' as Path<DatasourceFormDraft>
+      act(() => {
+        result.current.form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true })
+        result.current.form.setError(movedField, { type: 'server', message: 'datasources.errors.rejectedByServer' })
+      })
+
+      mockUpdateDatasource.mockRejectedValueOnce(mockApiError(500, 'Internal server error'))
+      await submit(result)
+
+      expect(result.current.form.getFieldState(movedField).error).toBeUndefined()
+    })
+
+    it.each(['AVAILABLE', 'DRAFT'] as const)(
+      'keeps an error of the backend when the status changes to %s',
+      async status => {
+        const { result } = renderDatasourceForm(createHttpDatasource())
+        const pathField = 'configuration.apiCalls.0.path' as Path<DatasourceFormDraft>
+        act(() => {
+          result.current.form.setError(pathField, { type: 'server', message: 'datasources.errors.rejectedByServer' })
+          result.current.handleStatusChange('AVAILABLE')
+        })
+        await act(async () => {})
+        if (status === 'DRAFT') {
+          act(() => result.current.handleStatusChange('DRAFT'))
+          await act(async () => {})
+        }
+
+        expect(result.current.form.getFieldState(pathField).error?.message).toBe('datasources.errors.rejectedByServer')
+      },
+    )
+
+    it('removes the errors of the backend when the connector type changes', async () => {
+      const { result } = renderDatasourceForm(createHttpDatasource())
+      act(() =>
+        result.current.form.setError('configuration.baseUrl', {
+          type: 'server',
+          message: 'datasources.errors.rejectedByServer',
+        }),
+      )
+
+      act(() => result.current.form.setValue('connectorType', 'SQL', { shouldDirty: true }))
+      await act(async () => {})
+
+      expect(result.current.form.formState.errors.configuration).toBeUndefined()
     })
 
     it('shows the general message for another update error', async () => {

@@ -20,6 +20,7 @@ import {
   HttpPaginationType,
   HttpParameterLocation,
 } from '@/types/connectors'
+import { triggerKeepingServerErrors } from '@/utils/form'
 
 type PageNumberField = Exclude<keyof HttpPageNumberPaginationForm, 'isEnabled' | 'type'>
 type CursorField = Exclude<keyof HttpCursorPaginationForm, 'isEnabled' | 'type' | 'cursorIn'>
@@ -87,7 +88,8 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
   const type = useWatch({ control: form.control, name: `${paginationPath}.type` })
   const isCursor = type === HTTP_PAGINATION_TYPES.CURSOR
 
-  const revalidateParameterNameCollisions = () => void form.trigger([...getParameterNameCollisionPaths(index)])
+  const revalidateParameterNameCollisions = () =>
+    void triggerKeepingServerErrors(form, [...getParameterNameCollisionPaths(index)])
 
   const handleChangeAndRevalidate = <T,>(value: T, onChange: (value: T) => void) => {
     onChange(value)

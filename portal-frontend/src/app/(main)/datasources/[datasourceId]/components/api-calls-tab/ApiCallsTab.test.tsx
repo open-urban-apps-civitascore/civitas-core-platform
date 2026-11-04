@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
-import { useForm, UseFormReturn, useFormState } from 'react-hook-form'
+import { Path, useForm, UseFormReturn, useFormState } from 'react-hook-form'
 import { toast } from 'sonner'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -112,8 +112,22 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
   const resetForm = () => act(() => form?.reset(defaultValues))
   const remount = () => act(() => remountTab?.())
   const getApiTokenNameError = () => form?.getFieldState('configuration.authentication.name').error?.message
-  return { user: userEvent.setup(), getApiCalls, isDirty, resetForm, remount, getApiTokenNameError }
+  const getError = (path: string) => form?.getFieldState(path as Path<DatasourceFormDraft>).error?.message
+  const setServerError = (path: string) =>
+    act(() => form?.setError(path as Path<DatasourceFormDraft>, { type: 'server', message: SERVER_ERROR }))
+  return {
+    user: userEvent.setup(),
+    getApiCalls,
+    isDirty,
+    resetForm,
+    remount,
+    getApiTokenNameError,
+    getError,
+    setServerError,
+  }
 }
+
+const SERVER_ERROR = 'datasources.errors.rejectedByServer'
 
 const DISABLED_INPUT_CLASSES = DISABLED_INPUT_CLASS_NAME.split(' ')
 const DISABLED_CHECKBOX_CLASSES = DISABLED_CHECKBOX_CLASS_NAME.split(' ')
@@ -411,6 +425,49 @@ describe('ApiCallsTab', () => {
         { name: 'limit', value: '' },
       ],
       headers: [{ name: '', value: '' }],
+    })
+  })
+
+  describe('error of the backend at a header', () => {
+    const API_CALL_WITH_HEADERS: HttpApiCallForm = {
+      ...API_CALL,
+      headers: [
+        { name: 'Accept', value: 'application/json' },
+        { name: 'X-Test', value: '5 €' },
+      ],
+    }
+
+    it('keeps the error at the same header when the user removes another header', async () => {
+      const { user, getError, setServerError } = renderApiCallsTab({ apiCalls: [API_CALL_WITH_HEADERS] })
+      await openApiCall(user)
+      setServerError('configuration.apiCalls.0.headers.1.value')
+
+      await user.click(screen.getAllByRole('button', { name: 'parameters.header remove' })[0])
+
+      await waitFor(() => expect(getError('configuration.apiCalls.0.headers.0.value')).toBe(SERVER_ERROR))
+      expect(screen.getByText(SERVER_ERROR)).toBeInTheDocument()
+    })
+
+    it('keeps the error when the user changes the name of another header', async () => {
+      const { user, getApiCalls, getError, setServerError } = renderApiCallsTab({ apiCalls: [API_CALL_WITH_HEADERS] })
+      await openApiCall(user)
+      setServerError('configuration.apiCalls.0.headers.1.value')
+
+      await user.type(screen.getAllByRole('textbox', { name: 'parameters.header name' })[0], '-2')
+      await act(async () => {})
+
+      expect(getApiCalls()?.[0].headers[0].name).toBe('Accept-2')
+      expect(getError('configuration.apiCalls.0.headers.1.value')).toBe(SERVER_ERROR)
+    })
+
+    it('removes the error when the user edits the header', async () => {
+      const { user, getError, setServerError } = renderApiCallsTab({ apiCalls: [API_CALL_WITH_HEADERS] })
+      await openApiCall(user)
+      setServerError('configuration.apiCalls.0.headers.1.value')
+
+      await user.clear(screen.getAllByRole('textbox', { name: 'parameters.header value' })[1])
+
+      await waitFor(() => expect(getError('configuration.apiCalls.0.headers.1.value')).toBeUndefined())
     })
   })
 
