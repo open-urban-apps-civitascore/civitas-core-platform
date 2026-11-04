@@ -109,12 +109,8 @@ final class ApiCallClient {
     try {
       content =
           nonEmpty(
-              Optional.ofNullable(response.body())
-                  .map(
-                      body ->
-                          new IdleTimeoutInputStream(
-                              body, bodyReadTimeout, () -> discard(response)))
-                  .orElse(null));
+              new IdleTimeoutInputStream(
+                  response.body(), bodyReadTimeout, () -> discard(response)));
     } catch (IOException e) {
       discard(response);
       return ApiCallOutcome.Failure.ofTransport(request, e);
@@ -128,9 +124,6 @@ final class ApiCallClient {
 
   /** The body from its first byte, or empty when the first read gives the end of the stream. */
   private static Optional<InputStream> nonEmpty(InputStream body) throws IOException {
-    if (body == null) {
-      return Optional.empty();
-    }
     PushbackInputStream content = new PushbackInputStream(body);
     int first = content.read();
     if (first == -1) {
