@@ -34,6 +34,7 @@ body:json {
         {
           "name": "links",
           "path": "/links",
+          "entriesPath": "$..data",
           "pagination": {
             "type": "NEXT_LINK",
             "nextLinkPath": "$..next",
@@ -58,6 +59,7 @@ tests {
       "connector.apiCalls[0].pagination.cursorPath",
       "connector.apiCalls[2].pagination.nextLinkPath",
       "connector.apiCalls[2].pagination.maxLinks",
+      "connector.apiCalls[2].entriesPath",
       "connector.apiCalls[1].pagination.offsetParameter",
       "connector.apiCalls[1].pagination.countPath"
     ]);

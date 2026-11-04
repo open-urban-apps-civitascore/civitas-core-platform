@@ -31,16 +31,16 @@ class HttpConnectorRulesTest {
   private final HttpConnectorRules rules = new HttpConnectorRules();
 
   private static ApiCall named(String name) {
-    return new ApiCall(name, null, "/x", null, null, null);
+    return new ApiCall(name, null, "/x", null, null, null, null);
   }
 
   private static ApiCall withHeaders(Parameter... headers) {
-    return new ApiCall("a", null, "/x", null, List.of(headers), null);
+    return new ApiCall("a", null, "/x", null, List.of(headers), null, null);
   }
 
   private static ApiCall withPages(Integer startPage, Integer endPage) {
     return new ApiCall(
-        null, null, "/x", null, null, new PageNumber("page", "size", 10, startPage, endPage));
+        null, null, "/x", null, null, null, new PageNumber("page", "size", 10, startPage, endPage));
   }
 
   private static ApiCall paged(
@@ -52,6 +52,7 @@ class HttpConnectorRulesTest {
         null,
         "/x",
         queryParameters,
+        null,
         null,
         new PageNumber(pageParameter, pageSizeParameter, 10, null, null));
   }
@@ -131,7 +132,7 @@ class HttpConnectorRulesTest {
 
   private static ApiCall sending(
       List<Parameter> queryParameters, List<Parameter> headers, Pagination pagination) {
-    return new ApiCall(null, null, "/x", queryParameters, headers, pagination);
+    return new ApiCall(null, null, "/x", queryParameters, headers, null, pagination);
   }
 
   @ParameterizedTest
@@ -345,7 +346,7 @@ class HttpConnectorRulesTest {
   @Test
   void validate_withPaginationParameterNamesMissingInADraft_reportsNothing() {
     ApiCall withoutQueryParameters =
-        new ApiCall(null, null, "/x", null, null, new PageNumber(null, null, 10, null, null));
+        new ApiCall(null, null, "/x", null, null, null, new PageNumber(null, null, 10, null, null));
 
     assertThat(validate(withoutQueryParameters, paged(null, null, (String) null))).isEmpty();
   }

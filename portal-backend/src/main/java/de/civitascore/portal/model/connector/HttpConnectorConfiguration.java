@@ -326,6 +326,16 @@ public record HttpConnectorConfiguration(
                   Parameter>
               headers,
       @Schema(
+              description =
+                  "JSON path in the response to the entries. Only member names and array"
+                      + " indexes. An array at the path holds one entry in each element, an object"
+                      + " is one entry, and [] or null holds none. The Data structure describes one"
+                      + " entry, and the pipeline receives only the entries. The paths of the"
+                      + " pagination start at the top of the response. Absent or null takes the"
+                      + " whole response.",
+              example = "$.data")
+          @Pattern(regexp = JSON_PATH, message = "'entriesPath'" + JSON_PATH_MESSAGE) String entriesPath,
+      @Schema(
               description = "Pagination of the API call. Absent or null is no pagination.",
               oneOf = {PageNumber.class, LimitOffset.class, Cursor.class, NextLink.class})
           @Valid Pagination pagination) {
@@ -336,6 +346,7 @@ public record HttpConnectorConfiguration(
       path = ConnectorValues.blankToNull(path);
       queryParameters = ConnectorValues.listOf(queryParameters, "queryParameters");
       headers = ConnectorValues.listOf(headers, "headers");
+      entriesPath = ConnectorValues.blankToNull(entriesPath);
     }
   }
 

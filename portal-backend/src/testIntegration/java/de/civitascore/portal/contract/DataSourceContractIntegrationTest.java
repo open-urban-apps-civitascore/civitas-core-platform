@@ -778,6 +778,53 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
       exchange(HttpMethod.DELETE, path + id, null);
     }
 
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(
+        delimiter = '|',
+        value = {
+          "$.data | $.data",
+          "$['result set'].items[0] | $['result set'].items[0]",
+          "' ' | ",
+        })
+    @DisplayName("creates, reads, updates and releases the path to entries")
+    void entriesPathIsStoredAndReleased(String entriesPath, String stored) throws Exception {
+      JSONObject apiCall =
+          new JSONObject()
+              .put("name", "items")
+              .put("path", "/items")
+              .put("entriesPath", entriesPath)
+              .put(
+                  "pagination",
+                  new JSONObject(
+                      "{\"type\":\"CURSOR\",\"cursorPath\":"
+                          + "\"$.next\",\"cursorParameter\":\"c\",\"cursorIn\":\"QUERY\"}"));
+      String connector =
+          new JSONObject(connector("p")).put("apiCalls", new JSONArray().put(apiCall)).toString();
+      UUID dsvId = createAvailableDataStructureVersionId();
+      String path = DATASOURCES_ENDPOINT + "/";
+      List<String> responses = new ArrayList<>();
+
+      responses.add(
+          exchange(
+              HttpMethod.POST,
+              DATASOURCES_ENDPOINT,
+              body("contract_http_entries", connector, dsvId)));
+      String id = JsonPath.read(responses.getFirst(), "$.id");
+      responses.add(exchange(HttpMethod.GET, path + id, null));
+      responses.add(
+          exchange(HttpMethod.PUT, path + id, body("contract_http_entries", connector, dsvId)));
+      responses.add(exchange(HttpMethod.POST, path + id + "/release", null));
+
+      for (String response : responses) {
+        assertThat((String) JsonPath.read(response, "$.connector.apiCalls[0].entriesPath"))
+            .isEqualTo(stored);
+      }
+      assertThat((String) JsonPath.read(readStoredConfiguration(id), "$.apiCalls[0].entriesPath"))
+          .isEqualTo(stored);
+      exchange(HttpMethod.POST, path + id + "/unrelease", null);
+      exchange(HttpMethod.DELETE, path + id, null);
+    }
+
     @ParameterizedTest(name = "{1}")
     @CsvSource(
         delimiter = '|',
@@ -794,6 +841,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
           "null | [{'pagination':{'type':'NEXT_LINK','maxLinks':0}}] | connector.apiCalls[0].pagination.maxLinks",
           "null | [{'pagination':{'type':'CURSOR','cursorPath':'$..cursor'}}]"
               + " | connector.apiCalls[0].pagination.cursorPath",
+          "null | [{'entriesPath':'$.data[*]'}] | connector.apiCalls[0].entriesPath",
           "null | [{'pagination':{'type':'CURSOR','cursorParameter':'c','cursorIn':'QUERY',"
               + "'limitParameter':'c'}}] | connector.apiCalls[0].pagination.limitParameter",
           "null | [{'headers':[{'name':'X-Cursor','value':'1'}],'pagination':{'type':'CURSOR',"

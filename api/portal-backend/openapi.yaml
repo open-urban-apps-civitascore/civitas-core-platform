@@ -12551,6 +12551,17 @@ components:
       type: object
       description: A GET request against the API host.
       properties:
+        entriesPath:
+          type: string
+          description: "JSON path in the response to the entries. Only member names\
+            \ and array indexes. An array at the path holds one entry in each element,\
+            \ an object is one entry, and [] or null holds none. The Data structure\
+            \ describes one entry, and the pipeline receives only the entries. The\
+            \ paths of the pagination start at the top of the response. Absent or\
+            \ null takes the whole response."
+          example: $.data
+          pattern: "^\\$(\\.[A-Za-z_][A-Za-z0-9_-]*|\\['[^'\\\\]+'\\]|\\[[0-9]+\\\
+            ])+$"
         headers:
           type: array
           description: "Request headers, sent as given. A name is a header token and\

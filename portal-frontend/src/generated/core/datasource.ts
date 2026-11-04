@@ -247,6 +247,8 @@ export const HttpApiCallSchema = z
     queryParameters: z.union([z.array(HttpParameterSchema), z.null()]).optional(),
     /** Request headers, in clear text. */
     headers: z.union([z.array(HttpParameterSchema), z.null()]).optional(),
+    /** Restricted JSON path in the response to the entries: an array holds one entry in each element, an object is one entry, [] or null holds none. The paths of the pagination start at the top of the response. Null takes the whole response. */
+    entriesPath: z.union([z.string(), z.null()]).optional(),
     /** Pagination of the API call, chosen by 'type'; null for none. */
     pagination: z
       .union([
