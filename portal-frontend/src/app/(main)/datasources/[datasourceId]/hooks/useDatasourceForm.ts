@@ -394,7 +394,7 @@ export const useDatasourceForm = (
       const coreDoc = { connectionType: connectorType.toLowerCase(), ...connectorFields }
       const coreValid = DataSourceDraftSchema.safeParse(coreDoc)
       if (!coreValid.success) {
-        console.error('DataSource configuration failed CORE schema validation:', coreValid.error.issues, coreDoc)
+        console.error('DataSource configuration failed CORE schema validation:', coreValid.error.issues)
         handleFormValidationError(coreValid.error)
         return false
       }
