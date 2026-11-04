@@ -142,6 +142,34 @@ Content-Type: application/json
 
 ---
 
+## TC-DSTV-06 – Delete DataStructure Version
+
+**Precondition:** `dataStructureId` and `duplicatedVersionId` are set (TC-DSTV-10 ran). Nothing
+references the duplicate.
+
+**Request**
+```
+DELETE {{baseUrl}}/datastructures/:dataStructureId/versions/:id
+```
+
+**Expected Response**
+- Status: `204 No Content`
+- A version that a Data source, Data sink, Mapping or other model references, on any revision of
+  its model: `409 Conflict` with type `RESOURCE_IN_USE`
+- A version of another data structure: `404 Not Found`
+
+**Verification:** Issue TC-DSTV-02 for `duplicatedVersionId` and confirm a `404` response.
+
+**System Impact**
+
+| System | Expected Change | Verified |
+|---|---|---|
+| Backend | Version record removed from `portal_backend` DB; its model with every revision removed from the model registry | ☐ |
+| Config Adapter | — | ☐ |
+| External System | — | ☐ |
+
+---
+
 ## TC-DSTV-07 – Release DataStructure Version
 
 **Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in draft state.

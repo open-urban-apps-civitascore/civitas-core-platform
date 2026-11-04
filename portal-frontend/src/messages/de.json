@@ -39,6 +39,7 @@
       "deleteItem": "{item} löschen",
       "remove": "Entfernen",
       "removeItem": "{item} entfernen",
+      "duplicateItem": "{item} duplizieren",
       "add": "Hinzufügen",
       "edit": "Bearbeiten",
       "editBase": "Basis bearbeiten",
@@ -1383,10 +1384,12 @@
     "messages": {
       "createSuccess": "Die Version der Datenstruktur wurde erfolgreich angelegt.",
       "updateSuccess": "Die Version der Datenstruktur wurde erfolgreich aktualisiert.",
+      "duplicateSuccess": "Die Version wurde erfolgreich dupliziert.",
       "isAvailableModelHint": "Die Versionsinformationen und die Strukturdefinition können nicht bearbeitet werden, da diese Version bereits den Status 'Verfügbar' hat."
     },
     "errors": {
       "creationError": "Beim Anlegen der Version der Datenstruktur ist ein Fehler aufgetreten.",
+      "duplicationError": "Beim Duplizieren der Version der Datenstruktur ist ein Fehler aufgetreten.",
       "saveInvalidModel": "Die Version kann nicht gespeichert werden: {reason}",
       "modelRootMissingError": "Die Version kann nicht auf \"Verfügbar\" gesetzt werden, weil ihr gespeichertes Modell keine Wurzelklasse hat. Markieren Sie die Wurzelklasse im Diagramm, speichern Sie die Version und setzen Sie sie dann auf \"Verfügbar\".",
       "modelMemberUnreachableError": "Die Version kann nicht auf \"Verfügbar\" gesetzt werden, weil diese Klassen nicht mit der Wurzelklasse verbunden sind: {names}. Verbinden Sie sie mit der Wurzelklasse oder entfernen Sie sie, speichern Sie die Version und setzen Sie sie dann auf \"Verfügbar\".",

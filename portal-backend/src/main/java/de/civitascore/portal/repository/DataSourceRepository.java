@@ -32,17 +32,9 @@ public interface DataSourceRepository extends NamedEntityRepository<DataSource, 
    */
   boolean existsByDataStructureVersionId(UUID dataStructureVersionId);
 
-  /**
-   * Check if any data source references any of the given data structure version IDs.
-   *
-   * @param versionIds the collection of data structure version IDs to check
-   * @return true if at least one data source references any of the given versions
-   */
-  @Query(
-      "SELECT CASE WHEN EXISTS("
-          + "SELECT 1 FROM DataSource ds WHERE ds.dataStructureVersion.id IN :versionIds"
-          + ") THEN true ELSE false END")
-  boolean existsByDataStructureVersionIdIn(@Param("versionIds") Collection<UUID> versionIds);
+  /** The data sources of any status that are pinned to the given version. */
+  @Query("SELECT ds.id FROM DataSource ds WHERE ds.dataStructureVersion.id = :versionId")
+  List<UUID> findIdsByDataStructureVersionId(@Param("versionId") UUID versionId);
 
   boolean existsByScopedDataPools_Id(UUID datapoolId);
 

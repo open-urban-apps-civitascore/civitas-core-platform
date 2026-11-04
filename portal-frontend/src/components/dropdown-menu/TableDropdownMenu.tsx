@@ -16,6 +16,7 @@ type DropDownMenuItem = {
   label: string
   onClick?: () => void
   icon?: LucideIcon
+  disabled?: boolean
 }
 
 interface TableDropdownMenuProps {
@@ -40,6 +41,7 @@ export const TableDropdownMenu = (props: TableDropdownMenuProps) => {
               <DropdownMenuItem
                 key={item.label}
                 onSelect={item.onClick}
+                disabled={item.disabled}
                 className={`hover:cursor-pointer ${isLastItem ? '' : 'border-b border-gray-200 rounded-none'}`}
               >
                 {Icon && <Icon className="mr-2 h-4 w-4" />}

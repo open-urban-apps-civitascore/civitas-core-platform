@@ -1,6 +1,7 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 
+import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { InUseIndicator } from '@/components/in-use-indicator/InUseIndicator'
 import { StatusBadge } from '@/components/status/status-badge/StatusBadge'
 import { DataTable } from '@/components/table/DataTable'
@@ -13,12 +14,17 @@ import { resolveUpdater } from '@/utils/table'
 interface VersionsTableProps extends TableProps<DatastructureVersionsListData> {
   datastructureId: string
   versions: DatastructureVersionsListData[]
+  isReadOnly: boolean
+  isDuplicating: boolean
+  onDuplicateVersionClick: (versionId: string) => void
 }
 
 export const VersionsTable = (props: VersionsTableProps) => {
   const {
     datastructureId,
     versions,
+    isReadOnly,
+    isDuplicating,
     rowCount,
     pageIndex,
     totalPages,
@@ -27,6 +33,7 @@ export const VersionsTable = (props: VersionsTableProps) => {
     rowSelection,
     onPaginationChange,
     onSortingChange,
+    onDuplicateVersionClick,
   } = props
   const t = useTranslations('datastructures')
   const tVersion = useTranslations('datastructureVersions')
@@ -95,6 +102,29 @@ export const VersionsTable = (props: VersionsTableProps) => {
         style: {
           width: '5%',
           minWidth: '120px',
+        },
+      },
+    }),
+    columnHelper.display({
+      id: 'actions',
+      cell: ({ row }) =>
+        isReadOnly ? null : (
+          <TableDropdownMenu
+            classNameDropdownContent="w-50"
+            menuItems={[
+              {
+                label: tCommon('actions.duplicateItem', { item: tCommon('items.datastructureVersion') }),
+                onClick: () => onDuplicateVersionClick(row.original.id),
+                disabled: isDuplicating,
+              },
+            ]}
+          />
+        ),
+      meta: {
+        style: {
+          width: '50px',
+          minWidth: '50px',
+          textAlign: 'right',
         },
       },
     }),

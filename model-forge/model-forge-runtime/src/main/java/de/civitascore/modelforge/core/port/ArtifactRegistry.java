@@ -45,7 +45,8 @@ public interface ArtifactRegistry {
      * back. The surrounding transaction may be a host's own one that {@link #inTransaction} joined,
      * so the action waits for that commit, not for {@code inTransaction} to return. Without a
      * surrounding transaction, the action runs at once; an implementation that has no transactions
-     * keeps that default.
+     * keeps that default. An action that fails after the commit is logged; it neither fails the
+     * committed change nor stops the actions registered after it.
      */
     default void afterCommit(Runnable action) {
         action.run();
@@ -102,9 +103,10 @@ public interface ArtifactRegistry {
      * @param refs               {@code $ref} composition edges (schema-ref)
      * @param associationTargets concrete {@code x-core-ref} association (foreign-key) edges
      * @param explicitVersion    when non-blank, stored verbatim instead of Model Forge's usual
-     *     version authority (1.0.0 for a new artifact, otherwise the next SemVer from
-     *     {@code bump}) — the escape hatch for imports (e.g. XÖV) that must preserve an upstream
-     *     version identity. Accepted as given, with no ordering check against the current version.
+     *     version authority (1.0.0 for a new artifact, or the next major after the highest version
+     *     its URN ever had; otherwise the next SemVer from {@code bump}) — the escape hatch for
+     *     imports (e.g. XÖV) that must preserve an upstream version identity. Accepted as given,
+     *     with no ordering check against the current version or the numbers deleted before.
      * @param bumpFromVersion    the existing version {@code bump} counts from; {@code null} counts
      *     from the artifact's newest version. A caller whose versions of this artifact form
      *     independent lines names the version it revises here, so the bump stays inside that line.
@@ -154,8 +156,8 @@ public interface ArtifactRegistry {
      * unchanged apart from {@code retargets}, so the byte-identical short-circuit the store methods
      * rely on would otherwise make this a no-op.
      *
-     * <p>The copy is numbered at the next MAJOR version above the artifact's highest version, or
-     * above {@code countAbove} when that is higher. Copies of several artifacts that each pass the
+     * <p>The copy is numbered at the next MAJOR version above the highest version the artifact ever
+     * had, or above {@code countAbove} when that is higher. Copies of several artifacts that each pass the
      * highest version of the others therefore share one number.
      *
      * @param sourcePin the Versioned URN of the version to copy
@@ -170,6 +172,25 @@ public interface ArtifactRegistry {
     String copyVersion(String sourcePin, String countAbove, Map<String, String> retargets);
 
     void deleteArtifact(String urn);
+
+    /** The versions the registry holds of the artifact, lowest first; empty when it holds none. */
+    List<String> versionsOf(String urn);
+
+    /**
+     * The versioned URNs of every version, of any artifact and whether current or not, that owns
+     * any of these pinned versions, as {@link #ownedMemberUrns(String, String)} reads ownership.
+     */
+    List<String> versionOwners(Collection<String> pinnedUrns);
+
+    /**
+     * Deletes the given versions of the artifact, with their representations and outgoing
+     * references, and moves its current version to the highest version left. A reference that
+     * pinned a deleted version stays, unresolved. The numbers stay taken.
+     *
+     * @throws IllegalArgumentException when no version would be left; that is
+     *     {@link #deleteArtifact}
+     */
+    void deleteVersions(String urn, Collection<String> versions);
 
     /**
      * Logical URNs of artifacts whose stored references point at the given artifact and therefore
@@ -196,6 +217,17 @@ public interface ArtifactRegistry {
      * the artifact as a whole, which is the question a delete asks.
      */
     List<String> nonDataSetBlockingDependents(String urn, String targetVersion);
+
+    /**
+     * Live non-DataSet referrers of versions selected for deletion. References from versions in
+     * {@code removedPins} do not block. An unpinned reference from {@code siblingUrns} does not block
+     * while another version of its target survives; explicit pins from surviving versions do.
+     * A referrer is live when current, an Element or Data Structure version, or pinned by a reference.
+     */
+    List<String> versionDeletionBlockers(Collection<String> removedPins, Collection<String> siblingUrns);
+
+    /** Pinned member versions owned by the given versions and by no version outside that set. */
+    List<String> exclusivelyOwnedMemberVersions(Collection<String> ownerPins);
 
     /** Logical URNs of the DataSets this artifact is a member of ({@code dataset-ref} in-edges). */
     List<String> dataSetMemberships(String urn);

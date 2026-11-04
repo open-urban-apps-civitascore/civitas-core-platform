@@ -5,6 +5,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -52,6 +53,22 @@ class ArtifactVersionRepository {
             .param("description", v.description())
             .param("createdAt", RegistryTime.toOffset(v.createdAt()))
             .param("createdBy", v.createdBy())
+            .update();
+    }
+
+    /** Every version string the artifact holds, in no particular order. */
+    List<String> listVersions(UUID artifactId) {
+        return jdbc.sql("select version from model_forge.artifact_version where artifact_id = :aid")
+            .param("aid", artifactId)
+            .query(String.class)
+            .list();
+    }
+
+    /** Deletes the given versions; their representations and outgoing references cascade. */
+    void delete(UUID artifactId, Collection<String> versions) {
+        jdbc.sql("delete from model_forge.artifact_version where artifact_id = :aid and version in (:versions)")
+            .param("aid", artifactId)
+            .param("versions", versions)
             .update();
     }
 

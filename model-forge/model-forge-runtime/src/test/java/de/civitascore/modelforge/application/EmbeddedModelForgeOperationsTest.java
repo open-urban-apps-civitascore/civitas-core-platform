@@ -42,6 +42,8 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -68,6 +70,10 @@ class EmbeddedModelForgeOperationsTest {
     void setUp() {
         registry = mock(ArtifactRegistry.class);
         when(registry.inTransaction(any())).thenAnswer(call -> call.getArgument(0, Supplier.class).get());
+        doAnswer(call -> {
+            call.getArgument(0, Runnable.class).run();
+            return null;
+        }).when(registry).afterCommit(any());
         graph = mock(DependencyGraphService.class);
         var refExtractor = mock(SchemaRefExtractor.class);
         when(refExtractor.extractRefs(any())).thenReturn(Set.of());
@@ -308,6 +314,31 @@ class EmbeddedModelForgeOperationsTest {
         verify(registry).deleteArtifact(orphanLogical);
         verify(registry, org.mockito.Mockito.never()).deleteArtifact(shared);
         verify(registry, org.mockito.Mockito.never()).deleteArtifact(sharedLogical);
+    }
+
+    @Test
+    void deleteVersionLine_refusesAnIdThatPinsNoVersion() {
+        String logical = "urn:core:platform:civitas:datastructure:common:d9d0d267-d8e1-8d73-8b58-4307281607ac";
+
+        for (String unpinned : List.of(logical, logical + ":latest")) {
+            assertThatThrownBy(() -> operations.deleteVersionLine(new ArtifactId(unpinned)))
+                .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> operations.versionLineDeletionBlockers(new ArtifactId(unpinned)))
+                .isInstanceOf(IllegalArgumentException.class);
+        }
+        verify(registry, never()).deleteVersions(anyString(), any());
+        verify(registry, never()).deleteArtifact(anyString());
+    }
+
+    @Test
+    void deleteVersionLine_ofALineTheRegistryDoesNotHoldDeletesNothing() {
+        String pin = "urn:core:platform:civitas:datastructure:common:d9d0d267-d8e1-8d73-8b58-4307281607ac:3.0.0";
+        when(registry.versionsOf(UrnParser.logicalUrn(pin))).thenReturn(List.of("1.0.0", "2.0.0"));
+
+        operations.deleteVersionLine(new ArtifactId(pin));
+
+        verify(registry, never()).deleteVersions(anyString(), any());
+        verify(registry, never()).deleteArtifact(anyString());
     }
 
     /** A Data Set the caller holds, the Mapping it names, and the Data Set that holds that Mapping. */
@@ -957,6 +988,7 @@ class EmbeddedModelForgeOperationsTest {
     @Test
     void copyVersion_publishesBothCopiesOnlyThroughTheAfterCommitHook() {
         stubElementWithGroupingAhead();
+        doNothing().when(registry).afterCommit(any());
 
         operations.copyVersion(new CopyVersionCommand(new ArtifactId(ELEMENT_TO_COPY + ":1.0.0")));
 

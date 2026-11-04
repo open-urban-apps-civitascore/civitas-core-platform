@@ -52,6 +52,13 @@ final class SemVer {
         return 0;
     }
 
+    /** The higher of two versions by {@link #compare}; a null one loses. */
+    static String higher(String a, String b) {
+        if (a == null) return b;
+        if (b == null) return a;
+        return compare(a, b) >= 0 ? a : b;
+    }
+
     /** {@code [major, minor, patch]}; absent/non-numeric segments become {@code 0}. */
     private static int[] parse(String version) {
         int[] out = new int[3];

@@ -137,6 +137,16 @@ class EmbeddedModelForgeTest {
                 }
 
                 @Override
+                public void deleteVersionLine(ArtifactId pinnedVersion) {
+                    // no-op fake
+                }
+
+                @Override
+                public List<String> versionLineDeletionBlockers(ArtifactId pinnedVersion) {
+                    return List.of();
+                }
+
+                @Override
                 public List<ArtifactSummary> orphans(de.civitascore.modelforge.contract.ArtifactKind kind) {
                     return List.of();
                 }

@@ -34,7 +34,8 @@ abstract class AbstractRegistryDatabaseTest {
 
     /** Every table the registry writes, in a fixed order so snapshots compare deterministically. */
     protected static final List<String> REGISTRY_TABLES = List.of(
-        "artifact", "artifact_version", "artifact_representation", "artifact_reference", "xsd_namespace");
+        "artifact", "artifact_version", "artifact_representation", "artifact_reference", "xsd_namespace",
+        "version_high_water");
 
     private static final PostgreSQLContainer POSTGRES;
 
@@ -108,7 +109,11 @@ abstract class AbstractRegistryDatabaseTest {
 
     /** Rows of one registry table in a stable order. */
     protected List<Map<String, Object>> rows(String table) {
-        String orderBy = "xsd_namespace".equals(table) ? "namespace" : "id";
+        String orderBy = switch (table) {
+            case "xsd_namespace" -> "namespace";
+            case "version_high_water" -> "logical_urn";
+            default -> "id";
+        };
         return jdbc.sql("select * from " + SCHEMA + "." + table + " order by " + orderBy).query().listOfRows();
     }
 

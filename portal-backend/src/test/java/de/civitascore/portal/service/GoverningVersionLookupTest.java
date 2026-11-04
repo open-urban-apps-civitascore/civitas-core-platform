@@ -37,13 +37,6 @@ class GoverningVersionLookupTest {
   void setUp() {
     lookup = new GoverningVersionLookup(dataStructureVersionRepository, modelRegistryGateway);
     lenient()
-        .when(modelRegistryGateway.logicalUrn(anyString()))
-        .thenAnswer(
-            call -> {
-              String urn = call.getArgument(0);
-              return urn.substring(0, urn.lastIndexOf(':'));
-            });
-    lenient()
         .when(modelRegistryGateway.modelIdOf(anyString()))
         .thenReturn(Optional.of(STRUCTURE_ID));
   }
@@ -101,7 +94,6 @@ class GoverningVersionLookupTest {
   @DisplayName("a pin naming no version is governed by whatever the structure holds")
   void anUnversionedPinTakesWhateverIsHeld() {
     records(record("1.0.0", DataStructureVersionStatus.AVAILABLE));
-    when(modelRegistryGateway.logicalUrn(LOGICAL)).thenReturn(LOGICAL);
 
     assertThat(lookup.governing(LOGICAL)).isPresent();
   }

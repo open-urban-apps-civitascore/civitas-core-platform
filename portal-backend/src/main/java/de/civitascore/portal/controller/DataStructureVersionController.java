@@ -134,13 +134,31 @@ public class DataStructureVersionController
   }
 
   /**
-   * Single versions are deleted only together with their data structure; the service delete logic
-   * stays so that this endpoint can be enabled again.
+   * Deletes a data structure version together with its model in the model registry.
+   *
+   * @param id the UUID of the version to delete
    */
   @Override
-  @Operation(hidden = true)
+  @Operation(
+      operationId = "deleteDataStructureVersion",
+      summary = "Delete a data structure version",
+      description =
+          "Deletes a DRAFT or AVAILABLE version that nothing uses, and its model with every"
+              + " revision of it from the model registry. A deleted version number is not given"
+              + " out again. The data structure stays, also without versions.")
+  @ApiResponse(responseCode = "204", description = "Data structure version deleted successfully")
+  @ApiResponse(
+      responseCode = "404",
+      description = "Data structure version not found in this data structure",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "The version is in use: a Data source, Data sink, Mapping or other model references it",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public void delete(@PathVariable UUID id) {
-    throw new MethodNotAllowedException(HttpMethod.DELETE, Collections.emptySet());
+    requireOwnedByPathDataStructure(id);
+    super.delete(id);
   }
 
   /**

@@ -8,7 +8,7 @@ import de.civitascore.portal.model.output.DataStructureOutputDTO;
 import de.civitascore.portal.model.output.summary.DataStructureVersionUsageSummaryDTO;
 import de.civitascore.portal.service.ArtifactUsageLookup;
 import de.civitascore.portal.service.ArtifactUsageLookup.ArtifactUsage;
-import java.util.Map;
+import de.civitascore.portal.service.ArtifactUsageLookup.DataStructureUsage;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -38,14 +38,13 @@ public class DataStructureAssembler
    */
   @Override
   public DataStructureOutputDTO enrichDto(DataStructureOutputDTO dto, DataStructure entity) {
-    Map<UUID, ArtifactUsage> usageByVersion = artifactUsageLookup.ofEachVersion(entity);
+    DataStructureUsage usage = artifactUsageLookup.ofStructureAndVersions(entity);
     dto.setDataStructureVersions(
         entity.getDataStructureVersions().stream()
-            .map(version -> toVersionRow(version, usageByVersion.get(version.getId())))
+            .map(version -> toVersionRow(version, usage.versions().get(version.getId())))
             .toList());
-    ArtifactUsage usage = ArtifactUsage.anyOf(usageByVersion.values());
-    dto.setInUse(usage.inUse());
-    dto.setInUseByReleased(usage.inUseByReleased());
+    dto.setInUse(usage.structure().inUse());
+    dto.setInUseByReleased(usage.structure().inUseByReleased());
     return dto;
   }
 
