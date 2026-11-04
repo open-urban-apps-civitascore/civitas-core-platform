@@ -48,12 +48,12 @@ pipeline refreshes the merge request.
 and the ruleset in `.spectral.yaml`: the Spectral OpenAPI rules, the
 [OWASP API Security rules](https://github.com/stoplightio/spectral-owasp-ruleset), and the
 conventions of this API. Its findings show in the Code Quality widget of the merge request.
-To lint the spec of a locally running backend, set the two versions from `.gitlab-ci.yml`:
+Spectral and the OWASP ruleset are locked in `package-lock.json` in this directory. Spectral
+loads the ruleset from `node_modules` next to `.spectral.yaml`. To lint the spec of a locally
+running backend:
 
 ```sh
-npm install --no-save --prefix api/portal-backend \
-  @stoplight/spectral-cli@$SPECTRAL_CLI_VERSION \
-  @stoplight/spectral-owasp-ruleset@$SPECTRAL_OWASP_RULESET_VERSION
+npm ci --ignore-scripts --prefix api/portal-backend
 curl -s http://localhost:8089/v1/api-docs.yaml -o /tmp/openapi.yaml
 api/portal-backend/node_modules/.bin/spectral lint /tmp/openapi.yaml \
   --ruleset api/portal-backend/.spectral.yaml

@@ -19,6 +19,7 @@
         - .gitlab/ci/model-forge.yml # Also run when model-forge changes since backend depends on it
         - .gitlab/ci/openapi.yml
         - api/portal-backend/.spectral.yaml
+        - api/portal-backend/package*.json
 
 # portal-backend compiles against portal-model, model-forge and config-adapter as they are built in
 # this pipeline: the jobs below need the artifacts of build-portal-model, build-model-forge and

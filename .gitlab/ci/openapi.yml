@@ -60,10 +60,8 @@ lint-openapi-spec:
   variables:
     GIT_DEPTH: 1
   script:
-    # Spectral resolves the rulesets that .spectral.yaml extends from the directory of that file
-    - npm install --no-save --no-audit --no-fund --loglevel=error --prefix api/portal-backend
-      @stoplight/spectral-cli@$SPECTRAL_CLI_VERSION
-      @stoplight/spectral-owasp-ruleset@$SPECTRAL_OWASP_RULESET_VERSION
+    # On protected branches this job receives OPENAPI_BOT_TOKEN, so no dependency may run a script
+    - npm ci --ignore-scripts --no-audit --no-fund --loglevel=error --prefix api/portal-backend
     - api/portal-backend/node_modules/.bin/spectral lint openapi.generated.yaml
       --ruleset api/portal-backend/.spectral.yaml
       -f text -o.text spectral-report.txt
