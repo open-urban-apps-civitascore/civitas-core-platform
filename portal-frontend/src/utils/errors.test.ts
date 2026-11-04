@@ -1,3 +1,4 @@
+import { AxiosError } from 'axios'
 import { describe, expect, it } from 'vitest'
 
 import { mockApiError } from '@/__mocks__/errors/apiError.mock'
@@ -14,6 +15,7 @@ import {
   isSagaInFlightError,
   isTableNameConflictError,
   isUnconfirmedDataLossError,
+  toConnectionTestProblem,
   unreachableModelMembers,
 } from './errors'
 
@@ -365,5 +367,49 @@ describe('unreachableModelMembers', () => {
   it('returns null for a 400 error with a different type', () => {
     const error = mockApiError(400, 'No root', 'urn:civitas:error:MODEL_ROOT_MISSING')
     expect(unreachableModelMembers(error)).toBeNull()
+  })
+})
+
+describe('toConnectionTestProblem', () => {
+  it('returns the code and the messages of the field errors for a 400 validation error', () => {
+    const error = mockApiError(400, 'Input validation failed', 'urn:civitas:error:VALIDATION_FAILED', {
+      fieldErrors: [
+        { field: 'connector.host', message: 'must not be blank' },
+        { field: 'connector.port', message: 'must be greater than 0' },
+      ],
+    })
+    expect(toConnectionTestProblem(error)).toEqual({
+      code: 'VALIDATION_FAILED',
+      details: ['Input validation failed', 'must not be blank', 'must be greater than 0'],
+    })
+  })
+
+  it('returns the code and the detail for a 429 error', () => {
+    const error = mockApiError(429, 'A connection test is running already', 'urn:civitas:error:TOO_MANY_REQUESTS')
+    expect(toConnectionTestProblem(error)).toEqual({
+      code: 'TOO_MANY_REQUESTS',
+      details: ['A connection test is running already'],
+    })
+  })
+
+  it('drops an empty field error message when there is no detail', () => {
+    const error = mockApiError(400, undefined, 'urn:civitas:error:VALIDATION_FAILED', {
+      fieldErrors: [{ field: 'connector.table', message: '' }],
+    })
+    expect(toConnectionTestProblem(error)).toEqual({ code: 'VALIDATION_FAILED', details: [] })
+  })
+
+  it('returns UNKNOWN for a type without a colon', () => {
+    const error = mockApiError(500, 'Server error', 'INTERNAL_ERROR')
+    expect(toConnectionTestProblem(error)).toEqual({ code: 'UNKNOWN', details: ['Server error'] })
+  })
+
+  it('returns UNKNOWN without details for a network error without response', () => {
+    const error = new AxiosError('Network Error', AxiosError.ERR_NETWORK)
+    expect(toConnectionTestProblem(error)).toEqual({ code: 'UNKNOWN', details: [] })
+  })
+
+  it('returns UNKNOWN without details for non-axios errors', () => {
+    expect(toConnectionTestProblem(new Error('plain error'))).toEqual({ code: 'UNKNOWN', details: [] })
   })
 })

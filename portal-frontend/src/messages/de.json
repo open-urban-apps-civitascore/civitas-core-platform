@@ -1239,6 +1239,36 @@
         "password": {
           "label": "Passwort"
         }
+      },
+      "connectionTest": {
+        "title": "Verbindungstest",
+        "button": "Verbindung testen",
+        "incompleteHint": "Alle Pflichtfelder ausfüllen, um die Verbindung zu testen.",
+        "httpIncompleteHint": "Alle Pflichtfelder in den Tabs „Konnektor“ und „API-Aufrufe“ ausfüllen, um die Verbindung zu testen.",
+        "invalidHint": "Die Konfiguration enthält ungültige Werte. Prüfen Sie auch die API-Aufrufe.",
+        "connecting": "Verbindung wird aufgebaut …",
+        "outdatedPending": "Die Konfiguration wurde geändert. Der laufende Verbindungstest wird verworfen. Danach können Sie erneut testen.",
+        "testAgain": "Erneut testen",
+        "success": "Verbindung erfolgreich hergestellt",
+        "failure": "Verbindung fehlgeschlagen",
+        "cause": "Ursache:",
+        "details": "Details:",
+        "httpStatus": "HTTP-Status: {status}",
+        "previewTruncated": "Vorschau gekürzt.",
+        "reenterPassword": "Die Konfiguration wurde geändert. Geben Sie das Passwort erneut ein, um die Verbindung zu testen.",
+        "causes": {
+          "INVALID_CONNECTOR": "Die Konfiguration ist ungültig.",
+          "SOURCE_ERROR": "Die Quelle ist nicht erreichbar oder hat mit einem Fehler geantwortet.",
+          "TIMEOUT": "Die Quelle hat nicht rechtzeitig geantwortet.",
+          "VALIDATION_FAILED": "Nicht alle Pflichtfelder sind gültig ausgefüllt.",
+          "MALFORMED_REQUEST": "Die Anfrage konnte nicht verarbeitet werden.",
+          "FORBIDDEN": "Keine Berechtigung für diesen Verbindungstest.",
+          "NOT_FOUND": "Die Datenquelle wurde nicht gefunden.",
+          "TOO_MANY_REQUESTS": "Es laufen bereits Verbindungstests. Bitte später erneut versuchen.",
+          "EXTERNAL_SYSTEM_ERROR": "Der Verbindungstest konnte nicht ausgeführt werden.",
+          "EXTERNAL_SYSTEM_TIMEOUT": "Der Verbindungstest hat zu lange gedauert.",
+          "UNKNOWN": "Unbekannter Fehler."
+        }
       }
     },
     "dataModel": {

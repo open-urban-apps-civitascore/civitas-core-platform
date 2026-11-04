@@ -1,5 +1,7 @@
 import { isAxiosError } from 'axios'
 
+import { ConnectionTestProblem } from '@/types/connectionTest'
+
 type ApiError = {
   type: string
   title: 'Conflict' | string
@@ -93,6 +95,24 @@ export const isUnconfirmedDataLossError = (error: unknown) => {
 export const isLayerNameError = (error: unknown) => {
   const problem = problemWithStatus(error, 409)
   return !!problem && problem.detail.includes('with layerName') && problem.detail.includes('already exists')
+}
+
+const UNKNOWN_ERROR_CODE = 'UNKNOWN'
+
+const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value !== ''
+
+const fieldErrorMessage = (fieldError: unknown) =>
+  typeof fieldError === 'object' && fieldError !== null && 'message' in fieldError ? fieldError.message : undefined
+
+export const toConnectionTestProblem = (error: unknown): ConnectionTestProblem => {
+  if (!isAxiosError(error)) return { code: UNKNOWN_ERROR_CODE, details: [] }
+  const data = error.response?.data as (Partial<ApiError> & { fieldErrors?: unknown }) | undefined
+  const type = typeof data?.type === 'string' ? data.type : ''
+  const code = type.includes(':') ? type.slice(type.lastIndexOf(':') + 1) : ''
+  const fieldErrors = Array.isArray(data?.fieldErrors) ? data.fieldErrors : []
+  const fieldMessages = fieldErrors.map(fieldErrorMessage)
+  const details = [data?.detail, ...fieldMessages]
+  return { code: code || UNKNOWN_ERROR_CODE, details: details.filter(isNonEmptyString) }
 }
 
 export class LayerSaveError extends Error {
