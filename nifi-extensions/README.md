@@ -254,7 +254,9 @@ null, or of the type `PAGE_NUMBER`, `CURSOR` or `LIMIT_OFFSET`:
   A `limitParameter` and a `limit` of at least 1 are optional, but one needs the other. A
   `countPath` is optional; a blank one is absent.
 
-A JSON path such as `cursorPath` or `countPath` starts with `$` and holds only member names
+An `entriesPath` is optional; a blank one is absent.
+
+A JSON path such as `entriesPath`, `cursorPath` or `countPath` starts with `$` and holds only member names
 (`$.next_cursor`), quoted member names (`$['next cursor']`) and array indexes (`$.data[0].id`). This
 is the grammar of the portal backend; the processor evaluates no filter, wildcard or recursive
 descent. The names that a pagination sends differ from each other and from the names of the API call
@@ -435,6 +437,36 @@ processor stays valid and scheduled but sends no request, NiFi raises an error b
 `Failed to properly initialize Processor` with the `InvalidRecordSchemaException` as its cause and
 tries again after the `Administrative Yield Duration`. The runtime monitor publishes this bulletin
 as an `ERROR` event of the Pipeline.
+
+### Path to entries
+
+With an `entriesPath`, for example `$.data`, the records of each response lie at that path. The
+value at the path gives the records:
+
+- A JSON array: each element is one record.
+- A JSON object: one record.
+- `[]` or `null`: no records. The run continues as for a response `[]` with the same pagination.
+- No value, or a JSON number, string or boolean: `stop`. The cause names the path and the type it
+  found, never a value of the response.
+- A response that holds the path twice, through a repeated member name: `stop`.
+
+The FlowFile on `success` holds the value at the path with the bytes of the response: an array
+stays an array, an object stays an object, and `null` gives `[]`. The rest of the response is not
+in the FlowFile, and `Record Schema` validates only the records. Without an `entriesPath`, each
+pagination reads the response as its section below says.
+
+`cursorPath`, `nextLinkPath` and `countPath` start at the top of the response, not at the path to
+entries. Without a `countPath`, page-number and limit/offset pagination count the records at the
+path. A `countPath` that leads to the same value as `entriesPath`, also when one of them quotes a
+member name, counts those records. Any other pagination path that leads to the value at
+`entriesPath`, or to a value around it, goes to `stop`, because its value would be the records. A
+pagination path inside a record reads its value from that record.
+
+The processor reads the response one token at a time and keeps at most one record in memory, as for
+a response that is a JSON array. It reads the values at the pagination paths in the same read, and
+skips every other part of the response. It cuts the FlowFile from the byte offsets of the value, so
+a response with an `entriesPath` must be UTF-8, as RFC 8259 section 8.1 requires; any other encoding
+goes to `stop`.
 
 ### Pagination
 

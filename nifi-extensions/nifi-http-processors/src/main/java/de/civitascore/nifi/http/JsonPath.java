@@ -63,10 +63,29 @@ final class JsonPath {
     return path;
   }
 
+  /** Empty for a blank text, as for {@link #required} otherwise. */
+  static Optional<JsonPath> optional(String text, String keyPath, List<String> violations) {
+    return text == null || text.isBlank() ? Optional.empty() : required(text, keyPath, violations);
+  }
+
+  /** Whether both paths lead to the same value, also when one quotes a member name. */
+  boolean leadsToTheSameValueAs(JsonPath other) {
+    return segments.equals(other.segments);
+  }
+
   /** The value at the path, or a {@link MissingNode} when a step finds nothing. */
   JsonNode valueIn(JsonNode root) {
-    JsonNode current = root;
-    for (Segment segment : segments) {
+    return valueIn(root, 0);
+  }
+
+  /**
+   * The value at the path, from the value at a location that the path starts with.
+   *
+   * @param depth the number of segments of that location, as {@link #depth} gives it
+   */
+  JsonNode valueIn(JsonNode value, int depth) {
+    JsonNode current = value;
+    for (Segment segment : segments.subList(depth, segments.size())) {
       current =
           segment.name() != null ? current.path(segment.name()) : current.path(segment.index());
     }
@@ -75,14 +94,35 @@ final class JsonPath {
 
   /** Whether the current value of a parser, in the given context, is the value at the path. */
   boolean isAt(JsonStreamContext context) {
+    return depth(context) == segments.size() && startsWith(context);
+  }
+
+  /** Whether the value at the path lies inside the current value of a parser. */
+  boolean isInside(JsonStreamContext context) {
+    return depth(context) < segments.size() && startsWith(context);
+  }
+
+  /**
+   * The number of member names and array indexes from the root to the current value of a parser in
+   * the given context.
+   */
+  static int depth(JsonStreamContext context) {
+    int depth = 0;
+    for (JsonStreamContext current = context; !current.inRoot(); current = current.getParent()) {
+      depth++;
+    }
+    return depth;
+  }
+
+  private boolean startsWith(JsonStreamContext context) {
     JsonStreamContext current = context;
-    for (int i = segments.size() - 1; i >= 0; i--) {
-      if (current == null || !segments.get(i).isAt(current)) {
+    for (int i = depth(context) - 1; i >= 0; i--) {
+      if (!segments.get(i).isAt(current)) {
         return false;
       }
       current = current.getParent();
     }
-    return current != null && current.inRoot();
+    return true;
   }
 
   @Override

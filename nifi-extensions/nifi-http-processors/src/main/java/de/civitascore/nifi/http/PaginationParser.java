@@ -42,6 +42,8 @@ final class PaginationParser {
    *     the pagination must not repeat
    * @param headers the headers of the API call, which the header names of the pagination must not
    *     repeat
+   * @param entriesPath a count path that leads to the same value counts the entries, as no count
+   *     path does
    * @param violations receives one violation for each broken rule
    * @return {@link SinglePage} when the pagination is absent, empty when it breaks a rule
    */
@@ -49,6 +51,7 @@ final class PaginationParser {
       JsonPagination pagination,
       List<Parameter> queryParameters,
       List<Parameter> headers,
+      Optional<JsonPath> entriesPath,
       List<String> violations) {
     if (pagination == null) {
       return Optional.of(new SinglePage());
@@ -57,7 +60,7 @@ final class PaginationParser {
     return switch (pagination.type()) {
       case PAGE_NUMBER -> pageNumber(pagination, names, violations);
       case CURSOR -> cursor(pagination, names, violations);
-      case LIMIT_OFFSET -> limitOffset(pagination, names, violations);
+      case LIMIT_OFFSET -> limitOffset(pagination, names, entriesPath, violations);
       case NEXT_LINK -> nextLink(pagination, violations);
       case null, default -> {
         violations.add(
@@ -138,7 +141,10 @@ final class PaginationParser {
   }
 
   private static Optional<Pagination> limitOffset(
-      JsonPagination pagination, PaginationNames names, List<String> violations) {
+      JsonPagination pagination,
+      PaginationNames names,
+      Optional<JsonPath> entriesPath,
+      List<String> violations) {
     int before = violations.size();
     Optional<Limit> limit = limit(pagination, names, violations);
     addRequiredQueryName(pagination.offsetParameter(), OFFSET_PARAMETER, names, violations);
@@ -147,11 +153,9 @@ final class PaginationParser {
     if (offset < 0) {
       violations.add("pagination.offset must be at least 0");
     }
-    String countPathText = blankToNull(pagination.countPath());
     Optional<JsonPath> countPath =
-        countPathText == null
-            ? Optional.empty()
-            : JsonPath.required(countPathText, COUNT_PATH, violations);
+        JsonPath.optional(pagination.countPath(), COUNT_PATH, violations)
+            .filter(path -> entriesPath.filter(path::leadsToTheSameValueAs).isEmpty());
     if (violations.size() > before) {
       return Optional.empty();
     }

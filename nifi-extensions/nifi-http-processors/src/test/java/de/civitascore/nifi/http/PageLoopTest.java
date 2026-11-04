@@ -12,6 +12,7 @@ package de.civitascore.nifi.http;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class PageLoopTest {
@@ -20,7 +21,13 @@ class PageLoopTest {
   void constructor_withMaxPagesBelow1_throws() {
     ApiCall apiCall =
         new ApiCall(
-            "Stations", HttpMethod.GET, "/stations", List.of(), List.of(), new SinglePage());
+            "Stations",
+            HttpMethod.GET,
+            "/stations",
+            List.of(),
+            List.of(),
+            Optional.empty(),
+            new SinglePage());
 
     assertThrows(
         IllegalArgumentException.class,

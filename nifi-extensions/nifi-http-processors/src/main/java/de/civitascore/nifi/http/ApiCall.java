@@ -10,12 +10,15 @@
 package de.civitascore.nifi.http;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * One API call of an HTTP/REST Data source, read from the {@code API Call} property and checked.
  *
  * @param queryParameters in the order the request sends them, repeated names included
  * @param headers in the order the request sends them
+ * @param entriesPath where each response holds its records; empty when the response holds them as
+ *     {@link Pagination#shape()} says
  */
 record ApiCall(
     String name,
@@ -23,11 +26,20 @@ record ApiCall(
     String path,
     List<Parameter> queryParameters,
     List<Parameter> headers,
+    Optional<JsonPath> entriesPath,
     Pagination pagination) {
 
   ApiCall {
     queryParameters = List.copyOf(queryParameters);
     headers = List.copyOf(headers);
+  }
+
+  /** What each 2xx body of a run must be, and how it holds its records. */
+  ResponseShape shape() {
+    return entriesPath
+        .<ResponseShape>map(
+            entries -> new ResponseShape.EntriesAt(entries, pagination.shape().paths()))
+        .orElseGet(pagination::shape);
   }
 
   /**

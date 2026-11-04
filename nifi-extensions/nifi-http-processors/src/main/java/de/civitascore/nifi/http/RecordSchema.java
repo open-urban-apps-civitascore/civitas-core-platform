@@ -11,20 +11,25 @@ package de.civitascore.nifi.http;
 
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonStreamContext;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.MissingNode;
+import com.fasterxml.jackson.databind.node.NullNode;
 import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaException;
 import com.networknt.schema.ValidationMessage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.processor.ProcessSession;
@@ -97,24 +102,26 @@ final class RecordSchema {
         return new Verdict.Empty();
       }
       Verdict verdict =
-          switch (first) {
-            case START_ARRAY -> {
-              if (shape instanceof ResponseShape.RecordObject) {
-                parser.skipChildren();
-                yield new Verdict.WrongType("array", shape.expected());
-              }
-              yield elements(parser);
-            }
-            case START_OBJECT -> {
-              if (shape instanceof ResponseShape.RecordArray) {
-                parser.skipChildren();
-                yield new Verdict.WrongType("object", shape.expected());
-              }
-              yield object(parser, shape);
-            }
-            case VALUE_NULL -> new Verdict.Empty();
-            default -> new Verdict.WrongType(scalarType(first), shape.expected());
-          };
+          shape instanceof ResponseShape.EntriesAt entriesAt && first != JsonToken.VALUE_NULL
+              ? new EntriesReader(parser, entriesAt).read()
+              : switch (first) {
+                case START_ARRAY -> {
+                  if (shape instanceof ResponseShape.RecordObject) {
+                    parser.skipChildren();
+                    yield new Verdict.WrongType("array", shape.expected());
+                  }
+                  yield elements(parser);
+                }
+                case START_OBJECT -> {
+                  if (shape instanceof ResponseShape.RecordArray) {
+                    parser.skipChildren();
+                    yield new Verdict.WrongType("object", shape.expected());
+                  }
+                  yield object(parser, shape);
+                }
+                case VALUE_NULL -> new Verdict.Empty();
+                default -> new Verdict.WrongType(scalarType(first), shape.expected());
+              };
       return parser.nextToken() == null ? verdict : new Verdict.Rejected(NOT_JSON);
     } catch (IOException e) {
       // Also CharConversionException, which Jackson throws for bytes that look like UTF-32. NiFi
@@ -130,7 +137,7 @@ final class RecordSchema {
         token = parser.nextToken()) {
       violations.add(recordViolations(parser, token));
     }
-    return violations.verdict(Map.of(), Map.of());
+    return violations.verdict(Map.of(), Map.of(), Optional.empty());
   }
 
   /** A response that is one record, whose tree is in memory for the validation anyway. */
@@ -139,7 +146,7 @@ final class RecordSchema {
     JsonNode record = RECORD_READER.readTree(numbers);
     Violations violations = new Violations();
     violations.add(violations(record));
-    return violations.verdict(shape.valuesIn(record), numbers.texts());
+    return violations.verdict(shape.valuesIn(record), numbers.texts(), Optional.empty());
   }
 
   private List<String> recordViolations(JsonParser parser, JsonToken token) throws IOException {
@@ -156,6 +163,142 @@ final class RecordSchema {
       violations.add(ViolationText.describe(message));
     }
     return violations;
+  }
+
+  /**
+   * Reads a response whose records lie at the path to entries. It reads a tree only for one entry
+   * at a time and for the value at a path of the pagination, and skips the rest of the response.
+   */
+  private final class EntriesReader {
+
+    private final NumberTextParser parser;
+    private final JsonPath entriesPath;
+    private final List<JsonPath> paths;
+    private final Map<JsonPath, JsonNode> values = new HashMap<>();
+    private final Violations violations = new Violations();
+    private Optional<PageContent.Span> entries = Optional.empty();
+    private boolean found;
+
+    EntriesReader(JsonParser parser, ResponseShape.EntriesAt shape) {
+      this.parser = new NumberTextParser(parser, shape.paths());
+      this.entriesPath = shape.entriesPath();
+      this.paths = shape.paths();
+      for (JsonPath path : paths) {
+        values.put(path, MissingNode.getInstance());
+      }
+    }
+
+    /** Leaves the parser at the last token of the response. */
+    Verdict read() throws IOException {
+      for (JsonToken token = parser.currentToken(); ; token = parser.nextToken()) {
+        if (token != JsonToken.FIELD_NAME && !token.isStructEnd()) {
+          Optional<String> rejection = value(token);
+          if (rejection.isPresent()) {
+            skipToTheEnd();
+            return new Verdict.Rejected(rejection.get());
+          }
+        }
+        if (parser.getParsingContext().inRoot()) {
+          break;
+        }
+      }
+      if (!found) {
+        return new Verdict.Rejected("the response has no value at " + entriesPath);
+      }
+      return violations.verdict(values, parser.texts(), entries);
+    }
+
+    /**
+     * Reads the value that starts at {@code token}, or only its first token when the parser must
+     * descend into it to reach a path.
+     */
+    private Optional<String> value(JsonToken token) throws IOException {
+      JsonStreamContext location = location(token);
+      Optional<JsonPath> holder = paths.stream().filter(path -> path.isAt(location)).findFirst();
+      boolean holdsEntries = entriesPath.isAt(location) || entriesPath.isInside(location);
+      if (token.isStructStart() && holdsEntries && holder.isPresent()) {
+        return Optional.of(
+            "the value at " + holder.get() + " must not hold the path to entries " + entriesPath);
+      }
+      if (entriesPath.isAt(location)) {
+        return entriesAt(token, location);
+      }
+      if (holder.isPresent()) {
+        capture(location);
+      } else if (token.isStructStart()
+          && !holdsEntries
+          && paths.stream().noneMatch(path -> path.isInside(location))) {
+        parser.skipChildren();
+      }
+      return Optional.empty();
+    }
+
+    private Optional<String> entriesAt(JsonToken token, JsonStreamContext location)
+        throws IOException {
+      if (found) {
+        return Optional.of("the response holds more than one value at " + entriesPath);
+      }
+      found = true;
+      if (token == JsonToken.VALUE_NULL) {
+        capture(location);
+        return Optional.empty();
+      }
+      if (!token.isStructStart()) {
+        return Optional.of(
+            "the value at "
+                + entriesPath
+                + " is a JSON "
+                + scalarType(token)
+                + ", not an object or an array");
+      }
+      long start = parser.currentTokenLocation().getByteOffset();
+      if (start < 0) {
+        return Optional.of("the response is not UTF-8");
+      }
+      if (token == JsonToken.START_ARRAY) {
+        for (JsonToken element = parser.nextToken();
+            element != JsonToken.END_ARRAY;
+            element = parser.nextToken()) {
+          JsonNode entry = capture(location(element));
+          violations.add(entry.isObject() ? violations(entry) : List.of("type"));
+        }
+      } else {
+        violations.add(violations(capture(location)));
+      }
+      entries =
+          Optional.of(
+              new PageContent.Span(start, parser.currentLocation().getByteOffset() - start));
+      return Optional.empty();
+    }
+
+    /**
+     * Reads the value at {@code location} as a tree, and takes from it the value of each path that
+     * starts at the location.
+     */
+    private JsonNode capture(JsonStreamContext location) throws IOException {
+      int depth = JsonPath.depth(location);
+      List<JsonPath> within =
+          paths.stream().filter(path -> path.isAt(location) || path.isInside(location)).toList();
+      JsonNode value = RECORD_READER.readTree(parser);
+      JsonNode tree = value == null ? NullNode.getInstance() : value;
+      for (JsonPath path : within) {
+        values.put(path, path.valueIn(tree, depth));
+      }
+      return tree;
+    }
+
+    /** Skips to the last token of the response, so that a JSON error still comes first. */
+    private void skipToTheEnd() throws IOException {
+      while (!parser.getParsingContext().inRoot()) {
+        parser.nextToken();
+      }
+    }
+
+    /** The context of the current value; Jackson opens a context of its own for a container. */
+    private JsonStreamContext location(JsonToken token) {
+      JsonStreamContext context = parser.getParsingContext();
+      return token.isStructStart() ? context.getParent() : context;
+    }
   }
 
   private static String scalarType(JsonToken scalar) {
@@ -215,9 +358,12 @@ final class RecordSchema {
       records++;
     }
 
-    Verdict verdict(Map<JsonPath, JsonNode> values, Map<JsonPath, String> numberTexts) {
+    Verdict verdict(
+        Map<JsonPath, JsonNode> values,
+        Map<JsonPath, String> numberTexts,
+        Optional<PageContent.Span> entries) {
       if (invalid == 0) {
-        return new Verdict.Agrees(new PageContent(records, values, numberTexts));
+        return new Verdict.Agrees(new PageContent(records, values, numberTexts, entries));
       }
       return new Verdict.Rejected(
           invalid

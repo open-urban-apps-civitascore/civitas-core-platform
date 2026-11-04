@@ -60,6 +60,24 @@ sealed interface ResponseShape {
     }
   }
 
+  /**
+   * The value at a path holds the records: a JSON array one in each element, a JSON object one,
+   * {@code null} none. The rest of the response holds no record.
+   *
+   * @param paths the paths whose values the pagination reads from the response
+   */
+  record EntriesAt(JsonPath entriesPath, List<JsonPath> paths) implements ResponseShape {
+
+    public EntriesAt {
+      paths = List.copyOf(paths);
+    }
+
+    @Override
+    public String expected() {
+      return "an object or an array";
+    }
+  }
+
   /** A JSON object is one record, and a JSON array holds one record in each element. */
   record ObjectOrArray() implements ResponseShape {
 
