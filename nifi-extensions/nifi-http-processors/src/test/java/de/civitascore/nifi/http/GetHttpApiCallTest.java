@@ -1267,7 +1267,7 @@ class GetHttpApiCallTest {
       assertEquals("page=2", rawQueries(endpoint).get(1));
       assertEquals("/v1/stations", endpoint.requests().get(1).rawPath());
       assertEquals(
-          "request 2",
+          "2",
           runner
               .getFlowFilesForRelationship(GetHttpApiCall.SUCCESS)
               .get(1)

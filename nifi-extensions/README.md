@@ -543,8 +543,9 @@ The optional `maxLinks` is an integer of at least 1. After that many links, the 
 error, with at most `maxLinks` + 1 requests. `Max Pages` still applies as a fatal guard. A repeated
 link, or a 400 or 404 on a later request, stops the Pipeline and removes all pages of the run.
 
-A cause and `http.page` name a request by position, for example `request 3`. They never hold the
-link, which can contain tokens. Logs and bulletins do not hold it either.
+A cause names a request by position, for example `request 3`. The `http.page` attribute holds the
+number, for example `3`. Neither holds the link, which can contain tokens. Logs and bulletins do
+not hold it either.
 
 #### Limit/offset pagination
 

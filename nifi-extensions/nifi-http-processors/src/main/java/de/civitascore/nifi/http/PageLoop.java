@@ -227,12 +227,7 @@ final class PageLoop {
     attributes.put(GetHttpApiCall.REQUEST_PATH, apiCall.path());
     page.position()
         .ifPresent(
-            position ->
-                attributes.put(
-                    GetHttpApiCall.PAGE,
-                    apiCall.pagination() instanceof NextLinkPagination
-                        ? position.title()
-                        : Long.toString(position.number())));
+            position -> attributes.put(GetHttpApiCall.PAGE, Long.toString(position.number())));
     return attributes;
   }
 

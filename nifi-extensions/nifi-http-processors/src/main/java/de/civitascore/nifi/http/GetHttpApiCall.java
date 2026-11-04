@@ -66,8 +66,7 @@ import org.apache.nifi.web.client.provider.api.WebClientServiceProvider;
   @WritesAttribute(
       attribute = GetHttpApiCall.PAGE,
       description =
-          "The page number, with cursor pagination the number of the request in the run from 1,"
-              + " with next link pagination the request position such as request 3,"
+          "The page number, with cursor or next link pagination the number of the request in the run from 1,"
               + " or with limit/offset pagination the offset, on success of an API call with"
               + " pagination."),
   @WritesAttribute(
