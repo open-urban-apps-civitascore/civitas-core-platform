@@ -34,7 +34,7 @@ record NextLinkPagination(JsonPath nextLinkPath, OptionalInt maxLinks) implement
   }
 
   @Override
-  public Progress next(Page page, PageContent content) {
+  public Progress next(Page page, URI requestUrl, PageContent content) {
     JsonNode value = content.values().get(nextLinkPath);
     if (value.isMissingNode() || value.isNull()) {
       return new Progress.Accepted(content.records(), Optional.empty());
@@ -49,17 +49,17 @@ record NextLinkPagination(JsonPath nextLinkPath, OptionalInt maxLinks) implement
     if (value.textValue().isEmpty()) {
       return new Progress.Accepted(content.records(), Optional.empty());
     }
-    return follow(page, content, value.textValue());
+    return follow(page, requestUrl, content, value.textValue());
   }
 
-  private Progress follow(Page page, PageContent content, String value) {
+  private Progress follow(Page page, URI requestUrl, PageContent content, String value) {
     URI link;
     try {
-      link = NextLinkUrl.resolve(content.requestUrl().orElseThrow(), URI.create(value));
+      link = NextLinkUrl.resolve(requestUrl, URI.create(value));
     } catch (IllegalArgumentException e) {
       return new Progress.Rejected("the next link is not a valid URI");
     }
-    if (!NextLinkUrl.sameHost(content.requestUrl().orElseThrow(), link)) {
+    if (!NextLinkUrl.sameHost(requestUrl, link)) {
       return new Progress.Rejected("the next link is on another host than the API host");
     }
     return new Progress.Accepted(

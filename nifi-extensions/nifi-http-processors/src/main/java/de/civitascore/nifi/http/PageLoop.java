@@ -190,8 +190,7 @@ final class PageLoop {
                 wrongType.reason(page.title().orElse("the response"))));
       }
       case RecordSchema.Verdict.Agrees agrees ->
-          switch (pagination.next(
-              page, agrees.content().withRequestUrl(client.target(apiCall, page)))) {
+          switch (pagination.next(page, client.target(apiCall, page), agrees.content())) {
             case Pagination.Progress.Rejected(String reason) -> {
               session.remove(flowFile);
               yield new PageRead.Failed(

@@ -9,6 +9,7 @@
  */
 package de.civitascore.nifi.http;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,8 +33,13 @@ sealed interface Pagination
    */
   boolean isPastTheEnd(Page page, int status);
 
-  /** What the pagination makes of {@code page}, whose records agree with the Record Schema. */
-  Progress next(Page page, PageContent content);
+  /**
+   * What the pagination makes of {@code page}, whose records agree with the Record Schema.
+   *
+   * @param requestUrl the URL that the request of {@code page} went to, without authentication
+   *     query parameters
+   */
+  Progress next(Page page, URI requestUrl, PageContent content);
 
   /** The names that the pages send at {@code location}. */
   List<String> names(ParameterLocation location);
