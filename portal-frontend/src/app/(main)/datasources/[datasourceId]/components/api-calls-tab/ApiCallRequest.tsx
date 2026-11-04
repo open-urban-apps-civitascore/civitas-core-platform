@@ -41,8 +41,8 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
   const pathWithQuery = formatPathWithQuery(apiCall?.path ?? '', apiCall?.queryParameters ?? [])
   const hasParameters = queryParameters.fields.length > 0 || headers.fields.length > 0
 
-  const revalidateParameterNameCollisions = () =>
-    void triggerKeepingServerErrors(form, [...getParameterNameCollisionPaths(index)])
+  const revalidateParameterNameCollisions = (editedPath?: string) =>
+    void triggerKeepingServerErrors(form, [...getParameterNameCollisionPaths(index)], editedPath ? [editedPath] : [])
 
   const handleQueryParameterRemove = (parameterIndex: number) => {
     queryParameters.remove(parameterIndex)

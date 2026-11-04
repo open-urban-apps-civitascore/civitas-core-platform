@@ -66,7 +66,14 @@ const renderConnectorTab = (
   }
   render(<Wrapper />)
   const getFieldError = (path: string) => form?.getFieldState(path as Path<DatasourceFormDraft>).error
-  return { getError: (path: string) => getFieldError(path)?.message, getFieldError }
+  const setServerError = (path: string) =>
+    act(() =>
+      form?.setError(path as Path<DatasourceFormDraft>, {
+        type: 'server',
+        message: 'datasources.errors.rejectedByServer',
+      }),
+    )
+  return { getError: (path: string) => getFieldError(path)?.message, getFieldError, setServerError }
 }
 
 const selectAuthenticationType = async (labelKey: string) => {
@@ -147,6 +154,21 @@ describe('ConnectorTab with the authentication of the Data source form', () => {
     await selectAuthenticationType('http.authentication.none')
 
     await waitFor(() => expect(getError(parameterPath)).toBeUndefined())
+  })
+
+  it('removes the error of the backend when the user edits the API token name', async () => {
+    const { getError, setServerError } = renderConnectorTab({
+      type: 'API_TOKEN',
+      name: 'key',
+      value: '********',
+      in: 'HEADER',
+    })
+    setServerError('configuration.authentication.name')
+
+    fireEvent.change(screen.getByLabelText(/http\.apiTokenName\.label/), { target: { value: 'key-2' } })
+    await act(async () => {})
+
+    expect(getError('configuration.authentication.name')).toBeUndefined()
   })
 
   it('shows no error after loading an http API host with an authentication', () => {

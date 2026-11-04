@@ -462,6 +462,19 @@ describe('useDatasourceForm with an HTTP connector', () => {
       )
     })
 
+    it('removes an error of the backend at a field of the previous authentication', async () => {
+      const { result } = renderHttpDatasourceForm(createHttpDatasource())
+      const usernamePath = 'configuration.authentication.username' as Path<DatasourceFormDraft>
+      act(() =>
+        result.current.form.setError(usernamePath, { type: 'server', message: 'datasources.errors.rejectedByServer' }),
+      )
+
+      await selectAuthenticationType(result, 'NONE')
+      await act(async () => {})
+
+      expect(result.current.form.getFieldState(usernamePath).error).toBeUndefined()
+    })
+
     it('creates the empty Basic fields for a loaded None', async () => {
       const datasource = createHttpDatasource()
       const { result } = renderHttpDatasourceForm({

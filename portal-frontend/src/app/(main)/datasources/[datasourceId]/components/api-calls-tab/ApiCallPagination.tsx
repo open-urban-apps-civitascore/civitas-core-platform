@@ -88,22 +88,22 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
   const type = useWatch({ control: form.control, name: `${paginationPath}.type` })
   const isCursor = type === HTTP_PAGINATION_TYPES.CURSOR
 
-  const revalidateParameterNameCollisions = () =>
-    void triggerKeepingServerErrors(form, [...getParameterNameCollisionPaths(index)])
+  const revalidateParameterNameCollisions = (editedPath: string) =>
+    void triggerKeepingServerErrors(form, [...getParameterNameCollisionPaths(index)], [editedPath])
 
-  const handleChangeAndRevalidate = <T,>(value: T, onChange: (value: T) => void) => {
+  const handleChangeAndRevalidate = <T,>(value: T, onChange: (value: T) => void, editedPath: string) => {
     onChange(value)
-    revalidateParameterNameCollisions()
+    revalidateParameterNameCollisions(editedPath)
   }
 
   const handleTypeChange = (newType: HttpPaginationType) => {
     form.setValue(paginationPath, { ...EMPTY_PAGINATIONS[newType], isEnabled: true }, { shouldDirty: true })
-    revalidateParameterNameCollisions()
+    revalidateParameterNameCollisions(`${paginationPath}.type`)
   }
 
   const handleCursorInChange = (value: string) => {
     form.setValue(`${paginationPath}.cursorIn`, value as HttpParameterLocation, { shouldDirty: true })
-    revalidateParameterNameCollisions()
+    revalidateParameterNameCollisions(`${paginationPath}.cursorIn`)
   }
 
   const typeId = `${paginationPath}.type` as const
@@ -128,7 +128,7 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
         inputMode={isNumeric ? 'numeric' : undefined}
         disabled={isDisabled}
         formItemProps={{ className: ROW_CLASS_NAME }}
-        onValueChange={revalidateParameterNameCollisions}
+        onValueChange={() => revalidateParameterNameCollisions(`${paginationPath}.${name}`)}
       />
     )
   }
@@ -177,7 +177,7 @@ export const ApiCallPagination = (props: ApiCallPaginationProps) => {
             <Label className="w-fit">
               <Checkbox
                 checked={field.value}
-                onCheckedChange={isChecked => handleChangeAndRevalidate(isChecked === true, field.onChange)}
+                onCheckedChange={isChecked => handleChangeAndRevalidate(isChecked === true, field.onChange, field.name)}
                 disabled={isDisabled}
               />
               {t('enable')}

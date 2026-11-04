@@ -460,6 +460,17 @@ describe('ApiCallsTab', () => {
       expect(getError('configuration.apiCalls.0.headers.1.value')).toBe(SERVER_ERROR)
     })
 
+    it('removes the error when the user edits the name of the header', async () => {
+      const { user, getError, setServerError } = renderApiCallsTab({ apiCalls: [API_CALL_WITH_HEADERS] })
+      await openApiCall(user)
+      setServerError('configuration.apiCalls.0.headers.1.name')
+
+      await user.type(screen.getAllByRole('textbox', { name: 'parameters.header name' })[1], '-2')
+      await act(async () => {})
+
+      expect(getError('configuration.apiCalls.0.headers.1.name')).toBeUndefined()
+    })
+
     it('removes the error when the user edits the header', async () => {
       const { user, getError, setServerError } = renderApiCallsTab({ apiCalls: [API_CALL_WITH_HEADERS] })
       await openApiCall(user)

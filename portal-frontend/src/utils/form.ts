@@ -56,7 +56,8 @@ export const getServerErrors = <T extends FieldValues>(form: UseFormReturn<T>): 
 export const restoreServerErrors = <T extends FieldValues>(form: UseFormReturn<T>, serverErrors: ServerError[]) => {
   for (const { path, message } of serverErrors) {
     const fieldPath = path as Path<T>
-    if (!form.getFieldState(fieldPath).error) {
+    const hasField = form.getValues(fieldPath) !== undefined
+    if (hasField && !form.getFieldState(fieldPath).error) {
       form.setError(fieldPath, { type: SERVER_ERROR_TYPE, message })
     }
   }
@@ -71,8 +72,12 @@ export const clearServerErrors = <T extends FieldValues>(form: UseFormReturn<T>)
 export const triggerKeepingServerErrors = async <T extends FieldValues>(
   form: UseFormReturn<T>,
   paths?: Path<T> | Path<T>[],
+  editedPaths: readonly string[] = [],
 ) => {
   const serverErrors = getServerErrors(form)
   await form.trigger(paths)
-  restoreServerErrors(form, serverErrors)
+  restoreServerErrors(
+    form,
+    serverErrors.filter(({ path }) => !editedPaths.includes(path)),
+  )
 }

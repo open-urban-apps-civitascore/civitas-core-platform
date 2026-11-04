@@ -71,6 +71,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
       void triggerKeepingServerErrors(
         form,
         paths.map(path => `configuration.${path}` as Path<DatasourceFormDraft>),
+        changedRules.map(rule => `configuration.${rule.watch}`),
       )
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
