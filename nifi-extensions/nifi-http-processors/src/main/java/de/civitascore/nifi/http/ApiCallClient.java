@@ -107,12 +107,14 @@ final class ApiCallClient {
     }
     Optional<InputStream> content;
     try {
-      InputStream body = response.body();
       content =
           nonEmpty(
-              body == null
-                  ? null
-                  : new IdleTimeoutInputStream(body, bodyReadTimeout, () -> discard(response)));
+              Optional.ofNullable(response.body())
+                  .map(
+                      body ->
+                          new IdleTimeoutInputStream(
+                              body, bodyReadTimeout, () -> discard(response)))
+                  .orElse(null));
     } catch (IOException e) {
       discard(response);
       return ApiCallOutcome.Failure.ofTransport(request, e);
