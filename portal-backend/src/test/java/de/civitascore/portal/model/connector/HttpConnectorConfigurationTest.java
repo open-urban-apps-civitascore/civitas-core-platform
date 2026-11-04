@@ -9,6 +9,7 @@ import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Basic;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Cursor;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.LimitOffset;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Method;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.NextLink;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.None;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.OAuth2;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.PageNumber;
@@ -83,7 +84,7 @@ class HttpConnectorConfigurationTest {
   void constructor_withBlankValuesOfAuthenticationAndPagination_storesNull() {
     OAuth2 oauth2 = new OAuth2(" ", " ", null, " ");
     LimitOffset limitOffset = new LimitOffset(" ", "", null, null, " ");
-    assertThat(new HttpConnectorConfiguration.NextLink(" ", null).nextLinkPath()).isNull();
+    assertThat(new NextLink(" ", null).nextLinkPath()).isNull();
     Cursor cursor = new Cursor(" ", "", null, " ", null);
 
     assertThat(new ApiToken(" ", null, null).name()).isNull();

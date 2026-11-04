@@ -69,7 +69,7 @@ class GetHttpApiCallAuthenticationTest {
   }
 
   @ParameterizedTest
-  @org.junit.jupiter.params.provider.EnumSource(ParameterLocation.class)
+  @EnumSource(ParameterLocation.class)
   void nextLinksKeepHeadersAndAuthenticationWithoutApiCallQueryParameters(
       ParameterLocation location) throws Exception {
     try (ApiEndpoint api =

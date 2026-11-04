@@ -32,6 +32,8 @@ final class PaginationParser {
   private static final String LIMIT = "pagination.limit";
   private static final String OFFSET_PARAMETER = "pagination.offsetParameter";
   private static final String COUNT_PATH = "pagination.countPath";
+  private static final String NEXT_LINK_PATH = "pagination.nextLinkPath";
+  private static final String MAX_LINKS = "pagination.maxLinks";
 
   private PaginationParser() {}
 
@@ -97,9 +99,9 @@ final class PaginationParser {
   private static Optional<Pagination> nextLink(JsonPagination pagination, List<String> violations) {
     int before = violations.size();
     Optional<JsonPath> path =
-        JsonPath.required(pagination.nextLinkPath(), "pagination.nextLinkPath", violations);
+        JsonPath.required(pagination.nextLinkPath(), NEXT_LINK_PATH, violations);
     if (pagination.maxLinks() != null && pagination.maxLinks() < 1) {
-      violations.add("pagination.maxLinks must be at least 1");
+      violations.add(MAX_LINKS + " must be at least 1");
     }
     return violations.size() > before
         ? Optional.empty()

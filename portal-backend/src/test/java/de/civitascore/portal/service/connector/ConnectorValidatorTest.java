@@ -16,6 +16,7 @@ import de.civitascore.portal.model.connector.HttpConnectorConfiguration.BearerTo
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ClientCertificate;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Cursor;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.LimitOffset;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.NextLink;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.OAuth2;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.PageNumber;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Pagination;
@@ -188,9 +189,7 @@ class ConnectorValidatorTest {
   void validate_nextLinkAtDraft_allowsAnIncompletePath() {
     HttpConnectorConfiguration connector =
         new HttpConnectorConfiguration(
-            "https://api.example.org",
-            null,
-            List.of(paged(new HttpConnectorConfiguration.NextLink(null, null))));
+            "https://api.example.org", null, List.of(paged(new NextLink(null, null))));
     assertThat(validator.validate(connector, ConnectorValidator.Stage.DRAFT)).isEmpty();
     assertThat(validator.validate(connector, ConnectorValidator.Stage.RELEASE))
         .extracting(ConnectorViolation::path)
@@ -209,9 +208,7 @@ class ConnectorValidatorTest {
   void validate_nextLinkAtRelease_acceptsAnyRestrictedPath(String path) {
     HttpConnectorConfiguration connector =
         new HttpConnectorConfiguration(
-            "https://api.example.org",
-            null,
-            List.of(paged(new HttpConnectorConfiguration.NextLink(path, 1))));
+            "https://api.example.org", null, List.of(paged(new NextLink(path, 1))));
     assertThat(validator.validate(connector, ConnectorValidator.Stage.RELEASE)).isEmpty();
   }
 
@@ -219,9 +216,7 @@ class ConnectorValidatorTest {
   void validate_nextLinkAtDraft_namesTheInvalidPathAndMaxLinks() {
     HttpConnectorConfiguration connector =
         new HttpConnectorConfiguration(
-            "https://api.example.org",
-            null,
-            List.of(paged(new HttpConnectorConfiguration.NextLink("$..next", 0))));
+            "https://api.example.org", null, List.of(paged(new NextLink("$..next", 0))));
     assertThat(validator.validate(connector, ConnectorValidator.Stage.DRAFT))
         .extracting(ConnectorViolation::path)
         .containsExactly(

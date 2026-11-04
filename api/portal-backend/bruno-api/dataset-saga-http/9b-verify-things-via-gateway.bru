@@ -62,7 +62,7 @@ tests {
     expect(res.getStatus()).to.equal(200);
   });
 
-  test("FROST holds the last response of the next-link API call", function() {
+  test("FROST holds the Things of both responses of the next-link API call", function() {
     expect(references()).to.include.members(['http-saga-next-link-1', 'http-saga-next-link-2']);
   });
 
