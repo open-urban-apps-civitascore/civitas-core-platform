@@ -267,7 +267,7 @@ describe('ConnectionTest', () => {
       expect(screen.getByText(`details ${message}`)).toBeInTheDocument()
     })
 
-    it('shows the HTTP status but not the body for HTTP', async () => {
+    it('shows only the error for HTTP', async () => {
       mockApiRequest.mockResolvedValue({
         data: testResult({
           success: false,
@@ -283,7 +283,9 @@ describe('ConnectionTest', () => {
       clickTest()
 
       expect(await screen.findByText('failure')).toBeInTheDocument()
-      expect(screen.getByText('httpStatus:500')).toBeInTheDocument()
+      expect(screen.getByText('cause causes.SOURCE_ERROR')).toBeInTheDocument()
+      expect(screen.getByText('details HTTP 500')).toBeInTheDocument()
+      expect(screen.queryByText('httpStatus:500')).not.toBeInTheDocument()
       expect(container.querySelector('pre')).not.toBeInTheDocument()
       expect(screen.queryByText('previewTruncated')).not.toBeInTheDocument()
     })
