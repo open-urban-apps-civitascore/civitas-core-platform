@@ -193,7 +193,7 @@ describe('ConnectionTest', () => {
     clickTest()
 
     expect(await screen.findByText('connecting')).toBeInTheDocument()
-    expect(screen.getByRole('status')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('connecting')
     expect(screen.getByRole('button', { name: 'button' })).toBeDisabled()
   })
 

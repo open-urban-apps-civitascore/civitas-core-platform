@@ -97,8 +97,8 @@ export const ConnectionTestStatus = (props: ConnectionTestStatusProps) => {
 
   if (isPending || isOutdatedPending) {
     return (
-      <div className="mt-4 flex items-center gap-2 text-sm">
-        <Spinner className="size-6" />
+      <div role="status" className="mt-4 flex items-center gap-2 text-sm">
+        <Spinner className="size-6" aria-hidden />
         <span>{isOutdatedPending ? t('outdatedPending') : t('connecting')}</span>
       </div>
     )
