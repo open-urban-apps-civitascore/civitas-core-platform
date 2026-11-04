@@ -77,8 +77,7 @@ class ModelRegistryExceptionHandlerTest {
         handler.handleRegistryConflict(
             new RegistryConflictException(
                 "The request conflicts with existing registry data",
-                new IllegalStateException("duplicate key")),
-            request());
+                new IllegalStateException("duplicate key")));
 
     assertThat(problem.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
     assertThat(problem.getType()).hasToString("urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION");

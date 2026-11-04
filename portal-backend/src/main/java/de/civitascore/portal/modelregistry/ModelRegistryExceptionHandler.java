@@ -62,10 +62,9 @@ public class ModelRegistryExceptionHandler {
 
   /** A write that collides with data the registry already holds, such as a taken version. */
   @ExceptionHandler(RegistryConflictException.class)
-  public ProblemDetail handleRegistryConflict(
-      RegistryConflictException ex, HttpServletRequest request) {
+  public ProblemDetail handleRegistryConflict(RegistryConflictException ex) {
     log.warn("Registry refused a conflicting write", ex);
-    return ProblemType.UNIQUE_CONSTRAINT_VIOLATION.problemDetail(ex.getMessage(), instance(request));
+    return problemDetails.of(ProblemType.UNIQUE_CONSTRAINT_VIOLATION, ex.getMessage());
   }
 
   /** The registry cannot be reached; the caller may retry. */

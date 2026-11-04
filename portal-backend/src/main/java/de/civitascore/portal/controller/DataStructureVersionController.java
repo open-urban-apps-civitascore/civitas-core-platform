@@ -37,8 +37,7 @@ import tools.jackson.databind.JsonNode;
  * structure.
  *
  * <p>Versions support a release/unrelease lifecycle. The model (a JSON Schema document) is
- * persisted directly on the version and returned as-is. A single version is deleted only together
- * with its data structure.
+ * persisted directly on the version and returned as-is.
  */
 @RestController
 @RequestMapping("/datastructures/{dataStructureId}/versions")
@@ -128,15 +127,12 @@ public class DataStructureVersionController {
               + " revision of it from the model registry. A deleted version number is not given"
               + " out again. The data structure stays, also without versions.")
   @ApiResponse(responseCode = "204", description = "Data structure version deleted successfully")
-  @ApiResponse(
-      responseCode = "404",
-      description = "Data structure version not found in this data structure",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "409",
-      description =
-          "The version is in use: a Data source, Data sink, Mapping or other model references it",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @Problems({
+    ProblemType.NOT_FOUND,
+    ProblemType.RESOURCE_IN_USE,
+    ProblemType.FOREIGN_KEY_VIOLATION,
+    ProblemType.REGISTRY_UNAVAILABLE
+  })
   public void deleteDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
     requireOwned(dataStructureId, versionId);
@@ -217,20 +213,13 @@ public class DataStructureVersionController {
               + " A source without a model gives a copy without a model. Any version can be"
               + " duplicated.")
   @ApiResponse(responseCode = "201", description = "Data structure version duplicated successfully")
-  @ApiResponse(
-      responseCode = "400",
-      description = "The source version's model references a model that is not available",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "404",
-      description = "Data structure version not found",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  @ApiResponse(
-      responseCode = "409",
-      description =
-          "The source version's model is missing from the model registry, or the new version"
-              + " number is already taken",
-      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @Problems({
+    ProblemType.NOT_FOUND,
+    ProblemType.MODEL_REFERENCE_NOT_AVAILABLE,
+    ProblemType.MODEL_MISSING,
+    ProblemType.UNIQUE_CONSTRAINT_VIOLATION,
+    ProblemType.REGISTRY_UNAVAILABLE
+  })
   public ResponseEntity<DataStructureVersionOutputDTO> duplicateDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
     requireOwned(dataStructureId, versionId);
