@@ -1,4 +1,5 @@
 import { CONNECTOR_TYPES } from '@/const/connectors'
+import { ConnectorType } from '@/types/connectors'
 
 import {
   buildApiCallUrl,
@@ -133,6 +134,13 @@ describe('buildApiCallUrl', () => {
 })
 
 describe('findSecretsToReenter', () => {
+  const findSecrets = (
+    connectorType: ConnectorType,
+    current: Record<string, unknown>,
+    loaded: Record<string, unknown> | undefined,
+  ) =>
+    findSecretsToReenter({ connectorType, configuration: current }, loaded && { connectorType, configuration: loaded })
+
   const BASE_URL = 'https://api.example.org/v1'
   const TOKEN_URL = 'https://auth.example.org/oauth2/token'
   const BASIC = { type: 'BASIC' as const, username: 'reader', password: '********' }
@@ -145,6 +153,7 @@ describe('findSecretsToReenter', () => {
   }
   const CLIENT_CERTIFICATE = { type: 'CLIENT_CERTIFICATE' as const, certificate: '********', privateKey: '********' }
   const LOADED = { baseUrl: BASE_URL, authentication: BASIC }
+  const OTHER_BASE_URL = 'https://other.example.org'
 
   it.each([
     ['the same host with another path', 'https://api.example.org/v2/'],
@@ -152,7 +161,7 @@ describe('findSecretsToReenter', () => {
     ['a leading space', ' https://api.example.org/v1'],
     ['no API host', ''],
   ])('asks for no secret for %s', (_name, baseUrl) => {
-    expect(findSecretsToReenter(CONNECTOR_TYPES.HTTP, { baseUrl, authentication: BASIC }, LOADED)).toEqual([])
+    expect(findSecrets(CONNECTOR_TYPES.HTTP, { baseUrl, authentication: BASIC }, LOADED)).toEqual([])
   })
 
   it.each([
@@ -162,7 +171,7 @@ describe('findSecretsToReenter', () => {
     ['the default port', 'https://api.example.org:443/v1'],
     ['another case of the host', 'https://API.example.org/v1'],
   ])('asks for the secret again for %s', (_name, baseUrl) => {
-    expect(findSecretsToReenter(CONNECTOR_TYPES.HTTP, { baseUrl, authentication: BASIC }, LOADED)).toEqual([
+    expect(findSecrets(CONNECTOR_TYPES.HTTP, { baseUrl, authentication: BASIC }, LOADED)).toEqual([
       'authentication.password',
     ])
   })
@@ -171,7 +180,7 @@ describe('findSecretsToReenter', () => {
     const loaded = { baseUrl: BASE_URL, authentication: CLIENT_CERTIFICATE }
 
     expect(
-      findSecretsToReenter(
+      findSecrets(
         CONNECTOR_TYPES.HTTP,
         { baseUrl: 'https://other.example.org', authentication: CLIENT_CERTIFICATE },
         loaded,
@@ -183,26 +192,31 @@ describe('findSecretsToReenter', () => {
     const loaded = { baseUrl: BASE_URL, authentication: OAUTH2 }
     const current = { baseUrl: BASE_URL, authentication: { ...OAUTH2, tokenUrl: 'https://login.example.org/token' } }
 
-    expect(findSecretsToReenter(CONNECTOR_TYPES.HTTP, current, loaded)).toEqual(['authentication.clientSecret'])
+    expect(findSecrets(CONNECTOR_TYPES.HTTP, current, loaded)).toEqual(['authentication.clientSecret'])
   })
 
   it('asks for no secret when only the path of the token URL changes', () => {
     const loaded = { baseUrl: BASE_URL, authentication: OAUTH2 }
     const current = { baseUrl: BASE_URL, authentication: { ...OAUTH2, tokenUrl: 'https://auth.example.org/token' } }
 
-    expect(findSecretsToReenter(CONNECTOR_TYPES.HTTP, current, loaded)).toEqual([])
+    expect(findSecrets(CONNECTOR_TYPES.HTTP, current, loaded)).toEqual([])
   })
 
   it('asks for no secret that the user entered again', () => {
     const current = { baseUrl: 'https://other.example.org', authentication: { ...BASIC, password: 'new-secret' } }
 
-    expect(findSecretsToReenter(CONNECTOR_TYPES.HTTP, current, LOADED)).toEqual([])
+    expect(findSecrets(CONNECTOR_TYPES.HTTP, current, LOADED)).toEqual([])
   })
 
   it('asks for no secret without a loaded connector of the same type', () => {
-    const current = { baseUrl: 'https://other.example.org', authentication: BASIC }
+    const current = {
+      connectorType: CONNECTOR_TYPES.HTTP,
+      configuration: { baseUrl: OTHER_BASE_URL, authentication: BASIC },
+    }
+    const loaded = { connectorType: CONNECTOR_TYPES.MQTT, configuration: { urls: 'mqtt://broker.example.org:1883' } }
 
-    expect(findSecretsToReenter(CONNECTOR_TYPES.HTTP, current, undefined)).toEqual([])
+    expect(findSecretsToReenter(current, undefined)).toEqual([])
+    expect(findSecretsToReenter(current, loaded)).toEqual([])
   })
 
   describe('MQTT', () => {
@@ -216,7 +230,7 @@ describe('findSecretsToReenter', () => {
       ['a removed broker', 'mqtt://broker-1.example.org:1883'],
       ['credentials in the URL', 'mqtt://reader@broker-1.example.org:1883'],
     ])('asks for no password for %s', (_name, urls) => {
-      expect(findSecretsToReenter(CONNECTOR_TYPES.MQTT, { ...LOADED_MQTT, urls }, LOADED_MQTT)).toEqual([])
+      expect(findSecrets(CONNECTOR_TYPES.MQTT, { ...LOADED_MQTT, urls }, LOADED_MQTT)).toEqual([])
     })
 
     it.each([
@@ -225,13 +239,13 @@ describe('findSecretsToReenter', () => {
       ['another scheme', 'mqtts://broker-1.example.org:1883'],
       ['a jdbc prefix', 'jdbc:mqtt://broker-1.example.org:1883'],
     ])('asks for the password again for %s', (_name, urls) => {
-      expect(findSecretsToReenter(CONNECTOR_TYPES.MQTT, { ...LOADED_MQTT, urls }, LOADED_MQTT)).toEqual(['password'])
+      expect(findSecrets(CONNECTOR_TYPES.MQTT, { ...LOADED_MQTT, urls }, LOADED_MQTT)).toEqual(['password'])
     })
 
     it('asks for no password that the user entered again', () => {
       const current = { urls: 'mqtt://broker-3.example.org:1883', password: 'new-secret' }
 
-      expect(findSecretsToReenter(CONNECTOR_TYPES.MQTT, current, LOADED_MQTT)).toEqual([])
+      expect(findSecrets(CONNECTOR_TYPES.MQTT, current, LOADED_MQTT)).toEqual([])
     })
   })
 
@@ -244,7 +258,7 @@ describe('findSecretsToReenter', () => {
       ['credentials in the DSN', 'postgres://reader@db.example.org:5432/stations?sslmode=require'],
       ['another parameter', 'postgres://db.example.org:5432/stations?sslmode=require&connect_timeout=5'],
     ])('asks for no password for %s', (_name, dsn) => {
-      expect(findSecretsToReenter(CONNECTOR_TYPES.SQL, { ...LOADED_SQL, dsn }, LOADED_SQL)).toEqual([])
+      expect(findSecrets(CONNECTOR_TYPES.SQL, { ...LOADED_SQL, dsn }, LOADED_SQL)).toEqual([])
     })
 
     it.each([
@@ -254,7 +268,7 @@ describe('findSecretsToReenter', () => {
       ['no sslmode', 'postgres://db.example.org:5432/stations'],
       ['an sslmode only in the fragment', 'postgres://db.example.org:5432/stations#?sslmode=require'],
     ])('asks for the password again for %s', (_name, dsn) => {
-      expect(findSecretsToReenter(CONNECTOR_TYPES.SQL, { ...LOADED_SQL, dsn }, LOADED_SQL)).toEqual(['password'])
+      expect(findSecrets(CONNECTOR_TYPES.SQL, { ...LOADED_SQL, dsn }, LOADED_SQL)).toEqual(['password'])
     })
   })
 })

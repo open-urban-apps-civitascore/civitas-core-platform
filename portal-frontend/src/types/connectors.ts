@@ -452,40 +452,9 @@ export const emptyHttpAuthentication = (type: HttpAuthenticationType): HttpAuthe
 const toAuthenticationForm = (
   authentication: HttpAuthenticationApiResponse | null | undefined,
 ): HttpAuthenticationForm => {
-  if (!authentication) return { type: HTTP_AUTHENTICATION_TYPES.NONE }
-  switch (authentication.type) {
-    case HTTP_AUTHENTICATION_TYPES.NONE:
-      return { type: authentication.type }
-    case HTTP_AUTHENTICATION_TYPES.BASIC:
-      return {
-        type: authentication.type,
-        username: authentication.username ?? '',
-        password: authentication.password ?? '',
-      }
-    case HTTP_AUTHENTICATION_TYPES.BEARER_TOKEN:
-      return { type: authentication.type, token: authentication.token ?? '' }
-    case HTTP_AUTHENTICATION_TYPES.API_TOKEN:
-      return {
-        type: authentication.type,
-        name: authentication.name ?? '',
-        value: authentication.value ?? '',
-        in: authentication.in ?? HTTP_PARAMETER_LOCATIONS.HEADER,
-      }
-    case HTTP_AUTHENTICATION_TYPES.OAUTH2:
-      return {
-        type: authentication.type,
-        tokenUrl: authentication.tokenUrl ?? '',
-        clientId: authentication.clientId ?? '',
-        clientSecret: authentication.clientSecret ?? '',
-        scope: authentication.scope ?? '',
-      }
-    case HTTP_AUTHENTICATION_TYPES.CLIENT_CERTIFICATE:
-      return {
-        type: authentication.type,
-        certificate: authentication.certificate ?? '',
-        privateKey: authentication.privateKey ?? '',
-      }
-  }
+  if (!authentication) return emptyHttpAuthentication(HTTP_AUTHENTICATION_TYPES.NONE)
+  const presentValues = Object.fromEntries(Object.entries(authentication).filter(([, value]) => value != null))
+  return { ...emptyHttpAuthentication(authentication.type), ...presentValues } as HttpAuthenticationForm
 }
 
 export const HttpApiToFormSchema = HttpApiResponseSchema.transform(({ baseUrl, authentication, apiCalls }) => ({

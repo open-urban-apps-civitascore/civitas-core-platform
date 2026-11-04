@@ -118,25 +118,25 @@ const getDestinations = (connectorType: ConnectorType, configuration: ConnectorC
   return presentAddresses.map(toDestination)
 }
 
-const getSecretPaths = (connectorType: ConnectorType, configuration: ConnectorConfiguration) => {
+export const getSecretPaths = (connectorType: ConnectorType, configuration: ConnectorConfiguration) => {
   if (connectorType !== CONNECTOR_TYPES.HTTP) return CONNECTOR_SECRET_PATHS[connectorType]
   const { authentication } = configuration as HttpConnectionForm
   const secretFields = authentication ? SECRET_FIELDS[authentication.type] : []
   return secretFields.map(field => `authentication.${field}`)
 }
 
-export const findSecretsToReenter = (
-  connectorType: ConnectorType,
-  current: ConnectorConfiguration,
-  loaded: ConnectorConfiguration | undefined,
-) => {
-  if (!loaded) return []
-  const maskedSecretPaths = getSecretPaths(connectorType, current).filter(
-    path => get(current, path) === SECRET_PLACEHOLDER,
+type ConnectorValues = { connectorType?: ConnectorType; configuration?: ConnectorConfiguration }
+
+export const findSecretsToReenter = (current: ConnectorValues, loaded: ConnectorValues | undefined) => {
+  const { connectorType, configuration } = current
+  const loadedConfiguration = loaded?.connectorType === connectorType ? loaded?.configuration : undefined
+  if (!connectorType || !configuration || !loadedConfiguration) return []
+  const maskedSecretPaths = getSecretPaths(connectorType, configuration).filter(
+    path => get(configuration, path) === SECRET_PLACEHOLDER,
   )
   if (!maskedSecretPaths.length) return []
-  const loadedDestinations = new Set(getDestinations(connectorType, loaded))
-  const currentDestinations = getDestinations(connectorType, current)
+  const loadedDestinations = new Set(getDestinations(connectorType, loadedConfiguration))
+  const currentDestinations = getDestinations(connectorType, configuration)
   const isAtLoadedDestinations = currentDestinations.every(destination => loadedDestinations.has(destination))
   return isAtLoadedDestinations ? [] : maskedSecretPaths
 }

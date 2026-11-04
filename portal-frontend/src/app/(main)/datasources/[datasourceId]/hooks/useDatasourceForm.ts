@@ -44,6 +44,7 @@ import {
   CONNECTOR_SECRET_PATHS,
   findSecretsToReenter,
   getConnectorDefaults,
+  getSecretPaths,
   toFormConnectorPath,
 } from '@/utils/connectors'
 import {
@@ -67,18 +68,6 @@ const REENTER_SECRET_MESSAGE = 'datasources.errors.reenterSecret'
 const REJECTED_BY_SERVER_MESSAGE = 'datasources.errors.rejectedByServer'
 
 const AUTHENTICATION_TYPE_PATH = 'configuration.authentication.type'
-
-type ConnectorValues = { connectorType?: ConnectorType; configuration?: Record<string, unknown> }
-
-const getSecretsToReenter = (values: ConnectorValues, loadedValues: ConnectorValues | undefined) => {
-  const { connectorType, configuration } = values
-  if (!connectorType || !configuration) return []
-  const loaded = loadedValues?.connectorType === connectorType ? loadedValues.configuration : undefined
-  return findSecretsToReenter(connectorType, configuration, loaded)
-}
-
-const getConnectorSecretPaths = (connectorType: ConnectorType | undefined) =>
-  connectorType ? CONNECTOR_SECRET_PATHS[connectorType] : []
 
 const toConnectorPayloadKey = (values: unknown) => {
   const parsed = ConnectorFormToApiSchema.safeParse(values)
@@ -170,11 +159,14 @@ export const useDatasourceForm = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectorTypeWatch])
 
-  const setReenterSecretErrors = () => {
-    for (const path of getSecretsToReenter(form.getValues(), form.formState.defaultValues)) {
+  const setReenterSecretErrorsAt = (paths: readonly string[]) => {
+    for (const path of paths) {
       form.setError(`configuration.${path}`, { type: 'custom', message: REENTER_SECRET_MESSAGE })
     }
   }
+
+  const setReenterSecretErrors = () =>
+    setReenterSecretErrorsAt(findSecretsToReenter(form.getValues(), form.formState.defaultValues))
 
   const authenticationTypeWatch = useWatch({
     control: form.control,
@@ -206,7 +198,7 @@ export const useDatasourceForm = (
   }, [authenticationTypeWatch])
 
   const secretsToReenter = useMemo(
-    () => getSecretsToReenter(formValues, initialFormValues),
+    () => findSecretsToReenter(formValues, initialFormValues),
     [formValues, initialFormValues],
   )
 
@@ -214,7 +206,7 @@ export const useDatasourceForm = (
 
   useEffect(() => {
     setReenterSecretErrors()
-    const secretPaths = getConnectorSecretPaths(connectorTypeWatch)
+    const secretPaths = connectorTypeWatch ? CONNECTOR_SECRET_PATHS[connectorTypeWatch] : []
     const resolvedPaths = secretPaths.filter(path => !secretsToReenter.includes(path))
     for (const path of resolvedPaths) {
       const fieldPath = `configuration.${path}` as const
@@ -330,11 +322,8 @@ export const useDatasourceForm = (
 
   const setMaskedSecretErrors = () => {
     const { connectorType, configuration } = form.getValues()
-    const secretPaths = getConnectorSecretPaths(connectorType)
-    const maskedSecretPaths = secretPaths.filter(path => get(configuration, path) === SECRET_PLACEHOLDER)
-    for (const path of maskedSecretPaths) {
-      form.setError(`configuration.${path}`, { type: 'custom', message: REENTER_SECRET_MESSAGE })
-    }
+    const secretPaths = connectorType && configuration ? getSecretPaths(connectorType, configuration) : []
+    setReenterSecretErrorsAt(secretPaths.filter(path => get(configuration, path) === SECRET_PLACEHOLDER))
   }
 
   const handleUpdateValues = async (values: DatasourcePatchData) => {

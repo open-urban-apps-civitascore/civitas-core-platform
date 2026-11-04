@@ -264,12 +264,8 @@ describe('ConnectorTab (integration)', () => {
     })
 
     it('does not surface a stale mismatch on mount for an already-mismatched stored configuration', async () => {
-      // The loaded configuration is already mismatched (TLS-only scheme, TLS disabled). The
-      // `isFirstRevalidationRender` guard in ConnectorTab exists specifically to stop the watch
-      // effect from firing a validation trigger on the initial mount render, so the user isn't
-      // shown an error before they've touched anything. Without the guard, the effect would run
-      // once on mount and call `form.trigger('configuration.urls')`, surfacing this error
-      // unprompted.
+      // The loaded configuration is already mismatched (TLS-only scheme, TLS disabled). On mount,
+      // `previousWatchedFields` in ConnectorTab holds the current values, so no rule revalidates.
       renderConnectorTab({
         configuration: {
           ...defaultValues.configuration,
