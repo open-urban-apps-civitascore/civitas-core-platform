@@ -47,7 +47,9 @@ pipeline refreshes the merge request.
 `lint-openapi-spec` lints the export with [Spectral](https://github.com/stoplightio/spectral)
 and the ruleset in `.spectral.yaml`: the Spectral OpenAPI rules, the
 [OWASP API Security rules](https://github.com/stoplightio/spectral-owasp-ruleset), and the
-conventions of this API. Its findings show in the Code Quality widget of the merge request.
+conventions of this API. Its findings show in the Code Quality widget of the merge request;
+their locations refer to `openapi.generated.yaml`, an artifact of `export-openapi-spec`, so the
+widget cannot link them to a file in the repository.
 Spectral and the OWASP ruleset are locked in `package-lock.json` in this directory. Spectral
 loads the ruleset from `node_modules` next to `.spectral.yaml`. To lint the spec of a locally
 running backend:

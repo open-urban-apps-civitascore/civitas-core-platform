@@ -68,7 +68,13 @@ lint-openapi-spec:
       -f text -o.text spectral-report.txt
       -f gitlab -o.gitlab gl-code-quality-report.json
       || SPECTRAL_EXIT=$?
+    # The gitlab formatter of Spectral writes zero-based lines; Code Quality expects one-based lines
     - |
+      [ -s gl-code-quality-report.json ] && node -e '
+        const fs = require("fs"); const file = "gl-code-quality-report.json"
+        const issues = JSON.parse(fs.readFileSync(file))
+        for (const { location } of issues) { location.positions.begin.line++; location.positions.end.line++ }
+        fs.writeFileSync(file, JSON.stringify(issues))'
       if [ -n "$SPECTRAL_EXIT" ]; then
         cat spectral-report.txt || true
         [ "$SPECTRAL_EXIT" = 1 ] && [ -s gl-code-quality-report.json ] && exit 3
