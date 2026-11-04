@@ -1,7 +1,76 @@
-# Keeps api/portal-backend/openapi.yaml in sync with the description the running backend serves.
-#
-# The export is made by api-test-backend (artifact openapi.generated.yaml), from the stack that the
-# Bruno tests run against. It was the job export-openapi-spec, which started a second stack.
+# Exports the OpenAPI description the backend serves, lints it, and keeps the committed copy in
+# api/portal-backend/openapi.yaml in sync with it.
+
+# Boots the backend jar against PostgreSQL only, the one service it cannot start without, so the
+# spec is available shortly after build-backend instead of after the API test stack.
+export-openapi-spec:
+  extends: .only-backend-changes
+  image: maven:3.9.16-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
+  stage: test
+  needs:
+    - job: build-backend
+      artifacts: true
+  services:
+    - name: postgres:16.15-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
+      alias: postgres
+  variables:
+    GIT_STRATEGY: none
+    POSTGRES_DB: portal_backend
+    POSTGRES_USER: admin
+    POSTGRES_PASSWORD: admin
+    SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/portal_backend
+    SPRING_DATASOURCE_USERNAME: admin
+    SPRING_DATASOURCE_PASSWORD: admin
+    # The `local` profile permits /api-docs.yaml without a token
+    SPRING_PROFILES_ACTIVE: local
+    SERVER_PORT: 8089
+    # The spec is hosted as documentation, where the Keycloak host of a stack points nowhere.
+    # example.org is reserved for examples (RFC 2606), so these URLs are obviously not real.
+    OPENAPI_OAUTH_SERVER_URL: https://auth.example.org
+  script:
+    - java -jar portal-backend/target/portal-backend-*.jar > portal-backend.log 2>&1 &
+    - BACKEND_PID=$!
+    - |
+      for attempt in $(seq 90); do
+        curl -sf http://localhost:8089/v1/api-docs.yaml -o openapi.generated.yaml && break
+        kill -0 "$BACKEND_PID" 2>/dev/null || { echo "The backend stopped before it served the spec"; exit 1; }
+        sleep 2
+      done
+    - test -s openapi.generated.yaml
+    # Fail when the override did not reach the backend, instead of committing a Keycloak host
+    - grep -q "$OPENAPI_OAUTH_SERVER_URL/realms/" openapi.generated.yaml
+  artifacts:
+    when: always
+    expire_in: 1 month
+    paths:
+      - openapi.generated.yaml
+      - portal-backend.log
+
+lint-openapi-spec:
+  extends: .only-backend-changes
+  image: node:24.21.0-alpine3.24@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
+  stage: test
+  needs:
+    - job: export-openapi-spec
+      artifacts: true
+  # The spec still has errors from before the lint existed; the Code Quality widget shows which
+  # findings a merge request adds.
+  allow_failure: true
+  variables:
+    GIT_DEPTH: 1
+  script:
+    - npx -y @stoplight/spectral-cli@$SPECTRAL_CLI_VERSION lint openapi.generated.yaml
+      --ruleset api/portal-backend/.spectral.yaml
+      -f text -o.text spectral-report.txt
+      -f gitlab -o.gitlab gl-code-quality-report.json
+      || { cat spectral-report.txt; exit 1; }
+  artifacts:
+    when: always
+    expire_in: 1 month
+    paths:
+      - spectral-report.txt
+    reports:
+      codequality: gl-code-quality-report.json
 
 # Compares the export with the committed file and, on a difference, opens or refreshes a merge
 # request from a bot branch, the way Renovate does. See .gitlab/ci/scripts/update-openapi-spec.mjs.
@@ -17,7 +86,7 @@ update-openapi-spec:
   # Two develop pipelines must not force-push the bot branch at the same time
   resource_group: openapi-spec-update
   needs:
-    - job: api-test-backend
+    - job: export-openapi-spec
       artifacts: true
   rules:
     - if: $CI_COMMIT_BRANCH == "develop"

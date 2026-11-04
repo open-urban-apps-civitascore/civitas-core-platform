@@ -44,6 +44,15 @@ from the branch `ci/openapi-spec-update` whenever the export differs from the co
 (`.gitlab/ci/openapi.yml`). To change the spec, change the backend — the next `develop`
 pipeline refreshes the merge request.
 
+`lint-openapi-spec` lints the export with [Spectral](https://github.com/stoplightio/spectral)
+and the ruleset in `.spectral.yaml`; its findings show in the Code Quality widget of the merge
+request. To lint the spec of a locally running backend:
+
+```sh
+curl -s http://localhost:8089/v1/api-docs.yaml -o /tmp/openapi.yaml
+npx @stoplight/spectral-cli lint /tmp/openapi.yaml --ruleset api/portal-backend/.spectral.yaml
+```
+
 `update-openapi-spec` needs the masked and protected CI/CD variable `OPENAPI_BOT_TOKEN`: a
 Project Access Token used only by this job, with the scopes `api` and `write_repository` and
 the role Developer. The bot commits and merge requests show this token's bot user as author.

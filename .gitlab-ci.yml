@@ -154,6 +154,7 @@ variables:
   BRUNO_CLI_VERSION: '4.3.0' # api-test-backend; was installed unpinned on every run
   CHECK_JSONSCHEMA_VERSION: '0.38.2' # validate-schemas-model-forge
   DEPCHECK_VERSION: '1.4.7' # lint-frontend
+  SPECTRAL_CLI_VERSION: '6.17.0' # lint-openapi-spec
   PLAYWRIGHT_VERSION: '1.58.2' # e2e-test-frontend; keep equal to @playwright/test in portal-frontend/package.json
   TRIVY_GATE_SEVERITY: 'CRITICAL' # Container scan fails on fixable findings of these severities. Stricter: 'HIGH,CRITICAL'
   GITLAB_ADVANCED_SAST_ENABLED: 'true'
