@@ -212,6 +212,7 @@
             { "$ref": "#/$defs/HttpPageNumberPagination" },
             { "$ref": "#/$defs/HttpLimitOffsetPagination" },
             { "$ref": "#/$defs/HttpCursorPagination" },
+            { "$ref": "#/$defs/HttpNextLinkPagination" },
             { "enum": [null] }
           ],
           "description": "Pagination of the API call, chosen by 'type'; null for none."
@@ -250,6 +251,16 @@
         "limit":           { "type": ["integer", "null"], "description": "Number of records per request; set together with 'limitParameter'." },
         "offset":          { "type": ["integer", "null"], "description": "Offset of the first request; null is 0." },
         "countPath":       { "type": ["string", "null"], "description": "JSON path in the response to the number of records, or to an array whose length is that number; null counts the elements of the response, which is then an array." }
+      }
+    },
+    "HttpNextLinkPagination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "NEXT_LINK" },
+        "nextLinkPath": { "type": ["string", "null"], "description": "Restricted JSON path in the response to the next link, a string or an object with a string href." },
+        "maxLinks": { "type": ["integer", "null"], "description": "Maximum number of links to follow; null follows all links, subject to Max Pages." }
       }
     },
     "HttpCursorPagination": {

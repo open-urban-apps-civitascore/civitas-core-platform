@@ -6,6 +6,7 @@ import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ApiCall;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.ApiToken;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Cursor;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.LimitOffset;
+import de.civitascore.portal.model.connector.HttpConnectorConfiguration.NextLink;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.None;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.PageNumber;
 import de.civitascore.portal.model.connector.HttpConnectorConfiguration.Pagination;
@@ -108,6 +109,7 @@ public class HttpConnectorRules implements ConnectorRules {
               Stream.of(
                   query("limitParameter", limitOffset.limitParameter()),
                   query("offsetParameter", limitOffset.offsetParameter()));
+          case NextLink ignored -> Stream.empty();
           case Cursor cursor ->
               Stream.of(
                   cursor.cursorIn() == null
@@ -165,6 +167,7 @@ public class HttpConnectorRules implements ConnectorRules {
               limitOffset.limitParameter(), limitOffset.limit(), paginationPath, violations);
         }
       }
+      case NextLink ignored -> {}
       case Cursor cursor -> {
         if (release) {
           addLimitViolations(cursor.limitParameter(), cursor.limit(), paginationPath, violations);

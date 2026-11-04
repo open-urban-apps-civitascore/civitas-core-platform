@@ -83,6 +83,7 @@ class HttpConnectorConfigurationTest {
   void constructor_withBlankValuesOfAuthenticationAndPagination_storesNull() {
     OAuth2 oauth2 = new OAuth2(" ", " ", null, " ");
     LimitOffset limitOffset = new LimitOffset(" ", "", null, null, " ");
+    assertThat(new HttpConnectorConfiguration.NextLink(" ", null).nextLinkPath()).isNull();
     Cursor cursor = new Cursor(" ", "", null, " ", null);
 
     assertThat(new ApiToken(" ", null, null).name()).isNull();

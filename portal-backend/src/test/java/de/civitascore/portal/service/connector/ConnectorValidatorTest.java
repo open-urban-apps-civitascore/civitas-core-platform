@@ -44,6 +44,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import tools.jackson.databind.DeserializationConfig;
 import tools.jackson.databind.JavaType;
@@ -181,6 +182,51 @@ class ConnectorValidatorTest {
         .containsExactly(
             new ConnectorViolation(
                 "connector.authentication.tokenUrl", "'tokenUrl' must use https"));
+  }
+
+  @Test
+  void validate_nextLinkAtDraft_allowsAnIncompletePath() {
+    HttpConnectorConfiguration connector =
+        new HttpConnectorConfiguration(
+            "https://api.example.org",
+            null,
+            List.of(paged(new HttpConnectorConfiguration.NextLink(null, null))));
+    assertThat(validator.validate(connector, ConnectorValidator.Stage.DRAFT)).isEmpty();
+    assertThat(validator.validate(connector, ConnectorValidator.Stage.RELEASE))
+        .extracting(ConnectorViolation::path)
+        .containsExactly("connector.apiCalls[0].pagination.nextLinkPath");
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "$.links.next",
+        "$._links.next.href",
+        "$['@odata.nextLink']",
+        "$['@iot.nextLink']",
+        "$.custom[0].url"
+      })
+  void validate_nextLinkAtRelease_acceptsAnyRestrictedPath(String path) {
+    HttpConnectorConfiguration connector =
+        new HttpConnectorConfiguration(
+            "https://api.example.org",
+            null,
+            List.of(paged(new HttpConnectorConfiguration.NextLink(path, 1))));
+    assertThat(validator.validate(connector, ConnectorValidator.Stage.RELEASE)).isEmpty();
+  }
+
+  @Test
+  void validate_nextLinkAtDraft_namesTheInvalidPathAndMaxLinks() {
+    HttpConnectorConfiguration connector =
+        new HttpConnectorConfiguration(
+            "https://api.example.org",
+            null,
+            List.of(paged(new HttpConnectorConfiguration.NextLink("$..next", 0))));
+    assertThat(validator.validate(connector, ConnectorValidator.Stage.DRAFT))
+        .extracting(ConnectorViolation::path)
+        .containsExactly(
+            "connector.apiCalls[0].pagination.maxLinks",
+            "connector.apiCalls[0].pagination.nextLinkPath");
   }
 
   @Test
