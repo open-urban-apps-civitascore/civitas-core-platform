@@ -30,7 +30,8 @@ body:json {
           "properties": {
             "reference": { "type": "string" },
             "next_cursor": { "type": "string" },
-            "count": { "type": "integer" }
+            "count": { "type": "integer" },
+            "next": { "type": "object", "properties": { "href": { "type": "string" } } }
           },
           "required": ["reference"]
         },

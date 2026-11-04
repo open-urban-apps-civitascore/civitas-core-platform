@@ -80,6 +80,14 @@ body:json {
             "limit": 1,
             "countPath": "$.properties.count"
           }
+        },
+        {
+          "name": "next-link",
+          "path": "/next-link",
+          "pagination": {
+            "type": "NEXT_LINK",
+            "nextLinkPath": "$.properties.next"
+          }
         }
       ]
     },

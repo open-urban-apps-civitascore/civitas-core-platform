@@ -102,7 +102,7 @@ Range checks such as MQTT `qos` run on every write
 |---|---|
 | `sql-create-and-read-*`, `mqtt-create-and-read-*`, `http-create-and-read-*` | Response shape, defaults, masked password |
 | `http-bearer-token-*`, `http-api-token-*`, `http-oauth2-*`, `http-client-certificate-*` | Each HTTP authentication reads back with its secret masked |
-| `http-pagination-create-and-read-*` | Limit/offset and cursor pagination read back as sent |
+| `http-pagination-create-and-read-*` | Limit/offset, cursor and next link pagination read back as sent |
 | `sql-update-masked-secret-*`, `http-update-masked-secret-*` | PUT with `"********"` keeps the stored password |
 | `sql-masked-password-without-stored-secret-*` | PUT with `"********"` and no stored password stores none |
 | `sql-patch-other-host-*` | PATCH of another host keeps no stored password and is refused |

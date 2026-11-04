@@ -28,6 +28,15 @@ body:json {
           "name": "events",
           "path": "/events",
           "pagination": { "type": "CURSOR", "cursorPath": "$.next_cursor", "cursorParameter": "X-Cursor", "cursorIn": "HEADER", "limitParameter": "limit", "limit": 20 }
+        },
+        {
+          "name": "links",
+          "path": "/links",
+          "pagination": {
+            "type": "NEXT_LINK",
+            "nextLinkPath": "$.links.next",
+            "maxLinks": 3
+          }
         }
       ]
     },
@@ -51,6 +60,9 @@ tests {
       type: "LIMIT_OFFSET", limitParameter: "limit", offsetParameter: "offset",
       limit: 20, offset: 0, countPath: "$.meta.count"
     });
+    expect(res.body.connector.apiCalls[2].pagination).to.deep.equal({
+      type: "NEXT_LINK", nextLinkPath: "$.links.next", maxLinks: 3
+    });
     expect(res.body.connector.apiCalls[1].pagination).to.deep.equal({
       type: "CURSOR", cursorPath: "$.next_cursor", cursorParameter: "X-Cursor",
       cursorIn: "HEADER", limitParameter: "limit", limit: 20
@@ -59,6 +71,6 @@ tests {
 }
 
 docs {
-  Creates an HTTP/REST Data source with a limit/offset and a cursor
+  Creates an HTTP/REST Data source with limit/offset, cursor and next link
   pagination and reads them back. The cursor travels in a header.
 }
