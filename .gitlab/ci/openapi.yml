@@ -57,6 +57,9 @@ lint-openapi-spec:
   needs:
     - job: export-openapi-spec
       artifacts: true
+  # Exit code 3 means Spectral reported findings; any other failure means the lint did not run
+  allow_failure:
+    exit_codes: 3
   variables:
     GIT_DEPTH: 1
   script:
@@ -66,7 +69,13 @@ lint-openapi-spec:
       --ruleset api/portal-backend/.spectral.yaml
       -f text -o.text spectral-report.txt
       -f gitlab -o.gitlab gl-code-quality-report.json
-      || { cat spectral-report.txt; test -s gl-code-quality-report.json; }
+      || SPECTRAL_EXIT=$?
+    - |
+      if [ -n "$SPECTRAL_EXIT" ]; then
+        cat spectral-report.txt || true
+        [ "$SPECTRAL_EXIT" = 1 ] && [ -s gl-code-quality-report.json ] && exit 3
+        exit 1
+      fi
   artifacts:
     when: always
     expire_in: 1 month
