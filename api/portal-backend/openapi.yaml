@@ -12542,7 +12542,9 @@ components:
             type: integer
             format: int32
             description: "Maximum number of links to follow. At least 1. Absent or\
-              \ null follows all links, subject to Max Pages."
+              \ null follows all links. A run sends at most 1000 requests and stops\
+              \ with an error when the last one still holds a link, so a value above\
+              \ 999 has no effect."
             example: 10
             minimum: 1
           nextLinkPath:

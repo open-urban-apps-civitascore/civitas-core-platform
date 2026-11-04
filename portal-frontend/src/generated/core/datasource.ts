@@ -230,7 +230,7 @@ export const HttpNextLinkPaginationSchema = z
     type: z.literal('NEXT_LINK'),
     /** Restricted JSON path in the response to the next link, a string or an object with a string href. */
     nextLinkPath: z.union([z.string(), z.null()]).optional(),
-    /** Maximum number of links to follow; null follows all links, subject to Max Pages. */
+    /** Maximum number of links to follow; null follows all links. A run sends at most 1000 requests and stops with an error when the last one still holds a link, so a value above 999 has no effect. */
     maxLinks: z.union([z.number().int(), z.null()]).optional(),
   })
   .strict()

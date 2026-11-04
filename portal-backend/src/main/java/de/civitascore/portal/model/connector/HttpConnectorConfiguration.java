@@ -550,16 +550,21 @@ public record HttpConnectorConfiguration(
   @Schema(
       name = "HttpConnectorNextLinkPagination",
       description =
-          "Next link pagination: each response is one record and holds the URL of the next request. Links must have the scheme, host and port of baseUrl.")
+          "Next link pagination: each response is one record and holds the URL of the next"
+              + " request. Links must have the scheme, host and port of baseUrl.")
   public record NextLink(
       @Schema(
               description =
-                  "JSON path to the next link, a string or an object with a string href. Only member names and array indexes. An absent, null or empty link ends the run.",
+                  "JSON path to the next link, a string or an object with a string href. Only"
+                      + " member names and array indexes. An absent, null or empty link ends the"
+                      + " run.",
               example = "$.links.next")
           @NotNull(groups = OnRelease.class, message = "'nextLinkPath' is required") @Pattern(regexp = JSON_PATH, message = "'nextLinkPath'" + JSON_PATH_MESSAGE) String nextLinkPath,
       @Schema(
               description =
-                  "Maximum number of links to follow. At least 1. Absent or null follows all links, subject to Max Pages.",
+                  "Maximum number of links to follow. At least 1. Absent or null follows all"
+                      + " links. A run sends at most 1000 requests and stops with an error when"
+                      + " the last one still holds a link, so a value above 999 has no effect.",
               example = "10")
           @Min(value = 1, message = "'maxLinks' must be at least 1") Integer maxLinks)
       implements Pagination {
