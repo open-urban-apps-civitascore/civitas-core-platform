@@ -224,22 +224,22 @@ if [ "$SKIP_BUILD" = false ]; then
     DEV_VERSION="0.0.0-e2e"
 
     echo "  Building portal-model..."
-    (cd "$PROJECT_ROOT/portal-model" && mvn clean install -DskipTests -Drevision="$DEV_VERSION" -q) || {
+    (cd "$PROJECT_ROOT/portal-model" && mvn clean install -DskipTests -DskipITs -Drevision="$DEV_VERSION" -q) || {
         echo -e "  ${RED}portal-model build failed${NC}"; exit 1;
     }
 
     echo "  Building config-adapter..."
-    (cd "$PROJECT_ROOT/config-adapter" && mvn clean install -DskipTests -Drevision="$DEV_VERSION" -q) || {
+    (cd "$PROJECT_ROOT/config-adapter" && mvn clean install -DskipTests -DskipITs -Drevision="$DEV_VERSION" -q) || {
         echo -e "  ${RED}config-adapter build failed${NC}"; exit 1;
     }
 
     echo "  Building authz-repository..."
-    (cd "$PROJECT_ROOT/authz/repository" && mvn clean package -DskipTests -Dportal-model.version="$DEV_VERSION" -q) || {
+    (cd "$PROJECT_ROOT/authz/repository" && mvn clean package -DskipTests -DskipITs -Dportal-model.version="$DEV_VERSION" -q) || {
         echo -e "  ${RED}authz-repository build failed${NC}"; exit 1;
     }
 
     echo "  Building portal-backend..."
-    (cd "$PROJECT_ROOT/portal-backend" && mvn clean package -DskipTests \
+    (cd "$PROJECT_ROOT/portal-backend" && mvn clean package -DskipTests -DskipITs \
         -Dconfig-adapter.version="$DEV_VERSION" \
         -Dportal-model.version="$DEV_VERSION" -q) || {
         echo -e "  ${RED}portal-backend build failed${NC}"; exit 1;
