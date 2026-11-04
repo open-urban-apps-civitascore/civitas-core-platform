@@ -532,8 +532,8 @@ or non-JSON body stops the Pipeline. A 2xx response without a body ends the run.
 
 Relative links resolve against the URL of the request that returned them, by RFC 3986 section 5.
 Each followed link must have the scheme, host and port of `baseUrl`. An omitted port means the
-default port of the scheme. A link on another host stops the Pipeline before credentials are sent.
-The cause says that the next link is on another host than the API host.
+default port of the scheme. Any other link stops the Pipeline before credentials are sent. The
+cause says that the next link has another scheme, host or port than the API host.
 
 The first request uses the API call query parameters. Each next request uses the link as it is,
 with the API call headers and authentication, including authentication query parameters. It adds

@@ -1325,7 +1325,7 @@ class GetHttpApiCallTest {
       MockFlowFile failure = runner.getFlowFilesForRelationship(GetHttpApiCall.STOP).getFirst();
       assertEquals("200", failure.getAttribute(GetHttpApiCall.ERROR_STATUS));
       assertEquals(
-          "API call \"Stations\": request 1: the next link is on another host than the API host",
+          "API call \"Stations\": request 1: the next link has another scheme, host or port than the API host",
           failure.getAttribute(GetHttpApiCall.ERROR_MESSAGE));
       assertEquals(0, other.requests().size());
       for (String text : visible(runner)) {
