@@ -57,6 +57,10 @@ final class ApiCallClient {
    */
   ApiCallOutcome send(ApiCall call, Page page, Authentication authentication) {
     String request = call.describe(page);
+    if (page.url().isPresent() && !NextLinkUrl.sameHost(URI.create(baseUrl), page.url().get())) {
+      return ApiCallOutcome.Failure.ofRejectedBody(
+          call.label(page), 0, "the next link is on another host than the API host");
+    }
     Attempt attempt = attempt(call, page, authentication, request);
     if (attempt.unauthorized() && authentication.renewAfterUnauthorized()) {
       attempt.discard();
@@ -148,12 +152,20 @@ final class ApiCallClient {
     }
   }
 
-  private URI uri(ApiCall call, Page page, Authentication authentication) {
-    List<Parameter> parameters = new ArrayList<>(call.queryParameters());
-    parameters.addAll(page.queryParameters());
+  URI uri(ApiCall call, Page page, Authentication authentication) {
+    List<Parameter> parameters = new ArrayList<>();
+    if (page.url().isEmpty()) {
+      parameters.addAll(call.queryParameters());
+      parameters.addAll(page.queryParameters());
+    }
     parameters.addAll(authentication.queryParameters());
     String query = query(parameters);
-    return URI.create(baseUrl + call.path() + (query.isEmpty() ? "" : "?" + query));
+    URI target = page.url().orElseGet(() -> URI.create(baseUrl + call.path()));
+    String text = target.toString();
+    int fragment = text.indexOf('#');
+    text = fragment < 0 ? text : text.substring(0, fragment);
+    return URI.create(
+        text + (query.isEmpty() ? "" : (target.getRawQuery() == null ? "?" : "&") + query));
   }
 
   /**

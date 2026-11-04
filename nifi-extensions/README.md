@@ -512,6 +512,40 @@ request with the requests of the run that it sent: a request with the same param
 an earlier one goes to `stop` before the processor sends it, because the API would repeat its pages
 without end.
 
+#### Next link pagination
+
+A `NEXT_LINK` pagination reads `nextLinkPath` from each JSON object response. The path uses the
+same restricted form as `cursorPath`, with member names, quoted member names and array indexes.
+Any path of this form is accepted.
+
+| Format | `nextLinkPath` |
+|---|---|
+| JSON:API | `$.links.next` |
+| HAL | `$._links.next.href` |
+| OData | `$['@odata.nextLink']` |
+| SensorThings | `$['@iot.nextLink']` |
+
+A non-empty string, or an object with a string `href`, gives the next link. An absent value, `null`
+or an empty string ends the run. The records of that response are part of the run. Any other value
+stops the Pipeline. Each response is one record, as with cursor pagination. A JSON array, scalar
+or non-JSON body stops the Pipeline. A 2xx response without a body ends the run.
+
+Relative links resolve against the URL of the request that returned them, by RFC 3986 section 5.
+Each followed link must have the scheme, host and port of `baseUrl`. An omitted port means the
+default port of the scheme. A link on another host stops the Pipeline before credentials are sent.
+The cause says that the next link is on another host than the API host.
+
+The first request uses the API call query parameters. Each next request uses the link as it is,
+with the API call headers and authentication, including authentication query parameters. It adds
+none of the API call query parameters again.
+
+The optional `maxLinks` is an integer of at least 1. After that many links, the run ends without an
+error, with at most `maxLinks` + 1 requests. `Max Pages` still applies as a fatal guard. A repeated
+link, or a 400 or 404 on a later request, stops the Pipeline and removes all pages of the run.
+
+A cause and `http.page` name a request by position, for example `request 3`. They never hold the
+link, which can contain tokens. Logs and bulletins do not hold it either.
+
 #### Limit/offset pagination
 
 A `LIMIT_OFFSET` pagination sends `offsetParameter` with the offset of each request as a query
@@ -609,8 +643,8 @@ for the shape that each response must have: a JSON array of records, a JSON obje
 record, or, without pagination, either. A `ResponseShape` of one object also names the JSON paths
 whose values the pagination reads. From the record count and those values of a page, the
 `Pagination` gives the next page, the end of the run, or a cause for `stop`. A page carries the query
-parameters and the headers that its request adds. A new pagination method adds an implementation of
-`Pagination`, and the page loop and the request code stay as they are.
+parameters and the headers that its request adds, or the URL of its own request. A new pagination
+method adds an implementation of `Pagination`, and the page loop and the request code stay as they are.
 
 A new authentication type adds a
 value of `Authentication Type`, its properties and a class that implements `Authentication`.

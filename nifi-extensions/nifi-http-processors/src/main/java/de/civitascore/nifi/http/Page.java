@@ -10,6 +10,7 @@
 package de.civitascore.nifi.http;
 
 import de.civitascore.nifi.http.ApiCall.Parameter;
+import java.net.URI;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,16 +21,30 @@ import java.util.Optional;
  * @param position how causes and {@code http.page} name the page; empty when the run has one page
  * @param queryParameters what the page adds after the query parameters of the API call
  * @param headers what the page adds after the headers of the API call
+ * @param url the URL of this request, or empty to use the API call URL and query parameters
  */
 record Page(
     long index,
     Optional<Position> position,
     List<Parameter> queryParameters,
-    List<Parameter> headers) {
+    List<Parameter> headers,
+    Optional<URI> url) {
 
   Page {
     queryParameters = List.copyOf(queryParameters);
     headers = List.copyOf(headers);
+  }
+
+  Page(
+      long index,
+      Optional<Position> position,
+      List<Parameter> queryParameters,
+      List<Parameter> headers) {
+    this(index, position, queryParameters, headers, Optional.empty());
+  }
+
+  Page withUrl(URI requestUrl) {
+    return new Page(index, position, queryParameters, headers, Optional.of(requestUrl));
   }
 
   Optional<String> title() {

@@ -68,6 +68,46 @@ class GetHttpApiCallAuthenticationTest {
     tls = TestTls.create(keys);
   }
 
+  @ParameterizedTest
+  @org.junit.jupiter.params.provider.EnumSource(ParameterLocation.class)
+  void nextLinksKeepHeadersAndAuthenticationWithoutApiCallQueryParameters(
+      ParameterLocation location) throws Exception {
+    try (ApiEndpoint api =
+        ApiEndpoint.answeringInTurnOverTls(
+            tls.server(),
+            Response.json("{\"next\":\"../other?token=link-4b90\"}"),
+            Response.json("{}"))) {
+      TestRunner runner = runner(api.baseUrl());
+      apiToken(runner, "api-key", "secret", location);
+      runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, "{\"type\":\"object\"}");
+      runner.setProperty(
+          GetHttpApiCall.API_CALL,
+          """
+          {"name":"Stations","path":"/stations", "queryParameters":[{"name":"filter","value":"active"}],
+           "headers":[{"name":"X-Call","value":"kept"}],
+           "pagination":{"type":"NEXT_LINK","nextLinkPath":"$.next"}}
+          """);
+      runner.run();
+      runner.assertAllFlowFilesTransferred(GetHttpApiCall.SUCCESS, 2);
+      assertEquals(
+          location == ParameterLocation.QUERY ? "filter=active&api-key=secret" : "filter=active",
+          api.requests().get(0).rawQuery());
+      assertEquals(
+          location == ParameterLocation.QUERY
+              ? "token=link-4b90&api-key=secret"
+              : "token=link-4b90",
+          api.requests().get(1).rawQuery());
+      assertEquals("/other", api.requests().get(1).rawPath());
+      assertEquals("kept", api.requests().get(1).headers().getFirst("X-Call"));
+      if (location == ParameterLocation.HEADER) {
+        assertEquals("secret", api.requests().get(1).headers().getFirst("api-key"));
+      }
+      for (String text : visible(runner)) {
+        assertFalse(text.contains("link-4b90"), text);
+      }
+    }
+  }
+
   @Test
   void sendsABearerToken() throws InitializationException {
     try (ApiEndpoint api = ApiEndpoint.answeringOverTls(tls.server(), 200, EMPTY)) {

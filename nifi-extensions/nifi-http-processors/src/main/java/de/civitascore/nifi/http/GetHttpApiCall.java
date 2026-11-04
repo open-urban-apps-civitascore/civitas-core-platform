@@ -67,6 +67,7 @@ import org.apache.nifi.web.client.provider.api.WebClientServiceProvider;
       attribute = GetHttpApiCall.PAGE,
       description =
           "The page number, with cursor pagination the number of the request in the run from 1,"
+              + " with next link pagination the request position such as request 3,"
               + " or with limit/offset pagination the offset, on success of an API call with"
               + " pagination."),
   @WritesAttribute(
@@ -265,7 +266,7 @@ public class GetHttpApiCall extends AbstractProcessor {
           .description(
               "The JSON Schema of the Data structure, with its imports inlined. Each record of a"
                   + " response must agree with it: each element of a JSON array, or, without"
-                  + " pagination, with cursor pagination and with limit/offset pagination with a"
+                  + " pagination, with cursor or next link pagination and with limit/offset pagination with a"
                   + " count path, a JSON object as one record. A $ref resolves only inside the"
                   + " schema or to a GeoJSON geometry of https://geojson.org/schema/, which the NAR"
                   + " holds. The processor does not start with a schema that it cannot compile.")

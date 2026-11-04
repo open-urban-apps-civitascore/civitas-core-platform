@@ -11,6 +11,7 @@ package de.civitascore.nifi.http;
 
 import de.civitascore.nifi.http.ApiCall.Parameter;
 import java.io.InputStream;
+import java.net.URI;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -29,7 +30,7 @@ import java.util.function.Supplier;
 final class PageRepeats {
 
   private final Map<String, Page> pagesByHash = new HashMap<>();
-  private final Map<List<List<Parameter>>, Page> pagesByRequest = new HashMap<>();
+  private final Map<Request, Page> pagesByRequest = new HashMap<>();
   private Supplier<String> currentHash;
 
   /**
@@ -70,7 +71,9 @@ final class PageRepeats {
     return Optional.ofNullable(pagesByRequest.putIfAbsent(request(page), page));
   }
 
-  private static List<List<Parameter>> request(Page page) {
-    return List.of(page.queryParameters(), page.headers());
+  private static Request request(Page page) {
+    return new Request(page.url(), page.queryParameters(), page.headers());
   }
+
+  private record Request(Optional<URI> url, List<Parameter> query, List<Parameter> headers) {}
 }

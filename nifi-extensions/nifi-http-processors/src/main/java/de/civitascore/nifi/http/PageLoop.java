@@ -77,14 +77,13 @@ final class PageLoop {
   }
 
   private RunResult readPages(ProcessSession session, Authentication authentication) {
-    Pagination pagination = apiCall.pagination();
     List<FlowFile> pages = new ArrayList<>();
-    Page page = pagination.first();
+    Page page = withRequestUrl(apiCall.pagination().first(), new NoAuthentication());
     PageRepeats repeats = new PageRepeats(page);
     for (int read = 1; ; read++) {
       ApiCallOutcome outcome = client.send(apiCall, page, authentication);
       Optional<Page> next;
-      switch (accept(session, page, outcome, pages, repeats)) {
+      switch (accept(session, withRequestUrl(page, authentication), outcome, pages, repeats)) {
         case PageRead.Failed failed -> {
           return new RunResult.Failed(pages, failed.failure());
         }
@@ -112,6 +111,12 @@ final class PageLoop {
             pages, ApiCallOutcome.Failure.ofStopped(apiCall.describe(page)));
       }
     }
+  }
+
+  private Page withRequestUrl(Page page, Authentication authentication) {
+    return apiCall.pagination() instanceof NextLinkPagination
+        ? page.withUrl(client.uri(apiCall, page, authentication))
+        : page;
   }
 
   /**
@@ -222,7 +227,12 @@ final class PageLoop {
     attributes.put(GetHttpApiCall.REQUEST_PATH, apiCall.path());
     page.position()
         .ifPresent(
-            position -> attributes.put(GetHttpApiCall.PAGE, Long.toString(position.number())));
+            position ->
+                attributes.put(
+                    GetHttpApiCall.PAGE,
+                    apiCall.pagination() instanceof NextLinkPagination
+                        ? position.title()
+                        : Long.toString(position.number())));
     return attributes;
   }
 

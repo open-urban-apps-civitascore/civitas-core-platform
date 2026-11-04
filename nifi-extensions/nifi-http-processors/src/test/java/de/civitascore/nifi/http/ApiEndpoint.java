@@ -156,7 +156,7 @@ final class ApiEndpoint implements AutoCloseable {
     }
   }
 
-  private static ApiEndpoint startHttp(IntFunction<Response> script) {
+  static ApiEndpoint startHttp(IntFunction<Response> script) {
     try {
       return start(HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0), "http", script);
     } catch (IOException e) {

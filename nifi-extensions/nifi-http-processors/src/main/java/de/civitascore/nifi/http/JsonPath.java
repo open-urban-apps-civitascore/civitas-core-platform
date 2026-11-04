@@ -52,6 +52,17 @@ final class JsonPath {
     return GRAMMAR.matcher(text).matches() ? Optional.of(new JsonPath(text)) : Optional.empty();
   }
 
+  static Optional<JsonPath> required(String text, String keyPath, List<String> violations) {
+    if (!ApiCallParser.notBlank(text, keyPath, violations)) {
+      return Optional.empty();
+    }
+    Optional<JsonPath> path = parse(text);
+    if (path.isEmpty()) {
+      violations.add(keyPath + " must start with $ and hold only member names and array indexes");
+    }
+    return path;
+  }
+
   /** The value at the path, or a {@link MissingNode} when a step finds nothing. */
   JsonNode valueIn(JsonNode root) {
     JsonNode current = root;
