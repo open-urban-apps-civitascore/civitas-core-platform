@@ -183,8 +183,8 @@ class ControllerConventionsTest {
 
   private static DescribedPredicate<CodeUnitCallTarget> dataStructureCheckedOperation() {
     return oneOf(
-        "findOwned, create, update, updateReleasedMeta, release or unrelease with the data"
-            + " structure id, or toMetaInput(version)",
+        "findOwned, create, update, updateReleasedMeta, release, unrelease, duplicate or delete"
+            + " with the data structure id, or toMetaInput(version)",
         signature("findOwned", UUID.class, UUID.class),
         signature("create", UUID.class, DataStructureVersionInputDTO.class),
         signature("update", UUID.class, UUID.class, DataStructureVersionInputDTO.class),
@@ -192,6 +192,8 @@ class ControllerConventionsTest {
             "updateReleasedMeta", UUID.class, UUID.class, DataStructureVersionMetaInputDTO.class),
         signature("release", UUID.class, UUID.class),
         signature("unrelease", UUID.class, UUID.class),
+        signature("duplicate", UUID.class, UUID.class),
+        signature("delete", UUID.class, UUID.class),
         signature("toMetaInput", DataStructureVersion.class));
   }
 

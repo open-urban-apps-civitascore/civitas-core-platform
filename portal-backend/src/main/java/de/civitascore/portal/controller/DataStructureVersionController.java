@@ -119,7 +119,6 @@ public class DataStructureVersionController {
           "Deletes a DRAFT or AVAILABLE version that nothing uses, and its model with every"
               + " revision of it from the model registry. A deleted version number is not given"
               + " out again. The data structure stays, also without versions.")
-  @ApiResponse(responseCode = "204", description = "Data structure version deleted successfully")
   @Problems({
     ProblemType.NOT_FOUND,
     ProblemType.RESOURCE_IN_USE,
@@ -128,8 +127,7 @@ public class DataStructureVersionController {
   })
   public void deleteDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
-    dataStructureVersionService.findOwned(dataStructureId, versionId);
-    dataStructureVersionService.deleteById(versionId);
+    dataStructureVersionService.delete(dataStructureId, versionId);
   }
 
   @PatchMapping("/{versionId}/released/meta")
@@ -190,8 +188,8 @@ public class DataStructureVersionController {
   }
 
   @PostMapping("/{versionId}/duplicate")
+  @ResponseStatus(HttpStatus.CREATED)
   @Operation(
-      operationId = "duplicateDataStructureVersion",
       summary = "Duplicate a data structure version",
       description =
           "Creates a new DRAFT version with the description, model name and imported structures"
@@ -199,7 +197,6 @@ public class DataStructureVersionController {
               + " styles and references to the next major version after the highest existing one."
               + " A source without a model gives a copy without a model. Any version can be"
               + " duplicated.")
-  @ApiResponse(responseCode = "201", description = "Data structure version duplicated successfully")
   @Problems({
     ProblemType.NOT_FOUND,
     ProblemType.MODEL_REFERENCE_NOT_AVAILABLE,
@@ -209,8 +206,8 @@ public class DataStructureVersionController {
   })
   public ResponseEntity<DataStructureVersionOutputDTO> duplicateDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
-    dataStructureVersionService.findOwned(dataStructureId, versionId);
-    DataStructureVersion duplicated = dataStructureVersionService.duplicate(versionId);
+    DataStructureVersion duplicated =
+        dataStructureVersionService.duplicate(dataStructureId, versionId);
     URI location =
         ServletUriComponentsBuilder.fromCurrentContextPath()
             .path("/datastructures/{dataStructureId}/versions/{id}")

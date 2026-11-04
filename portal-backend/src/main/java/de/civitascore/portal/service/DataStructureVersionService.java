@@ -134,6 +134,26 @@ public class DataStructureVersionService
   }
 
   /**
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the version does not exist or
+   *     belongs to another data structure
+   */
+  @Transactional
+  public DataStructureVersion duplicate(UUID dataStructureId, UUID versionId) {
+    findOwned(dataStructureId, versionId);
+    return duplicate(versionId);
+  }
+
+  /**
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the version does not exist or
+   *     belongs to another data structure
+   */
+  @Transactional
+  public void delete(UUID dataStructureId, UUID versionId) {
+    findOwned(dataStructureId, versionId);
+    deleteById(versionId);
+  }
+
+  /**
    * Resolves and sets the parent data structure relationship after DTO-to-entity conversion.
    *
    * @param entity the data structure version entity
