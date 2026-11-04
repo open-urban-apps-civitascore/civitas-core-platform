@@ -347,12 +347,13 @@ A 3xx is fatal because the processor expects a web client service that does not 
 redirects (`Redirect Handling Strategy` = `IGNORED`), so a redirect shows a wrong host or path.
 
 A FlowFile on `success` carries `http.status.code` and `http.request.path`, and with pagination
-`http.page`: the page number, with cursor pagination the number of the request in the run from 1,
-or with limit/offset pagination the offset. A FlowFile on `stop` or `failure` is empty and carries
-`http.request.path`, `http.error.status` and `http.error.message`. `http.error.status` is the status
-of the response, or `0` when no response came. The message is the one the log entry and the bulletin
-show. It names the API call and its path, never the base URL, and on a page of a paginated run the
-page number, with cursor pagination the request number, or with limit/offset pagination the offset.
+`http.page`: the page number, with cursor or next link pagination the number of the request in
+the run from 1, or with limit/offset pagination the offset. A FlowFile on `stop` or `failure` is
+empty and carries `http.request.path`, `http.error.status` and `http.error.message`.
+`http.error.status` is the status of the response, or `0` when no response came. The message is the
+one the log entry and the bulletin show. It names the API call and its path, never the base URL, and
+on a page of a paginated run the page number, with cursor or next link pagination the request
+number, or with limit/offset pagination the offset.
 A 401 or 403 names the authentication method. A failed token request names the host, the port and
 the path of the token URL, and of the token response only an error code of RFC 6749, section 5.2.
 A control character or line separator in the message appears as `\r`, `\n` or `\uXXXX`, so no part
@@ -437,7 +438,8 @@ as an `ERROR` event of the Pipeline.
 
 A pagination makes a run read the pages one after the other. Each page is a request of its own,
 through the same request code as an API call without pagination. A page adds its parameters after
-the query parameters of the API call, and its headers after the headers of the API call.
+the query parameters of the API call, and its headers after the headers of the API call. A page of
+next link pagination carries the URL of its own request instead.
 
 #### Page-number pagination
 
