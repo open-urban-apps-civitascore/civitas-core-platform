@@ -1,7 +1,7 @@
 import { get, set } from 'react-hook-form'
 
 import { CONNECTOR_INPUTS } from '@/app/(main)/datasources/[datasourceId]/components/connector-tab/connectorSources'
-import { HTTP_AUTHENTICATION_TYPES } from '@/const/connectors'
+import { CONNECTOR_TYPES, HTTP_AUTHENTICATION_TYPES } from '@/const/connectors'
 import {
   ConnectorDraft,
   ConnectorType,
@@ -10,6 +10,7 @@ import {
   HttpParameterForm,
   isEmptyParameter,
   normalizeHttpBaseUrl,
+  parseStringArray,
   SECRET_PLACEHOLDER,
 } from '@/types/connectors'
 
@@ -57,35 +58,87 @@ const SECRET_FIELDS: Record<HttpAuthenticationType, readonly string[]> = {
 
 const SECRET_FIELD_NAMES = Object.values(SECRET_FIELDS).flat()
 
-export const HTTP_SECRET_PATHS = SECRET_FIELD_NAMES.map(field => `authentication.${field}`)
+const HTTP_SECRET_PATHS = SECRET_FIELD_NAMES.map(field => `authentication.${field}`)
+
+export const CONNECTOR_SECRET_PATHS: Record<ConnectorType, readonly string[]> = {
+  [CONNECTOR_TYPES.HTTP]: HTTP_SECRET_PATHS,
+  [CONNECTOR_TYPES.MQTT]: ['password'],
+  [CONNECTOR_TYPES.SQL]: ['password'],
+}
+
+type ConnectorConfiguration = Record<string, unknown>
+
+// The backend compares a SQL DSN without this prefix
+const JDBC_PREFIX = /^jdbc:/i
 
 // Scheme, host and port as written
-const HTTP_URL_DESTINATION = /^([^:/?#]+):\/\/(?:[^@/?#]*@)?(\[[^\]]*\]|[^:/?#]*)(?::(\d*))?(?:[/?#]|$)/
+const URL_DESTINATION = /^([^:/?#]+):\/\/(?:[^@/?#]*@)?(\[[^\]]*\]|[^:/?#]*)(?::(\d*))?(?:[/?#]|$)/
+
+const URL_QUERY = /^[^?#]*\?([^#]*)/
+
+// The backend counts the sslmode of the query as part of the destination
+const SSLMODE_NAME = 'sslmode'
+
+const getSslmode = (url: string) => {
+  const [, query] = URL_QUERY.exec(url) ?? []
+  for (const parameter of query?.split('&') ?? []) {
+    const [name, ...value] = parameter.split('=')
+    if (name === SSLMODE_NAME) return value.join('=')
+  }
+  return undefined
+}
 
 const toDestination = (url: string) => {
-  const [, scheme, host, port] = HTTP_URL_DESTINATION.exec(url) ?? []
-  return scheme && host ? `${scheme}://${host}:${port ?? ''}` : url
+  const [, scheme, host, port] = URL_DESTINATION.exec(url) ?? []
+  if (!scheme || !host) return url
+  const sslmode = getSslmode(url)
+  const sslmodeSuffix = sslmode === undefined ? '' : ` ${SSLMODE_NAME}=${sslmode}`
+  return `${scheme}://${host}:${port ?? ''}${sslmodeSuffix}`
 }
 
-const getDestinations = (configuration: HttpConnectionForm) => {
+const getHttpAddresses = (configuration: HttpConnectionForm) => {
   const { baseUrl, authentication } = configuration
   const tokenUrl = authentication?.type === HTTP_AUTHENTICATION_TYPES.OAUTH2 ? authentication.tokenUrl : undefined
-  const urls = [normalizeHttpBaseUrl(baseUrl ?? ''), (tokenUrl ?? '').trim()]
-  const presentUrls = urls.filter(Boolean)
-  return presentUrls.map(toDestination)
+  return [normalizeHttpBaseUrl(baseUrl ?? ''), (tokenUrl ?? '').trim()]
 }
 
-export const findSecretsToReenter = (current: HttpConnectionForm, loaded: HttpConnectionForm | undefined) => {
-  const { authentication } = current
-  if (!loaded || !authentication) return []
-  const secretFields = SECRET_FIELDS[authentication.type]
-  const maskedSecrets = Object.entries(authentication).filter(
-    ([field, value]) => secretFields.includes(field) && value === SECRET_PLACEHOLDER,
+const getAddresses = (connectorType: ConnectorType, configuration: ConnectorConfiguration) => {
+  switch (connectorType) {
+    case CONNECTOR_TYPES.HTTP:
+      return getHttpAddresses(configuration as HttpConnectionForm)
+    case CONNECTOR_TYPES.MQTT:
+      return parseStringArray(configuration.urls) ?? []
+    case CONNECTOR_TYPES.SQL:
+      return [typeof configuration.dsn === 'string' ? configuration.dsn.trim().replace(JDBC_PREFIX, '') : '']
+  }
+}
+
+const getDestinations = (connectorType: ConnectorType, configuration: ConnectorConfiguration) => {
+  const presentAddresses = getAddresses(connectorType, configuration).filter(Boolean)
+  return presentAddresses.map(toDestination)
+}
+
+const getSecretPaths = (connectorType: ConnectorType, configuration: ConnectorConfiguration) => {
+  if (connectorType !== CONNECTOR_TYPES.HTTP) return CONNECTOR_SECRET_PATHS[connectorType]
+  const { authentication } = configuration as HttpConnectionForm
+  const secretFields = authentication ? SECRET_FIELDS[authentication.type] : []
+  return secretFields.map(field => `authentication.${field}`)
+}
+
+export const findSecretsToReenter = (
+  connectorType: ConnectorType,
+  current: ConnectorConfiguration,
+  loaded: ConnectorConfiguration | undefined,
+) => {
+  if (!loaded) return []
+  const maskedSecretPaths = getSecretPaths(connectorType, current).filter(
+    path => get(current, path) === SECRET_PLACEHOLDER,
   )
-  if (!maskedSecrets.length) return []
-  const loadedDestinations = new Set(getDestinations(loaded))
-  const isAtLoadedDestinations = getDestinations(current).every(destination => loadedDestinations.has(destination))
-  return isAtLoadedDestinations ? [] : maskedSecrets.map(([field]) => `authentication.${field}`)
+  if (!maskedSecretPaths.length) return []
+  const loadedDestinations = new Set(getDestinations(connectorType, loaded))
+  const currentDestinations = getDestinations(connectorType, current)
+  const isAtLoadedDestinations = currentDestinations.every(destination => loadedDestinations.has(destination))
+  return isAtLoadedDestinations ? [] : maskedSecretPaths
 }
 
 const FIELD_VALUE_TYPES = new Set(['string', 'number', 'boolean'])

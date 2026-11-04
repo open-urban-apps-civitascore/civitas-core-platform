@@ -835,3 +835,69 @@ describe('useDatasourceForm with an HTTP connector', () => {
     expect(connector.authentication).toEqual({ type: 'NONE' })
   })
 })
+
+describe('useDatasourceForm with the password of MQTT or SQL', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  const createSqlDatasource = (): Datasource => ({
+    ...createDatasource('DRAFT'),
+    connector: {
+      connectorType: 'SQL',
+      driver: 'postgres',
+      dsn: 'postgres://db.example.org:5432/stations?sslmode=require',
+      table: 'stations',
+      columns: ['*'],
+      where: null,
+      user: 'reader',
+      password: '********',
+    },
+  })
+
+  const getPasswordError = (result: ReturnType<typeof renderDatasourceForm>['result']) =>
+    result.current.form.getFieldState('configuration.password').error?.message
+
+  const submit = async (result: ReturnType<typeof renderDatasourceForm>['result']) => {
+    let isSaved = false
+    await act(async () => {
+      isSaved = await result.current.submitDatasource()
+    })
+    return isSaved
+  }
+
+  it.each([
+    ['MQTT', createDatasource('DRAFT'), 'configuration.urls', 'mqtt://other.example.org:1883'],
+    ['SQL', createSqlDatasource(), 'configuration.dsn', 'postgres://other.example.org:5432/stations?sslmode=require'],
+  ] as const)('asks for the %s password again when the address changes', async (_type, datasource, path, address) => {
+    const { result } = renderDatasourceForm(datasource)
+    const loadedAddress = result.current.form.getValues(path)
+
+    act(() => result.current.form.setValue(path, address, { shouldDirty: true }))
+
+    await waitFor(() => expect(getPasswordError(result)).toBe('datasources.errors.reenterSecret'))
+    expect(await submit(result)).toBe(false)
+    expect(mockUpdateDatasource).not.toHaveBeenCalled()
+
+    act(() => result.current.form.setValue(path, loadedAddress, { shouldDirty: true }))
+
+    await waitFor(() => expect(getPasswordError(result)).toBeUndefined())
+  })
+
+  it('asks for the SQL password again when the backend refuses the stored secret', async () => {
+    mockUpdateDatasource.mockRejectedValue(
+      mockApiError(
+        400,
+        'The stored secret is kept only for the stored destination; enter it again for another one',
+        'urn:civitas:error:MALFORMED_REQUEST',
+      ),
+    )
+    const { result } = renderDatasourceForm(createSqlDatasource())
+    act(() => result.current.form.setValue('configuration.table', 'other_stations', { shouldDirty: true }))
+
+    expect(await submit(result)).toBe(false)
+
+    expect(getPasswordError(result)).toBe('datasources.errors.reenterSecret')
+    expect(toast.error).toHaveBeenCalledWith('errors.storedSecretRefused')
+  })
+})

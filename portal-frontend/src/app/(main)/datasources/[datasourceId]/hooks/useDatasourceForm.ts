@@ -22,7 +22,6 @@ import {
   emptyHttpAuthentication,
   HttpApiCallsStrictSchema,
   HttpAuthenticationType,
-  HttpConnectionForm,
   SECRET_PLACEHOLDER,
 } from '@/types/connectors'
 import { Datapool } from '@/types/datapools'
@@ -41,7 +40,12 @@ import {
   DatasourceTab,
 } from '@/types/datasources'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
-import { findSecretsToReenter, getConnectorDefaults, HTTP_SECRET_PATHS, toFormConnectorPath } from '@/utils/connectors'
+import {
+  CONNECTOR_SECRET_PATHS,
+  findSecretsToReenter,
+  getConnectorDefaults,
+  toFormConnectorPath,
+} from '@/utils/connectors'
 import {
   getConnectorFieldErrorPaths,
   isDatastructureNotAvailableError,
@@ -67,11 +71,14 @@ const AUTHENTICATION_TYPE_PATH = 'configuration.authentication.type'
 type ConnectorValues = { connectorType?: ConnectorType; configuration?: Record<string, unknown> }
 
 const getSecretsToReenter = (values: ConnectorValues, loadedValues: ConnectorValues | undefined) => {
-  if (values.connectorType !== CONNECTOR_TYPES.HTTP || !values.configuration) return []
-  const isLoadedHttp = loadedValues?.connectorType === CONNECTOR_TYPES.HTTP
-  const loaded = isLoadedHttp ? (loadedValues.configuration as HttpConnectionForm | undefined) : undefined
-  return findSecretsToReenter(values.configuration as HttpConnectionForm, loaded)
+  const { connectorType, configuration } = values
+  if (!connectorType || !configuration) return []
+  const loaded = loadedValues?.connectorType === connectorType ? loadedValues.configuration : undefined
+  return findSecretsToReenter(connectorType, configuration, loaded)
 }
+
+const getConnectorSecretPaths = (connectorType: ConnectorType | undefined) =>
+  connectorType ? CONNECTOR_SECRET_PATHS[connectorType] : []
 
 const toConnectorPayloadKey = (values: unknown) => {
   const parsed = ConnectorFormToApiSchema.safeParse(values)
@@ -206,7 +213,8 @@ export const useDatasourceForm = (
 
   useEffect(() => {
     setReenterSecretErrors()
-    const resolvedPaths = HTTP_SECRET_PATHS.filter(path => !secretsToReenter.includes(path))
+    const secretPaths = getConnectorSecretPaths(connectorTypeWatch)
+    const resolvedPaths = secretPaths.filter(path => !secretsToReenter.includes(path))
     for (const path of resolvedPaths) {
       const fieldPath = `configuration.${path}` as const
       if (form.getFieldState(fieldPath).error?.message === REENTER_SECRET_MESSAGE) {
@@ -320,8 +328,9 @@ export const useDatasourceForm = (
   }
 
   const setMaskedSecretErrors = () => {
-    const configuration = form.getValues('configuration')
-    const maskedSecretPaths = HTTP_SECRET_PATHS.filter(path => get(configuration, path) === SECRET_PLACEHOLDER)
+    const { connectorType, configuration } = form.getValues()
+    const secretPaths = getConnectorSecretPaths(connectorType)
+    const maskedSecretPaths = secretPaths.filter(path => get(configuration, path) === SECRET_PLACEHOLDER)
     for (const path of maskedSecretPaths) {
       form.setError(`configuration.${path}`, { type: 'custom', message: REENTER_SECRET_MESSAGE })
     }
