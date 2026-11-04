@@ -22,6 +22,7 @@ final class PaginationParser {
   private static final String PAGE_NUMBER = "PAGE_NUMBER";
   private static final String CURSOR = "CURSOR";
   private static final String LIMIT_OFFSET = "LIMIT_OFFSET";
+  private static final String NEXT_LINK = "NEXT_LINK";
   private static final String PAGE_PARAMETER = "pagination.pageParameter";
   private static final String PAGE_SIZE_PARAMETER = "pagination.pageSizeParameter";
   private static final String CURSOR_PATH = "pagination.cursorPath";
@@ -53,17 +54,19 @@ final class PaginationParser {
     PaginationNames names = new PaginationNames(queryParameters, headers);
     return switch (pagination.type()) {
       case PAGE_NUMBER -> pageNumber(pagination, names, violations);
-      case "NEXT_LINK" -> nextLink(pagination, violations);
       case CURSOR -> cursor(pagination, names, violations);
       case LIMIT_OFFSET -> limitOffset(pagination, names, violations);
+      case NEXT_LINK -> nextLink(pagination, violations);
       case null, default -> {
         violations.add(
             "pagination.type must be "
                 + PAGE_NUMBER
                 + ", "
                 + CURSOR
-                + ", NEXT_LINK or "
-                + LIMIT_OFFSET);
+                + ", "
+                + LIMIT_OFFSET
+                + " or "
+                + NEXT_LINK);
         yield Optional.empty();
       }
     };
