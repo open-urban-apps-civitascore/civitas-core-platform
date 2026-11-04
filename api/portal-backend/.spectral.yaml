@@ -1,1 +1,39 @@
-extends: ["spectral:oas"]
+extends:
+  - spectral:oas
+  - "@stoplight/spectral-owasp-ruleset"
+
+rules:
+  operation-description: error
+  operation-success-response: error
+  oas3-unused-component: error
+  oas3-parameter-description: error
+
+  # Crashes on this spec in ruleset version 2.0.1
+  owasp:api2:2023-no-credentials-in-url: off
+  # Rate limits and CORS are set by the gateway in front of the backend, not by the backend
+  owasp:api4:2023-rate-limit: off
+  owasp:api4:2023-rate-limit-responses-429: off
+  owasp:api4:2023-rate-limit-retry-after: off
+  owasp:api8:2023-define-cors-origin: off
+
+  error-responses-use-problem-json:
+    description: Error responses are RFC 9457 problem details.
+    message: "Error response media type {{property}} must be application/problem+json."
+    severity: error
+    given: "$.paths[*][*].responses[?(@property.match(/^[45]/))].content"
+    then:
+      field: "@key"
+      function: pattern
+      functionOptions:
+        match: "^application/problem\\+json$"
+
+  collection-segments-plural:
+    description: A path segment that is followed by an ID names a collection, so it is plural.
+    message: "{{property}} has a singular collection segment."
+    severity: error
+    given: "$.paths"
+    then:
+      field: "@key"
+      function: pattern
+      functionOptions:
+        notMatch: "/[a-z-]*[^s/{}]/\\{"

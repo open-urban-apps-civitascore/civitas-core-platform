@@ -45,12 +45,18 @@ from the branch `ci/openapi-spec-update` whenever the export differs from the co
 pipeline refreshes the merge request.
 
 `lint-openapi-spec` lints the export with [Spectral](https://github.com/stoplightio/spectral)
-and the ruleset in `.spectral.yaml`; its findings show in the Code Quality widget of the merge
-request. To lint the spec of a locally running backend:
+and the ruleset in `.spectral.yaml`: the Spectral OpenAPI rules, the
+[OWASP API Security rules](https://github.com/stoplightio/spectral-owasp-ruleset), and the
+conventions of this API. Its findings show in the Code Quality widget of the merge request.
+To lint the spec of a locally running backend, set the two versions from `.gitlab-ci.yml`:
 
 ```sh
+npm install --no-save --prefix api/portal-backend \
+  @stoplight/spectral-cli@$SPECTRAL_CLI_VERSION \
+  @stoplight/spectral-owasp-ruleset@$SPECTRAL_OWASP_RULESET_VERSION
 curl -s http://localhost:8089/v1/api-docs.yaml -o /tmp/openapi.yaml
-npx @stoplight/spectral-cli lint /tmp/openapi.yaml --ruleset api/portal-backend/.spectral.yaml
+api/portal-backend/node_modules/.bin/spectral lint /tmp/openapi.yaml \
+  --ruleset api/portal-backend/.spectral.yaml
 ```
 
 `update-openapi-spec` needs the masked and protected CI/CD variable `OPENAPI_BOT_TOKEN`: a
