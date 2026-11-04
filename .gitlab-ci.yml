@@ -155,7 +155,7 @@ variables:
   CHECK_JSONSCHEMA_VERSION: '0.38.2' # validate-schemas-model-forge
   DEPCHECK_VERSION: '1.4.7' # lint-frontend
   SPECTRAL_CLI_VERSION: '6.17.0' # lint-openapi-spec
-  SPECTRAL_OWASP_RULESET_VERSION: '2.0.1' # lint-openapi-spec
+  SPECTRAL_OWASP_RULESET_VERSION: '2.0.1' # lint-openapi-spec; .spectral.yaml turns off a rule that crashes in this version
   PLAYWRIGHT_VERSION: '1.58.2' # e2e-test-frontend; keep equal to @playwright/test in portal-frontend/package.json
   TRIVY_GATE_SEVERITY: 'CRITICAL' # Container scan fails on fixable findings of these severities. Stricter: 'HIGH,CRITICAL'
   GITLAB_ADVANCED_SAST_ENABLED: 'true'

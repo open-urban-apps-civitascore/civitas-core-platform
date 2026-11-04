@@ -36,4 +36,4 @@ rules:
       field: "@key"
       function: pattern
       functionOptions:
-        notMatch: "/[a-z-]*[^s/{}]/\\{"
+        notMatch: "/[^/{}]*[^s/{}]/\\{"
