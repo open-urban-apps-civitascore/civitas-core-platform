@@ -658,6 +658,70 @@ describe('useDatasourceForm with an HTTP connector', () => {
       expect(toast.error).toHaveBeenCalledWith('errors.storedSecretRefused')
     })
 
+    it('asks for the masked password again when the backend refuses the stored secret', async () => {
+      mockUpdateDatasource.mockRejectedValue(
+        mockApiError(
+          400,
+          'The stored secret is kept only for the stored destination; enter it again for another one',
+          'urn:civitas:error:MALFORMED_REQUEST',
+        ),
+      )
+      const { result } = renderDatasourceForm(createHttpDatasource())
+      act(() =>
+        result.current.form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true }),
+      )
+
+      await submit(result)
+
+      expect(getPasswordError(result)).toBe('datasources.errors.reenterSecret')
+    })
+
+    it('shows the fields that the backend rejects at the field', async () => {
+      mockUpdateDatasource.mockRejectedValue(
+        mockApiError(400, 'Input validation failed', 'urn:civitas:error:VALIDATION_FAILED', {
+          fieldErrors: [
+            { field: 'connector.baseUrl', message: "'baseUrl' must use https with authentication" },
+            { field: 'connector.apiCalls[0].path', message: "'path' is invalid" },
+            { field: 'connector.apiCalls[0]', message: "'name' must be unique among the API calls" },
+          ],
+        }),
+      )
+      const { result } = renderDatasourceForm(createHttpDatasource())
+      act(() =>
+        result.current.form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true }),
+      )
+
+      expect(await submit(result)).toBe(false)
+
+      const { form } = result.current
+      expect(form.getFieldState('configuration.baseUrl').error?.message).toBe('datasources.errors.rejectedByServer')
+      expect(form.getFieldState('configuration.apiCalls.0.path' as Path<DatasourceFormDraft>).error?.message).toBe(
+        'datasources.errors.rejectedByServer',
+      )
+      expect(form.getFieldState('configuration.apiCalls.0' as Path<DatasourceFormDraft>).error?.message).toBeUndefined()
+      expect(toast.error).toHaveBeenCalledWith('errors.updateError')
+    })
+
+    it('clears the errors of the backend when the user saves again', async () => {
+      mockUpdateDatasource.mockRejectedValueOnce(
+        mockApiError(400, 'Input validation failed', 'urn:civitas:error:VALIDATION_FAILED', {
+          fieldErrors: [{ field: 'connector.apiCalls[0].path', message: "'path' is invalid" }],
+        }),
+      )
+      const { result } = renderDatasourceForm(createHttpDatasource())
+      const pathField = 'configuration.apiCalls.0.path' as Path<DatasourceFormDraft>
+      act(() =>
+        result.current.form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true }),
+      )
+      await submit(result)
+      expect(result.current.form.getFieldState(pathField).error?.message).toBe('datasources.errors.rejectedByServer')
+
+      mockUpdateDatasource.mockRejectedValueOnce(mockApiError(500, 'Internal server error'))
+      await submit(result)
+
+      expect(result.current.form.getFieldState(pathField).error).toBeUndefined()
+    })
+
     it('shows the general message for another update error', async () => {
       mockUpdateDatasource.mockRejectedValue(mockApiError(400, 'Failed to read request body'))
       const { result } = renderDatasourceForm(createHttpDatasource())
@@ -667,6 +731,7 @@ describe('useDatasourceForm with an HTTP connector', () => {
 
       expect(await submit(result)).toBe(false)
       expect(toast.error).toHaveBeenCalledWith('errors.updateError')
+      expect(result.current.form.formState.errors.configuration).toBeUndefined()
     })
   })
 

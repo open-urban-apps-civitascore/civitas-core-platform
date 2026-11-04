@@ -1044,7 +1044,8 @@
       "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert.",
       "reenterSecret": "Die URL hat sich geändert. Bitte geben Sie diesen Wert erneut ein.",
       "storedSecretRefused": "Die URL hat sich geändert. Bitte geben Sie die Secrets der Authentifizierung erneut ein.",
-      "parameterApiTokenDuplicate": "Das API-Token hat bereits diesen Namen."
+      "parameterApiTokenDuplicate": "Das API-Token hat bereits diesen Namen.",
+      "rejectedByServer": "Dieser Wert kann nicht gespeichert werden."
     },
     "connection": {
       "active": "aktiv",

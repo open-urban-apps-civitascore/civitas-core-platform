@@ -598,7 +598,7 @@ const HttpParameterFormSchema = z.object({ name: z.string().trim(), value: z.str
 
 export type HttpParameterForm = z.infer<typeof HttpParameterFormSchema>
 
-const isEmptyParameter = (parameter: HttpParameterForm) => !parameter.name && !parameter.value
+export const isEmptyParameter = (parameter: HttpParameterForm) => !parameter.name.trim() && !parameter.value
 
 const withoutEmptyParameters = (parameters: HttpParameterForm[]) =>
   parameters.filter(parameter => !isEmptyParameter(parameter))

@@ -1,4 +1,4 @@
-import { set } from 'react-hook-form'
+import { get, set } from 'react-hook-form'
 
 import { CONNECTOR_INPUTS } from '@/app/(main)/datasources/[datasourceId]/components/connector-tab/connectorSources'
 import { HTTP_AUTHENTICATION_TYPES } from '@/const/connectors'
@@ -8,6 +8,7 @@ import {
   HttpAuthenticationType,
   HttpConnectionForm,
   HttpParameterForm,
+  isEmptyParameter,
   normalizeHttpBaseUrl,
   SECRET_PLACEHOLDER,
 } from '@/types/connectors'
@@ -85,4 +86,29 @@ export const findSecretsToReenter = (current: HttpConnectionForm, loaded: HttpCo
   const loadedDestinations = new Set(getDestinations(loaded))
   const isAtLoadedDestinations = getDestinations(current).every(destination => loadedDestinations.has(destination))
   return isAtLoadedDestinations ? [] : maskedSecrets.map(([field]) => `authentication.${field}`)
+}
+
+const FIELD_VALUE_TYPES = new Set(['string', 'number', 'boolean'])
+
+const SENT_PARAMETER_PATH = /^(apiCalls\.\d+\.(?:queryParameters|headers))\.(\d+)(.*)$/
+
+const toFormRowPath = (path: string, configuration: unknown) => {
+  const [, listPath, sentIndex, rest] = SENT_PARAMETER_PATH.exec(path) ?? []
+  if (!listPath) return path
+  const parameters: HttpParameterForm[] = get(configuration, listPath) ?? []
+  const sentRowIndexes = parameters.flatMap((parameter, index) => (isEmptyParameter(parameter) ? [] : [index]))
+  const rowIndex = sentRowIndexes[Number(sentIndex)]
+  return rowIndex === undefined ? undefined : `${listPath}.${rowIndex}${rest}`
+}
+
+const isFieldValuePath = (path: string, configuration: unknown) => {
+  const parentPath = path.slice(0, Math.max(path.lastIndexOf('.'), 0))
+  const parent: unknown = parentPath ? get(configuration, parentPath) : configuration
+  const value: unknown = get(configuration, path)
+  return typeof parent === 'object' && parent !== null && FIELD_VALUE_TYPES.has(typeof value)
+}
+
+export const toFormConnectorPath = (path: string, configuration: unknown) => {
+  const formPath = toFormRowPath(path, configuration)
+  return formPath && isFieldValuePath(formPath, configuration) ? formPath : undefined
 }

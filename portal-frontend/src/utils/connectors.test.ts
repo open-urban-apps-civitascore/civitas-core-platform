@@ -6,6 +6,7 @@ import {
   formatPathWithQuery,
   getConnectorDefaults,
   getConnectorFormData,
+  toFormConnectorPath,
 } from './connectors'
 
 vi.mock('@/app/(main)/datasources/[datasourceId]/components/connector-tab/connectorSources', () => ({
@@ -194,5 +195,60 @@ describe('findSecretsToReenter', () => {
 
   it('asks for no secret when the loaded connector type is not HTTP', () => {
     expect(findSecretsToReenter({ baseUrl: 'https://other.example.org', authentication: BASIC }, undefined)).toEqual([])
+  })
+})
+
+describe('toFormConnectorPath', () => {
+  const CONFIGURATION = {
+    baseUrl: 'https://api.example.org/v1',
+    tls: false,
+    topics: 'sensors',
+    apiCalls: [
+      {
+        name: 'Get all stations',
+        path: '',
+        headers: [
+          { name: '', value: '' },
+          { name: 'Host', value: 'x' },
+        ],
+        queryParameters: [{ name: 'status', value: 'active' }],
+      },
+    ],
+  }
+
+  it.each([
+    ['a field', 'baseUrl', 'baseUrl'],
+    ['an empty field', 'apiCalls.0.path', 'apiCalls.0.path'],
+    ['a header after an empty row', 'apiCalls.0.headers.0.name', 'apiCalls.0.headers.1.name'],
+    ['a query parameter', 'apiCalls.0.queryParameters.0.value', 'apiCalls.0.queryParameters.0.value'],
+  ])('returns the form path of %s', (_name, path, formPath) => {
+    expect(toFormConnectorPath(path, CONFIGURATION)).toBe(formPath)
+  })
+
+  it.each([
+    ['an API call', 'apiCalls.0'],
+    ['a part of a check box', 'tls.enabled'],
+    ['a part of a text', 'topics.0'],
+    ['a missing field', 'authentication.name'],
+    ['a header that was not sent', 'apiCalls.0.headers.1.name'],
+  ])('returns no form path for %s', (_name, path) => {
+    expect(toFormConnectorPath(path, CONFIGURATION)).toBeUndefined()
+  })
+
+  it('skips a row whose name has only spaces', () => {
+    const configuration = {
+      apiCalls: [
+        {
+          queryParameters: [
+            { name: '  ', value: '' },
+            { name: 'status', value: 'active' },
+          ],
+        },
+      ],
+    }
+
+    expect(toFormConnectorPath('apiCalls.0.queryParameters.0.name', configuration)).toBe(
+      'apiCalls.0.queryParameters.1.name',
+    )
   })
 })

@@ -1052,7 +1052,8 @@
       "groupsWithoutRoles": "Groups with no assigned Roles have not been saved.",
       "reenterSecret": "The URL changed. Enter this value again.",
       "storedSecretRefused": "The URL changed. Enter the secrets of the authentication again.",
-      "parameterApiTokenDuplicate": "The API token already has this name."
+      "parameterApiTokenDuplicate": "The API token already has this name.",
+      "rejectedByServer": "This value cannot be saved."
     },
     "connection": {
       "active": "active",

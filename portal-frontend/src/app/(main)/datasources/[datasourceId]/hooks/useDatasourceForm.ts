@@ -23,6 +23,7 @@ import {
   HttpApiCallsStrictSchema,
   HttpAuthenticationType,
   HttpConnectionForm,
+  SECRET_PLACEHOLDER,
 } from '@/types/connectors'
 import { Datapool } from '@/types/datapools'
 import {
@@ -40,11 +41,18 @@ import {
   DatasourceTab,
 } from '@/types/datasources'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
-import { findSecretsToReenter, getConnectorDefaults, HTTP_SECRET_PATHS } from '@/utils/connectors'
-import { isDatastructureNotAvailableError, isResourceInUseError, isStoredSecretRefusedError } from '@/utils/errors'
+import { findSecretsToReenter, getConnectorDefaults, HTTP_SECRET_PATHS, toFormConnectorPath } from '@/utils/connectors'
+import {
+  getConnectorFieldErrorPaths,
+  isDatastructureNotAvailableError,
+  isResourceInUseError,
+  isStoredSecretRefusedError,
+} from '@/utils/errors'
 import { hasDirtyField, pickDirtyValues } from '@/utils/form'
 
 const REENTER_SECRET_MESSAGE = 'datasources.errors.reenterSecret'
+
+const REJECTED_BY_SERVER_MESSAGE = 'datasources.errors.rejectedByServer'
 
 const AUTHENTICATION_TYPE_PATH = 'configuration.authentication.type'
 
@@ -300,6 +308,26 @@ export const useDatasourceForm = (
     return { id, name: nameWatch, description, datapoolScope, assignments }
   }
 
+  const serverErrorPaths = useRef<string[]>([])
+
+  const clearServerErrors = () => {
+    for (const path of serverErrorPaths.current) {
+      const fieldPath = `configuration.${path}` as const
+      if (form.getFieldState(fieldPath).error?.message === REJECTED_BY_SERVER_MESSAGE) {
+        form.clearErrors(fieldPath)
+      }
+    }
+    serverErrorPaths.current = []
+  }
+
+  const setMaskedSecretErrors = () => {
+    const configuration = form.getValues('configuration')
+    const maskedSecretPaths = HTTP_SECRET_PATHS.filter(path => get(configuration, path) === SECRET_PLACEHOLDER)
+    for (const path of maskedSecretPaths) {
+      form.setError(`configuration.${path}`, { type: 'custom', message: REENTER_SECRET_MESSAGE })
+    }
+  }
+
   const handleUpdateValues = async (values: DatasourcePatchData) => {
     const hasInvalidAssignments = assignedGroups.some(group => group.assignedRoles.length === 0)
 
@@ -315,12 +343,23 @@ export const useDatasourceForm = (
       }
       return response.data
     } catch (error) {
-      toast.error(t(isStoredSecretRefusedError(error) ? 'errors.storedSecretRefused' : 'errors.updateError'))
+      const isStoredSecretRefused = isStoredSecretRefusedError(error)
+      if (isStoredSecretRefused) {
+        setMaskedSecretErrors()
+      }
+      const configuration = form.getValues('configuration')
+      const formPaths = (getConnectorFieldErrorPaths(error) ?? []).map(path => toFormConnectorPath(path, configuration))
+      serverErrorPaths.current = formPaths.filter((path): path is string => !!path)
+      for (const path of serverErrorPaths.current) {
+        form.setError(`configuration.${path}`, { type: 'server', message: REJECTED_BY_SERVER_MESSAGE })
+      }
+      toast.error(t(isStoredSecretRefused ? 'errors.storedSecretRefused' : 'errors.updateError'))
       throw error
     }
   }
 
   const submitDatasource = async (onSuccess?: () => void): Promise<boolean> => {
+    clearServerErrors()
     const values = form.getValues()
     const parsed = isDraftMode
       ? DatasourceFormDraftSchema.safeParse(values)
