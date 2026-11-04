@@ -1,36 +1,14 @@
 import { expect, test } from '@playwright/test'
 
-import { Authority } from '@/types/users'
-
-import { JSON_SERVER_HOST, JSON_SERVER_PORT } from '../../playwright.config'
 import { getMockUserData } from '../../playwright/helpers/userFactory'
 import { pickSelectOption } from '../utils/formUtils'
 
-const URL = `${JSON_SERVER_HOST}:${JSON_SERVER_PORT}`
-
 const MOCK_USER_1 = getMockUserData()
-
-const MOCK_AUTHORITIES = [
-  {
-    id: '1',
-    title: 'authority1',
-    departments: [
-      {
-        id: '1',
-        title: 'department1',
-      },
-    ],
-  },
-]
 
 // users tests are skipped because list view uses API and create and edit user use json-server
 
 test.describe.skip('Create User Flow', async () => {
   test.beforeEach(async ({ page }) => {
-    await page.route(`${URL}/authorities`, async route => {
-      const json: Authority[] = MOCK_AUTHORITIES
-      await route.fulfill({ json })
-    })
     await page.goto('/users/create')
   })
 
@@ -101,10 +79,7 @@ test.describe.skip('Create User Flow', async () => {
     await page.getByTestId('firstNameTextField').fill(MOCK_USER_1.firstName)
     await page.getByTestId('lastNameTextField').fill(MOCK_USER_1.lastName)
     await page.getByTestId('emailTextField').fill(MOCK_USER_1.email)
-    await page.getByTestId('phoneTextField').fill(MOCK_USER_1.phone)
-    await pickSelectOption(page, 'authority')
-    await pickSelectOption(page, 'department')
-    await page.getByTestId('positionDescriptionTextArea').fill(MOCK_USER_1.positionDescription || '')
+    await page.getByTestId('phoneTextField').fill(MOCK_USER_1.phone ?? '')
     await page.getByTestId('activeSwitch').click()
 
     await page.getByTestId('confirmButton').click()

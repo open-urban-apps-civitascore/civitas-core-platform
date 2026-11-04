@@ -14,7 +14,7 @@ describe('CompletionStep', () => {
           datasetId="1"
           step={{
             title: 'Test Title',
-            buttons: [{ text: 'Test Button', routeParam: 'metadata' }],
+            buttons: [{ text: 'Test Button', routeParam: 'access-management' }],
             isCompleted: true,
             content: <p>Test</p>,
           }}
@@ -36,8 +36,8 @@ describe('CompletionStep', () => {
           step={{
             title: 'Test Title',
             buttons: [
-              { text: 'Test Button 1', routeParam: 'metadata' },
-              { text: 'Test Button 2', routeParam: 'data' },
+              { text: 'Test Button 1', routeParam: 'access-management' },
+              { text: 'Test Button 2', routeParam: 'data-flow' },
             ],
             isCompleted: false,
           }}
@@ -62,7 +62,7 @@ describe('CompletionStep', () => {
           datasetId="1"
           step={{
             title: 'Test Title',
-            buttons: [{ text: 'Test Button', routeParam: 'metadata' }],
+            buttons: [{ text: 'Test Button', routeParam: 'access-management' }],
           }}
         />
       </NextIntlClientProvider>,
@@ -78,7 +78,7 @@ describe('CompletionStep', () => {
           datasetId="1"
           step={{
             title: 'Test Title',
-            buttons: [{ text: 'Test Button', routeParam: 'metadata' }],
+            buttons: [{ text: 'Test Button', routeParam: 'access-management' }],
             isCompleted: false,
           }}
           disabled={true}

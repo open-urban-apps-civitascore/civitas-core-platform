@@ -2,7 +2,8 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import { useEffect } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 
-import { API_TYPE_QUERY, LayerFormData, OwsApiFormData } from '@/types/namedApis'
+import { LayerFormData } from '@/types/layers'
+import { API_TYPE_QUERY, OwsApiFormData } from '@/types/namedApis'
 
 import { BoundingBoxConfig } from './BoundingBoxConfig'
 
