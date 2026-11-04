@@ -4,7 +4,6 @@
     "next-env.d.ts",
     "src/**/*.ts",
     "src/**/*.tsx",
-    ".storybook/**/*",
     ".next/types/**/*.ts",
     "playwright/**/*.ts",
     "e2e/**/*.ts",
