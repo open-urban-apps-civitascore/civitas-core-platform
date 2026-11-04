@@ -11,21 +11,15 @@ import {
   DISABLED_INPUT_CLASS_NAME,
 } from '@/components/form/fields/disabledFieldClassNames'
 import { Form } from '@/components/ui/form'
+import { EMPTY_CURSOR_PAGINATION, EMPTY_LIMIT_OFFSET_PAGINATION, EMPTY_PAGINATION } from '@/const/connectors'
 import {
   CURSOR_PAGINATION_FORM,
   LIMIT_OFFSET_PAGINATION_FORM,
   PAGINATION_FORM,
 } from '@/test-support/paginationFixtures'
-import {
-  ApiCallSnapshots,
-  CollapsedApiCallSections,
-  EMPTY_CURSOR_PAGINATION,
-  EMPTY_LIMIT_OFFSET_PAGINATION,
-  EMPTY_PAGINATION,
-  HttpApiCallForm,
-  HttpAuthenticationForm,
-} from '@/types/connectors'
+import { HttpAuthenticationForm } from '@/types/connectors'
 import { DatasourceFormDraft, DatasourceFormDraftSchema } from '@/types/datasources'
+import { ApiCallSnapshots, CollapsedApiCallSections, HttpApiCallForm } from '@/types/httpApiCalls'
 
 import { ApiCallsTab } from './ApiCallsTab'
 

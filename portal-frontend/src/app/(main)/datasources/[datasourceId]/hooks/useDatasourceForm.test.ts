@@ -4,7 +4,8 @@ import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { mockApiError } from '@/__mocks__/errors/apiError.mock'
-import { EMPTY_PAGINATION, HttpAuthenticationType } from '@/types/connectors'
+import { EMPTY_PAGINATION } from '@/const/connectors'
+import { HttpAuthenticationType } from '@/types/connectors'
 import { DATAPOOL_SCOPE_TYPES, Datasource, DatasourceFormDraft, DatasourceStatusType } from '@/types/datasources'
 
 import { useDatasourceForm } from './useDatasourceForm'

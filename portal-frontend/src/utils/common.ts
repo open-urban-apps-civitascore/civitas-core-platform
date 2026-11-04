@@ -23,6 +23,15 @@ export const getRequestEndpoint = <TValue>(endpointFn: (value: TValue) => string
   return endpointFn(value)
 }
 
+export const isValidUri = (v: string) => {
+  try {
+    new URL(v)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export const isNewItem = <T extends WithId>(item: T) => item.id?.startsWith('new-') ?? false
 
 export const getEmptyLabelIndex = (allLabels: string[], currentIndex: number) =>

@@ -7,9 +7,10 @@ import { useForm, UseFormReturn } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 
 import { Form } from '@/components/ui/form'
-import { ConnectorType, emptyHttpAuthentication, HttpAuthenticationType } from '@/types/connectors'
+import { ConnectorType, HttpAuthenticationType } from '@/types/connectors'
 import type { DatasourceFormDraft } from '@/types/datasources'
 import { DatasourceFormDraftSchema } from '@/types/datasources'
+import { emptyHttpAuthentication } from '@/utils/connectorMappers'
 
 import { ConnectorTab } from './ConnectorTab'
 

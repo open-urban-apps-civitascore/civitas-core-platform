@@ -1,18 +1,17 @@
 import { get, set } from 'react-hook-form'
 
 import { CONNECTOR_INPUTS } from '@/app/(main)/datasources/[datasourceId]/components/connector-tab/connectorSources'
-import { CONNECTOR_TYPES, HTTP_AUTHENTICATION_TYPES } from '@/const/connectors'
+import { CONNECTOR_TYPES, HTTP_AUTHENTICATION_TYPES, SECRET_PLACEHOLDER } from '@/const/connectors'
 import {
   ConnectorDraft,
   ConnectorType,
   HttpAuthenticationType,
   HttpConnectionForm,
-  HttpParameterForm,
-  isEmptyParameter,
   normalizeHttpBaseUrl,
   parseStringArray,
-  SECRET_PLACEHOLDER,
 } from '@/types/connectors'
+import { HttpParameterForm } from '@/types/httpApiCalls'
+import { isEmptyParameter } from '@/utils/connectorMappers'
 
 type ConnectorConfig = NonNullable<ConnectorDraft['configuration']>
 

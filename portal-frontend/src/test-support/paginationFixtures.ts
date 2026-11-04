@@ -1,5 +1,5 @@
 import { HttpCursorPagination, HttpLimitOffsetPagination, HttpPageNumberPagination } from '@/generated/core'
-import { HttpCursorPaginationForm, HttpLimitOffsetPaginationForm, HttpPaginationForm } from '@/types/connectors'
+import { HttpCursorPaginationForm, HttpLimitOffsetPaginationForm, HttpPaginationForm } from '@/types/httpApiCalls'
 
 export const PAGINATION_FORM: HttpPaginationForm = {
   isEnabled: true,

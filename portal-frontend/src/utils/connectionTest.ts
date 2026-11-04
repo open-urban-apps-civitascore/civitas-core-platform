@@ -1,14 +1,10 @@
 import { get } from 'react-hook-form'
 
-import { CONNECTOR_TYPES } from '@/const/connectors'
+import { CONNECTOR_TYPES, SECRET_PLACEHOLDER } from '@/const/connectors'
 import { ConnectionTestInput, ConnectionTestResult, PREVIEW_TRUNCATED_MARKER } from '@/types/connectionTest'
-import {
-  ConnectorFormToApiSchema,
-  ConnectorType,
-  HttpApiCallsStrictSchema,
-  SECRET_PLACEHOLDER,
-} from '@/types/connectors'
+import { ConnectorFormToApiSchema, ConnectorType } from '@/types/connectors'
 import { DatasourceFormDraft } from '@/types/datasources'
+import { HttpApiCallsStrictSchema } from '@/types/httpApiCalls'
 import { getSecretPaths } from '@/utils/connectors'
 
 type ConnectorValues = Pick<DatasourceFormDraft, 'connectorType' | 'configuration'>

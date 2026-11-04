@@ -9,9 +9,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { FormField } from '@/components/ui/form'
 import { Label } from '@/components/ui/label'
-import { HTTP_PAGINATION_TYPES, HTTP_PARAMETER_LOCATIONS } from '@/const/connectors'
+import { EMPTY_PAGINATIONS, HTTP_PAGINATION_TYPES, HTTP_PARAMETER_LOCATIONS } from '@/const/connectors'
 import {
-  EMPTY_PAGINATIONS,
   getParameterNameCollisionPaths,
   HttpApiCallsForm,
   HttpCursorPaginationForm,
@@ -19,7 +18,7 @@ import {
   HttpPageNumberPaginationForm,
   HttpPaginationType,
   HttpParameterLocation,
-} from '@/types/connectors'
+} from '@/types/httpApiCalls'
 import { triggerKeepingServerErrors } from '@/utils/form'
 
 type PageNumberField = Exclude<keyof HttpPageNumberPaginationForm, 'isEnabled' | 'type'>

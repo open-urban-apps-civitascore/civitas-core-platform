@@ -6,7 +6,7 @@ import { DISABLED_INPUT_CLASS_NAME } from '@/components/form/fields/disabledFiel
 import { Button } from '@/components/ui/button'
 import { FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { HttpApiCallsForm, HttpParameterListPath } from '@/types/connectors'
+import { HttpApiCallsForm, HttpParameterListPath } from '@/types/httpApiCalls'
 
 const PARAMETER_KEYS = ['name', 'value'] as const
 

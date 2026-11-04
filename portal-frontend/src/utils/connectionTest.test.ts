@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
+import { EMPTY_PAGINATION, SECRET_PLACEHOLDER } from '@/const/connectors'
 import { ConnectionTestResult } from '@/types/connectionTest'
-import { ConnectorFormToApiSchema, EMPTY_PAGINATION, SECRET_PLACEHOLDER } from '@/types/connectors'
+import { ConnectorFormToApiSchema } from '@/types/connectors'
 
 import { hasMaskedSecret, isApiCallIncomplete, toConnectionTestInput, toPreviewText } from './connectionTest'
 

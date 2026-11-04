@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { API_CALL_SECTIONS, HTTP_METHODS } from '@/const/connectors'
 import { cn } from '@/lib/utils'
-import { ApiCallSection, HttpApiCallsForm } from '@/types/connectors'
+import { ApiCallSection, HttpApiCallsForm } from '@/types/httpApiCalls'
 import { formatPathWithQuery } from '@/utils/connectors'
 
 import { ApiCallPagination } from './ApiCallPagination'

@@ -1,4 +1,9 @@
-import { CONNECTOR_TYPES } from '@/const/connectors'
+import {
+  CONNECTOR_TYPES,
+  EMPTY_CURSOR_PAGINATION,
+  EMPTY_LIMIT_OFFSET_PAGINATION,
+  EMPTY_PAGINATION,
+} from '@/const/connectors'
 import { DataSourceDraftSchema } from '@/generated/core'
 import {
   CURSOR_PAGINATION_API,
@@ -8,25 +13,24 @@ import {
   PAGINATION_API,
   PAGINATION_FORM,
 } from '@/test-support/paginationFixtures'
+import { emptyHttpAuthentication } from '@/utils/connectorMappers'
 
 import {
   ConnectorApiToFormSchema,
   ConnectorFormToApiSchema,
-  EMPTY_CURSOR_PAGINATION,
-  EMPTY_LIMIT_OFFSET_PAGINATION,
-  EMPTY_PAGINATION,
-  emptyHttpAuthentication,
-  HttpApiCallForm,
   HttpApiToFormSchema,
-  HttpCursorPaginationForm,
-  HttpLimitOffsetPaginationForm,
   HttpLooseSchema,
-  HttpPaginationForm,
-  HttpParameterLocation,
   HttpStrictSchema,
   MqttLooseSchema,
   MqttStrictSchema,
 } from './connectors'
+import {
+  HttpApiCallForm,
+  HttpCursorPaginationForm,
+  HttpLimitOffsetPaginationForm,
+  HttpPaginationForm,
+  HttpParameterLocation,
+} from './httpApiCalls'
 
 const loose = (urls: string, tls: boolean) => MqttLooseSchema.safeParse({ urls, tls })
 

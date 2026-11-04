@@ -12,17 +12,14 @@ import {
   useUpdateDatasourceReleased,
 } from '@/app/services/api/datasources/clientRequests'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
-import { CONNECTOR_TYPES } from '@/const/connectors'
+import { CONNECTOR_TYPES, SECRET_PLACEHOLDER } from '@/const/connectors'
 import { DataSourceDraftSchema } from '@/generated/core'
 import { useError } from '@/hooks/use-error'
 import {
   ConnectorFormToApiSchema,
   ConnectorTabCompleteSchema,
   ConnectorType,
-  emptyHttpAuthentication,
-  HttpApiCallsStrictSchema,
   HttpAuthenticationType,
-  SECRET_PLACEHOLDER,
 } from '@/types/connectors'
 import { Datapool } from '@/types/datapools'
 import {
@@ -39,7 +36,9 @@ import {
   DatasourceStatusType,
   DatasourceTab,
 } from '@/types/datasources'
+import { HttpApiCallsStrictSchema } from '@/types/httpApiCalls'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
+import { emptyHttpAuthentication } from '@/utils/connectorMappers'
 import {
   CONNECTOR_SECRET_PATHS,
   findSecretsToReenter,

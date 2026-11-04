@@ -10,16 +10,15 @@ import { NoDataCard } from '@/components/no-data/no-data-card/NoDataCard'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { InfoBox } from '@/components/text-box/TextBox'
 import { Button } from '@/components/ui/button'
-import { MAX_HTTP_API_CALLS } from '@/const/connectors'
+import { EMPTY_PAGINATION, MAX_HTTP_API_CALLS } from '@/const/connectors'
+import { DatasourceFormDraft } from '@/types/datasources'
 import {
   ApiCallSection,
   ApiCallSnapshots,
   CollapsedApiCallSections,
-  EMPTY_PAGINATION,
   HttpApiCallForm,
   HttpApiCallsForm,
-} from '@/types/connectors'
-import { DatasourceFormDraft } from '@/types/datasources'
+} from '@/types/httpApiCalls'
 import { triggerKeepingServerErrors } from '@/utils/form'
 
 import { ApiCallItem } from './ApiCallItem'
