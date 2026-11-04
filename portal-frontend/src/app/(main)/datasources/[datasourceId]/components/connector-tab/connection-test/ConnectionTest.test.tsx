@@ -166,6 +166,26 @@ describe('ConnectionTest', () => {
     expect(screen.queryByText('incompleteHint')).not.toBeInTheDocument()
   })
 
+  it.each([
+    ['no API call', []],
+    ['an API call without a name', [{ ...HTTP_CONFIGURATION.apiCalls[0], name: '' }]],
+    ['an API call without a path', [{ ...HTTP_CONFIGURATION.apiCalls[0], path: '' }]],
+  ])('disables the button and shows the HTTP hint for HTTP with %s', (_, apiCalls) => {
+    renderConnectionTest({ connectorType: 'HTTP', configuration: { ...HTTP_CONFIGURATION, apiCalls } })
+
+    expect(screen.getByRole('button', { name: 'button' })).toBeDisabled()
+    expect(screen.getByText('httpIncompleteHint')).toBeInTheDocument()
+    expect(screen.queryByText('invalidHint')).not.toBeInTheDocument()
+  })
+
+  it('shows the HTTP hint for an incomplete HTTP connector', () => {
+    renderConnectionTest({ connectorType: 'HTTP', isConnectorComplete: false })
+
+    expect(screen.getByRole('button', { name: 'button' })).toBeDisabled()
+    expect(screen.getByText('httpIncompleteHint')).toBeInTheDocument()
+    expect(screen.queryByText('incompleteHint')).not.toBeInTheDocument()
+  })
+
   it('shows a spinner and disables the button while the test runs', async () => {
     mockApiRequest.mockReturnValue(new Promise(() => {}))
     renderConnectionTest()
@@ -247,13 +267,14 @@ describe('ConnectionTest', () => {
       expect(screen.getByText(`details ${message}`)).toBeInTheDocument()
     })
 
-    it('shows the HTTP status and the body for HTTP', async () => {
+    it('shows the HTTP status but not the body for HTTP', async () => {
       mockApiRequest.mockResolvedValue({
         data: testResult({
           success: false,
           reason: 'SOURCE_ERROR',
           message: 'HTTP 500',
           preview: '{"error":"down"}',
+          previewTruncated: true,
           httpStatus: 500,
         }),
       })
@@ -263,7 +284,8 @@ describe('ConnectionTest', () => {
 
       expect(await screen.findByText('failure')).toBeInTheDocument()
       expect(screen.getByText('httpStatus:500')).toBeInTheDocument()
-      expect(container.querySelector('pre')?.textContent).toBe('{\n  "error": "down"\n}')
+      expect(container.querySelector('pre')).not.toBeInTheDocument()
+      expect(screen.queryByText('previewTruncated')).not.toBeInTheDocument()
     })
 
     it('shows the unknown cause for a reason without text', async () => {

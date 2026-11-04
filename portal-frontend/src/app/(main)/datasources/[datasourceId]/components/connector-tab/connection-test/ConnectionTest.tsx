@@ -8,10 +8,11 @@ import {
   useTestDatasourceConnection,
 } from '@/app/services/api/datasources/clientRequests'
 import { Button } from '@/components/ui/button'
+import { CONNECTOR_TYPES } from '@/const/connectors'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 import { DatasourceFormDraft } from '@/types/datasources'
-import { hasMaskedSecret, toConnectionTestInput } from '@/utils/connectionTest'
+import { hasMaskedSecret, isApiCallIncomplete, toConnectionTestInput } from '@/utils/connectionTest'
 import { toConnectionTestProblem } from '@/utils/errors'
 
 import { ConnectionTestStatus } from './ConnectionTestStatus'
@@ -40,6 +41,8 @@ export const ConnectionTest = (props: ConnectionTestProps) => {
   )
   const currentKey = JSON.stringify(currentInput)
   const canTest = isConnectorComplete && currentInput !== null
+  const isIncomplete = !isConnectorComplete || isApiCallIncomplete({ connectorType, configuration })
+  const incompleteHint = connectorType === CONNECTOR_TYPES.HTTP ? 'httpIncompleteHint' : 'incompleteHint'
   const isPending = lastRun?.status === 'pending'
   const lastRunVariables = lastRun?.variables
   const lastRunKey = lastRunVariables ? JSON.stringify(lastRunVariables.input) : null
@@ -80,7 +83,7 @@ export const ConnectionTest = (props: ConnectionTestProps) => {
             </Button>
             {!canTest && (
               <span className="text-sm text-muted-foreground">
-                {isConnectorComplete ? t('invalidHint') : t('incompleteHint')}
+                {isIncomplete ? t(incompleteHint) : t('invalidHint')}
               </span>
             )}
           </div>

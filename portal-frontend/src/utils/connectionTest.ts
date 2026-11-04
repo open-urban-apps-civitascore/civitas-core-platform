@@ -7,7 +7,7 @@ import {
   MASKED_SECRET,
   PREVIEW_TRUNCATED_MARKER,
 } from '@/types/connectionTest'
-import { ConnectorFormToApiSchema, ConnectorType } from '@/types/connectors'
+import { ConnectorFormToApiSchema, ConnectorType, HttpApiCallsStrictSchema } from '@/types/connectors'
 import { DatasourceFormDraft } from '@/types/datasources'
 
 type ConnectorValues = Pick<DatasourceFormDraft, 'connectorType' | 'configuration'>
@@ -25,12 +25,27 @@ const toFirstApiCallName = (configuration: ConnectorValues['configuration']) => 
   return typeof name === 'string' ? name.trim() : ''
 }
 
+const REQUIRED_MESSAGE = 'common.errors.required'
+
+// The backend requires an API call for HTTP. Invalid values of the API calls are left to the invalid hint.
+export const isApiCallIncomplete = (values: ConnectorValues) => {
+  if (values.connectorType !== CONNECTOR_TYPES.HTTP) return false
+  try {
+    const parsed = HttpApiCallsStrictSchema.safeParse(get(values.configuration, 'apiCalls') ?? [])
+    return !parsed.success && parsed.error.issues.some(issue => issue.message === REQUIRED_MESSAGE)
+  } catch {
+    // Zod v4: safeParse throws on stale keys
+    return true
+  }
+}
+
 export const toConnectionTestInput = (values: ConnectorValues): ConnectionTestInput | null => {
+  if (isApiCallIncomplete(values)) return null
   try {
     const parsed = ConnectorFormToApiSchema.safeParse(values)
     if (!parsed.success) return null
-    const apiCall = values.connectorType === CONNECTOR_TYPES.HTTP ? toFirstApiCallName(values.configuration) : ''
-    return apiCall ? { connector: parsed.data, apiCall } : { connector: parsed.data }
+    if (values.connectorType !== CONNECTOR_TYPES.HTTP) return { connector: parsed.data }
+    return { connector: parsed.data, apiCall: toFirstApiCallName(values.configuration) }
   } catch {
     // Zod v4: safeParse throws on stale keys
     return null

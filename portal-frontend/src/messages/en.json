@@ -1218,6 +1218,7 @@
         "title": "Connection test",
         "button": "Test connection",
         "incompleteHint": "Fill in all required fields to test the connection.",
+        "httpIncompleteHint": "Fill in all required fields in the \"Connector\" and \"API calls\" tabs to test the connection.",
         "invalidHint": "The configuration contains invalid values. Also check the API calls.",
         "connecting": "Connecting…",
         "outdatedPending": "The configuration was changed. The running connection test will be discarded. You can test again afterwards.",

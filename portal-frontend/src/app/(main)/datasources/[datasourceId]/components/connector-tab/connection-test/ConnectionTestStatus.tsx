@@ -23,6 +23,13 @@ const PROBLEM_CODES = [
 const toCause = (code: string | null, knownCodes: readonly string[]) =>
   code && knownCodes.includes(code) ? code : UNKNOWN_CAUSE
 
+const HttpStatus = (props: { status: number | null }) => {
+  const { status } = props
+  const t = useTranslations('datasources.connectorTab.connectionTest')
+  if (status == null || status === HTTP_OK) return null
+  return <p>{t('httpStatus', { status })}</p>
+}
+
 interface ResultDetailsProps {
   result: ConnectionTestResult
   connectorType: ConnectorType
@@ -34,9 +41,7 @@ const ResultDetails = (props: ResultDetailsProps) => {
   const previewText = toPreviewText(result, connectorType)
   return (
     <>
-      {result.httpStatus != null && result.httpStatus !== HTTP_OK && (
-        <p>{t('httpStatus', { status: result.httpStatus })}</p>
-      )}
+      <HttpStatus status={result.httpStatus} />
       {previewText !== null && (
         <pre className="rounded-md border bg-muted p-4 font-mono text-sm whitespace-pre-wrap break-all max-h-80 overflow-auto">
           {previewText}
@@ -127,7 +132,7 @@ export const ConnectionTestStatus = (props: ConnectionTestStatusProps) => {
           cause={toCause(result.reason, CONNECTION_TEST_REASONS)}
           details={result.message ? [result.message] : []}
         >
-          <ResultDetails result={result} connectorType={connectorType} />
+          <HttpStatus status={result.httpStatus} />
         </Failure>
       </div>
     )

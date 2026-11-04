@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { ConnectionTestResult, MASKED_SECRET } from '@/types/connectionTest'
 import { ConnectorFormToApiSchema, EMPTY_PAGINATION } from '@/types/connectors'
 
-import { hasMaskedSecret, toConnectionTestInput, toPreviewText } from './connectionTest'
+import { hasMaskedSecret, isApiCallIncomplete, toConnectionTestInput, toPreviewText } from './connectionTest'
 
 const MQTT_CONFIGURATION = {
   urls: 'mqtt://broker.example.org:1883',
@@ -75,17 +75,57 @@ describe('toConnectionTestInput', () => {
   it.each([
     ['no API call', httpConfiguration({ apiCalls: [] })],
     ['an API call with an empty name', httpConfiguration({ apiCalls: [{ ...API_CALL, name: '  ' }] })],
-  ])('sends no API call for HTTP with %s', (_, configuration) => {
-    const input = toConnectionTestInput({ connectorType: 'HTTP', configuration })
-
-    expect(input).not.toBeNull()
-    expect(input).not.toHaveProperty('apiCall')
+    ['an API call with an empty path', httpConfiguration({ apiCalls: [{ ...API_CALL, path: '' }] })],
+  ])('returns null for HTTP with %s', (_, configuration) => {
+    expect(toConnectionTestInput({ connectorType: 'HTTP', configuration })).toBeNull()
   })
 
   it('returns null for invalid values', () => {
     const configuration = { ...MQTT_CONFIGURATION, urls: 'not a url' }
 
     expect(toConnectionTestInput({ connectorType: 'MQTT', configuration })).toBeNull()
+  })
+})
+
+describe('isApiCallIncomplete', () => {
+  it.each([
+    ['no API call', httpConfiguration({ apiCalls: [] })],
+    ['an API call with an empty name', httpConfiguration({ apiCalls: [{ ...API_CALL, name: '  ' }] })],
+    ['an API call with an empty path', httpConfiguration({ apiCalls: [{ ...API_CALL, path: '' }] })],
+    [
+      'a query parameter without a name',
+      httpConfiguration({ apiCalls: [{ ...API_CALL, queryParameters: [{ name: '', value: 'x' }] }] }),
+    ],
+    [
+      'an enabled pagination without a page size',
+      httpConfiguration({
+        apiCalls: [
+          {
+            ...API_CALL,
+            pagination: { ...EMPTY_PAGINATION, isEnabled: true, pageParameter: 'page', pageSizeParameter: 'size' },
+          },
+        ],
+      }),
+    ],
+  ])('returns true for HTTP with %s', (_, configuration) => {
+    expect(isApiCallIncomplete({ connectorType: 'HTTP', configuration })).toBe(true)
+  })
+
+  it('returns false for HTTP with a complete API call', () => {
+    expect(isApiCallIncomplete({ connectorType: 'HTTP', configuration: httpConfiguration() })).toBe(false)
+  })
+
+  it('returns false for HTTP with a complete API call with an invalid path', () => {
+    const configuration = httpConfiguration({ apiCalls: [{ ...API_CALL, path: 'stations' }] })
+
+    expect(isApiCallIncomplete({ connectorType: 'HTTP', configuration })).toBe(false)
+  })
+
+  it.each([
+    ['MQTT', MQTT_CONFIGURATION],
+    ['SQL', SQL_CONFIGURATION],
+  ] as const)('returns false for %s', (connectorType, configuration) => {
+    expect(isApiCallIncomplete({ connectorType, configuration })).toBe(false)
   })
 })
 
