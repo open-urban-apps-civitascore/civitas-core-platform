@@ -76,7 +76,8 @@ class NextLinkPaginationTest {
       value = {
         "http://api.example | next | http://api.example/next",
         "http://api.example/a//b | ../c | http://api.example/a/c",
-        "http://api.example/a/b%2Fc?x=1 | ?x=2 | http://api.example/a/b%2Fc?x=2"
+        "http://api.example/a/b%2Fc?x=1 | ?x=2 | http://api.example/a/b%2Fc?x=2",
+        "http://api.example/a/b%2Fc?x=1 | ?page=2 | http://api.example/a/b%2Fc?page=2"
       })
   void resolve_keepsRawComponents(String base, String reference, String expected) {
     assertEquals(
