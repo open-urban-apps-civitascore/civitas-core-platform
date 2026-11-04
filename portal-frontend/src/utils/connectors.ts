@@ -145,6 +145,7 @@ const FIELD_VALUE_TYPES = new Set(['string', 'number', 'boolean'])
 
 const SENT_PARAMETER_PATH = /^(apiCalls\.\d+\.(?:queryParameters|headers))\.(\d+)(.*)$/
 
+// The backend counts only the sent rows; empty rows are not sent
 const toFormRowPath = (path: string, configuration: unknown) => {
   const [, listPath, sentIndex, rest] = SENT_PARAMETER_PATH.exec(path) ?? []
   if (!listPath) return path

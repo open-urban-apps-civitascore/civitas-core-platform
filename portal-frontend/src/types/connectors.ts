@@ -512,6 +512,7 @@ const getTokenUrlError = (tokenUrl: string) => {
   return undefined
 }
 
+// The config-adapter cannot read an encrypted private key
 const getPrivateKeyError = (privateKey: string) => {
   const isEncrypted = privateKey.startsWith(ENCRYPTED_PRIVATE_KEY) || privateKey.includes(ENCRYPTED_PEM_HEADER)
   if (isEncrypted) return 'datasources.errors.encryptedPrivateKey'

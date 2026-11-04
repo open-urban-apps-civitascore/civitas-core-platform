@@ -192,6 +192,7 @@ export const useDatasourceForm = (
         shouldDirty: true,
       })
     }
+    // No check of the loaded authentication
     if (isFirstAuthenticationTypeRender.current) {
       isFirstAuthenticationTypeRender.current = false
       return
