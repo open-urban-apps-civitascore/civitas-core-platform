@@ -1,6 +1,3 @@
-// For more info, see https://github.com/storybookjs/eslint-plugin-storybook#configuration-flat-config-format
-import storybook from 'eslint-plugin-storybook'
-
 /*
  * ESLint configuration for Civitas Core Platform V2
  * Next.js + TypeScript + Prettier
@@ -37,7 +34,6 @@ const eslintConfig = [
       'coverage',
       'playwright/.auth/**',
       'playwright-report',
-      'storybook-static',
     ],
   },
   ...compat.config({
@@ -292,9 +288,7 @@ const eslintConfig = [
       'import/no-extraneous-dependencies': 'off',
       'max-lines': 'off',
     },
-    // spread in storybook recommended config
   },
-  ...storybook.configs['flat/recommended'],
 ]
 
 export default eslintConfig
