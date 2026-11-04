@@ -59,7 +59,8 @@ api/portal-backend/node_modules/.bin/spectral lint /tmp/openapi.yaml \
   --ruleset api/portal-backend/.spectral.yaml
 ```
 
-`update-openapi-spec` needs the masked and protected CI/CD variable `OPENAPI_BOT_TOKEN`: a
-Project Access Token used only by this job, with the scopes `api` and `write_repository` and
+`update-openapi-spec` needs the masked and protected CI/CD variable `OPENAPI_BOT_TOKEN`, scoped
+to the environment `openapi-spec-update` so that no other job receives it: a Project Access Token
+used only by this job, with the scopes `api` and `write_repository` and
 the role Developer. The bot commits and merge requests show this token's bot user as author.
 If the variable is not set, the job fails.

@@ -28,7 +28,7 @@ rules:
         match: "^application/problem\\+json$"
 
   collection-segments-plural:
-    description: A path segment that is followed by an ID names a collection, so it is plural.
+    description: A path segment that is followed by an ID names a collection, so it ends in "s".
     message: "{{property}} has a singular collection segment."
     severity: error
     given: "$.paths"

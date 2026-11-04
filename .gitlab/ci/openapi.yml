@@ -19,11 +19,8 @@ export-openapi-spec:
     POSTGRES_USER: admin
     POSTGRES_PASSWORD: admin
     SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/portal_backend
-    SPRING_DATASOURCE_USERNAME: admin
-    SPRING_DATASOURCE_PASSWORD: admin
     # The `local` profile permits /api-docs.yaml without a token
     SPRING_PROFILES_ACTIVE: local
-    SERVER_PORT: 8089
     # The spec is hosted as documentation, where the Keycloak host of a stack points nowhere.
     # example.org is reserved for examples (RFC 2606), so these URLs are obviously not real.
     OPENAPI_OAUTH_SERVER_URL: https://auth.example.org
@@ -57,16 +54,17 @@ lint-openapi-spec:
   needs:
     - job: export-openapi-spec
       artifacts: true
-  # Exit code 3 means Spectral reported findings; any other failure means the lint did not run
+  # The script exits 3 only when Spectral reported findings, so a failed install or a crash fails the job
   allow_failure:
     exit_codes: 3
   variables:
     GIT_DEPTH: 1
   script:
-    # On protected branches this job receives OPENAPI_BOT_TOKEN, so no dependency may run a script
+    # --ignore-scripts skips the telemetry install script of @scarf/scarf, among others
     - npm ci --ignore-scripts --no-audit --no-fund --loglevel=error --prefix api/portal-backend
     - api/portal-backend/node_modules/.bin/spectral lint openapi.generated.yaml
       --ruleset api/portal-backend/.spectral.yaml
+      --fail-severity warn
       -f text -o.text spectral-report.txt
       -f gitlab -o.gitlab gl-code-quality-report.json
       || SPECTRAL_EXIT=$?
@@ -88,7 +86,8 @@ lint-openapi-spec:
 # request from a bot branch, the way Renovate does. See .gitlab/ci/scripts/update-openapi-spec.mjs.
 #
 # Requires OPENAPI_BOT_TOKEN: a Project Access Token of its own with the api and write_repository
-# scopes and the Developer role, stored as a masked and protected CI/CD variable. The job fails
+# scopes and the Developer role, stored as a masked and protected CI/CD variable that is scoped to
+# the environment openapi-spec-update, so that no other job receives it. The job fails
 # when the variable is not set, also when the spec has not changed, so a missing token shows up
 # on the first develop pipeline and not only on the next API change.
 update-openapi-spec:
@@ -97,6 +96,9 @@ update-openapi-spec:
   interruptible: false
   # Two develop pipelines must not force-push the bot branch at the same time
   resource_group: openapi-spec-update
+  environment:
+    name: openapi-spec-update
+    action: access
   needs:
     - job: export-openapi-spec
       artifacts: true
