@@ -59,6 +59,9 @@ record NextLinkPagination(JsonPath nextLinkPath, OptionalInt maxLinks) implement
     } catch (IllegalArgumentException e) {
       return new Progress.Rejected("the next link is not a valid URI");
     }
+    if (!NextLinkUrl.sameHost(content.requestUrl().orElseThrow(), link)) {
+      return new Progress.Rejected("the next link is on another host than the API host");
+    }
     return new Progress.Accepted(
         content.records(),
         maxLinks.isPresent() && page.index() >= maxLinks.getAsInt()

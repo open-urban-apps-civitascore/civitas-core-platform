@@ -57,10 +57,6 @@ final class ApiCallClient {
    */
   ApiCallOutcome send(ApiCall call, Page page, Authentication authentication) {
     String request = call.describe(page);
-    if (page.url().isPresent() && !NextLinkUrl.sameHost(URI.create(baseUrl), page.url().get())) {
-      return ApiCallOutcome.Failure.ofRejectedBody(
-          call.label(page), 0, "the next link is on another host than the API host");
-    }
     Attempt attempt = attempt(call, page, authentication, request);
     if (attempt.unauthorized() && authentication.renewAfterUnauthorized()) {
       attempt.discard();
