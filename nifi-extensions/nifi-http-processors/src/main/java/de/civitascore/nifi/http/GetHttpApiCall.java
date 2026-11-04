@@ -66,9 +66,9 @@ import org.apache.nifi.web.client.provider.api.WebClientServiceProvider;
   @WritesAttribute(
       attribute = GetHttpApiCall.PAGE,
       description =
-          "The page number, with cursor pagination the number of the request in the run from 1,"
-              + " or with limit/offset pagination the offset, on success of an API call with"
-              + " pagination."),
+          "The page number, with cursor or next link pagination the number of the request in"
+              + " the run from 1, or with limit/offset pagination the offset, on success of an API"
+              + " call with pagination."),
   @WritesAttribute(
       attribute = GetHttpApiCall.ERROR_STATUS,
       description = "The status of the response, or 0 when no response came, on stop and failure."),
@@ -265,8 +265,9 @@ public class GetHttpApiCall extends AbstractProcessor {
           .description(
               "The JSON Schema of the Data structure, with its imports inlined. Each record of a"
                   + " response must agree with it: each element of a JSON array, or, without"
-                  + " pagination, with cursor pagination and with limit/offset pagination with a"
-                  + " count path, a JSON object as one record. A $ref resolves only inside the"
+                  + " pagination, with cursor or next link pagination and with limit/offset"
+                  + " pagination with a count path, a JSON object as one record. A $ref resolves"
+                  + " only inside the"
                   + " schema or to a GeoJSON geometry of https://geojson.org/schema/, which the NAR"
                   + " holds. The processor does not start with a schema that it cannot compile.")
           .required(true)
@@ -308,7 +309,9 @@ public class GetHttpApiCall extends AbstractProcessor {
                   + " the client certificate, a response that is not JSON or does not agree with"
                   + " the Record Schema, a page of the wrong JSON type for its pagination, a"
                   + " cursor that is not a string or a number or that holds a character a header"
-                  + " cannot carry, a value at the count path that is not a record count, a page"
+                  + " cannot carry, a next link that is not a string or an object with a string"
+                  + " href, that is not a valid URI or that has another scheme, host or port than"
+                  + " the API host, a value at the count path that is not a record count, a page"
                   + " that repeats an earlier page or would send the same request as an earlier"
                   + " page of the run, and a run that reads Max Pages pages and meets no stop"
                   + " condition. With page-number or limit/offset pagination, a 400 or 404 on a"

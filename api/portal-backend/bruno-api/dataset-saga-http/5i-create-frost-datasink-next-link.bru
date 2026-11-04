@@ -1,0 +1,37 @@
+meta {
+  name: 5i. Create FROST DataSink (next-link)
+  type: http
+  seq: 18
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{httpSagaDataSetId}}
+}
+
+body:json {
+  {
+    "dataSinkType": "FROST",
+    "configuration": { "port": "ThingTree" }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('httpSagaNextLinkSinkId', res.body.id);
+  }
+  if (res.body && res.body.configurationUrn) {
+    bru.setVar('httpSagaNextLinkSinkConfigurationUrn', res.body.configurationUrn);
+  }
+}
+
+tests {
+  test("DataSink created", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

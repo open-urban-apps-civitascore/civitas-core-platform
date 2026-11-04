@@ -230,6 +230,10 @@ class CoreSchemaValidatorTest {
         {"type": "LIMIT_OFFSET", "limitParameter": "limit", "offsetParameter": "offset",
          "limit": 100, "offset": null, "countPath": "$.meta.count"}""",
         """
+        {"type": "NEXT_LINK", "nextLinkPath": "$.links.next", "maxLinks": 2}""",
+        """
+        {"type": "NEXT_LINK", "nextLinkPath": null, "maxLinks": null}""",
+        """
         {"type": "CURSOR", "cursorPath": "$.next_cursor", "cursorParameter": "cursor",
          "cursorIn": "QUERY", "limitParameter": "limit", "limit": 20}"""
     })

@@ -347,12 +347,13 @@ A 3xx is fatal because the processor expects a web client service that does not 
 redirects (`Redirect Handling Strategy` = `IGNORED`), so a redirect shows a wrong host or path.
 
 A FlowFile on `success` carries `http.status.code` and `http.request.path`, and with pagination
-`http.page`: the page number, with cursor pagination the number of the request in the run from 1,
-or with limit/offset pagination the offset. A FlowFile on `stop` or `failure` is empty and carries
-`http.request.path`, `http.error.status` and `http.error.message`. `http.error.status` is the status
-of the response, or `0` when no response came. The message is the one the log entry and the bulletin
-show. It names the API call and its path, never the base URL, and on a page of a paginated run the
-page number, with cursor pagination the request number, or with limit/offset pagination the offset.
+`http.page`: the page number, with cursor or next link pagination the number of the request in
+the run from 1, or with limit/offset pagination the offset. A FlowFile on `stop` or `failure` is
+empty and carries `http.request.path`, `http.error.status` and `http.error.message`.
+`http.error.status` is the status of the response, or `0` when no response came. The message is the
+one the log entry and the bulletin show. It names the API call and its path, never the base URL, and
+on a page of a paginated run the page number, with cursor or next link pagination the request
+number, or with limit/offset pagination the offset.
 A 401 or 403 names the authentication method. A failed token request names the host, the port and
 the path of the token URL, and of the token response only an error code of RFC 6749, section 5.2.
 A control character or line separator in the message appears as `\r`, `\n` or `\uXXXX`, so no part
@@ -437,7 +438,8 @@ as an `ERROR` event of the Pipeline.
 
 A pagination makes a run read the pages one after the other. Each page is a request of its own,
 through the same request code as an API call without pagination. A page adds its parameters after
-the query parameters of the API call, and its headers after the headers of the API call.
+the query parameters of the API call, and its headers after the headers of the API call. A page of
+next link pagination carries the URL of its own request instead.
 
 #### Page-number pagination
 
@@ -511,6 +513,41 @@ never show the cursor, because the cursor is data of the API host. The processor
 request with the requests of the run that it sent: a request with the same parameters and headers as
 an earlier one goes to `stop` before the processor sends it, because the API would repeat its pages
 without end.
+
+#### Next link pagination
+
+A `NEXT_LINK` pagination reads `nextLinkPath` from each JSON object response. The path uses the
+same restricted form as `cursorPath`, with member names, quoted member names and array indexes.
+Any path of this form is accepted.
+
+| Format | `nextLinkPath` |
+|---|---|
+| JSON:API | `$.links.next` |
+| HAL | `$._links.next.href` |
+| OData | `$['@odata.nextLink']` |
+| SensorThings | `$['@iot.nextLink']` |
+
+A non-empty string, or an object with a string `href`, gives the next link. An absent value, `null`
+or an empty string ends the run. The records of that response are part of the run. Any other value
+stops the Pipeline. Each response is one record, as with cursor pagination. A JSON array, scalar
+or non-JSON body stops the Pipeline. A 2xx response without a body ends the run.
+
+Relative links resolve against the URL of the request that returned them, by RFC 3986 section 5.
+Each followed link must have the scheme, host and port of `baseUrl`. An omitted port means the
+default port of the scheme. Any other link stops the Pipeline before credentials are sent. The
+cause says that the next link has another scheme, host or port than the API host.
+
+The first request uses the API call query parameters. Each next request uses the link as it is,
+with the API call headers and authentication, including authentication query parameters. It adds
+none of the API call query parameters again.
+
+The optional `maxLinks` is an integer of at least 1. After that many links, the run ends without an
+error, with at most `maxLinks` + 1 requests. `Max Pages` still applies as a fatal guard. A repeated
+link, or a 400 or 404 on a later request, stops the Pipeline and removes all pages of the run.
+
+A cause names a request by position, for example `request 3`. The `http.page` attribute holds the
+number, for example `3`. Neither holds the link, which can contain tokens. Logs and bulletins do
+not hold it either.
 
 #### Limit/offset pagination
 
@@ -609,8 +646,8 @@ for the shape that each response must have: a JSON array of records, a JSON obje
 record, or, without pagination, either. A `ResponseShape` of one object also names the JSON paths
 whose values the pagination reads. From the record count and those values of a page, the
 `Pagination` gives the next page, the end of the run, or a cause for `stop`. A page carries the query
-parameters and the headers that its request adds. A new pagination method adds an implementation of
-`Pagination`, and the page loop and the request code stay as they are.
+parameters and the headers that its request adds, or the URL of its own request. A new pagination
+method adds an implementation of `Pagination`, and the page loop and the request code stay as they are.
 
 A new authentication type adds a
 value of `Authentication Type`, its properties and a class that implements `Authentication`.

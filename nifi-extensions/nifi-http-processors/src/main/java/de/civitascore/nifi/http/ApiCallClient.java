@@ -107,7 +107,10 @@ final class ApiCallClient {
     }
     Optional<InputStream> content;
     try {
-      content = nonEmpty(guarded(response));
+      content =
+          nonEmpty(
+              new IdleTimeoutInputStream(
+                  response.body(), bodyReadTimeout, () -> discard(response)));
     } catch (IOException e) {
       discard(response);
       return ApiCallOutcome.Failure.ofTransport(request, e);
@@ -119,18 +122,8 @@ final class ApiCallClient {
     return new ApiCallOutcome.Body(status, content.get(), response);
   }
 
-  private InputStream guarded(HttpResponseEntity response) {
-    InputStream body = response.body();
-    return body == null
-        ? null
-        : new IdleTimeoutInputStream(body, bodyReadTimeout, () -> discard(response));
-  }
-
   /** The body from its first byte, or empty when the first read gives the end of the stream. */
   private static Optional<InputStream> nonEmpty(InputStream body) throws IOException {
-    if (body == null) {
-      return Optional.empty();
-    }
     PushbackInputStream content = new PushbackInputStream(body);
     int first = content.read();
     if (first == -1) {
@@ -148,12 +141,25 @@ final class ApiCallClient {
     }
   }
 
+  URI target(ApiCall call, Page page) {
+    String target;
+    if (page.url().isPresent()) {
+      target = page.url().get().toString();
+    } else {
+      List<Parameter> parameters = new ArrayList<>(call.queryParameters());
+      parameters.addAll(page.queryParameters());
+      String query = query(parameters);
+      target = baseUrl + call.path() + (query.isEmpty() ? "" : "?" + query);
+    }
+    int fragment = target.indexOf('#');
+    return URI.create(fragment < 0 ? target : target.substring(0, fragment));
+  }
+
   private URI uri(ApiCall call, Page page, Authentication authentication) {
-    List<Parameter> parameters = new ArrayList<>(call.queryParameters());
-    parameters.addAll(page.queryParameters());
-    parameters.addAll(authentication.queryParameters());
-    String query = query(parameters);
-    return URI.create(baseUrl + call.path() + (query.isEmpty() ? "" : "?" + query));
+    URI target = target(call, page);
+    String query = query(authentication.queryParameters());
+    return URI.create(
+        target + (query.isEmpty() ? "" : (target.getRawQuery() == null ? "?" : "&") + query));
   }
 
   /**

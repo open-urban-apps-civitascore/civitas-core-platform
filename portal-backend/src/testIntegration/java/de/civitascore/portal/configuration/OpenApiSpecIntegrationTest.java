@@ -149,6 +149,7 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
     "HttpConnectorClientCertificateAuthentication",
     "HttpConnectorPageNumberPagination",
     "HttpConnectorLimitOffsetPagination",
+    "HttpConnectorNextLinkPagination",
     "HttpConnectorCursorPagination"
   })
   @DisplayName("Should describe every connector field")
@@ -180,6 +181,7 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
         + " PAGE_NUMBER=HttpConnectorPageNumberPagination"
         + " LIMIT_OFFSET=HttpConnectorLimitOffsetPagination"
         + " CURSOR=HttpConnectorCursorPagination"
+        + " NEXT_LINK=HttpConnectorNextLinkPagination"
   })
   @DisplayName(
       "Should describe each nested HTTP/REST variant as oneOf with a type discriminator,"

@@ -1,7 +1,7 @@
 meta {
   name: 9a. Verify the runtime states of the Pipelines
   type: http
-  seq: 30
+  seq: 32
 }
 
 get {
@@ -69,6 +69,10 @@ tests {
 
   test("The pages Pipeline is OK", function() {
     expect(statusOf(bru.getVar('httpSagaPagesPipelineId')).state).to.equal('OK');
+  });
+
+  test("The next-link Pipeline is OK", function() {
+    expect(statusOf(bru.getVar('httpSagaNextLinkPipelineId')).state).to.equal('OK');
   });
 
   test("The cursor-query Pipeline is OK", function() {

@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.LongNode;
 import com.fasterxml.jackson.databind.node.MissingNode;
 import de.civitascore.nifi.http.ApiCall.Parameter;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,6 +33,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 class LimitOffsetPaginationTest {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  private static final URI REQUEST_URL = URI.create("https://api.example.org/items");
   private static final JsonPath COUNT_PATH = new JsonPath("$.meta.count");
   private static final Limit LIMIT = new Limit("limit", 20);
 
@@ -102,7 +105,8 @@ class LimitOffsetPaginationTest {
   void next_withALimit_endsAtFewerRecordsThanTheLimit(int records) {
     LimitOffsetPagination pagination = withLimit(0, Optional.empty());
 
-    Pagination.Progress progress = pagination.next(pagination.first(), arrayOf(records));
+    Pagination.Progress progress =
+        pagination.next(pagination.first(), REQUEST_URL, arrayOf(records));
 
     assertEquals(new Pagination.Progress.Accepted(records, Optional.empty()), progress);
   }
@@ -111,7 +115,7 @@ class LimitOffsetPaginationTest {
   void next_withMoreRecordsThanTheLimit_rejects() {
     LimitOffsetPagination pagination = withLimit(0, Optional.empty());
 
-    Pagination.Progress progress = pagination.next(pagination.first(), arrayOf(21));
+    Pagination.Progress progress = pagination.next(pagination.first(), REQUEST_URL, arrayOf(21));
 
     assertEquals(
         new Pagination.Progress.Rejected("the response holds more records than the limit"),
@@ -122,7 +126,7 @@ class LimitOffsetPaginationTest {
   void next_withoutALimit_endsAtNoRecords() {
     LimitOffsetPagination pagination = withoutLimit(0, Optional.empty());
 
-    Pagination.Progress progress = pagination.next(pagination.first(), arrayOf(0));
+    Pagination.Progress progress = pagination.next(pagination.first(), REQUEST_URL, arrayOf(0));
 
     assertEquals(new Pagination.Progress.Accepted(0, Optional.empty()), progress);
   }
@@ -144,7 +148,7 @@ class LimitOffsetPaginationTest {
     LimitOffsetPagination pagination = withoutLimit(10, Optional.of(COUNT_PATH));
 
     Pagination.Progress progress =
-        pagination.next(pagination.first(), countOf(MAPPER.readTree(value)));
+        pagination.next(pagination.first(), REQUEST_URL, countOf(MAPPER.readTree(value)));
 
     Pagination.Progress.Accepted accepted =
         assertInstanceOf(Pagination.Progress.Accepted.class, progress);
@@ -174,7 +178,7 @@ class LimitOffsetPaginationTest {
     LimitOffsetPagination pagination = withLimit(0, Optional.of(COUNT_PATH));
     JsonNode count = "absent".equals(value) ? MissingNode.getInstance() : MAPPER.readTree(value);
 
-    Pagination.Progress progress = pagination.next(pagination.first(), countOf(count));
+    Pagination.Progress progress = pagination.next(pagination.first(), REQUEST_URL, countOf(count));
 
     assertEquals(
         new Pagination.Progress.Rejected("the value at $.meta.count is not a record count"),
@@ -197,7 +201,7 @@ class LimitOffsetPaginationTest {
     LimitOffsetPagination pagination = withoutLimit(1, Optional.of(COUNT_PATH));
 
     Pagination.Progress progress =
-        pagination.next(pagination.first(), countOf(LongNode.valueOf(Long.MAX_VALUE)));
+        pagination.next(pagination.first(), REQUEST_URL, countOf(LongNode.valueOf(Long.MAX_VALUE)));
 
     assertEquals(
         new Pagination.Progress.Rejected("the next offset would be larger than " + Long.MAX_VALUE),
@@ -233,7 +237,8 @@ class LimitOffsetPaginationTest {
 
   private static Page nextPage(LimitOffsetPagination pagination, Page page, PageContent content) {
     Pagination.Progress.Accepted accepted =
-        assertInstanceOf(Pagination.Progress.Accepted.class, pagination.next(page, content));
+        assertInstanceOf(
+            Pagination.Progress.Accepted.class, pagination.next(page, REQUEST_URL, content));
     return accepted.next().orElseThrow();
   }
 }

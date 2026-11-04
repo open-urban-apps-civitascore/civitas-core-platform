@@ -728,6 +728,8 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
               + "'limit':20,'offset':40,'countPath':'$.meta.count'}",
           "{'type':'LIMIT_OFFSET','limitParameter':null,'offsetParameter':'offset',"
               + "'limit':null,'offset':0,'countPath':'$.items'}",
+          "{'type':'NEXT_LINK','nextLinkPath':'$.links.next','maxLinks':3}",
+          "{'type':'NEXT_LINK','nextLinkPath':'$.custom[0].url','maxLinks':null}",
           "{'type':'CURSOR','cursorPath':'$.next_cursor','cursorParameter':'X-Cursor',"
               + "'cursorIn':'HEADER','limitParameter':'limit','limit':20}",
           "{'type':'CURSOR','cursorPath':'$.next_cursor','cursorParameter':'cursor',"
@@ -788,6 +790,8 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
               + " | [{'queryParameters':[{'name':'status','value':'a'}]}]"
               + " | connector.authentication.name",
           "{'type':'API_TOKEN','name':'Host','in':'HEADER'} | [] | connector.authentication.name",
+          "null | [{'pagination':{'type':'NEXT_LINK','nextLinkPath':'$..next'}}] | connector.apiCalls[0].pagination.nextLinkPath",
+          "null | [{'pagination':{'type':'NEXT_LINK','maxLinks':0}}] | connector.apiCalls[0].pagination.maxLinks",
           "null | [{'pagination':{'type':'CURSOR','cursorPath':'$..cursor'}}]"
               + " | connector.apiCalls[0].pagination.cursorPath",
           "null | [{'pagination':{'type':'CURSOR','cursorParameter':'c','cursorIn':'QUERY',"
@@ -861,6 +865,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
               + "'pageParameter':'p','pageSize':1}}] | connector.apiCalls[0].pagination.pageSizeParameter",
           "'apiCalls':[{'name':'a','path':'/x','pagination':{'type':'PAGE_NUMBER',"
               + "'pageParameter':'p','pageSizeParameter':'s'}}] | connector.apiCalls[0].pagination.pageSize",
+          "'apiCalls':[{'name':'a','path':'/x','pagination':{'type':'NEXT_LINK'}}] | connector.apiCalls[0].pagination.nextLinkPath",
           "'authentication':{'type':'BEARER_TOKEN'} | connector.authentication.token",
           "'authentication':{'type':'API_TOKEN','name':'k','value':'v'} | connector.authentication.in",
           "'authentication':{'type':'OAUTH2','tokenUrl':'https://auth.example.org/token',"

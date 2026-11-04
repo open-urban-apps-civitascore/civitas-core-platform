@@ -11,6 +11,7 @@ package de.civitascore.nifi.http;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import de.civitascore.nifi.http.ApiCall.Parameter;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -43,7 +44,7 @@ record CursorPagination(
   }
 
   @Override
-  public Progress next(Page page, PageContent content) {
+  public Progress next(Page page, URI requestUrl, PageContent content) {
     JsonNode value = content.values().get(cursorPath);
     if (value.isMissingNode() || value.isNull() || "".equals(value.textValue())) {
       return new Progress.Accepted(content.records(), Optional.empty());

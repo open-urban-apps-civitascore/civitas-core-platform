@@ -30,6 +30,15 @@ body:json {
           "name": "items",
           "path": "/items",
           "pagination": { "type": "LIMIT_OFFSET", "limitParameter": "n", "offsetParameter": "n", "countPath": "$.items[?(@.id)]" }
+        },
+        {
+          "name": "links",
+          "path": "/links",
+          "pagination": {
+            "type": "NEXT_LINK",
+            "nextLinkPath": "$..next",
+            "maxLinks": 0
+          }
         }
       ]
     },
@@ -41,12 +50,14 @@ tests {
   test("Status is 400", function() {
     expect(res.getStatus()).to.equal(400);
   });
-  test("Error body names each colliding name and each JSON path that is not only member names and indexes", function() {
+  test("Error body names each colliding name, each JSON path that is not only member names and indexes, and a maxLinks below 1", function() {
     expect(res.body.type).to.equal("urn:civitas:error:VALIDATION_FAILED");
     expect(res.body.fieldErrors.map(function(e) { return e.field; })).to.have.members([
       "connector.authentication.name",
       "connector.apiCalls[0].pagination.cursorParameter",
       "connector.apiCalls[0].pagination.cursorPath",
+      "connector.apiCalls[2].pagination.nextLinkPath",
+      "connector.apiCalls[2].pagination.maxLinks",
       "connector.apiCalls[1].pagination.offsetParameter",
       "connector.apiCalls[1].pagination.countPath"
     ]);

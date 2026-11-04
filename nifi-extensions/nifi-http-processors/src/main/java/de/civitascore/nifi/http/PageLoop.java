@@ -77,9 +77,8 @@ final class PageLoop {
   }
 
   private RunResult readPages(ProcessSession session, Authentication authentication) {
-    Pagination pagination = apiCall.pagination();
     List<FlowFile> pages = new ArrayList<>();
-    Page page = pagination.first();
+    Page page = apiCall.pagination().first();
     PageRepeats repeats = new PageRepeats(page);
     for (int read = 1; ; read++) {
       ApiCallOutcome outcome = client.send(apiCall, page, authentication);
@@ -191,7 +190,7 @@ final class PageLoop {
                 wrongType.reason(page.title().orElse("the response"))));
       }
       case RecordSchema.Verdict.Agrees agrees ->
-          switch (pagination.next(page, agrees.content())) {
+          switch (pagination.next(page, client.target(apiCall, page), agrees.content())) {
             case Pagination.Progress.Rejected(String reason) -> {
               session.remove(flowFile);
               yield new PageRead.Failed(

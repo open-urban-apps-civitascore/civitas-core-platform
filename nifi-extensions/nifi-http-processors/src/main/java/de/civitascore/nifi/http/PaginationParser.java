@@ -22,6 +22,7 @@ final class PaginationParser {
   private static final String PAGE_NUMBER = "PAGE_NUMBER";
   private static final String CURSOR = "CURSOR";
   private static final String LIMIT_OFFSET = "LIMIT_OFFSET";
+  private static final String NEXT_LINK = "NEXT_LINK";
   private static final String PAGE_PARAMETER = "pagination.pageParameter";
   private static final String PAGE_SIZE_PARAMETER = "pagination.pageSizeParameter";
   private static final String CURSOR_PATH = "pagination.cursorPath";
@@ -31,6 +32,8 @@ final class PaginationParser {
   private static final String LIMIT = "pagination.limit";
   private static final String OFFSET_PARAMETER = "pagination.offsetParameter";
   private static final String COUNT_PATH = "pagination.countPath";
+  private static final String NEXT_LINK_PATH = "pagination.nextLinkPath";
+  private static final String MAX_LINKS = "pagination.maxLinks";
 
   private PaginationParser() {}
 
@@ -55,9 +58,17 @@ final class PaginationParser {
       case PAGE_NUMBER -> pageNumber(pagination, names, violations);
       case CURSOR -> cursor(pagination, names, violations);
       case LIMIT_OFFSET -> limitOffset(pagination, names, violations);
+      case NEXT_LINK -> nextLink(pagination, violations);
       case null, default -> {
         violations.add(
-            "pagination.type must be " + PAGE_NUMBER + ", " + CURSOR + " or " + LIMIT_OFFSET);
+            "pagination.type must be "
+                + PAGE_NUMBER
+                + ", "
+                + CURSOR
+                + ", "
+                + LIMIT_OFFSET
+                + " or "
+                + NEXT_LINK);
         yield Optional.empty();
       }
     };
@@ -85,10 +96,28 @@ final class PaginationParser {
                 : OptionalInt.of(pagination.endPage())));
   }
 
+  private static Optional<Pagination> nextLink(JsonPagination pagination, List<String> violations) {
+    int before = violations.size();
+    Optional<JsonPath> path =
+        JsonPath.required(pagination.nextLinkPath(), NEXT_LINK_PATH, violations);
+    if (pagination.maxLinks() != null && pagination.maxLinks() < 1) {
+      violations.add(MAX_LINKS + " must be at least 1");
+    }
+    return violations.size() > before
+        ? Optional.empty()
+        : Optional.of(
+            new NextLinkPagination(
+                path.orElseThrow(),
+                pagination.maxLinks() == null
+                    ? OptionalInt.empty()
+                    : OptionalInt.of(pagination.maxLinks())));
+  }
+
   private static Optional<Pagination> cursor(
       JsonPagination pagination, PaginationNames names, List<String> violations) {
     int before = violations.size();
-    Optional<JsonPath> cursorPath = jsonPath(pagination.cursorPath(), CURSOR_PATH, violations);
+    Optional<JsonPath> cursorPath =
+        JsonPath.required(pagination.cursorPath(), CURSOR_PATH, violations);
     boolean hasCursorParameter =
         ApiCallParser.notBlank(pagination.cursorParameter(), CURSOR_PARAMETER, violations);
     Optional<ParameterLocation> cursorIn = location(pagination.cursorIn(), violations);
@@ -120,23 +149,14 @@ final class PaginationParser {
     }
     String countPathText = blankToNull(pagination.countPath());
     Optional<JsonPath> countPath =
-        countPathText == null ? Optional.empty() : jsonPath(countPathText, COUNT_PATH, violations);
+        countPathText == null
+            ? Optional.empty()
+            : JsonPath.required(countPathText, COUNT_PATH, violations);
     if (violations.size() > before) {
       return Optional.empty();
     }
     return Optional.of(
         new LimitOffsetPagination(pagination.offsetParameter(), offset, limit, countPath));
-  }
-
-  private static Optional<JsonPath> jsonPath(String text, String keyPath, List<String> violations) {
-    if (!ApiCallParser.notBlank(text, keyPath, violations)) {
-      return Optional.empty();
-    }
-    Optional<JsonPath> path = JsonPath.parse(text);
-    if (path.isEmpty()) {
-      violations.add(keyPath + " must start with $ and hold only member names and array indexes");
-    }
-    return path;
   }
 
   private static Optional<ParameterLocation> location(String text, List<String> violations) {
@@ -222,5 +242,7 @@ final class PaginationParser {
       Integer limit,
       String offsetParameter,
       Integer offset,
-      String countPath) {}
+      String countPath,
+      String nextLinkPath,
+      Integer maxLinks) {}
 }

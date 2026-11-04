@@ -12261,6 +12261,7 @@ components:
           - $ref: "#/components/schemas/HttpConnectorPageNumberPagination"
           - $ref: "#/components/schemas/HttpConnectorLimitOffsetPagination"
           - $ref: "#/components/schemas/HttpConnectorCursorPagination"
+          - $ref: "#/components/schemas/HttpConnectorNextLinkPagination"
         path:
           type: string
           description: "Path of the API call below the API host. Starts with '/' and\
@@ -12532,6 +12533,36 @@ components:
         \ the token endpoint, sent as 'Authorization: Bearer <token>'."
       required:
       - type
+    HttpConnectorNextLinkPagination:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorPagination"
+      - type: object
+        properties:
+          maxLinks:
+            type: integer
+            format: int32
+            description: "Maximum number of links to follow. At least 1. Absent or\
+              \ null follows all links. A run sends at most 1000 requests and stops\
+              \ with an error when the last one still holds a link, so a value above\
+              \ 999 has no effect."
+            example: 10
+            minimum: 1
+          nextLinkPath:
+            type: string
+            description: "JSON path to the next link, a string or an object with a\
+              \ string href. Only member names and array indexes. An absent, null\
+              \ or empty link ends the run."
+            example: $.links.next
+            pattern: "^\\$(\\.[A-Za-z_][A-Za-z0-9_-]*|\\['[^'\\\\]+'\\]|\\[[0-9]+\\\
+              ])+$"
+          type:
+            type: string
+            enum:
+            - NEXT_LINK
+      description: "Next link pagination: each response is one record and holds the\
+        \ URL of the next request. Links must have the scheme, host and port of baseUrl."
+      required:
+      - type
     HttpConnectorPageNumberPagination:
       allOf:
       - $ref: "#/components/schemas/HttpConnectorPagination"
@@ -12581,6 +12612,7 @@ components:
         mapping:
           CURSOR: "#/components/schemas/HttpConnectorCursorPagination"
           LIMIT_OFFSET: "#/components/schemas/HttpConnectorLimitOffsetPagination"
+          NEXT_LINK: "#/components/schemas/HttpConnectorNextLinkPagination"
           PAGE_NUMBER: "#/components/schemas/HttpConnectorPageNumberPagination"
         propertyName: type
       properties:

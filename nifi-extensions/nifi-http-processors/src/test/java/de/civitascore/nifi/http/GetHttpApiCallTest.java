@@ -1233,6 +1233,232 @@ class GetHttpApiCallTest {
     }
   }
 
+  @ParameterizedTest
+  @CsvSource(
+      delimiter = '|',
+      quoteCharacter = '\'',
+      value = {
+        "$.links.next | {\"links\":{\"next\":\"?page=2\"}} | false",
+        "$.links.next | {\"links\":{\"next\":\"?page=2\"}} | true",
+        "$.links.next | {\"links\":{\"next\":{\"href\":\"?page=2\"}}} | false",
+        "$.links.next | {\"links\":{\"next\":{\"href\":\"?page=2\"}}} | true",
+        "$._links.next.href | {\"_links\":{\"next\":{\"href\":\"?page=2\"}}} | false",
+        "$._links.next.href | {\"_links\":{\"next\":{\"href\":\"?page=2\"}}} | true",
+        "$['@odata.nextLink'] | {\"@odata.nextLink\":\"?page=2\"} | false",
+        "$['@odata.nextLink'] | {\"@odata.nextLink\":\"?page=2\"} | true",
+        "$['@iot.nextLink'] | {\"@iot.nextLink\":\"?page=2\"} | false",
+        "$['@iot.nextLink'] | {\"@iot.nextLink\":\"?page=2\"} | true",
+      })
+  void onTrigger_withEachNextLinkFormat_readsTheLastResponse(
+      String path, String first, boolean absolute) throws Exception {
+    AtomicReference<String> apiUrl = new AtomicReference<>();
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.startHttp(
+            index ->
+                Response.json(
+                    index == 0
+                        ? first.replace(
+                            "?page=2", absolute ? apiUrl.get() + "/stations?page=2" : "?page=2")
+                        : "{}"))) {
+      apiUrl.set(endpoint.baseUrl());
+      TestRunner runner = nextLinkRunner(endpoint, path, "");
+      runner.run();
+      runner.assertAllFlowFilesTransferred(GetHttpApiCall.SUCCESS, 2);
+      assertEquals("page=2", rawQueries(endpoint).get(1));
+      assertEquals("/v1/stations", endpoint.requests().get(1).rawPath());
+      assertEquals(
+          "2",
+          runner
+              .getFlowFilesForRelationship(GetHttpApiCall.SUCCESS)
+              .get(1)
+              .getAttribute(GetHttpApiCall.PAGE));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"absent", "null", "\"\"", "{\"href\":\"\"}"})
+  void onTrigger_withoutANextLink_deliversTheLastResponse(String value) throws Exception {
+    String last = "absent".equals(value) ? "{}" : "{\"next\":" + value + "}";
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(Response.json("{\"next\":\"?page=2\"}"), Response.json(last))) {
+      TestRunner runner = nextLinkRunner(endpoint, "$.next", "");
+      runner.run();
+      runner.assertAllFlowFilesTransferred(GetHttpApiCall.SUCCESS, 2);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "true",
+        "42",
+        "[]",
+        "{}",
+        "{\"href\":null}",
+        "{\"href\":42}",
+        "\"http://bad link/token-4b90\"",
+        "\"https://another.example/token-4b90\"",
+        "\"http://localhost:1/token-4b90\""
+      })
+  void onTrigger_withAnInvalidNextLink_stopsWithoutLeakingTheLink(String value) throws Exception {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, "{\"next\":" + value + "}")) {
+      TestRunner runner = nextLinkRunner(endpoint, "$.next", "");
+      runner.run();
+      runner.assertAllFlowFilesTransferred(GetHttpApiCall.STOP, 1);
+      assertEquals(1, endpoint.requests().size());
+      for (String text : visible(runner)) {
+        assertFalse(text.contains("token-4b90"), text);
+      }
+    }
+  }
+
+  @Test
+  void onTrigger_withANextLinkOnAnotherHost_rejectsTheResponseBeforeSendingTheLink()
+      throws Exception {
+    try (ApiEndpoint other = ApiEndpoint.answering(200, "{}");
+        ApiEndpoint endpoint =
+            ApiEndpoint.answering(
+                200, "{\"next\":\"" + other.baseUrl() + "/private-link-9d20\"}")) {
+      TestRunner runner = nextLinkRunner(endpoint, "$.next", "");
+      runner.run();
+      runner.assertAllFlowFilesTransferred(GetHttpApiCall.STOP, 1);
+      MockFlowFile failure = runner.getFlowFilesForRelationship(GetHttpApiCall.STOP).getFirst();
+      assertEquals("200", failure.getAttribute(GetHttpApiCall.ERROR_STATUS));
+      assertEquals(
+          "API call \"Stations\": request 1: the next link has another scheme, host or port than the API host",
+          failure.getAttribute(GetHttpApiCall.ERROR_MESSAGE));
+      assertEquals(0, other.requests().size());
+      for (String text : visible(runner)) {
+        assertFalse(text.contains("private-link-9d20"), text);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"[]", "1", "true", "not JSON"})
+  void onTrigger_withANextLinkResponseThatIsNotAnObject_discardsEarlierPages(String last)
+      throws Exception {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json("{\"next\":\"?token=token-4b90\"}"), Response.json(last))) {
+      TestRunner runner = nextLinkRunner(endpoint, "$.next", "");
+      runner.run();
+      runner.assertAllFlowFilesTransferred(GetHttpApiCall.STOP, 1);
+      for (String text : visible(runner)) {
+        assertFalse(text.contains("token-4b90"), text);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {400, 404, 503})
+  void onTrigger_whenAFollowedLinkFails_discardsEarlierPages(int status) throws Exception {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json("{\"next\":\"?token=token-4b90\"}"), Response.status(status))) {
+      TestRunner runner = nextLinkRunner(endpoint, "$.next", "");
+      runner.run();
+      runner.assertAllFlowFilesTransferred(
+          status == 503 ? GetHttpApiCall.FAILURE : GetHttpApiCall.STOP, 1);
+      for (String text : visible(runner)) {
+        assertFalse(text.contains("token-4b90"), text);
+      }
+    }
+  }
+
+  @Test
+  void onTrigger_withARepeatedNextLink_stopsBeforeSendingItAgain() throws Exception {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json("{\"next\":\"?token=token-4b90\",\"id\":1}"),
+            Response.json("{\"next\":\"?token=token-4b90\",\"id\":2}"))) {
+      TestRunner runner = nextLinkRunner(endpoint, "$.next", "");
+      runner.run();
+      runner.assertAllFlowFilesTransferred(GetHttpApiCall.STOP, 1);
+      assertEquals(2, endpoint.requests().size());
+      for (String text : visible(runner)) {
+        assertFalse(text.contains("token-4b90"), text);
+      }
+    }
+  }
+
+  @Test
+  void onTrigger_withMaxLinks_deliversAtMostMaxLinksPlusOneResponses() throws Exception {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json("{\"next\":\"?page=2\"}"), Response.json("{\"next\":\"?page=3\"}"))) {
+      TestRunner runner = nextLinkRunner(endpoint, "$.next", ",\"maxLinks\":1");
+      runner.run();
+      runner.assertAllFlowFilesTransferred(GetHttpApiCall.SUCCESS, 2);
+      assertEquals(2, endpoint.requests().size());
+    }
+  }
+
+  @Test
+  void onTrigger_withNextLinksAndMaxPages_stopsWithoutEarlierPages() throws Exception {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json("{\"next\":\"?page=2\"}"),
+            Response.json("{\"next\":\"?page=3\"}"),
+            Response.json("{\"next\":\"?page=4\"}"))) {
+      TestRunner runner = nextLinkRunner(endpoint, "$.next", ",\"maxLinks\":10");
+      runner.setProperty(GetHttpApiCall.MAX_PAGES, "2");
+      runner.run();
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": no stop condition after 2 pages (Max Pages)");
+      assertEquals(2, endpoint.requests().size());
+    }
+  }
+
+  @Test
+  void onTrigger_withNextLinksAndNoBody_endsWithEarlierPages() throws Exception {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json("{\"next\":\"?page=2\"}"), Response.status(204))) {
+      TestRunner runner = nextLinkRunner(endpoint, "$.next", "");
+      runner.run();
+      runner.assertAllFlowFilesTransferred(GetHttpApiCall.SUCCESS, 1);
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource(
+      delimiter = '|',
+      value = {
+        " | pagination.nextLinkPath",
+        "\"nextLinkPath\":\"$..secret\" | pagination.nextLinkPath",
+        "\"nextLinkPath\":\"$.next\",\"maxLinks\":0 | pagination.maxLinks",
+        "\"nextLinkPath\":\"$.next\",\"maxLinks\":\"secret\" | pagination.maxLinks"
+      })
+  void validate_withAnInvalidNextLinkPagination_namesTheField(String fields, String key)
+      throws Exception {
+    TestRunner runner = runner("http://localhost:8080");
+    runner.setProperty(
+        GetHttpApiCall.API_CALL,
+        "{\"name\":\"Stations\",\"path\":\"/stations\",\"pagination\":{\"type\":\"NEXT_LINK\""
+            + (fields == null ? "" : "," + fields)
+            + "}}");
+    runner.assertNotValid();
+    assertTrue(invalid(runner).stream().anyMatch(result -> result.getExplanation().contains(key)));
+  }
+
+  private static TestRunner nextLinkRunner(ApiEndpoint endpoint, String path, String fields)
+      throws Exception {
+    TestRunner runner = runner(endpoint.baseUrl());
+    runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, "{\"type\":\"object\"}");
+    runner.setProperty(
+        GetHttpApiCall.API_CALL,
+        "{\"name\":\"Stations\",\"path\":\"/stations\",\"pagination\":{\"type\":\"NEXT_LINK\",\"nextLinkPath\":\""
+            + path
+            + "\""
+            + fields
+            + "}}");
+    return runner;
+  }
+
   @Test
   void onTrigger_withCursorInTheQuery_readsEachPageUntilAResponseWithoutACursor()
       throws InitializationException {
