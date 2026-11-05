@@ -39,10 +39,15 @@ const PEM_CERTIFICATES =
   /^-----BEGIN CERTIFICATE-----[^-]+-----END CERTIFICATE-----(?:\s+-----BEGIN CERTIFICATE-----[^-]+-----END CERTIFICATE-----)*$/
 const ENCRYPTED_PRIVATE_KEY = '-----BEGIN ENCRYPTED PRIVATE KEY-----'
 const ENCRYPTED_PEM_HEADER = 'Proc-Type: 4,ENCRYPTED'
-const PRIVATE_KEYS = ['-----BEGIN PRIVATE KEY-----', '-----BEGIN RSA PRIVATE KEY-----']
+const PRIVATE_KEY_FOOTERS = new Map([
+  ['-----BEGIN PRIVATE KEY-----', '-----END PRIVATE KEY-----'],
+  ['-----BEGIN RSA PRIVATE KEY-----', '-----END RSA PRIVATE KEY-----'],
+])
+const BASE64_LINE = /^[A-Za-z0-9+/=]*$/
 const HTTP_SCHEME = /^http:/i
 const HTTPS_SCHEME = /^https:/i
 const QUERY_OR_FRAGMENT = /[?#]/
+const LINE_BREAK = /\r\n|\r|\n/
 
 export type ConnectorTypeKey = keyof typeof CONNECTOR_TYPES
 
@@ -366,11 +371,18 @@ const getTokenUrlError = (tokenUrl: string) => {
   return undefined
 }
 
-// The config-adapter cannot read an encrypted private key
 const getPrivateKeyError = (privateKey: string) => {
+  // The config-adapter cannot read an encrypted private key
   const isEncrypted = privateKey.startsWith(ENCRYPTED_PRIVATE_KEY) || privateKey.includes(ENCRYPTED_PEM_HEADER)
   if (isEncrypted) return 'datasources.errors.encryptedPrivateKey'
-  if (!PRIVATE_KEYS.some(header => privateKey.startsWith(header))) return 'datasources.errors.invalidPrivateKey'
+  // The config-adapter takes the header as the whole first line and reads every following line as Base64
+  // up to a line that is the footer, or up to the end without one
+  const [header, ...lines] = privateKey.split(LINE_BREAK)
+  const footer = PRIVATE_KEY_FOOTERS.get(header)
+  if (!footer) return 'datasources.errors.invalidPrivateKey'
+  const footerIndex = lines.indexOf(footer)
+  const bodyLines = footerIndex === -1 ? lines : lines.slice(0, footerIndex)
+  if (!bodyLines.every(line => BASE64_LINE.test(line))) return 'datasources.errors.invalidPrivateKey'
   return undefined
 }
 

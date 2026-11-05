@@ -645,6 +645,7 @@ describe('HTTP connector schemas', () => {
       ['a PKCS#8 key', { privateKey: PRIVATE_KEY }],
       ['a PKCS#1 key', { privateKey: RSA_PRIVATE_KEY }],
       ['a key after an empty line', { privateKey: `\n${PRIVATE_KEY}` }],
+      ['a key without footer', { privateKey: '-----BEGIN PRIVATE KEY-----\nMIIEtest' }],
       ['masked values', { certificate: '********', privateKey: '********' }],
     ])('accepts %s', (_name, fields) => {
       expect(looseIssues({ authentication: { ...CLIENT_CERTIFICATE, ...fields } })).toEqual([])
@@ -663,6 +664,30 @@ describe('HTTP connector schemas', () => {
       ['an encrypted RSA key', { privateKey: ENCRYPTED_RSA_PRIVATE_KEY }, 'privateKey', 'encryptedPrivateKey'],
       ['a certificate as key', { privateKey: CERTIFICATE }, 'privateKey', 'invalidPrivateKey'],
       ['other text as key', { privateKey: 'secret' }, 'privateKey', 'invalidPrivateKey'],
+      [
+        'a key with header and body on one line',
+        { privateKey: '-----BEGIN PRIVATE KEY-----MIIEtest\n-----END PRIVATE KEY-----' },
+        'privateKey',
+        'invalidPrivateKey',
+      ],
+      [
+        'a key with a space after the header',
+        { privateKey: '-----BEGIN PRIVATE KEY----- \nMIIEtest\n-----END PRIVATE KEY-----' },
+        'privateKey',
+        'invalidPrivateKey',
+      ],
+      [
+        'a key with body and footer on one line',
+        { privateKey: '-----BEGIN PRIVATE KEY-----\nMIIEtest-----END PRIVATE KEY-----' },
+        'privateKey',
+        'invalidPrivateKey',
+      ],
+      [
+        'a key with the footer of another type',
+        { privateKey: '-----BEGIN PRIVATE KEY-----\nMIIEtest\n-----END RSA PRIVATE KEY-----' },
+        'privateKey',
+        'invalidPrivateKey',
+      ],
     ])('rejects %s', (_name, fields, field, message) => {
       expect(looseIssues({ authentication: { ...CLIENT_CERTIFICATE, ...fields } })).toContainEqual(
         issue(['authentication', field], `datasources.errors.${message}`),
