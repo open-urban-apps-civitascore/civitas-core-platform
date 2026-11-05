@@ -753,23 +753,7 @@ if [ -f .env ]; then
     set -a; . ./.env; set +a
 fi
 
-# Download PostgreSQL JDBC driver if not present (needed by NiFi for DB connections).
-POSTGRES_JDBC_VERSION=42.7.4
-if [ ! -f "$SCRIPT_DIR/nifi/drivers/postgresql.jar" ]; then
-    echo "  Downloading PostgreSQL JDBC driver $POSTGRES_JDBC_VERSION for NiFi..."
-    mkdir -p "$SCRIPT_DIR/nifi/drivers"
-    if curl -fsSL --retry 3 -o "$SCRIPT_DIR/nifi/drivers/postgresql.jar.tmp" \
-        "https://jdbc.postgresql.org/download/postgresql-${POSTGRES_JDBC_VERSION}.jar"; then
-        mv "$SCRIPT_DIR/nifi/drivers/postgresql.jar.tmp" "$SCRIPT_DIR/nifi/drivers/postgresql.jar"
-        echo "  PostgreSQL JDBC driver downloaded"
-    else
-        rm -f "$SCRIPT_DIR/nifi/drivers/postgresql.jar.tmp"
-        echo "ERROR: Failed to download PostgreSQL JDBC driver" >&2
-        exit 1
-    fi
-fi
-
-echo "  Building the NiFi NARs..."
+echo "  Building the NiFi NARs and JDBC drivers..."
 if ! mvn_build "$SCRIPT_DIR/../nifi-extensions" $MVN_CLEAN package -DskipTests -q; then
     echo "ERROR: NiFi extensions build failed"
     exit 1
@@ -778,6 +762,8 @@ if [ "$SKIP_BUILD" != "true" ]; then
     rm -f "$SCRIPT_DIR/nifi/extensions"/nifi-*-nar-*.nar
     cp "$SCRIPT_DIR/../nifi-extensions"/nifi-*-nar/target/nifi-*-nar-*.nar "$SCRIPT_DIR/nifi/extensions/"
     echo "  NiFi NARs copied to nifi/extensions"
+    cp "$SCRIPT_DIR/../nifi-extensions"/nifi-jdbc-drivers/target/drivers/*.jar "$SCRIPT_DIR/nifi/drivers/"
+    echo "  JDBC drivers copied to nifi/drivers"
 fi
 
 if $DOCKER_COMPOSE up -d 2>&1; then

@@ -9,6 +9,7 @@ that use them; the components themselves know nothing about the adapter.
 | `nifi-frost-nar` | The NiFi archive that carries the FROST code into an installation |
 | `nifi-http-processors` | The code: `GetHttpApiCall`, the request of one API call of an HTTP/REST Data source |
 | `nifi-http-nar` | The NiFi archive that carries the HTTP code into an installation |
+| `nifi-jdbc-drivers` | The PostgreSQL JDBC driver for the Pipelines' database connection pools, at `target/drivers/postgresql.jar` |
 
 ## Build
 
@@ -44,9 +45,9 @@ cp nifi-*-nar/target/nifi-*-nar-*.nar ../dev-environment/nifi/extensions/
 
 ## Install into a deployed NiFi
 
-The CI packages the NARs into the image `nifi-extensions`, tagged with the NAR version. It is never
-run: an init container of the NiFi pod copies the NARs into a volume, and NiFi reads that volume as
-a custom NAR library directory (`components/nifi` in the
+The CI packages the NARs and the JDBC drivers into the image `nifi-extensions`, tagged with the NAR
+version. It is never run: an init container of the NiFi pod copies them into volumes, and NiFi reads
+the NAR volume as a custom NAR library directory (`components/nifi` in the
 [deployment repository](https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-deployment)).
 The NiFi image stays the one Apache publishes.
 
