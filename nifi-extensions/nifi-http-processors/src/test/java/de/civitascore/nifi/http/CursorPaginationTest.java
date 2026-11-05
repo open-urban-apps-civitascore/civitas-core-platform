@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.MissingNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import de.civitascore.nifi.http.ApiCall.Parameter;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -31,6 +32,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 class CursorPaginationTest {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  private static final URI REQUEST_URL = URI.create("https://api.example.org/items");
   private static final JsonPath CURSOR_PATH = new JsonPath("$.next_cursor");
   private static final Limit LIMIT = new Limit("limit", 20);
 
@@ -104,7 +107,7 @@ class CursorPaginationTest {
     CursorPagination pagination = inQuery(Optional.empty());
     JsonNode cursor = "absent".equals(value) ? MissingNode.getInstance() : MAPPER.readTree(value);
 
-    Pagination.Progress turn = pagination.next(pagination.first(), content(cursor));
+    Pagination.Progress turn = pagination.next(pagination.first(), REQUEST_URL, content(cursor));
 
     assertEquals(new Pagination.Progress.Accepted(1, Optional.empty()), turn);
   }
@@ -117,7 +120,8 @@ class CursorPaginationTest {
       String value, String type) throws JsonProcessingException {
     CursorPagination pagination = inQuery(Optional.empty());
 
-    Pagination.Progress turn = pagination.next(pagination.first(), content(MAPPER.readTree(value)));
+    Pagination.Progress turn =
+        pagination.next(pagination.first(), REQUEST_URL, content(MAPPER.readTree(value)));
 
     assertEquals(
         new Pagination.Progress.Rejected(
@@ -132,7 +136,8 @@ class CursorPaginationTest {
     CursorPagination pagination =
         new CursorPagination(CURSOR_PATH, "X-Cursor", ParameterLocation.HEADER, Optional.empty());
 
-    Pagination.Progress turn = pagination.next(pagination.first(), content(new TextNode(cursor)));
+    Pagination.Progress turn =
+        pagination.next(pagination.first(), REQUEST_URL, content(new TextNode(cursor)));
 
     Pagination.Progress.Rejected rejected =
         assertInstanceOf(Pagination.Progress.Rejected.class, turn);
@@ -188,7 +193,8 @@ class CursorPaginationTest {
 
   private static Page nextPage(CursorPagination pagination, Page page, PageContent content) {
     Pagination.Progress.Accepted accepted =
-        assertInstanceOf(Pagination.Progress.Accepted.class, pagination.next(page, content));
+        assertInstanceOf(
+            Pagination.Progress.Accepted.class, pagination.next(page, REQUEST_URL, content));
     return accepted.next().orElseThrow();
   }
 }

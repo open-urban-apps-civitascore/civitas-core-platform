@@ -12,6 +12,7 @@ import de.civitascore.portal.model.output.DataStructureOutputDTO;
 import de.civitascore.portal.model.output.summary.DataStructureVersionUsageSummaryDTO;
 import de.civitascore.portal.service.ArtifactUsageLookup;
 import de.civitascore.portal.service.ArtifactUsageLookup.ArtifactUsage;
+import de.civitascore.portal.service.ArtifactUsageLookup.DataStructureUsage;
 import de.civitascore.portal.service.ArtifactUsageLookup.ReferrerKind;
 import de.civitascore.portal.service.ArtifactUsageLookup.ReleasedReferrer;
 import java.util.List;
@@ -33,20 +34,24 @@ class DataStructureAssemblerTest {
   @Mock private ArtifactUsageLookup artifactUsageLookup;
 
   @Test
-  @DisplayName("Each version row carries its own usage and the structure carries their union")
+  @DisplayName("Each version row carries its own usage and the structure carries its own")
   void enrichDto_setsUsagePerVersionRowAndOnStructure() {
     DataStructureVersion releasedUse = versionWithRow();
-    DataStructureVersion draftUse = versionWithRow();
+    DataStructureVersion sharingLine = versionWithRow();
     DataStructure structure = new DataStructure();
-    structure.setDataStructureVersions(Set.of(releasedUse, draftUse));
-    when(artifactUsageLookup.ofEachVersion(structure))
+    structure.setDataStructureVersions(Set.of(releasedUse, sharingLine));
+    ArtifactUsage released =
+        new ArtifactUsage(
+            true, List.of(), List.of(new ReleasedReferrer(ReferrerKind.DATA_SOURCE, "ref")));
+    when(artifactUsageLookup.ofStructureAndVersions(structure))
         .thenReturn(
-            Map.of(
-                releasedUse.getId(),
-                new ArtifactUsage(
-                    true, List.of(new ReleasedReferrer(ReferrerKind.DATA_SOURCE, "ref"))),
-                draftUse.getId(),
-                new ArtifactUsage(true, List.of())));
+            new DataStructureUsage(
+                released,
+                Map.of(
+                    releasedUse.getId(),
+                    released,
+                    sharingLine.getId(),
+                    new ArtifactUsage(true, List.of("pin"), List.of()))));
 
     DataStructureOutputDTO dto =
         new DataStructureAssembler(
@@ -59,9 +64,36 @@ class DataStructureAssemblerTest {
             DataStructureVersionUsageSummaryDTO::isInUse,
             DataStructureVersionUsageSummaryDTO::isInUseByReleased)
         .containsExactlyInAnyOrder(
-            tuple(releasedUse.getId(), true, true), tuple(draftUse.getId(), true, false));
+            tuple(releasedUse.getId(), true, true), tuple(sharingLine.getId(), true, false));
     assertThat(dto.isInUse()).isTrue();
     assertThat(dto.isInUseByReleased()).isTrue();
+  }
+
+  @Test
+  @DisplayName("The structure is not in use when only its versions hold each other")
+  void enrichDto_takesTheStructureFlagFromTheStructureUsage() {
+    DataStructureVersion first = versionWithRow();
+    DataStructureVersion second = versionWithRow();
+    DataStructure structure = new DataStructure();
+    structure.setDataStructureVersions(Set.of(first, second));
+    when(artifactUsageLookup.ofStructureAndVersions(structure))
+        .thenReturn(
+            new DataStructureUsage(
+                new ArtifactUsage(false, List.of(), List.of()),
+                Map.of(
+                    first.getId(),
+                    new ArtifactUsage(true, List.of("second pin"), List.of()),
+                    second.getId(),
+                    new ArtifactUsage(true, List.of("first pin"), List.of()))));
+
+    DataStructureOutputDTO dto =
+        new DataStructureAssembler(
+                dataStructureMapper, dataStructureVersionMapper, artifactUsageLookup)
+            .enrichDto(new DataStructureOutputDTO(), structure);
+
+    assertThat(dto.getDataStructureVersions())
+        .allMatch(DataStructureVersionUsageSummaryDTO::isInUse);
+    assertThat(dto.isInUse()).isFalse();
   }
 
   private DataStructureVersion versionWithRow() {

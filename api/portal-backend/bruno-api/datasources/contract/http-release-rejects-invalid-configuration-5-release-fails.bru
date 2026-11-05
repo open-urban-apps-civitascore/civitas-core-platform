@@ -24,6 +24,7 @@ tests {
     const fields = res.body.fieldErrors.map(function(error) { return error.field; });
     expect(fields).to.have.members([
       "connector.authentication.token",
+      "connector.apiCalls[3].pagination.nextLinkPath",
       "connector.apiCalls[0].path",
       "connector.apiCalls[0].pagination.pageSizeParameter",
       "connector.apiCalls[0].pagination.pageSize",

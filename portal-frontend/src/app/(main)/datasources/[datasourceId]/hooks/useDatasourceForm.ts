@@ -341,6 +341,7 @@ export const useDatasourceForm = (
     areAssignmentsDirty,
     areDatapoolsDirty,
     isFormDirty,
+    isConnectorChanged,
     form,
     dataSourceStatus,
     selectedConnectorType,

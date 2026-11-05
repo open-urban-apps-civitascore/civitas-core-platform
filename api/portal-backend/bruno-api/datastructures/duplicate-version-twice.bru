@@ -1,0 +1,44 @@
+meta {
+  name: Duplicate Data Structure Version Twice
+  type: http
+  seq: 16
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/duplicate
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+  versionId: {{dataStructureVersionId}}
+}
+
+tests {
+  test("Status code is 201 (a second duplicate of the same source does not collide)", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Second duplicate is distinct from the first (bru var duplicatedVersionId)", function() {
+    expect(res.body.id).to.not.equal(bru.getVar("duplicatedVersionId"));
+  });
+}
+
+docs {
+  **Precondition:** `dataStructureId` and `dataStructureVersionId` (the source version) are set,
+  and "Duplicate Data Structure Version" already ran once against the same source (it sets
+  `duplicatedVersionId`).
+
+  **Expected Response:** 201 Created, a version distinct from the first duplicate. The registry
+  copies the stored source version instead of storing its content again, so the content-hash
+  dedup of a normal write cannot hand back the number of the first duplicate. Each copy gets the
+  next major after the highest version.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Second new version record created, with its own registry pin |
+  | Config Adapter | -- |
+  | External System | -- |
+}

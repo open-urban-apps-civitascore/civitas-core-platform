@@ -5,6 +5,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,21 @@ import java.util.UUID;
  * is later created.
  */
 class ArtifactReferenceRepository {
+
+    /** The references by which their holder owns the target; see {@link #ownedMemberUrns}. */
+    private static final String OWNING_REFERENCE = """
+        (r.reference_type = 'datastructure-ref'
+                     or (r.reference_type = 'pipeline-node' and r.reference_name = 'mapping')
+                     or (r.reference_type = 'dataset-ref'   and r.reference_name in ('pipeline', 'mapping')))""";
+
+    /** The common table expression {@code removed}: the versions {@code :removedPins} names. */
+    private static final String REMOVED_VERSIONS = """
+        removed as (
+                    select v.id, v.artifact_id
+                      from model_forge.artifact_version v
+                      join model_forge.artifact a on a.id = v.artifact_id
+                     where a.logical_urn || ':' || v.version in (:removedPins)
+                )""";
 
     private final JdbcClient jdbc;
 
@@ -136,6 +152,60 @@ class ArtifactReferenceRepository {
             .list();
     }
 
+    /** Checks the complete removed set, retaining the source version and whether the edge pins it. */
+    List<String> versionDeletionBlockers(Collection<String> removedPins, Collection<String> siblingUrns) {
+        return jdbc.sql("with " + REMOVED_VERSIONS + """
+                select distinct a.logical_urn
+                  from model_forge.artifact_reference r
+                  join model_forge.artifact ta on ta.id = r.target_artifact_id
+                  join model_forge.artifact_version fv on fv.id = r.from_version_id
+                  join model_forge.artifact a on a.id = fv.artifact_id
+                 where r.reference_type <> 'dataset-ref'
+                   and exists (select 1 from removed target
+                                where target.artifact_id = r.target_artifact_id
+                                  and (r.target_version_id is null or r.target_version_id = target.id))
+                   and fv.id not in (select id from removed)
+                   and (fv.version = a.current_version
+                     or a.artifact_type in ('element', 'datastructure')
+                     or exists (select 1 from model_forge.artifact_reference pin
+                                 where pin.target_version_id = fv.id))
+                   and not (a.logical_urn in (:siblingUrns)
+                     and r.target_urn in (ta.logical_urn, ta.logical_urn || ':latest')
+                     and exists (select 1 from model_forge.artifact_version survivor
+                                  where survivor.artifact_id = r.target_artifact_id
+                                    and survivor.id not in (select id from removed)))
+                 order by a.logical_urn
+                """)
+            .param("removedPins", removedPins)
+            .param("siblingUrns", siblingUrns)
+            .query(String.class)
+            .list();
+    }
+
+    /** Resolves ownership for all removed versions in one query, including superseded owners. */
+    List<String> exclusivelyOwnedMemberVersions(Collection<String> ownerPins) {
+        return jdbc.sql("with " + REMOVED_VERSIONS + """
+                , owners as (
+                    select r.from_version_id, r.target_version_id
+                      from model_forge.artifact_reference r
+                     where """ + OWNING_REFERENCE + """
+                )
+                select distinct ta.logical_urn || ':' || tv.version as pin
+                  from owners owned
+                  join removed on removed.id = owned.from_version_id
+                  join model_forge.artifact_version tv on tv.id = owned.target_version_id
+                  join model_forge.artifact ta on ta.id = tv.artifact_id
+                 where not exists (
+                    select 1 from owners other
+                     where other.target_version_id = owned.target_version_id
+                       and other.from_version_id not in (select id from removed))
+                 order by pin
+                """)
+            .param("removedPins", ownerPins)
+            .query(String.class)
+            .list();
+    }
+
     /**
      * Logical URNs of the DataSet manifests that list the given artifact as a member
      * ({@code dataset-ref} in-edges) — i.e. the DataSets the artifact belongs to. Drives the
@@ -179,9 +249,7 @@ class ArtifactReferenceRepository {
                  where a.logical_urn = :logical
                    and fv.version = coalesce(cast(:ownerVersion as text), a.current_version)
                    and ta.logical_urn <> :logical
-                   and (r.reference_type = 'datastructure-ref'
-                     or (r.reference_type = 'pipeline-node' and r.reference_name = 'mapping')
-                     or (r.reference_type = 'dataset-ref'   and r.reference_name in ('pipeline', 'mapping')))
+                   and """ + OWNING_REFERENCE + """
                  order by r.target_urn
                 """)
             .param("logical", ownerLogicalUrn)
@@ -224,6 +292,27 @@ class ArtifactReferenceRepository {
                 """)
             .param("logical", elementLogicalUrn)
             .query(String.class)
+            .list();
+    }
+
+    /**
+     * Versioned URNs of the versions, of any artifact and current or not, that own any of the given
+     * versions through a pinned reference.
+     */
+    List<String> ownersOfVersions(Collection<String> targetPins) {
+        return jdbc.sql("""
+                select distinct a.logical_urn, fv.version
+                  from model_forge.artifact_reference r
+                  join model_forge.artifact_version fv on fv.id = r.from_version_id
+                  join model_forge.artifact a          on a.id = fv.artifact_id
+                  join model_forge.artifact_version tv on tv.id = r.target_version_id
+                  join model_forge.artifact ta         on ta.id = tv.artifact_id
+                 where ta.logical_urn || ':' || tv.version in (:targetPins)
+                   and """ + OWNING_REFERENCE + """
+                 order by a.logical_urn, fv.version
+                """)
+            .param("targetPins", targetPins)
+            .query((rs, n) -> UrnParser.withVersion(rs.getString("logical_urn"), rs.getString("version")))
             .list();
     }
 

@@ -12,16 +12,20 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.modelforge.contract.ArtifactId;
+import de.civitascore.modelforge.contract.ArtifactWriteResult;
+import de.civitascore.modelforge.contract.CopyVersionCommand;
 import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
 import de.civitascore.modelforge.contract.DependencyQuery;
 import de.civitascore.modelforge.contract.ImportResult;
 import de.civitascore.modelforge.facade.ModelForge;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ModelMissingException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -210,6 +214,94 @@ class ModelRegistryGatewayTest {
                   new ArtifactId(HOST_DATA_STRUCTURE_URN + ":1.1.0"), List.of(), Map.of()));
 
       assertThat(store(HOST_DATA_STRUCTURE_URN).logicalUrn()).isEqualTo(HOST_DATA_STRUCTURE_URN);
+    }
+  }
+
+  @Nested
+  @DisplayName("copying a model version")
+  class CopyingAModelVersion {
+
+    private static final String SOURCE_PIN =
+        "urn:core:platform:civitas:datastructure:common:6ddf8001-3ba6-83db-8d23-b547419c1ff2:1.0.0";
+    private static final String COPY_PIN =
+        "urn:core:platform:civitas:datastructure:common:6ddf8001-3ba6-83db-8d23-b547419c1ff2:3.0.0";
+
+    @Test
+    @DisplayName("copies the pinned version and returns the copy's pin")
+    void copiesThePinnedVersion() {
+      ArtifactId source = new ArtifactId(SOURCE_PIN);
+      when(modelForge.existing(List.of(source))).thenReturn(Set.of(source));
+      when(modelForge.copyVersion(any()))
+          .thenReturn(new ArtifactWriteResult(new ArtifactId(COPY_PIN), Map.of()));
+
+      ModelRegistryGateway.ModelPin pin = gateway.copyModelVersion(SOURCE_PIN);
+
+      verify(modelForge).copyVersion(new CopyVersionCommand(source));
+      assertThat(pin.versionedUrn()).isEqualTo(COPY_PIN);
+      assertThat(pin.version()).isEqualTo("3.0.0");
+    }
+
+    @Test
+    @DisplayName("refuses a version the registry does not hold")
+    void refusesAMissingVersion() {
+      when(modelForge.existing(any())).thenReturn(Set.of());
+
+      assertThatThrownBy(() -> gateway.copyModelVersion(SOURCE_PIN))
+          .isInstanceOf(ModelMissingException.class);
+      verify(modelForge, never()).copyVersion(any());
+    }
+  }
+
+  @Nested
+  @DisplayName("deleting a model version")
+  class DeletingAModelVersion {
+
+    private static final String ROOT_PIN =
+        "urn:core:platform:civitas:element:common:6ddf8001-3ba6-83db-8d23-b547419c1ff2:2.1.0";
+    private static final String ROOT =
+        "urn:core:platform:civitas:element:common:6ddf8001-3ba6-83db-8d23-b547419c1ff2";
+    private static final String GROUPING =
+        "urn:core:platform:civitas:datastructure:common:6ddf8001-3ba6-83db-8d23-b547419c1ff2";
+
+    @Test
+    @DisplayName("deletes the version line the pin names")
+    void deletesTheLineOfThePin() {
+      gateway.deleteModelVersion(ROOT_PIN);
+
+      verify(modelForge).deleteVersionLine(new ArtifactId(ROOT_PIN));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", " "})
+    @DisplayName("does nothing for a version without a model")
+    void doesNothingWithoutAModel(String modelUrn) {
+      gateway.deleteModelVersion(modelUrn);
+      gateway.deleteModelVersion(null);
+
+      assertThat(gateway.versionReferencesTo(modelUrn)).isEmpty();
+      assertThat(gateway.versionReferencesTo(null)).isEmpty();
+      verifyNoInteractions(modelForge);
+    }
+
+    @Test
+    @DisplayName("asks what blocks the version line the pin names")
+    void asksWhatBlocksTheLine() {
+      String sink =
+          "urn:core:platform:civitas:datasink:common:762a05c3-4783-8446-b3cb-8240eee1227a";
+      when(modelForge.versionLineDeletionBlockers(new ArtifactId(ROOT_PIN)))
+          .thenReturn(List.of(sink));
+
+      assertThat(gateway.versionReferencesTo(ROOT_PIN)).containsExactly(sink);
+    }
+
+    /** Without the second delete a root Element whose first line was deleted would outlive it. */
+    @Test
+    @DisplayName("deleting a root Element's model deletes its grouping and the Element itself")
+    void deletingARootModelDeletesTheGroupingAndTheElement() {
+      gateway.deleteModel(ROOT);
+
+      verify(modelForge).deleteArtifact(new ArtifactId(GROUPING), true, false);
+      verify(modelForge).deleteArtifact(new ArtifactId(ROOT), true, false);
     }
   }
 

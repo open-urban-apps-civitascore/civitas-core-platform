@@ -149,9 +149,7 @@ describe('mapGroupFormToApiata', () => {
       description: baseGroup.description,
       contactUserId: 'm1',
       members: ['m1', 'm2'],
-      assignments: [
-        { groupId: 'g1', roleId: 'r1', scopeType: ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE as const, scopeId: 's1' },
-      ],
+      assignments: [{ groupId: 'g1', roleId: 'r1', scopeType: ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE, scopeId: 's1' }],
     }
 
     const result = mapGroupFormToApiData(formData)

@@ -9,6 +9,7 @@
  */
 package de.civitascore.nifi.http;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,7 +34,7 @@ record SinglePage() implements Pagination {
   }
 
   @Override
-  public Progress next(Page page, PageContent content) {
+  public Progress next(Page page, URI requestUrl, PageContent content) {
     return new Progress.Accepted(content.records(), Optional.empty());
   }
 

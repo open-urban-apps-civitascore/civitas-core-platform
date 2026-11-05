@@ -353,6 +353,58 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
   }
 
   @Test
+  void nextLinksReadTheLastResponseAndStopAtMaxLinks() throws Exception {
+    wireMock.register(
+        get(urlPathEqualTo("/next-link"))
+            .willReturn(
+                okJson(objectRecord(records("A", "B"), "\"next\":\"next-link-end?page=2\""))));
+    wireMock.register(
+        get(urlPathEqualTo("/next-link-end"))
+            .withQueryParam("page", equalTo("2"))
+            .willReturn(okJson(objectRecord(records("C"), "\"next\":\"/must-not-follow\""))));
+    deploy(
+        "http-next-link",
+        map(
+            """
+        {"name":"readings","path":"/next-link",
+         "pagination":{"type":"NEXT_LINK","nextLinkPath":"$.next","maxLinks":1}}
+        """),
+        OBJECT_RECORD,
+        "http_next_link");
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(2))
+        .ignoreExceptions()
+        .until(() -> names("http_next_link").equals(List.of("A", "B", "C")));
+    assertEquals(0, wireMock.find(getRequestedFor(urlPathEqualTo("/must-not-follow"))).size());
+  }
+
+  @Test
+  void aFailedNextLinkLeavesNoRecords() throws Exception {
+    wireMock.register(
+        get(urlPathEqualTo("/next-link-failed"))
+            .willReturn(okJson(objectRecord(records("A"), "\"next\":\"/next-link-missing\""))));
+    wireMock.register(
+        get(urlPathEqualTo("/next-link-missing")).willReturn(aResponse().withStatus(404)));
+    String pipelineId = UUID.randomUUID().toString();
+    String processGroupId =
+        deploy(
+            pipelineId,
+            map(
+                """
+        {"name":"readings","path":"/next-link-failed",
+         "pagination":{"type":"NEXT_LINK","nextLinkPath":"$.next"}}
+        """),
+            OBJECT_RECORD,
+            "http_next_link_failed");
+    Map<String, Object> stopped = awaitEvent(pipelineId, processGroupId, "STOPPED");
+    assertEquals(
+        "API call \"readings\": GET /next-link-failed request 2 failed with status 404",
+        stopped.get("message"));
+    assertTrue(names("http_next_link_failed").isEmpty());
+  }
+
+  @Test
   void cursorInTheQueryReadsEachPageUntilAResponseWithoutACursor() throws Exception {
     wireMock.register(
         get(urlPathEqualTo("/cursor-query"))
@@ -1031,6 +1083,8 @@ class NifiHttpDataFlowIT extends AbstractNifiIT {
               "http_invalid",
               "http_pages",
               "http_end_page",
+              "http_next_link",
+              "http_next_link_failed",
               "http_cursor_query",
               "http_cursor_header",
               "http_offset_limit",

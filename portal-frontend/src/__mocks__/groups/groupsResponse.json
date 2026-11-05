@@ -8,6 +8,7 @@
       { "id": "user2", "name": "User 2" }
     ],
     "contactUser": { "id": "c1", "name": "Contact 1" },
+    "assignments": [],
     "createdAt": "",
     "modifiedAt": ""
   },
@@ -17,6 +18,7 @@
     "description": "description for Group 2",
     "members": null,
     "contactUser": { "id": "c2", "name": "Contact 2" },
+    "assignments": [],
     "createdAt": "",
     "modifiedAt": ""
   }

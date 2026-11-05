@@ -14,7 +14,12 @@ vi.mock('@/app/services/api/users/clientRequests', () => ({
   useGetCurrentUser: vi.fn(),
 }))
 
-const { mockDeleteMutate } = vi.hoisted(() => ({ mockDeleteMutate: vi.fn() }))
+const { mockDeleteMutate, mockDuplicateVersionMutate, mockDuplicateVersionState, mockRefresh } = vi.hoisted(() => ({
+  mockDeleteMutate: vi.fn(),
+  mockDuplicateVersionMutate: vi.fn(),
+  mockDuplicateVersionState: { isPending: false },
+  mockRefresh: vi.fn(),
+}))
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -24,8 +29,15 @@ vi.mock('@/app/services/api/datastructures/clientRequests', () => ({
   useDeleteDatastructure: vi.fn(() => ({ mutate: mockDeleteMutate, isPending: false })),
 }))
 
+vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
+  useDuplicateDatastructureVersion: vi.fn(() => ({
+    mutate: mockDuplicateVersionMutate,
+    isPending: mockDuplicateVersionState.isPending,
+  })),
+}))
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), refresh: mockRefresh }),
   useSearchParams: () => new URLSearchParams(),
   usePathname: vi.fn(() => '/datastructures'),
 }))
@@ -49,8 +61,23 @@ vi.mock('@/hooks/use-query-params', () => ({
 }))
 
 vi.mock('./DatastructuresTable', () => ({
-  DatastructuresTable: ({ onDeleteDatastructureClick }: { onDeleteDatastructureClick: (id: string) => void }) => (
-    <button data-testid="datastructures-table" onClick={() => onDeleteDatastructureClick('ds-1')} />
+  DatastructuresTable: ({
+    isDuplicating,
+    onDeleteDatastructureClick,
+    onDuplicateVersionClick,
+  }: {
+    isDuplicating: boolean
+    onDeleteDatastructureClick: (id: string) => void
+    onDuplicateVersionClick: (datastructureId: string, versionId: string) => void
+  }) => (
+    <div>
+      <button data-testid="datastructures-table" onClick={() => onDeleteDatastructureClick('ds-1')} />
+      <button
+        data-testid="duplicate-version-v1"
+        disabled={isDuplicating}
+        onClick={() => onDuplicateVersionClick('ds-1', 'v1')}
+      />
+    </div>
   ),
 }))
 
@@ -145,5 +172,46 @@ describe('DatastructuresList deletion', () => {
     onError(new Error('network failure'))
 
     expect(vi.mocked(toast.error)).toHaveBeenCalledWith('errors.deletionError')
+  })
+})
+
+describe('DatastructuresList version duplication', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockDuplicateVersionState.isPending = false
+    mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_READ])
+  })
+
+  it('disables duplication in the table while a copy is being made', () => {
+    mockDuplicateVersionState.isPending = true
+    renderComponent()
+
+    expect(screen.getByTestId('duplicate-version-v1')).toBeDisabled()
+  })
+
+  it('duplicates the version and shows a success toast', async () => {
+    renderComponent()
+    await userEvent.click(screen.getByTestId('duplicate-version-v1'))
+
+    expect(mockDuplicateVersionMutate).toHaveBeenCalledWith(
+      { data: undefined, endpoint: '/datastructures/ds-1/versions/v1/duplicate' },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    )
+
+    const [, { onSuccess }] = mockDuplicateVersionMutate.mock.calls[0]
+    onSuccess()
+
+    expect(toast.success).toHaveBeenCalledWith('messages.duplicateSuccess')
+    expect(mockRefresh).toHaveBeenCalled()
+  })
+
+  it('shows an error toast when duplication fails', async () => {
+    renderComponent()
+    await userEvent.click(screen.getByTestId('duplicate-version-v1'))
+
+    const [, { onError }] = mockDuplicateVersionMutate.mock.calls[0]
+    onError(new Error('network failure'))
+
+    expect(toast.error).toHaveBeenCalledWith('errors.duplicationError')
   })
 })

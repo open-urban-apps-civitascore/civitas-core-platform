@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { ComponentProps } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -154,7 +154,7 @@ describe('DatastructureTab', () => {
     const header = screen.getByTestId('datastructureVersionInfo')
     expect(header).toHaveTextContent('Test Datastructure')
     expect(header).toHaveTextContent('version{"version":"2"}')
-    expect(header).toHaveTextContent('status.AVAILABLE')
+    expect(within(header).getByTestId('statusBadge')).toHaveTextContent(/^status.AVAILABLE$/)
   })
 
   it('shows the fallback when the assigned version has no number', () => {
@@ -165,7 +165,7 @@ describe('DatastructureTab', () => {
 
     const header = screen.getByTestId('datastructureVersionInfo')
     expect(header).toHaveTextContent('noVersion')
-    expect(header).toHaveTextContent('status.DRAFT')
+    expect(within(header).getByTestId('statusBadge')).toHaveTextContent(/^status.DRAFT$/)
   })
 
   it('keeps the toolbar with an empty placeholder while the assigned version loads', () => {

@@ -20,6 +20,9 @@ tests {
       type: "LIMIT_OFFSET", limitParameter: "limit", offsetParameter: "offset",
       limit: 20, offset: 0, countPath: "$.meta.count"
     });
+    expect(res.body.connector.apiCalls[2].pagination).to.deep.equal({
+      type: "NEXT_LINK", nextLinkPath: "$.links.next", maxLinks: 3
+    });
     expect(res.body.connector.apiCalls[1].pagination).to.deep.equal({
       type: "CURSOR", cursorPath: "$.next_cursor", cursorParameter: "X-Cursor",
       cursorIn: "HEADER", limitParameter: "limit", limit: 20

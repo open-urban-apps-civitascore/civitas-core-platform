@@ -4,7 +4,7 @@ import type { FieldNode, SchemaTree } from '../_types'
 import { requiredFieldPaths } from './fieldTree'
 
 const node = (over: Partial<FieldNode> & { path: string; name: string }): FieldNode => ({
-  type: 'scalar',
+  type: 'str',
   portType: 'scalar',
   required: false,
   ...over,

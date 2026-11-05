@@ -39,6 +39,7 @@
       "deleteItem": "Delete {item}",
       "remove": "Remove",
       "removeItem": "Remove {item}",
+      "duplicateItem": "Duplicate {item}",
       "add": "Add",
       "edit": "Edit",
       "editBase": "Edit base",
@@ -129,6 +130,11 @@
       "DRAFT": "Draft",
       "AVAILABLE": "Available",
       "READY": "Ready"
+    },
+    "statusCount": {
+      "DRAFT": "{count, plural, one {# Draft} other {# Drafts}}",
+      "AVAILABLE": "{count, plural, other {# Available}}",
+      "READY": "{count, plural, other {# Ready}}"
     },
     "inUse": {
       "columnHeader": "Usage",
@@ -256,9 +262,6 @@
     },
     "anonymousDatapool": "Anonymous",
     "tableValues": {
-      "draft": "Draft",
-      "available": "Available",
-      "ready": "Ready",
       "yesterday": "Yesterday"
     },
     "pipelineStatus": {
@@ -1079,10 +1082,6 @@
       "status": "Status",
       "action": "Action"
     },
-    "status": {
-      "DRAFT": "Draft",
-      "AVAILABLE": "Available"
-    },
     "deleteModal": {
       "title": "Really delete Data source?",
       "description": "This action will permanently delete the Data source. This action cannot be undone."
@@ -1110,6 +1109,17 @@
       "pageNumberMax": "Enter a number up to 2147483647.",
       "pageSizeMin": "The page size must be at least 1.",
       "endPageBeforeStartPage": "The end page must not be lower than the start page.",
+      "clientHeader": "Connection, Content-Length, Expect, Host and Upgrade are not allowed.",
+      "invalidCursorPath": "Start with $ and use only names and array positions, e.g. $.next_cursor, $.data[0].id or $['next cursor'].",
+      "invalidCountPath": "Start with $ and use only names and array positions, e.g. $.meta.count, $.data or $['total count'].",
+      "paginationQueryDuplicate": "A query parameter already has this name.",
+      "paginationHeaderDuplicate": "A header already has this name.",
+      "paginationParameterDuplicate": "Another pagination parameter already has this name.",
+      "parameterPaginationDuplicate": "A pagination parameter already has this name.",
+      "unreadableDatasource": "Data source cannot be loaded.",
+      "limitRequired": "Enter a limit for the limit parameter.",
+      "limitParameterRequired": "Enter a limit parameter for the limit.",
+      "limitInteger": "Enter a whole number of 1 or more.",
       "creationError": "An error occurred while creating the Data source.",
       "updateError": "An error occurred while updating the Data source.",
       "inUseError": "This Data source is still used by a pipeline.",
@@ -1197,7 +1207,9 @@
         "enable": "Use pagination",
         "type": {
           "label": "Pagination type",
-          "pageNumber": "Page Number"
+          "pageNumber": "Page Number",
+          "cursor": "Cursor",
+          "limitOffset": "Limit/Offset"
         },
         "pageParameter": {
           "label": "Page parameter"
@@ -1213,6 +1225,33 @@
         },
         "endPage": {
           "label": "End page"
+        },
+        "cursorHint": "The Data structure describes the whole response, cursor included.",
+        "cursorPath": {
+          "label": "Cursor path"
+        },
+        "cursorParameter": {
+          "label": "Cursor parameter"
+        },
+        "cursorIn": {
+          "label": "Send cursor as",
+          "query": "Query parameter",
+          "header": "Header"
+        },
+        "offsetParameter": {
+          "label": "Offset parameter"
+        },
+        "offset": {
+          "label": "Offset"
+        },
+        "limitParameter": {
+          "label": "Limit parameter"
+        },
+        "limit": {
+          "label": "Limit"
+        },
+        "countPath": {
+          "label": "Count path"
         }
       }
     },
@@ -1301,6 +1340,36 @@
         },
         "password": {
           "label": "Password"
+        }
+      },
+      "connectionTest": {
+        "title": "Connection test",
+        "button": "Test connection",
+        "incompleteHint": "Fill in all required fields to test the connection.",
+        "httpIncompleteHint": "Fill in all required fields in the \"Connector\" and \"API calls\" tabs to test the connection.",
+        "invalidHint": "The configuration contains invalid values. Also check the API calls.",
+        "connecting": "Connecting…",
+        "outdatedPending": "The configuration was changed. The running connection test will be discarded. You can test again afterwards.",
+        "testAgain": "Test again",
+        "success": "Connection established successfully",
+        "failure": "Connection failed",
+        "cause": "Cause:",
+        "details": "Details:",
+        "httpStatus": "HTTP status: {status}",
+        "previewTruncated": "Preview truncated.",
+        "reenterPassword": "The configuration was changed. Enter the password again to test the connection.",
+        "causes": {
+          "INVALID_CONNECTOR": "The configuration is invalid.",
+          "SOURCE_ERROR": "The source could not be reached or answered with an error.",
+          "TIMEOUT": "The source did not answer in time.",
+          "VALIDATION_FAILED": "Not all required fields are filled in correctly.",
+          "MALFORMED_REQUEST": "The request could not be processed.",
+          "FORBIDDEN": "No permission for this connection test.",
+          "NOT_FOUND": "The data source was not found.",
+          "TOO_MANY_REQUESTS": "Connection tests are already running. Please try again later.",
+          "EXTERNAL_SYSTEM_ERROR": "The connection test could not be run.",
+          "EXTERNAL_SYSTEM_TIMEOUT": "The connection test took too long.",
+          "UNKNOWN": "Unknown error."
         }
       }
     },
@@ -1447,10 +1516,12 @@
     "messages": {
       "createSuccess": "The version of the Data structure has been successfully created.",
       "updateSuccess": "The version of the data has been successfully updated.",
+      "duplicateSuccess": "The version has been successfully duplicated.",
       "isAvailableModelHint": "The version information and the structure definition can not be edited since this version already has the status 'Available'."
     },
     "errors": {
       "creationError": "An error occurred while creating the Data structure version.",
+      "duplicationError": "An error occurred while duplicating the Data structure version.",
       "inUseError": "This version is still used by a Data source or data storage.",
       "saveInvalidModel": "The version cannot be saved: {reason}",
       "modelRootMissingError": "The version cannot be set to \"Available\" because its saved model has no root class. Mark the root class in the diagram, save the version, then set it to \"Available\".",
@@ -1731,7 +1802,6 @@
       "savingAll": "Saving...",
       "exit": "Exit",
       "validationFailed": "Validation failed for: {names}",
-      "unchangedPipelinesInvalid": "These pipelines are not valid: {names}. Fix the errors.",
       "duplicateNames": "Duplicate pipeline names: {names}",
       "saveFailed": "Failed to save: {names}",
       "saveSuccess": "Pipeline \"{name}\" saved successfully",
@@ -1980,10 +2050,6 @@
           "connector": "Connector",
           "lastActive": "Last updated",
           "status": "Status"
-        },
-        "status": {
-          "DRAFT": "Draft",
-          "AVAILABLE": "Available"
         }
       },
       "datasetsTab": {

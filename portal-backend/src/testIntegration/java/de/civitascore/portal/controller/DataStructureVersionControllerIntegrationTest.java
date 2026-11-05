@@ -1,23 +1,34 @@
 package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
 
+import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
+import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionMetaInputDTO;
+import de.civitascore.portal.model.output.DataStructureOutputDTO;
 import de.civitascore.portal.model.output.DataStructureVersionOutputDTO;
 import de.civitascore.portal.model.output.summary.DataStructureSummaryDTO;
+import de.civitascore.portal.model.output.summary.DataStructureVersionUsageSummaryDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.VersionBump;
+import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.security.AllowedScopesFilter;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -40,6 +51,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.simple.JdbcClient;
 
 @DisplayName("DataStructureVersion Controller Integration Tests")
 class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrationTest {
@@ -52,10 +64,16 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
 
+  @Autowired private DataSetRepository dataSetRepository;
+
   @Autowired private DataSourceRepository dataSourceRepository;
+  @Autowired private javax.sql.DataSource dataSource;
+
+  @Autowired private JdbcClient jdbcClient;
 
   private UUID dataStructureId;
   private UUID versionId1;
+  private UUID versionId2;
 
   @BeforeEach
   void initTestData() {
@@ -87,10 +105,12 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
                 b.description("Second version with updated fields")
                     .dataStructureVersionStatus(DataStructureVersionStatus.DRAFT)
                     .modelName("TestModel2"));
-    portalData.attachModel(
-        version2,
-        portalData.dataStructureVersionModel("Model2"),
-        Map.of("color", "red", "size", 20));
+    version2 =
+        portalData.attachModel(
+            version2,
+            portalData.dataStructureVersionModel("Model2"),
+            Map.of("color", "red", "size", 20));
+    versionId2 = version2.getId();
   }
 
   @AfterEach
@@ -649,20 +669,228 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   @DisplayName("Delete DataStructureVersion Tests")
   class DeleteDataStructureVersionTests {
 
+    private ResponseEntity<String> delete(UUID id) {
+      return restTemplate.exchange(
+          getEndpoint() + "/" + id,
+          HttpMethod.DELETE,
+          new HttpEntity<>(createAuthHeaders()),
+          String.class);
+    }
+
+    private ResponseEntity<DataStructureVersionOutputDTO> duplicate(UUID id) {
+      return restTemplate.exchange(
+          getEndpoint() + "/" + id + "/duplicate",
+          HttpMethod.POST,
+          new HttpEntity<>(createAuthHeaders()),
+          getOutputTypeReference());
+    }
+
+    private ResponseEntity<DataStructureVersionOutputDTO> createWithModel(String title) {
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setModelName(title);
+      input.setModel(portalData.dataStructureVersionModel(title));
+      return restTemplate.exchange(
+          getEndpoint(),
+          HttpMethod.POST,
+          new HttpEntity<>(input, createAuthHeaders()),
+          getOutputTypeReference());
+    }
+
     @Test
-    @DisplayName("Should return 405 for delete (endpoint disabled) and keep the version")
-    void shouldRejectDelete() {
+    @DisplayName("Should delete the version and its model, and keep the other version")
+    void shouldDeleteTheVersionAndItsModel() {
+      String deletedModel =
+          dataStructureVersionRepository.findById(versionId2).orElseThrow().getModelUrn();
+      String keptModel =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow().getModelUrn();
+
+      assertThat(delete(versionId2).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+      assertThat(dataStructureVersionRepository.existsById(versionId2)).isFalse();
+      assertThat(modelRegistryGateway.fetchStoredModel(deletedModel)).isEmpty();
+      assertThat(modelRegistryGateway.fetchStoredModel(keptModel)).isPresent();
+      assertThat(dataStructureVersionRepository.existsById(versionId1)).isTrue();
+    }
+
+    @Test
+    @DisplayName("Should delete a released version and its model")
+    void shouldDeleteAReleasedVersionAndItsModel() {
+      String model =
+          dataStructureVersionRepository.findById(versionId2).orElseThrow().getModelUrn();
+      assertThat(
+              restTemplate
+                  .exchange(
+                      getEndpoint() + "/" + versionId2 + "/release",
+                      HttpMethod.POST,
+                      new HttpEntity<>(createAuthHeaders()),
+                      getOutputTypeReference())
+                  .getStatusCode())
+          .isEqualTo(HttpStatus.OK);
+
+      assertThat(delete(versionId2).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+      assertThat(dataStructureVersionRepository.existsById(versionId2)).isFalse();
+      assertThat(modelRegistryGateway.fetchStoredModel(model)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("A row delete that fails at commit keeps the version's model in the registry")
+    void aFailingRowDeleteKeepsTheModel() {
+      String model =
+          dataStructureVersionRepository.findById(versionId2).orElseThrow().getModelUrn();
+      jdbcClient
+          .sql(
+              "CREATE TABLE version_delete_blocker"
+                  + " (version_id uuid REFERENCES data_structure_versions (id))")
+          .update();
+      try {
+        jdbcClient.sql("INSERT INTO version_delete_blocker VALUES (?)").param(versionId2).update();
+
+        ResponseEntity<String> response = delete(versionId2);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody()).contains("FOREIGN_KEY_VIOLATION");
+      } finally {
+        jdbcClient.sql("DROP TABLE version_delete_blocker").update();
+      }
+
+      assertThat(dataStructureVersionRepository.existsById(versionId2)).isTrue();
+      assertThat(modelRegistryGateway.fetchStoredModel(model)).isPresent();
+    }
+
+    @Test
+    @DisplayName("Should return 409 RESOURCE_IN_USE and keep the version a Data source pins")
+    void shouldRefuseAVersionADataSourcePins() {
+      DataSource dataSource = new DataSource();
+      dataSource.setName("ds_pinning_" + UUID.randomUUID().toString().substring(0, 8));
+      dataSource.setDataSourceStatus(DataSourceStatus.DRAFT);
+      dataSource.setDataStructureVersion(
+          dataStructureVersionRepository.findById(versionId1).orElseThrow());
+      dataSourceRepository.save(dataSource);
+
+      ResponseEntity<String> response = delete(versionId1);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody()).contains("RESOURCE_IN_USE");
+      assertThat(dataStructureVersionRepository.existsById(versionId1)).isTrue();
+    }
+
+    private DataStructureVersion versionInTheModelLineOf(UUID versionId) {
+      DataStructureVersion owner = dataStructureVersionRepository.findById(versionId).orElseThrow();
+      DataStructure structure = dataStructureRepository.findById(dataStructureId).orElseThrow();
+      ModelRegistryGateway.ModelPin pin =
+          modelRegistryGateway.storeModel(
+              Optional.of(structure.getModelLogicalUrn()),
+              structure.getId(),
+              structure.getName(),
+              portalData.dataStructureVersionModel("Sharing"),
+              null,
+              VersionBump.MINOR,
+              owner.getVersion());
+      assertThat(pin.version()).startsWith("1.").isNotEqualTo(owner.getVersion());
+      return portalData.dataStructureVersion(
+          structure, b -> b.modelUrn(pin.versionedUrn()).version(pin.version()));
+    }
+
+    private boolean inUse(UUID versionId) {
+      return restTemplate
+          .exchange(
+              getEndpoint() + "/" + versionId,
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference())
+          .getBody()
+          .isInUse();
+    }
+
+    @Test
+    @DisplayName(
+        "Two versions whose models share a major refuse their deletes and keep both models")
+    void versionsSharingAModelLineRefuseTheirDeletes() {
+      String ownerModel =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow().getModelUrn();
+      DataStructureVersion sharing = versionInTheModelLineOf(versionId1);
+
+      ResponseEntity<String> response = delete(versionId1);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody())
+          .contains("RESOURCE_IN_USE")
+          .contains("only deleting the whole data structure");
+      assertThat(delete(sharing.getId()).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(modelRegistryGateway.fetchStoredModel(ownerModel)).isPresent();
+      assertThat(modelRegistryGateway.fetchStoredModel(sharing.getModelUrn())).isPresent();
+      assertThat(inUse(versionId1)).isTrue();
+      assertThat(inUse(sharing.getId())).isTrue();
+      assertThat(inUse(versionId2)).isFalse();
+
+      DataStructureOutputDTO structure =
+          restTemplate
+              .exchange(
+                  "/datastructures/" + dataStructureId,
+                  HttpMethod.GET,
+                  new HttpEntity<>(createAuthHeaders()),
+                  DataStructureOutputDTO.class)
+              .getBody();
+      assertThat(structure.getDataStructureVersions())
+          .extracting(
+              DataStructureVersionUsageSummaryDTO::getId,
+              DataStructureVersionUsageSummaryDTO::isInUse)
+          .containsExactlyInAnyOrder(
+              tuple(versionId1, true), tuple(sharing.getId(), true), tuple(versionId2, false));
+      assertThat(structure.isInUse()).isFalse();
+    }
+
+    @Test
+    @DisplayName("A data structure whose versions share a model line can be deleted")
+    void aDataStructureWhoseVersionsShareAModelLineCanBeDeleted() {
+      versionInTheModelLineOf(versionId1);
+
       ResponseEntity<String> response =
           restTemplate.exchange(
-              getEndpoint() + "/" + versionId1,
+              "/datastructures/" + dataStructureId,
               HttpMethod.DELETE,
               new HttpEntity<>(createAuthHeaders()),
               String.class);
 
-      assertThat(response.getStatusCode())
-          .as("Should return METHOD_NOT_ALLOWED status")
-          .isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
-      assertThat(dataStructureVersionRepository.existsById(versionId1)).isTrue();
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+      assertThat(dataStructureRepository.existsById(dataStructureId)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Deleting the last version leaves the data structure without versions or model")
+    void deletingTheLastVersionLeavesTheDataStructureEmpty() {
+      assertThat(delete(versionId1).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+      assertThat(delete(versionId2).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+      DataStructure structure = dataStructureRepository.findById(dataStructureId).orElseThrow();
+      assertThat(dataStructureVersionRepository.findAll())
+          .noneMatch(version -> version.getDataStructure().getId().equals(dataStructureId));
+      assertThat(structure.getModelLogicalUrn()).isNull();
+
+      ResponseEntity<DataStructureVersionOutputDTO> next = createWithModel("Fresh");
+      assertThat(next.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(next.getBody().getVersion()).as("1.0.0 and 2.0.0 stay taken").isEqualTo("3.0.0");
+    }
+
+    @Test
+    @DisplayName("After the highest version is deleted, neither a new version nor a copy reuses it")
+    void aDeletedVersionNumberIsNotGivenOutAgain() {
+      DataStructureVersionOutputDTO third = duplicate(versionId1).getBody();
+      assertThat(third.getVersion()).isEqualTo("3.0.0");
+      assertThat(delete(third.getId()).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+      DataStructureVersionOutputDTO created = createWithModel("Fourth").getBody();
+      assertThat(created.getVersion()).isEqualTo("4.0.0");
+      assertThat(delete(created.getId()).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+      assertThat(duplicate(versionId1).getBody().getVersion()).isEqualTo("5.0.0");
+    }
+
+    @Test
+    @DisplayName("Should return 404 for an unknown version")
+    void shouldReturn404ForAnUnknownVersion() {
+      assertThat(delete(UUID.randomUUID()).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
   }
 
@@ -1559,6 +1787,320 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   }
 
   @Nested
+  @DisplayName("Duplicate DataStructureVersion Tests")
+  class DuplicateDataStructureVersionTests {
+
+    private ResponseEntity<DataStructureVersionOutputDTO> duplicate(UUID structureId, UUID id) {
+      return restTemplate.exchange(
+          "/datastructures/" + structureId + "/versions/" + id + "/duplicate",
+          HttpMethod.POST,
+          new HttpEntity<>(createAuthHeaders()),
+          getOutputTypeReference());
+    }
+
+    private DataStructureVersionOutputDTO duplicateCreated(UUID structureId, UUID id) {
+      ResponseEntity<DataStructureVersionOutputDTO> response = duplicate(structureId, id);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      return response.getBody();
+    }
+
+    private DataStructureVersionOutputDTO get(UUID structureId, UUID id) {
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              "/datastructures/" + structureId + "/versions/" + id,
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      return response.getBody();
+    }
+
+    @Test
+    @DisplayName(
+        "Duplicating an older version copies its content to the next major after the highest")
+    void duplicatingAnOlderVersionCopiesItsOwnContent() {
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          duplicate(dataStructureId, versionId1);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      DataStructureVersionOutputDTO copy = response.getBody();
+      assertThat(copy.getVersion()).isEqualTo("3.0.0");
+      assertThat(response.getHeaders().getLocation().getPath())
+          .endsWith("/datastructures/" + dataStructureId + "/versions/" + copy.getId());
+
+      DataStructureVersionOutputDTO stored = get(dataStructureId, copy.getId());
+      assertThat(stored.getModel()).containsEntry("title", "Model1");
+      assertThat(stored.getStyles()).containsEntry("color", "blue");
+      assertThat(stored.getDescription()).isEqualTo("First version of the test data structure");
+      assertThat(stored.getModelName()).isEqualTo("TestModel1");
+      assertThat(stored.getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.DRAFT);
+      assertThat(get(dataStructureId, versionId1).getVersion()).isEqualTo("1.0.0");
+    }
+
+    @Test
+    @DisplayName("Duplicating the latest version gives a new version rather than a conflict")
+    void duplicatingTheLatestVersionGivesANewVersion() {
+      DataStructureVersionOutputDTO copy = duplicateCreated(dataStructureId, versionId2);
+
+      assertThat(copy.getVersion()).isEqualTo("3.0.0");
+      assertThat(get(dataStructureId, copy.getId()).getModel()).containsEntry("title", "Model2");
+    }
+
+    @Test
+    @DisplayName("Duplicating the same version twice gives two versions")
+    void duplicatingTwiceGivesTwoVersions() {
+      DataStructureVersionOutputDTO first = duplicateCreated(dataStructureId, versionId1);
+      DataStructureVersionOutputDTO second = duplicateCreated(dataStructureId, versionId1);
+
+      assertThat(first.getVersion()).isEqualTo("3.0.0");
+      assertThat(second.getVersion()).isEqualTo("4.0.0");
+    }
+
+    @Test
+    @DisplayName("Duplicating an AVAILABLE version gives a DRAFT copy")
+    void duplicatingAnAvailableVersionGivesADraft() {
+      DataStructureVersion source =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      source.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      dataStructureVersionRepository.save(source);
+
+      DataStructureVersionOutputDTO copy = duplicateCreated(dataStructureId, versionId1);
+
+      assertThat(copy.getDataStructureVersionStatus()).isEqualTo(DataStructureVersionStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("Duplicating a version without a model gives a copy without a model")
+    void duplicatingAVersionWithoutAModelGivesACopyWithoutAModel() {
+      DataStructureVersion source =
+          portalData.dataStructureVersion(
+              dataStructureRepository.findById(dataStructureId).orElseThrow(),
+              b -> b.version(null).description("No model yet").modelName("Pending"));
+
+      DataStructureVersionOutputDTO copy = duplicateCreated(dataStructureId, source.getId());
+
+      assertThat(copy.getVersion()).isNull();
+      assertThat(copy.getModelUrn()).isNull();
+      assertThat(copy.getModel()).isNull();
+      assertThat(copy.getDescription()).isEqualTo("No model yet");
+      assertThat(copy.getModelName()).isEqualTo("Pending");
+    }
+
+    @Test
+    @DisplayName(
+        "Editing the copy of a single-root model advances the minor within the copy's major")
+    void editingTheCopyOfASingleRootModelAdvancesItsMinor() {
+      DataStructureVersionOutputDTO copy = duplicateCreated(dataStructureId, versionId1);
+
+      ResponseEntity<DataStructureVersionOutputDTO> edited =
+          restTemplate.exchange(
+              getEndpoint() + "/" + copy.getId(),
+              HttpMethod.PATCH,
+              new HttpEntity<>(
+                  Map.of("model", portalData.dataStructureVersionModel("Model1Edited")),
+                  createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(edited.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(edited.getBody().getVersion()).isEqualTo("3.1.0");
+      assertThat(edited.getBody().getModel()).containsEntry("title", "Model1Edited");
+      assertThat(get(dataStructureId, versionId1).getModel()).containsEntry("title", "Model1");
+    }
+
+    @Test
+    @DisplayName(
+        "Duplicating an older version of a $defs library copies that version's members, and an"
+            + " edit of the copy advances its minor")
+    void duplicatingAnOlderLibraryVersionCopiesItsMembers() {
+      DataStructure structure = portalData.dataStructure(b -> b.name("Library"));
+      DataStructureVersion first =
+          portalData.attachModel(
+              portalData.dataStructureVersion(structure, b -> b.modelName("People")),
+              library(List.of("Person")));
+      portalData.attachModel(
+          portalData.dataStructureVersion(
+              dataStructureRepository.findById(structure.getId()).orElseThrow(),
+              b -> b.modelName("People")),
+          library(List.of("Person", "Address")));
+
+      DataStructureVersionOutputDTO copy = duplicateCreated(structure.getId(), first.getId());
+
+      assertThat(copy.getVersion()).isEqualTo("3.0.0");
+      assertThat(copy.getModelUrn()).contains(":datastructure:");
+      assertThat(membersOf(get(structure.getId(), copy.getId()))).containsOnlyKeys("Person");
+
+      ResponseEntity<DataStructureVersionOutputDTO> edited =
+          restTemplate.exchange(
+              "/datastructures/" + structure.getId() + "/versions/" + copy.getId(),
+              HttpMethod.PATCH,
+              new HttpEntity<>(
+                  Map.of("model", library(List.of("Person", "Phone"))), createAuthHeaders()),
+              getOutputTypeReference());
+      assertThat(edited.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(edited.getBody().getVersion()).isEqualTo("3.1.0");
+      assertThat(membersOf(edited.getBody())).containsOnlyKeys("Person", "Phone");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> membersOf(DataStructureVersionOutputDTO version) {
+      return (Map<String, Object>) version.getModel().get("$defs");
+    }
+
+    private static Map<String, Object> library(List<String> members) {
+      Map<String, Object> defs = new HashMap<>();
+      for (String member : members) {
+        defs.put(
+            member,
+            Map.of("type", "object", "properties", Map.of("name", Map.of("type", "string"))));
+      }
+      return Map.of(
+          "$schema", "https://json-schema.org/draft/2020-12/schema",
+          "title", "People",
+          "$defs", defs,
+          "$ref", "#/$defs/Person");
+    }
+
+    @Test
+    @DisplayName("A sink using a copied root marks the copy in use and blocks its unrelease")
+    void sinkUsingACopiedRootMarksUsageAndBlocksUnrelease() {
+      DataStructureVersionOutputDTO copy = duplicateCreated(dataStructureId, versionId1);
+      String grouping = UrnParser.withArtifactType(copy.getModelUrn(), "datastructure");
+      assertThat(modelRegistryGateway.dependencyUrns(grouping)).contains(copy.getModelUrn());
+      DataSet dataSet = portalData.dataSet();
+      DataSinkInputDTO input = new DataSinkInputDTO();
+      input.setDataSinkType(DataSinkType.POSTGIS);
+      input.setConfiguration(Map.of("tableName", "copied_readings", "element", copy.getModelUrn()));
+      HttpHeaders sinkHeaders = createAuthHeaders();
+      sinkHeaders.set(AllowedScopesFilter.HEADER_NAME, "*");
+      ResponseEntity<String> created =
+          restTemplate.exchange(
+              "/datasets/" + dataSet.getId() + "/datasinks",
+              HttpMethod.POST,
+              new HttpEntity<>(input, sinkHeaders),
+              String.class);
+      assertThat(created.getStatusCode()).as("%s", created.getBody()).isEqualTo(HttpStatus.CREATED);
+
+      DataStructureVersionOutputDTO used = get(dataStructureId, copy.getId());
+      assertThat(used.isInUse()).isTrue();
+      assertThat(used.isInUseByReleased()).isFalse();
+      assertThat(get(dataStructureId, versionId1).isInUse()).isFalse();
+
+      ResponseEntity<String> released =
+          restTemplate.exchange(
+              getEndpoint() + "/" + copy.getId() + "/release",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+      assertThat(released.getStatusCode()).as("%s", released.getBody()).isEqualTo(HttpStatus.OK);
+      // The Dataset release saga is outside this regression. Set its completed state.
+      dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+      dataSetRepository.save(dataSet);
+
+      assertThat(get(dataStructureId, copy.getId()).isInUseByReleased()).isTrue();
+      ResponseEntity<String> refused =
+          restTemplate.exchange(
+              getEndpoint() + "/" + copy.getId() + "/unrelease",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+      assertThat(refused.getStatusCode())
+          .as("%s", refused.getBody())
+          .isEqualTo(HttpStatus.CONFLICT);
+      assertThat(get(dataStructureId, copy.getId()).getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName(
+        "Duplicating a single-root version after a later version stored the model under the data"
+            + " structure's own id numbers the copy above both")
+    void duplicatingASingleRootVersionCountsAboveALaterGrouping() {
+      DataStructure structure = portalData.dataStructure(b -> b.name("OwnId"));
+      DataStructureVersion first =
+          portalData.attachModel(
+              portalData.dataStructureVersion(structure, b -> b.modelName("Person")),
+              portalData.dataStructureVersionModel("Person"));
+      Map<String, Object> ownId = new HashMap<>(library(List.of("Person", "Address")));
+      ownId.put("$id", "urn:core:platform:civitas:datastructure:common:" + structure.getId());
+      portalData.attachModel(
+          portalData.dataStructureVersion(
+              dataStructureRepository.findById(structure.getId()).orElseThrow(),
+              b -> b.modelName("People")),
+          ownId);
+
+      DataStructureVersionOutputDTO copy = duplicateCreated(structure.getId(), first.getId());
+
+      assertThat(copy.getVersion()).isEqualTo("3.0.0");
+      assertThat(get(structure.getId(), copy.getId()).getModel()).containsEntry("title", "Person");
+    }
+
+    @Test
+    @DisplayName("Duplicating a version whose model is gone answers 409 and adds no version")
+    void duplicatingAVersionWhoseModelIsGoneAnswers409() {
+      DataStructureVersion source =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      source.setModelUrn(
+          "urn:core:platform:civitas:element:common:"
+              + UUID.randomUUID().toString().replace("-", "").substring(0, 10)
+              + ":1.0.0");
+      dataStructureVersionRepository.save(source);
+
+      ResponseEntity<ProblemDetail> response =
+          restTemplate.exchange(
+              "/datastructures/" + dataStructureId + "/versions/" + versionId1 + "/duplicate",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<ProblemDetail>() {});
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:MODEL_MISSING");
+      assertThat(
+              dataStructureVersionRepository.findAllByDataStructure_IdIn(List.of(dataStructureId)))
+          .hasSize(2);
+    }
+
+    @Test
+    @DisplayName("Duplicating into a version number the registry holds already answers 409")
+    void duplicatingIntoATakenRegistryVersionAnswers409() {
+      String sourceModel =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow().getModelUrn();
+      String grouping =
+          UrnParser.withArtifactType(UrnParser.logicalUrn(sourceModel), "datastructure");
+      // No write path leaves a version above current_version, so the conflict is planted directly.
+      JdbcClient.create(dataSource)
+          .sql(
+              """
+              INSERT INTO model_forge.artifact_version
+                  (id, artifact_id, version, primary_format, created_at)
+              SELECT gen_random_uuid(), id, '3.0.0', 'core-json', now()
+              FROM model_forge.artifact WHERE logical_urn = :urn
+              """)
+          .param("urn", grouping)
+          .update();
+
+      ResponseEntity<ProblemDetail> response =
+          restTemplate.exchange(
+              "/datastructures/" + dataStructureId + "/versions/" + versionId1 + "/duplicate",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<ProblemDetail>() {});
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(
+              dataStructureVersionRepository.findAllByDataStructure_IdIn(List.of(dataStructureId)))
+          .hasSize(2);
+    }
+
+    @Test
+    @DisplayName("Duplicating an unknown version answers 404")
+    void duplicatingAnUnknownVersionAnswers404() {
+      assertThat(duplicate(dataStructureId, UUID.randomUUID()).getStatusCode())
+          .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+  }
+
+  @Nested
   @DisplayName("Parent ownership")
   class ParentOwnershipTests {
 
@@ -1649,6 +2191,26 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
       assertThat(getUnderOwnDataStructure().getDataStructureVersionStatus())
           .isEqualTo(DataStructureVersionStatus.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName("Duplicate answers 404 and creates no version")
+    void duplicateAnswers404ForForeignVersion() {
+      long versionsBefore = dataStructureVersionRepository.count();
+
+      assertThat(statusOf(pathUnderForeignDataStructure("/duplicate"), HttpMethod.POST, null))
+          .isEqualTo(HttpStatus.NOT_FOUND);
+
+      assertThat(dataStructureVersionRepository.count()).isEqualTo(versionsBefore);
+    }
+
+    @Test
+    @DisplayName("DELETE answers 404 and keeps the version")
+    void deleteAnswers404AndKeepsTheVersion() {
+      assertThat(statusOf(pathUnderForeignDataStructure(""), HttpMethod.DELETE, null))
+          .isEqualTo(HttpStatus.NOT_FOUND);
+
+      assertThat(dataStructureVersionRepository.existsById(versionId1)).isTrue();
     }
 
     @Test

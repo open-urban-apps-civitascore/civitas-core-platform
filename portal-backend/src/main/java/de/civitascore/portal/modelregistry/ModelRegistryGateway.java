@@ -4,6 +4,7 @@ import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
+import de.civitascore.modelforge.contract.CopyVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyQuery;
@@ -161,6 +162,19 @@ public class ModelRegistryGateway {
     return toPin(root);
   }
 
+  /**
+   * Copies one stored model version, with its styles and references, to a new major version
+   * numbered from the model's highest version.
+   *
+   * @param versionedUrn the CORE URN pinned to the version to copy
+   * @return the pin of the copy
+   * @throws ModelMissingException when the registry holds no such version
+   */
+  public ModelPin copyModelVersion(String versionedUrn) {
+    ArtifactId source = requireExisting(versionedUrn);
+    return toPin(modelForge.copyVersion(new CopyVersionCommand(source)).artifactId());
+  }
+
   private static void requireNoForeignDataStructureId(JsonNode content, UUID dataStructureId) {
     String id = content.path("$id").asText(null);
     if (isDataStructureUrn(id) && !dataStructureId.equals(UrnParser.idFromUrn(id))) {
@@ -221,7 +235,49 @@ public class ModelRegistryGateway {
    * Deletes the artifact (all versions) behind a logical URN. No-op semantics are Model Forge's.
    */
   public void deleteModel(String logicalUrn) {
-    modelForge.deleteArtifact(new ArtifactId(groupingUrnOf(logicalUrn)), true, false);
+    String grouping = groupingUrnOf(logicalUrn);
+    modelForge.deleteArtifact(new ArtifactId(grouping), true, false);
+    // A root Element outlives its grouping once the line it was imported with is deleted.
+    if (!grouping.equals(logicalUrn)) {
+      modelForge.deleteArtifact(new ArtifactId(logicalUrn), true, false);
+    }
+  }
+
+  /**
+   * Deletes the stored model of one Data structure version: its version line, every registry
+   * version that shares the major of the pin, as {@link ModelForge#deleteVersionLine} defines it.
+   * One Data structure version is one such line, because each edit of it adds a minor.
+   *
+   * @param modelUrn the version's pinned model URN; null or blank is a no-op
+   * @throws de.civitascore.modelforge.contract.ArtifactInUseException when anything still
+   *     references the line
+   */
+  public void deleteModelVersion(String modelUrn) {
+    if (modelUrn != null && !modelUrn.isBlank()) {
+      modelForge.deleteVersionLine(new ArtifactId(modelUrn));
+    }
+  }
+
+  /**
+   * What stands in the way of {@link #deleteModelVersion}, named so a caller can go and remove it.
+   * Empty when nothing does.
+   *
+   * @param modelUrn the version's pinned model URN; null or blank yields an empty list
+   */
+  public List<String> versionReferencesTo(String modelUrn) {
+    if (modelUrn == null || modelUrn.isBlank()) {
+      return List.of();
+    }
+    return modelForge.versionLineDeletionBlockers(new ArtifactId(modelUrn));
+  }
+
+  /**
+   * Whether the registry still holds the artifact at any version.
+   *
+   * @param urn logical or versioned CORE URN
+   */
+  public boolean holds(String urn) {
+    return !modelForge.existing(List.of(new ArtifactId(urn))).isEmpty();
   }
 
   /**
@@ -236,17 +292,6 @@ public class ModelRegistryGateway {
   }
 
   /**
-   * Whether anything outside the model still references it — a DataSource or DataSink carrying one
-   * of its Elements, a Mapping naming one as an endpoint, or another model associating with one.
-   *
-   * @param modelUrn versioned or logical CORE URN of the model; null/blank yields {@code false}
-   * @return true while at least one reference stands in the way of deleting the model
-   */
-  public boolean isReferenced(String modelUrn) {
-    return !referencesTo(modelUrn).isEmpty();
-  }
-
-  /**
    * Refuses a model without the single root that publication needs, as {@link ModelForge#checkRoot}
    * defines it.
    *
@@ -256,10 +301,7 @@ public class ModelRegistryGateway {
    * @throws ModelMemberUnreachableException when members are not reachable from the root
    */
   public void requireSingleRoot(String modelUrn) {
-    ArtifactId model = new ArtifactId(modelUrn);
-    if (modelForge.existing(List.of(model)).isEmpty()) {
-      throw new ModelMissingException();
-    }
+    ArtifactId model = requireExisting(modelUrn);
     switch (modelForge.checkRoot(model)) {
       case RootCheck.Rooted _ -> {}
       case RootCheck.NoRoot _ -> throw new ModelRootMissingException();
@@ -294,11 +336,20 @@ public class ModelRegistryGateway {
    *
    * @param dataStructureId the id of the Data structure the model belongs to
    * @param modelUrn CORE URN of the stored model
+   * @throws ModelMissingException when the registry holds no such model
    */
   public List<ModelReference> foreignReferencesOf(UUID dataStructureId, String modelUrn) {
     return toModelReferences(
         modelForge.foreignReferences(
-            new ForeignReferencesQuery(dataStructureId, null, new ArtifactId(modelUrn))));
+            new ForeignReferencesQuery(dataStructureId, null, requireExisting(modelUrn))));
+  }
+
+  private ArtifactId requireExisting(String modelUrn) {
+    ArtifactId model = new ArtifactId(modelUrn);
+    if (modelForge.existing(List.of(model)).isEmpty()) {
+      throw new ModelMissingException();
+    }
+    return model;
   }
 
   private static List<ModelReference> toModelReferences(List<ForeignReference> references) {
@@ -335,6 +386,37 @@ public class ModelRegistryGateway {
    */
   public String logicalUrn(String urn) {
     return UrnParser.logicalUrn(urn);
+  }
+
+  /**
+   * The version a CORE URN names.
+   *
+   * @return the version or {@code latest}, or null when the URN names none
+   */
+  public static String versionOf(String urn) {
+    return UrnParser.versionFromUrn(urn);
+  }
+
+  /**
+   * Whether two versions are in one Model Forge version line.
+   *
+   * @return false when either version is null
+   */
+  public static boolean sameMajor(String version, String otherVersion) {
+    return version != null && otherVersion != null && UrnParser.sameMajor(version, otherVersion);
+  }
+
+  /**
+   * Whether two pins name versions in one version line of one model, so that deleting the line of
+   * one deletes the other.
+   *
+   * @return false when either pin is null or names no version
+   */
+  public static boolean sameLine(String pin, String otherPin) {
+    return pin != null
+        && otherPin != null
+        && UrnParser.logicalUrn(pin).equals(UrnParser.logicalUrn(otherPin))
+        && sameMajor(versionOf(pin), versionOf(otherPin));
   }
 
   /**

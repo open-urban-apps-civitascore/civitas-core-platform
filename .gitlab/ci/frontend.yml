@@ -2,14 +2,7 @@
 # All frontend jobs should extend this
 .only-frontend-changes:
   rules:
-    # Always run on the nightly scheduled pipeline so the full build/scan runs
-    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
-    # Always run on tags
-    - if: $CI_COMMIT_TAG
-    # Always run on main, staging and develop branch
-    - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_COMMIT_BRANCH == "staging"
-    - if: $CI_COMMIT_BRANCH == "develop"
+    - !reference [.rules-protected, rules]
     # Run on MR only when frontend files change
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
@@ -18,19 +11,18 @@
         # change here must run the conformance and drift tests in the MR that causes it.
         - model-forge/model-forge-runtime/src/main/resources/*.schema.json
         - .gitlab-ci.yml
+        - .gitlab/ci/docker.yml
+        - .gitlab/ci/maven.yml
+        - .gitlab/ci/rules.yml
+        - .gitlab/ci/scripts/api-test-stack.sh
         - .gitlab/ci/frontend.yml
 
 
-lint-frontend:
-  extends: .only-frontend-changes
-  image: node:22.23.4@sha256:63538dfe497cc29dfafdda25ada09b46db68a3f4cc205abf1f5d6bf0913f3384
-  stage: lint
-  needs: []
+# install-frontend is the only job that pushes this cache; the others pull it
+.frontend-pnpm:
+  image: node:22.23.4@sha256:18a6d90fd60542269850c80ca03b29b1d9b14d6b221ac7ee8e35b0d33ef904bd
   variables:
     PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
-    # Required because pipeline is included into main pipeline
-    # See https://gitlab.com/remcohaszing/eslint-formatter-gitlab/-/issues/13
-    ESLINT_CODE_QUALITY_REPORT: $CI_PROJECT_DIR/portal-frontend/eslint-report.json
   cache:
     key:
       prefix: frontend-pnpm
@@ -38,6 +30,36 @@ lint-frontend:
         - portal-frontend/pnpm-lock.yaml
     paths:
       - portal-frontend/.pnpm-store
+      - portal-frontend/node_modules
+    policy: pull
+
+install-frontend:
+  extends:
+    - .only-frontend-changes
+    - .frontend-pnpm
+  stage: .pre
+  needs: []
+  cache:
+    policy: pull-push
+    when: always
+  script:
+    - cd portal-frontend
+    - set -euo pipefail
+    - corepack enable >/dev/null 2>&1 || true
+    - pnpm config set store-dir $PNPM_STORE_DIR
+    - pnpm install --frozen-lockfile
+
+lint-frontend:
+  extends:
+    - .only-frontend-changes
+    - .frontend-pnpm
+  stage: lint
+  needs:
+    - job: install-frontend
+  variables:
+    # Required because pipeline is included into main pipeline
+    # See https://gitlab.com/remcohaszing/eslint-formatter-gitlab/-/issues/13
+    ESLINT_CODE_QUALITY_REPORT: $CI_PROJECT_DIR/portal-frontend/eslint-report.json
   script:
     - cd portal-frontend
     - set -euo pipefail
@@ -45,67 +67,41 @@ lint-frontend:
 
     - corepack enable >/dev/null 2>&1 || true
     - pnpm config set store-dir $PNPM_STORE_DIR
-    - pnpm install --frozen-lockfile
+    - pnpm install --frozen-lockfile --prefer-offline
 
+    # ESLint, the TypeScript check, then unused or undeclared dependencies (this was the job
+    # dependency-prune-frontend). All run, so one pipeline shows all results; the job fails if any failed.
     - |
+      status=0
       pnpm eslint . \
         --max-warnings=0 \
-        --format gitlab
+        --format gitlab || status=$?
+      pnpm run typecheck || status=$?
+      pnpm dlx depcheck@$DEPCHECK_VERSION --json --ignore-dev > depcheck-report.json || true
+      node scripts/check-dependencies.cjs depcheck-report.json || status=$?
+      exit $status
   artifacts:
     when: always
-    paths: [$ESLINT_CODE_QUALITY_REPORT]
+    paths:
+      - $ESLINT_CODE_QUALITY_REPORT
+      - portal-frontend/depcheck-report.json
     expire_in: 1 month
     reports:
       codequality: $ESLINT_CODE_QUALITY_REPORT
 
-dependency-prune-frontend:
-  extends: .only-frontend-changes
-  image: node:22.23.4@sha256:63538dfe497cc29dfafdda25ada09b46db68a3f4cc205abf1f5d6bf0913f3384
-  stage: lint
-  needs: []
-  variables:
-    PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
-  cache:
-    key:
-      prefix: frontend-pnpm
-      files:
-        - portal-frontend/pnpm-lock.yaml
-    paths:
-      - portal-frontend/.pnpm-store
-  script:
-    - cd portal-frontend
-    - set -euo pipefail
-    - corepack enable >/dev/null 2>&1 || true
-    - pnpm config set store-dir $PNPM_STORE_DIR
-    - pnpm install --frozen-lockfile
-    - pnpm dlx depcheck --json --ignore-dev > depcheck-report.json || true
-    - node scripts/check-dependencies.cjs depcheck-report.json
-  artifacts:
-    when: always
-    expire_in: 1 month
-    paths:
-      - portal-frontend/depcheck-report.json
-
 test-frontend:
-  extends: .only-frontend-changes
-  image: node:22.23.4@sha256:63538dfe497cc29dfafdda25ada09b46db68a3f4cc205abf1f5d6bf0913f3384
+  extends:
+    - .only-frontend-changes
+    - .frontend-pnpm
   stage: test
-  needs: []
-  variables:
-    PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
-  cache:
-    key:
-      prefix: frontend-pnpm
-      files:
-        - portal-frontend/pnpm-lock.yaml
-    paths:
-      - portal-frontend/.pnpm-store
+  needs:
+    - job: install-frontend
   script:
     - cd portal-frontend
     - set -euo pipefail
     - corepack enable >/dev/null 2>&1 || true
     - pnpm config set store-dir $PNPM_STORE_DIR
-    - pnpm install --frozen-lockfile
+    - pnpm install --frozen-lockfile --prefer-offline
     - pnpm run test:coverage
   coverage: '/All files(?:[^|]*\|){4}\s*(\S+)/'
   artifacts:
@@ -121,26 +117,20 @@ test-frontend:
         path: portal-frontend/coverage/cobertura-coverage.xml
 
 build-frontend:
-  extends: .only-frontend-changes
-  image: node:22.23.4@sha256:63538dfe497cc29dfafdda25ada09b46db68a3f4cc205abf1f5d6bf0913f3384
+  extends:
+    - .only-frontend-changes
+    - .frontend-pnpm
   stage: build
-  needs: ['lint-frontend', 'dependency-prune-frontend']
+  needs:
+    - job: install-frontend
   variables:
     NODE_ENV: production
-    PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
-  cache:
-    key:
-      prefix: frontend-pnpm
-      files:
-        - portal-frontend/pnpm-lock.yaml
-    paths:
-      - portal-frontend/.pnpm-store
   script:
     - cd portal-frontend
     - set -euo pipefail
     - corepack enable >/dev/null 2>&1 || true
     - pnpm config set store-dir $PNPM_STORE_DIR
-    - pnpm install --frozen-lockfile
+    - pnpm install --frozen-lockfile --prefer-offline
     - pnpm build
   artifacts:
     when: on_success
@@ -149,127 +139,159 @@ build-frontend:
     expire_in: 1 month
 
 build-frontend-image:
-  extends: .only-frontend-changes
-  image: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
+  extends:
+    - .only-frontend-changes
+    - .docker-build
   stage: publish
+  interruptible: false
+  timeout: 1h
   needs:
     - job: setup-version
       artifacts: true
     - job: build-frontend
     - job: test-frontend
-  services:
-    - name: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
-  variables:
-    DOCKER_DRIVER: overlay2
-    DOCKER_TLS_CERTDIR: '/certs'
-    DOCKER_BUILDKIT: 1
-  before_script:
-    - docker info
-    - |
-      cat > /tmp/buildkitd.toml <<'EOF'
-      [registry."docker.io"]
-        mirrors = ["docker-mirror01.extern.frachtwerk.de"]
-      EOF
-    - docker context create buildx-context
-    - docker buildx create --use --driver docker-container --name multiarch --config /tmp/buildkitd.toml buildx-context
-    - docker buildx inspect --bootstrap
-    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+    - job: lint-frontend
+      artifacts: false
   script:
     - cd portal-frontend
     - |
-      export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/frontend-portal:${CI_COMMIT_REF_SLUG}-scan
+      export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/frontend-portal:${CI_COMMIT_REF_SLUG}-${CI_PIPELINE_ID}-scan
       docker buildx build \
         --platform linux/amd64,linux/arm64 \
         --tag $SCAN_IMAGE_TAG \
         --provenance=false \
         --push \
         .
-  after_script:
-    - docker buildx rm multiarch || true
 
 container-scan-frontend:
-  extends: .only-frontend-changes
-  image:
-    name: aquasec/trivy:0.55.2@sha256:addfb8fd6b9e520c25b22c61d8aa5d58ecd7879177aa959f952bf4734f4e3f60
-    entrypoint: ['']
-  stage: container-qa
+  extends:
+    - .only-frontend-changes
+    - .container-scan
   needs:
     - job: setup-version
       artifacts: true
     - job: build-frontend-image
   variables:
-    TRIVY_USERNAME: $CI_REGISTRY_USER
-    TRIVY_PASSWORD: $CI_REGISTRY_PASSWORD
-  script:
-    - apk add --no-cache curl >/dev/null
-    - curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/gitlab.tpl -o gitlab.tpl
-    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/frontend-portal:${CI_COMMIT_REF_SLUG}-scan
-    - trivy image --scanners vuln --format template --template "@gitlab.tpl" --output gl-container-scanning-report.json $SCAN_IMAGE_TAG
-  artifacts:
-    when: always
-    expire_in: 1 month
-    reports:
-      container_scanning: gl-container-scanning-report.json
+    IMAGE_NAME: frontend-portal
+    SBOM_PATH: portal-frontend/sbom/portal-frontend-image.cdx.json
 
 deploy-frontend:
-  extends: .only-frontend-changes
-  image: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
-  stage: deploy
+  extends:
+    - .only-frontend-changes
+    - .deploy-image
+  resource_group: deploy-frontend-$CI_COMMIT_REF_SLUG
   needs:
     - job: setup-version
       artifacts: true
     - job: container-scan-frontend
-  services:
-    - docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
   variables:
-    DOCKER_DRIVER: overlay2
-    DOCKER_TLS_CERTDIR: '/certs'
-  before_script:
-    - docker info
-    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
-  script:
-    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/frontend-portal:${CI_COMMIT_REF_SLUG}-scan
-    - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/frontend-portal:$REVISION
-    - docker buildx imagetools rm $SCAN_IMAGE_TAG || true
-    - |
-      if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "staging" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
-        docker buildx imagetools create $CI_REGISTRY_IMAGE/frontend-portal:$REVISION --tag $CI_REGISTRY_IMAGE/frontend-portal:$CI_COMMIT_BRANCH
-      fi
-    # Nightly build: additionally tag with <branch>-nightly-<YYYYMMDD>
-    - |
-      if [ "$IS_NIGHTLY" = "true" ] && [ -n "$NIGHTLY_IMAGE_TAG" ]; then
-        docker buildx imagetools create $CI_REGISTRY_IMAGE/frontend-portal:$REVISION --tag $CI_REGISTRY_IMAGE/frontend-portal:$NIGHTLY_IMAGE_TAG
-      fi
+    IMAGE_NAME: frontend-portal
 
-
-sbom-frontend-image:
-  extends: .only-frontend-changes
-  image: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
-  stage: report
+# Playwright end-to-end tests of the portal (portal-frontend/e2e). They run in a Playwright container
+# on the network of the API test stack: the browser, the production server (`pnpm build`, `pnpm start`;
+# the dev server fetched Google Fonts at run time and failed on that) and a json-server mock share
+# localhost, and Keycloak, APISIX and the backend are reached by their service names. The E2E user is
+# the dev@civitas.local user of the Bruno `ci` environment. Traces of failed tests, the Next.js log
+# and the service logs are kept as artifacts.
+#
+# Nightly only: it takes about 7 minutes with the stack, and it overlaps the Robot hero case in the
+# deployment repository and e2e-mf (TEST-CONSOLIDATION-PLAN.md, D6, D8, C5).
+# TODO: the 14 specs of e2e/users are skipped (describe.skip): they use json-server for create and
+# edit, which the app no longer reads. Port them to the API helpers (playwright/helpers/api) like the
+# dataset specs.
+# TODO: the stored session's access token lives 5 minutes. The suite takes under one, but a longer
+# run showed 401s from APISIX ("JWT expired") when the refresh failed with "Session not active". If
+# it comes back, read keycloak-logs.txt.
+e2e-test-frontend:
+  extends:
+    - .rules-nightly
+    - .docker-cli
+    - .dind
+  tags:
+    - saas-linux-medium-amd64 # 4 cores, 16 GB memory
+  stage: test
+  timeout: 30m
   needs:
-    - job: setup-version
+    - job: build-backend
       artifacts: true
-    - job: deploy-frontend
-  services:
-    - docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
-  variables:
-    DOCKER_DRIVER: overlay2
-    DOCKER_TLS_CERTDIR: '/certs'
-  before_script:
-    - apk add --no-cache bash curl >/dev/null
-    - curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin >/dev/null
-    - docker info
-    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+      optional: true
+    - job: build-config-adapter
+      artifacts: true
+      optional: true
+    - job: build-authz
+      artifacts: true
+      optional: true
+    - job: build-nifi-nars
+      artifacts: true
+    - job: test-frontend # the unit tests first: no browser run for a broken build
+      artifacts: false
   script:
-    - cd portal-frontend
-    - mkdir -p sbom
-    - syft registry:$CI_REGISTRY_IMAGE/frontend-portal:$REVISION -o cyclonedx-json > sbom/portal-frontend-image.cdx.json
+    - . .gitlab/ci/scripts/api-test-stack.sh
+    - api_test_up
+    - docker run -d --name e2e-runner --network $API_TEST_NETWORK mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble sleep infinity
+    - docker exec e2e-runner mkdir /app
+    - tar -C portal-frontend --exclude=node_modules --exclude=.next --exclude=.pnpm-store -cf - . | docker exec -i e2e-runner tar -C /app -xf -
+    - |
+      set +e
+      docker exec -i e2e-runner bash -s <<'RUNNER'
+      set -euo pipefail
+      cd /app
+      cat > .env.local <<ENV
+      NEXT_AUTH_URL=http://localhost:3000
+      NEXT_SERVER_URL=http://localhost:3000
+      NEXTAUTH_SECRET=ci-only-secret
+      KEYCLOAK_CLIENT_ID=portal-frontend
+      KEYCLOAK_CLIENT_SECRET=dev-only-portal-frontend-secret
+      KEYCLOAK_ISSUER=http://keycloak:8080/realms/civitas-core
+      JSON_SERVER_HOST=http://localhost
+      JSON_SERVER_PORT=3001
+      NEXT_PUBLIC_JSON_SERVER_HOST=http://localhost
+      NEXT_PUBLIC_JSON_SERVER_PORT=3001
+      API_BASE_URL=http://apisix
+      API_PORT=9080
+      # The Playwright helpers (playwright/helpers/api) default to localhost:8080 for Keycloak
+      KC_URL=http://keycloak:8080
+      E2E_USERNAME=dev@civitas.local
+      E2E_PASSWORD=dev123
+      E2E_EMAIL=dev@civitas.local
+      E2E_FIRSTNAME=Dev
+      E2E_LASTNAME=User
+      E2E_TEST_ENV=dev
+      ENV
+      # The production build, not the dev server the Playwright config would start: the dev server
+      # fetched Google Fonts at run time and failed on that in a run (the build fetches them once).
+      # Auth.js needs the host trusted outside of dev.
+      echo "AUTH_TRUST_HOST=true" >> .env.local
+      corepack enable
+      pnpm install --frozen-lockfile
+      pnpm build
+      # The mock backend that the specs still use. Not `pnpm json-server`: that script needs bash's `source`.
+      npx json-server json-server/db.json -p 3001 > json-server.log 2>&1 &
+      pnpm start > next.log 2>&1 &
+      for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3000/login && break; sleep 2; done
+      # CI is not set, so the config reuses the server above instead of starting `pnpm dev`
+      PLAYWRIGHT_JUNIT_OUTPUT_FILE=results/junit.xml pnpm exec playwright test --project=chromium --retries=0 --workers=1 --trace=retain-on-failure --reporter=list,junit
+      RUNNER
+      E2E_EXIT=$?
+      set -e
+      mkdir -p e2e-results
+      docker cp e2e-runner:/app/results/junit.xml e2e-results/junit.xml || true
+      docker cp e2e-runner:/app/test-results e2e-results/test-results || true
+      docker cp e2e-runner:/app/json-server.log e2e-results/json-server.log || true
+      docker cp e2e-runner:/app/next.log e2e-results/next.log || true
+      if [ "$E2E_EXIT" != "0" ]; then
+        api_test_collect_logs
+      fi
+      exit $E2E_EXIT
+  after_script:
+    - docker rm -f e2e-runner 2>/dev/null || true
+    - . .gitlab/ci/scripts/api-test-stack.sh
+    - api_test_down
   artifacts:
     when: always
     expire_in: 1 month
     paths:
-      - portal-frontend/sbom/portal-frontend-image.cdx.json
-    # TODO: https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/issues/728
-    # Fix license name resolution
-    # reports:
-    #   cyclonedx: portal-frontend/sbom/portal-frontend-image.cdx.json
+      - e2e-results/
+      - '*-logs.txt'
+    reports:
+      junit: e2e-results/junit.xml

@@ -1,8 +1,8 @@
 package de.civitascore.modelforge.persistence.postgres;
 
 import de.civitascore.modelforge.core.port.ArtifactSearchCriteria;
+import de.civitascore.modelforge.contract.RegistryConflictException;
 import de.civitascore.modelforge.contract.RegistryUnavailableException;
-import de.civitascore.modelforge.contract.VersionBump;
 import de.civitascore.modelforge.core.port.XsdSchemaConverter;
 import de.civitascore.modelforge.urn.UrnService;
 import org.junit.jupiter.api.Test;
@@ -16,6 +16,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import tools.jackson.databind.ObjectMapper;
 
 import java.sql.SQLException;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -95,21 +96,22 @@ class PostgresArtifactRegistryClientTest {
     }
 
     @Test
-    void writeViolatingIntegrity_surfacesAsIllegalArgumentWithoutLeakingDbText() {
-        // A DataIntegrityViolationException is the caller's fault → 400 IllegalArgumentException.
+    void writeViolatingIntegrity_surfacesAsConflictWithoutLeakingDbTextInTheMessage() {
         // The message must be the safe, generic text — never the raw DB error — so registry
         // internals (constraint names, SQL state, table layout) are not leaked to the client.
         String rawDbDetail = "duplicate key value violates unique constraint \"artifact_version_pkey\"";
-        var client = clientWithFailingDb(new DataIntegrityViolationException(rawDbDetail));
+        var violation = new DataIntegrityViolationException(rawDbDetail);
+        var client = clientWithFailingDb(violation);
         var schema = new ObjectMapper().createObjectNode()
             .put("$id", "urn:core:platform:civitas:element:common:b3fc14fa-d95e-82ee-a922-927d2aba50c5:1.0.0")
             .put("type", "object");
 
         assertThatThrownBy(() -> client.storeElement(schema, Set.of()))
-            .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(RegistryConflictException.class)
             .hasMessageContaining("conflicts with existing registry data")
             .hasMessageNotContaining(rawDbDetail)
-            .hasMessageNotContaining("constraint");
+            .hasMessageNotContaining("constraint")
+            .hasCause(violation);
     }
 
     @Test
@@ -129,25 +131,23 @@ class PostgresArtifactRegistryClientTest {
     }
 
     @Test
-    void versionBumpDuringStorageOutage_surfacesAsRegistryUnavailableException() {
-        // bumpVersion opens its own transaction rather than going through writeArtifact, so it needs
+    void versionCopyDuringStorageOutage_surfacesAsRegistryUnavailableException() {
+        // copyVersion opens its own transaction rather than going through writeArtifact, so it needs
         // the same translation: a transient storage failure inside it must become a 502, not escape raw.
         var client = clientWithFailingDb(new QueryTimeoutException("statement timed out"));
-        assertThatThrownBy(() -> client.bumpVersion(
-                "urn:core:platform:civitas:datastructure:common:f51bac76-4d03-87ae-9d36-53de0b058bcc", VersionBump.MINOR))
+        assertThatThrownBy(() -> client.copyVersion(
+                "urn:core:platform:civitas:datastructure:common:f51bac76-4d03-87ae-9d36-53de0b058bcc:1.0.0", null, Map.of()))
             .isInstanceOf(RegistryUnavailableException.class);
     }
 
     @Test
-    void versionBumpViolatingIntegrity_surfacesAsIllegalArgumentWithoutLeakingDbText() {
-        // Two bumps racing onto the same (artifact_id, version) is the caller's fault → 400, with the
-        // safe generic message rather than the raw constraint text.
+    void versionCopyViolatingIntegrity_surfacesAsConflictWithoutLeakingDbTextInTheMessage() {
         String rawDbDetail = "duplicate key value violates unique constraint \"artifact_version_artifact_id_version_key\"";
         var client = clientWithFailingDb(new DataIntegrityViolationException(rawDbDetail));
 
-        assertThatThrownBy(() -> client.bumpVersion(
-                "urn:core:platform:civitas:datastructure:common:b3fc14fa-d95e-82ee-a922-927d2aba50c5", VersionBump.MAJOR))
-            .isInstanceOf(IllegalArgumentException.class)
+        assertThatThrownBy(() -> client.copyVersion(
+                "urn:core:platform:civitas:datastructure:common:b3fc14fa-d95e-82ee-a922-927d2aba50c5:1.0.0", null, Map.of()))
+            .isInstanceOf(RegistryConflictException.class)
             .hasMessageContaining("conflicts with existing registry data")
             .hasMessageNotContaining(rawDbDetail);
     }

@@ -4,7 +4,7 @@
   "packageRules": [
     {
       "description": "Reviewers for backend dependency MRs. They stay in this file because .gitlab/ci/scripts/update-openapi-spec.mjs reads them from here. Everything else is in the renovate-config preset.",
-      "matchFileNames": ["portal-backend/**"],
+      "matchFileNames": ["portal-backend/**", "api/portal-backend/**"],
       "reviewers": ["franklex", "jonasfrz"],
       "reviewersSampleSize": 1
     }

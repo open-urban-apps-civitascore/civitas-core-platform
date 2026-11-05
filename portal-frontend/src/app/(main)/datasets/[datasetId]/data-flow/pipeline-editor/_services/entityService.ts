@@ -39,6 +39,7 @@ export interface SelectableEntity {
 export interface UseEntityResult<T extends SelectableEntity> {
   entities: T[]
   isLoading: boolean
+  isFetching: boolean
   isError: boolean
   error: Error | null
   getEntityById: (id: string) => T | undefined
@@ -73,7 +74,7 @@ export const useDataSourceEntities = (opts?: {
     return p
   }, [datapoolId])
 
-  const { data: response, isLoading, isError, error } = useGetDatasources({ params, isEnabled })
+  const { data: response, isLoading, isFetching, isError, error } = useGetDatasources({ params, isEnabled })
 
   // Extract the data array from ApiServiceResponse
   const entities = useMemo(() => response?.data ?? [], [response])
@@ -88,6 +89,7 @@ export const useDataSourceEntities = (opts?: {
   return {
     entities,
     isLoading,
+    isFetching,
     isError,
     error: error ?? null,
     getEntityById,

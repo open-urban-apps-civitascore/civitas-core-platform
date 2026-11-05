@@ -51,5 +51,3 @@ playwright/.auth
 
 # json-server runtime database (use db.seed.json as template)
 json-server/db.json
-*storybook.log
-storybook-static

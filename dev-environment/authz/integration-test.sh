@@ -196,7 +196,8 @@ echo -e "  Docker: ${GREEN}OK${NC}"
 # Check port conflicts
 PORTS_TO_CHECK="5432 8080 8088 8089 8091 8181 9080 9092 9180"
 PORT_CONFLICT=false
-for port in $PORTS_TO_CHECK; do
+# CI forwards the ports of its Docker daemon to localhost before the script starts, so they are in use
+for port in $([ "${SKIP_PORT_CHECK:-false}" = true ] || echo "$PORTS_TO_CHECK"); do
     if ss -tlnp 2>/dev/null | grep -q ":$port " || \
        lsof -i ":$port" > /dev/null 2>&1; then
         echo -e "  Port $port: ${RED}IN USE${NC}"
@@ -223,22 +224,22 @@ if [ "$SKIP_BUILD" = false ]; then
     DEV_VERSION="0.0.0-e2e"
 
     echo "  Building portal-model..."
-    (cd "$PROJECT_ROOT/portal-model" && mvn clean install -DskipTests -Drevision="$DEV_VERSION" -q) || {
+    (cd "$PROJECT_ROOT/portal-model" && mvn clean install -DskipTests -DskipITs -Drevision="$DEV_VERSION" -q) || {
         echo -e "  ${RED}portal-model build failed${NC}"; exit 1;
     }
 
     echo "  Building config-adapter..."
-    (cd "$PROJECT_ROOT/config-adapter" && mvn clean install -DskipTests -Drevision="$DEV_VERSION" -q) || {
+    (cd "$PROJECT_ROOT/config-adapter" && mvn clean install -DskipTests -DskipITs -Drevision="$DEV_VERSION" -q) || {
         echo -e "  ${RED}config-adapter build failed${NC}"; exit 1;
     }
 
     echo "  Building authz-repository..."
-    (cd "$PROJECT_ROOT/authz/repository" && mvn clean package -DskipTests -Dportal-model.version="$DEV_VERSION" -q) || {
+    (cd "$PROJECT_ROOT/authz/repository" && mvn clean package -DskipTests -DskipITs -Dportal-model.version="$DEV_VERSION" -q) || {
         echo -e "  ${RED}authz-repository build failed${NC}"; exit 1;
     }
 
     echo "  Building portal-backend..."
-    (cd "$PROJECT_ROOT/portal-backend" && mvn clean package -DskipTests \
+    (cd "$PROJECT_ROOT/portal-backend" && mvn clean package -DskipTests -DskipITs \
         -Dconfig-adapter.version="$DEV_VERSION" \
         -Dportal-model.version="$DEV_VERSION" -q) || {
         echo -e "  ${RED}portal-backend build failed${NC}"; exit 1;
@@ -267,15 +268,20 @@ wait_for_healthy postgis-dev-env 30 1 || exit 1
 # Step 2: Flyway migrations
 echo "  Running Flyway migrations..."
 FLYWAY_MIGRATIONS="$PROJECT_ROOT/portal-backend/src/main/resources/db/migration"
-if docker run --rm --network civitas-network \
-    -v "$FLYWAY_MIGRATIONS:/flyway/sql:ro" \
+# The migrations are copied into the container instead of bind-mounted, so this also works when the
+# Docker daemon is not on this host (a dind service in CI)
+FLYWAY_CONTAINER=$(docker create --network civitas-network \
     flyway/flyway:11-alpine \
     -url=jdbc:postgresql://postgis-dev-env:5432/portal_backend \
     -user=admin -password=admin \
     -locations=filesystem:/flyway/sql \
-    migrate; then
+    migrate)
+docker cp "$FLYWAY_MIGRATIONS/." "$FLYWAY_CONTAINER:/flyway/sql"
+if docker start -a "$FLYWAY_CONTAINER"; then
+    docker rm "$FLYWAY_CONTAINER" > /dev/null
     echo -e "  Migrations: ${GREEN}OK${NC}"
 else
+    docker rm "$FLYWAY_CONTAINER" > /dev/null
     echo -e "  Migrations: ${RED}FAILED${NC}"
     exit 1
 fi
@@ -308,7 +314,7 @@ wait_for_healthy opa 30 2 || exit 1
 # Step 5: Start portal-backend
 echo "  Starting portal-backend..."
 dc up -d portal-backend
-wait_for_url "Backend health" "http://localhost:8089/v1/actuator/health" 60 2 || exit 1
+wait_for_url "Backend health" "http://localhost:8089/v1/actuator/health" 60 2 || { dc logs --tail 60 portal-backend; exit 1; }
 
 # Step 6: Seed role-permission mappings
 # Must run AFTER backend start because PermissionRoleInitializer creates

@@ -6,7 +6,7 @@ import de.civitascore.modelforge.contract.ArtifactSearchQuery;
 import de.civitascore.modelforge.contract.ArtifactSummary;
 import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
-import de.civitascore.modelforge.contract.BumpVersionCommand;
+import de.civitascore.modelforge.contract.CopyVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
@@ -224,18 +224,32 @@ public interface ModelForge {
     ArtifactWriteResult saveArtifact(SaveArtifactCommand command);
 
     /**
-     * Carries an artifact's current version forward as a new version numbered at the requested change
-     * class, with its content, every stored format and its reference edges unchanged, and makes it
-     * current. The new version is built from the stored rows, so a caller never reads content out and
-     * writes it back — a round trip that would drop the edges the content does not spell out.
+     * Copies one version of an artifact to a new version, with its content, every stored format and
+     * its References unchanged, and makes the copy current. A Versioned URN names the source
+     * version; a logical URN or {@code :latest} copies the current one. The new version is built
+     * from the stored rows, so a caller never reads content out and writes it back — a round trip
+     * that would drop the References the content does not spell out.
+     *
+     * <p>The copy is numbered at the next MAJOR version above the highest version the artifact ever
+     * had, whichever version is the source: copying 1.0.0 while 2.0.0 exists gives 3.0.0 with the
+     * content of 1.0.0.
      *
      * <p>This <em>always</em> mints a version, unlike every other write, which returns the existing
      * pin when the content is byte-identical. Carrying unchanged content forward is the whole point.
      *
-     * @throws IllegalArgumentException when the command's id pins a version, or the artifact is
-     *     unknown, or it holds no version to carry forward
+     * <p>When the grouping version with the same number as the source Element holds that Element as
+     * a member, the grouping version is copied together with it, atomically and to the same new
+     * version, which then counts above the highest version of either artifact. The grouping copy
+     * becomes the grouping's current version; its References to the source Element point to the
+     * copied Element, all other References stay unchanged. Otherwise the Element is copied on its
+     * own, also when a grouping version with another number holds it.
+     *
+     * @throws IllegalArgumentException when the artifact is unknown, holds no version to copy, or
+     *     does not hold the requested version
+     * @throws de.civitascore.modelforge.contract.RegistryConflictException when a version the copy
+     *     needs exists already; nothing is written
      */
-    ArtifactWriteResult bumpVersion(BumpVersionCommand command);
+    ArtifactWriteResult copyVersion(CopyVersionCommand command);
 
     // ── Delete ───────────────────────────────────────────────────────────────
 
@@ -293,6 +307,39 @@ public interface ModelForge {
      * graph.
      */
     List<String> deletionBlockers(ArtifactId artifactId);
+
+    /**
+     * Deletes the version line a pinned id names: every version whose major is the pin's, as one
+     * unit. The current version moves to the highest version left. A member version that only the
+     * line holds goes with it, and so does a member left with no version; one another version
+     * still holds stays. An Element's line also takes the versions of its own grouping, the Data
+     * Structure of the same UUID, that hold one of the line's versions. When the line holds every
+     * version, the artifact goes as {@link #deleteArtifact(ArtifactId, boolean, boolean)} deletes
+     * it with cascade and without force.
+     *
+     * <p>Model Forge does not assign a deleted version's number again, also after the whole artifact
+     * is gone; an import that names an explicit version is stored with it as given. A no-op when
+     * the registry holds no such artifact or line.
+     *
+     * @throws IllegalArgumentException when the id is logical or {@code :latest}
+     * @throws de.civitascore.modelforge.contract.ArtifactInUseException when
+     *     {@link #versionLineDeletionBlockers} names anything; nothing is deleted then
+     */
+    void deleteVersionLine(ArtifactId pinnedVersion);
+
+    /**
+     * What stands in the way of {@link #deleteVersionLine}: whatever references any version the
+     * delete removes. A referrer counts with its current version and with every version that can
+     * still be in use: any version of an Element or Data Structure, and a version a reference pins.
+     * A reference that names no version holds every version and so blocks. A referrer the same
+     * delete removes does not count. An unpinned reference from an Element of any version of the
+     * same Data Structure does not block while another version of its target survives; explicit
+     * pins from surviving versions do. Data Set memberships do not count. Empty when nothing stands
+     * in the way or the registry holds no such line.
+     *
+     * @throws IllegalArgumentException when the id is logical or {@code :latest}
+     */
+    List<String> versionLineDeletionBlockers(ArtifactId pinnedVersion);
 
     // ── DataSet membership ─────────────────────────────────────────────────────
 

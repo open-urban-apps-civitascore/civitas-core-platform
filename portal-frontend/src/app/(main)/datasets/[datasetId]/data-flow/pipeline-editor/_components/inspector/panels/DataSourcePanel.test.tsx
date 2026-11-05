@@ -61,6 +61,9 @@ const datasource = (
     dataStructureVersion,
   }) as unknown as Datasource
 
+const detailsValue = (label: string) =>
+  within(screen.getByText(label).parentElement as HTMLElement).getByTestId('statusBadge')
+
 const apiCall = (name: string, method: string | null = 'GET') => ({ name, method, path: '/items' })
 
 const HTTP_ONE_CALL = datasource('http-1', 'Test HTTP Source 1', {
@@ -219,6 +222,20 @@ describe('DataSourcePanel', () => {
     expect(screen.queryByText('dataSourcePanel.apiCallNotFound')).not.toBeInTheDocument()
   })
 
+  it('shows an error instead of the API call select when the frontend cannot read the HTTP data source', () => {
+    const httpUnreadable = datasource('http-4', 'Test HTTP Source 4', {
+      connectorType: 'HTTP',
+      authentication: { type: 'BEARER_TOKEN' },
+      apiCalls: [apiCall('Test Call 1')],
+    })
+    mockUseGetDatasources.mockReturnValue({ data: { data: [httpUnreadable] }, isLoading: false, isError: false })
+
+    renderPanel({ ...selectedNode(httpUnreadable), apiCallName: 'Test Call 1' })
+
+    expect(screen.getByText('entitySelector.errorLoading')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+  })
+
   it('shows a placeholder when the HTTP data source has no API calls', () => {
     const httpNoCalls = datasource('http-3', 'Test HTTP Source 3', { connectorType: 'HTTP', apiCalls: [] })
     mockUseGetDatasources.mockReturnValue({ data: { data: [httpNoCalls] }, isLoading: false, isError: false })
@@ -233,7 +250,8 @@ describe('DataSourcePanel', () => {
 
     expect(screen.getByText('Air Quality')).toBeInTheDocument()
     expect(screen.getByText('1.2.0')).toBeInTheDocument()
-    expect(screen.getByText('DRAFT')).toBeInTheDocument()
+    expect(detailsValue('dataSourcePanel.status')).toHaveTextContent('status.AVAILABLE')
+    expect(detailsValue('dataSourcePanel.dataStructureVersionStatus')).toHaveTextContent('status.DRAFT')
   })
 
   it('opens the Data structure version used by the Data source', async () => {

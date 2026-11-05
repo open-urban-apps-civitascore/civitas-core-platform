@@ -39,6 +39,7 @@
       "deleteItem": "{item} löschen",
       "remove": "Entfernen",
       "removeItem": "{item} entfernen",
+      "duplicateItem": "{item} duplizieren",
       "add": "Hinzufügen",
       "edit": "Bearbeiten",
       "editBase": "Basis bearbeiten",
@@ -128,6 +129,11 @@
       "DRAFT": "Entwurf",
       "AVAILABLE": "Verfügbar",
       "READY": "Fertig"
+    },
+    "statusCount": {
+      "DRAFT": "{count, plural, one {# Entwurf} other {# Entwürfe}}",
+      "AVAILABLE": "{count, plural, other {# Verfügbar}}",
+      "READY": "{count, plural, other {# Fertig}}"
     },
     "inUse": {
       "columnHeader": "Verwendung",
@@ -255,9 +261,6 @@
     },
     "anonymousDatapool": "Anonym",
     "tableValues": {
-      "draft": "Entwurf",
-      "available": "Verfügbar",
-      "ready": "Fertig",
       "yesterday": "Gestern"
     },
     "pipelineStatus": {
@@ -1071,10 +1074,6 @@
       "status": "Status",
       "action": "Aktion"
     },
-    "status": {
-      "DRAFT": "Entwurf",
-      "AVAILABLE": "Verfügbar"
-    },
     "deleteModal": {
       "title": "Datenquelle wirklich löschen?",
       "description": "Diese Aktion löscht die Datenquelle endgültig. Diese Aktion kann nicht rückgängig gemacht werden."
@@ -1102,6 +1101,17 @@
       "pageNumberMax": "Geben Sie eine Zahl bis 2147483647 ein.",
       "pageSizeMin": "Die Seitengröße muss mindestens 1 sein.",
       "endPageBeforeStartPage": "Die Endseite darf nicht kleiner als die Startseite sein.",
+      "clientHeader": "Connection, Content-Length, Expect, Host und Upgrade sind nicht erlaubt.",
+      "invalidCursorPath": "Beginnen Sie mit $ und verwenden Sie nur Namen und Array-Positionen, z. B. $.next_cursor, $.data[0].id oder $['next cursor'].",
+      "invalidCountPath": "Beginnen Sie mit $ und verwenden Sie nur Namen und Array-Positionen, z. B. $.meta.count, $.data oder $['total count'].",
+      "paginationQueryDuplicate": "Ein Query-Parameter hat bereits diesen Namen.",
+      "paginationHeaderDuplicate": "Ein Header hat bereits diesen Namen.",
+      "paginationParameterDuplicate": "Ein anderer Paginierungsparameter hat bereits diesen Namen.",
+      "parameterPaginationDuplicate": "Ein Paginierungsparameter hat bereits diesen Namen.",
+      "unreadableDatasource": "Datenquelle kann nicht geladen werden.",
+      "limitRequired": "Geben Sie ein Limit für den Limit-Parameter ein.",
+      "limitParameterRequired": "Geben Sie einen Limit-Parameter für das Limit ein.",
+      "limitInteger": "Geben Sie eine ganze Zahl ab 1 ein.",
       "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten",
       "inUseError": "Diese Datenquelle wird noch von einer Pipeline verwendet.",
@@ -1184,7 +1194,9 @@
         "enable": "Paginierung verwenden",
         "type": {
           "label": "Art der Paginierung",
-          "pageNumber": "Seitennummer"
+          "pageNumber": "Seitennummer",
+          "cursor": "Cursor",
+          "limitOffset": "Limit/Offset"
         },
         "pageParameter": {
           "label": "Seitenparameter"
@@ -1200,6 +1212,33 @@
         },
         "endPage": {
           "label": "Endseite"
+        },
+        "cursorHint": "Die Datenstruktur beschreibt die ganze Antwort, einschließlich Cursor.",
+        "cursorPath": {
+          "label": "Cursor-Pfad"
+        },
+        "cursorParameter": {
+          "label": "Cursor-Parameter"
+        },
+        "cursorIn": {
+          "label": "Cursor senden als",
+          "query": "Query-Parameter",
+          "header": "Header"
+        },
+        "offsetParameter": {
+          "label": "Offset-Parameter"
+        },
+        "offset": {
+          "label": "Offset"
+        },
+        "limitParameter": {
+          "label": "Limit-Parameter"
+        },
+        "limit": {
+          "label": "Limit"
+        },
+        "countPath": {
+          "label": "Pfad zur Anzahl"
         }
       }
     },
@@ -1288,6 +1327,36 @@
         },
         "password": {
           "label": "Passwort"
+        }
+      },
+      "connectionTest": {
+        "title": "Verbindungstest",
+        "button": "Verbindung testen",
+        "incompleteHint": "Alle Pflichtfelder ausfüllen, um die Verbindung zu testen.",
+        "httpIncompleteHint": "Alle Pflichtfelder in den Tabs „Konnektor“ und „API-Aufrufe“ ausfüllen, um die Verbindung zu testen.",
+        "invalidHint": "Die Konfiguration enthält ungültige Werte. Prüfen Sie auch die API-Aufrufe.",
+        "connecting": "Verbindung wird aufgebaut …",
+        "outdatedPending": "Die Konfiguration wurde geändert. Der laufende Verbindungstest wird verworfen. Danach können Sie erneut testen.",
+        "testAgain": "Erneut testen",
+        "success": "Verbindung erfolgreich hergestellt",
+        "failure": "Verbindung fehlgeschlagen",
+        "cause": "Ursache:",
+        "details": "Details:",
+        "httpStatus": "HTTP-Status: {status}",
+        "previewTruncated": "Vorschau gekürzt.",
+        "reenterPassword": "Die Konfiguration wurde geändert. Geben Sie das Passwort erneut ein, um die Verbindung zu testen.",
+        "causes": {
+          "INVALID_CONNECTOR": "Die Konfiguration ist ungültig.",
+          "SOURCE_ERROR": "Die Quelle ist nicht erreichbar oder hat mit einem Fehler geantwortet.",
+          "TIMEOUT": "Die Quelle hat nicht rechtzeitig geantwortet.",
+          "VALIDATION_FAILED": "Nicht alle Pflichtfelder sind gültig ausgefüllt.",
+          "MALFORMED_REQUEST": "Die Anfrage konnte nicht verarbeitet werden.",
+          "FORBIDDEN": "Keine Berechtigung für diesen Verbindungstest.",
+          "NOT_FOUND": "Die Datenquelle wurde nicht gefunden.",
+          "TOO_MANY_REQUESTS": "Es laufen bereits Verbindungstests. Bitte später erneut versuchen.",
+          "EXTERNAL_SYSTEM_ERROR": "Der Verbindungstest konnte nicht ausgeführt werden.",
+          "EXTERNAL_SYSTEM_TIMEOUT": "Der Verbindungstest hat zu lange gedauert.",
+          "UNKNOWN": "Unbekannter Fehler."
         }
       }
     },
@@ -1434,10 +1503,12 @@
     "messages": {
       "createSuccess": "Die Version der Datenstruktur wurde erfolgreich angelegt.",
       "updateSuccess": "Die Version der Datenstruktur wurde erfolgreich aktualisiert.",
+      "duplicateSuccess": "Die Version wurde erfolgreich dupliziert.",
       "isAvailableModelHint": "Die Versionsinformationen und die Strukturdefinition können nicht bearbeitet werden, da diese Version bereits den Status 'Verfügbar' hat."
     },
     "errors": {
       "creationError": "Beim Anlegen der Version der Datenstruktur ist ein Fehler aufgetreten.",
+      "duplicationError": "Beim Duplizieren der Version der Datenstruktur ist ein Fehler aufgetreten.",
       "saveInvalidModel": "Die Version kann nicht gespeichert werden: {reason}",
       "modelRootMissingError": "Die Version kann nicht auf \"Verfügbar\" gesetzt werden, weil ihr gespeichertes Modell keine Wurzelklasse hat. Markieren Sie die Wurzelklasse im Diagramm, speichern Sie die Version und setzen Sie sie dann auf \"Verfügbar\".",
       "modelMemberUnreachableError": "Die Version kann nicht auf \"Verfügbar\" gesetzt werden, weil diese Klassen nicht mit der Wurzelklasse verbunden sind: {names}. Verbinden Sie sie mit der Wurzelklasse oder entfernen Sie sie, speichern Sie die Version und setzen Sie sie dann auf \"Verfügbar\".",
@@ -1718,7 +1789,6 @@
       "savingAll": "Speichert...",
       "exit": "Beenden",
       "validationFailed": "Validierung fehlgeschlagen für: {names}",
-      "unchangedPipelinesInvalid": "Diese Pipelines sind nicht gültig: {names}. Bitte die Fehler beheben.",
       "duplicateNames": "Doppelte Pipeline-Namen: {names}",
       "saveFailed": "Speichern fehlgeschlagen: {names}",
       "saveSuccess": "Pipeline \"{name}\" erfolgreich gespeichert",
@@ -1967,10 +2037,6 @@
           "connector": "Konnektor",
           "lastActive": "Aktualisiert vor",
           "status": "Status"
-        },
-        "status": {
-          "DRAFT": "Entwurf",
-          "AVAILABLE": "Verfügbar"
         }
       },
       "datasetsTab": {

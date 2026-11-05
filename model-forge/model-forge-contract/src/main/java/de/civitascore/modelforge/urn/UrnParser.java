@@ -100,6 +100,19 @@ public final class UrnParser {
     }
 
     /**
+     * Whether two versions are in one version line: their text before the first dot is equal, so
+     * {@code 01.0.0} and {@code 1.0.0} are in different lines.
+     */
+    public static boolean sameMajor(String version, String other) {
+        return majorOf(version).equals(majorOf(other));
+    }
+
+    private static String majorOf(String version) {
+        int dot = version.indexOf('.');
+        return dot < 0 ? version : version.substring(0, dot);
+    }
+
+    /**
      * Rejects URN strings that contain ASCII control characters (0x00–0x1F, 0x7F).
      *
      * <p>Prevents injection when the URN is used in SQL, log lines, or URL path segments.

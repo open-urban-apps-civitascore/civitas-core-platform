@@ -74,7 +74,7 @@ services:
       retries: 10
 
   postgres-keycloak:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
@@ -227,13 +227,13 @@ services:
   # ── Messaging ──────────────────────────────────────────────
 
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.0
+    image: confluentinc/cp-zookeeper:7.9.10@sha256:1a870111c6e861f1e6015094fac902779981edb5cb1d2ad6b7437d2a6b8ba064
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
 
   kafka:
-    image: confluentinc/cp-kafka:7.6.0
+    image: confluentinc/cp-kafka:7.9.10@sha256:07c3d60362e67c296f7f34b690b1240e5ecdcde4a84f5e73cab320fb4041f58c
     depends_on:
       - zookeeper
     environment:
@@ -254,7 +254,7 @@ services:
   # ── API Gateway ──────────────────────────────────────────
 
   etcd:
-    image: quay.io/coreos/etcd:v3.5.16
+    image: quay.io/coreos/etcd:v3.7.3@sha256:8d1b6c24f08e12ed7623d1df421832b3cafabe221aa6b658b97288d07807582f
     environment:
       ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
       ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
@@ -273,7 +273,10 @@ services:
         FROM apache/apisix:3.17.0-debian
         COPY config.yaml /usr/local/apisix/conf/config.yaml
         USER root
-        RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+        # The APISIX apt repo (repos.apiseven.com) does not answer from the CI runners. apt-get update
+        # waits about 130 s for it on every run. curl comes from the Debian repos, so drop that source.
+        RUN rm -f /etc/apt/sources.list.d/apisix.list \
+            && apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
         USER apisix
     depends_on:
       etcd:
@@ -326,7 +329,7 @@ services:
         RUN mkdir -p /staging/data/config && \
             printf '{"authz_repository_url":"http://authz-repository:8091/api/v1/user-context","dataset_pool_membership_url":"http://authz-repository:8091/api/v1/dataset-pool","dashboard_dataset_url":"http://authz-repository:8091/api/v1/dashboard-dataset","authz_cache_duration_seconds":0}\n'\
             > /staging/data/config/config.json
-        FROM openpolicyagent/opa:1.21.0-static@sha256:9eb36ac3ceb3b855e776e60926a8a5142f96109a219a5fcd490fa1744c755bec
+        FROM openpolicyagent/opa:1.21.1-static
         COPY --from=prep /staging/policies /policies
         COPY --from=prep /staging/helpers /helpers
         COPY --from=prep /staging/providers /providers
@@ -361,7 +364,7 @@ services:
   # ── FROST SensorThings API ──────────────────────────────
 
   frost:
-    image: fraunhoferiosb/frost-server-http:2.7.3
+    image: fraunhoferiosb/frost-server-http:2.8.0@sha256:3102b01ac2ab664fac277b551f3a625a88ab8d606625d1aeea5309559530f4f0
     platform: linux/amd64
     hostname: civitas-frost
     environment:
@@ -396,21 +399,18 @@ services:
     # ./drivers, but CI runs in Docker-in-Docker where host bind mounts don't work, so it is baked
     # into the image instead.
     build:
-      # Every NAR of the NiFi extensions, which the build-nifi-nars-api-test job builds: the saga
-      # collections deploy Pipelines that use PutFrostRecord and GetHttpApiCall. The .dockerignore
-      # of the extensions admits only the NARs. Run `mvn -f nifi-extensions/pom.xml package` first
-      # when starting this stack by hand.
+      # Every NAR and JDBC driver of the NiFi extensions, which the build-nifi-nars job builds: the
+      # saga collections deploy Pipelines that use PutFrostRecord and GetHttpApiCall. The
+      # .dockerignore of the extensions admits only the NARs and the drivers. Run
+      # `mvn -f nifi-extensions/pom.xml package` first when starting this stack by hand.
       context: ../../nifi-extensions
       dockerfile_inline: |
         FROM apache/nifi:2.9.0
         # lib/, not the auto-load directory: NiFi loads lib/ before it answers a request, so the
         # first deployment already finds the processors of the extensions.
         COPY --chown=nifi:nifi nifi-*-nar/target/*.nar /opt/nifi/nifi-current/lib/
+        COPY --chown=nifi:nifi nifi-jdbc-drivers/target/drivers/*.jar /opt/nifi/drivers/
         USER root
-        RUN mkdir -p /opt/nifi/drivers \
-          && curl -fsSL -o /opt/nifi/drivers/postgresql.jar \
-               https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar \
-          && chown -R nifi:nifi /opt/nifi/drivers
         # AUTH=oidc needs an explicit keystore/truststore (single-user's auto-generation is gone).
         # Bake a throwaway self-signed pair; the config-adapter trusts all certs (NIFI_TLS_INSECURE).
         RUN mkdir -p /opt/nifi/certs \
@@ -468,7 +468,7 @@ services:
   # ── Email (SMTP sink for Keycloak verification emails) ──
 
   mailpit:
-    image: axllent/mailpit:v1.30@sha256:d5ecbb067db3705fa953d79e1b7f81ef84038df67aba6c52825d8c02a1ea748a
+    image: axllent/mailpit:v1.32@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://localhost:8025/api/v1/messages"]
       interval: 5s
@@ -500,7 +500,7 @@ services:
       retries: 10
 
   rabbitmq:
-    image: rabbitmq:4.1.3-alpine
+    image: rabbitmq:4.4.0-alpine@sha256:21577d148f4f7563a87d761862fa353f59348a094833ca8b1b1a46a8102dffce
     tmpfs:
       - /var/lib/rabbitmq:size=256m,mode=1777
     healthcheck:
@@ -587,9 +587,6 @@ services:
       KEYCLOAK_TARGET_REALM: civitas-core
       SERVER_PORT: 8089
       SPRING_PROFILES_ACTIVE: local,postgres,init
-      # Keycloak base URL the OpenAPI description shows. Empty here, so the description uses the
-      # real Keycloak URL; the export-openapi-spec job sets an example.org URL instead.
-      OPENAPI_OAUTH_SERVER_URL: ${OPENAPI_OAUTH_SERVER_URL:-}
     depends_on:
       postgis-dev-env:
         condition: service_healthy
@@ -762,7 +759,7 @@ services:
   # stubs: each Bruno folder registers its own through the admin API and removes them again. The
   # service name is the host name of the Data source, and NiFi's HTTP client takes no host with a '_'.
   wiremock:
-    image: wiremock/wiremock:3.9.2@sha256:d13997cd7b52583528a766019cfe7d4e91c4d224a67bdaa6f60efbb532f32176
+    image: wiremock/wiremock:3.13.2@sha256:0d4ecb3e4dc8213fd7a4d37d6a78f6e6b553a6d2e15bd51b0999781282ac61b3
     command: ["--verbose"]
 
   # ── APISIX Route Seeding (one-shot, run via: docker compose run --rm apisix-seed)

@@ -1,2 +1,3 @@
 *
 !nifi-*-nar/target/*.nar
+!nifi-jdbc-drivers/target/drivers/*.jar

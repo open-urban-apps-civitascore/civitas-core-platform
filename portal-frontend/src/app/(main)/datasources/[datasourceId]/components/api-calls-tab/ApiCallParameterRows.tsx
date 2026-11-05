@@ -2,6 +2,7 @@ import { X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { FieldArrayWithId, UseFormReturn } from 'react-hook-form'
 
+import { DISABLED_INPUT_CLASS_NAME } from '@/components/form/fields/disabledFieldClassNames'
 import { Button } from '@/components/ui/button'
 import { FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -16,10 +17,11 @@ interface ApiCallParameterRowsProps {
   typeLabel: string
   isDisabled: boolean
   onRemove: (index: number) => void
+  onNameChange: () => void
 }
 
 export const ApiCallParameterRows = (props: ApiCallParameterRowsProps) => {
-  const { form, name, fields, typeLabel, isDisabled, onRemove } = props
+  const { form, name, fields, typeLabel, isDisabled, onRemove, onNameChange } = props
   const t = useTranslations('datasources.apiCallsTab.parameters')
 
   return (
@@ -37,7 +39,12 @@ export const ApiCallParameterRows = (props: ApiCallParameterRowsProps) => {
                   <FormControl>
                     <Input
                       {...inputField}
+                      onChange={event => {
+                        inputField.onChange(event)
+                        if (key === 'name') onNameChange()
+                      }}
                       aria-label={`${typeLabel} ${t(key)}`}
+                      className={DISABLED_INPUT_CLASS_NAME}
                       placeholder={isDisabled ? undefined : t(key)}
                       disabled={isDisabled}
                     />

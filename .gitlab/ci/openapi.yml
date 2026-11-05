@@ -1,69 +1,110 @@
-# Keeps api/portal-backend/openapi.yaml in sync with the description the running backend serves.
+# Exports the OpenAPI description the backend serves, lints it, and keeps the committed copy in
+# api/portal-backend/openapi.yaml in sync with it.
 
-# Starts the portal-backend with only the services it needs to boot (postgis-dev-env, Kafka,
-# Keycloak) and exports the springdoc description as the artifact openapi.generated.yaml.
-# This job is separate from api-test-backend, so the export does not wait for the Bruno run,
-# a failed Bruno test does not stop the export, and a failed export does not stop the tests.
+# Boots the backend jar against PostgreSQL only, the one service it cannot start without, so the
+# spec is available shortly after build-backend instead of after the API test stack.
 export-openapi-spec:
-  rules:
-    - !reference [.only-backend-changes, rules]
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - .gitlab/ci/openapi.yml
-  image: docker:27@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
+  extends: .only-backend-changes
+  image: maven:3.9.16-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: test
   needs:
     - job: build-backend
       artifacts: true
-      optional: true
   services:
-    - name: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
+    - name: postgres:16.15-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
+      alias: postgres
   variables:
-    DOCKER_DRIVER: overlay2
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ''
-    # The spec is hosted as documentation, where the CI-internal Keycloak host points nowhere.
+    GIT_STRATEGY: none
+    POSTGRES_DB: portal_backend
+    POSTGRES_USER: admin
+    POSTGRES_PASSWORD: admin
+    SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/portal_backend
+    # The `local` profile permits /api-docs.yaml without a token
+    SPRING_PROFILES_ACTIVE: local
+    # The spec is hosted as documentation, where the Keycloak host of a stack points nowhere.
     # example.org is reserved for examples (RFC 2606), so these URLs are obviously not real.
     OPENAPI_OAUTH_SERVER_URL: https://auth.example.org
   script:
-    - export COMPOSE_FILES="-f dev-environment/ci/docker-compose.api-test.yml"
+    - java -jar portal-backend/target/portal-backend-*.jar > portal-backend.log 2>&1 &
+    - BACKEND_PID=$!
     - |
-      if ls portal-backend/target/*.jar >/dev/null 2>&1; then
-        echo "Portal-backend JAR found — building from source"
-        export COMPOSE_FILES="$COMPOSE_FILES -f dev-environment/ci/docker-compose.api-test.build-portal.yml"
-      else
-        echo "Portal-backend JAR not available — using registry image"
-        echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
-      fi
-    # Naming the service starts it with its depends_on chain only, not the full api-test stack
-    - |
-      docker compose -p openapi-export $COMPOSE_FILES up -d --build --wait --wait-timeout 600 portal-backend || {
-        docker compose -p openapi-export $COMPOSE_FILES ps -a
-        docker compose -p openapi-export $COMPOSE_FILES logs --tail=100 --no-color portal-backend
+      for attempt in $(seq 90); do
+        curl -sf http://localhost:8089/v1/api-docs.yaml -o openapi.generated.yaml && break
+        kill -0 "$BACKEND_PID" 2>/dev/null || break
+        sleep 2
+      done
+      if [ ! -s openapi.generated.yaml ]; then
+        echo "The backend stopped or did not serve the spec within 3 minutes. End of portal-backend.log:"
+        tail -n 50 portal-backend.log
         exit 1
-      }
-    # The `local` profile of the stack permits /api-docs.yaml without a token
-    - docker compose -p openapi-export $COMPOSE_FILES exec -T portal-backend curl -sf http://localhost:8089/v1/api-docs.yaml > openapi.generated.yaml
-    # Fail when the override did not reach the backend, instead of committing the internal host
+      fi
+    # Fail when the override did not reach the backend, instead of committing a Keycloak host
     - grep -q "$OPENAPI_OAUTH_SERVER_URL/realms/" openapi.generated.yaml
   artifacts:
-    when: on_success
+    when: always
+    expire_in: 1 month
     paths:
       - openapi.generated.yaml
-    expire_in: 30 days
+      - portal-backend.log
+
+lint-openapi-spec:
+  extends: .only-backend-changes
+  image: node:24.21.0-alpine3.24@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
+  stage: test
+  needs:
+    - job: export-openapi-spec
+      artifacts: true
+  # The script exits 3 only when Spectral reported findings, so a failed install or a crash fails the job
+  allow_failure:
+    exit_codes: 3
+  variables:
+    GIT_DEPTH: 1
+  script:
+    # --ignore-scripts skips the telemetry install script of @scarf/scarf, among others
+    - npm ci --ignore-scripts --no-audit --no-fund --loglevel=error --prefix api/portal-backend
+    - api/portal-backend/node_modules/.bin/spectral lint openapi.generated.yaml
+      --ruleset api/portal-backend/.spectral.yaml
+      --fail-severity warn
+      -f text -o.text spectral-report.txt
+      -f gitlab -o.gitlab gl-code-quality-report.json
+      || SPECTRAL_EXIT=$?
+    # The gitlab formatter of Spectral writes zero-based lines; Code Quality expects one-based lines
+    - |
+      [ -s gl-code-quality-report.json ] && node -e '
+        const fs = require("fs"); const file = "gl-code-quality-report.json"
+        const issues = JSON.parse(fs.readFileSync(file))
+        for (const { location } of issues) { location.positions.begin.line++; location.positions.end.line++ }
+        fs.writeFileSync(file, JSON.stringify(issues))'
+      if [ -n "$SPECTRAL_EXIT" ]; then
+        cat spectral-report.txt || true
+        [ "$SPECTRAL_EXIT" = 1 ] && [ -s gl-code-quality-report.json ] && exit 3
+        exit 1
+      fi
+  artifacts:
+    when: always
+    expire_in: 1 month
+    paths:
+      - spectral-report.txt
+    reports:
+      codequality: gl-code-quality-report.json
 
 # Compares the export with the committed file and, on a difference, opens or refreshes a merge
 # request from a bot branch, the way Renovate does. See .gitlab/ci/scripts/update-openapi-spec.mjs.
 #
 # Requires OPENAPI_BOT_TOKEN: a Project Access Token of its own with the api and write_repository
-# scopes and the Developer role, stored as a masked and protected CI/CD variable. The job fails
+# scopes and the Developer role, stored as a masked and protected CI/CD variable that is scoped to
+# the environment openapi-spec-update, so that no other job receives it. The job fails
 # when the variable is not set, also when the spec has not changed, so a missing token shows up
 # on the first develop pipeline and not only on the next API change.
 update-openapi-spec:
   image: node:24.21.0-alpine3.24@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
   stage: report
+  interruptible: false
   # Two develop pipelines must not force-push the bot branch at the same time
   resource_group: openapi-spec-update
+  environment:
+    name: openapi-spec-update
+    action: access
   needs:
     - job: export-openapi-spec
       artifacts: true

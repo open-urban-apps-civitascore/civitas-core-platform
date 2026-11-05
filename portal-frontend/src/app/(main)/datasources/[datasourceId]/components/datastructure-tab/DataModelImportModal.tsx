@@ -10,7 +10,6 @@ import {
   SortingState,
   useReactTable,
 } from '@tanstack/react-table'
-import { CircleCheckBig, CircleDashed } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
@@ -18,13 +17,15 @@ import { useGetDatastructures } from '@/app/services/api/datastructures/clientRe
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SearchHeader } from '@/components/search-area/SearchArea'
+import { StatusBadge } from '@/components/status/status-badge/StatusBadge'
+import { VersionStatusCounts } from '@/components/status/version-status-counts/VersionStatusCounts'
 import { DataTable } from '@/components/table/DataTable'
 import { ExpanderCell } from '@/components/table/expander-cell/ExpanderCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { DATASTRUCTURE_STATUS_TYPES, DatastructuresListData } from '@/types/datastructures'
+import { DatastructuresListData } from '@/types/datastructures'
 import { mapDatastructuresApiToListData } from '@/utils/datastructures'
 import { isPageIndexHigherThanTotalPages, resolveUpdater } from '@/utils/table'
 
@@ -183,19 +184,12 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
     }),
     columnHelper.accessor('status', {
       header: tDatastructures('tableHeaders.status'),
-      cell: info => {
-        const status = info.getValue()
-        if (!status) return '-'
-        return (
-          <div className="flex items-center gap-2">
-            {status === DATASTRUCTURE_STATUS_TYPES.DRAFT ? (
-              <CircleDashed className="text-muted-foreground" size={16} />
-            ) : (
-              <CircleCheckBig className="text-muted-foreground" size={16} />
-            )}
-            {tCommon(`status.${status}`)}
-          </div>
-        )
+      cell: ({ row }: CellContext<DatastructuresListData, unknown>) => {
+        if (row.depth === 0) {
+          return <VersionStatusCounts versionCountByStatus={row.original.versionCountByStatus} />
+        }
+        const { status } = row.original
+        return status ? <StatusBadge status={status} /> : '-'
       },
       meta: {
         style: {

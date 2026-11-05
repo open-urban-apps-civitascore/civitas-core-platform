@@ -25,6 +25,7 @@
 		<module>nifi-frost-nar</module>
 		<module>nifi-http-processors</module>
 		<module>nifi-http-nar</module>
+		<module>nifi-jdbc-drivers</module>
 	</modules>
 
 	<properties>
@@ -46,23 +47,23 @@
 		     compiled against this API and is installed into that image. -->
 		<nifi.version>2.9.0</nifi.version>
 
-		<jackson.version>2.21.6</jackson.version>
+		<jackson.version>2.21.8</jackson.version>
 		<!-- The version of model-forge-runtime: GetHttpApiCall validates a response against a Data
 		     structure as Model Forge validates data against it, so the two must not disagree. -->
-		<networknt.version>1.5.8</networknt.version>
-		<slf4j.version>2.0.18</slf4j.version>
+		<networknt.version>1.5.9</networknt.version>
+		<slf4j.version>2.0.20</slf4j.version>
 		<junit.version>5.14.4</junit.version>
 		<!-- The platform line that belongs to the JUnit version above. nifi-mock carries a newer
 		     JUnit into the test classpath, and two lines in one JVM break test discovery, so both
 		     halves are pinned here rather than left to the nearest declaration. -->
 		<junit.platform.version>1.14.4</junit.platform.version>
-		<mockito.version>5.23.0</mockito.version>
+		<mockito.version>5.24.0</mockito.version>
 		<!-- The integration test brings its own FROST server up, so the build needs no endpoint and
 		     no credential of an installation. -->
 		<testcontainers.version>2.0.5</testcontainers.version>
 		<awaitility.version>4.3.0</awaitility.version>
-		<jacoco.version>0.8.15</jacoco.version>
-		<spotless.version>3.4.0</spotless.version>
+		<jacoco.version>0.8.16</jacoco.version>
+		<spotless.version>3.10.4</spotless.version>
 		<nifi-nar-maven-plugin.version>2.4.0</nifi-nar-maven-plugin.version>
 		<cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
 	</properties>
@@ -204,12 +205,12 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-surefire-plugin</artifactId>
-					<version>3.2.3</version>
+					<version>3.6.1</version>
 				</plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-failsafe-plugin</artifactId>
-					<version>3.2.3</version>
+					<version>3.6.1</version>
 				</plugin>
 				<plugin>
 					<groupId>org.jacoco</groupId>

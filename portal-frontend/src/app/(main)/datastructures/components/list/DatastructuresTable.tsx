@@ -7,11 +7,13 @@ import {
   Row,
   useReactTable,
 } from '@tanstack/react-table'
-import { CircleCheckBig, CircleDashed } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
+import { CountBadge } from '@/components/count-badge/CountBadge'
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { InUseIndicator } from '@/components/in-use-indicator/InUseIndicator'
+import { StatusBadge } from '@/components/status/status-badge/StatusBadge'
+import { VersionStatusCounts } from '@/components/status/version-status-counts/VersionStatusCounts'
 import { DataTable } from '@/components/table/DataTable'
 import { ExpanderCell } from '@/components/table/expander-cell/ExpanderCell'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
@@ -19,18 +21,21 @@ import { SortableTableHeader } from '@/components/table/sortable-table-header/So
 import { usePermissions } from '@/hooks/use-permissions'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { PERMISSION_NAMES } from '@/types/currentUser'
-import { DATASTRUCTURE_STATUS_TYPES, DatastructuresListData } from '@/types/datastructures'
+import { DatastructuresListData } from '@/types/datastructures'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
 interface DatastructuresTableProps extends TableProps<DatastructuresListData> {
   datastructures: DatastructuresListData[]
+  isDuplicating: boolean
   onDeleteDatastructureClick: (id: string) => void
+  onDuplicateVersionClick: (datastructureId: string, versionId: string) => void
 }
 
 export const DatastructuresTable = (props: DatastructuresTableProps) => {
   const {
     datastructures,
+    isDuplicating,
     rowCount,
     pageIndex,
     totalPages,
@@ -40,6 +45,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     onPaginationChange,
     onSortingChange,
     onDeleteDatastructureClick,
+    onDuplicateVersionClick,
   } = props
   const { hasScopedPermission } = usePermissions()
   const t = useTranslations('datastructures')
@@ -60,7 +66,12 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
           row.depth === 0 ? `datastructures/${row.original.id}` : `datastructures/${row.parentId}/${row.original.id}`
         return (
           <ExpanderCell row={row} className="font-medium">
-            <LinkCell href={href}>{row.original.name}</LinkCell>
+            <LinkCell
+              href={href}
+              suffix={row.depth === 0 ? <CountBadge count={row.original.versions.length} /> : undefined}
+            >
+              {row.original.name}
+            </LinkCell>
           </ExpanderCell>
         )
       },
@@ -105,7 +116,17 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     }),
     columnHelper.accessor('inUseByReleased', {
       header: tCommon('inUse.columnHeader'),
-      cell: info => <InUseIndicator isInUseByReleased={!!info.getValue()} />,
+      cell: ({ row }: CellContext<DatastructuresListData, unknown>) => {
+        if (row.depth !== 0) return <InUseIndicator isInUseByReleased={!!row.original.inUseByReleased} />
+        const { inUseByReleasedVersionCount, versions } = row.original
+        if (!inUseByReleasedVersionCount) return null
+        return (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <InUseIndicator isInUseByReleased />
+            {`${inUseByReleasedVersionCount}/${versions.length}`}
+          </div>
+        )
+      },
       enableSorting: false,
       meta: {
         style: {
@@ -115,19 +136,12 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     }),
     columnHelper.accessor('status', {
       header: t('tableHeaders.status'),
-      cell: info => {
-        const status = info.getValue()
-        if (!status) return '-'
-        return (
-          <div className="flex items-center gap-2">
-            {status === DATASTRUCTURE_STATUS_TYPES.DRAFT ? (
-              <CircleDashed className="text-muted-foreground" size={16} />
-            ) : (
-              <CircleCheckBig className="text-muted-foreground" size={16} />
-            )}
-            {tCommon(`status.${status}`)}
-          </div>
-        )
+      cell: ({ row }: CellContext<DatastructuresListData, unknown>) => {
+        if (row.depth !== 0) {
+          const { status } = row.original
+          return status ? <StatusBadge status={status} /> : '-'
+        }
+        return <VersionStatusCounts versionCountByStatus={row.original.versionCountByStatus} />
       },
       meta: {
         style: {
@@ -138,7 +152,26 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     {
       id: 'actions',
       cell: ({ row }: { row: Row<DatastructuresListData> }) => {
-        if (row.depth !== 0) return null
+        if (row.depth !== 0) {
+          const datastructureId = row.parentId as string
+          const canDuplicate = hasScopedPermission(
+            PERMISSION_NAMES.DATASTRUCTURE_UPDATE,
+            ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
+            datastructureId,
+          )
+          return canDuplicate ? (
+            <TableDropdownMenu
+              classNameDropdownContent="w-50"
+              menuItems={[
+                {
+                  label: tCommon('actions.duplicateItem', { item: tCommon('items.datastructureVersion') }),
+                  onClick: () => onDuplicateVersionClick(datastructureId, row.original.id),
+                  disabled: isDuplicating,
+                },
+              ]}
+            />
+          ) : null
+        }
         const canDelete = hasScopedPermission(
           PERMISSION_NAMES.DATASTRUCTURE_DELETE,
           ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,

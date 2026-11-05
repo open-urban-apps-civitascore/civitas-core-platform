@@ -44,7 +44,25 @@ from the branch `ci/openapi-spec-update` whenever the export differs from the co
 (`.gitlab/ci/openapi.yml`). To change the spec, change the backend — the next `develop`
 pipeline refreshes the merge request.
 
-`update-openapi-spec` needs the masked and protected CI/CD variable `OPENAPI_BOT_TOKEN`: a
-Project Access Token used only by this job, with the scopes `api` and `write_repository` and
+`lint-openapi-spec` lints the export with [Spectral](https://github.com/stoplightio/spectral)
+and the ruleset in `.spectral.yaml`: the Spectral OpenAPI rules, the
+[OWASP API Security rules](https://github.com/stoplightio/spectral-owasp-ruleset), and the
+conventions of this API. Its findings show in the Code Quality widget of the merge request;
+their locations refer to `openapi.generated.yaml`, an artifact of `export-openapi-spec`, so the
+widget cannot link them to a file in the repository.
+Spectral and the OWASP ruleset are locked in `package-lock.json` in this directory. Spectral
+loads the ruleset from `node_modules` next to `.spectral.yaml`. To lint the spec of a locally
+running backend:
+
+```sh
+npm ci --ignore-scripts --prefix api/portal-backend
+curl -s http://localhost:8089/v1/api-docs.yaml -o /tmp/openapi.yaml
+api/portal-backend/node_modules/.bin/spectral lint /tmp/openapi.yaml \
+  --ruleset api/portal-backend/.spectral.yaml
+```
+
+`update-openapi-spec` needs the masked and protected CI/CD variable `OPENAPI_BOT_TOKEN`, scoped
+to the environment `openapi-spec-update` so that no other job receives it: a Project Access Token
+used only by this job, with the scopes `api` and `write_repository` and
 the role Developer. The bot commits and merge requests show this token's bot user as author.
 If the variable is not set, the job fails.

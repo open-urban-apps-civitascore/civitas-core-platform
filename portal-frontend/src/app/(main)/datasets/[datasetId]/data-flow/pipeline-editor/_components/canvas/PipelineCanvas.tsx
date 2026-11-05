@@ -19,7 +19,7 @@ import {
   type OnSelectionChangeParams,
 } from '@xyflow/react'
 import { useTranslations } from 'next-intl'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 import { toast } from 'sonner'
 
 import { CanvasScaffold } from '@/components/node-editor/canvas/CanvasScaffold'
@@ -113,10 +113,25 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
     [getLastApiSinkLockReason, getSelectionLockReason, pipeline?.nodes, t],
   )
 
+  const selectedElementIds = useMemo(
+    () =>
+      new Set([
+        ...(pipeline?.nodes.flatMap(node => (node.selected ? [node.id] : [])) ?? []),
+        ...(pipeline?.edges.flatMap(edge => (edge.selected ? [edge.id] : [])) ?? []),
+      ]),
+    [pipeline?.nodes, pipeline?.edges],
+  )
+  const selectedElementIdsRef = useRef(selectedElementIds)
+  useLayoutEffect(() => {
+    selectedElementIdsRef.current = selectedElementIds
+  }, [selectedElementIds])
+
   // Hide validation panel when the user makes a selection (latest action wins).
+  // Ignores selected elements of the previous pipeline, which React Flow reports after a tab switch.
   const onReactFlowSelectionChange = useCallback(
     ({ nodes, edges }: OnSelectionChangeParams) => {
-      if (nodes.length > 0 || edges.length > 0) hideValidationPanel()
+      const isSelectedInPipeline = [...nodes, ...edges].some(element => selectedElementIdsRef.current.has(element.id))
+      if (isSelectedInPipeline) hideValidationPanel()
     },
     [hideValidationPanel],
   )

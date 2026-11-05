@@ -107,6 +107,13 @@ describe('DatapoolsTable', () => {
       expect(cellsDp2[3]).toHaveTextContent('Description 2')
     })
 
+    it('shows the dataset count in a count badge', () => {
+      renderTable()
+      const rows = screen.getAllByRole('row')
+      expect(within(rows[1]).getByTestId('countBadge')).toHaveTextContent(/^2$/)
+      expect(within(rows[2]).getByTestId('countBadge')).toHaveTextContent(/^0$/)
+    })
+
     it('shows the contact name when a contactPerson is present', () => {
       renderTable()
       const rows = screen.getAllByRole('row')

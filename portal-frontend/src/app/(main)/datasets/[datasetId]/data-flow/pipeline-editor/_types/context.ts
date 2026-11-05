@@ -93,10 +93,6 @@ export interface ActivePipelineContextValue {
   clearValidation: () => void
   /** Name of the pipeline that already uses this table name in another node, or null */
   pipelineUsingTableName: (nodeId: string, tableName: string) => string | null
-  /** Whether validation is required before save (true when pipeline changed since last validation) */
-  isValidationRequired: boolean
-  /** Whether the pipeline can be saved (isDirty && !hasErrors && !isValidationRequired) */
-  canSave: boolean
   /** Whether to show the validation panel in inspector (true after clicking validate) */
   shouldShowValidationPanel: boolean
   /** Hide the validation panel (called when user selects a node/edge) */

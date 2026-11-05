@@ -89,7 +89,7 @@ export const ApiCallItem = (props: ApiCallItemProps) => {
   }
 
   return (
-    <div className={cn('flex flex-col gap-4', borderClassName)}>
+    <div className={cn('-mx-2 flex flex-col gap-4 px-2', borderClassName)}>
       <div className="flex items-center justify-between">
         <span className="font-semibold">{displayName}</span>
         <Tooltip>

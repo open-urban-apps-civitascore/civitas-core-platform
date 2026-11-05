@@ -10,6 +10,7 @@
 package de.civitascore.nifi.http;
 
 import de.civitascore.nifi.http.ApiCall.Parameter;
+import java.net.URI;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -51,7 +52,7 @@ record PageNumberPagination(
   }
 
   @Override
-  public Progress next(Page page, PageContent content) {
+  public Progress next(Page page, URI requestUrl, PageContent content) {
     boolean endPageDone = endPage.isPresent() && number(page.index()) >= endPage.getAsInt();
     if (endPageDone || content.records() < pageSize) {
       return new Progress.Accepted(content.records(), Optional.empty());

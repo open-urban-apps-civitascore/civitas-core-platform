@@ -22,7 +22,6 @@ import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionMetaInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.VersionBump;
-import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.security.ModelReferenceAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
@@ -60,7 +59,6 @@ class DataStructureVersionServiceTest {
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
   @Mock private DataStructureVersionMapper dataStructureVersionMapper;
   @Mock private DataStructureService dataStructureService;
-  @Mock private DataSourceRepository dataSourceRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private ArtifactUsageLookup artifactUsageLookup;
   @Mock private ModelReferenceAuthorizer modelReferenceAuthorizer;
@@ -68,12 +66,13 @@ class DataStructureVersionServiceTest {
   private static final ArtifactUsageLookup.ArtifactUsage IN_USE_BY_RELEASED =
       new ArtifactUsageLookup.ArtifactUsage(
           true,
+          List.of(),
           List.of(
               new ArtifactUsageLookup.ReleasedReferrer(
                   ArtifactUsageLookup.ReferrerKind.MAPPING,
                   "urn:core:platform:civitas:mapping:common:b2ecab01-2f5a-8963-ac6a-2f86b3c8205a")));
   private static final ArtifactUsageLookup.ArtifactUsage IN_USE_BY_DRAFTS =
-      new ArtifactUsageLookup.ArtifactUsage(true, List.of());
+      new ArtifactUsageLookup.ArtifactUsage(true, List.of(), List.of());
 
   @InjectMocks private DataStructureVersionService dataStructureVersionService;
 
@@ -90,7 +89,7 @@ class DataStructureVersionServiceTest {
                 "1.0.0"));
     lenient()
         .when(artifactUsageLookup.of(any(DataStructureVersion.class)))
-        .thenReturn(new ArtifactUsageLookup.ArtifactUsage(false, List.of()));
+        .thenReturn(new ArtifactUsageLookup.ArtifactUsage(false, List.of(), List.of()));
   }
 
   @Nested
@@ -166,66 +165,71 @@ class DataStructureVersionServiceTest {
   }
 
   @Nested
-  @DisplayName("Delete inUse guard")
-  class DeleteInUseTests {
+  @DisplayName("Delete")
+  class DeleteTests {
 
-    @Test
-    @DisplayName("Should block delete when version is in use by a DataSource")
-    void shouldBlockDeleteWhenInUse() {
-      UUID versionId = UUID.randomUUID();
-      DataStructure ds = new DataStructure();
+    private static final String LOGICAL_URN =
+        "urn:core:platform:civitas:element:common:36b5df47-c3f5-86fd-9428-4597d8cd4d36";
 
-      DataStructureVersion version = new DataStructureVersion();
+    private final UUID versionId = UUID.randomUUID();
+    private final DataStructure parent = new DataStructure();
+    private final DataStructureVersion version = new DataStructureVersion();
+
+    @BeforeEach
+    void storedVersion() {
+      parent.setModelLogicalUrn(LOGICAL_URN);
       version.setId(versionId);
       version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setDataStructure(ds);
-
-      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
-      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
-
-      assertThatThrownBy(() -> dataStructureVersionService.deleteById(versionId))
-          .isInstanceOf(ResourceInUseException.class);
-    }
-
-    @Test
-    @DisplayName("Should block delete when the registry still holds a reference")
-    void shouldBlockDeleteWhenStillReferenced() {
-      UUID versionId = UUID.randomUUID();
-      DataStructure ds = new DataStructure();
-
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setDataStructure(ds);
+      version.setDataStructure(parent);
       version.setModelUrn(MODEL_URN);
-
       when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
       when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
-      when(modelRegistryGateway.referencesTo(MODEL_URN)).thenReturn(List.of(BLOCKER_URN));
-
-      assertThatThrownBy(() -> dataStructureVersionService.deleteById(versionId))
-          .isInstanceOf(ResourceInUseException.class);
     }
 
     @Test
-    @DisplayName("Should allow delete when version is not in use")
-    void shouldAllowDeleteWhenNotInUse() {
-      UUID versionId = UUID.randomUUID();
-      DataStructure ds = new DataStructure();
+    @DisplayName("Should block delete and leave the model when the version is in use")
+    void deleteById_whenInUse_shouldThrowAndDeleteNothing() {
+      doThrow(new ResourceInUseException("DataStructureVersion", versionId, "in use"))
+          .when(artifactUsageLookup)
+          .requireNotInUse(version, "DataStructureVersion");
 
-      DataStructureVersion version = new DataStructureVersion();
-      version.setId(versionId);
-      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
-      version.setDataStructure(ds);
+      assertThatThrownBy(() -> dataStructureVersionService.deleteById(versionId))
+          .isInstanceOf(ResourceInUseException.class);
+      verify(dataStructureVersionRepository, never()).deleteById(any());
+      verify(modelRegistryGateway, never()).deleteModelVersion(any());
+    }
 
-      when(dataStructureVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
-      when(dataStructureVersionRepository.existsById(versionId)).thenReturn(true);
-      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
+    @Test
+    @DisplayName("Should delete the row and the model's version line")
+    void deleteById_whenNotInUse_shouldDeleteTheModelVersion() {
+      when(modelRegistryGateway.holds(LOGICAL_URN)).thenReturn(true);
 
       dataStructureVersionService.deleteById(versionId);
 
       verify(dataStructureVersionRepository).deleteById(versionId);
+      verify(modelRegistryGateway).deleteModelVersion(MODEL_URN);
+      assertThat(parent.getModelLogicalUrn()).isEqualTo(LOGICAL_URN);
+    }
+
+    @Test
+    @DisplayName("Should leave the registry alone for a version without a model")
+    void deleteById_withoutModel_shouldSkipTheRegistry() {
+      version.setModelUrn(null);
+
+      dataStructureVersionService.deleteById(versionId);
+
+      verify(dataStructureVersionRepository).deleteById(versionId);
+      verify(modelRegistryGateway, never()).deleteModelVersion(any());
+    }
+
+    @Test
+    @DisplayName("Should forget the logical URN once the registry holds no version of the model")
+    void deleteById_ofTheLastModelVersion_shouldClearTheLogicalUrn() {
+      when(modelRegistryGateway.holds(LOGICAL_URN)).thenReturn(false);
+
+      dataStructureVersionService.deleteById(versionId);
+
+      assertThat(parent.getModelLogicalUrn()).isNull();
     }
   }
 
@@ -711,6 +715,106 @@ class DataStructureVersionServiceTest {
       verify(modelRegistryGateway, never())
           .storeModel(any(), any(), any(), any(), any(), any(), any());
       assertThat(result.getModelUrn()).isEqualTo(STORED_PIN);
+    }
+  }
+
+  @Nested
+  @DisplayName("Duplicate")
+  class DuplicateTests {
+
+    private static final String SOURCE_PIN =
+        "urn:core:platform:civitas:datastructure:common:6f1c2a3e-8d4b-4c5a-9e7f-1a2b3c4d5e6f:1.0.0";
+    private static final ModelRegistryGateway.ModelPin COPY_PIN =
+        new ModelRegistryGateway.ModelPin(
+            "urn:core:platform:civitas:datastructure:common:6f1c2a3e-8d4b-4c5a-9e7f-1a2b3c4d5e6f",
+            "urn:core:platform:civitas:datastructure:common:6f1c2a3e-8d4b-4c5a-9e7f-1a2b3c4d5e6f:3.0.0",
+            "3.0.0");
+    private static final String IMPORTED_STRUCTURE =
+        "urn:core:platform:civitas:datastructure:frost:09846bf2-00d1-8ef2-bede-0e5936586b89:1.0.0";
+
+    private final DataStructure dataStructure = new DataStructure();
+
+    @BeforeEach
+    void mapInputToEntity() {
+      dataStructure.setId(UUID.randomUUID());
+      lenient()
+          .when(dataStructureVersionMapper.toEntity(any()))
+          .thenAnswer(
+              invocation -> {
+                DataStructureVersionInputDTO input = invocation.getArgument(0);
+                DataStructureVersion entity = new DataStructureVersion();
+                entity.setDescription(input.getDescription());
+                entity.setModelName(input.getModelName());
+                entity.setImportedStructureUrns(input.getImportedStructureUrns());
+                entity.setDataStructureVersionStatus(input.getDataStructureVersionStatus());
+                return entity;
+              });
+      lenient()
+          .when(dataStructureService.findByIdOrThrow(dataStructure.getId()))
+          .thenReturn(dataStructure);
+      lenient()
+          .when(dataStructureVersionRepository.save(any()))
+          .thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    @Test
+    @DisplayName("A copy takes the source's metadata, starts as DRAFT and pins the copied model")
+    void duplicateCopiesMetadataAndPinsTheCopiedModel() {
+      DataStructureVersion source = source(SOURCE_PIN);
+      when(modelRegistryGateway.copyModelVersion(SOURCE_PIN)).thenReturn(COPY_PIN);
+
+      DataStructureVersion copy = dataStructureVersionService.duplicate(source.getId());
+
+      assertThat(copy.getDataStructureVersionStatus()).isEqualTo(DataStructureVersionStatus.DRAFT);
+      assertThat(copy.getDescription()).isEqualTo("Weather stations");
+      assertThat(copy.getModelName()).isEqualTo("Station");
+      assertThat(copy.getImportedStructureUrns()).containsExactly(IMPORTED_STRUCTURE);
+      assertThat(copy.getDataStructure()).isSameAs(dataStructure);
+      assertThat(copy.getModelUrn()).isEqualTo(COPY_PIN.versionedUrn());
+      assertThat(copy.getVersion()).isEqualTo("3.0.0");
+      verify(modelRegistryGateway, never())
+          .storeModel(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("A source without a model gives a copy without a model and no registry call")
+    void duplicateWithoutModelSkipsRegistry() {
+      DataStructureVersion source = source(null);
+
+      DataStructureVersion copy = dataStructureVersionService.duplicate(source.getId());
+
+      assertThat(copy.getModelUrn()).isNull();
+      assertThat(copy.getVersion()).isNull();
+      assertThat(copy.getDescription()).isEqualTo("Weather stations");
+      verifyNoInteractions(modelRegistryGateway, modelReferenceAuthorizer);
+    }
+
+    @Test
+    @DisplayName("A refused model reference copies nothing")
+    void duplicateChecksReferencesBeforeTheCopy() {
+      DataStructureVersion source = source(SOURCE_PIN);
+      doThrow(new ModelReferenceNotAvailableException())
+          .when(modelReferenceAuthorizer)
+          .authorizeStored(dataStructure.getId(), SOURCE_PIN);
+
+      assertThatThrownBy(() -> dataStructureVersionService.duplicate(source.getId()))
+          .isInstanceOf(ModelReferenceNotAvailableException.class);
+      verify(modelRegistryGateway, never()).copyModelVersion(any());
+      verify(dataStructureVersionRepository, never()).save(any());
+    }
+
+    private DataStructureVersion source(String modelUrn) {
+      DataStructureVersion source = new DataStructureVersion();
+      source.setId(UUID.randomUUID());
+      source.setDataStructure(dataStructure);
+      source.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      source.setDescription("Weather stations");
+      source.setModelName("Station");
+      source.setModelUrn(modelUrn);
+      source.setVersion(modelUrn == null ? null : "1.0.0");
+      source.setImportedStructureUrns(List.of(IMPORTED_STRUCTURE));
+      when(dataStructureVersionRepository.findById(source.getId())).thenReturn(Optional.of(source));
+      return source;
     }
   }
 }

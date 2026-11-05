@@ -40,7 +40,7 @@ services:
 
   # OPA - Policy Decision Point
   opa:
-    image: openpolicyagent/opa:1.19.1-static
+    image: openpolicyagent/opa:1.22.0-static@sha256:906bfc9904b2693733e7959d71773dd073e6c135cf06f26d955abe94603e82b3
     mem_limit: 256m
     container_name: civitas-opa
     restart: always

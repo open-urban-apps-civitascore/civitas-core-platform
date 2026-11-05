@@ -247,6 +247,20 @@ export const getSelectedEdges = (pipeline: Pipeline): PipelineEdge[] => {
   return pipeline.edges.filter(edge => edge.selected)
 }
 
+const omitSelectedKeyFrom = <T extends { selected?: boolean }>(element: T): Omit<T, 'selected'> => {
+  // eslint-disable-next-line unused-imports/no-unused-vars
+  const { selected: isSelected, ...rest } = element
+  return rest
+}
+
+export const omitSelectedKey = ({
+  nodes,
+  edges,
+}: Pick<Pipeline, 'nodes' | 'edges'>): Pick<Pipeline, 'nodes' | 'edges'> => ({
+  nodes: nodes.map(omitSelectedKeyFrom),
+  edges: edges.map(omitSelectedKeyFrom),
+})
+
 /**
  * Validates if a connection between two nodes is allowed.
  * Basic validation - can be extended in Phase 5.

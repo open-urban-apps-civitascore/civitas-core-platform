@@ -120,8 +120,8 @@ class EmbeddedModelForgeTest {
                 }
 
                 @Override
-                public de.civitascore.modelforge.contract.ArtifactWriteResult bumpVersion(
-                        de.civitascore.modelforge.contract.BumpVersionCommand command) {
+                public de.civitascore.modelforge.contract.ArtifactWriteResult copyVersion(
+                        de.civitascore.modelforge.contract.CopyVersionCommand command) {
                     return new de.civitascore.modelforge.contract.ArtifactWriteResult(
                         command.artifactId(), java.util.Map.of());
                 }
@@ -133,6 +133,16 @@ class EmbeddedModelForgeTest {
 
                 @Override
                 public List<String> deletionBlockers(ArtifactId artifactId) {
+                    return List.of();
+                }
+
+                @Override
+                public void deleteVersionLine(ArtifactId pinnedVersion) {
+                    // no-op fake
+                }
+
+                @Override
+                public List<String> versionLineDeletionBlockers(ArtifactId pinnedVersion) {
                     return List.of();
                 }
 

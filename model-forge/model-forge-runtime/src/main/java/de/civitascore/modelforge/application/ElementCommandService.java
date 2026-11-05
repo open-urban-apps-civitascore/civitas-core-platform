@@ -125,7 +125,7 @@ public class ElementCommandService {
         }
     }
 
-    /** Removes the artifact from the registry and the dependency graph. */
+    /** Removes the artifact from the registry and, once that commits, from the dependency graph. */
     public void delete(String urn) {
         delete(urn, false, false);
     }
@@ -175,7 +175,7 @@ public class ElementCommandService {
             : registry.ownedMemberUrns(urn);
         Set<String> freed = freedMembers(logical, members, removedTogether);
         registry.deleteArtifact(urn);
-        graph.remove(urn);
+        registry.afterCommit(() -> graph.remove(urn));
         // Keep every DataSet manifest that listed this member consistent (the |D|=1 rule, and — with
         // force — any number), so no manifest dangles the removed member.
         for (String dataSet : memberships) {
@@ -257,7 +257,8 @@ public class ElementCommandService {
             String pin = registry.storeDataSet(dataSetLogicalUrn, doc, VersionBump.MINOR);
             // The graph is keyed by the version a node was registered under, and this mints a new
             // one. Without the refresh every member of the Data Set reads as removed.
-            graph.registerFromRegistry(pin != null && !pin.isBlank() ? pin : dataSetLogicalUrn);
+            String node = pin != null && !pin.isBlank() ? pin : dataSetLogicalUrn;
+            registry.afterCommit(() -> graph.registerFromRegistry(node));
         }
     }
 }

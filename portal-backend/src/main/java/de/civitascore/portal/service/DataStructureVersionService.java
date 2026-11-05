@@ -9,7 +9,6 @@ import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionMetaInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.VersionBump;
-import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.security.ModelReferenceAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
@@ -19,6 +18,7 @@ import de.civitascore.portal.util.ModelReferenceNotAvailableException;
 import de.civitascore.portal.util.ModelRootMissingException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,7 +42,6 @@ public class DataStructureVersionService
   private static final String DATASTRUCTURE_TYPE = "datastructure";
   private static final int URN_TYPE_SEGMENT = 4;
 
-  private final DataSourceRepository dataSourceRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
 
   private final DataStructureService dataStructureService;
@@ -281,6 +280,45 @@ public class DataStructureVersionService
   }
 
   /**
+   * Duplicates a data structure version into a new DRAFT version of the same data structure. The
+   * copy takes the description, model name and imported structure URNs of the source, and is pinned
+   * to a registry copy of exactly the source's model version. A source without a model gives a copy
+   * without a model.
+   *
+   * @param sourceVersionId the id of the version to duplicate
+   * @return the new version
+   * @throws ModelMissingException if the model registry no longer holds the source's model
+   * @throws ModelReferenceNotAvailableException if the source's model references a model the caller
+   *     may not use
+   */
+  @Transactional
+  public DataStructureVersion duplicate(UUID sourceVersionId) {
+    DataStructureVersion source = findByIdOrThrow(sourceVersionId);
+    UUID dataStructureId = source.getDataStructure().getId();
+    ModelRegistryGateway.ModelPin pin = null;
+    if (source.getModelUrn() != null) {
+      modelReferenceAuthorizer.authorizeStored(dataStructureId, source.getModelUrn());
+      pin = modelRegistryGateway.copyModelVersion(source.getModelUrn());
+    }
+
+    DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+    input.setDataStructureId(dataStructureId);
+    input.setDescription(source.getDescription());
+    input.setModelName(source.getModelName());
+    input.setImportedStructureUrns(
+        source.getImportedStructureUrns() == null
+            ? null
+            : new ArrayList<>(source.getImportedStructureUrns()));
+    DataStructureVersion copy = create(input);
+    if (pin != null) {
+      copy.setModelUrn(pin.versionedUrn());
+      copy.setVersion(pin.version());
+      copy = save(copy);
+    }
+    return copy;
+  }
+
+  /**
    * Unreleases a data structure version by setting status back to DRAFT.
    *
    * @param id the version ID
@@ -305,40 +343,41 @@ public class DataStructureVersionService
   }
 
   /**
-   * Validates that the version is not in use by any data source or data sink.
+   * Refuses the delete while anything references any version of the version's line in the model
+   * registry, a Data source is pinned to it, or another version of the data structure has its model
+   * in the same line, since deleting the line deletes that version's model too.
    *
    * @param id the version ID to delete
    * @return the version entity to be deleted
-   * @throws ResourceInUseException if the version is still referenced
+   * @throws ResourceInUseException if the version is in use
    */
   @Override
   protected DataStructureVersion preProcessDelete(UUID id) {
     DataStructureVersion version = findByIdOrThrow(id);
-    validateNotInUse(id);
+    artifactUsageLookup.requireNotInUse(version, getEntityName());
     return version;
   }
 
-  private void validateNotInUse(UUID versionId) {
-    if (dataSourceRepository.existsByDataStructureVersionId(versionId)) {
-      throw new ResourceInUseException(
-          "DataStructureVersion",
-          versionId,
-          "Cannot modify DataStructureVersion because a DataSource is pinned to it.");
+  /**
+   * Deletes the version's model line from Model Forge in the delete's transaction. Once the
+   * registry holds nothing of the data structure's model any more, the data structure forgets its
+   * logical URN, so that its next model starts a new artifact; the registry still numbers that one
+   * above every version it ever gave out.
+   *
+   * @param version the deleted version
+   */
+  @Override
+  protected void postDelete(DataStructureVersion version) {
+    if (version.getModelUrn() == null) {
+      return;
     }
-    List<String> blockers = modelRegistryGateway.referencesTo(modelUrnOf(versionId));
-    if (!blockers.isEmpty()) {
-      throw new ResourceInUseException(
-          "DataStructureVersion",
-          versionId,
-          "Cannot modify DataStructureVersion because it is still referenced.",
-          blockers);
+    modelRegistryGateway.deleteModelVersion(version.getModelUrn());
+    // Loading the parent's versions here would put the deleted row back into the persistence
+    // context, and Hibernate would drop the delete at flush.
+    DataStructure parent = version.getDataStructure();
+    if (parent.getModelLogicalUrn() != null
+        && !modelRegistryGateway.holds(parent.getModelLogicalUrn())) {
+      parent.setModelLogicalUrn(null);
     }
-  }
-
-  private String modelUrnOf(UUID versionId) {
-    return dataStructureVersionRepository
-        .findById(versionId)
-        .map(DataStructureVersion::getModelUrn)
-        .orElse(null);
   }
 }

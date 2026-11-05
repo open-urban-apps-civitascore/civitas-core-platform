@@ -7,10 +7,12 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 import { InputPropsWithoutForm } from '@/types/common'
 
+import { DISABLED_INPUT_CLASS_NAME } from './disabledFieldClassNames'
+
 interface TextFieldProps<T extends FieldValues> extends InputPropsWithoutForm {
   form: UseFormReturn<T>
   name: Path<T>
-  placeholder: string
+  placeholder?: string
   label: string
   // eslint-disable-next-line react/boolean-prop-naming
   required?: boolean
@@ -20,6 +22,8 @@ interface TextFieldProps<T extends FieldValues> extends InputPropsWithoutForm {
   maxLength?: number
   hasCharacterCount?: boolean
   normalize?: (value: string) => string
+  onValueChange?: (value: string) => void
+  inputClassName?: string
 }
 
 export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
@@ -37,7 +41,10 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
     maxLength,
     hasCharacterCount,
     autoComplete,
+    inputMode,
     normalize,
+    onValueChange,
+    inputClassName,
   } = props
   const isMobile = useIsMobile()
   const fieldValue = form.watch(name)
@@ -46,7 +53,7 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
     <FormField
       control={form.control}
       name={name}
-      render={({ field }) => (
+      render={({ field, fieldState }) => (
         <FormItem
           className={cn(
             isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]',
@@ -63,11 +70,16 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
                 data-testid={`${name}TextField`}
                 data-test-element="formField"
                 type={type}
+                inputMode={inputMode}
                 autoComplete={autoComplete ?? (type === 'password' ? 'new-password' : undefined)}
-                className="disabled:opacity-100 disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
+                className={cn(DISABLED_INPUT_CLASS_NAME, inputClassName)}
                 placeholder={disabled ? undefined : placeholder}
                 maxLength={maxLength}
                 {...field}
+                onChange={event => {
+                  field.onChange(event)
+                  onValueChange?.(event.target.value)
+                }}
                 onBlur={() => {
                   if (normalize && typeof field.value === 'string') {
                     const normalized = normalize(field.value)
@@ -76,7 +88,7 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
                   field.onBlur()
                 }}
                 disabled={disabled}
-                aria-invalid={!!manualError || !!form.formState.errors[name]}
+                aria-invalid={!!manualError || !!fieldState.error}
               />
             </FormControl>
             <div className="flex justify-between">

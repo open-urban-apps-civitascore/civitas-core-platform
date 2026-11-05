@@ -1,7 +1,7 @@
 name: frost_allinone
 services:
   web:
-    image: fraunhoferiosb/frost-server-http:2.7.3
+    image: fraunhoferiosb/frost-server-http:2.8.0@sha256:3102b01ac2ab664fac277b551f3a625a88ab8d606625d1aeea5309559530f4f0
     mem_limit: 1g
     platform: linux/amd64
     container_name: civitas-frost

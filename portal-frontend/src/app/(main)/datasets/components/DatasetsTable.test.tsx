@@ -72,7 +72,7 @@ describe('DatasetsTable', () => {
     expect(cells1[0]).toHaveTextContent(mappedDatasets[0].name)
     expect(cells1[2]).toHaveTextContent(mappedDatasets[0].createdBy.name)
     expect(cells1[3]).toHaveTextContent('10.09.2023')
-    expect(cells1[4]).toHaveTextContent('Entwurf')
+    expect(within(cells1[4]).getByTestId('statusBadge')).toHaveTextContent(/^Entwurf$/)
     expect(cells1[5]).toHaveTextContent('0')
 
     const dataRow2 = rows[2]
@@ -81,7 +81,7 @@ describe('DatasetsTable', () => {
     expect(cells2[0]).toHaveTextContent(mappedDatasets[1].name)
     expect(cells2[2]).toHaveTextContent(mappedDatasets[1].createdBy.name)
     expect(cells2[3]).toHaveTextContent('01.01.2023')
-    expect(cells2[4]).toHaveTextContent('Verfügbar')
+    expect(within(cells2[4]).getByTestId('statusBadge')).toHaveTextContent(/^Verfügbar$/)
     expect(cells2[5]).toHaveTextContent('Aktiv')
   })
 })

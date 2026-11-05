@@ -1,26 +1,10 @@
 import { expect, test } from '@playwright/test'
 
-import { Authority, User } from '@/types/users'
+import { User } from '@/types/users'
 
-import { JSON_SERVER_HOST, JSON_SERVER_PORT } from '../../playwright.config'
 import { createTestUser } from '../../playwright/createTestUser'
 import { removeTestUser } from '../../playwright/removeTestUser'
 import { pickSelectOption } from '../utils/formUtils'
-
-const URL = `${JSON_SERVER_HOST}:${JSON_SERVER_PORT}`
-
-const MOCK_AUTHORITIES = [
-  {
-    id: '1',
-    title: 'authority1',
-    departments: [
-      {
-        id: '1',
-        title: 'department1',
-      },
-    ],
-  },
-]
 
 // users tests are skipped because list view uses API and create and edit user use json-server
 
@@ -28,10 +12,6 @@ test.describe.skip('Edit User Page', async () => {
   let user: User
   test.beforeEach(async ({ page }) => {
     user = await createTestUser()
-    await page.route(`${URL}/authorities`, async route => {
-      const json: Authority[] = MOCK_AUTHORITIES
-      await route.fulfill({ json })
-    })
     await page.goto(`/users/${user.id}`)
   })
 
@@ -119,8 +99,6 @@ test.describe.skip('Edit User Page', async () => {
     await pickSelectOption(page, 'title', 1)
     await page.getByTestId('firstNameTextField').fill(`edited ${user.firstName}`)
     await page.getByTestId('lastNameTextField').fill(`edited ${user.lastName}`)
-    await pickSelectOption(page, 'department', 'Placeholder')
-    await page.getByTestId('positionDescriptionTextArea').fill('edited description')
 
     await page.getByTestId('confirmButton').click()
     await page.waitForLoadState('networkidle')
@@ -133,7 +111,6 @@ test.describe.skip('Edit User Page', async () => {
     const lastName = (await page.getByTestId('lastNameTextField').textContent())?.trim() ?? ''
     expect(`edited ${user.lastName}`).toContain(lastName)
     await expect(page.getByTestId('pageHeader')).toContainText(`edited ${user.firstName} edited ${user.lastName}`)
-    await expect(page.getByTestId('departmentSelectTrigger')).toContainText('Select department...')
 
     // verify if page gets set back to readonly view
     await expect(page.getByTestId('editButton')).toBeVisible()

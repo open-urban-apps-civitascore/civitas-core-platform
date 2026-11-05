@@ -53,10 +53,19 @@ _Avoid_: base urn, unversioned id
 The identifier of one exact version. What a reference uses when it must not move.
 _Avoid_: full urn, pinned id
 
+**Version line**:
+The versions of one artifact that share a major. A minor revises the line it counts from; a major
+opens a new line above every number the artifact ever had. A line is deleted as one unit.
+_Avoid_: branch, version family
+
 **Pin**:
 The versioned URN a write resolved to, returned by the write itself so a caller never has to read
 back what it just stored.
 _Avoid_: result id, assigned version
+
+A version number the registry assigns is assigned once. It stays taken after its version, its
+line or the whole artifact is deleted, so a pin never names different content. A version an
+import preserves from upstream is taken as given.
 
 ## References
 

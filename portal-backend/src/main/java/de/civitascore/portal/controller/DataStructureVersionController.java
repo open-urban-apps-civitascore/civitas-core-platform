@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.io.IOException;
+import java.net.URI;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.MethodNotAllowedException;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -132,13 +134,31 @@ public class DataStructureVersionController
   }
 
   /**
-   * Single versions are deleted only together with their data structure; the service delete logic
-   * stays so that this endpoint can be enabled again.
+   * Deletes a data structure version together with its model in the model registry.
+   *
+   * @param id the UUID of the version to delete
    */
   @Override
-  @Operation(hidden = true)
+  @Operation(
+      operationId = "deleteDataStructureVersion",
+      summary = "Delete a data structure version",
+      description =
+          "Deletes a DRAFT or AVAILABLE version that nothing uses, and its model with every"
+              + " revision of it from the model registry. A deleted version number is not given"
+              + " out again. The data structure stays, also without versions.")
+  @ApiResponse(responseCode = "204", description = "Data structure version deleted successfully")
+  @ApiResponse(
+      responseCode = "404",
+      description = "Data structure version not found in this data structure",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "The version is in use: a Data source, Data sink, Mapping or other model references it",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public void delete(@PathVariable UUID id) {
-    throw new MethodNotAllowedException(HttpMethod.DELETE, Collections.emptySet());
+    requireOwnedByPathDataStructure(id);
+    super.delete(id);
   }
 
   /**
@@ -295,6 +315,51 @@ public class DataStructureVersionController
     requireOwnedByDataStructure(dataStructureId, versionId);
     DataStructureVersion unreleased = dataStructureVersionService.unrelease(versionId);
     return ResponseEntity.ok(dataStructureVersionAssembler.toOutput(unreleased));
+  }
+
+  /**
+   * Duplicates a data structure version into a new DRAFT version of the same data structure.
+   *
+   * @param dataStructureId the UUID of the parent data structure
+   * @param versionId the UUID of the version to duplicate
+   * @return the new version output DTO with HTTP 201 status and a Location header
+   */
+  @PostMapping("/{versionId}/duplicate")
+  @Operation(
+      operationId = "duplicateDataStructureVersion",
+      summary = "Duplicate a data structure version",
+      description =
+          "Creates a new DRAFT version with the description, model name and imported structures"
+              + " of the source version. The model registry copies the source's model with its"
+              + " styles and references to the next major version after the highest existing one."
+              + " A source without a model gives a copy without a model. Any version can be"
+              + " duplicated.")
+  @ApiResponse(responseCode = "201", description = "Data structure version duplicated successfully")
+  @ApiResponse(
+      responseCode = "400",
+      description = "The source version's model references a model that is not available",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "404",
+      description = "Data structure version not found",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "The source version's model is missing from the model registry, or the new version"
+              + " number is already taken",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  public ResponseEntity<DataStructureVersionOutputDTO> duplicateDataStructureVersion(
+      @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
+    requireOwnedByDataStructure(dataStructureId, versionId);
+    DataStructureVersion duplicated = dataStructureVersionService.duplicate(versionId);
+    URI location =
+        ServletUriComponentsBuilder.fromCurrentContextPath()
+            .path("/datastructures/{dataStructureId}/versions/{id}")
+            .buildAndExpand(dataStructureId, duplicated.getId())
+            .toUri();
+    return ResponseEntity.created(location)
+        .body(dataStructureVersionAssembler.toOutput(duplicated));
   }
 
   private DataStructureVersion requireOwnedByPathDataStructure(UUID versionId) {

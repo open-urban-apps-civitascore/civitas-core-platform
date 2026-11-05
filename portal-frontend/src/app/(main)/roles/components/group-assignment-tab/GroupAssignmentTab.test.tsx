@@ -5,6 +5,7 @@ import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { type Assignment, ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
+import type { PermissionName } from '@/types/currentUser'
 import type { Group } from '@/types/groups'
 import { ROLE_TYPES } from '@/types/roles'
 
@@ -59,11 +60,12 @@ const makeDefaultQueryParams = () => ({
   getApiRequestParamsByUrl: vi.fn().mockImplementation(() => new URLSearchParams()),
 })
 
-const mockPermissions = {
-  hasPermission: (perm: string) => perm === 'ASSIGNMENT_CREATE' || perm === 'ASSIGNMENT_DELETE',
+const grantPermissions = (...granted: PermissionName[]): ReturnType<typeof usePermissions> => ({
+  hasPermission: permission => granted.includes(permission),
+  hasPermissionInScope: () => false,
   hasAnyPermission: () => false,
   hasScopedPermission: () => false,
-}
+})
 
 const mockGroups: Group[] = [
   {
@@ -163,11 +165,7 @@ const defaultProps = {
 describe('Add group and Delete group button Visibility', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(usePermissions).mockReturnValue({
-      hasPermission: (perm: string) => perm === 'ASSIGNMENT_CREATE' || perm === 'ASSIGNMENT_DELETE',
-      hasAnyPermission: () => false,
-      hasScopedPermission: () => false,
-    })
+    vi.mocked(usePermissions).mockReturnValue(grantPermissions('ASSIGNMENT_CREATE', 'ASSIGNMENT_DELETE'))
     vi.mocked(useGetGroups).mockReturnValue({
       data: { data: mockGroups, totalElements: 3 },
       isFetching: false,
@@ -231,31 +229,19 @@ describe('Add group and Delete group button Visibility', () => {
 
 describe('GroupAssignmentTab permission gating', () => {
   it('hides add-group button in edit mode when user lacks ASSIGNMENT_CREATE', () => {
-    vi.mocked(usePermissions).mockReturnValue({
-      hasPermission: () => false,
-      hasAnyPermission: () => false,
-      hasScopedPermission: () => false,
-    })
+    vi.mocked(usePermissions).mockReturnValue(grantPermissions())
     render(<GroupAssignmentTab {...defaultProps} isReadOnly={false} />)
     expect(screen.queryByText('addGroup')).not.toBeInTheDocument()
   })
 
   it('shows add-group button in edit mode when user has ASSIGNMENT_CREATE', () => {
-    vi.mocked(usePermissions).mockReturnValue({
-      hasPermission: (perm: string) => perm === 'ASSIGNMENT_CREATE',
-      hasAnyPermission: () => false,
-      hasScopedPermission: () => false,
-    })
+    vi.mocked(usePermissions).mockReturnValue(grantPermissions('ASSIGNMENT_CREATE'))
     render(<GroupAssignmentTab {...defaultProps} isReadOnly={false} />)
     expect(screen.getByText('addGroup')).toBeInTheDocument()
   })
 
   it('hides delete button in edit mode when user lacks ASSIGNMENT_DELETE', () => {
-    vi.mocked(usePermissions).mockReturnValue({
-      hasPermission: (perm: string) => perm === 'ASSIGNMENT_CREATE',
-      hasAnyPermission: () => false,
-      hasScopedPermission: () => false,
-    })
+    vi.mocked(usePermissions).mockReturnValue(grantPermissions('ASSIGNMENT_CREATE'))
     vi.mocked(useGetGroups).mockReturnValue({
       data: { data: mockGroups, totalElements: 2 },
       isFetching: false,
@@ -275,11 +261,7 @@ describe('GroupAssignmentTab permission gating', () => {
   })
 
   it('shows delete button in edit mode when user has ASSIGNMENT_DELETE', () => {
-    vi.mocked(usePermissions).mockReturnValue({
-      hasPermission: (perm: string) => perm === 'ASSIGNMENT_CREATE' || perm === 'ASSIGNMENT_DELETE',
-      hasAnyPermission: () => false,
-      hasScopedPermission: () => false,
-    })
+    vi.mocked(usePermissions).mockReturnValue(grantPermissions('ASSIGNMENT_CREATE', 'ASSIGNMENT_DELETE'))
     vi.mocked(useGetGroups).mockReturnValue({
       data: { data: mockGroups, totalElements: 2 },
       isFetching: false,
@@ -302,7 +284,7 @@ describe('GroupAssignmentTab permission gating', () => {
 describe('GroupAssignmentTab scope filtering', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(usePermissions).mockReturnValue(mockPermissions)
+    vi.mocked(usePermissions).mockReturnValue(grantPermissions('ASSIGNMENT_CREATE', 'ASSIGNMENT_DELETE'))
     vi.mocked(useQueryParams).mockReturnValue(makeDefaultQueryParams() as unknown as ReturnType<typeof useQueryParams>)
     vi.mocked(useGetGroups).mockReturnValue({
       data: { data: mockGroups, totalElements: 2 },
@@ -386,7 +368,7 @@ describe('GroupAssignmentTab scope filtering', () => {
 describe('Remove Group', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(usePermissions).mockReturnValue(mockPermissions)
+    vi.mocked(usePermissions).mockReturnValue(grantPermissions('ASSIGNMENT_CREATE', 'ASSIGNMENT_DELETE'))
     vi.mocked(useQueryParams).mockReturnValue(makeDefaultQueryParams() as unknown as ReturnType<typeof useQueryParams>)
     vi.mocked(useGetGroups).mockReturnValue({
       data: { data: mockGroups, totalElements: 2 },
@@ -414,7 +396,7 @@ describe('Remove Group', () => {
 describe('GroupAssignmentTab no-data state', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(usePermissions).mockReturnValue(mockPermissions)
+    vi.mocked(usePermissions).mockReturnValue(grantPermissions('ASSIGNMENT_CREATE', 'ASSIGNMENT_DELETE'))
     vi.mocked(useQueryParams).mockReturnValue(makeDefaultQueryParams() as unknown as ReturnType<typeof useQueryParams>)
     vi.mocked(useGetGroups).mockReturnValue({
       data: { data: [], totalElements: 0 },
@@ -436,7 +418,7 @@ describe('GroupAssignmentTab no-data state', () => {
 describe('GroupAssignmentTab pagination reset', () => {
   it('resets pageIndex to 0 when scope changes', () => {
     vi.clearAllMocks()
-    vi.mocked(usePermissions).mockReturnValue(mockPermissions)
+    vi.mocked(usePermissions).mockReturnValue(grantPermissions('ASSIGNMENT_CREATE', 'ASSIGNMENT_DELETE'))
     vi.mocked(useGetGroups).mockReturnValue({
       data: { data: [], totalElements: 0 },
       isFetching: false,

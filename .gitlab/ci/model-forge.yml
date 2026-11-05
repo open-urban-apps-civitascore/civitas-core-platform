@@ -25,91 +25,41 @@
 # Hidden job that defines rules for model-forge changes. All model-forge jobs extend this.
 .only-model-forge-changes:
   rules:
-    # Always run on the nightly scheduled pipeline
-    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
-    # Always run on tags
-    - if: $CI_COMMIT_TAG
-    # Always run on main, staging and develop branch
-    - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_COMMIT_BRANCH == "staging"
-    - if: $CI_COMMIT_BRANCH == "develop"
-    # Mirrors .only-backend-changes: every pipeline that builds portal-backend must also
-    # publish Model Forge for that branch, since the backend jobs require it.
+    - !reference [.rules-protected, rules]
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - model-forge/**/*
-        - portal-backend/**/*
-        - portal-model/**/*
         - .gitlab-ci.yml
+        - .gitlab/ci/docker.yml
+        - .gitlab/ci/maven.yml
+        - .gitlab/ci/rules.yml
+        - .gitlab/ci/scripts/api-test-stack.sh
         - .gitlab/ci/model-forge.yml
-        - .gitlab/ci/backend.yml
-        - .gitlab/ci/portal-model.yml
 
-# Setup version for model-forge from pom.xml with branch-based suffixes
-# - main/tags: release version (e.g., 0.1.0)
-# - develop: snapshot version (e.g., 0.1.0-SNAPSHOT)
-# - MR: merge request version (e.g., 0.1.0-MR-123-SNAPSHOT)
-setup-version-model-forge:
-  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
-  stage: .pre
-  variables:
-    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
-  cache:
-    key:
-      prefix: model-forge-maven
-      files:
-        - model-forge/pom.xml
-    paths:
-      - .m2/repository
-  script:
-    - cd model-forge
-    - BASE_VERSION=$(mvn help:evaluate -Dexpression=revision -q -DforceStdout)
-    - echo "Base version from pom.xml - $BASE_VERSION"
-    - |
-      if [ "$CI_COMMIT_BRANCH" = "main" ] || [ -n "$CI_COMMIT_TAG" ]; then
-        MODEL_FORGE_VERSION="$BASE_VERSION"
-      elif [ "$CI_COMMIT_BRANCH" = "develop" ]; then
-        MODEL_FORGE_VERSION="${BASE_VERSION}-SNAPSHOT"
-      elif [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
-        MODEL_FORGE_VERSION="${BASE_VERSION}-MR-${CI_MERGE_REQUEST_IID}-SNAPSHOT"
-      else
-        MODEL_FORGE_VERSION="${BASE_VERSION}-${CI_COMMIT_SHORT_SHA}"
-      fi
-    - echo "MODEL_FORGE_VERSION=$MODEL_FORGE_VERSION" > ../model-forge-version.env
-    - echo "Setting MODEL_FORGE_VERSION=$MODEL_FORGE_VERSION"
-  artifacts:
-    reports:
-      dotenv: model-forge-version.env
+# portal-backend compiles against the artifact of build-model-forge, so that job exists wherever the
+# backend or the API test stack is built. Its tests and checks follow only a change of Model Forge.
+.build-model-forge-changes:
+  rules:
+    - !reference [.only-model-forge-changes, rules]
+    - !reference [.only-backend-changes, rules]
+    - !reference [.api-test-stack-changes, rules]
 
 # Generate the maven dependency graph JSON for license/dependency scanning.
 # Always runs (own rules, no `changes`) so the scanner has the graph even when the
 # build job is skipped because nothing changed.
 generate-graph-model-forge:
-  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
+  extends: .maven-model-forge
+  image: maven:3.9.16-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: lint
   needs:
-    - job: setup-version-model-forge
+    - job: setup-version
       artifacts: true
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule" && $IS_NIGHTLY == "true"
-    - if: $CI_COMMIT_TAG
-    - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_COMMIT_BRANCH == "staging"
-    - if: $CI_COMMIT_BRANCH == "develop"
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-  variables:
-    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
-  cache:
-    key:
-      prefix: model-forge-maven
-      files:
-        - model-forge/pom.xml
-    paths:
-      - .m2/repository
+    - !reference [.rules-all, rules]
   script:
     - cd model-forge
     # Reactor build: writes one maven.graph.json per module (and the aggregator pom).
-    - mvn -B dependency:tree -Drevision=$MODEL_FORGE_VERSION -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
+    - mvn $MAVEN_CLI_OPTS dependency:tree -Drevision=$MODEL_FORGE_VERSION -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
   artifacts:
     when: always
     expire_in: 1 week
@@ -125,11 +75,11 @@ generate-graph-model-forge:
 #  in the documentation repo.)
 validate-schemas-model-forge:
   extends: .only-model-forge-changes
-  image: python:3.12-slim@sha256:e70237b264442328526ff29d6b3c43bd8abcf6cbab78a949322fb69b7d91d6b6
+  image: python:3.12.16-slim@sha256:8523d6abeb48ceae0b7240d30c5808fc26cb79c1a635bacdf19cf3baecfbec07
   stage: lint
   needs: []
   script:
-    - pip install --quiet check-jsonschema
+    - pip install --quiet check-jsonschema==$CHECK_JSONSCHEMA_VERSION
     - |
       CORE_DIR=model-forge/model-forge-runtime/src/main/resources
       CATALOGUE=model-forge/schemas
@@ -210,35 +160,59 @@ validate-schemas-model-forge:
 
       exit $FAILED
 
-# Build + test the whole reactor. `mvn verify` also runs the quality gates bound to the
-# verify phase (spotless format check, spotbugs static analysis). Needs Docker-in-Docker for
-# the Testcontainers-based tests (admin-ui boot test against a real PostgreSQL).
-test-model-forge:
-  extends: .only-model-forge-changes
-  image: maven:3.9-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
+# The quality gates bound to verify: spotless format check and spotbugs. They run here, beside the tests.
+static-analysis-model-forge:
+  extends:
+    - .only-model-forge-changes
+    - .maven-model-forge
+  image: maven:3.9.16-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
   stage: build-package
   needs:
-    - job: setup-version-model-forge
+    - job: setup-version
       artifacts: true
-  services:
-    - name: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
-      alias: docker
-  variables:
-    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ''
-    DOCKER_DRIVER: overlay2
-    TESTCONTAINERS_HOST_OVERRIDE: docker
-  cache:
-    key:
-      prefix: model-forge-maven
-      files:
-        - model-forge/pom.xml
-    paths:
-      - .m2/repository
   script:
     - cd model-forge
-    - mvn $MAVEN_CLI_OPTS verify -Drevision=$MODEL_FORGE_VERSION
+    - mvn $MAVEN_CLI_OPTS verify -DskipTests -DskipITs -Drevision=$MODEL_FORGE_VERSION -Djacoco.skip=true
+
+# The Maven artifacts of this pipeline, for portal-backend. No tests and no checks: they run in
+# test-model-forge and static-analysis-model-forge, and the release gate is publish-model-forge.
+# portal-backend compiles against the artifact of this job and not against a copy from the registry.
+build-model-forge:
+  extends:
+    - .build-model-forge-changes
+    - .maven-model-forge
+  image: maven:3.9.16-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
+  stage: build-package
+  needs:
+    - job: setup-version
+      artifacts: true
+  script:
+    - cd model-forge
+    - mvn $MAVEN_CLI_OPTS install -DskipTests -DskipITs -Drevision=$MODEL_FORGE_VERSION -Dspotless.check.skip=true -Dspotbugs.skip=true -Djacoco.skip=true
+  artifacts:
+    expire_in: 1 month
+    paths:
+      - .m2/repository/de/civitascore/core-model-forge-*/$MODEL_FORGE_VERSION/
+
+# Build + test the whole reactor. Needs Docker-in-Docker for the Testcontainers-based tests
+# (admin-ui boot test against a real PostgreSQL). Spotless and spotbugs are in static-analysis-model-forge.
+test-model-forge:
+  extends:
+    - .only-model-forge-changes
+    - .dind
+    - .maven-model-forge
+  image: maven:3.9.16-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
+  stage: build-package
+  timeout: 1h
+  needs:
+    - job: setup-version
+      artifacts: true
+  cache:
+    policy: pull-push
+    when: always
+  script:
+    - cd model-forge
+    - mvn $MAVEN_CLI_OPTS verify -Drevision=$MODEL_FORGE_VERSION -Dspotless.check.skip=true -Dspotbugs.skip=true
   artifacts:
     when: always
     expire_in: 1 month
@@ -249,32 +223,36 @@ test-model-forge:
     reports:
       junit:
         - model-forge/*/target/surefire-reports/TEST-*.xml
+      # TODO: new, so that every module reports coverage the same way (TEST-CONSOLIDATION-PLAN.md,
+      # section 4). Check that the report is written (-Djacoco.skip is not set here); GitLab merges
+      # the glob. Add a coverage: regex when a console total is printed.
+      coverage_report:
+        coverage_format: jacoco
+        path: model-forge/*/target/site/jacoco/jacoco.xml
 
-# Publish the Maven artifacts to this project's GitLab Maven registry so portal-backend can
-# resolve them. Skips tests/quality (already run in test-model-forge).
+# Publish the Maven artifacts to this project's GitLab Maven registry. This is the release gate:
+# only a commit on a protected branch whose tests and static analysis passed is published. Merge
+# requests do not publish; portal-backend uses the artifact of build-model-forge there.
+# Skips tests/quality (already run in test-model-forge and static-analysis-model-forge).
 # The admin UI sets maven.deploy.skip, so the console is not published.
 publish-model-forge:
-  extends: .only-model-forge-changes
-  image: maven:3.9-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
+  extends:
+    - .rules-protected
+    - .maven-model-forge
+  image: maven:3.9.16-eclipse-temurin-25-alpine@sha256:781f1da87cd3d142e66e47cc149c4582a652fb7f574648206d1e956170c0dc90
   stage: deploy-package
+  interruptible: false
   needs:
-    - job: setup-version-model-forge
+    - job: setup-version
       artifacts: true
     - job: test-model-forge
       artifacts: false
-  variables:
-    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
-  cache:
-    key:
-      prefix: model-forge-maven
-      files:
-        - model-forge/pom.xml
-    paths:
-      - .m2/repository
+    - job: static-analysis-model-forge
+      artifacts: false
   script:
     - cd model-forge
     - |
-      mvn deploy -DskipTests -Drevision=$MODEL_FORGE_VERSION \
+      mvn $MAVEN_CLI_OPTS deploy -DskipTests -DskipITs -Drevision=$MODEL_FORGE_VERSION \
         -Dspotless.check.skip=true \
         -Dspotbugs.skip=true \
         -Djacoco.skip=true \

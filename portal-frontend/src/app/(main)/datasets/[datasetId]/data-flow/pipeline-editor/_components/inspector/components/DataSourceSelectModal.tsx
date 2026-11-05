@@ -10,17 +10,17 @@ import {
   type SortingState,
   useReactTable,
 } from '@tanstack/react-table'
-import { CircleCheckBig, CircleDashed } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { SearchHeader } from '@/components/search-area/SearchArea'
+import { StatusBadge } from '@/components/status/status-badge/StatusBadge'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { type Datasource, DATASOURCE_STATUS_TYPES } from '@/types/datasources'
+import { type Datasource } from '@/types/datasources'
 
 interface DataSourceSelectModalProps {
   isOpen: boolean
@@ -49,7 +49,6 @@ export const DataSourceSelectModal = ({
 }: DataSourceSelectModalProps) => {
   const t = useTranslations('pipelineEditor.dataSourcePanel.selectDialog')
   const tHeaders = useTranslations('datasources.tableHeaders')
-  const tCommon = useTranslations('common')
   const [searchString, setSearchString] = useState('')
   const [sorting, setSorting] = useState<SortingState>([])
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 })
@@ -93,16 +92,7 @@ export const DataSourceSelectModal = ({
     }),
     columnHelper.accessor('dataSourceStatus', {
       header: tHeaders('status'),
-      cell: info => (
-        <div className="flex items-center gap-2">
-          {info.getValue() === DATASOURCE_STATUS_TYPES.DRAFT ? (
-            <CircleDashed className="text-muted-foreground" size={16} />
-          ) : (
-            <CircleCheckBig className="text-muted-foreground" size={16} />
-          )}
-          {tCommon(`status.${info.getValue()}`)}
-        </div>
-      ),
+      cell: info => <StatusBadge status={info.getValue()} />,
       meta: { style: { minWidth: '120px' } },
     }),
   ]

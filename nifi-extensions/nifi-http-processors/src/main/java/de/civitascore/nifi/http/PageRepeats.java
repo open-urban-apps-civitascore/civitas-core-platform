@@ -11,6 +11,7 @@ package de.civitascore.nifi.http;
 
 import de.civitascore.nifi.http.ApiCall.Parameter;
 import java.io.InputStream;
+import java.net.URI;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -23,13 +24,14 @@ import java.util.function.Supplier;
 
 /**
  * The pages of one run, to find a page that repeats an earlier page: by the SHA-256 of its body, or
- * by what its request adds to the API call. The page loop reads one body at a time: it reads the
- * stream from {@link #hashing} to its end, then asks {@link #earlierWithSameBody}.
+ * by its request, which is the page's own URL or what the page adds to the API call. The page loop
+ * reads one body at a time: it reads the stream from {@link #hashing} to its end, then asks {@link
+ * #earlierWithSameBody}.
  */
 final class PageRepeats {
 
   private final Map<String, Page> pagesByHash = new HashMap<>();
-  private final Map<List<List<Parameter>>, Page> pagesByRequest = new HashMap<>();
+  private final Map<Request, Page> pagesByRequest = new HashMap<>();
   private Supplier<String> currentHash;
 
   /**
@@ -61,16 +63,18 @@ final class PageRepeats {
   }
 
   /**
-   * Records the page under the query parameters and headers that its request adds. A page with the
-   * same request as an earlier page makes the API repeat its pages without end.
+   * Records the page under its own URL and the query parameters and headers that it adds. A page
+   * with the same request as an earlier page makes the API repeat its pages without end.
    *
-   * @return the earlier page of the run that adds the same
+   * @return the earlier page of the run with the same request
    */
   Optional<Page> earlierWithSameRequest(Page page) {
     return Optional.ofNullable(pagesByRequest.putIfAbsent(request(page), page));
   }
 
-  private static List<List<Parameter>> request(Page page) {
-    return List.of(page.queryParameters(), page.headers());
+  private static Request request(Page page) {
+    return new Request(page.url(), page.queryParameters(), page.headers());
   }
+
+  private record Request(Optional<URI> url, List<Parameter> query, List<Parameter> headers) {}
 }

@@ -3,6 +3,7 @@ package de.civitascore.portal.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nimbusds.jwt.JWTParser;
+import de.civitascore.modelforge.urn.UrnParser;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.PermissionName;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,6 +33,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -50,6 +53,7 @@ class DataStructureReferenceAuthorizationIntegrationTest extends BaseKeycloakInt
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
   @Autowired private PermissionRepository permissionRepository;
   @Autowired private ObjectMapper mapper;
+  @Autowired private DataSource dataSource;
 
   private String token;
   private Group group;
@@ -493,6 +497,27 @@ class DataStructureReferenceAuthorizationIntegrationTest extends BaseKeycloakInt
                   .orElseThrow()
                   .getDataStructureVersionStatus())
           .hasToString("DRAFT");
+    }
+
+    @Test
+    @DisplayName("stops the duplicate by a caller who may not read the target, leaving no copy")
+    void duplicateIsRefusedForANonReader() {
+      assertRefused(
+          call(
+              HttpMethod.POST,
+              "/datastructures/" + charlie + "/versions/" + version.getId() + "/duplicate",
+              null,
+              charlie.toString()),
+          mapper);
+      assertThat(dataStructureVersionRepository.findAllByDataStructure_IdIn(List.of(charlie)))
+          .hasSize(1);
+      assertThat(
+              JdbcClient.create(dataSource)
+                  .sql("SELECT current_version FROM model_forge.artifact WHERE logical_urn = :urn")
+                  .param("urn", UrnParser.logicalUrn(version.getModelUrn()))
+                  .query(String.class)
+                  .single())
+          .isEqualTo(UrnParser.versionFromUrn(version.getModelUrn()));
     }
 
     @Test

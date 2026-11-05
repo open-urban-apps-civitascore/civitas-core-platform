@@ -1,7 +1,7 @@
 
 services:
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.0
+    image: confluentinc/cp-zookeeper:7.9.10@sha256:1a870111c6e861f1e6015094fac902779981edb5cb1d2ad6b7437d2a6b8ba064
     mem_limit: 256m
     hostname: zookeeper
     container_name: civitas-zookeeper
@@ -14,7 +14,7 @@ services:
       - civitas-network
 
   kafka:
-    image: confluentinc/cp-kafka:7.6.0
+    image: confluentinc/cp-kafka:7.9.10@sha256:07c3d60362e67c296f7f34b690b1240e5ecdcde4a84f5e73cab320fb4041f58c
     mem_limit: 768m
     hostname: kafka
     container_name: civitas-kafka
@@ -46,7 +46,7 @@ services:
 
   kafka-ui:
     image: provectuslabs/kafka-ui:v0.7.2@sha256:8f2ff02d64b0a7a2b71b6b3b3148b85f66d00ec20ad40c30bdcd415d46d31818
-    mem_limit: 256m
+    mem_limit: 512m
     container_name: civitas-kafka-ui
     depends_on:
       - kafka
@@ -56,12 +56,14 @@ services:
       KAFKA_CLUSTERS_0_NAME: civitas-local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      # The image's JDK 17.0.6 does not detect the container limit on some cgroup v2 hosts and sizes itself from host memory and CPUs.
+      JAVA_OPTS: -Xms32m -Xmx192m -XX:+UseSerialGC -XX:ActiveProcessorCount=2
     networks:
       - civitas-network
 
   # Optional: Kafka Consumer for testing (simple CLI consumer)
   kafka-consumer:
-    image: confluentinc/cp-kafka:7.6.0
+    image: confluentinc/cp-kafka:7.9.10@sha256:07c3d60362e67c296f7f34b690b1240e5ecdcde4a84f5e73cab320fb4041f58c
     container_name: civitas-kafka-consumer
     depends_on:
       - kafka
@@ -81,4 +83,3 @@ networks:
   civitas-network:
     name: civitas-network
     external: true
-

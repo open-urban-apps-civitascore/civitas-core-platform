@@ -173,8 +173,25 @@ superseded version states what that version declared and stays readable, but it
 holds nothing back: a Data Sink repointed at a newer Data Structure leaves the
 older one free.
 
-An artifact is removed with its whole history; versions are not deleted one at
-a time.
+A delete removes either the whole artifact with its history or one **version
+line**: the versions that share one major. A line goes as one unit, never one
+minor of it. A line has its own rule for what uses it, because an older version
+of the line can still be in use: besides an artifact's current version, every
+version of an Element or Data Structure and every version a reference pins
+counts, so a superseded Data Sink version a Pipeline still pins refuses the
+delete. A reference that names no version holds every line; from an Element of
+the same Data Structure it does not count while another version of its target
+stays. Data Set membership does not count for a line. The current version moves
+to the highest version left, and a member version the line owns goes with it
+unless another version owns it too. An Element's line also takes the versions of
+its own grouping that hold it. When the line is the last one, the whole artifact
+goes and leaves every Data Set it belonged to.
+
+A version number Model Forge assigns is never assigned again. After line 3 is
+deleted the next major is 4.0.0, also when the whole artifact was deleted and is
+stored again under its URN: a pinned URN must always name the same content, and
+other artifacts and caches may still hold it. An import that preserves an
+upstream version (XÖV) stores that version as given.
 
 ## Local Build
 

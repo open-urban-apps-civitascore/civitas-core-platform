@@ -210,6 +210,15 @@ class UrnParserTest {
     }
 
     @Test
+    void sameMajor_comparesTheTextBeforeTheFirstDot() {
+        assertThat(UrnParser.sameMajor("1.0.0", "1.4.2")).isTrue();
+        assertThat(UrnParser.sameMajor("1.0", "1.0.0-rc.1")).isTrue();
+        assertThat(UrnParser.sameMajor("1.0.0", "2.0.0")).isFalse();
+        assertThat(UrnParser.sameMajor("01.0.0", "1.0.0")).isFalse();
+        assertThat(UrnParser.sameMajor("1-rc", "1.0.0")).isFalse();
+    }
+
+    @Test
     void requireUrn_rejectsANonUrnNamingTheExpectedFormat() {
         assertThatThrownBy(() -> UrnParser.requireUrn("plain-id", "Element id"))
             .isInstanceOf(IllegalArgumentException.class)

@@ -126,6 +126,8 @@ describe('mapDatastructuresApiToListData', () => {
       source: expectedVersions[0].dataStructureVersionSource,
       status: null,
       versionNumber: expectedVersions[0].version,
+      versionCountByStatus: { AVAILABLE: 0, DRAFT: 1 },
+      inUseByReleasedVersionCount: 0,
       versions: [
         {
           id: expectedVersions[0].id,
@@ -151,10 +153,51 @@ describe('mapDatastructuresApiToListData', () => {
     datastructure.dataStructureVersions[0].inUseByReleased = true
 
     const result = mapDatastructuresApiToListData([datastructure])
+    const byVersion = Object.fromEntries(result[0].versions.map(version => [version.versionNumber, version]))
 
     expect(result[0].inUseByReleased).toBe(true)
-    expect(result[0].versions[0].inUseByReleased).toBe(true)
-    expect(result[0].versions[1].inUseByReleased).toBeUndefined()
+    expect(byVersion['1.0'].inUseByReleased).toBe(true)
+    expect(byVersion['2.0'].inUseByReleased).toBeUndefined()
+  })
+
+  it('counts the versions of each status on the structure row', () => {
+    const datastructure: Datastructure = createDatastructure(['1.0', '2.0', '3.0'])
+    datastructure.dataStructureVersions[0].dataStructureVersionStatus = DATASTRUCTURE_STATUS_TYPES.AVAILABLE
+    datastructure.dataStructureVersions[1].dataStructureVersionStatus = DATASTRUCTURE_STATUS_TYPES.AVAILABLE
+
+    const result = mapDatastructuresApiToListData([datastructure])
+
+    expect(result[0].versionCountByStatus).toEqual({ AVAILABLE: 2, DRAFT: 1 })
+  })
+
+  it('counts only the versions that a released entity uses', () => {
+    const datastructure: Datastructure = createDatastructure(['1.0', '2.0', '3.0'])
+    datastructure.dataStructureVersions[0].inUse = true
+    datastructure.dataStructureVersions[0].inUseByReleased = true
+    datastructure.dataStructureVersions[1].inUse = true
+    datastructure.dataStructureVersions[1].inUseByReleased = false
+
+    const result = mapDatastructuresApiToListData([datastructure])
+
+    expect(result[0].inUseByReleasedVersionCount).toBe(1)
+  })
+
+  it('sets zero counts on a structure without versions', () => {
+    const datastructure: Datastructure = createDatastructure([])
+
+    const result = mapDatastructuresApiToListData([datastructure])
+
+    expect(result[0].versionCountByStatus).toEqual({ AVAILABLE: 0, DRAFT: 0 })
+    expect(result[0].inUseByReleasedVersionCount).toBe(0)
+  })
+
+  it('sets no counts on the version rows', () => {
+    const datastructure: Datastructure = createDatastructure(['1.0'])
+
+    const result = mapDatastructuresApiToListData([datastructure])
+
+    expect(result[0].versions[0].versionCountByStatus).toBeUndefined()
+    expect(result[0].versions[0].inUseByReleasedVersionCount).toBeUndefined()
   })
 
   it('selects the highest numeric version', () => {
@@ -199,6 +242,23 @@ describe('mapDatastructuresApiToListData', () => {
     expect(result).toHaveLength(1)
     expect(result[0].versionNumber).toBeNull()
     expect(result[0].versions).toEqual([])
+  })
+
+  it('sorts the versions subrows by version number, highest first', () => {
+    const datastructure: Datastructure = createDatastructure(['1.0', '2.0', '1.1'])
+
+    const result = mapDatastructuresApiToListData([datastructure])
+
+    expect(result[0].versions.map(version => version.versionNumber)).toEqual(['2.0', '1.1', '1.0'])
+  })
+
+  it('puts a version subrow with no stored model on top of the numbered ones', () => {
+    const datastructure: Datastructure = createDatastructure(['1.0', '2.0'])
+    datastructure.dataStructureVersions.push(createVersionSummary({ id: 'draft', version: null }))
+
+    const result = mapDatastructuresApiToListData([datastructure])
+
+    expect(result[0].versions.map(version => version.id)).toEqual(['draft', '2.0', '1.0'])
   })
 })
 
@@ -252,6 +312,43 @@ describe('mapDatastructureVersionsApiToListData', () => {
     const result = mapDatastructureVersionsApiToListData(versions)
 
     expect(result[0].description).toBe('-')
+  })
+
+  it('sorts by version number, highest first, regardless of input order', () => {
+    const low = createVersionSummary({ id: 'v1', version: '1.0' })
+    const high = createVersionSummary({ id: 'v3', version: '2.0' })
+    const mid = createVersionSummary({ id: 'v2', version: '1.1' })
+
+    const result = mapDatastructureVersionsApiToListData([low, high, mid])
+
+    expect(result.map(version => version.id)).toEqual(['v3', 'v2', 'v1'])
+  })
+
+  it('sorts numerically rather than lexicographically', () => {
+    const v2 = createVersionSummary({ id: 'v2', version: '1.2.0' })
+    const v10 = createVersionSummary({ id: 'v10', version: '1.10.0' })
+
+    const result = mapDatastructureVersionsApiToListData([v2, v10])
+
+    expect(result.map(version => version.id)).toEqual(['v10', 'v2'])
+  })
+
+  it('puts a version with no stored model on top, ahead of every numbered version', () => {
+    const draft = createVersionSummary({ id: 'draft', version: null, createdAt: '2024-01-01T00:00:00.000Z' })
+    const numbered = createVersionSummary({ id: 'v1', version: '2.0', createdAt: '2025-01-01T00:00:00.000Z' })
+
+    const result = mapDatastructureVersionsApiToListData([numbered, draft])
+
+    expect(result.map(version => version.id)).toEqual(['draft', 'v1'])
+  })
+
+  it('orders versions with no stored model by createdAt, newest first', () => {
+    const olderDraft = createVersionSummary({ id: 'draft1', version: null, createdAt: '2024-01-01T00:00:00.000Z' })
+    const newerDraft = createVersionSummary({ id: 'draft2', version: null, createdAt: '2024-02-01T00:00:00.000Z' })
+
+    const result = mapDatastructureVersionsApiToListData([olderDraft, newerDraft])
+
+    expect(result.map(version => version.id)).toEqual(['draft2', 'draft1'])
   })
 })
 

@@ -7,8 +7,10 @@ import { DirtyField } from '@/components/uml-modeler/types/session'
 import { SelectOption } from '@/types/common'
 import {
   Datastructure,
+  DATASTRUCTURE_STATUS_TYPES,
   DatastructureFormData,
   DatastructuresListData,
+  DatastructureStatusType,
   DatastructureVersion,
   DatastructureVersionFormAvailableSchema,
   DatastructureVersionFormData,
@@ -24,6 +26,15 @@ export const mapDatastructureApiToFormData = (datastructure: Datastructure): Dat
   description: datastructure.description ?? '',
 })
 
+// A version without a stored model has no number yet, so it counts as newer than every numbered one.
+const sortVersionsDesc = (versions: DatastructureVersionSummary[]): DatastructureVersionSummary[] =>
+  [...versions].sort((a, b) => {
+    if (!a.version && !b.version) return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    if (!a.version) return -1
+    if (!b.version) return 1
+    return b.version.localeCompare(a.version, undefined, { numeric: true })
+  })
+
 export const mapDatastructuresApiToListData = (datastructures: Datastructure[]): DatastructuresListData[] => {
   return datastructures.map(datastructure => {
     const highestVersion: DatastructureVersionSummary | null =
@@ -33,6 +44,14 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
         if (!highest?.version) return current
         return current.version.localeCompare(highest.version, undefined, { numeric: true }) > 0 ? current : highest
       }, null)
+    const versionCountByStatus = datastructure.dataStructureVersions.reduce<Record<DatastructureStatusType, number>>(
+      (counts, version) => ({
+        ...counts,
+        [version.dataStructureVersionStatus]: counts[version.dataStructureVersionStatus] + 1,
+      }),
+      { [DATASTRUCTURE_STATUS_TYPES.AVAILABLE]: 0, [DATASTRUCTURE_STATUS_TYPES.DRAFT]: 0 },
+    )
+    const inUseByReleasedVersions = datastructure.dataStructureVersions.filter(version => version.inUseByReleased)
     return {
       id: datastructure.id,
       dataStructureId: datastructure.id,
@@ -43,8 +62,10 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
       source: highestVersion?.dataStructureVersionSource || null,
       inUse: datastructure.inUse,
       inUseByReleased: datastructure.inUseByReleased,
+      versionCountByStatus,
+      inUseByReleasedVersionCount: inUseByReleasedVersions.length,
       // add versions field to versions for showing subrows in table
-      versions: datastructure.dataStructureVersions.map(version => ({
+      versions: sortVersionsDesc(datastructure.dataStructureVersions).map(version => ({
         id: version.id,
         versionNumber: version.version,
         modelUrn: version.modelUrn,
@@ -62,7 +83,7 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
 export const mapDatastructureVersionsApiToListData = (
   versions: DatastructureVersionSummary[],
 ): DatastructureVersionsListData[] =>
-  versions.map(version => ({
+  sortVersionsDesc(versions).map(version => ({
     id: version.id,
     versionNumber: version.version,
     name: version.version ? `Version ${version.version}` : '-',

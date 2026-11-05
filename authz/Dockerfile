@@ -10,7 +10,7 @@
 # The cold-start.sh script handles this automatically.
 
 # Pinned: eclipse-temurin:25-jre-alpine (2026-10-29), Alpine 3.24.3. Update digest on base image updates.
-FROM eclipse-temurin:25-jre-alpine@sha256:56f273059de6b13a6b49fe0ded691ed2d0399bbee76156a8f2d385f7524a3d43 AS authz-repo-service
+FROM eclipse-temurin:25.0.5_8-jre-alpine-3.24@sha256:56f273059de6b13a6b49fe0ded691ed2d0399bbee76156a8f2d385f7524a3d43 AS authz-repo-service
 
 WORKDIR /app
 
@@ -46,10 +46,10 @@ RUN mkdir /out && \
     printf '{\n  "authz_repository_url": "http://civitas-authz-repository:8091/api/v1/user-context",\n  "dataset_pool_membership_url": "http://civitas-authz-repository:8091/api/v1/dataset-pool",\n  "dashboard_dataset_url": "http://civitas-authz-repository:8091/api/v1/dashboard-dataset",\n  "authz_cache_duration_seconds": 0\n}\n' > /out/config.json
 
 
-# Pinned: openpolicyagent/opa:1.21.0-static (2026-09-24). Update digest on base image updates.
+# Pinned: openpolicyagent/opa:1.21.1-static (the OPA of the cicd image that builds the bundle). Update digest on base image updates.
 # Bumps golang.org/x/crypto to v0.55.0 (CVE-2026-56854) and google.golang.org/grpc
 # to v1.83.2 (CVE-2026-84304, CVE-2026-84445).
-FROM openpolicyagent/opa:1.21.0-static@sha256:9eb36ac3ceb3b855e776e60926a8a5142f96109a219a5fcd490fa1744c755bec AS opa
+FROM openpolicyagent/opa:1.21.1-static@sha256:4675ab04ad1627f74741d2d9c5142698c79e18b7b09f192587d31d6dba20838e AS opa
 
 COPY --from=fetcher /out/config.json /data/config.json
 COPY --from=fetcher /out/bundle/policy /policies

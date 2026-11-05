@@ -293,6 +293,38 @@ test_delete_on_readonly_endpoint_denied if {
 	result.reason == "unknown_endpoint"
 }
 
+mock_send_datastructure_deleter(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASTRUCTURE_DELETE"], "DATASTRUCTURE", "dst-1")}
+
+mock_send_datastructure_updater(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASTRUCTURE_UPDATE"], "DATASTRUCTURE", "dst-1")}
+
+# Test: Deleting a data structure version requires DATASTRUCTURE_DELETE on its data structure
+test_delete_datastructure_version_allowed if {
+	result := authz.decision with http.send as mock_send_datastructure_deleter
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/datastructures/dst-1/versions/v-1")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.required_permissions == {"DATASTRUCTURE_DELETE"}
+}
+
+# Test: DATASTRUCTURE_UPDATE does not delete a version
+test_delete_datastructure_version_without_delete_permission_denied if {
+	result := authz.decision with http.send as mock_send_datastructure_updater
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/datastructures/dst-1/versions/v-1")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# Test: DATASTRUCTURE_DELETE on one data structure does not delete versions of another
+test_delete_datastructure_version_of_another_datastructure_denied if {
+	result := authz.decision with http.send as mock_send_datastructure_deleter
+		with data.config as mock_http.mock_config
+		with input as portal_request("DELETE", "/v1/datastructures/dst-2/versions/v-1")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
 # Test: Unknown endpoint path results in denial
 test_unknown_endpoint_denied if {
 	result := authz.decision with http.send as mock_send_all_read

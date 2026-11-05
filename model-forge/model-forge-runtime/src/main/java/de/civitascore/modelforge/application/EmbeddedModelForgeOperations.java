@@ -9,7 +9,7 @@ import de.civitascore.modelforge.contract.ArtifactSummary;
 import de.civitascore.modelforge.contract.ArtifactKind;
 import de.civitascore.modelforge.contract.ArtifactView;
 import de.civitascore.modelforge.contract.ArtifactWriteResult;
-import de.civitascore.modelforge.contract.BumpVersionCommand;
+import de.civitascore.modelforge.contract.CopyVersionCommand;
 import de.civitascore.modelforge.contract.CreateArtifactCommand;
 import de.civitascore.modelforge.contract.DependencyClosureView;
 import de.civitascore.modelforge.contract.DependencyGraphView;
@@ -77,6 +77,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
     private final XRepositoryService xRepositoryService;
     private final UrnService urns;
     private final ForeignReferenceResolver foreignReferenceResolver;
+    private final VersionLineDeletion versionLineDeletion;
 
     public EmbeddedModelForgeOperations(
         SchemaImportService schemaImportService,
@@ -105,6 +106,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         this.xRepositoryService = xRepositoryService;
         this.urns = urns;
         this.foreignReferenceResolver = new ForeignReferenceResolver(registry, urns);
+        this.versionLineDeletion = new VersionLineDeletion(registry, dependencyGraph, elementCommandService);
     }
 
     @Override
@@ -726,21 +728,42 @@ public class EmbeddedModelForgeOperations implements ModelForge {
     }
 
     @Override
-    public ArtifactWriteResult bumpVersion(BumpVersionCommand command) {
+    public ArtifactWriteResult copyVersion(CopyVersionCommand command) {
         String urn = command.artifactId().value();
-        // A pinned identity is refused rather than reinterpreted: bumping from a version that is not
-        // current has no sound answer, and bumping from the current one instead would quietly ignore
-        // the version the caller named. :latest names the current version and is accepted.
-        if (!UrnParser.isLatest(urn) && UrnParser.versionFromUrn(urn) != null) {
-            throw new IllegalArgumentException(
-                "bumpVersion needs a logical URN; " + urn + " pins a version. "
-                + "Bump the artifact, then store the pin the bump returns.");
-        }
+        UrnParser.requireNoControlChars(urn);
         String logical = UrnParser.logicalUrn(urn);
-        String assigned = registry.bumpVersion(logical, command.bump());
-        registerWritten(assigned, logical);
-        var pin = new ArtifactId(assigned != null && !assigned.isBlank() ? assigned : logical);
+        String requestedVersion = UrnParser.isLatest(urn) ? null : UrnParser.versionFromUrn(urn);
+        List<String> copies = registry.inTransaction(() -> copyWithGrouping(logical, requestedVersion));
+        registry.afterCommit(() -> copies.forEach(dependencyGraph::registerFromRegistry));
+        var pin = new ArtifactId(copies.getFirst());
         return new ArtifactWriteResult(pin, dependenciesOf(pin));
+    }
+
+    /**
+     * Copies the requested version of the artifact and, for an Element, the grouping version with
+     * the same number when that version holds the Element as a member. Returns the Pin of the
+     * copied artifact first, then the Pin of the grouping copy if there is one.
+     */
+    private List<String> copyWithGrouping(String logical, String requestedVersion) {
+        registry.lockForWrite(logical);
+        String current = registry.resolveReference(logical).map(UrnParser::versionFromUrn)
+            .orElseThrow(() -> new IllegalArgumentException("No version of " + logical + " to copy"));
+        String sourceVersion = requestedVersion != null ? requestedVersion : current;
+        String source = UrnParser.withVersion(logical, sourceVersion);
+        if (!typeSegmentFor(ArtifactKind.ELEMENT).equals(UrnParser.artifactTypeFromUrn(logical))) {
+            return List.of(registry.copyVersion(source, null, Map.of()));
+        }
+        String grouping = SchemaImportService.groupingUrnOf(urns, logical);
+        // Imports write the root before the grouping, so the copy locks in the same order.
+        registry.lockForWrite(grouping);
+        if (!registry.ownedMemberUrns(grouping, sourceVersion).contains(source)) {
+            return List.of(registry.copyVersion(source, null, Map.of()));
+        }
+        String groupingCurrent = registry.resolveReference(grouping).map(UrnParser::versionFromUrn).orElseThrow();
+        String copy = registry.copyVersion(source, groupingCurrent, Map.of());
+        String groupingCopy = registry.copyVersion(
+            UrnParser.withVersion(grouping, sourceVersion), current, Map.of(source, copy));
+        return List.of(copy, groupingCopy);
     }
 
     @Override
@@ -777,6 +800,16 @@ public class EmbeddedModelForgeOperations implements ModelForge {
         }
         List<String> memberships = registry.dataSetMemberships(root);
         return memberships.size() >= 2 ? memberships : List.of();
+    }
+
+    @Override
+    public void deleteVersionLine(ArtifactId pinnedVersion) {
+        versionLineDeletion.delete(pinnedVersion.value());
+    }
+
+    @Override
+    public List<String> versionLineDeletionBlockers(ArtifactId pinnedVersion) {
+        return versionLineDeletion.blockers(pinnedVersion.value());
     }
 
     /**

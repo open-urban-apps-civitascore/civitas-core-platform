@@ -88,8 +88,7 @@ describe('DatasetTable', () => {
 
     it('renders the dataset status', () => {
       renderComponent({ datasets: [makeRow({ dataSetStatus: 'AVAILABLE' })] })
-      expect(screen.getByText('status.AVAILABLE')).toBeInTheDocument()
-      expect(document.querySelector('svg.lucide-user-check')).toBeInTheDocument()
+      expect(screen.getByTestId('statusBadge')).toHaveTextContent('status.AVAILABLE')
     })
 
     it('renders multiple rows', () => {

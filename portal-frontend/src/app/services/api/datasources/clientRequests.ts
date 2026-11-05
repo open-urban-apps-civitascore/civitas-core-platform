@@ -1,8 +1,14 @@
+import { MutationState, useMutation, useMutationState, useQueryClient } from '@tanstack/react-query'
+import { AxiosError } from 'axios'
+import { useCallback } from 'react'
+
+import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useDataQuery } from '@/hooks/use-data-query'
 import { useDeleteMutation } from '@/hooks/use-delete-mutation'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
 import { GetItemInput, GetListInput, WithId } from '@/types/common'
+import { ConnectionTestResult, ConnectionTestRunVariables } from '@/types/connectionTest'
 import { Datasource, DatasourceCreateData, DatasourceMetaPatchData, DatasourcePatchData } from '@/types/datasources'
 
 const key = 'datasources'
@@ -64,6 +70,48 @@ export const useUnreleaseDatasource = () =>
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while unreleasing datasource',
   })
+
+export type ConnectionTestRun = MutationState<
+  ApiServiceResponse<ConnectionTestResult>,
+  AxiosError,
+  ConnectionTestRunVariables
+>
+
+const connectionTestKey = (id: string) => [key, id, 'connection-test']
+
+export const useTestDatasourceConnection = (id: string) =>
+  useMutation<ApiServiceResponse<ConnectionTestResult>, AxiosError, ConnectionTestRunVariables>({
+    mutationKey: connectionTestKey(id),
+    mutationFn: ({ input }) =>
+      apiRequest<ConnectionTestResult>({
+        method: 'POST',
+        endpoint: `/datasources/${id}/connection-test`,
+        headers: { 'x-api-request': 'true' },
+        data: input,
+        errorMessage: 'An error occurred while testing the connection',
+      }),
+  })
+
+export const useLastConnectionTestRun = (id: string): ConnectionTestRun | undefined => {
+  const runs = useMutationState({
+    filters: { mutationKey: connectionTestKey(id), exact: true },
+    select: mutation => mutation.state as ConnectionTestRun,
+  })
+  return runs.at(-1)
+}
+
+export const useDiscardConnectionTestRuns = (id: string) => {
+  const queryClient = useQueryClient()
+  return useCallback(() => {
+    const cache = queryClient.getMutationCache()
+    const runs = cache.findAll({ mutationKey: connectionTestKey(id), exact: true })
+    for (const run of runs) {
+      const variables = run.state.variables as ConnectionTestRunVariables | undefined
+      if (run.state.status !== 'pending') cache.remove(run)
+      else if (variables) variables.marker.isOutdated = true
+    }
+  }, [queryClient, id])
+}
 
 export const useDeleteDatasource = () =>
   useDeleteMutation({

@@ -11,12 +11,13 @@ import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
+import { StatusBadge } from '@/components/status/status-badge/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { CONNECTOR_TYPES } from '@/const/connectors'
 import { useDatasetPermissionsById } from '@/hooks/use-dataset-permissions'
 import { cn } from '@/lib/utils'
-import type { Datasource } from '@/types/datasources'
+import { type Datasource, isConnectorReadable } from '@/types/datasources'
 
 import { useDatastructureVersionInfo } from '../../../_hooks/use-datastructure-version-info'
 import { usePipelineDatasources } from '../../../_hooks/use-pipeline-datasources'
@@ -35,7 +36,6 @@ interface DataSourcePanelProps {
 export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate, isLocked }) => {
   const t = useTranslations('pipelineEditor')
   const tCommon = useTranslations('common')
-  const tStatus = useTranslations('common.status')
   const { entities, isLoading, isError, canReadDatasources, getEntityById, getName } = usePipelineDatasources()
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false)
 
@@ -123,7 +123,7 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
           entities={selectableApiCalls}
           selectedId={data.apiCallName}
           isLoading={isLoading}
-          isError={isError}
+          isError={isError || !isConnectorReadable(selectedEntity.connector)}
           onChange={apiCall => onUpdate({ apiCallName: apiCall?.name })}
           fallbackName={data.apiCallName}
           renderEntityName={renderApiCallName}
@@ -137,13 +137,15 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
             title={t('dataSourcePanel.details')}
             items={[
               { label: t('dataSourcePanel.connector'), value: selectedEntity.connector?.connectorType },
-              { label: t('dataSourcePanel.status'), value: tStatus(selectedEntity.dataSourceStatus) },
+              { label: t('dataSourcePanel.status'), value: <StatusBadge status={selectedEntity.dataSourceStatus} /> },
               { label: t('dataSourcePanel.description'), value: selectedEntity.description ?? undefined },
               { label: t('dataSourcePanel.dataStructure'), value: dataStructureName },
               { label: t('dataSourcePanel.dataStructureVersion'), value: dataStructureVersion?.version ?? undefined },
               {
                 label: t('dataSourcePanel.dataStructureVersionStatus'),
-                value: dataStructureVersion ? tStatus(dataStructureVersion.dataStructureVersionStatus) : undefined,
+                value: dataStructureVersion ? (
+                  <StatusBadge status={dataStructureVersion.dataStructureVersionStatus} />
+                ) : undefined,
               },
             ]}
           />

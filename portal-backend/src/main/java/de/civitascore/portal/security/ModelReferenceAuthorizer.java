@@ -59,6 +59,7 @@ public class ModelReferenceAuthorizer {
    * @param dataStructureId the id of the data structure the model belongs to
    * @param modelUrn CORE URN of the stored model
    * @throws ModelReferenceNotAvailableException when a reference may not be used
+   * @throws de.civitascore.portal.util.ModelMissingException when the registry holds no such model
    */
   public void authorizeStored(UUID dataStructureId, String modelUrn) {
     requireUsable(

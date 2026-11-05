@@ -1,6 +1,7 @@
 package de.civitascore.modelforge.graph;
 
 import de.civitascore.modelforge.core.port.ArtifactRegistry;
+import de.civitascore.modelforge.urn.UrnParser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -208,6 +209,18 @@ class DependencyGraphServiceTest {
     // ── hasAnyDependents ──────────────────────────────────────────────────────
 
     // ── remove ────────────────────────────────────────────────────────────────
+
+    @Test
+    void removeVersion_dropsTheEdgesThatVersionDeclaredAndKeepsTheOtherVersions() {
+        String b2 = UrnParser.withVersion(UrnParser.logicalUrn(B_V), "2.0.0");
+        graph.register(B_V, Set.of(C_V));
+        graph.register(b2, Set.of(D_V));
+
+        graph.removeVersion(B_V);
+
+        assertThat(graph.getDependents(C)).isEmpty();
+        assertThat(graph.getDependents(D)).containsExactly(b2);
+    }
 
     @Test
     void remove_versionedUrn_deletesAllEdges() {

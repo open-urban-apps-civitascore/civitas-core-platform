@@ -13,7 +13,7 @@ docker run --rm \
   -v "${SCRIPT_DIR}/providers:/rego/providers:ro" \
   -v "${SCRIPT_DIR}/data/backends:/rego/data/backends:ro" \
   -v "${SCRIPT_DIR}/test:/rego/test:ro" \
-  openpolicyagent/opa:1.21.0-static@sha256:9eb36ac3ceb3b855e776e60926a8a5142f96109a219a5fcd490fa1744c755bec \
+  openpolicyagent/opa:1.21.1-static \
   test /rego/policy /rego/lib /rego/providers /rego/test /rego/data -v
 
 echo ""

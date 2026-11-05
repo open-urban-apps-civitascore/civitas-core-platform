@@ -157,8 +157,7 @@ describe('DatasetTab', () => {
     it('renders the dataset status', () => {
       mockDatasets([makeDataset({ dataSetStatus: 'AVAILABLE' })])
       renderComponent()
-      expect(screen.getByText('status.AVAILABLE')).toBeInTheDocument()
-      expect(document.querySelector('svg.lucide-user-check')).toBeInTheDocument()
+      expect(screen.getByTestId('statusBadge')).toHaveTextContent('status.AVAILABLE')
     })
 
     it('shows the NoDataPage when no datasets are returned and no search is active', () => {

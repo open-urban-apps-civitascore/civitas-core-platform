@@ -1,6 +1,6 @@
 services:
   keycloak:
-    image: quay.io/keycloak/keycloak:26.6.4
+    image: quay.io/keycloak/keycloak:26.8.1@sha256:3f3c5f8e03c614774b4bd9173b88391fefa4153bfc010d8012d59ad825377332
     mem_limit: 1g
     container_name: civitas-keycloak
     hostname: civitas-keycloak.local
@@ -44,7 +44,7 @@ services:
   # so they can be inspected at http://localhost:8025.
   # The realm-export.json configures Keycloak SMTP to point to mailpit:1025.
   mailpit:
-    image: axllent/mailpit:v1.30@sha256:d5ecbb067db3705fa953d79e1b7f81ef84038df67aba6c52825d8c02a1ea748a
+    image: axllent/mailpit:v1.32@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
     mem_limit: 128m
     container_name: civitas-mailpit
     ports:

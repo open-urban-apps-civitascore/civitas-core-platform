@@ -33,6 +33,13 @@ body:json {
           "name": "things",
           "path": "/things",
           "pagination": { "type": "CURSOR", "cursorPath": "$.next", "cursorIn": "QUERY", "limit": 20 }
+        },
+        {
+          "name": "links",
+          "path": "/links",
+          "pagination": {
+            "type": "NEXT_LINK"
+          }
         }
       ]
     },
@@ -57,7 +64,7 @@ tests {
 
 docs {
   Creates an HTTP/REST Data source with a Bearer token authentication
-  without token, an API call without path and three incomplete
+  without token, an API call without path and four incomplete
   paginations, one of each type. A DRAFT accepts it; step 5 pins the
   release rejection.
 }

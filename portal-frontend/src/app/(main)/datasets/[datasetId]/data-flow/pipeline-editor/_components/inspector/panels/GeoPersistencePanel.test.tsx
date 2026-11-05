@@ -37,8 +37,9 @@ vi.mock('@/app/services/api/datastructures/clientRequests', () => ({
   useGetDatastructures: (...args: unknown[]) => mockUseGetDatastructures(...args),
 }))
 
+const mockUseGetDatastructureVersion = vi.fn().mockReturnValue({ data: undefined })
 vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
-  useGetDatastructureVersion: () => ({ data: undefined }),
+  useGetDatastructureVersion: (...args: unknown[]) => mockUseGetDatastructureVersion(...args),
 }))
 
 vi.mock('@/hooks/use-query-params', () => ({
@@ -189,6 +190,7 @@ describe('GeoPersistencePanel data structure selection', () => {
 
   afterEach(() => {
     mockHasPermission.mockReturnValue(false)
+    mockUseGetDatastructureVersion.mockReturnValue({ data: undefined })
   })
 
   const selectVersion = async (openButtonLabel: string, versionLabel: string) => {
@@ -255,6 +257,18 @@ describe('GeoPersistencePanel data structure selection', () => {
       dataStructureUrn: `${DATASTRUCTURE_URN}:1.0.0`,
       configured: false,
     })
+  })
+
+  it('shows the status of the selected Data structure version in the details', () => {
+    mockUseGetDatastructureVersion.mockReturnValue({
+      data: {
+        data: { dataStructure: { name: 'Test Structure' }, version: '1.0.0', dataStructureVersionStatus: 'DRAFT' },
+      },
+    })
+    renderPanel(() => null, { dataStructureVersionId: `${DATASTRUCTURE_ID}/${FIRST_VERSION_ID}` })
+
+    const statusRow = screen.getByText('geoPersistencePanel.status').parentElement as HTMLElement
+    expect(within(statusRow).getByTestId('statusBadge')).toHaveTextContent('status.DRAFT')
   })
 
   it('opens the selected Data structure version', async () => {

@@ -20,6 +20,7 @@ describe('RoleTemplateSelect', () => {
     {
       id: '1',
       name: 'Admin',
+      description: null,
       roleType: 'DATA',
       permissions: [],
       readonly: true,
@@ -32,6 +33,7 @@ describe('RoleTemplateSelect', () => {
     {
       id: '2',
       name: 'User',
+      description: null,
       roleType: 'DATA',
       permissions: [],
       readonly: true,

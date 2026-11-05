@@ -327,7 +327,7 @@ public record HttpConnectorConfiguration(
               headers,
       @Schema(
               description = "Pagination of the API call. Absent or null is no pagination.",
-              oneOf = {PageNumber.class, LimitOffset.class, Cursor.class})
+              oneOf = {PageNumber.class, LimitOffset.class, Cursor.class, NextLink.class})
           @Valid Pagination pagination) {
 
     public ApiCall {
@@ -383,6 +383,7 @@ public record HttpConnectorConfiguration(
     @JsonSubTypes.Type(value = PageNumber.class, name = PageNumber.TYPE),
     @JsonSubTypes.Type(value = LimitOffset.class, name = LimitOffset.TYPE),
     @JsonSubTypes.Type(value = Cursor.class, name = Cursor.TYPE),
+    @JsonSubTypes.Type(value = NextLink.class, name = NextLink.TYPE),
   })
   @Schema(
       name = "HttpConnectorPagination",
@@ -391,8 +392,9 @@ public record HttpConnectorConfiguration(
         @DiscriminatorMapping(value = PageNumber.TYPE, schema = PageNumber.class),
         @DiscriminatorMapping(value = LimitOffset.TYPE, schema = LimitOffset.class),
         @DiscriminatorMapping(value = Cursor.TYPE, schema = Cursor.class),
+        @DiscriminatorMapping(value = NextLink.TYPE, schema = NextLink.class),
       })
-  public sealed interface Pagination permits PageNumber, LimitOffset, Cursor {
+  public sealed interface Pagination permits PageNumber, LimitOffset, Cursor, NextLink {
     @JsonProperty(JsonMergePatch.NESTED_TYPE_PROPERTY)
     String type();
   }
@@ -535,6 +537,41 @@ public record HttpConnectorConfiguration(
       cursorPath = ConnectorValues.blankToNull(cursorPath);
       cursorParameter = ConnectorValues.blankToNull(cursorParameter);
       limitParameter = ConnectorValues.blankToNull(limitParameter);
+    }
+
+    @Override
+    @Schema(allowableValues = TYPE, requiredMode = Schema.RequiredMode.REQUIRED)
+    public String type() {
+      return TYPE;
+    }
+  }
+
+  /** Next link pagination, with the URL of the next request taken from each response. */
+  @Schema(
+      name = "HttpConnectorNextLinkPagination",
+      description =
+          "Next link pagination: each response is one record and holds the URL of the next"
+              + " request. Links must have the scheme, host and port of baseUrl.")
+  public record NextLink(
+      @Schema(
+              description =
+                  "JSON path to the next link, a string or an object with a string href. Only"
+                      + " member names and array indexes. An absent, null or empty link ends the"
+                      + " run.",
+              example = "$.links.next")
+          @NotNull(groups = OnRelease.class, message = "'nextLinkPath' is required") @Pattern(regexp = JSON_PATH, message = "'nextLinkPath'" + JSON_PATH_MESSAGE) String nextLinkPath,
+      @Schema(
+              description =
+                  "Maximum number of links to follow. At least 1. Absent or null follows all"
+                      + " links. A run sends at most 1000 requests and stops with an error when"
+                      + " the last one still holds a link, so a value above 999 has no effect.",
+              example = "10")
+          @Min(value = 1, message = "'maxLinks' must be at least 1") Integer maxLinks)
+      implements Pagination {
+    static final String TYPE = "NEXT_LINK";
+
+    public NextLink {
+      nextLinkPath = ConnectorValues.blankToNull(nextLinkPath);
     }
 
     @Override

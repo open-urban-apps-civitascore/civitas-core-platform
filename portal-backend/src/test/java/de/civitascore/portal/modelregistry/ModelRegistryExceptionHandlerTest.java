@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.civitascore.modelforge.contract.ArtifactInUseException;
 import de.civitascore.modelforge.contract.Diagnostic;
 import de.civitascore.modelforge.contract.DiagnosticSeverity;
+import de.civitascore.modelforge.contract.RegistryConflictException;
 import de.civitascore.modelforge.contract.RegistryUnavailableException;
 import de.civitascore.modelforge.contract.ValidationFailedException;
 import java.util.List;
@@ -76,6 +77,21 @@ class ModelRegistryExceptionHandlerTest {
     assertThat(problem.getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
     assertThat(problem.getDetail())
         .contains("urn:core:platform:civitas:pipeline:common:c71d3077-985f-85f7-b699-88738d3e0dd6");
+  }
+
+  @Test
+  @DisplayName("a write that collides with a stored version is a conflict, not a server error")
+  void conflictingWriteIsConflict() {
+    ProblemDetail problem =
+        handler.handleRegistryConflict(
+            new RegistryConflictException(
+                "The request conflicts with existing registry data",
+                new IllegalStateException("duplicate key")),
+            request());
+
+    assertThat(problem.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+    assertThat(problem.getType()).hasToString("urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION");
+    assertThat(problem.getDetail()).doesNotContain("duplicate key");
   }
 
   @Test

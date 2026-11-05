@@ -2,18 +2,13 @@ package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.DataStructureMapper;
 import de.civitascore.portal.model.entity.DataStructure;
-import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
-import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
-import java.util.List;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -31,7 +26,7 @@ public class DataStructureService
   private final DataStructureMapper dataStructureMapper;
   private final AssignmentFactory assignmentFactory;
   private final AssignmentChangeAuthorizer assignmentChangeAuthorizer;
-  private final DataSourceRepository dataSourceRepository;
+  private final ArtifactUsageLookup artifactUsageLookup;
   private final ModelRegistryGateway modelRegistryGateway;
 
   @Override
@@ -88,7 +83,7 @@ public class DataStructureService
   @Override
   protected DataStructure preProcessDelete(UUID id) {
     DataStructure dataStructure = findByIdOrThrow(id);
-    validateNoVersionInUse(dataStructure);
+    artifactUsageLookup.of(dataStructure).requireNotInUse(getEntityName(), id);
     return dataStructure;
   }
 
@@ -102,37 +97,6 @@ public class DataStructureService
   protected void postDelete(DataStructure entity) {
     if (entity != null && entity.getModelLogicalUrn() != null) {
       modelRegistryGateway.deleteModel(entity.getModelLogicalUrn());
-    }
-  }
-
-  private void validateNoVersionInUse(DataStructure dataStructure) {
-    Set<DataStructureVersion> versions = dataStructure.getDataStructureVersions();
-    Set<UUID> versionIds =
-        versions.stream().map(DataStructureVersion::getId).collect(Collectors.toSet());
-    if (versionIds.isEmpty()) {
-      return;
-    }
-    if (dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)) {
-      throw new ResourceInUseException(
-          "DataStructure",
-          dataStructure.getId(),
-          "Cannot modify DataStructure because a DataSource is pinned to one of its versions.");
-    }
-    // The registry answers for every reference it holds onto a version's model — a sink's or
-    // source's element, a mapping endpoint, another model.
-    List<String> blockers =
-        versions.stream()
-            .map(DataStructureVersion::getModelUrn)
-            .map(modelRegistryGateway::referencesTo)
-            .flatMap(List::stream)
-            .distinct()
-            .toList();
-    if (!blockers.isEmpty()) {
-      throw new ResourceInUseException(
-          "DataStructure",
-          dataStructure.getId(),
-          "Cannot modify DataStructure because one or more of its versions is still referenced.",
-          blockers);
     }
   }
 }

@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useForm } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
@@ -110,6 +111,7 @@ const renderConnectorTab = (
   values?: Partial<DatasourceFormDraft>,
   isReadOnly = false,
   isDatasourceReleased = false,
+  isConnectorComplete = false,
 ) => {
   const merged = { ...defaultValues, ...values }
   const Wrapper = () => {
@@ -122,7 +124,10 @@ const renderConnectorTab = (
       <Form {...form}>
         <ConnectorTab
           form={form}
+          datasourceId={merged.id}
           connectorType={merged.connectorType}
+          isConnectorComplete={isConnectorComplete}
+          isConnectorChanged={false}
           isReadOnly={isReadOnly}
           isDatasourceReleased={isDatasourceReleased}
         />
@@ -130,7 +135,11 @@ const renderConnectorTab = (
     )
   }
 
-  return render(<Wrapper />)
+  return render(
+    <QueryClientProvider client={new QueryClient()}>
+      <Wrapper />
+    </QueryClientProvider>,
+  )
 }
 
 describe('ConnectorTab (integration)', () => {
@@ -392,6 +401,11 @@ describe('ConnectorTab (integration)', () => {
     it('shows no released info for a draft data source', () => {
       renderConnectorTab(undefined, false, false)
       expect(screen.queryByText('availableInfo')).not.toBeInTheDocument()
+    })
+
+    it('enables the connection test for a released data source in read-only mode', () => {
+      renderConnectorTab(undefined, true, true, true)
+      expect(screen.getByRole('button', { name: 'button' })).toBeEnabled()
     })
   })
 })

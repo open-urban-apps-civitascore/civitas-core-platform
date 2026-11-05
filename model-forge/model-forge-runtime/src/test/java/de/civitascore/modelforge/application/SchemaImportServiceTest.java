@@ -30,9 +30,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -61,9 +64,14 @@ class SchemaImportServiceTest {
     void setUp() {
         registry = mock(ArtifactRegistry.class);
         when(registry.resolveReference(anyString())).thenReturn(Optional.empty());
-        // A mock does not run the interface's default methods, so the transaction seam has to be
-        // stubbed to actually execute the work — otherwise the whole import silently stores nothing.
+        // A mock does not run the interface's default methods, so the transaction seam and the commit
+        // hook have to be stubbed to actually execute their work — otherwise the whole import silently
+        // stores and publishes nothing.
         when(registry.inTransaction(any())).thenAnswer(call -> call.getArgument(0, Supplier.class).get());
+        doAnswer(call -> {
+            call.getArgument(0, Runnable.class).run();
+            return null;
+        }).when(registry).afterCommit(any());
         ModelValidator validator = mock(ModelValidator.class);
         when(validator.validateSchema(any())).thenReturn(List.of());
         UrnService urns = new UrnService("platform", "civitas", "common", "1.0.0");
@@ -906,6 +914,30 @@ class SchemaImportServiceTest {
         // therefore never have been touched, or the failed import leaves phantom nodes behind.
         verify(graphSpy, never()).register(anyString(), anySet());
         verify(graphSpy, never()).registerFromRegistry(anyString());
+    }
+
+    @Test
+    void graphNodesArePublishedOnlyThroughTheAfterCommitHook() {
+        DependencyGraphService graphSpy = mock(DependencyGraphService.class);
+        SchemaImportService service = new SchemaImportService(
+            validatorAcceptingEverything(), mapper, registry,
+            new UrnService("platform", "civitas", "common", "1.0.0"),
+            new SchemaRefExtractor(), graphSpy,
+            new ReferenceExistenceValidator(registry, new SchemaRefExtractor()),
+            mock(RemoteSchemaRepository.class), new CoreSchemaValidator(mapper));
+        doNothing().when(registry).afterCommit(any());
+        JsonNode schema = mapper.readTree("""
+            { "title": "Bundle",
+              "$defs": { "Alpha": {"type":"object"}, "Beta": {"type":"object"} } }
+            """);
+
+        service.importSchema(new SchemaImportRequest(schema));
+
+        ArgumentCaptor<Runnable> publish = ArgumentCaptor.forClass(Runnable.class);
+        verify(registry).afterCommit(publish.capture());
+        verifyNoInteractions(graphSpy);
+        publish.getValue().run();
+        verify(graphSpy, atLeastOnce()).registerFromRegistry(anyString());
     }
 
     private ModelValidator validatorAcceptingEverything() {
