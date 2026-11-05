@@ -55,6 +55,8 @@ services:
       KAFKA_CLUSTERS_0_NAME: civitas-local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      # The image's JDK 17.0.6 does not detect the container limit on some cgroup v2 hosts and sizes itself from host memory and CPUs.
+      JAVA_OPTS: -Xms32m -Xmx192m -XX:+UseSerialGC -XX:ActiveProcessorCount=2
     networks:
       - civitas-network
 
