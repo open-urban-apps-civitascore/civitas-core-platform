@@ -688,11 +688,11 @@ fi
 # Build AuthZ Repository JAR (required by its Dockerfile)
 # Uses containerized Maven (JDK 25) so the host doesn't need Java 25 installed.
 echo "Building AuthZ Repository..."
-if ! mvn_build "$SCRIPT_DIR/../portal-model" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -q; then
+if ! mvn_build "$SCRIPT_DIR/../portal-model" $MVN_CLEAN install -DskipTests -DskipITs -Drevision=$DEV_VERSION -q; then
     echo "ERROR: Portal Model build failed"
     exit 1
 fi
-if ! mvn_build "$SCRIPT_DIR/../authz/repository" $MVN_CLEAN package -DskipTests -Dportal-model.version=$DEV_VERSION -q; then
+if ! mvn_build "$SCRIPT_DIR/../authz/repository" $MVN_CLEAN package -DskipTests -DskipITs -Dportal-model.version=$DEV_VERSION -q; then
     echo "ERROR: AuthZ Repository build failed"
     exit 1
 fi
@@ -754,7 +754,7 @@ if [ -f .env ]; then
 fi
 
 echo "  Building the NiFi NARs and JDBC drivers..."
-if ! mvn_build "$SCRIPT_DIR/../nifi-extensions" $MVN_CLEAN package -DskipTests -q; then
+if ! mvn_build "$SCRIPT_DIR/../nifi-extensions" $MVN_CLEAN package -DskipTests -DskipITs -q; then
     echo "ERROR: NiFi extensions build failed"
     exit 1
 fi
@@ -890,7 +890,7 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ] || [ "$STAR
     echo "Building Java artifacts for Docker images (containerized Maven)..."
 
     # portal-model is a dependency for both services
-    if ! mvn_build "$SCRIPT_DIR/../portal-model" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -q; then
+    if ! mvn_build "$SCRIPT_DIR/../portal-model" $MVN_CLEAN install -DskipTests -DskipITs -Drevision=$DEV_VERSION -q; then
         echo "ERROR: Portal Model build failed"
         exit 1
     fi
@@ -898,7 +898,7 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ] || [ "$STAR
 
     # Config Adapter JAR (needed by config-adapter Dockerfile)
     if [ "$config_adapter_option" = "1" ]; then
-        if ! mvn_build "$SCRIPT_DIR/../config-adapter" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -Pdist -q; then
+        if ! mvn_build "$SCRIPT_DIR/../config-adapter" $MVN_CLEAN install -DskipTests -DskipITs -Drevision=$DEV_VERSION -Pdist -q; then
             echo "ERROR: Config Adapter build failed"
             exit 1
         fi
@@ -910,7 +910,7 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ] || [ "$STAR
     # compiles against, so build it into the container Maven cache before the image build.
     # Only the Java jars are needed.
     if [ "$backend_option" = "1" ] || [ "$START_ADMIN_UI" = "true" ]; then
-        if ! mvn_build "$SCRIPT_DIR/../model-forge" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -Dspotless.check.skip=true -Dspotbugs.skip=true -q; then
+        if ! mvn_build "$SCRIPT_DIR/../model-forge" $MVN_CLEAN install -DskipTests -DskipITs -Drevision=$DEV_VERSION -Dspotless.check.skip=true -Dspotbugs.skip=true -q; then
             echo "ERROR: Model Forge build failed"
             exit 1
         fi
@@ -939,7 +939,7 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ] || [ "$STAR
 
     # Portal Backend JAR (needed by portal-backend Dockerfile)
     if [ "$backend_option" = "1" ]; then
-        if ! mvn_build "$SCRIPT_DIR/../portal-backend" $MVN_CLEAN package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION -Dmodel-forge.version=$DEV_VERSION -q; then
+        if ! mvn_build "$SCRIPT_DIR/../portal-backend" $MVN_CLEAN package -DskipTests -DskipITs -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION -Dmodel-forge.version=$DEV_VERSION -q; then
             echo "ERROR: Portal Backend build failed"
             exit 1
         fi
@@ -979,7 +979,7 @@ if [ "$config_adapter_option" = "2" ] || [ "$backend_option" = "2" ]; then
 
     # portal-model is a dependency for both services
     cd "$SCRIPT_DIR/../portal-model"
-    if ! mvn $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -q; then
+    if ! mvn $MVN_CLEAN install -DskipTests -DskipITs -Drevision=$DEV_VERSION -q; then
         echo "ERROR: Portal Model build failed"
         exit 1
     fi
@@ -987,7 +987,7 @@ if [ "$config_adapter_option" = "2" ] || [ "$backend_option" = "2" ]; then
 
     if [ "$config_adapter_option" = "2" ]; then
         cd "$SCRIPT_DIR/../config-adapter"
-        if ! mvn $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -Pdist; then
+        if ! mvn $MVN_CLEAN install -DskipTests -DskipITs -Drevision=$DEV_VERSION -Pdist; then
             echo "ERROR: Config Adapter build failed"
             exit 1
         fi
@@ -996,7 +996,7 @@ if [ "$config_adapter_option" = "2" ] || [ "$backend_option" = "2" ]; then
 
     if [ "$backend_option" = "2" ]; then
         cd "$SCRIPT_DIR/../portal-backend"
-        if ! mvn $MVN_CLEAN package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION; then
+        if ! mvn $MVN_CLEAN package -DskipTests -DskipITs -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION; then
             echo "ERROR: Portal Backend build failed"
             exit 1
         fi
@@ -1141,7 +1141,7 @@ if [ "$config_adapter_option" = "3" ]; then
     echo
     echo "Build first (if not already done):"
     echo "  cd config-adapter"
-    echo "  mvn $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION"
+    echo "  mvn $MVN_CLEAN install -DskipTests -DskipITs -Drevision=$DEV_VERSION"
     echo
     echo "Then start in your IDE:"
     echo "  Project: config-adapter/config-adapter-application"
@@ -1208,9 +1208,9 @@ if [ "$backend_option" = "3" ]; then
     echo "======================================================"
     echo
     echo "Build first (if not already done):"
-    echo "  cd portal-model && mvn $MVN_CLEAN install -DskipTests && cd .."
+    echo "  cd portal-model && mvn $MVN_CLEAN install -DskipTests -DskipITs && cd .."
     echo "  cd portal-backend"
-    echo "  mvn $MVN_CLEAN package -DskipTests -Dconfig-adapter.version=$DEV_VERSION"
+    echo "  mvn $MVN_CLEAN package -DskipTests -DskipITs -Dconfig-adapter.version=$DEV_VERSION"
     echo
     echo "Then start in your IDE:"
     echo "  Project: portal-backend"

@@ -185,7 +185,7 @@ echo
 if [ "$DO_CONFIG" = "true" ]; then
     echo "== config-adapter =="
     echo "  Building config-adapter JAR (containerized Maven)..."
-    mvn_in_container "$PROJECT_ROOT/config-adapter" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -Pdist -q
+    mvn_in_container "$PROJECT_ROOT/config-adapter" $MVN_CLEAN install -DskipTests -DskipITs -Drevision=$DEV_VERSION -Pdist -q
     rebuild_image_and_recreate config-adapter civitas-config-adapter
     # The connection test runs from the same JAR in a container of its own.
     rebuild_image_and_recreate connection-tester civitas-connection-tester
@@ -199,10 +199,10 @@ if [ "$DO_BACKEND" = "true" ]; then
     # changed model (new entity/saga-payload field) is picked up. Not gated by --skip-model-forge —
     # that flag is about model-forge, a separate module.
     echo "  Building portal-model ($DEV_VERSION) — backend dependency..."
-    mvn_in_container "$PROJECT_ROOT/portal-model" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION -q
+    mvn_in_container "$PROJECT_ROOT/portal-model" $MVN_CLEAN install -DskipTests -DskipITs -Drevision=$DEV_VERSION -q
     if [ "$SKIP_MODEL_FORGE" = "false" ]; then
         echo "  Building model-forge ($DEV_VERSION) — backend dependency..."
-        mvn_in_container "$PROJECT_ROOT/model-forge" $MVN_CLEAN install -DskipTests -Drevision=$DEV_VERSION \
+        mvn_in_container "$PROJECT_ROOT/model-forge" $MVN_CLEAN install -DskipTests -DskipITs -Drevision=$DEV_VERSION \
             -Dspotless.check.skip=true -Dspotbugs.skip=true -q
     else
         # The backend build below asks for core-model-forge-*:$DEV_VERSION, and the skipped build
@@ -217,7 +217,7 @@ if [ "$DO_BACKEND" = "true" ]; then
         echo "  (--skip-model-forge) reusing the cached model-forge ($DEV_VERSION)"
     fi
     echo "  Building portal-backend JAR (containerized Maven)..."
-    mvn_in_container "$PROJECT_ROOT/portal-backend" $MVN_CLEAN package -DskipTests \
+    mvn_in_container "$PROJECT_ROOT/portal-backend" $MVN_CLEAN package -DskipTests -DskipITs \
         -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION -Dmodel-forge.version=$DEV_VERSION -q
     rebuild_image_and_recreate portal-backend civitas-portal-backend
     echo

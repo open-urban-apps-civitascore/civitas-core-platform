@@ -188,7 +188,7 @@ build-model-forge:
       artifacts: true
   script:
     - cd model-forge
-    - mvn $MAVEN_CLI_OPTS install -DskipTests -Drevision=$MODEL_FORGE_VERSION -Dspotless.check.skip=true -Dspotbugs.skip=true -Djacoco.skip=true
+    - mvn $MAVEN_CLI_OPTS install -DskipTests -DskipITs -Drevision=$MODEL_FORGE_VERSION -Dspotless.check.skip=true -Dspotbugs.skip=true -Djacoco.skip=true
   artifacts:
     expire_in: 1 month
     paths:
