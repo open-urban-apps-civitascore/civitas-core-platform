@@ -183,7 +183,11 @@ public class DataSinkRemovalService {
     boolean deletesStoredData =
         plan.deactivatedDataSinks().stream().anyMatch(DataSink::isProvisioned);
     if (deletesStoredData || !plan.layers().isEmpty() || !plan.apis().isEmpty()) {
-      throw new RemovalNotConfirmedException(plan.dataSet().getId(), UnconfirmedRemoval.of(plan));
+      throw new RemovalNotConfirmedException(
+          plan.dataSet().getId(),
+          UnconfirmedRemoval.of(plan),
+          "This request removes stored data, Layers or APIs of the Dataset; set"
+              + " confirmDataLoss=true to proceed");
     }
   }
 

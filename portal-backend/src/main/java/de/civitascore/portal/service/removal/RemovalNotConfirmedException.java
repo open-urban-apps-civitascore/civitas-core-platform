@@ -13,10 +13,8 @@ public class RemovalNotConfirmedException extends RuntimeException {
   private final UUID dataSetId;
   private final transient UnconfirmedRemoval removal;
 
-  RemovalNotConfirmedException(UUID dataSetId, UnconfirmedRemoval removal) {
-    super(
-        "This request removes stored data, Layers or APIs of the Dataset; set"
-            + " confirmDataLoss=true to proceed");
+  public RemovalNotConfirmedException(UUID dataSetId, UnconfirmedRemoval removal, String message) {
+    super(message);
     this.dataSetId = dataSetId;
     this.removal = removal;
   }

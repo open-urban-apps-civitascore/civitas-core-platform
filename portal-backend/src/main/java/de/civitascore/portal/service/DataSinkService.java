@@ -17,6 +17,8 @@ import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.service.removal.DataSinkChange;
 import de.civitascore.portal.service.removal.DataSinkRemovalService;
+import de.civitascore.portal.service.removal.RemovalNotConfirmedException;
+import de.civitascore.portal.service.removal.UnconfirmedRemoval;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -173,9 +175,9 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
           "DataSink is provisioned; its table name and data structure can no longer change."
               + " Create a new DataSink and attach it to the Pipeline instead");
     }
-    throw new ResourceInUseException(
-        getEntityName(),
-        existingEntity.getId(),
+    throw new RemovalNotConfirmedException(
+        existingEntity.getDataSet().getId(),
+        UnconfirmedRemoval.storedDataOf(existingEntity),
         "This change rebuilds the sink's table and discards all stored data;"
             + " set confirmDataLoss=true to proceed");
   }
@@ -373,8 +375,9 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
    * next release removes its storage.
    *
    * @param confirmDataLoss whether the caller accepts that stored data, Layers and APIs go
-   * @throws ResourceInUseException if a Pipeline still links the DataSink, or if the delete removes
-   *     stored data, a Layer or an API and {@code confirmDataLoss} is not set
+   * @throws ResourceInUseException if a Pipeline still links the DataSink
+   * @throws RemovalNotConfirmedException if the delete removes stored data, a Layer or an API and
+   *     {@code confirmDataLoss} is not set
    */
   @Transactional
   public void deleteById(UUID id, boolean confirmDataLoss) {

@@ -27,6 +27,7 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.service.removal.DataSinkRemovalService;
+import de.civitascore.portal.service.removal.RemovalNotConfirmedException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -918,8 +919,12 @@ class DataSinkServiceTest {
       input.setConfirmDataLoss(false);
 
       assertThatThrownBy(() -> dataSinkService.update(sink.getId(), input))
-          .isInstanceOf(ResourceInUseException.class)
-          .hasMessageContaining("confirmDataLoss");
+          .isInstanceOfSatisfying(
+              RemovalNotConfirmedException.class,
+              e ->
+                  assertThat(e.getRemoval().dataSinks())
+                      .singleElement()
+                      .satisfies(removed -> assertThat(removed.id()).isEqualTo(sink.getId())));
     }
 
     @ParameterizedTest(name = "confirmDataLoss={0}")
@@ -968,7 +973,7 @@ class DataSinkServiceTest {
       input.setConfirmDataLoss(true);
 
       assertThatThrownBy(() -> dataSinkService.update(sink.getId(), input))
-          .isNotInstanceOf(ResourceInUseException.class);
+          .isNotInstanceOfAny(ResourceInUseException.class, RemovalNotConfirmedException.class);
     }
 
     /**
@@ -984,7 +989,7 @@ class DataSinkServiceTest {
       DataSinkInputDTO input = updateInput("new_table", "v1", false);
 
       assertThatThrownBy(() -> dataSinkService.update(sink.getId(), input))
-          .isNotInstanceOf(ResourceInUseException.class);
+          .isNotInstanceOfAny(ResourceInUseException.class, RemovalNotConfirmedException.class);
     }
 
     @Test
@@ -997,7 +1002,7 @@ class DataSinkServiceTest {
       DataSinkInputDTO input = updateInput("old_table", "v1", false);
 
       assertThatThrownBy(() -> dataSinkService.update(sink.getId(), input))
-          .isNotInstanceOf(ResourceInUseException.class);
+          .isNotInstanceOfAny(ResourceInUseException.class, RemovalNotConfirmedException.class);
     }
   }
 }

@@ -51,7 +51,7 @@ docs {
   |---|---|
   | not provisioned | accepted |
   | provisioned POSTGIS | 409 Conflict, also with `confirmDataLoss` — a release never replaces a table; create a new DataSink and attach it to the Pipeline instead |
-  | provisioned FROST | 409 Conflict unless `confirmDataLoss: true` |
+  | provisioned FROST | 409 Conflict `REMOVAL_NOT_CONFIRMED` unless `confirmDataLoss: true`; its `removal` lists this DataSink under `dataSinks` |
 
   **Precondition:** `dataSetId`, `dataSinkId` and `setupModelUrn` set.
 
