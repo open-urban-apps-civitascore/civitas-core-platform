@@ -2,7 +2,7 @@ import proj4 from 'proj4'
 
 import { GEOJSON_REF_BASE } from '@/components/uml-modeler/services/jsonSchemaExportService'
 import { crsOptions } from '@/const/crs'
-import { DataSink, DATASINK_TYPES, DataSinkType } from '@/types/datasinks'
+import { DataSink, DATASINK_TYPES } from '@/types/datasinks'
 import { DatastructureVersion } from '@/types/datastructures'
 import { BoundingBox, Layer, LayerApiPayload, LayerFormData } from '@/types/layers'
 import {
@@ -15,15 +15,6 @@ import {
   StaApiFormData,
 } from '@/types/namedApis'
 import { Style, StyleFormData, StyleInput } from '@/types/styles'
-
-/** Mirrors the backend's NamedApiRules.backingDataSinkTypes: the API goes with the last Data sink of its type. */
-export const BACKING_DATASINK_TYPE: Partial<Record<ApiStandard, DataSinkType>> = {
-  [API_STANDARDS.OWS]: DATASINK_TYPES.POSTGIS,
-  [API_STANDARDS.STA]: DATASINK_TYPES.FROST,
-}
-
-/** Mirrors the backend's NamedApiRules.layerPublishingApi: every Layer of a Dataset belongs to its API of this standard. */
-export const LAYER_PUBLISHING_STANDARD: ApiStandard = API_STANDARDS.OWS
 
 export const hasApiType = (apis: NamedApi[], apiType: ApiStandard): boolean =>
   apis.some(api => api.standard === apiType)
