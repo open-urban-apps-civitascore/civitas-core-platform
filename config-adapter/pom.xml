@@ -47,6 +47,11 @@
 		     jacoco appends the agent argument to this value when it runs in the lifecycle. -->
 		<argLine />
 
+		<!-- Failsafe 3.6 no longer reads -DskipTests. Deriving skipITs from it keeps
+		     -DskipTests skipping the integration tests, and -DskipITs alone still works. -->
+		<skipTests>false</skipTests>
+		<skipITs>${skipTests}</skipITs>
+
 		<kafka.version>4.1.2</kafka.version>
 		<keycloak.version>26.0.12</keycloak.version>
 		<cloudevents.version>3.0.0</cloudevents.version>
