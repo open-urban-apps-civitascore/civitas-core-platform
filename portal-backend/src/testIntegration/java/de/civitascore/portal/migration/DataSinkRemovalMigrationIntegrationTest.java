@@ -72,15 +72,15 @@ class DataSinkRemovalMigrationIntegrationTest {
   }
 
   @Test
-  void migrate_keepsEveryProvisionedSinkActive() {
+  void migrate_keepsEverySinkActive() {
     assertThat(stateOf(LINKED_SINK)).isEqualTo("ACTIVE");
     assertThat(stateOf(UNLINKED_PROVISIONED_SINK)).isEqualTo("ACTIVE");
+    assertThat(stateOf(UNLINKED_UNPROVISIONED_SINK)).isEqualTo("ACTIVE");
   }
 
   @Test
-  void migrate_deletesAnUnlinkedSinkThatWasNeverProvisionedWithItsLayers() {
-    assertThat(exists("data_sinks", UNLINKED_UNPROVISIONED_SINK)).isFalse();
-    assertThat(exists("layers", UNPROVISIONED_LAYER)).isFalse();
+  void migrate_keepsTheLayersOfAnUnlinkedSinkThatWasNeverProvisioned() {
+    assertThat(exists("layers", UNPROVISIONED_LAYER)).isTrue();
   }
 
   @Test
