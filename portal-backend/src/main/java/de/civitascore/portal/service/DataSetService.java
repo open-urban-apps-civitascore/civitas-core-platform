@@ -38,6 +38,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -330,26 +331,29 @@ public class DataSetService
   }
 
   /**
+   * Datasets from before the limit can exceed it; they can still save their APIs.
+   *
    * @throws InvalidInputException if the input names more APIs of a standard than a dataset can
-   *     have
+   *     have, and more than the dataset has now
    */
   private void requireApiCardinality(DataSet entity, List<NamedApiInputDTO> incoming) {
     Map<ApiStandard, Long> counts =
         incoming.stream()
             .collect(Collectors.groupingBy(NamedApiInputDTO::getStandard, Collectors.counting()));
-    counts.forEach(
-        (standard, count) ->
-            NamedApiRules.maxPerDataSet(standard)
-                .ifPresent(
-                    max -> {
-                      if (count > max) {
-                        throw new InvalidInputException(
-                            "namedApis",
-                            entity.getId(),
-                            "A dataset can expose at most %d %s named API(s); got %d"
-                                .formatted(max, standard, count));
-                      }
-                    }));
+    for (Map.Entry<ApiStandard, Long> entry : counts.entrySet()) {
+      ApiStandard standard = entry.getKey();
+      long count = entry.getValue();
+      long existing =
+          entity.getNamedApis().stream().filter(api -> api.getStandard() == standard).count();
+      OptionalInt max = NamedApiRules.maxPerDataSet(standard);
+      if (max.isPresent() && count > max.getAsInt() && count > existing) {
+        throw new InvalidInputException(
+            "namedApis",
+            entity.getId(),
+            "A dataset can expose at most %d %s named API(s); got %d"
+                .formatted(max.getAsInt(), standard, count));
+      }
+    }
   }
 
   /**

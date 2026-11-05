@@ -868,6 +868,32 @@ class DataSetServiceTest {
     }
 
     @Test
+    @DisplayName("adds an OWS named API to a dataset that already has two STA named APIs")
+    void addsOwsApiNextToExistingDuplicateStaApis() {
+      UUID id = UUID.randomUUID();
+      DataSet entity = new DataSet();
+      entity.setId(id);
+      entity.setNamedApis(
+          new HashSet<>(
+              Set.of(
+                  NamedApi.builder().name("t").slug("traffic").standard(ApiStandard.STA).build(),
+                  NamedApi.builder().name("w").slug("weather").standard(ApiStandard.STA).build())));
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(
+          List.of(
+              namedApi("traffic", ApiStandard.STA),
+              namedApi("weather", ApiStandard.STA),
+              namedApi("maps", ApiStandard.OWS)));
+      when(dataSinkRepository.findByDataSetIdAndState(id, DataSinkState.ACTIVE))
+          .thenReturn(activeSinks(DataSinkType.POSTGIS));
+      mapNamedApis();
+
+      createService().postConvertToEntity(entity, input);
+
+      assertThat(entity.getNamedApis()).hasSize(3);
+    }
+
+    @Test
     @DisplayName("accepts several CUSTOM named APIs without a data sink")
     void acceptsSeveralCustomApisWithoutDataSink() {
       DataSet entity = new DataSet();
