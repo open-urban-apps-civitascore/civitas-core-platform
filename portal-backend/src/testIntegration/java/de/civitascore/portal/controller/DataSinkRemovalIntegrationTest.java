@@ -296,8 +296,9 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
     }
 
     @Test
-    @DisplayName("PATCH removing the last link without confirmation answers 409")
-    void patchUnconfirmed_answers409() {
+    @DisplayName(
+        "PATCH removing the last link without confirmation answers 409 and changes nothing")
+    void patchUnconfirmed_answers409AndChangesNothing() {
       frostSink(pipeline, true);
       addApi(ApiStandard.STA);
 
@@ -305,6 +306,10 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
           exchange(HttpMethod.PATCH, pipelinePath(), Map.of("dataSinkIds", List.of()));
 
       assertDataLossUnconfirmed(response);
+      assertThat(dataSinkRepository.findByPipelinesId(pipeline.getId())).hasSize(1);
+      assertThat(pipelineRepository.findById(pipeline.getId()).orElseThrow().getVersion())
+          .isEqualTo(pipeline.getVersion());
+      assertThat(apiStandards()).containsExactly("STA");
     }
 
     @Test

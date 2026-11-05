@@ -2124,6 +2124,25 @@ class DataSetServiceTest {
       verifyNoInteractions(modelRegistryGateway);
     }
 
+    @ParameterizedTest
+    @EnumSource(
+        value = PendingSagaType.class,
+        names = {"CREATE", "UPDATE"})
+    @DisplayName("release failure: keeps the data sinks waiting for removal")
+    void releaseFailureKeepsPendingSinks(PendingSagaType sagaType) {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(sagaType);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().handleSagaFailed(id, "deprovision-sink", "PostGIS down", false);
+
+      verify(dataSinkRepository, never())
+          .findByDataSetIdAndState(id, DataSinkState.PENDING_UNPROVISION);
+      verify(dataSinkRepository, never()).delete(any(DataSink.class));
+    }
+
     @Test
     @DisplayName("UNRELEASE failure: reverts optimistic READY to AVAILABLE, pending cleared")
     void unreleaseFailureRevertsToAvailable() {
