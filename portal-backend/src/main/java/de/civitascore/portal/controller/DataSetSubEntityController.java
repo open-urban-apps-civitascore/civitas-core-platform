@@ -47,9 +47,10 @@ public abstract class DataSetSubEntityController<
           + " stored data of a provisioned Data sink is deleted at the next release.";
 
   protected static final String REMOVAL_CONFLICT_DESCRIPTION =
-      "A saga is in flight on the parent dataset, or the request removes a provisioned Data"
-          + " sink, a Layer or an API without confirmDataLoss=true (code RESOURCE_IN_USE). Nothing"
-          + " changed.";
+      "A saga is in flight on the parent dataset (code SAGA_IN_FLIGHT), or the request removes a"
+          + " provisioned Data sink, a Layer or an API without confirmDataLoss=true (code"
+          + " REMOVAL_NOT_CONFIRMED; the property removal lists the dataSinks, layers and apis it"
+          + " would remove). Nothing changed.";
 
   /**
    * Names this controller's entity in the {@code dataSetId} path-variable error and in the

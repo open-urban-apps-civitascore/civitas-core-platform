@@ -47,9 +47,9 @@ public class DataSinkRemovalService {
    * @param confirmDataLoss whether the caller accepts that stored data, Layers and APIs go
    * @throws InvalidInputException if a requested Data sink id is unknown, not active, of another
    *     Dataset or linked to another Pipeline
-   * @throws ResourceInUseException if a Pipeline still links a Data sink the change deletes, or if
-   *     the change removes a provisioned Data sink, a Layer or an API without {@code
-   *     confirmDataLoss}
+   * @throws ResourceInUseException if a Pipeline still links a Data sink the change deletes
+   * @throws RemovalNotConfirmedException if the change removes a provisioned Data sink, a Layer or
+   *     an API without {@code confirmDataLoss}
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public PreparedDataSinkChange prepare(DataSinkChange change, boolean confirmDataLoss) {
@@ -183,11 +183,7 @@ public class DataSinkRemovalService {
     boolean deletesStoredData =
         plan.deactivatedDataSinks().stream().anyMatch(DataSink::isProvisioned);
     if (deletesStoredData || !plan.layers().isEmpty() || !plan.apis().isEmpty()) {
-      throw new ResourceInUseException(
-          DataSet.class.getSimpleName(),
-          plan.dataSet().getId(),
-          "This request removes stored data, Layers or APIs of the Dataset; set"
-              + " confirmDataLoss=true to proceed");
+      throw new RemovalNotConfirmedException(plan.dataSet().getId(), UnconfirmedRemoval.of(plan));
     }
   }
 

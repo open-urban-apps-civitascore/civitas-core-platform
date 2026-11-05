@@ -20,7 +20,7 @@ tests {
 
   test("Delete refused until data loss is confirmed", function() {
     expect(res.getStatus()).to.equal(409);
-    expect(body.type).to.equal('urn:civitas:error:RESOURCE_IN_USE');
+    expect(body.type).to.equal('urn:civitas:error:REMOVAL_NOT_CONFIRMED');
     expect(body.detail).to.include('confirmDataLoss=true');
   });
 }
@@ -32,7 +32,7 @@ docs {
 
   **Precondition:** steps 4 to 12 ran; the dataset is `DRAFT` again.
 
-  **Expected Response:** 409 Conflict, type `urn:civitas:error:RESOURCE_IN_USE`, `detail` tells to set `confirmDataLoss=true`.
+  **Expected Response:** 409 Conflict, type `urn:civitas:error:REMOVAL_NOT_CONFIRMED`, `detail` tells to set `confirmDataLoss=true`, `removal` lists the `dataSinks`, `layers` and `apis` that go.
 
   **System Impact:**
 

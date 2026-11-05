@@ -911,7 +911,7 @@ class DataSinkControllerIntegrationTest
       ResponseEntity<ProblemDetail> unconfirmed =
           exchangeForProblem(
               getEndpointPath() + "/" + id, HttpMethod.DELETE, createAuthHeaders(), null);
-      assertRejected(unconfirmed, HttpStatus.CONFLICT, "urn:civitas:error:RESOURCE_IN_USE");
+      assertRejected(unconfirmed, HttpStatus.CONFLICT, "urn:civitas:error:REMOVAL_NOT_CONFIRMED");
       assertThat(dataSinkRepository.findById(id).orElseThrow().getState())
           .isEqualTo(DataSinkState.ACTIVE);
 

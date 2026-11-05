@@ -41,6 +41,7 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
 
   private static final String CONFIRMED = "?confirmDataLoss=true";
   private static final String RESOURCE_IN_USE = "urn:civitas:error:RESOURCE_IN_USE";
+  private static final String REMOVAL_NOT_CONFIRMED = "urn:civitas:error:REMOVAL_NOT_CONFIRMED";
 
   @Autowired private PortalTestDataFactory portalData;
   @Autowired private DataSinkRepository dataSinkRepository;
@@ -147,7 +148,7 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
 
   private static void assertDataLossUnconfirmed(ResponseEntity<JsonNode> response) {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-    assertThat(response.getBody().get("type").asString()).isEqualTo(RESOURCE_IN_USE);
+    assertThat(response.getBody().get("type").asString()).isEqualTo(REMOVAL_NOT_CONFIRMED);
     assertThat(response.getBody().get("detail").asString()).contains("confirmDataLoss=true");
   }
 
@@ -163,6 +164,11 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
       ResponseEntity<JsonNode> response = exchange(HttpMethod.DELETE, pipelinePath(), null);
 
       assertDataLossUnconfirmed(response);
+      JsonNode removal = response.getBody().get("removal");
+      assertThat(ids(removal, "dataSinks")).containsExactly(surface.sink().getId().toString());
+      assertThat(removal.get("dataSinks").get(0).get("provisioned").asBoolean()).isTrue();
+      assertThat(ids(removal, "layers")).containsExactly(surface.layer().getId().toString());
+      assertThat(ids(removal, "apis")).containsExactly(surface.ows().getId().toString());
       assertThat(pipelineRepository.existsById(pipeline.getId())).isTrue();
       assertThat(dataSinkRepository.findByPipelinesId(pipeline.getId())).hasSize(1);
       assertThat(layerRepository.existsById(surface.layer().getId())).isTrue();

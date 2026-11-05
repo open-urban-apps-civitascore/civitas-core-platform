@@ -78,9 +78,13 @@ class DataSinkRemovalServiceTest {
 
     assertThatThrownBy(() -> service.prepare(DataSinkChange.deletePipeline(pipeline), false))
         .isInstanceOfSatisfying(
-            ResourceInUseException.class,
-            e -> assertThat(e.getResourceId()).isEqualTo(dataSet.getId()))
-        .hasMessageContaining("confirmDataLoss=true");
+            RemovalNotConfirmedException.class,
+            e -> {
+              assertThat(e.getDataSetId()).isEqualTo(dataSet.getId());
+              assertThat(e.getRemoval().dataSinks())
+                  .singleElement()
+                  .satisfies(removed -> assertThat(removed.provisioned()).isTrue());
+            });
   }
 
   @Test
@@ -99,8 +103,7 @@ class DataSinkRemovalServiceTest {
     api(ApiStandard.STA);
 
     assertThatThrownBy(() -> service.prepare(DataSinkChange.deletePipeline(pipeline), false))
-        .isInstanceOf(ResourceInUseException.class)
-        .hasMessageContaining("confirmDataLoss=true");
+        .isInstanceOf(RemovalNotConfirmedException.class);
   }
 
   @Test
@@ -113,8 +116,7 @@ class DataSinkRemovalServiceTest {
     when(layerRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(layer));
 
     assertThatThrownBy(() -> service.prepare(DataSinkChange.deletePipeline(pipeline), false))
-        .isInstanceOf(ResourceInUseException.class)
-        .hasMessageContaining("confirmDataLoss=true");
+        .isInstanceOf(RemovalNotConfirmedException.class);
   }
 
   @Test

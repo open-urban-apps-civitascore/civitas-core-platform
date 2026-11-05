@@ -30,9 +30,9 @@ docs {
 
   Each DataSink that loses its last Pipeline with this delete becomes inactive: a never provisioned one is deleted, a provisioned one is marked `PENDING_UNPROVISION` until the next release removes its storage. Its Layers are deleted. An API of the DataSet goes, together with its Layers, when no active DataSink of a kind that backs it remains: PostGIS for OWS, FROST for STA. All of this happens in one transaction.
 
-  **Confirmation:** When the delete removes a provisioned DataSink, a Layer or an API, the request must set `confirmDataLoss=true`; the next release deletes the stored data of a provisioned DataSink. Without it the backend answers `409` with type `urn:civitas:error:RESOURCE_IN_USE`, a `detail` that contains `confirmDataLoss=true`, and changes nothing. Only DataSinks that were never provisioned and take no Layer and no API go without confirmation. The Pipeline of this collection has no DataSink at this point, so it goes without confirmation; `dataset-saga-workflow` steps 15 and 15a show the confirmed delete.
+  **Confirmation:** When the delete removes a provisioned DataSink, a Layer or an API, the request must set `confirmDataLoss=true`; the next release deletes the stored data of a provisioned DataSink. Without it the backend answers `409` with type `urn:civitas:error:REMOVAL_NOT_CONFIRMED` and changes nothing. The property `removal` lists what the request would remove: `dataSinks` (`id`, `dataSinkType`, `provisioned`), `layers` (`id`, `layerName`, `title`) and `apis` (`id`, `slug`, `name`, `standard`). Only DataSinks that were never provisioned and take no Layer and no API go without confirmation. The Pipeline of this collection has no DataSink at this point, so it goes without confirmation; `dataset-saga-workflow` steps 15 and 15a show the confirmed delete.
 
-  **Expected Response:** 204 No Content. 409 `RESOURCE_IN_USE` if the delete removes stored data, a Layer or an API and `confirmDataLoss` is not `true`.
+  **Expected Response:** 204 No Content. 409 `REMOVAL_NOT_CONFIRMED` if the delete removes stored data, a Layer or an API and `confirmDataLoss` is not `true`.
 
   **Verification:** Issue TC-PIPE-02 for same `pipelineId` and confirm 404.
 
