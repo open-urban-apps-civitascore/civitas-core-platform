@@ -928,7 +928,7 @@ public class DataSetService
             .distinct()
             .toList();
 
-    sinks.forEach(sink -> dataSinkRepository.delete(sink));
+    sinks.forEach(dataSinkRepository::delete);
     dataSetRepository.delete(dataSet);
     dataSetRepository.flush();
 

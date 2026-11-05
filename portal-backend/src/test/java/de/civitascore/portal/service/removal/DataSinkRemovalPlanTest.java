@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 class DataSinkRemovalPlanTest {
@@ -29,7 +30,7 @@ class DataSinkRemovalPlanTest {
     NamedApi ows = api(ApiStandard.OWS);
     Layer layer = layer(sink, ows);
 
-    DataSinkRemovalPlan plan = compute(DataSinkRemovalRequest.deletePipeline(pipeline.getId()));
+    DataSinkRemovalPlan plan = compute(removeAllLinksOf(pipeline));
 
     assertThat(plan.deactivatedDataSinks()).containsExactly(sink);
     assertThat(plan.layers()).containsExactly(layer);
@@ -42,7 +43,7 @@ class DataSinkRemovalPlanTest {
     DataSink sink = sink(DataSinkType.POSTGIS, true, deleted, pipeline());
     api(ApiStandard.OWS);
 
-    DataSinkRemovalPlan plan = compute(DataSinkRemovalRequest.deletePipeline(deleted.getId()));
+    DataSinkRemovalPlan plan = compute(removeAllLinksOf(deleted));
 
     assertThat(plan.isEmpty()).isTrue();
     assertThat(sink.getPipelines()).hasSize(2);
@@ -56,7 +57,7 @@ class DataSinkRemovalPlanTest {
     DataSink unlinked = sink(DataSinkType.FROST, false);
     api(ApiStandard.STA);
 
-    DataSinkRemovalPlan plan = compute(DataSinkRemovalRequest.deletePipeline(pipeline.getId()));
+    DataSinkRemovalPlan plan = compute(removeAllLinksOf(pipeline));
 
     assertThat(plan.deactivatedDataSinks()).containsExactly(linked);
     assertThat(plan.deactivatedDataSinks()).doesNotContain(unlinked);
@@ -101,7 +102,7 @@ class DataSinkRemovalPlanTest {
     api(ApiStandard.OWS);
     api(ApiStandard.CUSTOM);
 
-    DataSinkRemovalPlan plan = compute(DataSinkRemovalRequest.deletePipeline(pipeline.getId()));
+    DataSinkRemovalPlan plan = compute(removeAllLinksOf(pipeline));
 
     assertThat(plan.apis()).containsExactly(sta);
   }
@@ -113,7 +114,7 @@ class DataSinkRemovalPlanTest {
     NamedApi ows = api(ApiStandard.OWS);
     api(ApiStandard.STA);
 
-    DataSinkRemovalPlan plan = compute(DataSinkRemovalRequest.deletePipeline(pipeline.getId()));
+    DataSinkRemovalPlan plan = compute(removeAllLinksOf(pipeline));
 
     assertThat(plan.apis()).containsExactly(ows);
   }
@@ -124,9 +125,19 @@ class DataSinkRemovalPlanTest {
     sink(DataSinkType.FROST, false, pipeline);
     api(ApiStandard.CUSTOM);
 
-    DataSinkRemovalPlan plan = compute(DataSinkRemovalRequest.deletePipeline(pipeline.getId()));
+    DataSinkRemovalPlan plan = compute(removeAllLinksOf(pipeline));
 
     assertThat(plan.apis()).isEmpty();
+  }
+
+  private DataSinkRemovalRequest removeAllLinksOf(Pipeline pipeline) {
+    return DataSinkRemovalRequest.removeLinks(
+        sinks.stream()
+            .filter(
+                sink ->
+                    sink.getPipelines().stream().anyMatch(p -> p.getId().equals(pipeline.getId())))
+            .map(sink -> new PipelineDataSinkLink(pipeline.getId(), sink.getId()))
+            .collect(Collectors.toSet()));
   }
 
   private DataSinkRemovalPlan compute(DataSinkRemovalRequest request) {

@@ -56,15 +56,8 @@ public class DataSinkRemovalService {
     return switch (change) {
       case DataSinkChange.LinkPipeline(Pipeline pipeline, Set<UUID> dataSinkIds) ->
           prepareLinks(pipeline, dataSinkIds, confirmDataLoss);
-      case DataSinkChange.DeletePipeline(Pipeline pipeline) -> {
-        List<DataSink> linked = dataSinkRepository.findByPipelinesId(pipeline.getId());
-        DataSinkRemovalPlan plan =
-            planConfirmed(
-                pipeline.getDataSet(),
-                DataSinkRemovalRequest.deletePipeline(pipeline.getId()),
-                confirmDataLoss);
-        yield new PreparedDataSinkChange(plan, pipeline, List.of(), linked);
-      }
+      case DataSinkChange.DeletePipeline(Pipeline pipeline) ->
+          prepareLinks(pipeline, Set.of(), confirmDataLoss);
       case DataSinkChange.DeleteDataSink(DataSink sink) ->
           PreparedDataSinkChange.removalOnly(
               planConfirmed(

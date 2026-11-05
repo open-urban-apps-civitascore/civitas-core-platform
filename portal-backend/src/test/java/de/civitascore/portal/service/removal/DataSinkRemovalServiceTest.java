@@ -346,6 +346,9 @@ class DataSinkRemovalServiceTest {
     lenient()
         .when(dataSinkRepository.findByDataSetIdAndState(dataSet.getId(), DataSinkState.ACTIVE))
         .thenReturn(List.of(sink));
+    lenient()
+        .when(dataSinkRepository.findByPipelinesId(pipeline.getId()))
+        .thenReturn(List.of(sink));
     return sink;
   }
 
