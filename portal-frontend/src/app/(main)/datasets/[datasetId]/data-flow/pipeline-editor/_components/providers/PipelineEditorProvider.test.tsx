@@ -1668,6 +1668,40 @@ describe('PipelineEditorProviderComponent', () => {
         return result
       }
 
+      // Saving sinks and pipeline per session would let one pipeline's update count a sink as gone that another
+      // session moves into its own pipeline in the same save.
+      it('creates the data sinks of every session before the first pipeline update', async () => {
+        const callOrder: string[] = []
+        vi.mocked(useCreateDataSink).mockReturnValue({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn().mockImplementation(async () => {
+            callOrder.push('createDataSink')
+            return { data: { id: 'new-sink-id' } }
+          }),
+          isPending: false,
+        } as unknown as ReturnType<typeof useCreateDataSink>)
+        mockUpdatePipelineMutateAsync.mockImplementation(async () => {
+          callOrder.push('updatePipeline')
+          return {}
+        })
+        vi.mocked(buildDataSinkPayloads).mockImplementation(pipeline =>
+          pipeline.id === 'pipeline-b'
+            ? [{ nodeId: 'persist-new', entityId: null, payload: { name: 'new-sink' } as never }]
+            : [],
+        )
+        const sessionB = savedSession('session-b', 'pipeline-b')
+        renderProviderWithSessions([
+          savedSession('session-a', 'pipeline-a'),
+          { ...sessionB, pipeline: { ...sessionB.pipeline, nodes: [makeGeoPersistenceNode('persist-new')] } },
+        ])
+
+        await act(async () => {
+          await contextRef.current?.saveAllPipelines()
+        })
+
+        expect(callOrder).toEqual(['createDataSink', 'updatePipeline', 'updatePipeline'])
+      })
+
       it('saves without a dialog when the backend needs no confirmation', async () => {
         renderProvider(savedSession('session-1', 'pipeline-1'))
 
@@ -2005,6 +2039,42 @@ describe('PipelineEditorProviderComponent', () => {
       expect(result).toBe(false)
       expect(mockUpdatePipelineMutateAsync).not.toHaveBeenCalled()
       expect(toast.error).toHaveBeenCalled()
+    })
+
+    it('names the pipeline when the backend refuses a sink update as an unconfirmed table rebuild', async () => {
+      vi.mocked(useUpdateDataSink).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockRejectedValue(
+          removalNotConfirmed({
+            dataSinks: [{ id: 'existing-sink', dataSinkType: 'FROST', provisioned: true }],
+            layers: [],
+            apis: [],
+          }),
+        ),
+        isPending: false,
+      } as unknown as ReturnType<typeof useUpdateDataSink>)
+      vi.mocked(buildDataSinkPayloads).mockReturnValue([
+        { nodeId: 'persist-node', entityId: 'existing-sink', payload: { name: 'sink' } as never },
+      ])
+      vi.mocked(hasDataSinkChanged).mockReturnValue(true)
+      renderProvider(
+        makeSession({
+          isDirty: true,
+          pipeline: {
+            ...createEmptyPipeline('Test'),
+            id: 'pipeline-1',
+            nodes: [makeGeoPersistenceNode('persist-node', 'existing-sink')],
+          },
+        }),
+      )
+
+      await act(async () => {
+        await contextRef.current?.saveAllPipelines()
+      })
+
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('header.unconfirmedDataLossError')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('header.dataSinkInUseError')
+      expect(mockUpdatePipelineMutateAsync).not.toHaveBeenCalled()
     })
 
     it('handles multiple dataSink creates and updates in one save', async () => {

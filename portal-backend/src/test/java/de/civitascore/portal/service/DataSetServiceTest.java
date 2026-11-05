@@ -894,6 +894,27 @@ class DataSetServiceTest {
     }
 
     @Test
+    @DisplayName("rejects a third STA named API on a dataset that already has two")
+    void rejectsThirdStaApiNextToExistingDuplicates() {
+      DataSet entity = new DataSet();
+      entity.setNamedApis(
+          new HashSet<>(
+              Set.of(
+                  NamedApi.builder().name("t").slug("traffic").standard(ApiStandard.STA).build(),
+                  NamedApi.builder().name("w").slug("weather").standard(ApiStandard.STA).build())));
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(
+          List.of(
+              namedApi("traffic", ApiStandard.STA),
+              namedApi("weather", ApiStandard.STA),
+              namedApi("air", ApiStandard.STA)));
+
+      assertThatThrownBy(() -> createService().postConvertToEntity(entity, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("at most 1 STA named API");
+    }
+
+    @Test
     @DisplayName("accepts several CUSTOM named APIs without a data sink")
     void acceptsSeveralCustomApisWithoutDataSink() {
       DataSet entity = new DataSet();

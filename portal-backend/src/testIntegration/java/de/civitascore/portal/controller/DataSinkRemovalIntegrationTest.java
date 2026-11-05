@@ -165,10 +165,25 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
 
       assertDataLossUnconfirmed(response);
       JsonNode removal = response.getBody().get("removal");
+      assertThat(removal.get("dataSinks").get(0).properties())
+          .extracting(Map.Entry::getKey)
+          .containsExactlyInAnyOrder("id", "dataSinkType", "provisioned");
       assertThat(ids(removal, "dataSinks")).containsExactly(surface.sink().getId().toString());
+      assertThat(removal.get("dataSinks").get(0).get("dataSinkType").asString())
+          .isEqualTo("POSTGIS");
       assertThat(removal.get("dataSinks").get(0).get("provisioned").asBoolean()).isTrue();
+      assertThat(removal.get("layers").get(0).properties())
+          .extracting(Map.Entry::getKey)
+          .containsExactlyInAnyOrder("id", "layerName", "title");
       assertThat(ids(removal, "layers")).containsExactly(surface.layer().getId().toString());
+      assertThat(removal.get("layers").get(0).get("layerName").asString())
+          .isEqualTo(surface.layer().getLayerName());
+      assertThat(removal.get("apis").get(0).properties())
+          .extracting(Map.Entry::getKey)
+          .containsExactlyInAnyOrder("id", "slug", "name", "standard");
       assertThat(ids(removal, "apis")).containsExactly(surface.ows().getId().toString());
+      assertThat(removal.get("apis").get(0).get("name").asString())
+          .isEqualTo(surface.ows().getName());
       assertThat(pipelineRepository.existsById(pipeline.getId())).isTrue();
       assertThat(dataSinkRepository.findByPipelinesId(pipeline.getId())).hasSize(1);
       assertThat(layerRepository.existsById(surface.layer().getId())).isTrue();
