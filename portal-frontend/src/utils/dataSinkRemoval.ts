@@ -1,50 +1,43 @@
-import { DataSink } from '@/types/datasinks'
-import { Layer } from '@/types/layers'
-import { NamedApi } from '@/types/namedApis'
-import { BACKING_DATASINK_TYPE, LAYER_PUBLISHING_STANDARD } from '@/utils/namedApis'
+import { DataSinkType } from '@/types/datasinks'
+import { ApiStandard } from '@/types/namedApis'
 
-export interface DatasetResources {
-  dataSinks: DataSink[]
-  layers: Layer[]
-  apis: NamedApi[]
+export interface RemovedDataSink {
+  id: string
+  dataSinkType: DataSinkType
+  provisioned: boolean
 }
 
-/** What the backend deletes together with the removed Data sinks. */
+export interface RemovedLayer {
+  id: string
+  layerName: string
+  title: string | null
+}
+
+export interface RemovedApi {
+  id: string
+  slug: string
+  name: string
+  standard: ApiStandard
+}
+
+/** What the backend removes with a request it refused as unconfirmed (`REMOVAL_NOT_CONFIRMED`). */
 export interface DataSinkRemoval {
-  layers: Layer[]
-  apis: NamedApi[]
-  /** A removed Data sink is provisioned, so the next release deletes its stored data. */
-  hasStoredData: boolean
+  dataSinks: RemovedDataSink[]
+  layers: RemovedLayer[]
+  apis: RemovedApi[]
 }
 
-export const getPipelineDataSinkIds = (dataSinks: DataSink[], pipelineId: string): string[] => {
-  const pipelineDataSinks = dataSinks.filter(dataSink => dataSink.pipelineIds.includes(pipelineId))
-  return pipelineDataSinks.map(dataSink => dataSink.id)
-}
+export const NO_REMOVAL: DataSinkRemoval = { dataSinks: [], layers: [], apis: [] }
 
-export const getDataSinkRemoval = (
-  removedDataSinkIds: string[],
-  { dataSinks, layers, apis }: DatasetResources,
-): DataSinkRemoval => {
-  const removedIds = new Set(removedDataSinkIds)
-  const removedDataSinks = dataSinks.filter(dataSink => removedIds.has(dataSink.id))
-  const remainingDataSinks = dataSinks.filter(dataSink => !removedIds.has(dataSink.id))
-  const losesBackingDataSink = (api: NamedApi) => {
-    const backingType = BACKING_DATASINK_TYPE[api.standard]
-    return (
-      !!backingType &&
-      removedDataSinks.some(dataSink => dataSink.dataSinkType === backingType) &&
-      remainingDataSinks.every(dataSink => dataSink.dataSinkType !== backingType)
-    )
-  }
-  const removedApis = apis.filter(losesBackingDataSink)
-  const isLayerApiRemoved = removedApis.some(api => api.standard === LAYER_PUBLISHING_STANDARD)
-  return {
-    layers: isLayerApiRemoved ? layers : layers.filter(layer => removedIds.has(layer.dataSinkId)),
-    apis: removedApis,
-    hasStoredData: removedDataSinks.some(dataSink => dataSink.provisioned === true),
-  }
-}
+/** A removed provisioned Data sink loses its stored data at the next release. */
+export const deletesStoredData = (removal: DataSinkRemoval) => removal.dataSinks.some(dataSink => dataSink.provisioned)
 
-export const hasRemovalConsequences = ({ layers, apis, hasStoredData }: DataSinkRemoval) =>
-  hasStoredData || layers.length > 0 || apis.length > 0
+const uniqueById = <T extends { id: string }>(items: T[]): T[] => [
+  ...new Map(items.map(item => [item.id, item])).values(),
+]
+
+export const mergeRemovals = (removals: DataSinkRemoval[]): DataSinkRemoval => ({
+  dataSinks: uniqueById(removals.flatMap(removal => removal.dataSinks)),
+  layers: uniqueById(removals.flatMap(removal => removal.layers)),
+  apis: uniqueById(removals.flatMap(removal => removal.apis)),
+})

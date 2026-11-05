@@ -636,33 +636,30 @@ The FROST section is a fixed template that generates thing/observation upsert lo
 
 ### Save Flow
 
-`saveAllPipelines()` in `PipelineEditorProvider` saves every dirty session, one after the other, in three phases.
+`saveAllPipelines()` in `PipelineEditorProvider` saves every dirty session, one after the other, in two phases.
 
 Phase 1, per session:
 
-1. **Collect the removed sinks** – `getRemovedDataSinkIds()` compares the pipeline with the snapshot of the last save and collects the removed sink entity ids.
-2. **Save the data sinks** – create a sink for a node that has no `entityId`, update a changed one. The returned `configurationUrn` is stashed on the node and becomes the model's `sinkRef`.
-3. **Save the mappings** – create or version the mapping artifacts. An unchanged mapping is skipped, because the mapping API creates a new version per request.
+1. **Save the data sinks** – create a sink for a node that has no `entityId`, update a changed one. The returned `configurationUrn` is stashed on the node and becomes the model's `sinkRef`.
+2. **Save the mappings** – create or version the mapping artifacts. An unchanged mapping is skipped, because the mapping API creates a new version per request.
 
-Phase 2, once for all sessions:
+Phase 2, per session:
 
-4. **Confirm the removal** – `getDatasetResources()` reads the data sinks, Layers and the Dataset's APIs, and `getDataSinkRemoval()` finds what goes with the removed sinks: their Layers, each API whose last data sink of the backing type goes (`BACKING_DATASINK_TYPE`), and whether a removed sink is provisioned. When anything of that goes, the `RemovalConfirmModal` lists it. Cancel stops the save before any pipeline is stored.
+3. **Save the pipeline** – `POST` for a new pipeline, `PUT` for an existing one, with the ids and URNs from the steps above, first without `confirmDataLoss`. The backend deletes or deactivates the removed sinks, their Layers and the APIs without a sink in the same request. When the update would remove a provisioned sink, a Layer or an API, the backend changes nothing and answers `409 REMOVAL_NOT_CONFIRMED` with a `removal` property that lists the `dataSinks`, `layers` and `apis` it would remove. The save keeps that list and goes on with the next session.
+4. **Delete the removed mappings** – `getRemovedMappingUrns()` collects the logical URNs of mapping nodes that were removed since the last save. A node that was never saved has no URN and is skipped. A failed delete gives an error toast (`mappingStillInUse` or `mappingCleanupFailed`) but keeps the save successful.
+5. **Clean the session** – mark it clean, write the new data sink and mapping snapshots, show the success toast.
 
-Phase 3, per session:
+After phase 2, when the backend refused one or more updates, `mergeRemovals()` combines their lists (each item once, by id) and the `RemovalConfirmModal` shows them once, with a note when a provisioned sink loses its stored data. Confirm sends each refused update again with `confirmDataLoss=true` and handles it like steps 3 to 5; a second refusal is reported as `unconfirmedDataLossError`. Cancel restores the refused sessions (see below) and the save returns `false`. Pipelines saved before the dialog stay saved.
 
-5. **Save the pipeline** – `POST` for a new pipeline, `PUT` for an existing one, with the ids and URNs from the steps above, and `confirmDataLoss=true` when the user confirmed a removal that deletes stored data, a Layer or an API. The backend deletes or deactivates the removed sinks, their Layers and the APIs without a sink in the same request. It refuses to remove a provisioned sink, a Layer or an API without `confirmDataLoss` (`409 RESOURCE_IN_USE`), which the save reports as `unconfirmedDataLossError`.
-6. **Delete the removed mappings** – `getRemovedMappingUrns()` collects the logical URNs of mapping nodes that were removed since the last save. A node that was never saved has no URN and is skipped. A failed delete gives an error toast (`mappingStillInUse` or `mappingCleanupFailed`) but keeps the save successful.
-7. **Clean the session** – mark it clean, write the new data sink and mapping snapshots, show the success toast.
-
-**Order rules:** the removal is checked after phase 1, so a sink node replaced in one save keeps its API. The mapping delete stays behind the pipeline save. When it comes first, the backend refuses it with `409 RESOURCE_IN_USE`, because the stored pipeline still points at the mapping through `mappingRef`.
+**Order rules:** phase 1 runs for every session before any pipeline update, so the backend counts the new sinks when it plans a removal: a sink node replaced in one save keeps its API. The mapping delete stays behind the pipeline save. When it comes first, the backend refuses it with `409 RESOURCE_IN_USE`, because the stored pipeline still points at the mapping through `mappingRef`.
 
 If a step throws, the partial progress is written back to the session — still dirty — so a retry updates the artifacts that were already created instead of creating duplicates. An error is classified and reported in a toast.
 
-If the removal is cancelled in phase 2, every session whose pipeline was not saved is written back the same way, except for the data sinks and mappings that phase 1 created: no pipeline references them, so they are deleted again (`DELETE /datasets/{datasetId}/datasinks/{id}`, where a sink without storage or Layers needs no confirmation, and `DELETE /datasets/{datasetId}/mappings?urn={logicalUrn}`). Their nodes lose `entityId` and `configurationUrn`, or `mappingRef` and `mappingLogicalUrn`. An artifact whose delete fails keeps its ref, so the next save links or versions it. A mapping that existed before the save keeps the version phase 1 added. A pipeline save that fails in phase 3 keeps the data sinks that phase 1 created, with their refs: the removal check counted them as staying, and deleting them could remove an API without a confirmation.
+If the removal is cancelled, every refused session is written back the same way, except for the data sinks and mappings that phase 1 created: no pipeline references them, so they are deleted again (`DELETE /datasets/{datasetId}/datasinks/{id}`, where a sink without storage or Layers needs no confirmation, and `DELETE /datasets/{datasetId}/mappings?urn={logicalUrn}`). Their nodes lose `entityId` and `configurationUrn`, or `mappingRef` and `mappingLogicalUrn`. An artifact whose delete fails keeps its ref, so the next save links or versions it. A mapping that existed before the save keeps the version phase 1 added. A pipeline save that fails in phase 2 for another reason keeps the data sinks that phase 1 created, with their refs: pipelines saved earlier in the same run counted them as staying, and deleting them could remove an API without a confirmation.
 
 ### Pipeline Delete
 
-`deletePipeline()` finds the data sinks of the pipeline in `getDatasetResources()` and shows the `RemovalConfirmModal` with what goes with them, or only the delete question when nothing goes. The `DELETE` carries `confirmDataLoss=true` when the dialog lists stored data, a Layer or an API. The Dataset overview (`PipelineCard`) works the same way.
+`deletePipeline()` first shows the `RemovalConfirmModal` with only the delete question, then sends the `DELETE` without `confirmDataLoss`. When the backend answers `409 REMOVAL_NOT_CONFIRMED`, the modal shows the Layers, APIs and stored data from its `removal` property, and Confirm sends the `DELETE` again with `confirmDataLoss=true`. Cancel at either question sends nothing more. The Dataset overview (`PipelineCard`) works the same way; both use `sendConfirmingRemoval()` from `useRemovalConfirmation()`.
 
 ### Locked Data Sinks
 

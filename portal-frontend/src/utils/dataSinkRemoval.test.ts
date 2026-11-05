@@ -1,88 +1,36 @@
 import { describe, expect, it } from 'vitest'
 
-import { DataSink, DataSinkType } from '@/types/datasinks'
-import { Layer } from '@/types/layers'
-import { ApiStandard, NamedApi } from '@/types/namedApis'
+import { DataSinkRemoval, deletesStoredData, mergeRemovals, NO_REMOVAL, RemovedDataSink } from './dataSinkRemoval'
 
-import { getDataSinkRemoval, getPipelineDataSinkIds, hasRemovalConsequences } from './dataSinkRemoval'
+const sink = (id: string, provisioned: boolean): RemovedDataSink => ({ id, dataSinkType: 'FROST', provisioned })
 
-const sink = (id: string, dataSinkType: DataSinkType, overrides: Partial<DataSink> = {}) =>
-  ({ id, dataSinkType, pipelineIds: [], provisioned: false, ...overrides }) as DataSink
+const ROADS = { id: 'layer-roads', layerName: 'roads', title: 'Roads' }
+const TREES = { id: 'layer-trees', layerName: 'trees', title: null }
+const MAPS = { id: 'api-maps', slug: 'maps', name: 'Maps', standard: 'OWS' } as const
 
-const layer = (id: string, dataSinkId: string) => ({ id, dataSinkId, layerName: id, title: id }) as Layer
-
-const api = (slug: string, standard: ApiStandard): NamedApi => ({ slug, name: slug, standard })
-
-const APIS = [api('ows', 'OWS'), api('sta', 'STA'), api('custom', 'CUSTOM')]
-
-describe('getDataSinkRemoval', () => {
-  it('removes the API whose last backing data sink goes and keeps the others', () => {
-    const dataSinks = [sink('frost-1', 'FROST'), sink('postgis-1', 'POSTGIS')]
-
-    const removal = getDataSinkRemoval(['frost-1'], { dataSinks, layers: [], apis: APIS })
-
-    expect(removal.apis).toEqual([api('sta', 'STA')])
+describe('deletesStoredData', () => {
+  it('is true when a removed data sink is provisioned', () => {
+    expect(deletesStoredData({ ...NO_REMOVAL, dataSinks: [sink('a', false), sink('b', true)] })).toBe(true)
   })
 
-  it('keeps the API while another data sink of its type remains', () => {
-    const dataSinks = [sink('frost-1', 'FROST'), sink('frost-2', 'FROST'), sink('postgis-1', 'POSTGIS')]
-
-    const removal = getDataSinkRemoval(['frost-1'], { dataSinks, layers: [], apis: APIS })
-
-    expect(removal.apis).toEqual([])
-  })
-
-  it('keeps an API that no removed data sink backs, even without a backing data sink', () => {
-    const dataSinks = [sink('postgis-1', 'POSTGIS')]
-
-    const removal = getDataSinkRemoval(['postgis-1'], { dataSinks, layers: [], apis: APIS })
-
-    expect(removal.apis).toEqual([api('ows', 'OWS')])
-  })
-
-  it('removes only the Layers of the removed data sinks', () => {
-    const dataSinks = [sink('postgis-1', 'POSTGIS'), sink('postgis-2', 'POSTGIS'), sink('frost-1', 'FROST')]
-    const layers = [layer('trees', 'postgis-1'), layer('roads', 'postgis-2')]
-
-    const removal = getDataSinkRemoval(['postgis-1'], { dataSinks, layers, apis: APIS })
-
-    expect(removal.layers).toEqual([layer('trees', 'postgis-1')])
-    expect(removal.apis).toEqual([])
-  })
-
-  it('removes every Layer with the OWS API, also one on a data sink that stays', () => {
-    const dataSinks = [sink('postgis-1', 'POSTGIS'), sink('frost-1', 'FROST')]
-    const layers = [layer('trees', 'postgis-1'), layer('sensors', 'frost-1')]
-
-    const removal = getDataSinkRemoval(['postgis-1'], { dataSinks, layers, apis: APIS })
-
-    expect(removal.layers).toEqual(layers)
-  })
-
-  it('reports stored data only for a provisioned data sink', () => {
-    const dataSinks = [sink('frost-1', 'FROST'), sink('frost-2', 'FROST', { provisioned: true })]
-    const context = { dataSinks, layers: [], apis: [] }
-
-    expect(getDataSinkRemoval(['frost-1'], context).hasStoredData).toBe(false)
-    expect(getDataSinkRemoval(['frost-2'], context).hasStoredData).toBe(true)
+  it('is false when no removed data sink is provisioned', () => {
+    expect(deletesStoredData({ ...NO_REMOVAL, dataSinks: [sink('a', false)] })).toBe(false)
   })
 })
 
-describe('hasRemovalConsequences', () => {
-  it('is false when nothing but an unprovisioned data sink goes', () => {
-    const dataSinks = [sink('frost-1', 'FROST'), sink('frost-2', 'FROST'), sink('postgis-1', 'POSTGIS')]
+describe('mergeRemovals', () => {
+  it('combines the removals and lists an item named by several only once', () => {
+    const first: DataSinkRemoval = { dataSinks: [sink('a', true)], layers: [ROADS], apis: [MAPS] }
+    const second: DataSinkRemoval = { dataSinks: [sink('a', true), sink('b', false)], layers: [TREES], apis: [MAPS] }
 
-    expect(hasRemovalConsequences(getDataSinkRemoval(['frost-1'], { dataSinks, layers: [], apis: APIS }))).toBe(false)
+    expect(mergeRemovals([first, second])).toEqual({
+      dataSinks: [sink('a', true), sink('b', false)],
+      layers: [ROADS, TREES],
+      apis: [MAPS],
+    })
   })
-})
 
-describe('getPipelineDataSinkIds', () => {
-  it('returns the data sinks the pipeline writes into', () => {
-    const dataSinks = [
-      sink('frost-1', 'FROST', { pipelineIds: ['p-1'] }),
-      sink('frost-2', 'FROST', { pipelineIds: ['p-2'] }),
-    ]
-
-    expect(getPipelineDataSinkIds(dataSinks, 'p-1')).toEqual(['frost-1'])
+  it('is empty without removals', () => {
+    expect(mergeRemovals([])).toEqual(NO_REMOVAL)
   })
 })

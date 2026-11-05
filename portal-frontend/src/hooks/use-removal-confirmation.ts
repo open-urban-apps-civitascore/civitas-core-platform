@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react'
 
 import type { DataSinkRemoval } from '@/utils/dataSinkRemoval'
+import { unconfirmedRemoval } from '@/utils/errors'
 
 export interface RemovalConfirmationDialog {
   open: boolean
@@ -23,6 +24,27 @@ export const useRemovalConfirmation = () => {
     })
   }, [])
 
+  /**
+   * Sends the request unconfirmed. When the backend refuses it as an unconfirmed removal, shows what it would remove
+   * and sends it again confirmed. Resolves false when the user cancels; rethrows any other error.
+   */
+  const sendConfirmingRemoval = useCallback(
+    async (send: (isDataLossConfirmed: boolean) => Promise<unknown>) => {
+      try {
+        await send(false)
+        return true
+      } catch (error) {
+        const removalToConfirm = unconfirmedRemoval(error)
+        if (!removalToConfirm) throw error
+        const isConfirmed = await confirmRemoval(removalToConfirm)
+        if (!isConfirmed) return false
+        await send(true)
+        return true
+      }
+    },
+    [confirmRemoval],
+  )
+
   const answer = useCallback((isConfirmed: boolean) => {
     answerRef.current?.(isConfirmed)
     answerRef.current = null
@@ -36,5 +58,5 @@ export const useRemovalConfirmation = () => {
     onCancel: () => answer(false),
   }
 
-  return { confirmRemoval, dialog }
+  return { confirmRemoval, sendConfirmingRemoval, dialog }
 }

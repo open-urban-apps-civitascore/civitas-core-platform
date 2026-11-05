@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import type { RemovalConfirmationDialog } from '@/hooks/use-removal-confirmation'
+import { deletesStoredData } from '@/utils/dataSinkRemoval'
 
 interface RemovalConfirmModalProps {
   dialog: RemovalConfirmationDialog
@@ -39,8 +40,8 @@ export const RemovalConfirmModal = (props: RemovalConfirmModalProps) => {
   const t = useTranslations('common.removalConfirmModal')
 
   const layers = removal?.layers.map(layer => ({ id: layer.id, name: layer.title || layer.layerName })) ?? []
-  const apis = removal?.apis.map(api => ({ id: api.slug, name: api.name })) ?? []
-  const hasStoredData = removal?.hasStoredData ?? false
+  const apis = removal?.apis.map(api => ({ id: api.id, name: api.name })) ?? []
+  const hasStoredData = !!removal && deletesStoredData(removal)
 
   return (
     <WarningModal

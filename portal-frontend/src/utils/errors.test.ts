@@ -18,6 +18,7 @@ import {
   isTableNameConflictError,
   isUnconfirmedDataLossError,
   toConnectionTestProblem,
+  unconfirmedRemoval,
   unreachableModelMembers,
 } from './errors'
 
@@ -288,6 +289,9 @@ describe('isSagaInFlightError', () => {
 })
 
 const RESOURCE_IN_USE = 'urn:civitas:error:RESOURCE_IN_USE'
+const REMOVAL_NOT_CONFIRMED = 'urn:civitas:error:REMOVAL_NOT_CONFIRMED'
+const UNCONFIRMED_REMOVAL_DETAIL =
+  'Removing this deletes stored data, Layers or APIs; set confirmDataLoss=true to proceed'
 
 describe('isResourceInUseError', () => {
   it('returns true when a style is still referenced by layers', () => {
@@ -318,12 +322,8 @@ describe('isResourceInUseError', () => {
     expect(isResourceInUseError(error)).toBe(true)
   })
 
-  it('returns false for a missing data-loss confirmation, which shares the type', () => {
-    const error = mockApiError(
-      409,
-      "This change rebuilds the sink's table and discards all stored data; set confirmDataLoss=true to proceed",
-      RESOURCE_IN_USE,
-    )
+  it('returns false for an unconfirmed removal', () => {
+    const error = mockApiError(409, UNCONFIRMED_REMOVAL_DETAIL, REMOVAL_NOT_CONFIRMED)
     expect(isResourceInUseError(error)).toBe(false)
   })
 
@@ -347,42 +347,62 @@ describe('isResourceInUseError', () => {
   })
 })
 
-const UNCONFIRMED_DATA_LOSS =
-  "This change rebuilds the sink's table and discards all stored data; set confirmDataLoss=true to proceed"
-
 describe('isUnconfirmedDataLossError', () => {
-  it('returns true when a destructive sink change was not confirmed', () => {
-    const error = mockApiError(409, UNCONFIRMED_DATA_LOSS, RESOURCE_IN_USE)
+  it('returns true for a 409 unconfirmed removal', () => {
+    const error = mockApiError(409, UNCONFIRMED_REMOVAL_DETAIL, REMOVAL_NOT_CONFIRMED)
     expect(isUnconfirmedDataLossError(error)).toBe(true)
   })
 
-  it('returns false when a style is still referenced, which shares the type', () => {
-    const error = mockApiError(409, 'Style is referenced by one or more Layers', RESOURCE_IN_USE)
-    expect(isUnconfirmedDataLossError(error)).toBe(false)
-  })
-
-  it('returns false when a data sink is still referenced, which shares the type', () => {
-    const error = mockApiError(409, 'DataSink is referenced by one or more Layers', RESOURCE_IN_USE)
-    expect(isUnconfirmedDataLossError(error)).toBe(false)
-  })
-
-  it('returns false for a 409 error with a different type', () => {
-    const error = mockApiError(409, UNCONFIRMED_DATA_LOSS, SAGA_IN_FLIGHT)
+  it('returns false for a resource in use, even when its detail names confirmDataLoss', () => {
+    const error = mockApiError(409, UNCONFIRMED_REMOVAL_DETAIL, RESOURCE_IN_USE)
     expect(isUnconfirmedDataLossError(error)).toBe(false)
   })
 
   it('returns false for a 409 error without a type field', () => {
-    const error = mockApiError(409, UNCONFIRMED_DATA_LOSS)
+    const error = mockApiError(409, UNCONFIRMED_REMOVAL_DETAIL)
     expect(isUnconfirmedDataLossError(error)).toBe(false)
   })
 
   it('returns false for non-409 status codes', () => {
-    const error = mockApiError(400, UNCONFIRMED_DATA_LOSS, RESOURCE_IN_USE)
+    const error = mockApiError(400, UNCONFIRMED_REMOVAL_DETAIL, REMOVAL_NOT_CONFIRMED)
     expect(isUnconfirmedDataLossError(error)).toBe(false)
   })
 
   it('returns false for non-axios errors', () => {
     expect(isUnconfirmedDataLossError(new Error('plain error'))).toBe(false)
+  })
+})
+
+describe('unconfirmedRemoval', () => {
+  const DATA_SINK = { id: 'sink-1', dataSinkType: 'POSTGIS', provisioned: true }
+  const LAYER = { id: 'layer-1', layerName: 'roads', title: null }
+  const API = { id: 'api-1', slug: 'maps', name: 'Maps', standard: 'OWS' }
+
+  it('returns the removal the backend lists', () => {
+    const error = mockApiError(409, UNCONFIRMED_REMOVAL_DETAIL, REMOVAL_NOT_CONFIRMED, {
+      removal: { dataSinks: [DATA_SINK], layers: [LAYER], apis: [API] },
+    })
+    expect(unconfirmedRemoval(error)).toEqual({ dataSinks: [DATA_SINK], layers: [LAYER], apis: [API] })
+  })
+
+  it('drops malformed entries and missing lists', () => {
+    const error = mockApiError(409, UNCONFIRMED_REMOVAL_DETAIL, REMOVAL_NOT_CONFIRMED, {
+      removal: { dataSinks: [DATA_SINK, { id: 7 }, null], layers: 'roads' },
+    })
+    expect(unconfirmedRemoval(error)).toEqual({ dataSinks: [DATA_SINK], layers: [], apis: [] })
+  })
+
+  it('returns an empty removal when the backend lists none', () => {
+    const error = mockApiError(409, UNCONFIRMED_REMOVAL_DETAIL, REMOVAL_NOT_CONFIRMED)
+    expect(unconfirmedRemoval(error)).toEqual({ dataSinks: [], layers: [], apis: [] })
+  })
+
+  it('returns null for any other error', () => {
+    const error = mockApiError(409, 'DataSink is referenced by one or more Layers', RESOURCE_IN_USE, {
+      removal: { dataSinks: [DATA_SINK] },
+    })
+    expect(unconfirmedRemoval(error)).toBeNull()
+    expect(unconfirmedRemoval(new Error('plain error'))).toBeNull()
   })
 })
 
