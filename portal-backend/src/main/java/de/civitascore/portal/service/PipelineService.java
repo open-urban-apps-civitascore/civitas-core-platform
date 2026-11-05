@@ -15,10 +15,10 @@ import de.civitascore.portal.security.dto.PrincipalUserDetails;
 import de.civitascore.portal.service.removal.DataSinkChange;
 import de.civitascore.portal.service.removal.DataSinkRemovalService;
 import de.civitascore.portal.service.removal.PreparedDataSinkChange;
+import de.civitascore.portal.service.removal.RemovalNotConfirmedException;
 import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.Collection;
@@ -151,8 +151,8 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
    * check runs before the first write.
    *
    * @throws InvalidInputException if a requested DataSink cannot be linked
-   * @throws ResourceInUseException if the update removes a provisioned DataSink, a Layer or an API
-   *     without {@code input.confirmDataLoss}
+   * @throws RemovalNotConfirmedException if the update removes a provisioned DataSink, a Layer or
+   *     an API without {@code input.confirmDataLoss}
    */
   @Override
   @Transactional
@@ -347,8 +347,8 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
    * references.
    *
    * @param confirmDataLoss whether the caller accepts that stored data, Layers and APIs go
-   * @throws ResourceInUseException if the delete removes a provisioned DataSink, a Layer or an API
-   *     without {@code confirmDataLoss}
+   * @throws RemovalNotConfirmedException if the delete removes a provisioned DataSink, a Layer or
+   *     an API without {@code confirmDataLoss}
    */
   @Transactional
   public void deleteById(UUID id, boolean confirmDataLoss) {
