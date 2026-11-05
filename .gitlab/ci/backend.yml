@@ -17,6 +17,9 @@
         - .gitlab/ci/backend.yml
         - .gitlab/ci/portal-model.yml # Also run when portal-model changes since backend depends on it
         - .gitlab/ci/model-forge.yml # Also run when model-forge changes since backend depends on it
+        - .gitlab/ci/openapi.yml
+        - api/portal-backend/.spectral.yaml
+        - api/portal-backend/package*.json
 
 # portal-backend compiles against portal-model, model-forge and config-adapter as they are built in
 # this pipeline: the jobs below need the artifacts of build-portal-model, build-model-forge and
@@ -189,9 +192,6 @@ saga-e2e-test-backend:
 # CLI collection against it. Validates the HTTP API contract from the outside, complementing the
 # Maven-based unit and integration tests. The stack comes from .gitlab/ci/scripts/api-test-stack.sh,
 # which e2e-test-frontend uses as well.
-#
-# The OpenAPI description is exported from this stack too (it was the job export-openapi-spec, which
-# started a second stack of its own), and update-openapi-spec reads it from here.
 api-test-backend:
   tags:
     - saas-linux-medium-amd64 # 4 cores, 16 GB memory
@@ -213,18 +213,9 @@ api-test-backend:
       optional: true
     - job: build-nifi-nars
       artifacts: true
-  variables:
-    # The spec is hosted as documentation, where the CI-internal Keycloak host points nowhere.
-    # example.org is reserved for examples (RFC 2606), so these URLs are obviously not real.
-    OPENAPI_OAUTH_SERVER_URL: https://auth.example.org
   script:
     - . .gitlab/ci/scripts/api-test-stack.sh
     - api_test_up
-    # The `local` profile of the stack permits /api-docs.yaml without a token
-    - api_test_compose exec -T portal-backend curl -sf http://localhost:8089/v1/api-docs.yaml > openapi.generated.yaml
-    # Fail when the override did not reach the backend, instead of committing the internal host
-    # TODO: this check is new in this job; the override must not change what the Bruno tests see.
-    - grep -q "$OPENAPI_OAUTH_SERVER_URL/realms/" openapi.generated.yaml
     # Run Bruno API tests from a container on the same Compose network
     - docker run -d --name bruno-runner --network $API_TEST_NETWORK node:22.23.3-alpine sleep infinity
     - docker cp api/portal-backend/bruno-api/. bruno-runner:/tests/
@@ -258,7 +249,6 @@ api-test-backend:
     when: always
     paths:
       - bruno-results.txt
-      - openapi.generated.yaml
       - portal-backend-logs.txt
       - config-adapter-logs.txt
       - connection-tester-logs.txt
