@@ -27,8 +27,8 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.security.dto.PrincipalUserDetails;
+import de.civitascore.portal.service.removal.RemovalNotConfirmedException;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.ResourceInUseException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -404,7 +404,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       dataSetService.unstage(id);
 
       assertThatThrownBy(() -> dataSinkService.deleteById(sink.getId()))
-          .isInstanceOf(ResourceInUseException.class);
+          .isInstanceOf(RemovalNotConfirmedException.class);
       assertThat(dataSinkRepository.findById(sink.getId())).isPresent();
 
       completeSaga(id, DataSetStatus.DRAFT, PendingSagaType.DELETE);
