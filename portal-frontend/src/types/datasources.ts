@@ -37,7 +37,7 @@ const enumFromConst = <T extends Record<string, string>>(obj: T) =>
 export const ConnectorTypeSchema = enumFromConst(CONNECTOR_TYPES)
 export const DatasourceStatusSchema = enumFromConst(DATASOURCE_STATUS_TYPES)
 
-export type FormFieldType = 'input' | 'textArea' | 'select' | 'checkbox'
+export type FormFieldType = 'input' | 'textArea' | 'select' | 'checkbox' | 'file'
 
 export type FormInputType = 'text' | 'password'
 
@@ -70,6 +70,7 @@ export type ConnectorField = {
   placeholder?: string
   rows?: number
   expert?: boolean
+  accept?: string
 }
 
 export const DATAPOOL_SCOPE_TYPES = {

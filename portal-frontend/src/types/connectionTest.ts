@@ -1,6 +1,5 @@
 import { DatasourcePatchData } from './datasources'
 
-export const MASKED_SECRET = '********'
 export const PREVIEW_TRUNCATED_MARKER = '\n[truncated]'
 
 export const CONNECTION_TEST_REASONS = ['INVALID_CONNECTOR', 'SOURCE_ERROR', 'TIMEOUT'] as const

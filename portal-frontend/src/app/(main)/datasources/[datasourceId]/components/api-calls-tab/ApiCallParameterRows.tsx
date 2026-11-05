@@ -6,7 +6,7 @@ import { DISABLED_INPUT_CLASS_NAME } from '@/components/form/fields/disabledFiel
 import { Button } from '@/components/ui/button'
 import { FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { HttpApiCallsForm, HttpParameterListPath } from '@/types/connectors'
+import { HttpApiCallsForm, HttpParameterListPath } from '@/types/httpApiCalls'
 
 const PARAMETER_KEYS = ['name', 'value'] as const
 
@@ -17,7 +17,7 @@ interface ApiCallParameterRowsProps {
   typeLabel: string
   isDisabled: boolean
   onRemove: (index: number) => void
-  onNameChange: () => void
+  onNameChange: (editedPath: string) => void
 }
 
 export const ApiCallParameterRows = (props: ApiCallParameterRowsProps) => {
@@ -41,7 +41,7 @@ export const ApiCallParameterRows = (props: ApiCallParameterRowsProps) => {
                       {...inputField}
                       onChange={event => {
                         inputField.onChange(event)
-                        if (key === 'name') onNameChange()
+                        if (key === 'name') onNameChange(inputField.name)
                       }}
                       aria-label={`${typeLabel} ${t(key)}`}
                       className={DISABLED_INPUT_CLASS_NAME}

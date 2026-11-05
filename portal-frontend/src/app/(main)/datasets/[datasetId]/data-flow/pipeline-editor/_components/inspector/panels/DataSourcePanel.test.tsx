@@ -225,7 +225,7 @@ describe('DataSourcePanel', () => {
   it('shows an error instead of the API call select when the frontend cannot read the HTTP data source', () => {
     const httpUnreadable = datasource('http-4', 'Test HTTP Source 4', {
       connectorType: 'HTTP',
-      authentication: { type: 'BEARER_TOKEN' },
+      authentication: { type: 'UNKNOWN' },
       apiCalls: [apiCall('Test Call 1')],
     })
     mockUseGetDatasources.mockReturnValue({ data: { data: [httpUnreadable] }, isLoading: false, isError: false })

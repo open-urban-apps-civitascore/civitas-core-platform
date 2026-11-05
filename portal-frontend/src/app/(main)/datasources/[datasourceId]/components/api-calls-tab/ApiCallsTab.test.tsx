@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
-import { useForm, UseFormReturn, useFormState } from 'react-hook-form'
+import { Path, useForm, UseFormReturn, useFormState } from 'react-hook-form'
 import { toast } from 'sonner'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -11,20 +11,15 @@ import {
   DISABLED_INPUT_CLASS_NAME,
 } from '@/components/form/fields/disabledFieldClassNames'
 import { Form } from '@/components/ui/form'
+import { EMPTY_CURSOR_PAGINATION, EMPTY_LIMIT_OFFSET_PAGINATION, EMPTY_PAGINATION } from '@/const/connectors'
 import {
   CURSOR_PAGINATION_FORM,
   LIMIT_OFFSET_PAGINATION_FORM,
   PAGINATION_FORM,
 } from '@/test-support/paginationFixtures'
-import {
-  ApiCallSnapshots,
-  CollapsedApiCallSections,
-  EMPTY_CURSOR_PAGINATION,
-  EMPTY_LIMIT_OFFSET_PAGINATION,
-  EMPTY_PAGINATION,
-  HttpApiCallForm,
-} from '@/types/connectors'
+import { HttpAuthenticationForm } from '@/types/connectors'
 import { DatasourceFormDraft, DatasourceFormDraftSchema } from '@/types/datasources'
+import { ApiCallSnapshots, CollapsedApiCallSections, HttpApiCallForm } from '@/types/httpApiCalls'
 
 import { ApiCallsTab } from './ApiCallsTab'
 
@@ -50,10 +45,18 @@ interface RenderOptions {
   isDatasourceReleased?: boolean
   dataStructureName?: string
   baseUrl?: string
+  authentication?: HttpAuthenticationForm
 }
 
 const renderApiCallsTab = (options: RenderOptions = {}) => {
-  const { apiCalls = [], isReadOnly = false, isDatasourceReleased = false, dataStructureName, baseUrl = '' } = options
+  const {
+    apiCalls = [],
+    isReadOnly = false,
+    isDatasourceReleased = false,
+    dataStructureName,
+    baseUrl = '',
+    authentication = { type: 'NONE' },
+  } = options
   const defaultValues: DatasourceFormDraft = {
     id: '1',
     name: 'Test Data source',
@@ -61,7 +64,7 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
     dataSourceStatus: 'DRAFT',
     dataStructureVersionId: null,
     connectorType: 'HTTP',
-    configuration: { baseUrl, authentication: { type: 'NONE', username: '', password: '' }, apiCalls },
+    configuration: { baseUrl, authentication, apiCalls },
   }
   let form: UseFormReturn<DatasourceFormDraft> | undefined
   let isFormDirty = false
@@ -102,8 +105,23 @@ const renderApiCallsTab = (options: RenderOptions = {}) => {
   const isDirty = () => isFormDirty
   const resetForm = () => act(() => form?.reset(defaultValues))
   const remount = () => act(() => remountTab?.())
-  return { user: userEvent.setup(), getApiCalls, isDirty, resetForm, remount }
+  const getApiTokenNameError = () => form?.getFieldState('configuration.authentication.name').error?.message
+  const getError = (path: string) => form?.getFieldState(path as Path<DatasourceFormDraft>).error?.message
+  const setServerError = (path: string) =>
+    act(() => form?.setError(path as Path<DatasourceFormDraft>, { type: 'server', message: SERVER_ERROR }))
+  return {
+    user: userEvent.setup(),
+    getApiCalls,
+    isDirty,
+    resetForm,
+    remount,
+    getApiTokenNameError,
+    getError,
+    setServerError,
+  }
 }
+
+const SERVER_ERROR = 'datasources.errors.rejectedByServer'
 
 const DISABLED_INPUT_CLASSES = DISABLED_INPUT_CLASS_NAME.split(' ')
 const DISABLED_CHECKBOX_CLASSES = DISABLED_CHECKBOX_CLASS_NAME.split(' ')
@@ -401,6 +419,109 @@ describe('ApiCallsTab', () => {
         { name: 'limit', value: '' },
       ],
       headers: [{ name: '', value: '' }],
+    })
+  })
+
+  describe('error of the backend at a header', () => {
+    const API_CALL_WITH_HEADERS: HttpApiCallForm = {
+      ...API_CALL,
+      headers: [
+        { name: 'Accept', value: 'application/json' },
+        { name: 'X-Test', value: '5 €' },
+      ],
+    }
+
+    it('keeps the error at the same header when the user removes another header', async () => {
+      const { user, getError, setServerError } = renderApiCallsTab({ apiCalls: [API_CALL_WITH_HEADERS] })
+      await openApiCall(user)
+      setServerError('configuration.apiCalls.0.headers.1.value')
+
+      await user.click(screen.getAllByRole('button', { name: 'parameters.header remove' })[0])
+
+      await waitFor(() => expect(getError('configuration.apiCalls.0.headers.0.value')).toBe(SERVER_ERROR))
+      expect(screen.getByText(SERVER_ERROR)).toBeInTheDocument()
+    })
+
+    it('keeps the error when the user changes the name of another header', async () => {
+      const { user, getApiCalls, getError, setServerError } = renderApiCallsTab({ apiCalls: [API_CALL_WITH_HEADERS] })
+      await openApiCall(user)
+      setServerError('configuration.apiCalls.0.headers.1.value')
+
+      await user.type(screen.getAllByRole('textbox', { name: 'parameters.header name' })[0], '-2')
+      await act(async () => {})
+
+      expect(getApiCalls()?.[0].headers[0].name).toBe('Accept-2')
+      expect(getError('configuration.apiCalls.0.headers.1.value')).toBe(SERVER_ERROR)
+    })
+
+    it('removes the error when the user edits the name of the header', async () => {
+      const { user, getError, setServerError } = renderApiCallsTab({ apiCalls: [API_CALL_WITH_HEADERS] })
+      await openApiCall(user)
+      setServerError('configuration.apiCalls.0.headers.1.name')
+
+      await user.type(screen.getAllByRole('textbox', { name: 'parameters.header name' })[1], '-2')
+      await act(async () => {})
+
+      expect(getError('configuration.apiCalls.0.headers.1.name')).toBeUndefined()
+    })
+
+    it('removes the error when the user edits the header', async () => {
+      const { user, getError, setServerError } = renderApiCallsTab({ apiCalls: [API_CALL_WITH_HEADERS] })
+      await openApiCall(user)
+      setServerError('configuration.apiCalls.0.headers.1.value')
+
+      await user.clear(screen.getAllByRole('textbox', { name: 'parameters.header value' })[1])
+
+      await waitFor(() => expect(getError('configuration.apiCalls.0.headers.1.value')).toBeUndefined())
+    })
+  })
+
+  describe('API token name', () => {
+    const API_TOKEN: HttpAuthenticationForm = { type: 'API_TOKEN', name: 'X-API-Key', value: 'key-1', in: 'HEADER' }
+    const COLLISION = 'datasources.errors.apiTokenNameCollision'
+
+    it('shows and clears the error when a header gets and loses the API token name', async () => {
+      const { user, getApiTokenNameError } = renderApiCallsTab({ apiCalls: [API_CALL], authentication: API_TOKEN })
+      await openApiCall(user)
+      const headerName = screen.getByRole('textbox', { name: 'parameters.header name' })
+
+      await user.clear(headerName)
+      await user.type(headerName, 'x-api-key')
+      await waitFor(() => expect(getApiTokenNameError()).toBe(COLLISION))
+      expect(screen.getByText('datasources.errors.parameterApiTokenDuplicate')).toBeInTheDocument()
+
+      await user.type(headerName, '-2')
+      await waitFor(() => expect(getApiTokenNameError()).toBeUndefined())
+      expect(screen.queryByText('datasources.errors.parameterApiTokenDuplicate')).not.toBeInTheDocument()
+    })
+
+    it('clears the error when the API call with the API token name is deleted', async () => {
+      const { user, getApiTokenNameError } = renderApiCallsTab({ apiCalls: [API_CALL], authentication: API_TOKEN })
+      await openApiCall(user)
+      const headerName = screen.getByRole('textbox', { name: 'parameters.header name' })
+      await user.clear(headerName)
+      await user.type(headerName, 'X-API-Key')
+      await user.click(screen.getByRole('button', { name: 'apply' }))
+      await waitFor(() => expect(getApiTokenNameError()).toBe(COLLISION))
+
+      await user.click(screen.getByRole('button', { name: 'Open menu' }))
+      await user.click(await screen.findByText('delete'))
+      await user.click(screen.getByTestId('confirmButton'))
+
+      await waitFor(() => expect(getApiTokenNameError()).toBeUndefined())
+    })
+
+    it('clears the error when the change of the header is cancelled', async () => {
+      const { user, getApiTokenNameError } = renderApiCallsTab({ apiCalls: [API_CALL], authentication: API_TOKEN })
+      await openApiCall(user)
+      const headerName = screen.getByRole('textbox', { name: 'parameters.header name' })
+      await user.clear(headerName)
+      await user.type(headerName, 'X-API-Key')
+      await waitFor(() => expect(getApiTokenNameError()).toBe(COLLISION))
+
+      await user.click(screen.getByRole('button', { name: 'cancel' }))
+
+      await waitFor(() => expect(getApiTokenNameError()).toBeUndefined())
     })
   })
 

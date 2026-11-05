@@ -10,16 +10,16 @@ import { NoDataCard } from '@/components/no-data/no-data-card/NoDataCard'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { InfoBox } from '@/components/text-box/TextBox'
 import { Button } from '@/components/ui/button'
-import { MAX_HTTP_API_CALLS } from '@/const/connectors'
+import { EMPTY_PAGINATION, MAX_HTTP_API_CALLS } from '@/const/connectors'
+import { DatasourceFormDraft } from '@/types/datasources'
 import {
   ApiCallSection,
   ApiCallSnapshots,
   CollapsedApiCallSections,
-  EMPTY_PAGINATION,
   HttpApiCallForm,
   HttpApiCallsForm,
-} from '@/types/connectors'
-import { DatasourceFormDraft } from '@/types/datasources'
+} from '@/types/httpApiCalls'
+import { triggerKeepingServerErrors } from '@/utils/form'
 
 import { ApiCallItem } from './ApiCallItem'
 
@@ -32,6 +32,8 @@ const EMPTY_API_CALL: HttpApiCallForm = {
 }
 
 type ArrayError = { message?: string; root?: { message?: string } }
+
+const API_TOKEN_NAME_PATH = 'configuration.authentication.name'
 
 const NO_COLLAPSED_SECTIONS: ReadonlySet<ApiCallSection> = new Set()
 
@@ -103,6 +105,7 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
     onCollapsedSectionsChange(removeEntryAndShift(collapsedSections, index))
     onApiCallRemove(index)
     remove(index)
+    void triggerKeepingServerErrors(apiCallsForm, API_TOKEN_NAME_PATH)
   }
 
   // getValues returns the live form objects, which change on input.
@@ -118,7 +121,7 @@ export const ApiCallsTab = (props: ApiCallsTabProps) => {
       return
     }
     update(index, snapshot)
-    void apiCallsForm.trigger(`configuration.apiCalls.${index}`)
+    void triggerKeepingServerErrors(apiCallsForm, [`configuration.apiCalls.${index}`, API_TOKEN_NAME_PATH])
     handleClose(index)
   }
 

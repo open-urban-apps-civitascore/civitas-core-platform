@@ -151,6 +151,11 @@
     "deletionWarningModal": {
       "title": "{item} wirklich löschen?",
       "description": "Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "fileField": {
+      "select": "Datei auswählen",
+      "noFile": "Keine Datei ausgewählt",
+      "unreadable": "Die Datei kann nicht gelesen werden. Wählen Sie sie erneut aus."
     }
   },
   "languages": {
@@ -1003,6 +1008,15 @@
       "invalidBaseUrl": "Geben Sie eine gültige http- oder https-URL ohne Query und Fragment ein (z. B. https://api.example.org/v1).",
       "baseUrlCredentials": "Geben Sie keine Zugangsdaten im API-Host ein. Tragen Sie sie in der Authentifizierung ein.",
       "usernameColon": "Der Benutzername darf keinen Doppelpunkt (:) enthalten.",
+      "invalidTokenUrl": "Geben Sie eine gültige https-URL ein (z. B. https://auth.example.org/oauth2/token).",
+      "tokenUrlHttps": "Die Token-URL muss https verwenden.",
+      "tokenUrlQueryOrFragment": "Die Token-URL darf keine Query und kein Fragment enthalten.",
+      "tokenUrlCredentials": "Geben Sie keine Zugangsdaten in der Token-URL ein. Tragen Sie sie bei Client-ID und Client-Secret ein.",
+      "invalidCertificate": "Wählen Sie ein Zertifikat im PEM-Format (-----BEGIN CERTIFICATE-----).",
+      "invalidPrivateKey": "Wählen Sie einen privaten Schlüssel im PEM-Format (-----BEGIN PRIVATE KEY----- oder -----BEGIN RSA PRIVATE KEY-----).",
+      "encryptedPrivateKey": "Wählen Sie einen privaten Schlüssel ohne Passphrase.",
+      "baseUrlHttpsRequired": "Der API-Host muss mit Authentifizierung https verwenden.",
+      "apiTokenNameCollision": "Ein Query-Parameter, Header oder Paginierungsparameter der API-Aufrufe hat bereits diesen Namen.",
       "invalidPath": "Der Pfad muss mit / beginnen und darf nur erlaubte Zeichen enthalten.",
       "apiCallsMax": "Es ist nur ein API-Aufruf möglich.",
       "invalidHeaderName": "Erlaubte Zeichen im Header-Namen: a–z, A–Z, 0–9 und ! # $ % & ' * + - . ^ _ ` | ~. Keine Leerzeichen.",
@@ -1027,7 +1041,11 @@
       "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten",
       "inUseError": "Diese Datenquelle wird noch von einer Pipeline verwendet.",
       "datastructureNotAvailableError": "Die Datenquelle konnte nicht auf \"Verfügbar\" gesetzt werden. Bitte setzen Sie zuerst die Version der Datenstruktur auf \"Verfügbar\".",
-      "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
+      "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert.",
+      "reenterSecret": "Die Adresse hat sich geändert. Bitte geben Sie diesen Wert erneut ein.",
+      "storedSecretRefused": "Die Adresse hat sich geändert. Bitte geben Sie die Secrets erneut ein.",
+      "parameterApiTokenDuplicate": "Das API-Token hat bereits diesen Namen.",
+      "rejectedByServer": "Dieser Wert kann nicht gespeichert werden."
     },
     "connection": {
       "active": "aktiv",
@@ -1231,13 +1249,50 @@
         "authentication": {
           "label": "Authentifizierung",
           "none": "Keine",
-          "basic": "Basic"
+          "basic": "Basic",
+          "bearerToken": "Bearer-Token",
+          "apiToken": "API-Token",
+          "oauth2": "OAuth2",
+          "clientCertificate": "Client-Zertifikat"
         },
         "username": {
           "label": "Benutzername"
         },
         "password": {
           "label": "Passwort"
+        },
+        "token": {
+          "label": "Token"
+        },
+        "apiTokenName": {
+          "label": "Name"
+        },
+        "apiTokenValue": {
+          "label": "Wert"
+        },
+        "apiTokenIn": {
+          "label": "Senden als",
+          "header": "Header",
+          "query": "Query-Parameter"
+        },
+        "tokenUrl": {
+          "label": "Token-URL"
+        },
+        "clientId": {
+          "label": "Client-ID"
+        },
+        "clientSecret": {
+          "label": "Client-Secret"
+        },
+        "scope": {
+          "label": "Scope",
+          "hint": "optional, durch Leerzeichen getrennt"
+        },
+        "certificate": {
+          "label": "Zertifikat"
+        },
+        "privateKey": {
+          "label": "Privater Schlüssel"
         }
       },
       "connectionTest": {
@@ -1255,7 +1310,7 @@
         "details": "Details:",
         "httpStatus": "HTTP-Status: {status}",
         "previewTruncated": "Vorschau gekürzt.",
-        "reenterPassword": "Die Konfiguration wurde geändert. Geben Sie das Passwort erneut ein, um die Verbindung zu testen.",
+        "reenterSecrets": "Die Konfiguration wurde geändert. Geben Sie die Secrets erneut ein, um die Verbindung zu testen.",
         "causes": {
           "INVALID_CONNECTOR": "Die Konfiguration ist ungültig.",
           "SOURCE_ERROR": "Die Quelle ist nicht erreichbar oder hat mit einem Fehler geantwortet.",

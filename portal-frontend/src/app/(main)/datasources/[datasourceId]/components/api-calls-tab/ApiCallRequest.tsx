@@ -12,8 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { HTTP_METHODS } from '@/const/connectors'
 import { cn } from '@/lib/utils'
-import { getParameterNameCollisionPaths, HttpApiCallsForm } from '@/types/connectors'
+import { getParameterNameCollisionPaths, HttpApiCallsForm } from '@/types/httpApiCalls'
 import { buildApiCallUrl, formatPathWithQuery } from '@/utils/connectors'
+import { triggerKeepingServerErrors } from '@/utils/form'
 
 import { ApiCallParameterRows } from './ApiCallParameterRows'
 
@@ -40,7 +41,8 @@ export const ApiCallRequest = (props: ApiCallRequestProps) => {
   const pathWithQuery = formatPathWithQuery(apiCall?.path ?? '', apiCall?.queryParameters ?? [])
   const hasParameters = queryParameters.fields.length > 0 || headers.fields.length > 0
 
-  const revalidateParameterNameCollisions = () => void form.trigger([...getParameterNameCollisionPaths(index)])
+  const revalidateParameterNameCollisions = (editedPath?: string) =>
+    void triggerKeepingServerErrors(form, [...getParameterNameCollisionPaths(index)], editedPath ? [editedPath] : [])
 
   const handleQueryParameterRemove = (parameterIndex: number) => {
     queryParameters.remove(parameterIndex)

@@ -1,12 +1,16 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { useForm } from 'react-hook-form'
+import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
+import { useForm, UseFormReturn } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 
 import { Form } from '@/components/ui/form'
+import { ConnectorType, HttpAuthenticationType } from '@/types/connectors'
 import type { DatasourceFormDraft } from '@/types/datasources'
 import { DatasourceFormDraftSchema } from '@/types/datasources'
+import { emptyHttpAuthentication } from '@/utils/connectorMappers'
 
 import { ConnectorTab } from './ConnectorTab'
 
@@ -261,12 +265,8 @@ describe('ConnectorTab (integration)', () => {
     })
 
     it('does not surface a stale mismatch on mount for an already-mismatched stored configuration', async () => {
-      // The loaded configuration is already mismatched (TLS-only scheme, TLS disabled). The
-      // `isFirstRevalidationRender` guard in ConnectorTab exists specifically to stop the watch
-      // effect from firing a validation trigger on the initial mount render, so the user isn't
-      // shown an error before they've touched anything. Without the guard, the effect would run
-      // once on mount and call `form.trigger('configuration.urls')`, surfacing this error
-      // unprompted.
+      // The loaded configuration is already mismatched (TLS-only scheme, TLS disabled). On mount,
+      // `previousWatchedFields` in ConnectorTab holds the current values, so no rule revalidates.
       renderConnectorTab({
         configuration: {
           ...defaultValues.configuration,
@@ -344,16 +344,103 @@ describe('ConnectorTab (integration)', () => {
       expect(screen.getByLabelText(/http\.password\.label/)).toBeInTheDocument()
     })
 
-    it('validates the credentials when the user selects Basic', async () => {
-      renderConnectorTab({
-        connectorType: 'HTTP',
-        configuration: { baseUrl: '', authentication: { type: 'NONE', username: 'a:b', password: '' } },
+    describe('authentication types', () => {
+      const FIELD_LABELS: Record<HttpAuthenticationType, RegExp[]> = {
+        NONE: [],
+        BASIC: [/http\.username\.label/, /http\.password\.label/],
+        BEARER_TOKEN: [/http\.token\.label/],
+        API_TOKEN: [/http\.apiTokenName\.label/, /http\.apiTokenValue\.label/, /http\.apiTokenIn\.label/],
+        OAUTH2: [/http\.tokenUrl\.label/, /http\.clientId\.label/, /http\.clientSecret\.label/, /http\.scope\.label/],
+        CLIENT_CERTIFICATE: [/http\.certificate\.label/, /http\.privateKey\.label/],
+      }
+      const SECRET_LABELS = [
+        ['BASIC', /http\.password\.label/],
+        ['BEARER_TOKEN', /http\.token\.label/],
+        ['API_TOKEN', /http\.apiTokenValue\.label/],
+        ['OAUTH2', /http\.clientSecret\.label/],
+      ] as const
+      const ALL_LABELS = Object.values(FIELD_LABELS).flat()
+
+      const renderWithAuthentication = (type: HttpAuthenticationType, baseUrl = '') =>
+        renderConnectorTab({
+          connectorType: 'HTTP',
+          configuration: { baseUrl, authentication: emptyHttpAuthentication(type) },
+        })
+
+      it('offers None, Basic, Bearer token, API token, OAuth2 and client certificate', async () => {
+        renderWithAuthentication('NONE')
+
+        fireEvent.click(screen.getByLabelText(/http\.authentication\.label/))
+
+        const options = await screen.findAllByRole('option')
+        expect(options.map(option => option.textContent)).toEqual([
+          'http.authentication.none',
+          'http.authentication.basic',
+          'http.authentication.bearerToken',
+          'http.authentication.apiToken',
+          'http.authentication.oauth2',
+          'http.authentication.clientCertificate',
+        ])
       })
 
-      fireEvent.click(screen.getByLabelText(/http\.authentication\.label/))
-      fireEvent.click(await screen.findByText('http.authentication.basic'))
+      it.each(['BEARER_TOKEN', 'API_TOKEN', 'OAUTH2', 'CLIENT_CERTIFICATE'] as const)(
+        'shows only the fields of %s',
+        type => {
+          renderWithAuthentication(type)
 
-      expect(await screen.findByText('datasources.errors.usernameColon')).toBeInTheDocument()
+          const ownLabels = FIELD_LABELS[type]
+          for (const label of ownLabels) {
+            expect(screen.getByLabelText(label)).toBeInTheDocument()
+          }
+          for (const label of ALL_LABELS.filter(other => !ownLabels.includes(other))) {
+            expect(screen.queryByLabelText(label)).not.toBeInTheDocument()
+          }
+        },
+      )
+
+      it.each(SECRET_LABELS)('masks the secret of %s and turns off autocomplete', (type, label) => {
+        renderWithAuthentication(type)
+
+        const secret = screen.getByLabelText(label)
+        expect(secret).toHaveAttribute('type', 'password')
+        expect(secret).toHaveAttribute('autocomplete', 'new-password')
+      })
+
+      it.each([
+        ['API_TOKEN', /http\.apiTokenName\.label/],
+        ['OAUTH2', /http\.clientId\.label/],
+      ] as const)('turns off autocomplete for the visible fields of %s', (type, label) => {
+        renderWithAuthentication(type)
+
+        expect(screen.getByLabelText(label)).toHaveAttribute('autocomplete', 'off')
+      })
+
+      it.each([
+        ['certificate', /http\.certificate\.label/],
+        ['privateKey', /http\.privateKey\.label/],
+      ])('selects the %s as a PEM file', (field, label) => {
+        renderWithAuthentication('CLIENT_CERTIFICATE')
+
+        expect(screen.getByLabelText(label)).toHaveValue('noFile')
+        expect(screen.getByTestId(`configuration.authentication.${field}FileInput`)).toHaveAttribute(
+          'accept',
+          '.pem,.crt,.cer,.key',
+        )
+      })
+
+      it.each([
+        ['certificate', 'datasources.errors.invalidCertificate'],
+        ['privateKey', 'datasources.errors.invalidPrivateKey'],
+      ])('shows the PEM error right after the user selects an invalid %s file', async (field, message) => {
+        renderWithAuthentication('CLIENT_CERTIFICATE')
+
+        await userEvent.upload(
+          screen.getByTestId(`configuration.authentication.${field}FileInput`),
+          new File(['not a PEM file'], 'invalid.pem'),
+        )
+
+        expect(await screen.findByText(message)).toBeInTheDocument()
+      })
     })
 
     it('disables the HTTP fields in read-only mode', () => {
@@ -363,6 +450,45 @@ describe('ConnectorTab (integration)', () => {
       expect(screen.getByLabelText(/http\.authentication\.label/)).toBeDisabled()
       expect(screen.getByLabelText(/http\.username\.label/)).toBeDisabled()
       expect(screen.getByLabelText(/http\.password\.label/)).toBeDisabled()
+    })
+  })
+
+  describe('change of the connector type', () => {
+    it('validates no field of the new connector type', () => {
+      let form: UseFormReturn<DatasourceFormDraft> | undefined
+      let setConnectorType: ((connectorType: ConnectorType) => void) | undefined
+      const Wrapper = () => {
+        const [connectorType, setType] = useState<ConnectorType>('MQTT')
+        setConnectorType = setType
+        form = useForm<DatasourceFormDraft>({
+          resolver: zodResolver(DatasourceFormDraftSchema),
+          defaultValues,
+        })
+        return (
+          <Form {...form}>
+            <ConnectorTab
+              form={form}
+              datasourceId={defaultValues.id}
+              connectorType={connectorType}
+              isConnectorComplete={false}
+              isConnectorChanged={false}
+            />
+          </Form>
+        )
+      }
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <Wrapper />
+        </QueryClientProvider>,
+      )
+      const trigger = vi.spyOn(form!, 'trigger')
+
+      act(() => {
+        form!.setValue('configuration', { baseUrl: '', authentication: { type: 'NONE' } })
+        setConnectorType!('HTTP')
+      })
+
+      expect(trigger).not.toHaveBeenCalled()
     })
   })
 

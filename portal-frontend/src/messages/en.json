@@ -152,6 +152,11 @@
     "deletionWarningModal": {
       "title": "Delete {item}?",
       "description": "This action can not be undone."
+    },
+    "fileField": {
+      "select": "Select file",
+      "noFile": "No file selected",
+      "unreadable": "The file cannot be read. Select it again."
     }
   },
   "languages": {
@@ -1011,6 +1016,15 @@
       "invalidBaseUrl": "Enter a valid http or https URL without query or fragment (e.g. https://api.example.org/v1).",
       "baseUrlCredentials": "Do not put credentials into the API host. Enter them in the authentication.",
       "usernameColon": "The username must not contain a colon (:).",
+      "invalidTokenUrl": "Enter a valid https URL (e.g. https://auth.example.org/oauth2/token).",
+      "tokenUrlHttps": "The token URL must use https.",
+      "tokenUrlQueryOrFragment": "The token URL must not contain a query or fragment.",
+      "tokenUrlCredentials": "Do not put credentials into the token URL. Enter them in the client ID and client secret.",
+      "invalidCertificate": "Select a certificate in PEM format (-----BEGIN CERTIFICATE-----).",
+      "invalidPrivateKey": "Select a private key in PEM format (-----BEGIN PRIVATE KEY----- or -----BEGIN RSA PRIVATE KEY-----).",
+      "encryptedPrivateKey": "Select a private key without a passphrase.",
+      "baseUrlHttpsRequired": "The API host must use https with authentication.",
+      "apiTokenNameCollision": "A query parameter, header or pagination parameter of the API calls already has this name.",
       "invalidPath": "The path must start with / and contain only allowed characters.",
       "apiCallsMax": "Only one API call is possible.",
       "invalidHeaderName": "Allowed in the header name: a–z A–Z 0–9 and ! # $ % & ' * + - . ^ _ ` | ~. No spaces.",
@@ -1035,7 +1049,11 @@
       "updateError": "An error occurred while updating the Data source.",
       "inUseError": "This Data source is still used by a pipeline.",
       "datastructureNotAvailableError": "The Data source could not be set to \"Available\". Set the Data structure version to \"Available\" first.",
-      "groupsWithoutRoles": "Groups with no assigned Roles have not been saved."
+      "groupsWithoutRoles": "Groups with no assigned Roles have not been saved.",
+      "reenterSecret": "The address changed. Enter this value again.",
+      "storedSecretRefused": "The address changed. Enter the secrets again.",
+      "parameterApiTokenDuplicate": "The API token already has this name.",
+      "rejectedByServer": "This value cannot be saved."
     },
     "connection": {
       "active": "active",
@@ -1244,13 +1262,50 @@
         "authentication": {
           "label": "Authentication",
           "none": "None",
-          "basic": "Basic"
+          "basic": "Basic",
+          "bearerToken": "Bearer token",
+          "apiToken": "API token",
+          "oauth2": "OAuth2",
+          "clientCertificate": "Client certificate"
         },
         "username": {
           "label": "Username"
         },
         "password": {
           "label": "Password"
+        },
+        "token": {
+          "label": "Token"
+        },
+        "apiTokenName": {
+          "label": "Name"
+        },
+        "apiTokenValue": {
+          "label": "Value"
+        },
+        "apiTokenIn": {
+          "label": "Send in",
+          "header": "Header",
+          "query": "Query parameter"
+        },
+        "tokenUrl": {
+          "label": "Token URL"
+        },
+        "clientId": {
+          "label": "Client ID"
+        },
+        "clientSecret": {
+          "label": "Client secret"
+        },
+        "scope": {
+          "label": "Scope",
+          "hint": "optional, separated by spaces"
+        },
+        "certificate": {
+          "label": "Certificate"
+        },
+        "privateKey": {
+          "label": "Private key"
         }
       },
       "connectionTest": {
@@ -1268,7 +1323,7 @@
         "details": "Details:",
         "httpStatus": "HTTP status: {status}",
         "previewTruncated": "Preview truncated.",
-        "reenterPassword": "The configuration was changed. Enter the password again to test the connection.",
+        "reenterSecrets": "The configuration was changed. Enter the secrets again to test the connection.",
         "causes": {
           "INVALID_CONNECTOR": "The configuration is invalid.",
           "SOURCE_ERROR": "The source could not be reached or answered with an error.",

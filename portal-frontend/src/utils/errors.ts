@@ -63,12 +63,37 @@ export const unreachableModelMembers = (error: unknown): string[] | null => {
   return Array.isArray(memberNames) ? memberNames.filter((name): name is string => typeof name === 'string') : []
 }
 
+const ARRAY_INDEX = /\[(\d+)\]/g
+const CONNECTOR_PATH_PREFIX = 'connector.'
+
+/** The paths below the connector of the fields that the backend rejects, or null for any other error. */
+export const getConnectorFieldErrorPaths = (error: unknown): string[] | null => {
+  const problem = problemWithStatus(error, 400)
+  if (!problem || !hasErrorType(problem, 'VALIDATION_FAILED') || !isAxiosError(error)) return null
+  const fieldErrors: unknown = (error.response?.data as { fieldErrors?: unknown } | undefined)?.fieldErrors
+  if (!Array.isArray(fieldErrors)) return []
+  const fields: unknown[] = fieldErrors.map((fieldError: { field?: unknown } | null) => fieldError?.field)
+  const connectorFields = fields.filter(
+    (field): field is string => typeof field === 'string' && field.startsWith(CONNECTOR_PATH_PREFIX),
+  )
+  return connectorFields.map(field => field.slice(CONNECTOR_PATH_PREFIX.length).replace(ARRAY_INDEX, '.$1'))
+}
+
 export const isDatastructureNotAvailableError = (error: unknown) => {
   const problem = problemWithStatus(error, 400)
   return (
     !!problem &&
     hasErrorType(problem, 'INVALID_INPUT') &&
     problem.detail.includes('must be in AVAILABLE status for an AVAILABLE DataSource')
+  )
+}
+
+export const isStoredSecretRefusedError = (error: unknown) => {
+  const problem = problemWithStatus(error, 400)
+  return (
+    !!problem &&
+    hasErrorType(problem, 'MALFORMED_REQUEST') &&
+    problem.detail.includes('stored secret is kept only for the stored destination')
   )
 }
 

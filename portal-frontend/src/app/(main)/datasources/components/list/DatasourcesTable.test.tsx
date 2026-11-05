@@ -67,7 +67,7 @@ describe('DatasourcesTable', () => {
   it('renders the rows and row content correctly', () => {
     renderTable()
     const rows = screen.getAllByRole('row')
-    expect(rows).toHaveLength(5) // 1 header + 4 data rows
+    expect(rows).toHaveLength(mockDatasources.length + 1)
 
     const dataRow1 = rows[1]
     const cells1 = within(dataRow1).getAllByRole('cell')
@@ -108,7 +108,7 @@ describe('DatasourcesTable', () => {
   it('renders an action menu button for each row', () => {
     renderTable()
     const menuButtons = screen.getAllByRole('button', { name: 'Open menu' })
-    expect(menuButtons).toHaveLength(4)
+    expect(menuButtons).toHaveLength(mockDatasources.length)
   })
 
   describe('Permission gating', () => {

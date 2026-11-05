@@ -1,6 +1,14 @@
 import { CONNECTOR_TYPES } from '@/const/connectors'
+import { ConnectorType } from '@/types/connectors'
 
-import { buildApiCallUrl, formatPathWithQuery, getConnectorDefaults, getConnectorFormData } from './connectors'
+import {
+  buildApiCallUrl,
+  findSecretsToReenter,
+  formatPathWithQuery,
+  getConnectorDefaults,
+  getConnectorFormData,
+  toFormConnectorPath,
+} from './connectors'
 
 vi.mock('@/app/(main)/datasources/[datasourceId]/components/connector-tab/connectorSources', () => ({
   CONNECTOR_INPUTS: {
@@ -122,5 +130,200 @@ describe('buildApiCallUrl', () => {
 
   it('returns the path with query parameters without a host', () => {
     expect(buildApiCallUrl('', '/stations', queryParameters)).toBe('/stations?status=active')
+  })
+})
+
+describe('findSecretsToReenter', () => {
+  const findSecrets = (
+    connectorType: ConnectorType,
+    current: Record<string, unknown>,
+    loaded: Record<string, unknown> | undefined,
+  ) =>
+    findSecretsToReenter({ connectorType, configuration: current }, loaded && { connectorType, configuration: loaded })
+
+  const BASE_URL = 'https://api.example.org/v1'
+  const TOKEN_URL = 'https://auth.example.org/oauth2/token'
+  const BASIC = { type: 'BASIC' as const, username: 'reader', password: '********' }
+  const OAUTH2 = {
+    type: 'OAUTH2' as const,
+    tokenUrl: TOKEN_URL,
+    clientId: 'client-1',
+    clientSecret: '********',
+    scope: '',
+  }
+  const CLIENT_CERTIFICATE = { type: 'CLIENT_CERTIFICATE' as const, certificate: '********', privateKey: '********' }
+  const LOADED = { baseUrl: BASE_URL, authentication: BASIC }
+  const OTHER_BASE_URL = 'https://other.example.org'
+
+  it.each([
+    ['the same host with another path', 'https://api.example.org/v2/'],
+    ['credentials in the URL', 'https://reader@api.example.org/v1'],
+    ['a leading space', ' https://api.example.org/v1'],
+    ['no API host', ''],
+  ])('asks for no secret for %s', (_name, baseUrl) => {
+    expect(findSecrets(CONNECTOR_TYPES.HTTP, { baseUrl, authentication: BASIC }, LOADED)).toEqual([])
+  })
+
+  it.each([
+    ['another host', 'https://other.example.org/v1'],
+    ['another port', 'https://api.example.org:8443/v1'],
+    ['another scheme', 'http://api.example.org/v1'],
+    ['the default port', 'https://api.example.org:443/v1'],
+    ['another case of the host', 'https://API.example.org/v1'],
+  ])('asks for the secret again for %s', (_name, baseUrl) => {
+    expect(findSecrets(CONNECTOR_TYPES.HTTP, { baseUrl, authentication: BASIC }, LOADED)).toEqual([
+      'authentication.password',
+    ])
+  })
+
+  it('asks for all secrets of the client certificate', () => {
+    const loaded = { baseUrl: BASE_URL, authentication: CLIENT_CERTIFICATE }
+
+    expect(
+      findSecrets(
+        CONNECTOR_TYPES.HTTP,
+        { baseUrl: 'https://other.example.org', authentication: CLIENT_CERTIFICATE },
+        loaded,
+      ),
+    ).toEqual(['authentication.certificate', 'authentication.privateKey'])
+  })
+
+  it('asks for the client secret when the token URL changes', () => {
+    const loaded = { baseUrl: BASE_URL, authentication: OAUTH2 }
+    const current = { baseUrl: BASE_URL, authentication: { ...OAUTH2, tokenUrl: 'https://login.example.org/token' } }
+
+    expect(findSecrets(CONNECTOR_TYPES.HTTP, current, loaded)).toEqual(['authentication.clientSecret'])
+  })
+
+  it('asks for no secret when only the path of the token URL changes', () => {
+    const loaded = { baseUrl: BASE_URL, authentication: OAUTH2 }
+    const current = { baseUrl: BASE_URL, authentication: { ...OAUTH2, tokenUrl: 'https://auth.example.org/token' } }
+
+    expect(findSecrets(CONNECTOR_TYPES.HTTP, current, loaded)).toEqual([])
+  })
+
+  it('asks for no secret that the user entered again', () => {
+    const current = { baseUrl: 'https://other.example.org', authentication: { ...BASIC, password: 'new-secret' } }
+
+    expect(findSecrets(CONNECTOR_TYPES.HTTP, current, LOADED)).toEqual([])
+  })
+
+  it('asks for no secret without a loaded connector of the same type', () => {
+    const current = {
+      connectorType: CONNECTOR_TYPES.HTTP,
+      configuration: { baseUrl: OTHER_BASE_URL, authentication: BASIC },
+    }
+    const loaded = { connectorType: CONNECTOR_TYPES.MQTT, configuration: { urls: 'mqtt://broker.example.org:1883' } }
+
+    expect(findSecretsToReenter(current, undefined)).toEqual([])
+    expect(findSecretsToReenter(current, loaded)).toEqual([])
+  })
+
+  describe('MQTT', () => {
+    const LOADED_MQTT = {
+      urls: 'mqtt://broker-1.example.org:1883, mqtt://broker-2.example.org:1883',
+      password: '********',
+    }
+
+    it.each([
+      ['the same brokers in another order', 'mqtt://broker-2.example.org:1883, mqtt://broker-1.example.org:1883'],
+      ['a removed broker', 'mqtt://broker-1.example.org:1883'],
+      ['credentials in the URL', 'mqtt://reader@broker-1.example.org:1883'],
+    ])('asks for no password for %s', (_name, urls) => {
+      expect(findSecrets(CONNECTOR_TYPES.MQTT, { ...LOADED_MQTT, urls }, LOADED_MQTT)).toEqual([])
+    })
+
+    it.each([
+      ['another host', 'mqtt://broker-3.example.org:1883'],
+      ['another port', 'mqtt://broker-1.example.org:8883'],
+      ['another scheme', 'mqtts://broker-1.example.org:1883'],
+      ['a jdbc prefix', 'jdbc:mqtt://broker-1.example.org:1883'],
+    ])('asks for the password again for %s', (_name, urls) => {
+      expect(findSecrets(CONNECTOR_TYPES.MQTT, { ...LOADED_MQTT, urls }, LOADED_MQTT)).toEqual(['password'])
+    })
+
+    it('asks for no password that the user entered again', () => {
+      const current = { urls: 'mqtt://broker-3.example.org:1883', password: 'new-secret' }
+
+      expect(findSecrets(CONNECTOR_TYPES.MQTT, current, LOADED_MQTT)).toEqual([])
+    })
+  })
+
+  describe('SQL', () => {
+    const LOADED_SQL = { dsn: 'postgres://db.example.org:5432/stations?sslmode=require', password: '********' }
+
+    it.each([
+      ['another database', 'postgres://db.example.org:5432/other?sslmode=require'],
+      ['a jdbc prefix', 'jdbc:postgres://db.example.org:5432/stations?sslmode=require'],
+      ['credentials in the DSN', 'postgres://reader@db.example.org:5432/stations?sslmode=require'],
+      ['another parameter', 'postgres://db.example.org:5432/stations?sslmode=require&connect_timeout=5'],
+    ])('asks for no password for %s', (_name, dsn) => {
+      expect(findSecrets(CONNECTOR_TYPES.SQL, { ...LOADED_SQL, dsn }, LOADED_SQL)).toEqual([])
+    })
+
+    it.each([
+      ['another host', 'postgres://other.example.org:5432/stations?sslmode=require'],
+      ['another port', 'postgres://db.example.org:6432/stations?sslmode=require'],
+      ['another sslmode', 'postgres://db.example.org:5432/stations?sslmode=disable'],
+      ['no sslmode', 'postgres://db.example.org:5432/stations'],
+      ['an sslmode only in the fragment', 'postgres://db.example.org:5432/stations#?sslmode=require'],
+    ])('asks for the password again for %s', (_name, dsn) => {
+      expect(findSecrets(CONNECTOR_TYPES.SQL, { ...LOADED_SQL, dsn }, LOADED_SQL)).toEqual(['password'])
+    })
+  })
+})
+
+describe('toFormConnectorPath', () => {
+  const CONFIGURATION = {
+    baseUrl: 'https://api.example.org/v1',
+    tls: false,
+    topics: 'sensors',
+    apiCalls: [
+      {
+        name: 'Get all stations',
+        path: '',
+        headers: [
+          { name: '', value: '' },
+          { name: 'Host', value: 'x' },
+        ],
+        queryParameters: [{ name: 'status', value: 'active' }],
+      },
+    ],
+  }
+
+  it.each([
+    ['a field', 'baseUrl', 'baseUrl'],
+    ['an empty field', 'apiCalls.0.path', 'apiCalls.0.path'],
+    ['a header after an empty row', 'apiCalls.0.headers.0.name', 'apiCalls.0.headers.1.name'],
+    ['a query parameter', 'apiCalls.0.queryParameters.0.value', 'apiCalls.0.queryParameters.0.value'],
+  ])('returns the form path of %s', (_name, path, formPath) => {
+    expect(toFormConnectorPath(path, CONFIGURATION)).toBe(formPath)
+  })
+
+  it.each([
+    ['an API call', 'apiCalls.0'],
+    ['a part of a check box', 'tls.enabled'],
+    ['a part of a text', 'topics.0'],
+    ['a missing field', 'authentication.name'],
+    ['a header that was not sent', 'apiCalls.0.headers.1.name'],
+  ])('returns no form path for %s', (_name, path) => {
+    expect(toFormConnectorPath(path, CONFIGURATION)).toBeUndefined()
+  })
+
+  it('skips a row whose name has only spaces', () => {
+    const configuration = {
+      apiCalls: [
+        {
+          queryParameters: [
+            { name: '  ', value: '' },
+            { name: 'status', value: 'active' },
+          ],
+        },
+      ],
+    }
+
+    expect(toFormConnectorPath('apiCalls.0.queryParameters.0.name', configuration)).toBe(
+      'apiCalls.0.queryParameters.1.name',
+    )
   })
 })

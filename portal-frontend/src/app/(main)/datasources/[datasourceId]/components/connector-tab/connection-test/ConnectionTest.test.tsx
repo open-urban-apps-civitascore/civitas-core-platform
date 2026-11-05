@@ -6,8 +6,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { mockApiError } from '@/__mocks__/errors/apiError.mock'
 import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { Form } from '@/components/ui/form'
-import { ConnectionTestResult, MASKED_SECRET } from '@/types/connectionTest'
-import { ConnectorFormToApiSchema, ConnectorType, EMPTY_PAGINATION } from '@/types/connectors'
+import { EMPTY_PAGINATION, SECRET_PLACEHOLDER } from '@/const/connectors'
+import { ConnectionTestResult } from '@/types/connectionTest'
+import { ConnectorFormToApiSchema, ConnectorType } from '@/types/connectors'
 import { DatasourceFormDraft } from '@/types/datasources'
 
 import { ConnectionTest } from './ConnectionTest'
@@ -562,14 +563,14 @@ describe('ConnectionTest', () => {
   })
 
   describe('masked password', () => {
-    const maskedConfiguration = { ...SQL_CONFIGURATION, password: MASKED_SECRET }
+    const maskedConfiguration = { ...SQL_CONFIGURATION, password: SECRET_PLACEHOLDER }
 
     it('asks for the password again for a changed connector and sends no request', () => {
       renderConnectionTest({ configuration: maskedConfiguration, isConnectorChanged: true })
 
       clickTest()
 
-      expect(screen.getByText('reenterPassword')).toBeInTheDocument()
+      expect(screen.getByText('reenterSecrets')).toBeInTheDocument()
       expect(mockApiRequest).not.toHaveBeenCalled()
     })
 
@@ -579,7 +580,7 @@ describe('ConnectionTest', () => {
       clickTest()
       act(() => form.setValue('configuration.password', 'new-secret'))
 
-      await waitFor(() => expect(screen.queryByText('reenterPassword')).not.toBeInTheDocument())
+      await waitFor(() => expect(screen.queryByText('reenterSecrets')).not.toBeInTheDocument())
     })
 
     it('does not show the result of the stored password after a new password is saved', async () => {
@@ -590,7 +591,7 @@ describe('ConnectionTest', () => {
       await screen.findByText('success')
       act(() => form.setValue('configuration.password', 'new-secret'))
       await waitFor(() => expect(screen.queryByText('success')).not.toBeInTheDocument())
-      act(() => form.setValue('configuration.password', MASKED_SECRET))
+      act(() => form.setValue('configuration.password', SECRET_PLACEHOLDER))
 
       expect(screen.queryByText('success')).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'button' })).toBeEnabled()
@@ -600,12 +601,12 @@ describe('ConnectionTest', () => {
       const { form } = renderConnectionTest({ configuration: maskedConfiguration, isConnectorChanged: true })
 
       clickTest()
-      expect(screen.getByText('reenterPassword')).toBeInTheDocument()
+      expect(screen.getByText('reenterSecrets')).toBeInTheDocument()
       act(() => form.setValue('configuration.password', 'new-secret'))
-      await waitFor(() => expect(screen.queryByText('reenterPassword')).not.toBeInTheDocument())
-      act(() => form.setValue('configuration.password', MASKED_SECRET))
+      await waitFor(() => expect(screen.queryByText('reenterSecrets')).not.toBeInTheDocument())
+      act(() => form.setValue('configuration.password', SECRET_PLACEHOLDER))
 
-      expect(screen.queryByText('reenterPassword')).not.toBeInTheDocument()
+      expect(screen.queryByText('reenterSecrets')).not.toBeInTheDocument()
     })
 
     it('shows no result when the password is changed and set back to the masked value during the test', async () => {
@@ -616,7 +617,7 @@ describe('ConnectionTest', () => {
       clickTest()
       await screen.findByText('connecting')
       act(() => form.setValue('configuration.password', 'new-secret'))
-      act(() => form.setValue('configuration.password', MASKED_SECRET))
+      act(() => form.setValue('configuration.password', SECRET_PLACEHOLDER))
       act(() => resolve({ data: testResult() }))
 
       await waitFor(() => expect(screen.getByRole('button', { name: 'button' })).toBeEnabled())
@@ -648,7 +649,7 @@ describe('ConnectionTest', () => {
       clickTest()
 
       await waitFor(() => expect(mockApiRequest).toHaveBeenCalledTimes(1))
-      expect(screen.queryByText('reenterPassword')).not.toBeInTheDocument()
+      expect(screen.queryByText('reenterSecrets')).not.toBeInTheDocument()
     })
   })
 

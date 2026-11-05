@@ -1,8 +1,12 @@
-import { act, renderHook } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
+import { Path } from 'react-hook-form'
+import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { EMPTY_PAGINATION } from '@/types/connectors'
-import { DATAPOOL_SCOPE_TYPES, Datasource, DatasourceStatusType } from '@/types/datasources'
+import { mockApiError } from '@/__mocks__/errors/apiError.mock'
+import { EMPTY_PAGINATION } from '@/const/connectors'
+import { HttpAuthenticationType } from '@/types/connectors'
+import { DATAPOOL_SCOPE_TYPES, Datasource, DatasourceFormDraft, DatasourceStatusType } from '@/types/datasources'
 
 import { useDatasourceForm } from './useDatasourceForm'
 
@@ -230,8 +234,8 @@ describe('useDatasourceForm with an HTTP connector', () => {
 
   const submitAfter = async (
     edit: (form: ReturnType<typeof renderDatasourceForm>['result']['current']['form']) => void,
+    datasource = createHttpDatasource(),
   ) => {
-    const datasource = createHttpDatasource()
     mockUpdateDatasource.mockResolvedValue({ data: datasource })
     const { result } = renderDatasourceForm(datasource)
     act(() => edit(result.current.form))
@@ -407,6 +411,432 @@ describe('useDatasourceForm with an HTTP connector', () => {
     expect(connector.authentication).toEqual({ type: 'BASIC', username: 'reader', password: 'new-secret' })
   })
 
+  describe('change of the authentication type', () => {
+    const AUTHENTICATION_TYPE_PATH = 'configuration.authentication.type' as Path<DatasourceFormDraft>
+
+    const renderHttpDatasourceForm = (datasource: Datasource) => {
+      const rendered = renderDatasourceForm(datasource)
+      // The connector tab registers the select.
+      act(() => {
+        rendered.result.current.form.register(AUTHENTICATION_TYPE_PATH)
+      })
+      return rendered
+    }
+
+    const selectAuthenticationType = (
+      result: ReturnType<typeof renderDatasourceForm>['result'],
+      type: HttpAuthenticationType,
+    ) =>
+      act(async () => {
+        const { onChange } = result.current.form.register(AUTHENTICATION_TYPE_PATH)
+        await onChange({ target: { name: AUTHENTICATION_TYPE_PATH, value: type }, type: 'change' })
+      })
+
+    it.each([
+      ['BEARER_TOKEN', { type: 'BEARER_TOKEN', token: '' }],
+      ['API_TOKEN', { type: 'API_TOKEN', name: '', value: '', in: 'HEADER' }],
+      ['OAUTH2', { type: 'OAUTH2', tokenUrl: '', clientId: '', clientSecret: '', scope: '' }],
+      ['CLIENT_CERTIFICATE', { type: 'CLIENT_CERTIFICATE', certificate: '', privateKey: '' }],
+      ['NONE', { type: 'NONE' }],
+    ] as const)('keeps only the empty fields of %s', async (type, expected) => {
+      const { result } = renderHttpDatasourceForm(createHttpDatasource())
+
+      await selectAuthenticationType(result, type)
+
+      expect(result.current.form.getValues('configuration.authentication')).toEqual(expected)
+    })
+
+    it('keeps an error of the backend at the API host', async () => {
+      const { result } = renderHttpDatasourceForm(createHttpDatasource())
+      act(() =>
+        result.current.form.setError('configuration.baseUrl', {
+          type: 'server',
+          message: 'datasources.errors.rejectedByServer',
+        }),
+      )
+
+      await selectAuthenticationType(result, 'NONE')
+      await act(async () => {})
+
+      expect(result.current.form.getFieldState('configuration.baseUrl').error?.message).toBe(
+        'datasources.errors.rejectedByServer',
+      )
+    })
+
+    it('removes an error of the backend at a field of the previous authentication', async () => {
+      const { result } = renderHttpDatasourceForm(createHttpDatasource())
+      const usernamePath = 'configuration.authentication.username' as Path<DatasourceFormDraft>
+      act(() =>
+        result.current.form.setError(usernamePath, { type: 'server', message: 'datasources.errors.rejectedByServer' }),
+      )
+
+      await selectAuthenticationType(result, 'NONE')
+      await act(async () => {})
+
+      expect(result.current.form.getFieldState(usernamePath).error).toBeUndefined()
+    })
+
+    it('creates the empty Basic fields for a loaded None', async () => {
+      const datasource = createHttpDatasource()
+      const { result } = renderHttpDatasourceForm({
+        ...datasource,
+        connector: { ...datasource.connector!, authentication: { type: 'NONE' } },
+      })
+
+      await selectAuthenticationType(result, 'BASIC')
+
+      expect(result.current.form.getValues('configuration.authentication')).toEqual({
+        type: 'BASIC',
+        username: '',
+        password: '',
+      })
+    })
+
+    it('restores the loaded values when the loaded type is selected again', async () => {
+      const { result } = renderHttpDatasourceForm(createHttpDatasource())
+
+      await selectAuthenticationType(result, 'BEARER_TOKEN')
+      await selectAuthenticationType(result, 'BASIC')
+
+      expect(result.current.form.getValues('configuration.authentication')).toEqual({
+        type: 'BASIC',
+        username: 'reader',
+        password: '********',
+      })
+      expect(result.current.isFormDirty).toBe(false)
+    })
+
+    it('restores the loaded values when the user exits after a change of the type', async () => {
+      const { result } = renderHttpDatasourceForm(createHttpDatasource())
+
+      await selectAuthenticationType(result, 'API_TOKEN')
+      act(() => result.current.resetToInitialState())
+
+      expect(result.current.form.getValues('configuration.authentication')).toEqual({
+        type: 'BASIC',
+        username: 'reader',
+        password: '********',
+      })
+    })
+  })
+
+  describe.each([
+    ['BEARER_TOKEN', { type: 'BEARER_TOKEN', token: '********' }, { type: 'BEARER_TOKEN', token: 'new-token' }],
+    [
+      'API_TOKEN',
+      { type: 'API_TOKEN', name: 'X-API-Key', value: '********', in: 'HEADER' },
+      { type: 'API_TOKEN', name: 'X-API-Key', value: 'new-key', in: 'HEADER' },
+    ],
+    [
+      'OAUTH2',
+      {
+        type: 'OAUTH2',
+        tokenUrl: 'https://auth.example.org/token',
+        clientId: 'client-1',
+        clientSecret: '********',
+        scope: 'read',
+      },
+      {
+        type: 'OAUTH2',
+        tokenUrl: 'https://auth.example.org/token',
+        clientId: 'client-1',
+        clientSecret: 'new-secret',
+        scope: 'read',
+      },
+    ],
+    [
+      'CLIENT_CERTIFICATE',
+      { type: 'CLIENT_CERTIFICATE', certificate: '********', privateKey: '********' },
+      {
+        type: 'CLIENT_CERTIFICATE',
+        certificate: '-----BEGIN CERTIFICATE-----\nMIIBtest1\n-----END CERTIFICATE-----',
+        privateKey: '-----BEGIN PRIVATE KEY-----\nMIIEtest\n-----END PRIVATE KEY-----',
+      },
+    ],
+  ] as const)('with the authentication %s', (_type, loaded, changed) => {
+    const datasource = createHttpDatasource()
+    const datasourceWithAuthentication = {
+      ...datasource,
+      connector: { ...datasource.connector!, authentication: loaded },
+    }
+
+    it('sends the masked secret back when it did not change', async () => {
+      const connector = await submitAfter(
+        form => form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true }),
+        datasourceWithAuthentication,
+      )
+
+      expect(connector.authentication).toEqual(loaded)
+    })
+
+    it('sends a new secret', async () => {
+      const connector = await submitAfter(
+        form => form.setValue('configuration.authentication', changed, { shouldDirty: true }),
+        datasourceWithAuthentication,
+      )
+
+      expect(connector.authentication).toEqual(changed)
+    })
+  })
+
+  describe('changed destination', () => {
+    const PASSWORD_PATH = 'configuration.authentication.password'
+    const OTHER_HOST = 'https://other.example.org/v1'
+
+    const renderWithChangedHost = () => {
+      const datasource = createHttpDatasource()
+      mockUpdateDatasource.mockResolvedValue({ data: datasource })
+      const rendered = renderDatasourceForm(datasource)
+      act(() => rendered.result.current.form.setValue('configuration.baseUrl', OTHER_HOST, { shouldDirty: true }))
+      return rendered
+    }
+
+    const submit = async (result: ReturnType<typeof renderDatasourceForm>['result']) => {
+      let isSaved = false
+      await act(async () => {
+        isSaved = await result.current.submitDatasource()
+      })
+      return isSaved
+    }
+
+    const getPasswordError = (result: ReturnType<typeof renderDatasourceForm>['result']) =>
+      result.current.form.getFieldState(PASSWORD_PATH).error?.message
+
+    it('asks for the masked password again and sends nothing', async () => {
+      const { result } = renderWithChangedHost()
+
+      expect(getPasswordError(result)).toBe('datasources.errors.reenterSecret')
+      expect(await submit(result)).toBe(false)
+      expect(mockUpdateDatasource).not.toHaveBeenCalled()
+      expect(getPasswordError(result)).toBe('datasources.errors.reenterSecret')
+    })
+
+    it('sends the connector after the user entered the password again', async () => {
+      const { result } = renderWithChangedHost()
+      expect(getPasswordError(result)).toBe('datasources.errors.reenterSecret')
+
+      act(() =>
+        result.current.form.setValue(
+          'configuration.authentication',
+          { type: 'BASIC', username: 'reader', password: 'new-secret' },
+          { shouldDirty: true },
+        ),
+      )
+
+      expect(getPasswordError(result)).toBeUndefined()
+      expect(await submit(result)).toBe(true)
+      expect(mockUpdateDatasource.mock.calls[0][0].connector).toMatchObject({
+        baseUrl: OTHER_HOST,
+        authentication: { type: 'BASIC', username: 'reader', password: 'new-secret' },
+      })
+    })
+
+    it('clears the error when the API host gets the loaded host again', () => {
+      const { result } = renderWithChangedHost()
+      expect(getPasswordError(result)).toBe('datasources.errors.reenterSecret')
+
+      act(() =>
+        result.current.form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true }),
+      )
+
+      expect(getPasswordError(result)).toBeUndefined()
+    })
+
+    it('keeps the hint at the password when the status changes to Available and back to Draft', async () => {
+      const { result } = renderWithChangedHost()
+      const setStatus = (dataSourceStatus: DatasourceStatusType) =>
+        act(async () => {
+          result.current.form.setValue('dataSourceStatus', dataSourceStatus, { shouldDirty: true })
+        })
+
+      await setStatus('AVAILABLE')
+      await waitFor(() => expect(getPasswordError(result)).toBe('datasources.errors.reenterSecret'))
+
+      await setStatus('DRAFT')
+      expect(getPasswordError(result)).toBe('datasources.errors.reenterSecret')
+    })
+
+    it('shows the hint at the password after the user selects the loaded type again', async () => {
+      const { result } = renderWithChangedHost()
+      act(() => {
+        result.current.form.register('configuration.authentication.type' as Path<DatasourceFormDraft>)
+      })
+
+      await act(async () => {
+        result.current.form.setValue('configuration.authentication.type' as Path<DatasourceFormDraft>, 'BEARER_TOKEN')
+      })
+      await act(async () => {
+        result.current.form.setValue('configuration.authentication.type' as Path<DatasourceFormDraft>, 'BASIC')
+      })
+
+      await waitFor(() => expect(getPasswordError(result)).toBe('datasources.errors.reenterSecret'))
+    })
+
+    it('shows its own message when the backend refuses the stored secret', async () => {
+      mockUpdateDatasource.mockRejectedValue(
+        mockApiError(
+          400,
+          'The stored secret is kept only for the stored destination; enter it again for another one',
+          'urn:civitas:error:MALFORMED_REQUEST',
+        ),
+      )
+      const { result } = renderDatasourceForm(createHttpDatasource())
+      act(() =>
+        result.current.form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true }),
+      )
+
+      expect(await submit(result)).toBe(false)
+      expect(toast.error).toHaveBeenCalledWith('errors.storedSecretRefused')
+    })
+
+    it('asks for the masked password again when the backend refuses the stored secret', async () => {
+      mockUpdateDatasource.mockRejectedValue(
+        mockApiError(
+          400,
+          'The stored secret is kept only for the stored destination; enter it again for another one',
+          'urn:civitas:error:MALFORMED_REQUEST',
+        ),
+      )
+      const { result } = renderDatasourceForm(createHttpDatasource())
+      act(() =>
+        result.current.form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true }),
+      )
+
+      await submit(result)
+
+      expect(getPasswordError(result)).toBe('datasources.errors.reenterSecret')
+    })
+
+    it('shows the fields that the backend rejects at the field', async () => {
+      mockUpdateDatasource.mockRejectedValue(
+        mockApiError(400, 'Input validation failed', 'urn:civitas:error:VALIDATION_FAILED', {
+          fieldErrors: [
+            { field: 'connector.baseUrl', message: "'baseUrl' must use https with authentication" },
+            { field: 'connector.apiCalls[0].path', message: "'path' is invalid" },
+            { field: 'connector.apiCalls[0]', message: "'name' must be unique among the API calls" },
+          ],
+        }),
+      )
+      const { result } = renderDatasourceForm(createHttpDatasource())
+      act(() =>
+        result.current.form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true }),
+      )
+
+      expect(await submit(result)).toBe(false)
+
+      const { form } = result.current
+      expect(form.getFieldState('configuration.baseUrl').error?.message).toBe('datasources.errors.rejectedByServer')
+      expect(form.getFieldState('configuration.apiCalls.0.path' as Path<DatasourceFormDraft>).error?.message).toBe(
+        'datasources.errors.rejectedByServer',
+      )
+      expect(form.getFieldState('configuration.apiCalls.0' as Path<DatasourceFormDraft>).error?.message).toBeUndefined()
+      expect(toast.error).toHaveBeenCalledWith('errors.updateError')
+    })
+
+    it('clears the errors of the backend when the user saves again', async () => {
+      mockUpdateDatasource.mockRejectedValueOnce(
+        mockApiError(400, 'Input validation failed', 'urn:civitas:error:VALIDATION_FAILED', {
+          fieldErrors: [{ field: 'connector.apiCalls[0].path', message: "'path' is invalid" }],
+        }),
+      )
+      const { result } = renderDatasourceForm(createHttpDatasource())
+      const pathField = 'configuration.apiCalls.0.path' as Path<DatasourceFormDraft>
+      act(() =>
+        result.current.form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true }),
+      )
+      await submit(result)
+      expect(result.current.form.getFieldState(pathField).error?.message).toBe('datasources.errors.rejectedByServer')
+
+      mockUpdateDatasource.mockRejectedValueOnce(mockApiError(500, 'Internal server error'))
+      await submit(result)
+
+      expect(result.current.form.getFieldState(pathField).error).toBeUndefined()
+    })
+
+    it('clears an error of the backend that moved to another row when the user saves again', async () => {
+      const { result } = renderDatasourceForm(createHttpDatasource())
+      const movedField = 'configuration.apiCalls.0.name' as Path<DatasourceFormDraft>
+      act(() => {
+        result.current.form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true })
+        result.current.form.setError(movedField, { type: 'server', message: 'datasources.errors.rejectedByServer' })
+      })
+
+      mockUpdateDatasource.mockRejectedValueOnce(mockApiError(500, 'Internal server error'))
+      await submit(result)
+
+      expect(result.current.form.getFieldState(movedField).error).toBeUndefined()
+    })
+
+    it.each(['AVAILABLE', 'DRAFT'] as const)(
+      'keeps an error of the backend when the status changes to %s',
+      async status => {
+        const { result } = renderDatasourceForm(createHttpDatasource())
+        const pathField = 'configuration.apiCalls.0.path' as Path<DatasourceFormDraft>
+        act(() => {
+          result.current.form.setError(pathField, { type: 'server', message: 'datasources.errors.rejectedByServer' })
+          result.current.handleStatusChange('AVAILABLE')
+        })
+        await act(async () => {})
+        if (status === 'DRAFT') {
+          act(() => result.current.handleStatusChange('DRAFT'))
+          await act(async () => {})
+        }
+
+        expect(result.current.form.getFieldState(pathField).error?.message).toBe('datasources.errors.rejectedByServer')
+      },
+    )
+
+    it('removes the errors of the backend when the connector type changes', async () => {
+      const { result } = renderDatasourceForm(createHttpDatasource())
+      act(() =>
+        result.current.form.setError('configuration.baseUrl', {
+          type: 'server',
+          message: 'datasources.errors.rejectedByServer',
+        }),
+      )
+
+      act(() => result.current.form.setValue('connectorType', 'SQL', { shouldDirty: true }))
+      await act(async () => {})
+
+      expect(result.current.form.formState.errors.configuration).toBeUndefined()
+    })
+
+    it('shows the general message for another update error', async () => {
+      mockUpdateDatasource.mockRejectedValue(mockApiError(400, 'Failed to read request body'))
+      const { result } = renderDatasourceForm(createHttpDatasource())
+      act(() =>
+        result.current.form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true }),
+      )
+
+      expect(await submit(result)).toBe(false)
+      expect(toast.error).toHaveBeenCalledWith('errors.updateError')
+      expect(result.current.form.formState.errors.configuration).toBeUndefined()
+    })
+  })
+
+  it('sends nothing when the API token name collides with a header of an API call', async () => {
+    const datasource = createHttpDatasource()
+    const { result } = renderDatasourceForm({
+      ...datasource,
+      connector: {
+        ...datasource.connector!,
+        authentication: { type: 'API_TOKEN', name: 'X-API-Key', value: '********', in: 'HEADER' },
+        apiCalls: [{ name: 'Get all stations', path: '/stations', headers: [{ name: 'x-api-key', value: 'x' }] }],
+      },
+    })
+    act(() =>
+      result.current.form.setValue('configuration.baseUrl', 'https://api.example.org/v2', { shouldDirty: true }),
+    )
+
+    let isSaved = true
+    await act(async () => {
+      isSaved = await result.current.submitDatasource()
+    })
+
+    expect(isSaved).toBe(false)
+    expect(mockUpdateDatasource).not.toHaveBeenCalled()
+  })
+
   it('sends only the type when the authentication changes to None', async () => {
     const connector = await submitAfter(form =>
       form.setValue(
@@ -417,5 +847,71 @@ describe('useDatasourceForm with an HTTP connector', () => {
     )
 
     expect(connector.authentication).toEqual({ type: 'NONE' })
+  })
+})
+
+describe('useDatasourceForm with the password of MQTT or SQL', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  const createSqlDatasource = (): Datasource => ({
+    ...createDatasource('DRAFT'),
+    connector: {
+      connectorType: 'SQL',
+      driver: 'postgres',
+      dsn: 'postgres://db.example.org:5432/stations?sslmode=require',
+      table: 'stations',
+      columns: ['*'],
+      where: null,
+      user: 'reader',
+      password: '********',
+    },
+  })
+
+  const getPasswordError = (result: ReturnType<typeof renderDatasourceForm>['result']) =>
+    result.current.form.getFieldState('configuration.password').error?.message
+
+  const submit = async (result: ReturnType<typeof renderDatasourceForm>['result']) => {
+    let isSaved = false
+    await act(async () => {
+      isSaved = await result.current.submitDatasource()
+    })
+    return isSaved
+  }
+
+  it.each([
+    ['MQTT', createDatasource('DRAFT'), 'configuration.urls', 'mqtt://other.example.org:1883'],
+    ['SQL', createSqlDatasource(), 'configuration.dsn', 'postgres://other.example.org:5432/stations?sslmode=require'],
+  ] as const)('asks for the %s password again when the address changes', async (_type, datasource, path, address) => {
+    const { result } = renderDatasourceForm(datasource)
+    const loadedAddress = result.current.form.getValues(path)
+
+    act(() => result.current.form.setValue(path, address, { shouldDirty: true }))
+
+    await waitFor(() => expect(getPasswordError(result)).toBe('datasources.errors.reenterSecret'))
+    expect(await submit(result)).toBe(false)
+    expect(mockUpdateDatasource).not.toHaveBeenCalled()
+
+    act(() => result.current.form.setValue(path, loadedAddress, { shouldDirty: true }))
+
+    await waitFor(() => expect(getPasswordError(result)).toBeUndefined())
+  })
+
+  it('asks for the SQL password again when the backend refuses the stored secret', async () => {
+    mockUpdateDatasource.mockRejectedValue(
+      mockApiError(
+        400,
+        'The stored secret is kept only for the stored destination; enter it again for another one',
+        'urn:civitas:error:MALFORMED_REQUEST',
+      ),
+    )
+    const { result } = renderDatasourceForm(createSqlDatasource())
+    act(() => result.current.form.setValue('configuration.table', 'other_stations', { shouldDirty: true }))
+
+    expect(await submit(result)).toBe(false)
+
+    expect(getPasswordError(result)).toBe('datasources.errors.reenterSecret')
+    expect(toast.error).toHaveBeenCalledWith('errors.storedSecretRefused')
   })
 })

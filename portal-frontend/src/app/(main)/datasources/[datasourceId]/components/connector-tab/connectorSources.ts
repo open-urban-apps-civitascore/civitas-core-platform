@@ -1,6 +1,8 @@
-import { CONNECTOR_TYPES, HTTP_AUTHENTICATION_TYPES } from '@/const/connectors'
+import { CONNECTOR_TYPES, HTTP_AUTHENTICATION_TYPES, HTTP_PARAMETER_LOCATIONS } from '@/const/connectors'
 import { ConnectorType, normalizeHttpBaseUrl } from '@/types/connectors'
 import { ConnectorField } from '@/types/datasources'
+
+const PEM_FILE_EXTENSIONS = '.pem,.crt,.cer,.key'
 
 export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
   [CONNECTOR_TYPES.MQTT]: [
@@ -164,6 +166,10 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       options: [
         { value: HTTP_AUTHENTICATION_TYPES.NONE, labelKey: 'http.authentication.none' },
         { value: HTTP_AUTHENTICATION_TYPES.BASIC, labelKey: 'http.authentication.basic' },
+        { value: HTTP_AUTHENTICATION_TYPES.BEARER_TOKEN, labelKey: 'http.authentication.bearerToken' },
+        { value: HTTP_AUTHENTICATION_TYPES.API_TOKEN, labelKey: 'http.authentication.apiToken' },
+        { value: HTTP_AUTHENTICATION_TYPES.OAUTH2, labelKey: 'http.authentication.oauth2' },
+        { value: HTTP_AUTHENTICATION_TYPES.CLIENT_CERTIFICATE, labelKey: 'http.authentication.clientCertificate' },
       ],
       defaultValue: HTTP_AUTHENTICATION_TYPES.NONE,
       required: true,
@@ -174,7 +180,6 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       autoComplete: 'off',
       label: { labelKey: 'http.username.label' },
       visibleWhen: { key: 'authentication.type', value: HTTP_AUTHENTICATION_TYPES.BASIC },
-      defaultValue: '',
       required: true,
     },
     {
@@ -183,7 +188,89 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       inputType: 'password',
       label: { labelKey: 'http.password.label' },
       visibleWhen: { key: 'authentication.type', value: HTTP_AUTHENTICATION_TYPES.BASIC },
-      defaultValue: '',
+      required: true,
+    },
+    {
+      key: 'authentication.token',
+      type: 'input',
+      inputType: 'password',
+      label: { labelKey: 'http.token.label' },
+      visibleWhen: { key: 'authentication.type', value: HTTP_AUTHENTICATION_TYPES.BEARER_TOKEN },
+      required: true,
+    },
+    {
+      key: 'authentication.name',
+      type: 'input',
+      autoComplete: 'off',
+      label: { labelKey: 'http.apiTokenName.label' },
+      placeholder: 'X-API-Key',
+      visibleWhen: { key: 'authentication.type', value: HTTP_AUTHENTICATION_TYPES.API_TOKEN },
+      required: true,
+    },
+    {
+      key: 'authentication.value',
+      type: 'input',
+      inputType: 'password',
+      label: { labelKey: 'http.apiTokenValue.label' },
+      visibleWhen: { key: 'authentication.type', value: HTTP_AUTHENTICATION_TYPES.API_TOKEN },
+      required: true,
+    },
+    {
+      key: 'authentication.in',
+      type: 'select',
+      label: { labelKey: 'http.apiTokenIn.label' },
+      options: [
+        { value: HTTP_PARAMETER_LOCATIONS.HEADER, labelKey: 'http.apiTokenIn.header' },
+        { value: HTTP_PARAMETER_LOCATIONS.QUERY, labelKey: 'http.apiTokenIn.query' },
+      ],
+      visibleWhen: { key: 'authentication.type', value: HTTP_AUTHENTICATION_TYPES.API_TOKEN },
+      required: true,
+    },
+    {
+      key: 'authentication.tokenUrl',
+      type: 'input',
+      label: { labelKey: 'http.tokenUrl.label' },
+      placeholder: 'https://auth.example.org/oauth2/token',
+      visibleWhen: { key: 'authentication.type', value: HTTP_AUTHENTICATION_TYPES.OAUTH2 },
+      required: true,
+    },
+    {
+      key: 'authentication.clientId',
+      type: 'input',
+      autoComplete: 'off',
+      label: { labelKey: 'http.clientId.label' },
+      visibleWhen: { key: 'authentication.type', value: HTTP_AUTHENTICATION_TYPES.OAUTH2 },
+      required: true,
+    },
+    {
+      key: 'authentication.clientSecret',
+      type: 'input',
+      inputType: 'password',
+      label: { labelKey: 'http.clientSecret.label' },
+      visibleWhen: { key: 'authentication.type', value: HTTP_AUTHENTICATION_TYPES.OAUTH2 },
+      required: true,
+    },
+    {
+      key: 'authentication.scope',
+      type: 'input',
+      label: { labelKey: 'http.scope.label', hintKey: 'http.scope.hint' },
+      visibleWhen: { key: 'authentication.type', value: HTTP_AUTHENTICATION_TYPES.OAUTH2 },
+      required: false,
+    },
+    {
+      key: 'authentication.certificate',
+      type: 'file',
+      accept: PEM_FILE_EXTENSIONS,
+      label: { labelKey: 'http.certificate.label' },
+      visibleWhen: { key: 'authentication.type', value: HTTP_AUTHENTICATION_TYPES.CLIENT_CERTIFICATE },
+      required: true,
+    },
+    {
+      key: 'authentication.privateKey',
+      type: 'file',
+      accept: PEM_FILE_EXTENSIONS,
+      label: { labelKey: 'http.privateKey.label' },
+      visibleWhen: { key: 'authentication.type', value: HTTP_AUTHENTICATION_TYPES.CLIENT_CERTIFICATE },
       required: true,
     },
   ],

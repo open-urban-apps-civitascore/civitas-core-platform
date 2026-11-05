@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { mockApiError } from '@/__mocks__/errors/apiError.mock'
 
 import {
+  getConnectorFieldErrorPaths,
   isDatapoolScopeViolationError,
   isDatastructureNotAvailableError,
   isModelRootMissingError,
@@ -13,6 +14,7 @@ import {
   isPipelineClosureInvalidError,
   isResourceInUseError,
   isSagaInFlightError,
+  isStoredSecretRefusedError,
   isTableNameConflictError,
   isUnconfirmedDataLossError,
   toConnectionTestProblem,
@@ -137,6 +139,65 @@ describe('isTableNameConflictError', () => {
 
   it('returns false for non-axios errors', () => {
     expect(isTableNameConflictError(new Error('plain error'))).toBe(false)
+  })
+})
+
+describe('getConnectorFieldErrorPaths', () => {
+  const TYPE = 'urn:civitas:error:VALIDATION_FAILED'
+  const validationError = (fieldErrors: unknown) => mockApiError(400, 'Input validation failed', TYPE, { fieldErrors })
+
+  it('returns the paths below the connector of the rejected fields', () => {
+    const error = validationError([
+      { field: 'connector.baseUrl', message: "'baseUrl' must use https with authentication" },
+      { field: 'connector.authentication.name', message: "'name' must differ" },
+      { field: 'connector.apiCalls[0].headers[1].name', message: 'invalid header name' },
+    ])
+
+    expect(getConnectorFieldErrorPaths(error)).toEqual(['baseUrl', 'authentication.name', 'apiCalls.0.headers.1.name'])
+  })
+
+  it('skips field errors without a field below the connector', () => {
+    const error = validationError([
+      { message: 'x' },
+      null,
+      { field: 'connector', message: 'x' },
+      { field: 'name', message: 'x' },
+      { field: 'connector.baseUrl', message: 'x' },
+    ])
+
+    expect(getConnectorFieldErrorPaths(error)).toEqual(['baseUrl'])
+  })
+
+  it('returns no path for a validation error without field errors', () => {
+    expect(getConnectorFieldErrorPaths(mockApiError(400, 'Input validation failed', TYPE))).toEqual([])
+  })
+
+  it.each([
+    ['another type', mockApiError(400, 'Failed to read request body', 'urn:civitas:error:MALFORMED_REQUEST')],
+    [
+      'another status',
+      mockApiError(409, 'Input validation failed', TYPE, { fieldErrors: [{ field: 'connector.baseUrl' }] }),
+    ],
+  ])('returns null for %s', (_name, error) => {
+    expect(getConnectorFieldErrorPaths(error)).toBeNull()
+  })
+})
+
+describe('isStoredSecretRefusedError', () => {
+  const DETAIL = 'The stored secret is kept only for the stored destination; enter it again for another one'
+  const TYPE = 'urn:civitas:error:MALFORMED_REQUEST'
+
+  it('returns true for a 400 malformed request that refuses the stored secret', () => {
+    expect(isStoredSecretRefusedError(mockApiError(400, DETAIL, TYPE))).toBe(true)
+  })
+
+  it.each([
+    ['another status', mockApiError(409, DETAIL, TYPE)],
+    ['another type', mockApiError(400, DETAIL, 'urn:civitas:error:INVALID_INPUT')],
+    ['a missing stored secret', mockApiError(400, 'No stored secret for ******** at authentication.token', TYPE)],
+    ['another detail', mockApiError(400, 'Failed to read request body', TYPE)],
+  ])('returns false for %s', (_name, error) => {
+    expect(isStoredSecretRefusedError(error)).toBe(false)
   })
 })
 

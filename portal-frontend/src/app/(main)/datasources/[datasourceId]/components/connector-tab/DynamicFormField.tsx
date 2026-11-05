@@ -1,15 +1,16 @@
 import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
 import { FormCheckbox } from '@/components/form/fields/FormCheckbox'
+import { FormFileField } from '@/components/form/fields/FormFileField'
 import { FormSelect } from '@/components/form/fields/FormSelect'
 import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { InputPropsWithoutForm, SelectOption } from '@/types/common'
-import { FormInputType } from '@/types/datasources'
+import { FormFieldType, FormInputType } from '@/types/datasources'
 
 export interface DynamicFormFieldProps<T extends FieldValues> extends InputPropsWithoutForm {
   id: string
-  type: 'textArea' | 'input' | 'select' | 'checkbox'
+  type: FormFieldType
   inputType?: FormInputType
   form: UseFormReturn<T>
   label: string
@@ -36,6 +37,7 @@ export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldP
     disabled,
     autoComplete,
     normalize,
+    accept,
   } = props
   switch (type) {
     case 'textArea':
@@ -57,6 +59,18 @@ export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldP
           form={form}
           name={name}
           label={label}
+          required={required}
+          formItemProps={{ className }}
+          disabled={disabled}
+        />
+      )
+    case 'file':
+      return (
+        <FormFileField
+          form={form}
+          name={name}
+          label={label}
+          accept={accept}
           required={required}
           formItemProps={{ className }}
           disabled={disabled}

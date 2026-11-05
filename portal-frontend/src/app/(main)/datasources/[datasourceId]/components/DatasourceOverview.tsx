@@ -22,7 +22,6 @@ import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
-import { ApiCallSnapshots, CollapsedApiCallSections, HttpApiCallForm } from '@/types/connectors'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Datapool } from '@/types/datapools'
 import {
@@ -32,6 +31,7 @@ import {
   DatasourceStatusType,
   DatasourceTab,
 } from '@/types/datasources'
+import { ApiCallSnapshots, CollapsedApiCallSections, HttpApiCallForm } from '@/types/httpApiCalls'
 import { getSelectedDatastructureVersion } from '@/utils/datasources'
 
 import { useDatasourceForm } from '../hooks/useDatasourceForm'

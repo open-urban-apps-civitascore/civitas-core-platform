@@ -103,7 +103,7 @@ export const ConnectionTestStatus = (props: ConnectionTestStatusProps) => {
     return (
       <div className="mt-4 flex items-center gap-2 text-sm">
         <Info className="size-4 shrink-0" />
-        <span>{t('reenterPassword')}</span>
+        <span>{t('reenterSecrets')}</span>
       </div>
     )
   }

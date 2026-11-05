@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 import { CONNECTOR_FIELD_REVALIDATION_RULES, ConnectorType } from '@/types/connectors'
 import { ConnectorFieldLabel, ConnectorFieldOption, DatasourceFormDraft } from '@/types/datasources'
+import { triggerKeepingServerErrors } from '@/utils/form'
 
 import { ConnectionTest } from './connection-test/ConnectionTest'
 import { CONNECTOR_INPUTS } from './connectorSources'
@@ -48,30 +49,33 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
   // connector type in CONNECTOR_FIELD_REVALIDATION_RULES, colocated with the schema that owns the
   // relationship (see `validateMqttSchemes` in types/connectors.ts). This component stays generic
   // over connector type: adding a new connector's rule never requires touching this file.
-  const revalidationRule = connectorType ? CONNECTOR_FIELD_REVALIDATION_RULES[connectorType] : null
-
-  const watchedFieldValue = useWatch({
-    control: form.control,
-    name: `configuration.${revalidationRule?.watch}` as Path<DatasourceFormDraft>,
-    disabled: !revalidationRule,
-  })
-  const isFirstRevalidationRender = useRef(true)
+  const revalidationRules = connectorType ? CONNECTOR_FIELD_REVALIDATION_RULES[connectorType] : []
 
   const configuration = useWatch({ control: form.control, name: 'configuration' })
   const visibleFields = connectorConfig.filter(
     field => !field.visibleWhen || get(configuration, field.visibleWhen.key) === field.visibleWhen.value,
   )
 
+  const watchedFieldValues: unknown[] = revalidationRules.map(rule => get(configuration, rule.watch))
+  const previousWatchedFields = useRef({ connectorType, values: watchedFieldValues })
+
   useEffect(() => {
-    if (isFirstRevalidationRender.current) {
-      isFirstRevalidationRender.current = false
-      return
-    }
-    if (revalidationRule) {
-      void form.trigger(`configuration.${revalidationRule.revalidate}` as Path<DatasourceFormDraft>)
+    const previous = previousWatchedFields.current
+    previousWatchedFields.current = { connectorType, values: watchedFieldValues }
+    if (previous.connectorType !== connectorType) return
+    const changedRules = revalidationRules.filter(
+      (_rule, index) => previous.values[index] !== watchedFieldValues[index],
+    )
+    const paths = changedRules.flatMap(rule => rule.revalidate)
+    if (paths.length) {
+      void triggerKeepingServerErrors(
+        form,
+        paths.map(path => `configuration.${path}` as Path<DatasourceFormDraft>),
+        changedRules.map(rule => `configuration.${rule.watch}`),
+      )
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedFieldValue])
+  }, [connectorType, JSON.stringify(watchedFieldValues)])
 
   const getLabel = (label: ConnectorFieldLabel) => {
     const hint = label.hintKey ? `(${t(label.hintKey)})` : ''
@@ -119,6 +123,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
               inputType={property.inputType}
               autoComplete={property.autoComplete}
               normalize={property.normalize}
+              accept={property.accept}
               options={property.options?.map(toSelectOption)}
               shouldShowErrors
               required={property.required}

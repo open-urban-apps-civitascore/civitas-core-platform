@@ -1,8 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AxiosError } from 'axios'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { get, useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import {
@@ -12,14 +12,14 @@ import {
   useUpdateDatasourceReleased,
 } from '@/app/services/api/datasources/clientRequests'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
-import { CONNECTOR_TYPES } from '@/const/connectors'
+import { CONNECTOR_TYPES, SECRET_PLACEHOLDER } from '@/const/connectors'
 import { DataSourceDraftSchema } from '@/generated/core'
 import { useError } from '@/hooks/use-error'
 import {
   ConnectorFormToApiSchema,
   ConnectorTabCompleteSchema,
   ConnectorType,
-  HttpApiCallsStrictSchema,
+  HttpAuthenticationType,
 } from '@/types/connectors'
 import { Datapool } from '@/types/datapools'
 import {
@@ -36,10 +36,37 @@ import {
   DatasourceStatusType,
   DatasourceTab,
 } from '@/types/datasources'
+import { HttpApiCallsStrictSchema } from '@/types/httpApiCalls'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
-import { getConnectorDefaults } from '@/utils/connectors'
-import { isDatastructureNotAvailableError, isResourceInUseError } from '@/utils/errors'
-import { hasDirtyField, pickDirtyValues } from '@/utils/form'
+import { emptyHttpAuthentication } from '@/utils/connectorMappers'
+import {
+  CONNECTOR_SECRET_PATHS,
+  findSecretsToReenter,
+  getConnectorDefaults,
+  getSecretPaths,
+  toFormConnectorPath,
+} from '@/utils/connectors'
+import {
+  getConnectorFieldErrorPaths,
+  isDatastructureNotAvailableError,
+  isResourceInUseError,
+  isStoredSecretRefusedError,
+} from '@/utils/errors'
+import {
+  clearServerErrors,
+  getServerErrors,
+  hasDirtyField,
+  pickDirtyValues,
+  restoreServerErrors,
+  SERVER_ERROR_TYPE,
+  triggerKeepingServerErrors,
+} from '@/utils/form'
+
+const REENTER_SECRET_MESSAGE = 'datasources.errors.reenterSecret'
+
+const REJECTED_BY_SERVER_MESSAGE = 'datasources.errors.rejectedByServer'
+
+const AUTHENTICATION_TYPE_PATH = 'configuration.authentication.type'
 
 const toConnectorPayloadKey = (values: unknown) => {
   const parsed = ConnectorFormToApiSchema.safeParse(values)
@@ -119,6 +146,7 @@ export const useDatasourceForm = (
       form.resetField('connectorType')
       form.resetField('configuration')
     } else {
+      clearServerErrors(form)
       form.setValue('connectorType', connectorTypeWatch, {
         shouldDirty: true,
       })
@@ -129,6 +157,64 @@ export const useDatasourceForm = (
     setSelectedConnectorType(connectorTypeWatch)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectorTypeWatch])
+
+  const setReenterSecretErrorsAt = (paths: readonly string[]) => {
+    for (const path of paths) {
+      form.setError(`configuration.${path}`, { type: 'custom', message: REENTER_SECRET_MESSAGE })
+    }
+  }
+
+  const setReenterSecretErrors = () =>
+    setReenterSecretErrorsAt(findSecretsToReenter(form.getValues(), form.formState.defaultValues))
+
+  const authenticationTypeWatch = useWatch({
+    control: form.control,
+    name: AUTHENTICATION_TYPE_PATH,
+  }) as HttpAuthenticationType | undefined
+  const isFirstAuthenticationTypeRender = useRef(true)
+
+  useEffect(() => {
+    if (connectorTypeWatch !== CONNECTOR_TYPES.HTTP || !authenticationTypeWatch) return
+    const isLoadedHttpConnector = initialFormValues?.connectorType === CONNECTOR_TYPES.HTTP
+    if (isLoadedHttpConnector && get(initialFormValues, AUTHENTICATION_TYPE_PATH) === authenticationTypeWatch) {
+      form.resetField('configuration.authentication')
+    } else {
+      form.setValue('configuration.authentication', emptyHttpAuthentication(authenticationTypeWatch), {
+        shouldDirty: true,
+      })
+    }
+    // No check of the loaded authentication
+    if (isFirstAuthenticationTypeRender.current) {
+      isFirstAuthenticationTypeRender.current = false
+      return
+    }
+    const revalidate = async () => {
+      await triggerKeepingServerErrors(form, ['configuration.authentication', 'configuration.baseUrl'])
+      setReenterSecretErrors()
+    }
+    void revalidate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authenticationTypeWatch])
+
+  const secretsToReenter = useMemo(
+    () => findSecretsToReenter(formValues, initialFormValues),
+    [formValues, initialFormValues],
+  )
+
+  const secretsToReenterKey = secretsToReenter.join(',')
+
+  useEffect(() => {
+    setReenterSecretErrors()
+    const secretPaths = connectorTypeWatch ? CONNECTOR_SECRET_PATHS[connectorTypeWatch] : []
+    const resolvedPaths = secretPaths.filter(path => !secretsToReenter.includes(path))
+    for (const path of resolvedPaths) {
+      const fieldPath = `configuration.${path}` as const
+      if (form.getFieldState(fieldPath).error?.message === REENTER_SECRET_MESSAGE) {
+        form.clearErrors(fieldPath)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secretsToReenterKey])
 
   const isDraftMode = dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
   const hasStatusChanged = dataSourceStatus !== datasource.dataSourceStatus
@@ -154,12 +240,19 @@ export const useDatasourceForm = (
   useEffect(() => {
     if (isDraftMode) {
       const nameError = form.formState.errors.name
+      const serverErrors = getServerErrors(form)
       form.clearErrors()
       if (nameError) {
         form.setError('name', nameError)
       }
+      restoreServerErrors(form, serverErrors)
+      setReenterSecretErrors()
     } else {
-      void form.trigger()
+      const revalidate = async () => {
+        await triggerKeepingServerErrors(form)
+        setReenterSecretErrors()
+      }
+      void revalidate()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectorTypeWatch, isDraftMode])
@@ -226,6 +319,12 @@ export const useDatasourceForm = (
     return { id, name: nameWatch, description, datapoolScope, assignments }
   }
 
+  const setMaskedSecretErrors = () => {
+    const { connectorType, configuration } = form.getValues()
+    const secretPaths = connectorType && configuration ? getSecretPaths(connectorType, configuration) : []
+    setReenterSecretErrorsAt(secretPaths.filter(path => get(configuration, path) === SECRET_PLACEHOLDER))
+  }
+
   const handleUpdateValues = async (values: DatasourcePatchData) => {
     const hasInvalidAssignments = assignedGroups.some(group => group.assignedRoles.length === 0)
 
@@ -241,18 +340,34 @@ export const useDatasourceForm = (
       }
       return response.data
     } catch (error) {
-      toast.error(t('errors.updateError'))
+      const isStoredSecretRefused = isStoredSecretRefusedError(error)
+      if (isStoredSecretRefused) {
+        setMaskedSecretErrors()
+      }
+      const configuration = form.getValues('configuration')
+      const formPaths = (getConnectorFieldErrorPaths(error) ?? []).map(path => toFormConnectorPath(path, configuration))
+      const serverErrorPaths = formPaths.filter((path): path is string => !!path)
+      for (const path of serverErrorPaths) {
+        form.setError(`configuration.${path}`, { type: SERVER_ERROR_TYPE, message: REJECTED_BY_SERVER_MESSAGE })
+      }
+      toast.error(t(isStoredSecretRefused ? 'errors.storedSecretRefused' : 'errors.updateError'))
       throw error
     }
   }
 
   const submitDatasource = async (onSuccess?: () => void): Promise<boolean> => {
+    clearServerErrors(form)
     const values = form.getValues()
     const parsed = isDraftMode
       ? DatasourceFormDraftSchema.safeParse(values)
       : DatasourceFormAvailableSchema.safeParse(values)
     if (!parsed.success) {
       handleFormValidationError(parsed.error)
+      return false
+    }
+    if (secretsToReenter.length) {
+      setReenterSecretErrors()
+      handleFormValidationError()
       return false
     }
 
@@ -279,7 +394,7 @@ export const useDatasourceForm = (
       const coreDoc = { connectionType: connectorType.toLowerCase(), ...connectorFields }
       const coreValid = DataSourceDraftSchema.safeParse(coreDoc)
       if (!coreValid.success) {
-        console.error('DataSource configuration failed CORE schema validation:', coreValid.error.issues, coreDoc)
+        console.error('DataSource configuration failed CORE schema validation:', coreValid.error.issues)
         handleFormValidationError(coreValid.error)
         return false
       }
