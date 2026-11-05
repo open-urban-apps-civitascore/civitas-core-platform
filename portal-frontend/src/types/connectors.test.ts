@@ -82,6 +82,16 @@ describe.each([
     }
   })
 
+  it.each(['tcp:broker', 'tcp://:1883'])('rejects URL %s without host', url => {
+    const result = parse(`tcp://broker.example:1883, ${url}`, false)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues).toContainEqual(
+        expect.objectContaining({ path: ['urls'], message: 'datasources.errors.invalidBrokerUrl' }),
+      )
+    }
+  })
+
   it('checks every URL in a broker list', () => {
     expect(parse('ssl://one.example:8883, MQTTS://two.example:8883, wss://three.example/mqtt', true).success).toBe(true)
     expect(parse('tcp://one.example:1883, ssl://two.example:8883', false).success).toBe(false)

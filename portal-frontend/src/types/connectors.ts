@@ -115,10 +115,13 @@ const uriSchema = (message: string) =>
 
 const URISchema = uriSchema('datasources.errors.invalidDsn')
 
+// The backend rejects a broker URL without host, e.g. "tcp:broker"
+const hasHost = (url: string) => isValidUri(url) && new URL(url).host !== ''
+
 const brokerUrlArray = (inner: z.ZodTypeAny) =>
   z
     .preprocess(parseStringArray, inner)
-    .refine(urls => !urls || (urls as string[]).every(isValidUri), 'datasources.errors.invalidBrokerUrl')
+    .refine(urls => !urls || (urls as string[]).every(hasHost), 'datasources.errors.invalidBrokerUrl')
 
 const MQTT_PLAINTEXT_SCHEMES = new Set(['tcp:', 'ws:', 'mqtt:'])
 const MQTT_TLS_SCHEMES = new Set(['ssl:', 'mqtts:', 'wss:'])
