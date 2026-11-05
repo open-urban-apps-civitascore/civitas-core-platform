@@ -2,8 +2,10 @@
 # Generate backends-allowall data from real backend endpoint definitions.
 #
 # Reads each data/backends/<backend>/data.json and produces a matching
-# data/backends-allowall/<backend>/data.json with all permissions set to null
-# and internal flags (like _collection) stripped.
+# data/backends-allowall/<backend>/data.json in which every permission is null.
+# Endpoint flags (keys starting with _, such as _collection or _open_data) are
+# copied unchanged: allow-all mode relaxes permissions only, and the policy must
+# still see how each endpoint is shaped and whether it is open data.
 #
 # Requires: jq
 
@@ -35,13 +37,9 @@ for backend_dir in "$BACKENDS_DIR"/*/; do
         "_backend_id": ._backend_id,
         "endpoints": (.endpoints | to_entries
             | map(select(.value | type == "object"))
-            | map({
-                key: .key,
-                value: (.value | to_entries
-                    | map(select(.key | startswith("_") | not))
-                    | map(.value = null)
-                    | from_entries)
-            }) | from_entries)
+            | map(.value |= with_entries(
+                if (.key | startswith("_")) then . else .value = null end))
+            | from_entries)
     }' "$src" > "$dest_dir/data.json"
 
     echo "Generated $dest_dir/data.json"
