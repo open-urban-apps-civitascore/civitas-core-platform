@@ -20,6 +20,9 @@ public class LayerOutputDTO extends BaseOutputDTO {
   @Schema(description = "ID of the datasink this layer is derived from")
   private UUID dataSinkId;
 
+  @Schema(description = "ID of the named API that publishes this layer; the layer goes with it")
+  private UUID namedApiId;
+
   @Schema(description = "Unique name of the layer within its datasink")
   private String layerName;
 

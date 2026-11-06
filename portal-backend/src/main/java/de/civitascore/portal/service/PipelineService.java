@@ -151,8 +151,8 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
    * check runs before the first write.
    *
    * @throws InvalidInputException if a requested DataSink cannot be linked
-   * @throws RemovalNotConfirmedException if the update removes a provisioned DataSink, a Layer or
-   *     an API without {@code input.confirmDataLoss}
+   * @throws RemovalNotConfirmedException if the update removes a provisioned DataSink without
+   *     {@code input.confirmDataLoss}
    */
   @Override
   @Transactional
@@ -346,9 +346,9 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
    * artifact goes first: Model Forge refuses to delete a Data sink configuration that it still
    * references.
    *
-   * @param confirmDataLoss whether the caller accepts that stored data, Layers and APIs go
-   * @throws RemovalNotConfirmedException if the delete removes a provisioned DataSink, a Layer or
-   *     an API without {@code confirmDataLoss}
+   * @param confirmDataLoss whether the caller accepts that stored data goes
+   * @throws RemovalNotConfirmedException if the delete removes a provisioned DataSink without
+   *     {@code confirmDataLoss}
    */
   @Transactional
   public void deleteById(UUID id, boolean confirmDataLoss) {

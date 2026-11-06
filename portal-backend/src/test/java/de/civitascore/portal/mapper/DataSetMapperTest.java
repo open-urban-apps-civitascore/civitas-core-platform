@@ -7,6 +7,7 @@ import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -49,5 +50,17 @@ class DataSetMapperTest {
         .extracting(NamedApi::getSlug)
         .containsExactlyInAnyOrder("traffic", "weather");
     assertThat(entity.getName()).isEqualTo("dataset-renamed");
+  }
+
+  // The portal lists the APIs a removal takes along by matching Layers to them through this id.
+  @Test
+  @DisplayName("toNamedApiOutputDto carries the id that Layers reference")
+  void namedApiOutputCarriesItsId() {
+    NamedApi api = new NamedApi();
+    api.setId(UUID.randomUUID());
+    api.setSlug("map");
+    api.setStandard(ApiStandard.OWS);
+
+    assertThat(mapper.toNamedApiOutputDto(api).getId()).isEqualTo(api.getId());
   }
 }

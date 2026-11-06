@@ -213,18 +213,17 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
 
     @Test
     @DisplayName(
-        "of an unprovisioned sink with a Layer and API without confirmation answers 409 and"
-            + " changes nothing")
-    void unconfirmedUnprovisionedSinkWithLayerAndApi_answers409AndChangesNothing() {
+        "without confirmation deletes an unprovisioned sink with its Layer and API: no stored data"
+            + " goes")
+    void unconfirmedUnprovisionedSinkWithLayerAndApi_deletesAll() {
       MapSurface surface = mapSurface(false);
 
       ResponseEntity<JsonNode> response = exchange(HttpMethod.DELETE, pipelinePath(), null);
 
-      assertDataLossUnconfirmed(response);
-      assertThat(pipelineRepository.existsById(pipeline.getId())).isTrue();
-      assertThat(stateOf(surface.sink())).isEqualTo(DataSinkState.ACTIVE);
-      assertThat(layerRepository.existsById(surface.layer().getId())).isTrue();
-      assertThat(apiStandards()).containsExactly("OWS");
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+      assertThat(dataSinkRepository.existsById(surface.sink().getId())).isFalse();
+      assertThat(layerRepository.existsById(surface.layer().getId())).isFalse();
+      assertThat(apiStandards()).isEmpty();
     }
 
     @Test
@@ -366,30 +365,12 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
     }
 
     @Test
-    @DisplayName(
-        "PUT removing an unprovisioned sink with an API without confirmation answers 409 and"
-            + " changes nothing")
-    void putUnconfirmedUnprovisionedSinkWithApi_answers409AndChangesNothing() {
+    @DisplayName("PUT without confirmation deletes an unprovisioned sink and its API")
+    void putUnconfirmedUnprovisionedSinkWithApi_deletesBoth() {
       DataSink sink = frostSink(pipeline, false);
       addApi(ApiStandard.STA);
 
       ResponseEntity<JsonNode> response = exchange(HttpMethod.PUT, pipelinePath(), pipelineBody());
-
-      assertDataLossUnconfirmed(response);
-      assertThat(dataSinkRepository.findByPipelinesId(pipeline.getId()))
-          .extracting(DataSink::getId)
-          .containsExactly(sink.getId());
-      assertThat(apiStandards()).containsExactly("STA");
-    }
-
-    @Test
-    @DisplayName("PUT with confirmation deletes an unprovisioned sink and its API")
-    void putConfirmedUnprovisionedSinkWithApi_deletesBoth() {
-      DataSink sink = frostSink(pipeline, false);
-      addApi(ApiStandard.STA);
-
-      ResponseEntity<JsonNode> response =
-          exchange(HttpMethod.PUT, pipelinePath() + CONFIRMED, pipelineBody());
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(dataSinkRepository.existsById(sink.getId())).isFalse();
@@ -530,31 +511,14 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
 
     @Test
     @DisplayName(
-        "of an unprovisioned sink with a Layer without confirmation answers 409 and changes"
-            + " nothing")
-    void unconfirmedUnprovisionedSinkWithLayer_answers409AndChangesNothing() {
+        "without confirmation deletes an unprovisioned sink with its Layer; another sink keeps the"
+            + " API")
+    void unconfirmedUnprovisionedSink_isDeleted() {
       MapSurface surface = mapSurface(null, false);
       postgisSink(null, false);
 
       ResponseEntity<JsonNode> response =
           exchange(HttpMethod.DELETE, sinkPath(surface.sink()), null);
-
-      assertDataLossUnconfirmed(response);
-      assertThat(stateOf(surface.sink())).isEqualTo(DataSinkState.ACTIVE);
-      assertThat(layerRepository.existsById(surface.layer().getId())).isTrue();
-      assertThat(apiStandards()).containsExactly("OWS");
-    }
-
-    @Test
-    @DisplayName(
-        "with confirmation deletes an unprovisioned sink with its Layer; another sink keeps the"
-            + " API")
-    void confirmedUnprovisionedSink_isDeleted() {
-      MapSurface surface = mapSurface(null, false);
-      postgisSink(null, false);
-
-      ResponseEntity<JsonNode> response =
-          exchange(HttpMethod.DELETE, sinkPath(surface.sink()) + CONFIRMED, null);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
       assertThat(dataSinkRepository.existsById(surface.sink().getId())).isFalse();

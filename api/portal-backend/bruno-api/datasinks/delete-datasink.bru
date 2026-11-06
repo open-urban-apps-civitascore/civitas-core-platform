@@ -37,9 +37,9 @@ docs {
   - A DataSink that was never provisioned is deleted together with its Layers. A provisioned one is marked `PENDING_UNPROVISION`: its Layers are deleted, the record stays until the next release removes its storage, and it is no longer returned by the DataSink endpoints (`404`).
   - An API of the DataSet goes, together with its Layers, when no active DataSink of a kind that backs it remains: PostGIS for OWS, FROST for STA.
 
-  **Confirmation:** When the delete removes a provisioned DataSink, a Layer or an API, the request must set `confirmDataLoss=true`; the next release deletes the stored data of a provisioned DataSink. Without it the backend answers `409` with type `urn:civitas:error:REMOVAL_NOT_CONFIRMED` and changes nothing. The property `removal` lists what the request would remove: `dataSinks` (`id`, `dataSinkType`, `provisioned`), `layers` (`id`, `layerName`, `title`) and `apis` (`id`, `slug`, `name`, `standard`). Only a DataSink that was never provisioned and takes no Layer and no API goes without confirmation. The DataSink of this collection is not provisioned, has no Layer yet and backs no API, so it goes without confirmation.
+  **Confirmation:** When the delete removes a provisioned DataSink, the request must set `confirmDataLoss=true`: the next release deletes its stored data. Without it the backend answers `409` with type `urn:civitas:error:REMOVAL_NOT_CONFIRMED` and changes nothing. The property `removal` lists what the request would remove: `dataSinks` (`id`, `dataSinkType`, `provisioned`), `layers` (`id`, `layerName`, `title`) and `apis` (`id`, `slug`, `name`, `standard`). The Layers and APIs the delete takes along need no confirmation. The DataSink of this collection is not provisioned, so it goes without confirmation.
 
-  **Expected Response:** 204 No Content. 409 `RESOURCE_IN_USE` if a Pipeline still links the DataSink. 409 `REMOVAL_NOT_CONFIRMED` if the delete removes stored data, a Layer or an API and `confirmDataLoss` is not `true`.
+  **Expected Response:** 204 No Content. 409 `RESOURCE_IN_USE` if a Pipeline still links the DataSink. 409 `REMOVAL_NOT_CONFIRMED` if the delete removes stored data and `confirmDataLoss` is not `true`.
 
   **Verification:** Issue `get-datasink-by-id` for the same `dataSinkId` and confirm 404.
 

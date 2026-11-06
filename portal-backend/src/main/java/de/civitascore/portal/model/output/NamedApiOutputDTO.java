@@ -2,6 +2,7 @@ package de.civitascore.portal.model.output;
 
 import de.civitascore.portal.model.embedded.ApiStandard;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.UUID;
 import lombok.Data;
 
 /**
@@ -13,6 +14,11 @@ import lombok.Data;
  */
 @Data
 public class NamedApiOutputDTO {
+
+  @Schema(
+      description = "Id of the named API; a Layer names the API that publishes it by this id.",
+      accessMode = Schema.AccessMode.READ_ONLY)
+  private UUID id;
 
   @Schema(
       description = "Human-readable display label for this named API.",

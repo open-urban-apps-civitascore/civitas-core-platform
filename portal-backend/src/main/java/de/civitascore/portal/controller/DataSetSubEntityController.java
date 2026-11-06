@@ -39,18 +39,18 @@ public abstract class DataSetSubEntityController<
         S extends BaseSpec<E>>
     extends BaseController<I, O, E, S> {
 
-  /** Query parameter that confirms the removal of stored data, Layers and APIs. */
+  /** Query parameter that confirms the deletion of stored data. */
   protected static final String CONFIRM_DATA_LOSS = "confirmDataLoss";
 
   protected static final String CONFIRM_DATA_LOSS_DESCRIPTION =
-      "Must be true when the request removes a provisioned Data sink, a Layer or an API. The"
-          + " stored data of a provisioned Data sink is deleted at the next release.";
+      "Must be true when the request removes a provisioned Data sink: its stored data is deleted"
+          + " at the next release. Layers and APIs that the request removes need no confirmation.";
 
   protected static final String REMOVAL_CONFLICT_DESCRIPTION =
       "A saga is in flight on the parent dataset (code SAGA_IN_FLIGHT), or the request removes a"
-          + " provisioned Data sink, a Layer or an API without confirmDataLoss=true (code"
-          + " REMOVAL_NOT_CONFIRMED; the property removal lists the dataSinks, layers and apis it"
-          + " would remove). Nothing changed.";
+          + " provisioned Data sink without confirmDataLoss=true (code REMOVAL_NOT_CONFIRMED; the"
+          + " property removal lists the dataSinks, layers and apis it would remove). Nothing"
+          + " changed.";
 
   /**
    * Names this controller's entity in the {@code dataSetId} path-variable error and in the

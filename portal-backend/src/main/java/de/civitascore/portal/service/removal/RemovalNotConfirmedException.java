@@ -4,8 +4,8 @@ import java.util.UUID;
 import lombok.Getter;
 
 /**
- * Thrown when a request removes stored data, Layers or APIs without {@code confirmDataLoss=true}.
- * The request changed nothing.
+ * Thrown when a request deletes stored data without {@code confirmDataLoss=true}. The request
+ * changed nothing.
  */
 @Getter
 public class RemovalNotConfirmedException extends RuntimeException {

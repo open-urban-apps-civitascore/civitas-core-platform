@@ -106,16 +106,18 @@ class DataSinkRemovalServiceTest {
   }
 
   @Test
-  void prepare_unprovisionedSinkWithApiWithoutConfirmDataLoss_isRefused() {
+  void prepare_unprovisionedSinkWithApiWithoutConfirmDataLoss_returnsThePlanWithTheApi() {
     activeSink(DataSinkType.FROST, false);
-    api(ApiStandard.STA);
+    NamedApi sta = api(ApiStandard.STA);
 
-    assertThatThrownBy(() -> service.prepare(DataSinkChange.deletePipeline(pipeline), false))
-        .isInstanceOf(RemovalNotConfirmedException.class);
+    PreparedDataSinkChange prepared =
+        service.prepare(DataSinkChange.deletePipeline(pipeline), false);
+
+    assertThat(prepared.plan().apis()).containsExactly(sta);
   }
 
   @Test
-  void prepare_unprovisionedSinkWithLayerWithoutConfirmDataLoss_isRefused() {
+  void prepare_unprovisionedSinkWithLayerWithoutConfirmDataLoss_returnsThePlanWithTheLayer() {
     DataSink sink = activeSink(DataSinkType.POSTGIS, false);
     Layer layer = new Layer();
     layer.setId(UUID.randomUUID());
@@ -123,30 +125,10 @@ class DataSinkRemovalServiceTest {
     layer.setDataSink(sink);
     when(layerRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(layer));
 
-    assertThatThrownBy(() -> service.prepare(DataSinkChange.deletePipeline(pipeline), false))
-        .isInstanceOf(RemovalNotConfirmedException.class);
-  }
-
-  @Test
-  void prepare_unprovisionedSinkWithApiWithConfirmDataLoss_returnsThePlan() {
-    DataSink sink = activeSink(DataSinkType.FROST, false);
-    NamedApi sta = api(ApiStandard.STA);
-
-    PreparedDataSinkChange prepared =
-        service.prepare(DataSinkChange.deletePipeline(pipeline), true);
-
-    assertThat(prepared.plan().deactivatedDataSinks()).containsExactly(sink);
-    assertThat(prepared.plan().apis()).containsExactly(sta);
-  }
-
-  @Test
-  void prepare_unprovisionedSinkWithoutLayersAndApis_needsNoConfirmation() {
-    DataSink sink = activeSink(DataSinkType.FROST, false);
-
     PreparedDataSinkChange prepared =
         service.prepare(DataSinkChange.deletePipeline(pipeline), false);
 
-    assertThat(prepared.plan().deactivatedDataSinks()).containsExactly(sink);
+    assertThat(prepared.plan().layers()).containsExactly(layer);
   }
 
   @Test

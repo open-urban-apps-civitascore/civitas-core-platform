@@ -103,4 +103,8 @@ record DataSinkRemovalPlan(
   boolean isEmpty() {
     return deactivatedDataSinks.isEmpty() && layers.isEmpty() && apis.isEmpty();
   }
+
+  boolean deletesStoredData() {
+    return deactivatedDataSinks.stream().anyMatch(DataSink::isProvisioned);
+  }
 }

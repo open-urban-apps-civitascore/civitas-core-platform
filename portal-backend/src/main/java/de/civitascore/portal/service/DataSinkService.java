@@ -359,10 +359,10 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
    * {@link DataSinkRemovalService}). A provisioned DataSink stays as PENDING_UNPROVISION until the
    * next release removes its storage.
    *
-   * @param confirmDataLoss whether the caller accepts that stored data, Layers and APIs go
+   * @param confirmDataLoss whether the caller accepts that stored data goes
    * @throws ResourceInUseException if a Pipeline still links the DataSink
-   * @throws RemovalNotConfirmedException if the delete removes stored data, a Layer or an API and
-   *     {@code confirmDataLoss} is not set
+   * @throws RemovalNotConfirmedException if the delete removes stored data and {@code
+   *     confirmDataLoss} is not set
    */
   @Transactional
   public void deleteById(UUID id, boolean confirmDataLoss) {
