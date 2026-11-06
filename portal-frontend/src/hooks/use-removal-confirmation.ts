@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react'
 
-import type { DataSinkRemoval } from '@/utils/dataSinkRemoval'
+import type { DataSinkRemoval } from '@/types/dataSinkRemoval'
 import { unconfirmedRemoval } from '@/utils/errors'
 
 export interface RemovalConfirmationDialog {

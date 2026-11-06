@@ -3,23 +3,25 @@ import { resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import type {
+  DataSinkRemoval,
+  DataSinkRemovalRequest,
+  PlannedApi,
+  PlannedDataSink,
+  PlannedLayer,
+  RemovedDataSink,
+} from '@/types/dataSinkRemoval'
 import type { DataSinkType } from '@/types/datasinks'
 import type { ApiStandard } from '@/types/namedApis'
 
 import {
-  DataSinkRemoval,
-  DataSinkRemovalRequest,
   deletesStoredData,
   mergeRemovals,
   needsConfirmation,
   NO_REMOVAL,
   planDataSinkRemoval,
-  PlannedApi,
-  PlannedDataSink,
-  PlannedLayer,
   planPipelineDelete,
   planPipelineSaves,
-  RemovedDataSink,
 } from './dataSinkRemoval'
 
 const sink = (id: string, provisioned: boolean): RemovedDataSink => ({ id, dataSinkType: 'FROST', provisioned })

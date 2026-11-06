@@ -1,34 +1,14 @@
+import {
+  DatasetRemovalState,
+  DataSinkRemoval,
+  DataSinkRemovalInput,
+  DataSinkRemovalRequest,
+  PipelineSave,
+  PlannedApi,
+  PlannedDataSink,
+} from '@/types/dataSinkRemoval'
 import { DATASINK_TYPES, DataSinkType } from '@/types/datasinks'
 import { API_STANDARDS, ApiStandard } from '@/types/namedApis'
-
-export interface RemovedDataSink {
-  id: string
-  dataSinkType: DataSinkType
-  provisioned: boolean
-}
-
-export interface RemovedLayer {
-  id: string
-  layerName: string
-  title: string | null
-}
-
-export interface RemovedApi {
-  id: string
-  slug: string
-  name: string
-  standard: ApiStandard
-}
-
-/**
- * What a request removes from its Dataset: calculated by the portal before the request, or named by the backend when it
- * refuses one as unconfirmed (`REMOVAL_NOT_CONFIRMED`).
- */
-export interface DataSinkRemoval {
-  dataSinks: RemovedDataSink[]
-  layers: RemovedLayer[]
-  apis: RemovedApi[]
-}
 
 export const NO_REMOVAL: DataSinkRemoval = { dataSinks: [], layers: [], apis: [] }
 
@@ -44,47 +24,6 @@ export const mergeRemovals = (removals: DataSinkRemoval[]): DataSinkRemoval => (
   layers: uniqueById(removals.flatMap(removal => removal.layers)),
   apis: uniqueById(removals.flatMap(removal => removal.apis)),
 })
-
-/** An active Data sink of the Dataset, with the Pipelines that write into it. */
-export interface PlannedDataSink {
-  id: string
-  dataSinkType: DataSinkType
-  provisioned: boolean
-  pipelineIds: string[]
-}
-
-export interface PlannedLayer {
-  id: string
-  dataSinkId: string
-  namedApiId: string | null
-  layerName: string
-  title: string | null
-}
-
-export interface PlannedApi {
-  id: string
-  slug: string
-  name: string
-  standard: ApiStandard
-}
-
-export interface PipelineDataSinkLink {
-  pipelineId: string
-  dataSinkId: string
-}
-
-/** The removals one request makes: links it removes, also by deleting a Pipeline, and Data sinks it deletes. */
-export interface DataSinkRemovalRequest {
-  removedLinks: PipelineDataSinkLink[]
-  deletedDataSinkIds: string[]
-}
-
-export interface DataSinkRemovalInput {
-  dataSinks: PlannedDataSink[]
-  layers: PlannedLayer[]
-  apis: PlannedApi[]
-  request: DataSinkRemovalRequest
-}
 
 /** The Data sink types that can hold the data of an API of this standard; none for a standard no Data sink backs. */
 const BACKING_DATA_SINK_TYPES: Record<ApiStandard, DataSinkType[]> = {
@@ -145,18 +84,6 @@ export const isCoveredBy = (removal: DataSinkRemoval, agreed: DataSinkRemoval) =
 /** Whether the user has to agree before the removal: it deletes stored data, a Layer or an API. */
 export const needsConfirmation = (removal: DataSinkRemoval) =>
   deletesStoredData(removal) || removal.layers.length > 0 || removal.apis.length > 0
-
-export interface DatasetRemovalState {
-  dataSinks: PlannedDataSink[]
-  layers: PlannedLayer[]
-  apis: PlannedApi[]
-}
-
-/** A Pipeline save that links the Pipeline to exactly these Data sinks. */
-export interface PipelineSave {
-  pipelineId: string
-  dataSinkIds: string[]
-}
 
 const afterSave = (dataSink: PlannedDataSink, save: PipelineSave): PlannedDataSink => {
   const otherPipelineIds = dataSink.pipelineIds.filter(pipelineId => pipelineId !== save.pipelineId)

@@ -1,7 +1,7 @@
 import { isAxiosError } from 'axios'
 
 import { ConnectionTestProblem } from '@/types/connectionTest'
-import type { DataSinkRemoval } from '@/utils/dataSinkRemoval'
+import type { DataSinkRemoval } from '@/types/dataSinkRemoval'
 
 type ApiError = {
   type: string

@@ -35,17 +35,14 @@ import { useDataSinkRemovalState } from '@/hooks/use-data-sink-removal-state'
 import { useDatasetPermissions } from '@/hooks/use-dataset-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { useRemovalConfirmation } from '@/hooks/use-removal-confirmation'
+import type { DatasetRemovalState, DataSinkRemoval, PipelineSave, PlannedDataSink } from '@/types/dataSinkRemoval'
 import { isConnectorReadable } from '@/types/datasources'
 import {
-  type DatasetRemovalState,
-  type DataSinkRemoval,
   deletesStoredData,
   isCoveredBy,
   mergeRemovals,
   needsConfirmation,
   NO_REMOVAL,
-  type PipelineSave,
-  type PlannedDataSink,
   planPipelineDelete,
   planPipelineSaves,
 } from '@/utils/dataSinkRemoval'

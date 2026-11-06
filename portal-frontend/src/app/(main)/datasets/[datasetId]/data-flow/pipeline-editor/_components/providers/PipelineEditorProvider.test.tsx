@@ -18,8 +18,8 @@ import {
   useUpdatePipeline,
 } from '@/app/services/api/pipelines/clientRequests'
 import type { RemovalConfirmationDialog } from '@/hooks/use-removal-confirmation'
+import type { DatasetRemovalState, DataSinkRemoval } from '@/types/dataSinkRemoval'
 import type { Datasource } from '@/types/datasources'
-import type { DatasetRemovalState, DataSinkRemoval } from '@/utils/dataSinkRemoval'
 
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { mockApiError } from '@/__mocks__/errors/apiError.mock'
 import { PipelineBasicInfo } from '@/types/datasets'
-import type { DatasetRemovalState } from '@/utils/dataSinkRemoval'
+import type { DatasetRemovalState } from '@/types/dataSinkRemoval'
 
 import { PipelineCard } from './PipelineCard'
 

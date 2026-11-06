@@ -5,7 +5,7 @@ import { useMemo } from 'react'
 import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { useGetLayers } from '@/app/services/api/datasets/layers/clientRequests'
-import type { DatasetRemovalState, PlannedApi } from '@/utils/dataSinkRemoval'
+import type { DatasetRemovalState, PlannedApi } from '@/types/dataSinkRemoval'
 
 /** The Data sinks, Layers and APIs of the Dataset that a removal is planned on; null until all three are loaded. */
 export const useDataSinkRemovalState = (datasetId: string): DatasetRemovalState | null => {
