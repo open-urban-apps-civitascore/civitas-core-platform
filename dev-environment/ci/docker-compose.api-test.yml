@@ -74,7 +74,7 @@ services:
       retries: 10
 
   postgres-keycloak:
-    image: postgres:16-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
+    image: postgres:16-alpine@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
@@ -435,7 +435,7 @@ services:
       retries: 10
 
   rabbitmq:
-    image: rabbitmq:4.4.0-alpine@sha256:21577d148f4f7563a87d761862fa353f59348a094833ca8b1b1a46a8102dffce
+    image: rabbitmq:4.4.0-alpine@sha256:42a204b8f401d2c19583db83bbad250273954d216a1e5c0e6a0f6b0185bc0b03
     tmpfs:
       - /var/lib/rabbitmq:size=256m,mode=1777
     healthcheck:
@@ -662,7 +662,7 @@ services:
   # never through the deployed flow, so without this every MQTT-TLS pipeline deploy fails validation.
   nifi-parameter-contexts:
     profiles: [seed]
-    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
+    image: curlimages/curl:8.23.0@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93
     entrypoint: ["sh", "/provision-parameter-contexts.sh"]
     environment:
       NIFI_SECURITY_USER_OIDC_CLIENT_SECRET: "${NIFI_OIDC_CLIENT_SECRET:-nifi-dev-secret}"
