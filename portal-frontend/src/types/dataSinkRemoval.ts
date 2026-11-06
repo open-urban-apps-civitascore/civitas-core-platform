@@ -31,27 +31,16 @@ export interface DataSinkRemoval {
 }
 
 /** An active Data sink of the Dataset, with the Pipelines that write into it. */
-export interface PlannedDataSink {
-  id: string
-  dataSinkType: DataSinkType
-  provisioned: boolean
+export interface PlannedDataSink extends RemovedDataSink {
   pipelineIds: string[]
 }
 
-export interface PlannedLayer {
-  id: string
+export interface PlannedLayer extends RemovedLayer {
   dataSinkId: string
   namedApiId: string | null
-  layerName: string
-  title: string | null
 }
 
-export interface PlannedApi {
-  id: string
-  slug: string
-  name: string
-  standard: ApiStandard
-}
+export type PlannedApi = RemovedApi
 
 export interface PipelineDataSinkLink {
   pipelineId: string
