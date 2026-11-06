@@ -104,13 +104,12 @@ services:
       SUPERSET_SERVICE_PASSWORD: ${SUPERSET_SERVICE_PASSWORD:-dev-only-civitas-superset-service-password}
       OPA_URL: ${OPA_URL:-http://civitas-opa:8181}
       SUPERSET_CONFIG_PATH: /opt/civitas/superset/superset_config.py
-      PYTHONPATH: /opt/civitas/superset
+      PYTHONPATH: /app/pythonpath:/opt/civitas/superset
     ports:
       - "${SUPERSET_PORT:-8092}:8088"
     volumes:
       - superset_home:/app/superset_home
       - ./superset:/opt/civitas/superset:ro
-      - ./superset/civitas-logo.svg:/app/superset/static/assets/images/civitas-logo.svg:ro
     networks:
       - civitas-network
     healthcheck:
