@@ -1747,6 +1747,11 @@
       "description": "This change discards all stored data for this Dataset. The data will be recreated the next time the pipeline runs. All previously stored data will be permanently lost.",
       "confirm": "Discard stored data"
     },
+    "dataSinkNodeRemoval": {
+      "title": "Remove Data storage?",
+      "description": "Data, Layers or APIs of this Dataset may depend on this Data storage. They can be deleted when you save.",
+      "confirm": "Remove"
+    },
     "removalConfirm": {
       "title": "Delete Data storage?",
       "description": "The Data storage removed from the Pipelines will be deleted on save. This action cannot be undone.",

@@ -15,16 +15,20 @@ import {
   ConnectionMode,
   type EdgeChange,
   type NodeChange,
+  type OnBeforeDelete,
   type OnSelectionChangeParams,
 } from '@xyflow/react'
 import { useTranslations } from 'next-intl'
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { CanvasScaffold } from '@/components/node-editor/canvas/CanvasScaffold'
+import { useConfirmation } from '@/hooks/use-confirmation'
 
 import { CANVAS_CONFIG } from '../../_constants/pipelineStyles'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
 import { useReadOnly } from '../../_hooks/use-pipeline-read-only'
+import { isFrostNodeData, isGeoPersistenceNodeData, type PipelineNodeData } from '../../_types/nodes'
 import type { PipelineNodeType } from '../../_types/pipeline'
 import { pipelineEdgeTypes } from '../edges/edgeTypes'
 import { pipelineNodeTypes } from '../nodes/nodeTypes'
@@ -36,6 +40,9 @@ import { pipelineNodeTypes } from '../nodes/nodeTypes'
 interface PipelineCanvasProps {
   className?: string
 }
+
+const isSavedDataSinkNode = (data: PipelineNodeData) =>
+  (isFrostNodeData(data) || isGeoPersistenceNodeData(data)) && !!data.entityId
 
 // ============================================================================
 // Component
@@ -51,6 +58,8 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
   const { pipeline, dispatch, addNode, addEdge, validateConnection, hideValidationPanel } = useActivePipeline()
   const { isReadOnly } = useReadOnly()
   const canEdit = !isReadOnly
+
+  const { confirm: confirmDataSinkNodeRemoval, dialog: dataSinkNodeRemovalDialog } = useConfirmation()
 
   const nodeTypes = useMemo(() => pipelineNodeTypes, [])
   const edgeTypes = useMemo(() => pipelineEdgeTypes, [])
@@ -71,6 +80,14 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
       if (validateConnection(connection)) addEdge(connection)
     },
     [canEdit, validateConnection, addEdge],
+  )
+
+  const onBeforeDelete = useCallback<OnBeforeDelete>(
+    async ({ nodes }) => {
+      const hasSavedDataSink = nodes.some(node => isSavedDataSinkNode(node.data as PipelineNodeData))
+      return !hasSavedDataSink || confirmDataSinkNodeRemoval()
+    },
+    [confirmDataSinkNodeRemoval],
   )
 
   const onDropNode = useCallback(
@@ -112,31 +129,45 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
   }
 
   return (
-    <CanvasScaffold
-      nodes={pipeline.nodes}
-      edges={pipeline.edges}
-      nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onConnect={onConnect}
-      onDropNode={onDropNode}
-      onReactFlowSelectionChange={onReactFlowSelectionChange}
-      isValidConnection={connection => validateConnection(connection as Connection)}
-      canEdit={canEdit}
-      connectionMode={ConnectionMode.Loose}
-      shouldSnapToGrid={CANVAS_CONFIG.snapToGrid}
-      snapGrid={[CANVAS_CONFIG.gridSize, CANVAS_CONFIG.gridSize]}
-      minZoom={CANVAS_CONFIG.minZoom}
-      maxZoom={CANVAS_CONFIG.maxZoom}
-      defaultViewport={CANVAS_CONFIG.defaultViewport}
-      fitViewPadding={CANVAS_CONFIG.fitViewPadding}
-      backgroundGap={CANVAS_CONFIG.gridSize}
-      multiSelectionKeyCode={['Meta', 'Ctrl']}
-      panActivationKeyCode={null}
-      hasNativeDeleteKey
-      deleteKeyCode={['Delete', 'Backspace']}
-      className={`bg-muted/10 ${className}`}
-    />
+    <>
+      <CanvasScaffold
+        nodes={pipeline.nodes}
+        edges={pipeline.edges}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onBeforeDelete={onBeforeDelete}
+        onDropNode={onDropNode}
+        onReactFlowSelectionChange={onReactFlowSelectionChange}
+        isValidConnection={connection => validateConnection(connection as Connection)}
+        canEdit={canEdit}
+        connectionMode={ConnectionMode.Loose}
+        shouldSnapToGrid={CANVAS_CONFIG.snapToGrid}
+        snapGrid={[CANVAS_CONFIG.gridSize, CANVAS_CONFIG.gridSize]}
+        minZoom={CANVAS_CONFIG.minZoom}
+        maxZoom={CANVAS_CONFIG.maxZoom}
+        defaultViewport={CANVAS_CONFIG.defaultViewport}
+        fitViewPadding={CANVAS_CONFIG.fitViewPadding}
+        backgroundGap={CANVAS_CONFIG.gridSize}
+        multiSelectionKeyCode={['Meta', 'Ctrl']}
+        panActivationKeyCode={null}
+        hasNativeDeleteKey
+        deleteKeyCode={['Delete', 'Backspace']}
+        className={`bg-muted/10 ${className}`}
+      />
+      <WarningModal
+        open={dataSinkNodeRemovalDialog.open}
+        onOpenChange={isOpen => {
+          if (!isOpen) dataSinkNodeRemovalDialog.onCancel()
+        }}
+        title={t('dataSinkNodeRemoval.title')}
+        description={t('dataSinkNodeRemoval.description')}
+        confirmButtonTitle={t('dataSinkNodeRemoval.confirm')}
+        onConfirm={dataSinkNodeRemovalDialog.onConfirm}
+        onDiscard={dataSinkNodeRemovalDialog.onCancel}
+      />
+    </>
   )
 }

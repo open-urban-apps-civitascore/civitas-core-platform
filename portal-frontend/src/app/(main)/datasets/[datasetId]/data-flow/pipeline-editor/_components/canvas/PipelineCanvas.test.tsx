@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { ActivePipelineContext } from '../../_hooks/use-active-pipeline'
@@ -20,17 +20,18 @@ const nodeData: GeoPersistenceNodeData = {
   tableName: 'roads',
 }
 
-const selectedSinkNode = {
-  id: 'geo-1',
-  type: 'geoPersistence',
-  position: { x: 0, y: 0 },
-  selected: true,
-  data: nodeData,
-} as PipelineNode
+const selectedSinkNode = (data: GeoPersistenceNodeData = nodeData) =>
+  ({
+    id: 'geo-1',
+    type: 'geoPersistence',
+    position: { x: 0, y: 0 },
+    selected: true,
+    data,
+  }) as PipelineNode
 
-const renderCanvas = (isReadOnly = false, dispatch = vi.fn()) => {
+const renderCanvas = (isReadOnly = false, node = selectedSinkNode(), dispatch = vi.fn()) => {
   const contextValue = {
-    pipeline: { id: 'pipeline-1', name: 'Test', nodes: [selectedSinkNode], edges: [] },
+    pipeline: { id: 'pipeline-1', name: 'Test', nodes: [node], edges: [] },
     dispatch,
     addNode: vi.fn(),
     addEdge: vi.fn(),
@@ -61,11 +62,33 @@ describe('PipelineCanvas', () => {
     vi.clearAllMocks()
   })
 
-  it('removes a selected Data storage node on Delete', async () => {
+  it('removes a saved Data storage node after the user confirms', async () => {
     const dispatch = renderCanvas()
 
     await userEvent.keyboard('{Delete}')
+    expect(await screen.findByText('dataSinkNodeRemoval.description')).toBeInTheDocument()
+    expect(removedNodeIds(dispatch)).toEqual([])
 
+    await userEvent.click(screen.getByTestId('confirmButton'))
+
+    expect(removedNodeIds(dispatch)).toEqual(['geo-1'])
+  })
+
+  it('keeps a saved Data storage node when the user cancels', async () => {
+    const dispatch = renderCanvas()
+
+    await userEvent.keyboard('{Delete}')
+    await userEvent.click(await screen.findByTestId('discardButton'))
+
+    expect(removedNodeIds(dispatch)).toEqual([])
+  })
+
+  it('removes an unsaved Data storage node without asking', async () => {
+    const dispatch = renderCanvas(false, selectedSinkNode({ ...nodeData, entityId: undefined }))
+
+    await userEvent.keyboard('{Delete}')
+
+    expect(screen.queryByText('dataSinkNodeRemoval.description')).not.toBeInTheDocument()
     expect(removedNodeIds(dispatch)).toEqual(['geo-1'])
   })
 

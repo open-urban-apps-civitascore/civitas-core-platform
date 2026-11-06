@@ -1,28 +1,29 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 
+import { type ConfirmationDialog, useConfirmation } from '@/hooks/use-confirmation'
 import type { DataSinkRemoval } from '@/types/dataSinkRemoval'
 import { unconfirmedRemoval } from '@/utils/errors'
 
-export interface RemovalConfirmationDialog {
-  open: boolean
+export interface RemovalConfirmationDialog extends ConfirmationDialog {
   removal: DataSinkRemoval | null
-  onConfirm: () => void
-  onCancel: () => void
 }
 
 export const useRemovalConfirmation = () => {
+  const { confirm, dialog: confirmation } = useConfirmation()
   const [removal, setRemoval] = useState<DataSinkRemoval | null>(null)
-  const answerRef = useRef<((isConfirmed: boolean) => void) | null>(null)
 
   /** Shows the removal and resolves with the user's answer. */
-  const confirmRemoval = useCallback((removalToConfirm: DataSinkRemoval) => {
-    setRemoval(removalToConfirm)
-    return new Promise<boolean>(resolve => {
-      answerRef.current = resolve
-    })
-  }, [])
+  const confirmRemoval = useCallback(
+    async (removalToConfirm: DataSinkRemoval) => {
+      setRemoval(removalToConfirm)
+      const isConfirmed = await confirm()
+      setRemoval(current => (current === removalToConfirm ? null : current))
+      return isConfirmed
+    },
+    [confirm],
+  )
 
   /**
    * Sends the request. When the backend still refuses it as an unconfirmed removal, shows what it would remove and
@@ -45,18 +46,7 @@ export const useRemovalConfirmation = () => {
     [confirmRemoval],
   )
 
-  const answer = useCallback((isConfirmed: boolean) => {
-    answerRef.current?.(isConfirmed)
-    answerRef.current = null
-    setRemoval(null)
-  }, [])
-
-  const dialog: RemovalConfirmationDialog = {
-    open: removal !== null,
-    removal,
-    onConfirm: () => answer(true),
-    onCancel: () => answer(false),
-  }
+  const dialog: RemovalConfirmationDialog = { ...confirmation, removal }
 
   return { confirmRemoval, sendConfirmingRemoval, dialog }
 }

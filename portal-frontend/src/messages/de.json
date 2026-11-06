@@ -1734,6 +1734,11 @@
       "description": "Diese Änderung verwirft alle gespeicherten Daten dieses Datensatzes. Die Daten werden beim nächsten Ausführen der Pipeline neu erzeugt. Alle bisher gespeicherten Daten gehen dauerhaft verloren.",
       "confirm": "Gespeicherte Daten verwerfen"
     },
+    "dataSinkNodeRemoval": {
+      "title": "Datenspeicher entfernen?",
+      "description": "Daten, Layer oder APIs dieses Datensatzes können von diesem Datenspeicher abhängen. Sie können beim Speichern gelöscht werden.",
+      "confirm": "Entfernen"
+    },
     "removalConfirm": {
       "title": "Datenspeicher löschen?",
       "description": "Die aus den Pipelines entfernten Datenspeicher werden beim Speichern gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
