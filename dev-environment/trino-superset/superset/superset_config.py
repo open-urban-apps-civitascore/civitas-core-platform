@@ -118,6 +118,7 @@ SQLLAB_CTAS_NO_LIMIT = True
 # brand mark (public/images/only_logo_civitas.svg) and primary color (--primary in globals.css,
 # oklch(49.999% 0.11934 242.772) == #0369a1).
 APP_NAME = "Civitas Core"
+HIDE_NAVBAR_LOGO = True
 CIVITAS_BRAND_LOGO_URL = "/static/assets/images/civitas-logo.svg"
 CIVITAS_BRAND_COLOR = "#0369a1"
 # menu_data() (superset/views/base.py) reads APP_ICON directly for the brand icon shown in the
