@@ -75,7 +75,7 @@ services:
       start_period: 40s
 
   superset:
-    image: registry.gitlab.com/civitas-connect/civitas-core/civitas-core-v2/superset:7.0.0rc2-civitas-c33d77a2
+    image: registry.gitlab.com/civitas-connect/civitas-core/civitas-core-v2/superset:7.0.0rc2-civitas-df58ec71
     mem_limit: 1g
     container_name: civitas-superset
     restart: unless-stopped
