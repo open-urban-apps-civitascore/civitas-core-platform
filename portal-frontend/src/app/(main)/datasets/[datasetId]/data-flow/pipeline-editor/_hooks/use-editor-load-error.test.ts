@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 
 import { useGetDataset } from '@/app/services/api/datasets/clientRequests'
 import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientRequests'
+import { useGetLayers } from '@/app/services/api/datasets/layers/clientRequests'
 import { useGetPipelines } from '@/app/services/api/pipelines/clientRequests'
 
 import { useEditorLoadError } from './use-editor-load-error'
@@ -25,17 +26,22 @@ vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
   useGetDataSinks: vi.fn(),
 }))
 
+vi.mock('@/app/services/api/datasets/layers/clientRequests', () => ({
+  useGetLayers: vi.fn(),
+}))
+
 vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
   useGetPipelines: vi.fn(),
 }))
 
-type FailingQuery = 'pipelines' | 'dataSinks' | 'dataset' | null
+type FailingQuery = 'pipelines' | 'dataSinks' | 'dataset' | 'layers' | null
 
 const mockQueries = (failing: FailingQuery) => {
   const result = (isLoadingError: boolean) => ({ isLoadingError })
   vi.mocked(useGetPipelines).mockReturnValue(result(failing === 'pipelines') as ReturnType<typeof useGetPipelines>)
   vi.mocked(useGetDataSinks).mockReturnValue(result(failing === 'dataSinks') as ReturnType<typeof useGetDataSinks>)
   vi.mocked(useGetDataset).mockReturnValue(result(failing === 'dataset') as ReturnType<typeof useGetDataset>)
+  vi.mocked(useGetLayers).mockReturnValue(result(failing === 'layers') as ReturnType<typeof useGetLayers>)
 }
 
 beforeEach(() => {
@@ -52,7 +58,7 @@ describe('useEditorLoadError', () => {
     expect(toast.error).not.toHaveBeenCalled()
   })
 
-  it.each<FailingQuery>(['pipelines', 'dataSinks', 'dataset'])(
+  it.each<FailingQuery>(['pipelines', 'dataSinks', 'dataset', 'layers'])(
     'reports an error and shows one toast when the %s request fails',
     failing => {
       mockQueries(failing)

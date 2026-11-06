@@ -2,17 +2,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
 
 import { DATASINKS_QUERY_KEY } from '@/app/services/api/datasets/datasinks/clientRequests'
-import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
+import { apiRequest, apiRequestAllPages, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { CreateLayerInput, Layer, UpdateLayerInput } from '@/types/layers'
 
 export const LAYERS_QUERY_KEY = 'layers'
 
+/** Loads every Layer of the Dataset. */
 export const useGetLayers = (datasetId: string) =>
   useQuery<ApiServiceResponse<Layer[]>, AxiosError>({
     queryKey: [LAYERS_QUERY_KEY, datasetId],
     queryFn: () =>
-      apiRequest<Layer[]>({
-        method: 'GET',
+      apiRequestAllPages<Layer>({
         endpoint: `/datasets/${datasetId}/layers`,
         headers: { 'x-api-request': 'true' },
         errorMessage: 'An error occurred while loading layers.',

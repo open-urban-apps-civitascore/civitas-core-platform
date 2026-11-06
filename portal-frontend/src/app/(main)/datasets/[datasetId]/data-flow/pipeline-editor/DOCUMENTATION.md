@@ -638,6 +638,8 @@ The FROST section is a fixed template that generates thing/observation upsert lo
 
 `saveAllPipelines()` in `PipelineEditorProvider` saves every dirty session, one after the other, in two phases.
 
+Before phase 1, `planPipelineSaves()` (`utils/dataSinkRemoval.ts`) calculates what each pipeline update removes, in save order and on the state the previous update leaves. It reads the Data sinks, Layers and APIs that `useDataSinkRemovalState()` loads, and counts a sink node without `entityId` as a new sink without a pipeline. When the updates together delete stored data, a Layer or an API, the `RemovalConfirmModal` shows the merged list once. Cancel sends nothing and the save returns `false`. The calculation mirrors the backend's `DataSinkRemovalPlan`; both run the cases in `api/portal-backend/data-sink-removal-cases.json`.
+
 Phase 1, per session:
 
 1. **Save the data sinks** – create a sink for a node that has no `entityId`, update a changed one. The returned `configurationUrn` is stashed on the node and becomes the model's `sinkRef`.
@@ -645,7 +647,7 @@ Phase 1, per session:
 
 Phase 2, per session:
 
-3. **Save the pipeline** – `POST` for a new pipeline, `PUT` for an existing one, with the ids and URNs from the steps above, first without `confirmDataLoss`. The backend deletes or deactivates the removed sinks, their Layers and the APIs without a sink in the same request. When the update would remove a provisioned sink, a Layer or an API, the backend changes nothing and answers `409 REMOVAL_NOT_CONFIRMED` with a `removal` property that lists the `dataSinks`, `layers` and `apis` it would remove. The save keeps that list and goes on with the next session.
+3. **Save the pipeline** – `POST` for a new pipeline, `PUT` for an existing one, with the ids and URNs from the steps above, with `confirmDataLoss` when the calculated removal of this update deletes stored data. The backend deletes or deactivates the removed sinks, their Layers and the APIs without a sink in the same request. When the update would remove a provisioned sink without `confirmDataLoss`, because the calculation missed it, the backend changes nothing and answers `409 REMOVAL_NOT_CONFIRMED` with a `removal` property that lists the `dataSinks`, `layers` and `apis` it would remove. The save keeps that list and goes on with the next session.
 4. **Delete the removed mappings** – `getRemovedMappingUrns()` collects the logical URNs of mapping nodes that were removed since the last save. A node that was never saved has no URN and is skipped. A failed delete gives an error toast (`mappingStillInUse` or `mappingCleanupFailed`) but keeps the save successful.
 5. **Clean the session** – mark it clean, write the new data sink and mapping snapshots, show the success toast.
 
@@ -659,7 +661,7 @@ If the removal is cancelled, every refused session is written back the same way,
 
 ### Pipeline Delete
 
-`deletePipeline()` first shows the `RemovalConfirmModal` with only the delete question, then sends the `DELETE` without `confirmDataLoss`. When the backend answers `409 REMOVAL_NOT_CONFIRMED`, the modal shows the Layers, APIs and stored data from its `removal` property, and Confirm sends the `DELETE` again with `confirmDataLoss=true`. Cancel at either question sends nothing more. The Dataset overview (`PipelineCard`) works the same way; both use `sendConfirmingRemoval()` from `useRemovalConfirmation()`.
+`deletePipeline()` shows the `RemovalConfirmModal` with the delete question and the Layers, APIs and stored data that `planPipelineDelete()` calculates, then sends the `DELETE`, with `confirmDataLoss=true` when stored data goes. When the calculation missed stored data, the backend answers `409 REMOVAL_NOT_CONFIRMED`; the modal then shows the list from its `removal` property, and Confirm sends the `DELETE` again with `confirmDataLoss=true`. Cancel sends nothing more. The Dataset overview (`PipelineCard`) works the same way; both use `sendConfirmingRemoval()` from `useRemovalConfirmation()`.
 
 ### Locked Data Sinks
 

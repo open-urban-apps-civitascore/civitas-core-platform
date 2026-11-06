@@ -19,7 +19,7 @@ import {
 } from '@/app/services/api/pipelines/clientRequests'
 import type { RemovalConfirmationDialog } from '@/hooks/use-removal-confirmation'
 import type { Datasource } from '@/types/datasources'
-import type { DataSinkRemoval } from '@/utils/dataSinkRemoval'
+import type { DatasetRemovalState, DataSinkRemoval } from '@/utils/dataSinkRemoval'
 
 import { getNodeDef } from '../../_config/nodeRegistry'
 import { useActivePipeline } from '../../_hooks/use-active-pipeline'
@@ -93,6 +93,15 @@ vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   useGetDataset: vi.fn(),
 }))
 
+// The Dataset has no Data sinks, Layers or APIs unless a test sets them.
+const removalState = vi.hoisted(() => ({
+  current: { dataSinks: [], layers: [], apis: [] } as DatasetRemovalState | null,
+}))
+
+vi.mock('@/hooks/use-data-sink-removal-state', () => ({
+  useDataSinkRemovalState: () => removalState.current,
+}))
+
 vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
   useGetDataSinks: vi.fn(() => ({ data: undefined })),
   useCreateDataSink: vi.fn(),
@@ -123,10 +132,23 @@ const LAYER_REMOVAL: DataSinkRemoval = {
 
 const STA_API = { id: 'api-sta', slug: 'sta', name: 'STA', standard: 'STA' } as const
 
-const API_ONLY_REMOVAL: DataSinkRemoval = {
-  dataSinks: [{ id: 'old-sink-2', dataSinkType: 'FROST', provisioned: false }],
+const STA_REMOVAL: DataSinkRemoval = {
+  dataSinks: [{ id: 'old-sink-2', dataSinkType: 'FROST', provisioned: true }],
   layers: [],
   apis: [STA_API],
+}
+
+const OWS_API = { id: 'api-ows', slug: 'map', name: 'Map', standard: 'OWS' } as const
+
+// pipeline-a writes into a released PostGIS Data sink with a Layer behind the OWS API, pipeline-b into a FROST Data
+// sink that was never released, behind the STA API.
+const TWO_PIPELINE_STATE: DatasetRemovalState = {
+  dataSinks: [
+    { id: 'sink-a', dataSinkType: 'POSTGIS', provisioned: true, pipelineIds: ['pipeline-a'] },
+    { id: 'sink-b', dataSinkType: 'FROST', provisioned: false, pipelineIds: ['pipeline-b'] },
+  ],
+  layers: [{ ...ROADS_LAYER, dataSinkId: 'sink-a', namedApiId: OWS_API.id }],
+  apis: [OWS_API, STA_API],
 }
 
 const removalNotConfirmed = (removal: DataSinkRemoval) =>
@@ -268,6 +290,7 @@ let mockDeleteDataSinkMutateAsync: ReturnType<typeof vi.fn>
 beforeEach(() => {
   vi.clearAllMocks()
   contextRef.current = null
+  removalState.current = { dataSinks: [], layers: [], apis: [] }
 
   mockReadOnly.isReadOnly = false
   mockDatasetPermissions.canDeletePipeline = true
@@ -421,6 +444,15 @@ describe('PipelineEditorProviderComponent', () => {
         data: undefined,
         isLoading: true,
       } as unknown as ReturnType<typeof useGetDataSinks>)
+
+      renderProvider()
+
+      expect(contextRef.current?.isLoadingEditor).toBe(true)
+    })
+
+    // A save before the Layers and APIs are known would remove them without asking.
+    it('waits for the Data sinks, Layers and APIs that a removal is planned on', () => {
+      removalState.current = null
 
       renderProvider()
 
@@ -1702,6 +1734,98 @@ describe('PipelineEditorProviderComponent', () => {
         expect(callOrder).toEqual(['createDataSink', 'updatePipeline', 'updatePipeline'])
       })
 
+      it('asks once before sending anything and saves each pipeline with its own confirmDataLoss', async () => {
+        removalState.current = TWO_PIPELINE_STATE
+        renderProviderWithSessions([savedSession('session-a', 'pipeline-a'), savedSession('session-b', 'pipeline-b')])
+
+        const pendingSave = await startSave()
+
+        expect(saveDialog()?.open).toBe(true)
+        expect(saveDialog()?.removal).toEqual({
+          dataSinks: [
+            { id: 'sink-a', dataSinkType: 'POSTGIS', provisioned: true },
+            { id: 'sink-b', dataSinkType: 'FROST', provisioned: false },
+          ],
+          layers: [ROADS_LAYER],
+          apis: [OWS_API, STA_API],
+        })
+        expect(mockUpdatePipelineMutateAsync).not.toHaveBeenCalled()
+
+        expect(await answerSaveDialog(pendingSave, true)).toBe(true)
+        expect(mockUpdatePipelineMutateAsync).toHaveBeenCalledTimes(2)
+        expect(mockUpdatePipelineMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({ pipelineId: 'pipeline-a', isDataLossConfirmed: true }),
+        )
+        expect(mockUpdatePipelineMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({ pipelineId: 'pipeline-b', isDataLossConfirmed: false }),
+        )
+      })
+
+      it('sends nothing and returns false when the planned removal is cancelled', async () => {
+        removalState.current = TWO_PIPELINE_STATE
+        renderProviderWithSessions([savedSession('session-a', 'pipeline-a')])
+
+        const pendingSave = await startSave()
+
+        expect(await answerSaveDialog(pendingSave, false)).toBe(false)
+        expect(mockUpdatePipelineMutateAsync).not.toHaveBeenCalled()
+        expect(contextRef.current?.hasAnyDirtySession).toBe(true)
+      })
+
+      it('keeps the API without a dialog when a new storage node of the same type replaces the removed one', async () => {
+        removalState.current = {
+          dataSinks: [{ id: 'sink-a', dataSinkType: 'POSTGIS', provisioned: false, pipelineIds: ['pipeline-a'] }],
+          layers: [],
+          apis: [OWS_API],
+        }
+        vi.mocked(buildDataSinkPayloads).mockReturnValue([
+          { nodeId: 'persist-new', entityId: null, payload: { dataSinkType: 'POSTGIS' } as never },
+        ])
+        renderProvider(savedSession('session-a', 'pipeline-a'))
+
+        let result: boolean | undefined
+        await act(async () => {
+          result = await contextRef.current?.saveAllPipelines()
+        })
+
+        expect(result).toBe(true)
+        expect(saveDialog()?.open).toBe(false)
+        expect(mockUpdatePipelineMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({ pipelineId: 'pipeline-a', isDataLossConfirmed: false }),
+        )
+      })
+
+      // Without the second question, the API of the removed sink would go although the user agreed to keep it.
+      it('asks again and sends no update when the replacement that kept the API fails to save', async () => {
+        removalState.current = {
+          dataSinks: [{ id: 'sink-a', dataSinkType: 'POSTGIS', provisioned: false, pipelineIds: ['pipeline-a'] }],
+          layers: [],
+          apis: [OWS_API],
+        }
+        vi.mocked(buildDataSinkPayloads).mockImplementation(pipeline =>
+          pipeline.id === 'pipeline-b'
+            ? [{ nodeId: 'persist-new', entityId: null, payload: { dataSinkType: 'POSTGIS' } as never }]
+            : [],
+        )
+        vi.mocked(useCreateDataSink).mockReturnValue({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn().mockRejectedValue(new Error('server error')),
+          isPending: false,
+        } as unknown as ReturnType<typeof useCreateDataSink>)
+        const sessionB = savedSession('session-b', 'pipeline-b')
+        renderProviderWithSessions([
+          savedSession('session-a', 'pipeline-a'),
+          { ...sessionB, pipeline: { ...sessionB.pipeline, nodes: [makeGeoPersistenceNode('persist-new')] } },
+        ])
+
+        const pendingSave = await startSave()
+
+        expect(saveDialog()?.open).toBe(true)
+        expect(saveDialog()?.removal?.apis).toEqual([OWS_API])
+        expect(await answerSaveDialog(pendingSave, false)).toBe(false)
+        expect(mockUpdatePipelineMutateAsync).not.toHaveBeenCalled()
+      })
+
       it('saves without a dialog when the backend needs no confirmation', async () => {
         renderProvider(savedSession('session-1', 'pipeline-1'))
 
@@ -1721,14 +1845,14 @@ describe('PipelineEditorProviderComponent', () => {
       it('asks once with the merged removal of every refused pipeline', async () => {
         mockUpdatePipelineMutateAsync
           .mockRejectedValueOnce(removalNotConfirmed(LAYER_REMOVAL))
-          .mockRejectedValueOnce(removalNotConfirmed(API_ONLY_REMOVAL))
+          .mockRejectedValueOnce(removalNotConfirmed(STA_REMOVAL))
         renderProviderWithSessions([savedSession('session-a', 'pipeline-a'), savedSession('session-b', 'pipeline-b')])
 
         const pendingSave = await startSave()
 
         expect(saveDialog()?.open).toBe(true)
         expect(saveDialog()?.removal).toEqual({
-          dataSinks: [...LAYER_REMOVAL.dataSinks, ...API_ONLY_REMOVAL.dataSinks],
+          dataSinks: [...LAYER_REMOVAL.dataSinks, ...STA_REMOVAL.dataSinks],
           layers: [ROADS_LAYER],
           apis: [STA_API],
         })
@@ -2584,6 +2708,31 @@ describe('PipelineEditorProviderComponent', () => {
       })
     }
 
+    it('lists what the delete takes along and deletes once with confirmDataLoss when it deletes stored data', async () => {
+      removalState.current = {
+        ...TWO_PIPELINE_STATE,
+        dataSinks: [{ id: 'sink-a', dataSinkType: 'POSTGIS', provisioned: true, pipelineIds: ['pipeline-to-delete'] }],
+      }
+      renderProvider(savedSession())
+
+      await startDelete()
+
+      expect(deleteDialog()?.removal).toEqual({
+        dataSinks: [{ id: 'sink-a', dataSinkType: 'POSTGIS', provisioned: true }],
+        layers: [ROADS_LAYER],
+        apis: [OWS_API],
+      })
+      expect(mockDeleteMutateAsync).not.toHaveBeenCalled()
+
+      await confirmDelete()
+
+      expect(mockDeleteMutateAsync).toHaveBeenCalledOnce()
+      expect(mockDeleteMutateAsync).toHaveBeenCalledWith({
+        pipelineId: 'pipeline-to-delete',
+        isDataLossConfirmed: true,
+      })
+    })
+
     it('asks the plain delete question first and sends nothing before it is answered', async () => {
       renderProvider(savedSession())
 
@@ -2629,7 +2778,7 @@ describe('PipelineEditorProviderComponent', () => {
     })
 
     it('sends nothing more and keeps the session when the named removal is cancelled', async () => {
-      mockDeleteMutateAsync.mockRejectedValueOnce(removalNotConfirmed(API_ONLY_REMOVAL))
+      mockDeleteMutateAsync.mockRejectedValueOnce(removalNotConfirmed(STA_REMOVAL))
       renderProvider(savedSession())
 
       await startDelete()

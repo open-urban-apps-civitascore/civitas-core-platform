@@ -25,16 +25,16 @@ export const useRemovalConfirmation = () => {
   }, [])
 
   /**
-   * Sends the request unconfirmed. When the backend refuses it as an unconfirmed removal, shows what it would remove
-   * and sends it again confirmed. Resolves false when the user cancels; rethrows any other error.
+   * Sends the request. When the backend still refuses it as an unconfirmed removal, shows what it would remove and
+   * sends it again confirmed. Resolves false when the user cancels; rethrows any other error.
    */
   const sendConfirmingRemoval = useCallback(
-    async (send: (isDataLossConfirmed: boolean) => Promise<unknown>) => {
+    async (send: (isDataLossConfirmed: boolean) => Promise<unknown>, isDataLossConfirmed: boolean) => {
       try {
-        await send(false)
+        await send(isDataLossConfirmed)
         return true
       } catch (error) {
-        const removalToConfirm = unconfirmedRemoval(error)
+        const removalToConfirm = isDataLossConfirmed ? null : unconfirmedRemoval(error)
         if (!removalToConfirm) throw error
         const isConfirmed = await confirmRemoval(removalToConfirm)
         if (!isConfirmed) return false

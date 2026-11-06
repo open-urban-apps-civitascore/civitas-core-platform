@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { mockApiError } from '@/__mocks__/errors/apiError.mock'
 import { PipelineBasicInfo } from '@/types/datasets'
+import type { DatasetRemovalState } from '@/utils/dataSinkRemoval'
 
 import { PipelineCard } from './PipelineCard'
 
@@ -12,6 +13,7 @@ const mockRequestNavigation = vi.fn()
 const mockRefresh = vi.fn()
 const mockDeletePipelineMutateAsync = vi.fn().mockResolvedValue(undefined)
 let mockHasUnsavedChanges = false
+let mockRemovalState: DatasetRemovalState | null = null
 
 vi.mock('@/contexts/unsaved-changes/UnsavedChangesContext', () => ({
   useUnsavedChanges: () => ({
@@ -34,6 +36,10 @@ vi.mock('next-intl', () => ({
 
 vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
   useDeletePipeline: () => ({ mutateAsync: mockDeletePipelineMutateAsync, isPending: false }),
+}))
+
+vi.mock('@/hooks/use-data-sink-removal-state', () => ({
+  useDataSinkRemovalState: () => mockRemovalState,
 }))
 
 vi.mock('sonner', () => ({
@@ -62,11 +68,19 @@ const LAYER_REMOVAL_ERROR = removalNotConfirmed({
   apis: [{ id: 'api-1', slug: 'ows', name: 'Trees API', standard: 'OWS' }],
 })
 
-const API_ONLY_REMOVAL_ERROR = removalNotConfirmed({
-  dataSinks: [{ id: 'sink-1', dataSinkType: 'FROST', provisioned: false }],
+const EMPTY_STATE: DatasetRemovalState = { dataSinks: [], layers: [], apis: [] }
+
+const MAP_STATE: DatasetRemovalState = {
+  dataSinks: [{ id: 'sink-1', dataSinkType: 'POSTGIS', provisioned: true, pipelineIds: ['pipeline-1'] }],
+  layers: [{ id: 'layer-1', dataSinkId: 'sink-1', namedApiId: 'api-1', layerName: 'trees', title: 'Trees' }],
+  apis: [{ id: 'api-1', slug: 'ows', name: 'Trees API', standard: 'OWS' }],
+}
+
+const SENSOR_STATE: DatasetRemovalState = {
+  dataSinks: [{ id: 'sink-1', dataSinkType: 'FROST', provisioned: false, pipelineIds: ['pipeline-1'] }],
   layers: [],
   apis: [{ id: 'api-1', slug: 'sta', name: 'Sensor API', standard: 'STA' }],
-})
+}
 
 const renderComponent = (props: Partial<typeof defaultProps> = {}) =>
   render(<PipelineCard {...defaultProps} {...props} />)
@@ -75,6 +89,7 @@ describe('PipelineCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockHasUnsavedChanges = false
+    mockRemovalState = EMPTY_STATE
     mockDeletePipelineMutateAsync.mockResolvedValue(undefined)
   })
 
@@ -183,7 +198,7 @@ describe('PipelineCard', () => {
 
     const confirm = () => fireEvent.click(screen.getByTestId('confirmButton'))
 
-    it('asks the plain delete question without Layers, APIs or stored data', async () => {
+    it('asks the plain delete question when the delete takes nothing along', async () => {
       renderComponent()
       await startDelete()
       expect(screen.queryByTestId('removalConfirmLayers')).not.toBeInTheDocument()
@@ -193,6 +208,7 @@ describe('PipelineCard', () => {
     })
 
     it('closes the modal without deleting when cancel is clicked', async () => {
+      mockRemovalState = MAP_STATE
       renderComponent()
       await startDelete()
       fireEvent.click(screen.getByTestId('discardButton'))
@@ -200,7 +216,7 @@ describe('PipelineCard', () => {
       expect(mockDeletePipelineMutateAsync).not.toHaveBeenCalled()
     })
 
-    it('deletes once without confirmDataLoss when the backend needs no confirmation', async () => {
+    it('deletes once without confirmDataLoss when the delete takes nothing along', async () => {
       renderComponent()
       await startDelete()
       confirm()
@@ -214,36 +230,66 @@ describe('PipelineCard', () => {
       expect(mockRefresh).toHaveBeenCalled()
     })
 
-    it('lists the Layers, APIs and stored data the backend names when it refuses the delete', async () => {
+    it('lists the Layers, APIs and stored data the delete takes along in its one question', async () => {
+      mockRemovalState = MAP_STATE
+      renderComponent()
+      await startDelete()
+
+      expect(screen.getByTestId('removalConfirmLayers')).toHaveTextContent('Trees')
+      expect(screen.getByTestId('removalConfirmApis')).toHaveTextContent('Trees API')
+      expect(screen.getByTestId('removalConfirmStoredData')).toBeInTheDocument()
+      expect(mockDeletePipelineMutateAsync).not.toHaveBeenCalled()
+    })
+
+    it('deletes once with confirmDataLoss when the agreed removal deletes stored data', async () => {
+      mockRemovalState = MAP_STATE
+      renderComponent()
+      await startDelete()
+      confirm()
+
+      await waitFor(() => expect(toast.success).toHaveBeenCalled())
+      expect(mockDeletePipelineMutateAsync).toHaveBeenCalledOnce()
+      expect(mockDeletePipelineMutateAsync).toHaveBeenCalledWith({
+        pipelineId: 'pipeline-1',
+        isDataLossConfirmed: true,
+      })
+    })
+
+    it('deletes once without confirmDataLoss when the agreed removal keeps all stored data', async () => {
+      mockRemovalState = SENSOR_STATE
+      renderComponent()
+      await startDelete()
+      expect(screen.getByTestId('removalConfirmApis')).toHaveTextContent('Sensor API')
+      expect(screen.queryByTestId('removalConfirmStoredData')).not.toBeInTheDocument()
+      confirm()
+
+      await waitFor(() => expect(toast.success).toHaveBeenCalled())
+      expect(mockDeletePipelineMutateAsync).toHaveBeenCalledOnce()
+      expect(mockDeletePipelineMutateAsync).toHaveBeenCalledWith({
+        pipelineId: 'pipeline-1',
+        isDataLossConfirmed: false,
+      })
+    })
+
+    it('asks again with the list the backend names when it still refuses the delete', async () => {
       mockDeletePipelineMutateAsync.mockRejectedValueOnce(LAYER_REMOVAL_ERROR)
       renderComponent()
       await startDelete()
       confirm()
 
       expect(await screen.findByTestId('removalConfirmLayers')).toHaveTextContent('Trees')
-      expect(screen.getByTestId('removalConfirmApis')).toHaveTextContent('Trees API')
       expect(screen.getByTestId('removalConfirmStoredData')).toBeInTheDocument()
-      expect(mockDeletePipelineMutateAsync).toHaveBeenCalledOnce()
-    })
-
-    it('deletes again with confirmDataLoss when the listed removal is confirmed', async () => {
-      mockDeletePipelineMutateAsync.mockRejectedValueOnce(API_ONLY_REMOVAL_ERROR)
-      renderComponent()
-      await startDelete()
-      confirm()
-      await screen.findByTestId('removalConfirmApis')
-      expect(screen.queryByTestId('removalConfirmStoredData')).not.toBeInTheDocument()
       confirm()
 
       await waitFor(() => expect(toast.success).toHaveBeenCalled())
+      expect(mockDeletePipelineMutateAsync).toHaveBeenCalledTimes(2)
       expect(mockDeletePipelineMutateAsync).toHaveBeenLastCalledWith({
         pipelineId: 'pipeline-1',
         isDataLossConfirmed: true,
       })
-      expect(mockDeletePipelineMutateAsync).toHaveBeenCalledTimes(2)
     })
 
-    it('sends nothing more when the listed removal is cancelled', async () => {
+    it('sends nothing more when the list the backend names is cancelled', async () => {
       mockDeletePipelineMutateAsync.mockRejectedValueOnce(LAYER_REMOVAL_ERROR)
       renderComponent()
       await startDelete()
@@ -255,6 +301,19 @@ describe('PipelineCard', () => {
       expect(mockDeletePipelineMutateAsync).toHaveBeenCalledOnce()
       expect(toast.success).not.toHaveBeenCalled()
       expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('asks the plain delete question and sends it unconfirmed while the Dataset is still loading', async () => {
+      mockRemovalState = null
+      renderComponent()
+      await startDelete()
+      confirm()
+
+      await waitFor(() => expect(toast.success).toHaveBeenCalled())
+      expect(mockDeletePipelineMutateAsync).toHaveBeenCalledWith({
+        pipelineId: 'pipeline-1',
+        isDataLossConfirmed: false,
+      })
     })
 
     it('shows an error toast when deletePipeline rejects', async () => {

@@ -14,9 +14,10 @@ import { BasicTooltip } from '@/components/tooltip/Tooltip'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { useDataSinkRemovalState } from '@/hooks/use-data-sink-removal-state'
 import { useRemovalConfirmation } from '@/hooks/use-removal-confirmation'
 import { PipelineBasicInfo } from '@/types/datasets'
-import { NO_REMOVAL } from '@/utils/dataSinkRemoval'
+import { deletesStoredData, NO_REMOVAL, planPipelineDelete } from '@/utils/dataSinkRemoval'
 import { formatDate } from '@/utils/formatDate'
 
 interface PipelineCardProps {
@@ -32,6 +33,7 @@ export const PipelineCard = ({ datasetId, pipeline, badges, canDelete }: Pipelin
   const router = useRouter()
   const deletePipeline = useDeletePipeline(datasetId)
   const { confirmRemoval, sendConfirmingRemoval, dialog: removalDialog } = useRemovalConfirmation()
+  const removalState = useDataSinkRemovalState(datasetId)
   const [isDeleteRunning, setIsDeleteRunning] = useState(false)
 
   const hasError = pipeline.runtimeStatus?.state === 'ERROR'
@@ -43,10 +45,13 @@ export const PipelineCard = ({ datasetId, pipeline, badges, canDelete }: Pipelin
   const handleDelete = async () => {
     setIsDeleteRunning(true)
     try {
-      const isConfirmed = await confirmRemoval(NO_REMOVAL)
+      // Until the Dataset is loaded the dialog asks the plain question; the backend still refuses a loss of stored data.
+      const removal = removalState ? planPipelineDelete(removalState, pipeline.id) : NO_REMOVAL
+      const isConfirmed = await confirmRemoval(removal)
       if (!isConfirmed) return
-      const isDeleted = await sendConfirmingRemoval(isDataLossConfirmed =>
-        deletePipeline.mutateAsync({ pipelineId: pipeline.id, isDataLossConfirmed }),
+      const isDeleted = await sendConfirmingRemoval(
+        isDataLossConfirmed => deletePipeline.mutateAsync({ pipelineId: pipeline.id, isDataLossConfirmed }),
+        deletesStoredData(removal),
       )
       if (!isDeleted) return
       toast.success(t('messages.deleteSuccess'))

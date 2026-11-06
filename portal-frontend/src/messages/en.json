@@ -159,9 +159,9 @@
       "unreadable": "The file cannot be read. Select it again."
     },
     "removalConfirmModal": {
-      "layers": "The following Layers will be deleted:",
-      "apis": "The following APIs will be deleted:",
-      "storedData": "The stored data will be deleted."
+      "layers": "The following Layers will be deleted as well:",
+      "apis": "The following APIs will be deleted as well:",
+      "storedData": "The stored data will be deleted as well."
     }
   },
   "languages": {

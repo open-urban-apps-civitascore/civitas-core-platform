@@ -4,7 +4,7 @@ import { DATASETS_QUERY_KEY } from '@/app/services/api/datasets/clientRequests'
 import { DATASINKS_QUERY_KEY } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { LAYERS_QUERY_KEY } from '@/app/services/api/datasets/layers/clientRequests'
 
-/** Query params that confirm the removal of stored data, Layers and APIs; undefined when not confirmed. */
+/** Query params that confirm the deletion of stored data; undefined when not confirmed. */
 export const confirmDataLossParams = (isDataLossConfirmed = false): URLSearchParams | undefined =>
   isDataLossConfirmed ? new URLSearchParams({ confirmDataLoss: 'true' }) : undefined
 

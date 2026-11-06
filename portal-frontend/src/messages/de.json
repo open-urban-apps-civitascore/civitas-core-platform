@@ -158,9 +158,9 @@
       "unreadable": "Die Datei kann nicht gelesen werden. Wählen Sie sie erneut aus."
     },
     "removalConfirmModal": {
-      "layers": "Folgende Layer werden gelöscht:",
-      "apis": "Folgende APIs werden gelöscht:",
-      "storedData": "Die gespeicherten Daten werden gelöscht."
+      "layers": "Folgende Layer werden ebenfalls gelöscht:",
+      "apis": "Folgende APIs werden ebenfalls gelöscht:",
+      "storedData": "Die gespeicherten Daten werden ebenfalls gelöscht."
     }
   },
   "languages": {

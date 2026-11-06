@@ -31,11 +31,24 @@ import {
 import { RemovalConfirmModal } from '@/components/modals/removal-confirm-modal/RemovalConfirmModal'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { CONNECTOR_TYPES } from '@/const/connectors'
+import { useDataSinkRemovalState } from '@/hooks/use-data-sink-removal-state'
 import { useDatasetPermissions } from '@/hooks/use-dataset-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { useRemovalConfirmation } from '@/hooks/use-removal-confirmation'
 import { isConnectorReadable } from '@/types/datasources'
-import { type DataSinkRemoval, mergeRemovals, NO_REMOVAL } from '@/utils/dataSinkRemoval'
+import {
+  type DatasetRemovalState,
+  type DataSinkRemoval,
+  deletesStoredData,
+  isCoveredBy,
+  mergeRemovals,
+  needsConfirmation,
+  NO_REMOVAL,
+  type PipelineSave,
+  type PlannedDataSink,
+  planPipelineDelete,
+  planPipelineSaves,
+} from '@/utils/dataSinkRemoval'
 import {
   isDatapoolScopeViolationError,
   isNotDraftError,
@@ -101,6 +114,44 @@ type PreparedSession = {
   pipeline: Pipeline
   createdDataSinks: CreatedDataSink[]
   createdMappings: CreatedMapping[]
+}
+
+const NEW_DATA_SINK_ID_PREFIX = 'new:'
+const UNSAVED_PIPELINE_ID_PREFIX = 'unsaved:'
+
+/**
+ * What saving the session pipelines in this order removes, by session id. A session whose storage nodes cannot be read
+ * is left out: its save fails before its pipeline update.
+ */
+const planSessionSaves = (
+  state: DatasetRemovalState,
+  sessionPipelines: { sessionId: string; pipeline: Pipeline }[],
+): Map<string, DataSinkRemoval> => {
+  const createdDataSinks: PlannedDataSink[] = []
+  const saves: PipelineSave[] = []
+  const plannedSessionIds: string[] = []
+  for (const { sessionId, pipeline } of sessionPipelines) {
+    let dataSinkPayloads
+    try {
+      dataSinkPayloads = buildDataSinkPayloads(pipeline)
+    } catch {
+      continue
+    }
+    const dataSinkIds: string[] = []
+    for (const { nodeId, entityId, payload } of dataSinkPayloads) {
+      if (entityId) {
+        dataSinkIds.push(entityId)
+        continue
+      }
+      const id = `${NEW_DATA_SINK_ID_PREFIX}${nodeId}`
+      createdDataSinks.push({ id, dataSinkType: payload.dataSinkType, provisioned: false, pipelineIds: [] })
+      dataSinkIds.push(id)
+    }
+    saves.push({ pipelineId: pipeline.id ?? `${UNSAVED_PIPELINE_ID_PREFIX}${sessionId}`, dataSinkIds })
+    plannedSessionIds.push(sessionId)
+  }
+  const removals = planPipelineSaves({ ...state, dataSinks: [...state.dataSinks, ...createdDataSinks] }, saves)
+  return new Map(plannedSessionIds.map((sessionId, index) => [sessionId, removals[index]]))
 }
 
 const withoutSelection = (pipeline: Pipeline): Pipeline => ({
@@ -194,6 +245,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     dialog: deleteRemovalDialog,
   } = useRemovalConfirmation()
   const { confirmRemoval: confirmSaveRemoval, dialog: saveRemovalDialog } = useRemovalConfirmation()
+  const removalState = useDataSinkRemovalState(datasetId)
 
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})
@@ -593,10 +645,12 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
     setIsDeleting(true)
     try {
-      const isConfirmed = await confirmDelete(NO_REMOVAL)
+      const removal = removalState ? planPipelineDelete(removalState, pipelineId) : NO_REMOVAL
+      const isConfirmed = await confirmDelete(removal)
       if (!isConfirmed) return
-      const isDeleted = await sendDeleteConfirmingRemoval(isDataLossConfirmed =>
-        deletePipelineMutation.mutateAsync({ pipelineId, isDataLossConfirmed }),
+      const isDeleted = await sendDeleteConfirmingRemoval(
+        isDataLossConfirmed => deletePipelineMutation.mutateAsync({ pipelineId, isDataLossConfirmed }),
+        deletesStoredData(removal),
       )
       if (!isDeleted) return
       sessionManager.closeSession(sessionId)
@@ -617,6 +671,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     isReadOnly,
     sessionManager,
     canDelete,
+    removalState,
     confirmDelete,
     sendDeleteConfirmingRemoval,
     deletePipelineMutation,
@@ -624,8 +679,10 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   ])
 
   // ===== Loading State =====
-  // Without the locks a provisioned node looks editable, so the editor waits for them too.
-  const isLoadingEditor = pipelinesQuery.isLoading || isLoadingSinkLocks || !hasSettledDatasourcesOnOpen
+  // Without the locks a provisioned node looks editable, and without the removal state a save could remove Layers and
+  // APIs without asking, so the editor waits for both.
+  const isLoadingEditor =
+    pipelinesQuery.isLoading || isLoadingSinkLocks || removalState === null || !hasSettledDatasourcesOnOpen
 
   // ===== Cross-session state =====
   const hasAnyDirtySession = useMemo(() => sessionManager.sessions.some(s => s.isDirty), [sessionManager.sessions])
@@ -823,6 +880,25 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         if (!isConfirmed) return false
       }
 
+      // The Pipeline updates below remove Layers and APIs without asking, so the user agrees before anything is sent.
+      const sessionPipelines = dirtySessions.map(session => ({
+        sessionId: session.id,
+        pipeline: withoutSelection(currentPipelineOf(session.pipeline)),
+      }))
+      const planSaves = (sessionIds: Set<string>) =>
+        removalState
+          ? planSessionSaves(
+              removalState,
+              sessionPipelines.filter(({ sessionId }) => sessionIds.has(sessionId)),
+            )
+          : new Map<string, DataSinkRemoval>()
+      let plannedRemovals = planSaves(new Set(dirtySessions.map(session => session.id)))
+      const agreedRemoval = mergeRemovals([...plannedRemovals.values()])
+      if (needsConfirmation(agreedRemoval)) {
+        const isConfirmed = await confirmSaveRemoval(agreedRemoval)
+        if (!isConfirmed) return false
+      }
+
       // Phase 1 saves the data sinks and mappings of every session before any pipeline update, so the backend
       // counts the new sinks when it plans a removal: a node replaced in one save keeps its API.
       const preparedSessions: PreparedSession[] = []
@@ -900,11 +976,25 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
         }
       }
 
-      // Phase 2 saves the pipelines. The backend refuses an update that removes stored data, a Layer or an API
-      // until it is confirmed, so those are asked once together and sent again.
+      // A session that failed in phase 1 neither saves nor keeps the sinks it created, so a replacement it was
+      // to provide is gone and the other saves can remove more than the user agreed to.
+      let sessionsToSave = preparedSessions
+      if (preparedSessions.length < dirtySessions.length) {
+        plannedRemovals = planSaves(new Set(preparedSessions.map(({ session }) => session.id)))
+        const replannedRemoval = mergeRemovals([...plannedRemovals.values()])
+        if (!isCoveredBy(replannedRemoval, agreedRemoval) && !(await confirmSaveRemoval(replannedRemoval))) {
+          isAborted = true
+          sessionsToSave = []
+          for (const prepared of preparedSessions) await restoreUnsavedSession(prepared)
+        }
+      }
+
+      // Phase 2 saves the pipelines. The backend still refuses an update that deletes stored data the plan above
+      // missed; those are asked once together and sent again.
       const unconfirmedSessions: { prepared: PreparedSession; removal: DataSinkRemoval }[] = []
-      for (const prepared of preparedSessions) {
-        const removal = await savePreparedPipeline(prepared, false)
+      for (const prepared of sessionsToSave) {
+        const isDataLossConfirmed = deletesStoredData(plannedRemovals.get(prepared.session.id) ?? NO_REMOVAL)
+        const removal = await savePreparedPipeline(prepared, isDataLossConfirmed)
         if (removal) unconfirmedSessions.push({ prepared, removal })
       }
 
@@ -984,6 +1074,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     datasetQuery.data,
     confirmDataLoss,
     confirmSaveRemoval,
+    removalState,
     validationContextFor,
     currentPipelineOf,
     setValidationResultFor,
