@@ -17,7 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useDataSinkRemovalState } from '@/hooks/use-data-sink-removal-state'
 import { useRemovalConfirmation } from '@/hooks/use-removal-confirmation'
 import { PipelineBasicInfo } from '@/types/datasets'
-import { deletesStoredData, NO_REMOVAL, planPipelineDelete } from '@/utils/dataSinkRemoval'
+import { deletesStoredData, planPipelineDelete } from '@/utils/dataSinkRemoval'
 import { formatDate } from '@/utils/formatDate'
 
 interface PipelineCardProps {
@@ -43,10 +43,10 @@ export const PipelineCard = ({ datasetId, pipeline, badges, canDelete }: Pipelin
   const editorUrl = `/datasets/${datasetId}/data-flow/pipeline-editor?pipeline=${pipeline.id}`
 
   const handleDelete = async () => {
+    if (!removalState) return
     setIsDeleteRunning(true)
     try {
-      // Until the Dataset is loaded the dialog asks the plain question; the backend still refuses a loss of stored data.
-      const removal = removalState ? planPipelineDelete(removalState, pipeline.id) : NO_REMOVAL
+      const removal = planPipelineDelete(removalState, pipeline.id)
       const isConfirmed = await confirmRemoval(removal)
       if (!isConfirmed) return
       const isDeleted = await sendConfirmingRemoval(
@@ -102,7 +102,7 @@ export const PipelineCard = ({ datasetId, pipeline, badges, canDelete }: Pipelin
               {canDelete && (
                 <DropdownMenuItem
                   variant="destructive"
-                  disabled={isDeleteRunning}
+                  disabled={isDeleteRunning || !removalState}
                   onClick={e => {
                     e.stopPropagation()
                     handleDelete()

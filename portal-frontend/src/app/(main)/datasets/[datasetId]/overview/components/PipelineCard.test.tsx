@@ -303,17 +303,14 @@ describe('PipelineCard', () => {
       expect(toast.error).not.toHaveBeenCalled()
     })
 
-    it('asks the plain delete question and sends it unconfirmed while the Dataset is still loading', async () => {
+    // Otherwise the backend removes Layers and APIs of an unprovisioned Data sink that the dialog did not list.
+    it('disables Delete until the Data sinks, Layers and APIs of the Dataset are loaded', async () => {
       mockRemovalState = null
       renderComponent()
-      await startDelete()
-      confirm()
+      await openMenu()
 
-      await waitFor(() => expect(toast.success).toHaveBeenCalled())
-      expect(mockDeletePipelineMutateAsync).toHaveBeenCalledWith({
-        pipelineId: 'pipeline-1',
-        isDataLossConfirmed: false,
-      })
+      expect(screen.getByTestId('pipelineCardMenuDelete-pipeline-1')).toHaveAttribute('data-disabled')
+      expect(mockDeletePipelineMutateAsync).not.toHaveBeenCalled()
     })
 
     it('shows an error toast when deletePipeline rejects', async () => {
