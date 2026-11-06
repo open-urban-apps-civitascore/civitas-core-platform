@@ -244,7 +244,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     dialog: deleteRemovalDialog,
   } = useRemovalConfirmation()
   const { confirmRemoval: confirmSaveRemoval, dialog: saveRemovalDialog } = useRemovalConfirmation()
-  const removalState = useDataSinkRemovalState(datasetId)
+  const { removalState } = useDataSinkRemovalState(datasetId)
 
   // ===== Data sink snapshot for change detection =====
   const dataSinkSnapshotsRef = useRef<Record<string, DataSinkSnapshot>>({})

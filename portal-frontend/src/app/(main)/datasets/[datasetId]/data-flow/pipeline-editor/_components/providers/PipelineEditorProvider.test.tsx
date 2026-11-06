@@ -99,7 +99,7 @@ const removalState = vi.hoisted(() => ({
 }))
 
 vi.mock('@/hooks/use-data-sink-removal-state', () => ({
-  useDataSinkRemovalState: () => removalState.current,
+  useDataSinkRemovalState: () => ({ removalState: removalState.current, isLoadingError: false }),
 }))
 
 vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({

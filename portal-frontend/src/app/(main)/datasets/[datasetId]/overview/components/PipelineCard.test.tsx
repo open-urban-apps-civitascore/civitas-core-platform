@@ -39,7 +39,7 @@ vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
 }))
 
 vi.mock('@/hooks/use-data-sink-removal-state', () => ({
-  useDataSinkRemovalState: () => mockRemovalState,
+  useDataSinkRemovalState: () => ({ removalState: mockRemovalState, isLoadingError: false }),
 }))
 
 vi.mock('sonner', () => ({

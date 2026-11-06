@@ -7,17 +7,26 @@ import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientReq
 import { useGetLayers } from '@/app/services/api/datasets/layers/clientRequests'
 import type { DatasetRemovalState, PlannedApi } from '@/types/dataSinkRemoval'
 
-/** The Data sinks, Layers and APIs of the Dataset that a removal is planned on; null until all three are loaded. */
-export const useDataSinkRemovalState = (datasetId: string): DatasetRemovalState | null => {
-  const { data: dataSinksData } = useGetDataSinks(datasetId, { isEnabled: !!datasetId })
-  const { data: layersData } = useGetLayers(datasetId)
-  const { data: datasetData } = useGetDataset({ id: datasetId, isEnabled: !!datasetId })
+export interface DataSinkRemovalStateResult {
+  /** The Data sinks, Layers and APIs of the Dataset that a removal is planned on; null until all three are loaded. */
+  removalState: DatasetRemovalState | null
+  /** Whether one of the three requests failed, so that the removal state stays null. */
+  isLoadingError: boolean
+}
+
+export const useDataSinkRemovalState = (datasetId: string): DataSinkRemovalStateResult => {
+  const dataSinksQuery = useGetDataSinks(datasetId, { isEnabled: !!datasetId })
+  const layersQuery = useGetLayers(datasetId)
+  const datasetQuery = useGetDataset({ id: datasetId, isEnabled: !!datasetId })
+  const dataSinksData = dataSinksQuery.data
+  const layersData = layersQuery.data
+  const datasetData = datasetQuery.data
 
   const dataSinks = dataSinksData?.data
   const layers = layersData?.data
   const namedApis = datasetData?.data?.namedApis
 
-  return useMemo(() => {
+  const removalState = useMemo(() => {
     if (!dataSinks || !layers || !datasetData?.data) return null
     const apis: PlannedApi[] = []
     for (const api of namedApis ?? []) {
@@ -40,4 +49,7 @@ export const useDataSinkRemovalState = (datasetId: string): DatasetRemovalState 
       apis,
     }
   }, [dataSinks, layers, namedApis, datasetData?.data])
+
+  const isLoadingError = dataSinksQuery.isLoadingError || layersQuery.isLoadingError || datasetQuery.isLoadingError
+  return { removalState, isLoadingError }
 }

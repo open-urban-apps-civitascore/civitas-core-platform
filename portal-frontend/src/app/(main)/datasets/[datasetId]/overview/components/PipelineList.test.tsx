@@ -48,6 +48,12 @@ vi.mock('@/app/services/api/datasources/clientRequests', () => ({
   useGetDatasources: vi.fn().mockReturnValue({ data: { data: [] } }),
 }))
 
+const mockRemovalStateResult = vi.hoisted(() => ({ removalState: null, isLoadingError: false }))
+
+vi.mock('@/hooks/use-data-sink-removal-state', () => ({
+  useDataSinkRemovalState: () => mockRemovalStateResult,
+}))
+
 vi.mock('sonner', () => ({
   toast: { error: vi.fn() },
 }))
@@ -71,6 +77,7 @@ const renderComponent = (props: Partial<typeof defaultProps> = {}) =>
 describe('PipelineList', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockRemovalStateResult.isLoadingError = false
     vi.mocked(useGetPipelines).mockReturnValue({ data: { data: [] } } as never)
     vi.mocked(useGetDatasources).mockReturnValue({ data: { data: [] } } as never)
   })
@@ -188,6 +195,18 @@ describe('PipelineList', () => {
         />,
       )
       expect(toast.error).toHaveBeenCalledTimes(2)
+    })
+
+    it('says why Delete is disabled when the Data sinks, Layers or Dataset failed to load', () => {
+      mockRemovalStateResult.isLoadingError = true
+      renderComponent({ pipelines: [makePipeline()] })
+      expect(toast.error).toHaveBeenCalledWith('messages.deleteUnavailable', expect.anything())
+    })
+
+    it('says nothing about Delete to a user who may not delete Pipelines', () => {
+      mockRemovalStateResult.isLoadingError = true
+      renderComponent({ pipelines: [makePipeline()], canDeletePipeline: false })
+      expect(toast.error).not.toHaveBeenCalled()
     })
   })
 })

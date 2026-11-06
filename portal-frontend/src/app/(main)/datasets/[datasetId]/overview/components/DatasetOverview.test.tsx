@@ -110,7 +110,7 @@ vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
 }))
 
 vi.mock('@/hooks/use-data-sink-removal-state', () => ({
-  useDataSinkRemovalState: () => null,
+  useDataSinkRemovalState: () => ({ removalState: null, isLoadingError: false }),
 }))
 
 vi.mock('@/contexts/unsaved-changes/UnsavedChangesContext', () => ({

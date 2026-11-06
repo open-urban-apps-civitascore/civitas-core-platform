@@ -33,7 +33,7 @@ export const PipelineCard = ({ datasetId, pipeline, badges, canDelete }: Pipelin
   const router = useRouter()
   const deletePipeline = useDeletePipeline(datasetId)
   const { confirmRemoval, sendConfirmingRemoval, dialog: removalDialog } = useRemovalConfirmation()
-  const removalState = useDataSinkRemovalState(datasetId)
+  const { removalState } = useDataSinkRemovalState(datasetId)
   const [isDeleteRunning, setIsDeleteRunning] = useState(false)
 
   const hasError = pipeline.runtimeStatus?.state === 'ERROR'

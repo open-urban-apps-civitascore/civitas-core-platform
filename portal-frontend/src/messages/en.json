@@ -352,7 +352,8 @@
             },
             "messages": {
               "deleteSuccess": "Pipeline has been successfully deleted.",
-              "deleteError": "An error occurred while deleting the pipeline. Please try again."
+              "deleteError": "An error occurred while deleting the pipeline. Please try again.",
+              "deleteUnavailable": "Not all data of this Dataset could be loaded. Pipelines can therefore not be deleted. Please try again later."
             }
           },
           "apis": {

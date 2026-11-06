@@ -13,12 +13,15 @@ import { useGetDatasources } from '@/app/services/api/datasources/clientRequests
 import { useGetPipelines } from '@/app/services/api/pipelines/clientRequests'
 import { GuardedLink } from '@/components/guarded-link/GuardedLink'
 import { Button } from '@/components/ui/button'
+import { useDataSinkRemovalState } from '@/hooks/use-data-sink-removal-state'
 import { usePermissions } from '@/hooks/use-permissions'
 import { PERMISSION_NAMES } from '@/types/currentUser'
 import { PipelineBasicInfo } from '@/types/datasets'
 import { DATASINK_TYPES } from '@/types/datasinks'
 
 import { PipelineCard } from './PipelineCard'
+
+const REMOVAL_STATE_LOAD_FAILED_TOAST_ID = 'pipeline-list-removal-state-load-failed'
 
 const getPipelineBadges = (dto: PipelineOutputDTO, datasourceConnectors: Map<string, string>): string[] => {
   const nodes = dto.styles?.nodes ?? []
@@ -58,6 +61,12 @@ export const PipelineList = ({ datasetId, pipelines, canCreatePipeline, canDelet
   const { data: pipelinesData } = useGetPipelines(datasetId)
   const { data: datasourcesData } = useGetDatasources({ isEnabled: canReadDatasources })
   const seenErrors = useRef(new Set<string>())
+  const { isLoadingError: isRemovalStateLoadingError } = useDataSinkRemovalState(datasetId)
+  const isDeleteUnavailable = canDeletePipeline && isRemovalStateLoadingError
+
+  useEffect(() => {
+    if (isDeleteUnavailable) toast.error(t('messages.deleteUnavailable'), { id: REMOVAL_STATE_LOAD_FAILED_TOAST_ID })
+  }, [isDeleteUnavailable, t])
 
   useEffect(() => {
     for (const pipeline of pipelines) {

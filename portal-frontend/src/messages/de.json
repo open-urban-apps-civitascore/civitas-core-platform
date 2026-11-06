@@ -351,7 +351,8 @@
             },
             "messages": {
               "deleteSuccess": "Pipeline wurde erfolgreich gelöscht.",
-              "deleteError": "Beim Löschen der Pipeline ist ein Fehler aufgetreten. Bitte versuche es erneut."
+              "deleteError": "Beim Löschen der Pipeline ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "deleteUnavailable": "Es konnten nicht alle Daten dieses Datensatzes geladen werden. Pipelines können daher nicht gelöscht werden. Bitte versuchen Sie es später erneut."
             }
           },
           "apis": {
