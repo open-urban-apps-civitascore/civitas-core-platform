@@ -1,7 +1,7 @@
 meta {
   name: Create Layer
   type: http
-  seq: 1
+  seq: 2
 }
 
 post {
@@ -33,7 +33,7 @@ script:post-response {
 }
 
 docs {
-  **Precondition:** `dataSetId`, `postgisDataSinkId` (from `datasinks/create-postgis-datasink.bru`), `defaultStyleId` (from `styles/create-style.bru`), and `alternativeStyleId` (from `styles/create-alternative-style.bru`) are all set.
+  **Precondition:** `dataSetId`, `postgisDataSinkId` (from `datasinks/create-postgis-datasink.bru`), the Dataset's OWS API (from `add-ows-api.bru`), `defaultStyleId` (from `styles/create-style.bru`), and `alternativeStyleId` (from `styles/create-alternative-style.bru`) are all set.
 
   **Expected Response:** 201 Created, body contains `id` and the layer's resolved fields.
 
